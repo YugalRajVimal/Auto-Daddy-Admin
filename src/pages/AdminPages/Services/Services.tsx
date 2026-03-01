@@ -1,28 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-// Service/subservice schemas
-interface SubService {
-  name: string;
-  desc?: string;
-}
-
+// Service schema (no subservices)
 interface Service {
   _id: string;
   name: string;
   desc?: string;
-  services: SubService[];
 }
-
-const defaultSubService = (): SubService => ({
-  name: "",
-  desc: "",
-});
-const defaultService = (): Omit<Service, "_id"> => ({
-  name: "",
-  desc: "",
-  services: [defaultSubService()],
-});
 
 const Services: React.FC = () => {
   const [services, setServices] = useState<Service[]>([]);
@@ -32,13 +16,13 @@ const Services: React.FC = () => {
   // Modal and form state
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
-  const [formValues, setFormValues] = useState<Omit<Service, "_id">>(defaultService());
+  const [formValues, setFormValues] = useState<Omit<Service, "_id">>({
+    name: "",
+    desc: "",
+  });
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string>("");
   const nameInputRef = useRef<HTMLInputElement>(null);
-
-  // State to handle collapsible subservices: array of open service IDs
-  const [openRows, setOpenRows] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchServices();
@@ -71,7 +55,10 @@ const Services: React.FC = () => {
   const openAddModal = () => {
     clearAlerts();
     setEditingService(null);
-    setFormValues(defaultService());
+    setFormValues({
+      name: "",
+      desc: "",
+    });
     setShowModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 150);
   };
@@ -82,23 +69,13 @@ const Services: React.FC = () => {
     setFormValues({
       name: service.name,
       desc: service.desc,
-      services: service.services.length
-        ? service.services.map(sub => ({ ...sub }))
-        : [defaultSubService()],
     });
     setShowModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 150);
   };
 
-  const removeSubService = (idx: number) => {
-    setFormValues(prev => ({
-      ...prev,
-      services: prev.services.filter((_, i) => i !== idx),
-    }));
-  };
-
   const updateFormField = (
-    field: keyof Omit<Service, "_id" | "services">,
+    field: keyof Omit<Service, "_id">,
     value: string
   ) => {
     setFormValues(prev => ({
@@ -107,39 +84,23 @@ const Services: React.FC = () => {
     }));
   };
 
-  const updateSubServiceField = (
-    idx: number,
-    field: keyof SubService,
-    value: string
-  ) => {
-    setFormValues(prev => ({
-      ...prev,
-      services: prev.services.map((s, i) =>
-        i === idx ? { ...s, [field]: value } : s
-      ),
-    }));
-  };
-
-  const addSubServiceRow = () => {
-    setFormValues(prev => ({
-      ...prev,
-      services: [...prev.services, defaultSubService()],
-    }));
-  };
-
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearAlerts();
     const baseURL = import.meta.env.VITE_API_URL;
+    const payload = {
+      name: formValues.name,
+      desc: formValues.desc,
+    };
     try {
       if (editingService) {
         await axios.put(
           `${baseURL}/api/admin/services/${editingService._id}`,
-          formValues
+          payload
         );
         setSuccessMsg("Service updated successfully.");
       } else {
-        await axios.post(`${baseURL}/api/admin/services`, formValues);
+        await axios.post(`${baseURL}/api/admin/services`, payload);
         setSuccessMsg("Service added successfully.");
       }
       setShowModal(false);
@@ -173,22 +134,8 @@ const Services: React.FC = () => {
     setDeletingId(null);
   };
 
-  // Handler to toggle subservices
-  const toggleSubservices = (serviceId: string) => {
-    setOpenRows(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(serviceId)) {
-        newSet.delete(serviceId);
-      } else {
-        newSet.add(serviceId);
-      }
-      return newSet;
-    });
-  };
-
-  // Enhanced table row hover, card styled modal, and improved form layout
   return (
-    <div className="min-h-[85vh] bg-gray-50 px-2 py-6 sm:px-8">
+    <div className="h-[85vh] overflow-y-auto bg-gray-50 px-2 py-6 sm:px-8">
       <div className="mb-6 flex items-center justify-between flex-wrap gap-x-4 gap-y-2">
         <h2 className="text-2xl font-bold text-gray-700">All Services</h2>
         <button
@@ -222,109 +169,41 @@ const Services: React.FC = () => {
                 <tr>
                   <th className="py-3 px-3 font-semibold text-left text-gray-700 border-b">Service Name</th>
                   <th className="py-3 px-3 font-semibold text-left text-gray-700 border-b">Description</th>
-                  <th className="py-3 px-3 font-semibold text-left text-gray-700 border-b">Subservices</th>
                   <th className="py-3 px-3 font-semibold text-left text-gray-700 border-b">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {services.map(service => {
-                  const isOpen = openRows.has(service._id);
-                  const hasSubs = service.services && service.services.length > 0;
-                  return (
-                    <React.Fragment key={service._id}>
-                      <tr
-                        className="transition hover:bg-blue-50 group border-b last:border-b-0"
-                      >
-                        <td className="px-3 py-3 whitespace-nowrap font-medium text-gray-900">
-                          {service.name}
-                        </td>
-                        <td className="px-3 py-3 max-w-[240px] text-gray-700">
-                          {service.desc || (
-                            <span className="italic text-gray-400">No description</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-3 max-w-[340px]">
-                          <button
-                            type="button"
-                            onClick={() => toggleSubservices(service._id)}
-                            className={`flex items-center gap-2 px-2 py-1 rounded transition
-                              border font-medium
-                              ${
-                                hasSubs
-                                  ? isOpen
-                                    ? "bg-blue-100 border-blue-200 text-blue-700"
-                                    : "hover:bg-blue-50 border-gray-200 text-blue-600"
-                                  : "border-gray-100 text-gray-300 cursor-not-allowed"
-                              }
-                            `}
-                            disabled={!hasSubs}
-                            aria-expanded={isOpen}
-                            aria-controls={`subservices-row-${service._id}`}
-                            tabIndex={0}
-                          >
-                            {hasSubs ? (
-                              <>
-                                <span>
-                                  {isOpen ? "Hide" : "Show"}
-                                </span>
-                                <svg
-                                  className={`w-3 h-3 transition-transform duration-200
-                                    ${isOpen ? "rotate-90" : ""}
-                                  `}
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 12 12"
-                                >
-                                  <path d="M5 2v8m-3-3 3 3 3-3" strokeWidth="2" strokeLinecap="round" />
-                                </svg>
-                              </>
-                            ) : (
-                              <span className="italic">No subservices</span>
-                            )}
-                          </button>
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap flex gap-2 items-center">
-                          <button
-                            onClick={() => openEditModal(service)}
-                            className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-3 py-1 rounded transition group-hover:scale-105 shadow-sm"
-                            aria-label={`Edit ${service.name}`}
-                          >
-                            <svg viewBox="0 0 20 20" className="w-4 h-4 mr-1 inline-block" fill="none"><path d="M15.232 5.232l-.464-.464a2 2 0 0 0-2.828 0l-6.036 6.036a1 1 0 0 0-.263.493l-.732 2.928a.5.5 0 0 0 .605.605l2.929-.732a1 1 0 0 0 .492-.263l6.036-6.036a2 2 0 0 0 0-2.828zM17.414 2.586a4 4 0 0 0-5.656 0l-6.036 6.036a3 3 0 0 0-.79 1.477l-.732 2.929a2 2 0 0 0 2.41 2.41l2.928-.732a3 3 0 0 0 1.477-.79l6.036-6.036a4 4 0 0 0 0-5.656z" fill="currentColor"/></svg>
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(service._id)}
-                            className={`bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition group-hover:scale-105 shadow-sm disabled:opacity-60`}
-                            disabled={!!deletingId}
-                            aria-label={`Delete ${service.name}`}
-                          >
-                            <svg viewBox="0 0 20 20" className="w-4 h-4 mr-1 inline-block" fill="none"><path d="M6.5 4a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7H3a1 1 0 1 1 0-2h4V4zm2 0v1h3V4h-3zm-3 3h9v10H5V7zm3 2a1 1 0 0 1 2 0v5a1 1 0 1 1-2 0V9z" fill="currentColor"/></svg>
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                      {isOpen && hasSubs && (
-                        <tr id={`subservices-row-${service._id}`} className="bg-blue-50">
-                          <td colSpan={4} className="py-1.5 px-4">
-                            <div>
-                              <div className="font-semibold text-gray-700 mb-1">Subservices:</div>
-                              <ul className="ml-2 md:ml-8 pl-2 md:pl-6 border-l-2 border-blue-300 text-gray-900 text-[15px] space-y-0.5">
-                                {service.services.map((sub, subIdx) => (
-                                  <li key={subIdx} className="flex flex-col sm:flex-row gap-x-2">
-                                    <span className="font-medium">{sub.name}</span>
-                                    {sub.desc && (
-                                      <span className="text-gray-500 sm:ml-2">– {sub.desc}</span>
-                                    )}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          </td>
-                        </tr>
+                {services.map(service => (
+                  <tr key={service._id} className="transition hover:bg-blue-50 group border-b last:border-b-0">
+                    <td className="px-3 py-3 whitespace-nowrap font-medium text-gray-900">
+                      {service.name}
+                    </td>
+                    <td className="px-3 py-3 max-w-[240px] text-gray-700">
+                      {service.desc || (
+                        <span className="italic text-gray-400">No description</span>
                       )}
-                    </React.Fragment>
-                  );
-                })}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap flex gap-2 items-center">
+                      <button
+                        onClick={() => openEditModal(service)}
+                        className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-3 py-1 rounded transition group-hover:scale-105 shadow-sm"
+                        aria-label={`Edit ${service.name}`}
+                      >
+                        <svg viewBox="0 0 20 20" className="w-4 h-4 mr-1 inline-block" fill="none"><path d="M15.232 5.232l-.464-.464a2 2 0 0 0-2.828 0l-6.036 6.036a1 1 0 0 0-.263.493l-.732 2.928a.5.5 0 0 0 .605.605l2.929-.732a1 1 0 0 0 .492-.263l6.036-6.036a2 2 0 0 0 0-2.828zM17.414 2.586a4 4 0 0 0-5.656 0l-6.036 6.036a3 3 0 0 0-.79 1.477l-.732 2.929a2 2 0 0 0 2.41 2.41l2.928-.732a3 3 0 0 0 1.477-.79l6.036-6.036a4 4 0 0 0 0-5.656z" fill="currentColor"/></svg>
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(service._id)}
+                        className={`bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition group-hover:scale-105 shadow-sm disabled:opacity-60`}
+                        disabled={!!deletingId}
+                        aria-label={`Delete ${service.name}`}
+                      >
+                        <svg viewBox="0 0 20 20" className="w-4 h-4 mr-1 inline-block" fill="none"><path d="M6.5 4a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7H3a1 1 0 1 1 0-2h4V4zm2 0v1h3V4h-3zm-3 3h9v10H5V7zm3 2a1 1 0 0 1 2 0v5a1 1 0 1 1-2 0V9z" fill="currentColor"/></svg>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -381,68 +260,6 @@ const Services: React.FC = () => {
                   className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
                   placeholder="Enter service description"
                 />
-              </div>
-              <div className="mb-4">
-                <label className="block mb-2 font-semibold text-gray-700">Subservices</label>
-                <div className="rounded border bg-gray-50">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr>
-                        <th className="px-2 py-2 font-medium text-gray-700 text-left">Name</th>
-                        <th className="px-2 py-2 font-medium text-gray-700 text-left">Description</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {formValues.services.map((sub, idx) => (
-                        <tr key={idx}>
-                          <td className="py-2 px-2">
-                            <input
-                              type="text"
-                              value={sub.name}
-                              required
-                              autoComplete="off"
-                              onChange={e => updateSubServiceField(idx, "name", e.target.value)}
-                              placeholder="Subservice name"
-                              className="w-full px-2 py-1 border rounded focus:border-blue-400 focus:ring-1 focus:ring-blue-200 placeholder:text-gray-400"
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="text"
-                              value={sub.desc || ""}
-                              autoComplete="off"
-                              onChange={e => updateSubServiceField(idx, "desc", e.target.value)}
-                              placeholder="Subservice desc (optional)"
-                              className="w-full px-2 py-1 border rounded focus:border-blue-400 focus:ring-1 focus:ring-blue-200 placeholder:text-gray-400"
-                            />
-                          </td>
-                          <td className="py-2 px-1 text-center">
-                            {formValues.services.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeSubService(idx)}
-                                title="Remove subservice"
-                                className="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white border border-red-200 font-semibold rounded-full w-7 h-7 flex items-center justify-center transition"
-                              >
-                                <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none">
-                                  <path d="M6 6l8 8M6 14L14 6" stroke="currentColor" strokeWidth={2} strokeLinecap="round"/>
-                                </svg>
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <button
-                  type="button"
-                  onClick={addSubServiceRow}
-                  className="mt-2 bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded font-semibold shadow transition-colors"
-                >
-                  + Add Subservice
-                </button>
               </div>
               <div className="mt-7 flex gap-4 items-center justify-end">
                 <button

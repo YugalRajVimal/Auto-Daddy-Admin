@@ -41,6 +41,7 @@ import PackagesPage from "./pages/AdminPages/Packages/Packages";
 import CarOwners from "./pages/AdminPages/Users/CarOwners";
 import AutoShopOwners from "./pages/AdminPages/Users/AutoShopOwners";
 import Services from "./pages/AdminPages/Services/Services";
+import AutoShopOwnerOnboarding from "./pages/AutoShopOwnerOnboarding";
 
 
 export default function App() {
@@ -102,6 +103,10 @@ export default function App() {
 
 
           <Route path="/admin/signin" element={<AdminSignInPage />} />
+
+          <Route path="/auto-shop-owner/onboarding" element={<AutoShopOwnerOnboarding />} />
+
+
 
 
          {/*  <Route element={<SupervisorAppLayout />}>
