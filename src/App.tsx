@@ -42,6 +42,8 @@ import CarOwners from "./pages/AdminPages/Users/CarOwners";
 import AutoShopOwners from "./pages/AdminPages/Users/AutoShopOwners";
 import Services from "./pages/AdminPages/Services/Services";
 import AutoShopOwnerOnboarding from "./pages/AutoShopOwnerOnboarding";
+import VehicleType from "./pages/AdminPages/VehicleType/VehicleType";
+import WebsiteTemplates from "./pages/AdminPages/WebsiteTemplates/WebsiteTemplates";
 
 
 export default function App() {
@@ -99,6 +101,11 @@ export default function App() {
             <Route path="/admin/profile" element={<AdminProfile />} />
             <Route path="/admin/finances" element={<Payments />} />
             <Route path="/admin/logout" element={<LogOutAdmin />} />
+
+            <Route path="/admin/vehicle-types" element={<VehicleType />} />
+            <Route path="/admin/website-templates" element={<WebsiteTemplates />} />
+     
+     
           </Route>
 
 

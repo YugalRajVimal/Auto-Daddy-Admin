@@ -40,6 +40,16 @@ const navItems: NavItem[] = [
     name: "Services",
     path: "/admin/services",
   },
+  {
+    icon: <GridIcon />,
+    name: "Vehicle Types",
+    path: "/admin/vehicle-types",
+  },
+  {
+    icon: <GridIcon />,
+    name: "Website Templates",
+    path: "/admin/website-templates",
+  },
 
   // {
   //   icon: <FileIcon />,
