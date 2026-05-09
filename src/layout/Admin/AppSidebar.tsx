@@ -50,6 +50,16 @@ const navItems: NavItem[] = [
     name: "Website Templates",
     path: "/admin/website-templates",
   },
+  {
+    icon: <GridIcon />,
+    name: "Dashboard Data",
+    path: "/admin/dashboard-data",
+  },
+  {
+    icon: <GridIcon />,
+    name: "Car Companies",
+    path: "/admin/car-companies",
+  },
 
   // {
   //   icon: <FileIcon />,

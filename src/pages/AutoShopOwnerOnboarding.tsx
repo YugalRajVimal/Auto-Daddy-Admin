@@ -8,8 +8,95 @@ import axios from "axios";
  *   /api/auth/verify-otp                                 [verify OTP]
  *
  * Server source: Auth Controller (signUpLogInAndCompleteProfileAutoShopOwner, verifyAccount)
+ *
+ * Allowed country codes:
+ *   Canada — +1
+ *   United States — +1
+ *   Australia — +61
+ *   United Kingdom — +44
+ *   India — +91
  */
+
+const ALLOWED_COUNTRY_CODES = [
+  { label: "Canada (+1)", value: "+1" },
+  { label: "United States (+1)", value: "+1" },
+  { label: "Australia (+61)", value: "+61" },
+  { label: "United Kingdom (+44)", value: "+44" },
+  { label: "India (+91)", value: "+91" },
+];
+
 const API_BASE = import.meta.env.VITE_API_URL || "";
+
+// All dark text colors
+const darkText = "text-gray-900";
+
+
+// Adapt InputField to all dark
+const InputField = ({
+  label,
+  name,
+  type = "text",
+  value,
+  onChange,
+  required = false,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+  name: string;
+  value: string;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+  required?: boolean;
+}) => (
+  <div className="flex flex-col gap-1">
+    <label className={`text-sm font-semibold ${darkText}`}>{label}</label>
+    <input
+      name={name}
+      type={type}
+      value={value}
+      onChange={onChange}
+      required={required}
+      className={`px-4 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-700 transition ${darkText} bg-white`}
+      {...props}
+    />
+  </div>
+);
+
+const Stepper = ({ step }: { step: number }) => (
+  <div className="flex justify-center mb-8 gap-4">
+    {["Information", "OTP", "Done"].map((label, idx) => (
+      <div key={label} className="flex flex-col items-center">
+        <div
+          className={`w-8 h-8 flex items-center justify-evenly rounded-full border-2 ${
+            step === idx + 1
+              ? "bg-green-800 border-green-600 text-white"
+              : step > idx + 1
+              ? "bg-gray-200 border-gray-400 text-gray-700"
+              : "bg-gray-200 border-gray-400 text-gray-700"
+          }`}
+        >
+          {step > idx + 1 ? (
+            <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
+              <path d="M5 10.5l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          ) : (
+            idx + 1
+          )}
+        </div>
+        <span
+          className={`mt-1 text-xs font-medium ${
+            step === idx + 1
+              ? "text-primary-900"
+              : step > idx + 1
+              ? "text-green-900"
+              : "text-gray-600"
+          }`}
+        >
+          {label}
+        </span>
+      </div>
+    ))}
+  </div>
+);
 
 const AutoShopOwnerOnboarding: React.FC = () => {
   const [step, setStep] = useState<"form" | "otp" | "verified" | "error">("form");
@@ -23,9 +110,12 @@ const AutoShopOwnerOnboarding: React.FC = () => {
   });
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
 
   // Handle input change for form fields
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
@@ -33,18 +123,30 @@ const AutoShopOwnerOnboarding: React.FC = () => {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
+
+    if (!ALLOWED_COUNTRY_CODES.some(cc => cc.value === form.countryCode)) {
+      setError(`Selected country code is not allowed.`);
+      setStep("error");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await axios.post(
         `${API_BASE}/api/auth/autoshopowner/sign-up-log-in-complete-profile`,
         { ...form }
       );
+      setLoading(false);
       if (res.data && res.data.userId) {
         setStep("otp");
+        setOtpSent(true);
       } else {
         setError(res.data.message || "Unknown error. Please try again.");
         setStep("error");
       }
     } catch (err: any) {
+      setLoading(false);
       setError(
         err?.response?.data?.message ||
           "Error during onboarding. Please try again."
@@ -57,12 +159,14 @@ const AutoShopOwnerOnboarding: React.FC = () => {
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
     try {
       const res = await axios.post(`${API_BASE}/api/auth/verify-otp`, {
         countryCode: form.countryCode,
         phone: form.phone,
         otp,
       });
+      setLoading(false);
       if (res.data && res.data.token) {
         setStep("verified");
       } else {
@@ -70,6 +174,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
         setStep("error");
       }
     } catch (err: any) {
+      setLoading(false);
       setError(
         err?.response?.data?.message ||
           "OTP verification failed. Please try again."
@@ -85,169 +190,309 @@ const AutoShopOwnerOnboarding: React.FC = () => {
     setError("");
   };
 
+  // Resend OTP
+  const handleResendOtp = async () => {
+    setResendLoading(true);
+    setError("");
+    try {
+      await axios.post(
+        `${API_BASE}/api/auth/autoshopowner/sign-up-log-in-complete-profile`,
+        { ...form }
+      );
+      setOtpSent(true);
+      setResendLoading(false);
+    } catch (err: any) {
+      setResendLoading(false);
+      setError("Failed to resend OTP. Please try again.");
+    }
+  };
+
+  // For Stepper: step = 1 (form), 2 (otp), 3 (verified)
+  const currentStepNum = step === "form" ? 1 : step === "otp" ? 2 : 3;
+
   return (
-    <div className="max-w-md mx-auto mt-14 p-8 bg-white rounded-2xl shadow-lg border border-gray-200">
-      {/* FORM STEP */}
-      {step === "form" && (
-        <form
-          onSubmit={handleFormSubmit}
-          autoComplete="off"
-          className="space-y-6"
-        >
-          <h2 className="text-2xl font-semibold mb-4 text-center text-primary-700">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-gray-100">
+      <div className="max-w-lg w-full mx-auto bg-white rounded-3xl shadow-2xl border border-gray-200 p-0 overflow-hidden">
+        {/* Header with logo and title */}
+        <div className="bg-primary-700 py-7 px-8 flex flex-col items-center">
+          {/* Logo or Icon */}
+          <svg
+            className="w-12 h-12 mb-3 text-white"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            viewBox="0 0 40 40"
+          >
+            <rect x="5" y="14" width="30" height="14" rx="4" fill="white" stroke="none"/>
+            <rect x="5" y="14" width="30" height="14" rx="4" stroke="currentColor" strokeWidth="2"/>
+            <rect x="11" y="8" width="18" height="8" rx="2" fill="white" stroke="none"/>
+            <rect x="11" y="8" width="18" height="8" rx="2" stroke="currentColor" strokeWidth="2"/>
+            <circle cx="13.5" cy="30" r="3" fill="white" stroke="currentColor" strokeWidth="2" />
+            <circle cx="26.5" cy="30" r="3" fill="white" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          <h1 className="text-3xl font-bold text-gray-900 text-center">
             AutoShop Owner Onboarding
-          </h2>
-          <div className="flex gap-3">
-            <div className="flex flex-col w-1/3">
-              <label className="text-sm mb-1 text-gray-600">Country Code</label>
-              <input
-                name="countryCode"
-                value={form.countryCode}
+          </h1>
+          <p className="mt-2 text-gray-800 text-sm text-center">
+            Create your garage account and verify your phone number
+          </p>
+        </div>
+        <div className="px-8 pb-10 pt-7">
+
+          <Stepper step={currentStepNum} />
+
+          {/* FORM STEP */}
+          {step === "form" && (
+            <form
+              onSubmit={handleFormSubmit}
+              autoComplete="off"
+              className="space-y-6"
+            >
+              {/* Country code + Phone in one group */}
+              <div className="flex gap-4">
+                <div className="w-1/3">
+                  <label className={`text-sm font-semibold ${darkText} mb-1 block`}>
+                    Country
+                  </label>
+                  <select
+                    name="countryCode"
+                    value={form.countryCode}
+                    onChange={handleChange}
+                    required
+                    className={`w-full px-4 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-700 transition bg-white ${darkText}`}
+                    autoComplete="tel-country-code"
+                  >
+                    {ALLOWED_COUNTRY_CODES.map((cc) => (
+                      <option key={cc.value + cc.label} value={cc.value}>
+                        {cc.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-grow">
+                  <InputField
+                    label="Phone"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                    type="tel"
+                    required
+                    pattern="\d{5,15}"
+                    placeholder="Phone number"
+                    autoComplete="tel-local"
+                  />
+                </div>
+              </div>
+              <InputField
+                label="Full Name"
+                name="name"
+                value={form.name}
                 onChange={handleChange}
                 required
-                pattern="^\+?\d{1,4}$"
-                className="px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary-400"
-                autoComplete="tel-country-code"
+                autoComplete="name"
+                placeholder="Full Name"
               />
-            </div>
-            <div className="flex flex-col flex-1">
-              <label className="text-sm mb-1 text-gray-600">Phone</label>
-              <input
-                name="phone"
-                value={form.phone}
+              <InputField
+                label="Email"
+                name="email"
+                type="email"
+                value={form.email}
                 onChange={handleChange}
-                type="tel"
                 required
-                pattern="\d{5,15}"
-                placeholder="Phone"
-                autoComplete="tel-local"
-                className="px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary-400"
+                autoComplete="email"
+                placeholder="your@email.com"
               />
+              <div className="flex gap-4">
+                <div className="w-1/2">
+                  <InputField
+                    label="Pincode"
+                    name="pincode"
+                    value={form.pincode}
+                    onChange={handleChange}
+                    required
+                    placeholder="Postal Code"
+                  />
+                </div>
+                <div className="flex-1">
+                  <InputField
+                    label="Address"
+                    name="address"
+                    value={form.address}
+                    onChange={handleChange}
+                    required
+                    placeholder="Shop Address"
+                  />
+                </div>
+              </div>
+              {error && (
+                <div className="bg-red-100 text-red-900 border border-red-300 rounded px-3 py-2 text-sm text-center">
+                  {error}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full mt-3 py-3 px-4 bg-blue-400 hover:bg-blue-200 text-black text-base font-bold rounded-xl shadow transition-all flex items-center justify-center ${
+                  loading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Submitting...
+                  </span>
+                ) : (
+                  "Submit"
+                )}
+              </button>
+              <div className="mt-2 text-xs text-center text-gray-800">
+                Allowed country codes:{" "}
+                <span className="inline-block text-gray-900 font-mono">
+                  {ALLOWED_COUNTRY_CODES.map((cc) => cc.label).join(", ")}
+                </span>
+              </div>
+            </form>
+          )}
+
+          {/* OTP STEP */}
+          {step === "otp" && (
+            <form
+              onSubmit={handleOtpSubmit}
+              autoComplete="off"
+              className="space-y-7 flex flex-col items-center"
+            >
+              <div className="flex flex-col items-center mb-2">
+                <svg className="w-12 h-12 mb-2 text-primary-900" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 40 40">
+                  <circle cx="20" cy="20" r="19" stroke="currentColor" strokeWidth="3" fill="none" />
+                  <path
+                    d="M28 16l-9 9-4-4"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Verify Your Account</h2>
+                <p className="text-gray-900 text-sm mb-2">
+                  We sent a 6-digit OTP to <span className="font-semibold">{form.countryCode} {form.phone}</span>
+                </p>
+                {otpSent && (
+                  <span className="text-xs text-green-900 mb-1">OTP sent!</span>
+                )}
+              </div>
+              <div className="flex flex-col items-center w-full">
+                <label className={`text-sm mb-2 ${darkText} font-medium`}>Enter OTP</label>
+                <input
+                  name="otp"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  required
+                  pattern="\d{6}"
+                  maxLength={6}
+                  minLength={6}
+                  inputMode="numeric"
+                  placeholder="______"
+                  className={`w-48 px-6 py-3 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-800 text-center tracking-widest font-mono text-2xl bg-white ${darkText}`}
+                  autoComplete="one-time-code"
+                  style={{ letterSpacing: "0.7em" }}
+                />
+              </div>
+              {error && (
+                <div className="bg-red-100 text-red-900 border border-red-300 rounded px-3 py-2 text-sm text-center w-full">
+                  {error}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full py-3 px-4 bg-primary-900 hover:bg-primary-950 text-white text-base font-bold rounded-xl shadow transition-all flex items-center justify-center ${
+                  loading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Verifying...
+                  </span>
+                ) : (
+                  "Verify OTP"
+                )}
+              </button>
+              <div className="mt-2 text-xs text-center text-gray-900 w-full">
+                Didn't get the code?
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={resendLoading}
+                  className={`ml-2 inline text-primary-900 font-semibold hover:underline transition ${resendLoading ? "opacity-60 cursor-not-allowed" : ""}`}
+                >
+                  {resendLoading ? "Resending..." : "Resend"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* VERIFIED STEP */}
+          {step === "verified" && (
+            <div className="text-center px-4 py-10 flex flex-col items-center">
+              <div className="flex items-center justify-center mb-4">
+                <svg className="w-20 h-20 text-green-900" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 48 48">
+                  <circle cx="24" cy="24" r="22" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path
+                    d="M14 26l7 7 13-13"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold mb-1 text-green-900">
+                Verification Complete!
+              </h2>
+              <p className="text-lg text-gray-900 mb-2">
+                Your AutoShop Owner account has been verified. Welcome aboard!
+              </p>
+              <div className="mt-4 bg-green-100 border border-green-200 rounded-lg px-4 py-3 mx-auto text-green-900 text-sm max-w-xs">
+                You will now be redirected to your dashboard, or you can close this page.
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm mb-1 text-gray-600">Name</label>
-            <input
-              name="name"
-              value={form.name}
-              onChange={handleChange}
-              required
-              autoComplete="name"
-              className="px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary-400"
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm mb-1 text-gray-600">Email</label>
-            <input
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={handleChange}
-              required
-              autoComplete="email"
-              className="px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary-400"
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm mb-1 text-gray-600">Pincode</label>
-            <input
-              name="pincode"
-              value={form.pincode}
-              onChange={handleChange}
-              required
-              className="px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary-400"
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm mb-1 text-gray-600">Address</label>
-            <input
-              name="address"
-              value={form.address}
-              onChange={handleChange}
-              required
-              className="px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary-400"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full mt-2 py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white text-base font-bold rounded-lg shadow transition-all"
-          >
-            Submit
-          </button>
-        </form>
-      )}
+          )}
 
-      {/* OTP STEP */}
-      {step === "otp" && (
-        <form
-          onSubmit={handleOtpSubmit}
-          autoComplete="off"
-          className="space-y-6"
-        >
-          <h2 className="text-2xl font-semibold mb-4 text-center text-primary-700">
-            Verify Your Account
-          </h2>
-          <div className="flex flex-col items-center">
-            <label className="text-sm mb-1 text-gray-600">OTP</label>
-            <input
-              name="otp"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              required
-              pattern="\d{6}"
-              maxLength={6}
-              placeholder="Enter received OTP"
-              className="w-48 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary-400 text-center tracking-widest font-mono text-lg"
-              autoComplete="one-time-code"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white text-base font-bold rounded-lg shadow transition-all"
-          >
-            Verify OTP
-          </button>
-        </form>
-      )}
-
-      {/* VERIFIED STEP */}
-      {step === "verified" && (
-        <div className="text-center px-4 py-8">
-          <div className="flex flex-col items-center justify-center">
-            <svg className="w-16 h-16 text-green-500 mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 48 48">
-              <circle cx="24" cy="24" r="22" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path
-                d="M14 26l7 7 13-13"
-                stroke="currentColor"
-                strokeWidth="4"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <h2 className="text-2xl font-semibold mb-2 text-green-700">
-              Verification Complete
-            </h2>
-            <p className="text-lg text-gray-700">
-              Your AutoShop Owner account has been verified. Welcome!
-            </p>
-          </div>
+          {/* ERROR STEP */}
+          {step === "error" && (
+            <div className="text-center px-4 py-10 flex flex-col items-center">
+              <svg className="w-16 h-16 text-red-800 mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="22" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path
+                  d="M18 18L30 30M30 18L18 30"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <h3 className="text-2xl font-bold text-red-800 mb-2">Something went wrong</h3>
+              <p className={`mb-4 ${darkText}`}>{error}</p>
+              <button
+                className="px-7 py-3 rounded-xl shadow bg-red-800 hover:bg-red-900 text-white font-semibold text-base transition"
+                onClick={handleRetry}
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
-      )}
-
-      {/* ERROR STEP */}
-      {step === "error" && (
-        <div className="text-center px-4 py-8">
-          <h3 className="text-xl font-bold text-red-600 mb-2">Error</h3>
-          <p className="mb-4 text-gray-700">{error}</p>
-          <button
-            className="px-4 py-2 rounded-lg shadow bg-red-500 hover:bg-red-600 text-white font-semibold"
-            onClick={handleRetry}
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      </div>
     </div>
   );
 };

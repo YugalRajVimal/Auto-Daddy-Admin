@@ -44,6 +44,8 @@ import Services from "./pages/AdminPages/Services/Services";
 import AutoShopOwnerOnboarding from "./pages/AutoShopOwnerOnboarding";
 import VehicleType from "./pages/AdminPages/VehicleType/VehicleType";
 import WebsiteTemplates from "./pages/AdminPages/WebsiteTemplates/WebsiteTemplates";
+import DashboardData from "./pages/AdminPages/Dashboarddata/DashboardData";
+import CarCompany from "./pages/AdminPages/CarCompany/CarCompany";
 
 
 export default function App() {
@@ -104,6 +106,9 @@ export default function App() {
 
             <Route path="/admin/vehicle-types" element={<VehicleType />} />
             <Route path="/admin/website-templates" element={<WebsiteTemplates />} />
+            <Route path="/admin/dashboard-data" element={<DashboardData />} />
+            <Route path="/admin/car-companies" element={<CarCompany />} />
+     
      
      
           </Route>
@@ -112,6 +117,9 @@ export default function App() {
           <Route path="/admin/signin" element={<AdminSignInPage />} />
 
           <Route path="/auto-shop-owner/onboarding" element={<AutoShopOwnerOnboarding />} />
+
+         
+    
 
 
 
