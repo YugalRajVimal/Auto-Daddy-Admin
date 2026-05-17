@@ -25,6 +25,8 @@ interface AdminDashboardAPI {
   dealsCount: number;
   servicesCount: number;
   subServicesCount: number;
+  thoughtOfTheDay?: string;
+  thoughtOfTheDayLike?: number;
 }
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -143,6 +145,7 @@ export default function AdminDashboardHome() {
       .then((json) => {
         if (json.success && json.data) {
           setDashboardData(json.data);
+          console.log(json.data);
           // Don't set date filters here, will set after data changes
         } else {
           throw new Error(json.message || "Invalid dashboard response");
@@ -188,6 +191,31 @@ export default function AdminDashboardHome() {
           </div>
         ) : (
           <>
+            {/* Thought of the Day Section */}
+            {dashboardData?.thoughtOfTheDay && (
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border border-blue-200 shadow p-5 mb-8 flex items-center justify-between">
+                <div>
+                  <div className="font-semibold text-base text-blue-800 mb-1">Thought of the Day</div>
+                  <div className="italic text-gray-800 text-lg">{dashboardData.thoughtOfTheDay}</div>
+                </div>
+                <div className="flex items-center ml-6">
+                  <button
+                    disabled
+                    className="flex items-center px-3 py-1 bg-white border border-gray-200 text-blue-600 rounded-full shadow text-sm font-medium cursor-default"
+                    style={{ pointerEvents: "none" }}
+                  >
+                    <svg
+                      className="w-5 h-5 mr-1 fill-blue-500"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M3.172 10.172a4 4 0 015.656-5.656L10 5.687l1.172-1.171a4 4 0 115.656 5.656l-1.171 1.172L10 18l-5.657-7.828z"/>
+                    </svg>
+                    {dashboardData.thoughtOfTheDayLike ?? 0}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Stat Cards: summary */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
               {statCardConfig.map((card, i) => (
