@@ -17,6 +17,8 @@ import Calendar from "./pages/SuperAdminPages/Calendar";
 import BasicTables from "./pages/SuperAdminPages/Tables/BasicTables";
 import FormElements from "./pages/SuperAdminPages/Forms/FormElements";
 import Blank from "./pages/SuperAdminPages/Blank";
+
+
 import { ScrollToTop } from "./components/common/ScrollToTop";
 // import Home from "./pages/SuperAdminPages/Dashboard/Home";
 // import SubAdminSignIn from "./pages/SuperAdminPages/AuthPages/SubAdmin/SignIn";
@@ -40,12 +42,16 @@ import Payments from "./pages/AdminPages/Payments/Payments";
 import PackagesPage from "./pages/AdminPages/Packages/Packages";
 import CarOwners from "./pages/AdminPages/Users/CarOwners";
 import AutoShopOwners from "./pages/AdminPages/Users/AutoShopOwners";
+
+
 import Services from "./pages/AdminPages/Services/Services";
 import AutoShopOwnerOnboarding from "./pages/AutoShopOwnerOnboarding";
-import VehicleType from "./pages/AdminPages/VehicleType/VehicleType";
 import WebsiteTemplates from "./pages/AdminPages/WebsiteTemplates/WebsiteTemplates";
 import DashboardData from "./pages/AdminPages/Dashboarddata/DashboardData";
 import CarCompany from "./pages/AdminPages/CarCompany/CarCompany";
+import Cities from "./pages/AdminPages/Cities/Cities";
+import Ads from "./pages/AdminPages/Ads/Ads";
+import RunningDeals from "./pages/AdminPages/Deals/RunningDeals";
 
 
 export default function App() {
@@ -97,6 +103,12 @@ export default function App() {
             <Route path="/admin/car-owners" element={<CarOwners/>} />
             <Route path="/admin/auto-shop-owners" element={<AutoShopOwners/>} />
             <Route path="/admin/services" element={<Services />} />
+            <Route path="/admin/cities" element={<Cities />} />
+            <Route path="/admin/ads" element={<Ads />} />
+            <Route path="/admin/running-deals" element={<RunningDeals />} />
+
+
+
             <Route path="/admin/manage-packages" element={<PackagesPage/>} />
             <Route path="/admin/manage-task" element={<Tasks />} />
             <Route path="/admin/manage-rewards" element={<div>Manage Rewards (HTML placeholder)</div>} />
@@ -104,7 +116,7 @@ export default function App() {
             <Route path="/admin/finances" element={<Payments />} />
             <Route path="/admin/logout" element={<LogOutAdmin />} />
 
-            <Route path="/admin/vehicle-types" element={<VehicleType />} />
+            {/* <Route path="/admin/vehicle-types" element={<VehicleType />} /> */}
             <Route path="/admin/website-templates" element={<WebsiteTemplates />} />
             <Route path="/admin/dashboard-data" element={<DashboardData />} />
             <Route path="/admin/car-companies" element={<CarCompany />} />

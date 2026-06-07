@@ -40,11 +40,11 @@ const navItems: NavItem[] = [
     name: "Services",
     path: "/admin/services",
   },
-  {
-    icon: <GridIcon />,
-    name: "Vehicle Types",
-    path: "/admin/vehicle-types",
-  },
+  // {
+  //   icon: <GridIcon />,
+  //   name: "Vehicle Types",
+  //   path: "/admin/vehicle-types",
+  // },
   {
     icon: <GridIcon />,
     name: "Website Templates",
@@ -59,6 +59,21 @@ const navItems: NavItem[] = [
     icon: <GridIcon />,
     name: "Car Companies",
     path: "/admin/car-companies",
+  },
+  {
+    icon: <GridIcon />,
+    name: "Cities",
+    path: "/admin/cities",
+  },
+  {
+    icon: <GridIcon />,
+    name: "Ads",
+    path: "/admin/ads",
+  },
+  {
+    icon: <GridIcon />,
+    name: "Running Deals",
+    path: "/admin/running-deals",
   },
 
   // {

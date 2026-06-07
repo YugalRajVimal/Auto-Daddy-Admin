@@ -1,83 +1,66 @@
 import React, { useEffect, useState, useRef } from "react";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 
+// Types
 interface SectionData {
-  heading?: string;
-  desc?: string;
+  heading: string;
+  desc: string;
 }
 interface DashboardDataType {
   thoughtOfTheDay?: string;
-  aboutUs?: SectionData;
-  privacyPolicy?: SectionData;
-  FAQs?: SectionData;
-  documents?: SectionData;
-  disclaimer?: SectionData;
+  sections?: SectionData[];
 }
 
 // API Root
-const API_BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api/admin`
-  : "/api/admin";
+const API_BASE: string =
+  typeof import.meta !== "undefined" && import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api/admin`
+    : "/api/admin";
 
-const SECTION_DEFS: {
-  key: keyof DashboardDataType,
-  label: string,
-  fields?: { subkey: keyof SectionData, label: string, type?: "text"|"textarea" }[]
-  type?: "text"|"textarea"
-}[] = [
-  { key: "thoughtOfTheDay", label: "Thought of the Day", type: "textarea" },
-  { key: "aboutUs", label: "About Us", fields: [
-    { subkey: "heading", label: "Heading" }, { subkey: "desc", label: "Description", type: "textarea" }
-  ]},
-  { key: "privacyPolicy", label: "Privacy Policy", fields: [
-    { subkey: "heading", label: "Heading" }, { subkey: "desc", label: "Description", type: "textarea" }
-  ]},
-  { key: "FAQs", label: "FAQs", fields: [
-    { subkey: "heading", label: "Heading" }, { subkey: "desc", label: "Description", type: "textarea" }
-  ]},
-  { key: "documents", label: "Documents", fields: [
-    { subkey: "heading", label: "Heading" }, { subkey: "desc", label: "Description", type: "textarea" }
-  ]},
-  { key: "disclaimer", label: "Disclaimer", fields: [
-    { subkey: "heading", label: "Heading" }, { subkey: "desc", label: "Description", type: "textarea" }
-  ]},
-];
+type ModalSectionType = "all" | "thought" | number;
 
 const DashboardData: React.FC = () => {
-  const [dashboardData, setDashboardData] = useState<DashboardDataType | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardDataType | null>(
+    null
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
   const [successMsg, setSuccessMsg] = useState<string>("");
 
   // Modal and form state
-  const [showModal, setShowModal] = useState(false);
-  const [modalSection, setModalSection] = useState<keyof DashboardDataType | null>(null);
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [modalSection, setModalSection] = useState<ModalSectionType>("all");
   const [editData, setEditData] = useState<DashboardDataType>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const firstInputRef = useRef<HTMLInputElement>(null);
-
-  // Backend lower/upper fix
-  function apiToState(data: any): DashboardDataType {
-    return {
-      thoughtOfTheDay: data.thoughtOfTheDay ?? data.thoughtoftheday,
-      aboutUs: data.aboutUs ?? data.aboutus,
-      privacyPolicy: data.privacyPolicy ?? data.privacypolicy,
-      FAQs: data.FAQs ?? data.faqs,
-      documents: data.Documents ?? data.documents,
-      disclaimer: data.Disclaimer ?? data.disclaimer,
-    };
-  }
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [deleting, setDeleting] = useState<boolean>(false);
+  const firstInputRef =
+    useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   // Fetch dashboard data
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (): Promise<void> => {
     setLoading(true);
     setError("");
     try {
       const { data } = await axios.get(`${API_BASE}/dashboard-data`);
-      setDashboardData(apiToState(data.data));
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || "Failed to fetch dashboard data");
+      setDashboardData({
+        thoughtOfTheDay:
+          data.data?.thoughtOfTheDay ??
+          data.data?.thoughtoftheday ??
+          "",
+        sections: Array.isArray(data.data?.sections)
+          ? data.data.sections.map((s: any) => ({
+              heading: s.heading || "",
+              desc: s.desc || "",
+            }))
+          : [],
+      });
+    } catch (err) {
+      const axiosErr = err as AxiosError<any>;
+      setError(
+        axiosErr?.response?.data?.message ||
+          (axiosErr.message as string) ||
+          "Failed to fetch dashboard data"
+      );
     } finally {
       setLoading(false);
     }
@@ -87,7 +70,7 @@ const DashboardData: React.FC = () => {
     fetchDashboardData();
   }, []);
 
-  // For expansion modal reset focus
+  // For modal focus
   useEffect(() => {
     if (showModal && firstInputRef.current) {
       firstInputRef.current.focus();
@@ -100,72 +83,103 @@ const DashboardData: React.FC = () => {
   };
 
   // Modal open for edit
-  const openModal = (section: keyof DashboardDataType | "all", existing?: DashboardDataType | null) => {
+  const openModal = (
+    section: ModalSectionType,
+    existing?: DashboardDataType | null,
+
+  ) => {
     if (section === "all") {
-      setEditData(existing ? { ...(existing as DashboardDataType) } : {});
-      setModalSection(null);
-    } else {
-      setEditData(existing
-        ? { [section]: existing[section] ?? (section === "thoughtOfTheDay" ? "" : {}) }
-        : { [section]: section === "thoughtOfTheDay" ? "" : {} }
-      );
+      setEditData(existing ? { ...existing } : { sections: [], thoughtOfTheDay: "" });
+      setModalSection("all");
+    } else if (section === "thought") {
+      setEditData({
+        thoughtOfTheDay: existing?.thoughtOfTheDay ?? "",
+      });
+      setModalSection("thought");
+    } else if (typeof section === "number") {
+      setEditData({
+        sections: [
+          existing && existing.sections && existing.sections[section]
+            ? { ...existing.sections[section] }
+            : { heading: "", desc: "" },
+        ],
+      });
       setModalSection(section);
     }
     setShowModal(true);
     setTimeout(() => {
       if (firstInputRef.current) firstInputRef.current.focus();
-    }, 50);
+    }, 70);
     clearAlerts();
   };
 
   const closeModal = () => {
     setShowModal(false);
     setEditData({});
-    setModalSection(null);
+    setModalSection("all");
     clearAlerts();
   };
 
   // Save/Update dashboard data (PATCH or POST)
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
     clearAlerts();
+
     try {
-      let body: any = {};
-      if (modalSection === null) {
-        // "all" mode: send all changes from editData
-        if (typeof editData.thoughtOfTheDay !== "undefined") body.thoughtOfTheDay = editData.thoughtOfTheDay;
-        if (typeof editData.aboutUs !== "undefined") body.aboutUs = editData.aboutUs;
-        if (typeof editData.privacyPolicy !== "undefined") body.privacyPolicy = editData.privacyPolicy;
-        if (typeof editData.FAQs !== "undefined") body.FAQs = editData.FAQs;
-        if (typeof editData.documents !== "undefined") body.Documents = editData.documents;
-        if (typeof editData.disclaimer !== "undefined") body.Disclaimer = editData.disclaimer;
-      } else {
-        // single section edit
-        const sec = modalSection;
-        if (sec === "thoughtOfTheDay") {
-          body.thoughtOfTheDay = editData.thoughtOfTheDay;
-        } else if (sec === "aboutUs") {
-          body.aboutUs = editData.aboutUs;
-        } else if (sec === "privacyPolicy") {
-          body.privacyPolicy = editData.privacyPolicy;
-        } else if (sec === "FAQs") {
-          body.FAQs = editData.FAQs;
-        } else if (sec === "documents") {
-          body.Documents = editData.documents;
-        } else if (sec === "disclaimer") {
-          body.Disclaimer = editData.disclaimer;
+      let body: DashboardDataType = {};
+      if (modalSection === "all") {
+        body = {
+          thoughtOfTheDay: editData.thoughtOfTheDay ?? "",
+          sections: editData.sections ?? [],
+        };
+      } else if (modalSection === "thought") {
+        body = { thoughtOfTheDay: editData.thoughtOfTheDay ?? "" };
+      } else if (typeof modalSection === "number") {
+        // update a single section index
+        if (
+          editData.sections &&
+          editData.sections.length === 1 &&
+          dashboardData?.sections
+        ) {
+          const idx = modalSection;
+          const updatedSections = [...dashboardData.sections];
+          updatedSections[idx] = { ...editData.sections[0] };
+          body = {
+            thoughtOfTheDay: dashboardData.thoughtOfTheDay ?? "",
+            sections: updatedSections,
+          };
         }
       }
-      const method = dashboardData ? axios.patch : axios.post;
+      const method =
+        dashboardData && typeof dashboardData === "object"
+          ? axios.patch
+          : axios.post;
       const { data } = await method(`${API_BASE}/dashboard-data`, body);
-      setDashboardData(apiToState(data.data));
-      setSuccessMsg(dashboardData ? "Dashboard data updated." : "Dashboard data created.");
+      setDashboardData({
+        thoughtOfTheDay: data.data?.thoughtOfTheDay ?? "",
+        sections: Array.isArray(data.data?.sections)
+          ? data.data.sections.map((s: any) => ({
+              heading: s.heading || "",
+              desc: s.desc || "",
+            }))
+          : [],
+      });
+      setSuccessMsg(
+        dashboardData
+          ? "Dashboard data updated."
+          : "Dashboard data created."
+      );
       setShowModal(false);
       setEditData({});
-      setModalSection(null);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || "Failed to save dashboard data");
+      setModalSection("all");
+    } catch (err) {
+      const axiosErr = err as AxiosError<any>;
+      setError(
+        axiosErr?.response?.data?.message ||
+          (axiosErr.message as string) ||
+          "Failed to save dashboard data"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -173,7 +187,12 @@ const DashboardData: React.FC = () => {
 
   // Delete dashboard data
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete all dashboard data? This cannot be undone.")) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to delete all dashboard data? This cannot be undone."
+      )
+    )
+      return;
     setDeleting(true);
     clearAlerts();
     try {
@@ -182,9 +201,14 @@ const DashboardData: React.FC = () => {
       setSuccessMsg("Dashboard data deleted.");
       setShowModal(false);
       setEditData({});
-      setModalSection(null);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || "Failed to delete dashboard data");
+      setModalSection("all");
+    } catch (err) {
+      const axiosErr = err as AxiosError<any>;
+      setError(
+        axiosErr?.response?.data?.message ||
+          (axiosErr.message as string) ||
+          "Failed to delete dashboard data"
+      );
     } finally {
       setDeleting(false);
     }
@@ -192,150 +216,193 @@ const DashboardData: React.FC = () => {
 
   // Form field change
   function updateEditField(
-    section: keyof DashboardDataType, 
-    field: keyof SectionData | undefined, 
-    value: string
+    which: "thought" | number | "all",
+    field: "heading" | "desc" | "thoughtOfTheDay",
+    value: string,
+    idx?: number
   ) {
-    setEditData(prev => {
-      if (section === "thoughtOfTheDay") return { ...prev, thoughtOfTheDay: value };
-      if (
-        section === "aboutUs" ||
-        section === "privacyPolicy" ||
-        section === "FAQs" ||
-        section === "documents" ||
-        section === "disclaimer"
-      ) {
-        const prior: SectionData = prev[section] ? { ...(prev[section] as SectionData) } : {};
+    setEditData((prev: DashboardDataType) => {
+      if (which === "thought" || (which === "all" && field === "thoughtOfTheDay")) {
+        return { ...prev, thoughtOfTheDay: value };
+      }
+      // Section update:
+      if (which === "all") {
+        if (typeof idx === "number") {
+          const sections = prev.sections ? [...prev.sections] : [];
+          sections[idx] = { ...sections[idx], [field]: value };
+          return { ...prev, sections };
+        }
+      } else if (typeof which === "number") {
+        // editing single section modal
         return {
           ...prev,
-          [section]: {
-            ...prior,
-            [field!]: value,
-          }
+          sections: [
+            {
+              ...((prev.sections && prev.sections[0]) || { heading: "", desc: "" }),
+              [field]: value,
+            },
+          ],
         };
       }
       return prev;
     });
   }
 
-  // Render modal contents according to the section/all
-  const renderModalFields = () => {
-    if (modalSection) {
-      // Single section edit
-      const def = SECTION_DEFS.find(d => d.key === modalSection)!;
+  // Add a new dynamic section in "edit all" mode
+  function handleAddSection() {
+    setEditData((prev: DashboardDataType) => ({
+      ...prev,
+      sections: [...(prev.sections ?? []), { heading: "", desc: "" }],
+    }));
+    setTimeout(() => {
+      // focus the new heading input
+      const inputEls = document.querySelectorAll<HTMLInputElement>(
+        '[data-sectioninput="heading"]'
+      );
+      if (inputEls.length) {
+        inputEls[inputEls.length - 1].focus();
+      }
+    }, 120);
+  }
+
+  function handleRemoveSection(idx: number) {
+    setEditData((prev: DashboardDataType) => {
+      const sections = prev.sections ? [...prev.sections] : [];
+      sections.splice(idx, 1);
+      return { ...prev, sections };
+    });
+  }
+
+  // Render Modal Fields
+  const renderModalFields = (): React.ReactNode => {
+    if (modalSection === "thought") {
+      // Thought of the Day only
       return (
         <div>
-          {def.type ? (
-            <div>
-              <label className="block font-medium mb-1">{def.label}</label>
-              <textarea
-                ref={
-                  def.key === "thoughtOfTheDay"
-                    ? (firstInputRef as unknown as React.RefObject<HTMLTextAreaElement>)
-                    : undefined
-                }
-                value={editData[def.key] as string || ""}
-                rows={2}
-                onChange={e => updateEditField(def.key, undefined, e.target.value)}
-                required={def.key === "thoughtOfTheDay"}
-                className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
-                placeholder={`Enter ${def.label.toLowerCase()}`}
-              />
-        
-            </div>
-          ) : (
-            <>
-              <div className="font-semibold mb-1">{def.label}</div>
-              {def.fields?.map(f => (
-                <div key={f.subkey} className="mb-3">
-                  <label className="block text-gray-600 font-medium mb-0.5">{f.label}</label>
-                  {f.type === "textarea" ? (
-                    <textarea
-                      ref={
-                        def.key === "aboutUs" && f.subkey === "heading"
-                          ? (firstInputRef as unknown as React.RefObject<HTMLTextAreaElement>)
-                          : undefined
-                      }
-                      value={(editData[def.key] as SectionData)?.[f.subkey] || ""}
-                      rows={2}
-                      onChange={e => updateEditField(def.key, f.subkey, e.target.value)}
-                      className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
-                      placeholder={`Enter ${f.label.toLowerCase()}`}
-                    />
-              
-                  ) : (
-                    <input
-                      ref={def.key === "aboutUs" && f.subkey === "heading" ? firstInputRef : undefined}
-                      type="text"
-                      value={(editData[def.key] as SectionData)?.[f.subkey] || ""}
-                      onChange={e => updateEditField(def.key, f.subkey, e.target.value)}
-                      className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
-                      placeholder={`Enter ${f.label.toLowerCase()}`}
-                    />
-                  )}
-                </div>
-              ))}
-            </>
-          )}
+          <label className="block font-medium mb-1">Thought of the Day</label>
+          <textarea
+            ref={firstInputRef as React.RefObject<HTMLTextAreaElement>}
+            value={editData.thoughtOfTheDay || ""}
+            rows={2}
+            onChange={e =>
+              updateEditField("thought", "thoughtOfTheDay", e.target.value)
+            }
+            required
+            className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
+            placeholder="Enter thought of the day"
+          />
         </div>
       );
-    } else {
-      // Edit all sections
-      return SECTION_DEFS.map((def) => (
-        <div key={def.key as string} className="mb-7">
-          {def.type ? (
-            <div>
-              <label className="block font-medium mb-1">{def.label}</label>
-              <textarea
-                ref={def.key === "thoughtOfTheDay" ? (firstInputRef as unknown as React.RefObject<HTMLTextAreaElement>) : undefined}
-                value={editData[def.key] as string || ""}
-                rows={2}
-                onChange={e => updateEditField(def.key, undefined, e.target.value)}
-                required={def.key === "thoughtOfTheDay"}
-                className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
-                placeholder={`Enter ${def.label.toLowerCase()}`}
-              />
-        
-        
-            </div>
-          ) : (
-            <>
-              <div className="font-semibold mb-1">{def.label}</div>
-              {def.fields?.map(f => (
-                <div key={f.subkey} className="mb-3">
-                  <label className="block text-gray-600 font-medium mb-0.5">{f.label}</label>
-                  {f.type === "textarea" ? (
-                    <textarea
-                      ref={
-                        def.key === "aboutUs" && f.subkey === "heading"
-                          ? (firstInputRef as unknown as React.RefObject<HTMLTextAreaElement>)
-                          : undefined
-                      }
-                      value={(editData[def.key] as SectionData)?.[f.subkey] || ""}
-                      rows={2}
-                      onChange={e => updateEditField(def.key, f.subkey, e.target.value)}
-                      className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
-                      placeholder={`Enter ${f.label.toLowerCase()}`}
-                    />
-              
-              
-                  ) : (
-                    <input
-                      ref={def.key === "aboutUs" && f.subkey === "heading" ? firstInputRef : undefined}
-                      type="text"
-                      value={(editData[def.key] as SectionData)?.[f.subkey] || ""}
-                      onChange={e => updateEditField(def.key, f.subkey, e.target.value)}
-                      className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
-                      placeholder={`Enter ${f.label.toLowerCase()}`}
-                    />
-                  )}
-                </div>
-              ))}
-            </>
-          )}
+    } else if (typeof modalSection === "number") {
+      // Editing a single section
+      return (
+        <div>
+          <label className="block font-medium mb-1">Heading</label>
+          <input
+            ref={firstInputRef as React.RefObject<HTMLInputElement>}
+            type="text"
+            value={editData.sections?.[0]?.heading || ""}
+            onChange={e => updateEditField(modalSection, "heading", e.target.value)}
+            className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
+            placeholder="Enter heading"
+            required
+            data-sectioninput="heading"
+          />
+          <label className="block font-medium mb-1 mt-3">Description</label>
+          <textarea
+            value={editData.sections?.[0]?.desc || ""}
+            onChange={e => updateEditField(modalSection, "desc", e.target.value)}
+            className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
+            placeholder="Enter description"
+            required
+            rows={2}
+          />
         </div>
-      ));
+      );
+    } else if (modalSection === "all") {
+      // Editing all data (thought + sections)
+      return (
+        <div className="overflow-y-auto max-h-[60vh] sm:max-h-[65vh] pr-2">
+          <div className="mb-7">
+            <label className="block font-medium mb-1">Thought of the Day</label>
+            <textarea
+              ref={firstInputRef as React.RefObject<HTMLTextAreaElement>}
+              value={editData.thoughtOfTheDay || ""}
+              rows={2}
+              onChange={e =>
+                updateEditField("all", "thoughtOfTheDay", e.target.value)
+              }
+              required
+              className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
+              placeholder="Enter thought of the day"
+            />
+          </div>
+          <div className="mb-1 flex justify-between items-center">
+            <span className="font-semibold">Additional Sections</span>
+            <button
+              type="button"
+              className="px-3 py-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300 shadow text-xs font-semibold"
+              onClick={handleAddSection}
+            >
+              + Add Section
+            </button>
+          </div>
+          {(editData.sections ?? []).length === 0 && (
+            <div className="text-gray-400 mb-3">No sections. Add one!</div>
+          )}
+          {(editData.sections ?? []).map((sec, idx) => (
+            <div key={idx} className="mb-5 p-4 border rounded bg-gray-50 relative">
+              <div className="mb-2">
+                <label className="block text-gray-600 font-medium mb-0.5">
+                  Heading
+                </label>
+                <input
+                  type="text"
+                  data-sectioninput="heading"
+                  ref={
+                    idx === 0
+                      ? (firstInputRef as React.RefObject<HTMLInputElement>)
+                      : undefined
+                  }
+                  value={sec.heading}
+                  onChange={e =>
+                    updateEditField("all", "heading", e.target.value, idx)
+                  }
+                  className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
+                  placeholder="Enter heading"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-600 font-medium mb-0.5">
+                  Description
+                </label>
+                <textarea
+                  value={sec.desc}
+                  onChange={e =>
+                    updateEditField("all", "desc", e.target.value, idx)
+                  }
+                  className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
+                  placeholder="Enter description"
+                  rows={2}
+                  required
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleRemoveSection(idx)}
+                className="absolute top-1 right-2 text-red-500 hover:text-red-700 text-lg font-bold"
+                tabIndex={-1}
+                title="Remove Section"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      );
     }
+    return null;
   };
 
   return (
@@ -356,7 +423,9 @@ const DashboardData: React.FC = () => {
         <div className="mb-4 text-red-600 bg-red-50 rounded px-3 py-2">{error}</div>
       )}
       {successMsg && (
-        <div className="mb-4 text-green-700 bg-green-50 rounded px-3 py-2">{successMsg}</div>
+        <div className="mb-4 text-green-700 bg-green-50 rounded px-3 py-2">
+          {successMsg}
+        </div>
       )}
 
       {!loading && !dashboardData && (
@@ -364,55 +433,54 @@ const DashboardData: React.FC = () => {
           No dashboard data configured in backend.
         </div>
       )}
-
       {dashboardData && (
         <div className="bg-white rounded shadow px-5 py-6">
-          {SECTION_DEFS.map(def => (
-            <div key={def.key as string} className="mb-6 border-b border-gray-100 pb-6">
-              {def.key === "thoughtOfTheDay" ? (
-                <>
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="font-medium text-gray-700">{def.label}</div>
-                    <button
-                      className="bg-blue-200 hover:bg-blue-300 text-blue-900 px-3 py-1 rounded text-xs font-semibold"
-                      onClick={() => openModal(def.key, dashboardData)}
-                    >
-                      Edit
-                    </button>
-                  </div>
-                  <blockquote className="italic text-gray-900 min-h-[1.7em] mt-1">
-                    {dashboardData.thoughtOfTheDay || (
-                      <span className="text-gray-400">Not set</span>
-                    )}
-                  </blockquote>
-                </>
+          {/* Thought of the Day */}
+          <div className="mb-6 border-b border-gray-100 pb-6">
+            <div className="flex justify-between items-center mb-2">
+              <div className="font-medium text-gray-700">Thought of the Day</div>
+              <button
+                className="bg-blue-200 hover:bg-blue-300 text-blue-900 px-3 py-1 rounded text-xs font-semibold"
+                onClick={() => openModal("thought", dashboardData)}
+              >
+                Edit
+              </button>
+            </div>
+            <blockquote className="italic text-gray-900 min-h-[1.7em] mt-1">
+              {dashboardData.thoughtOfTheDay ? (
+                dashboardData.thoughtOfTheDay
               ) : (
-                <>
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="font-semibold">{def.label}</div>
-                    <button
-                      className="bg-blue-200 hover:bg-blue-300 text-blue-900 px-3 py-1 rounded text-xs font-semibold"
-                      onClick={() => openModal(def.key, dashboardData)}
-                    >
-                      Edit
-                    </button>
-                  </div>
-                  <div className="mt-1 ml-2">
-                    <div className="text-gray-900 font-medium">
-                      {dashboardData[def.key]?.heading || (
-                        <span className="text-gray-400">No heading</span>
-                      )}
-                    </div>
-                    <div className="text-gray-700 whitespace-pre-line min-h-[1.7em] mt-0.5">
-                      {dashboardData[def.key]?.desc || (
-                        <span className="text-gray-400">No description set.</span>
-                      )}
-                    </div>
-                  </div>
-                </>
+                <span className="text-gray-400">Not set</span>
               )}
+            </blockquote>
+          </div>
+          {/* Dynamic Sections */}
+          {(dashboardData.sections ?? []).map((sec, idx) => (
+            <div key={idx} className="mb-6 border-b border-gray-100 pb-6">
+              <div className="flex justify-between items-center mb-2">
+                <div className="font-semibold">Section {idx + 1}</div>
+                <button
+                  className="bg-blue-200 hover:bg-blue-300 text-blue-900 px-3 py-1 rounded text-xs font-semibold"
+                  onClick={() => openModal(idx, dashboardData)}
+                >
+                  Edit
+                </button>
+              </div>
+              <div className="mt-1 ml-2">
+                <div className="text-gray-900 font-medium">
+                  {sec.heading || (
+                    <span className="text-gray-400">No heading</span>
+                  )}
+                </div>
+                <div className="text-gray-700 whitespace-pre-line min-h-[1.7em] mt-0.5">
+                  {sec.desc || (
+                    <span className="text-gray-400">No description set.</span>
+                  )}
+                </div>
+              </div>
             </div>
           ))}
+
           <div className="flex justify-end gap-4 mt-6">
             <button
               onClick={() => openModal("all", dashboardData)}
@@ -434,22 +502,61 @@ const DashboardData: React.FC = () => {
 
       {showModal && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm transition">
-          <div className="bg-white rounded-xl shadow-lg max-w-lg w-full px-8 py-8 animate-fadein relative">
-            <div className="mb-7 flex items-center justify-between">
+          <div
+            className={
+              "bg-white rounded-xl shadow-lg max-w-lg w-full px-0 sm:px-8 py-0 sm:py-8 animate-fadein relative flex flex-col" +
+              (modalSection === "all"
+                ? " min-h-[65vh] max-h-[95vh] justify-start"
+                : " px-8 py-8")
+            }
+            style={
+              modalSection === "all"
+                ? { maxHeight: "95vh", minHeight: "60vh", width: "100%", padding: 0 }
+                : undefined
+            }
+          >
+            <div className="px-8 pt-8 mb-7 flex items-center justify-between flex-shrink-0">
               <div className="text-xl font-bold">
-                {(modalSection
-                  ? `Edit ${SECTION_DEFS.find(d => d.key === modalSection)!.label}`
-                  : dashboardData ? "Edit All Dashboard Data" : "Create Dashboard Data"
-                )}
+                {modalSection === "all"
+                  ? dashboardData
+                    ? "Edit All Dashboard Data"
+                    : "Create Dashboard Data"
+                  : modalSection === "thought"
+                  ? "Edit Thought of the Day"
+                  : `Edit Section ${typeof modalSection === "number" ? modalSection + 1 : ""}`}
               </div>
             </div>
             {error && (
-              <div className="mb-4 text-red-600 bg-red-50 rounded px-3 py-2">{error}</div>
+              <div className="px-8 mb-4 text-red-600 bg-red-50 rounded px-3 py-2">
+                {error}
+              </div>
             )}
-            <form onSubmit={handleSubmit} autoComplete="off">
+            <form
+              onSubmit={handleSubmit}
+              autoComplete="off"
+              className={
+                modalSection === "all"
+                  ? "flex flex-col flex-1 min-h-0"
+                  : undefined
+              }
+              style={
+                modalSection === "all"
+                  ? { minHeight: 0, flex: "1 1 0%" }
+                  : undefined
+              }
+            >
               {/* Fields */}
-              {renderModalFields()}
-              <div className="mt-7 flex gap-4 items-center justify-end">
+              <div
+                className={
+                  modalSection === "all"
+                    ? "flex-1 min-h-0 px-8 pb-2"
+                    : undefined
+                }
+                style={modalSection === "all" ? { minHeight: 0 } : undefined}
+              >
+                {renderModalFields()}
+              </div>
+              <div className="px-8 mt-7 flex gap-4 items-center justify-end bg-white flex-shrink-0">
                 <button
                   type="submit"
                   className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded shadow transition disabled:opacity-70"
@@ -457,11 +564,19 @@ const DashboardData: React.FC = () => {
                 >
                   {submitting
                     ? dashboardData
-                      ? (modalSection ? "Saving..." : "Saving All...")
-                      : (modalSection ? "Creating..." : "Creating All...")
+                      ? modalSection === "all"
+                        ? "Saving All..."
+                        : "Saving..."
+                      : modalSection === "all"
+                        ? "Creating All..."
+                        : "Creating..."
                     : dashboardData
-                      ? (modalSection ? "Save" : "Save All")
-                      : (modalSection ? "Create" : "Create All")}
+                      ? modalSection === "all"
+                        ? "Save All"
+                        : "Save"
+                      : modalSection === "all"
+                        ? "Create All"
+                        : "Create"}
                 </button>
                 <button
                   type="button"
@@ -481,6 +596,9 @@ const DashboardData: React.FC = () => {
                 to   { opacity: 1; transform: none; }
               }
               .animate-fadein { animation: fadein .24s cubic-bezier(.4,1,.6,1) both; }
+              @media (max-width: 640px) {
+                .max-w-lg { max-width: 98vw !important; }
+              }
             `}
           </style>
         </div>

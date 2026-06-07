@@ -53,6 +53,7 @@ type BusinessProfileType = {
   businessName?: string;
   businessAddress?: string;
   pincode?: string;
+  city?: string;
   businessPhone?: string;
   businessEmail?: string;
   businessHSTNumber?: string;
@@ -63,6 +64,11 @@ type BusinessProfileType = {
   myDeals?: (string | DealType)[];
   teamMembers?: TeamMemberType[];
   businessMapLocation?: any;
+  isOpen?: boolean;
+  rating?: number;
+  reviewCount?: number;
+  reviewDate?: string;
+  websiteUrl?: string;
   createdAt?: string;
   updatedAt?: string;
   [k: string]: any;
@@ -113,6 +119,7 @@ type JobCardServiceType = {
 
 type JobCardType = {
   _id: string;
+  jobNo:string;
   business: string;
   customerId: string;
   vehicleId: string;
@@ -138,6 +145,7 @@ type AutoShopOwnerType = {
   countryCode?: string;
   phone?: string;
   pincode?: string;
+ 
   address?: string;
   isDisabled?: boolean;
   isProfileComplete?: boolean;
@@ -153,18 +161,246 @@ type AutoShopOwnerType = {
 const ShopOverviewCard: React.FC<{ shopData: BusinessProfileType }> = ({
   shopData = {},
 }) => {
-  // ...unchanged...
-  // (omitted for brevity, unchanged)
-  // ...unchanged...
-  // (paste ShopOverviewCard exactly as in first code)
-  // ...unchanged...
-  // (end unchanged section)
-  // Paste unchanged code for ShopOverviewCard...
-  // (Not repeating for clarity and brevity)
-  // ...unchanged...
+  // Destructure with fallbacks
+  const {
+    businessPhone = "289 274 8591",
+    businessName = "Auto 27 Car Garage",
+    businessAddress = "2 Fisherman Dr - Unit 9",
+    city = shopData.city || "Brampton, ON L7A 1B5",
+    openHours = "9:00 AM - 6:00 PM",
+    openDays = shopData.openDays
+      ? Array.isArray(shopData.openDays)
+        ? shopData.openDays.length === 1 &&
+          typeof shopData.openDays[0] === "string" &&
+          shopData.openDays[0].trim().startsWith("[")
+          ? (() => {
+              try {
+                return JSON.parse(shopData.openDays[0]).join(", ");
+              } catch {
+                return shopData.openDays.join(", ");
+              }
+            })()
+          : shopData.openDays.join(", ")
+        : shopData.openDays
+      : "Mon - Sat",
+    isOpen = true,
+    myServices = [],
+    businessLogo,
+    businessEmail = "",
+    websiteUrl = "#",
+    businessMapLocation,
+    pincode,
+    rating = 4.8,
+    reviewCount = 142,
+    reviewDate = "01 / 2026",
+  } = shopData || {};
+
+  let services: string[] = [];
+  if (Array.isArray(myServices) && myServices.length > 0) {
+    // Gather service names, fall back if none
+    for (const item of myServices) {
+      if (item?.service?.name) {
+        services.push(item.service.name);
+      }
+    }
+  }
+  if (services.length === 0) {
+    services = [
+      "General Repair",
+      "Diagnose - Paccer",
+      "Diagnose - Communis",
+      "Safety On-line",
+      "Oil Change",
+      "Brake Service",
+    ];
+  }
+  const servicesToShow = services.slice(0, 6);
+
+  // Shop logo or fallback image
+  let imageUrl =
+    businessLogo && typeof businessLogo === "string"
+      ? businessLogo.startsWith("http")
+        ? businessLogo
+        : `${import.meta.env.VITE_IMAGE_URL ?? ""}/${businessLogo}`
+      : "https://images.unsplash.com/photo-1486006920555-c77dcf18193c?q=80&w=1200&auto=format&fit=crop";
+
+  // Directions URL (use businessMapLocation if provided, or fallback)
+  let directionsUrl = "#";
+  if (businessMapLocation?.lat && businessMapLocation?.lng) {
+    directionsUrl = `https://www.google.com/maps/search/?api=1&query=${businessMapLocation.lat},${businessMapLocation.lng}`;
+  }
+
+  // Website url
+  let webUrl =
+    websiteUrl && websiteUrl !== "#"
+      ? websiteUrl
+      : businessEmail
+      ? `mailto:${businessEmail}`
+      : "#";
+
+  // Status open logic: You can adjust based on business hours, for now fallback true
+  const statusOpen = isOpen;
+
+  return (
+    <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.06)] mb-7">
+      {/* Top action bar */}
+      <div
+        className="grid border-b border-slate-200"
+        style={{
+          gridTemplateColumns:
+            "minmax(0, 1.15fr) minmax(0, 0.72fr) minmax(0, 0.72fr) minmax(0, 1.65fr) minmax(52px, 0.55fr)",
+          minHeight: 48,
+        }}
+      >
+        <div className="flex items-center justify-center border-r border-slate-200 bg-emerald-50 px-2 py-2 text-center text-[13px] font-bold text-emerald-800">
+          <span className="truncate">📞 {businessPhone}</span>
+        </div>
+
+        <a
+          href={directionsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center border-r border-slate-200 bg-sky-50 text-[13px] font-semibold text-blue-600 no-underline transition-colors hover:bg-sky-100"
+        >
+          Directions
+        </a>
+
+        <a
+          href={webUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center border-r border-slate-200 bg-slate-50 text-[13px] font-semibold text-slate-700 no-underline transition-colors hover:bg-slate-100"
+        >
+          Website
+        </a>
+
+        <div className="flex min-w-0 items-center justify-between gap-2 border-r border-slate-200 bg-white px-3 py-2">
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              className={`h-2 w-2 shrink-0 rounded-full ${
+                statusOpen ? "bg-emerald-500" : "bg-red-500"
+              }`}
+            />
+            <span
+              className={`whitespace-nowrap text-[12px] font-semibold ${
+                statusOpen ? "text-emerald-700" : "text-red-600"
+              }`}
+            >
+              {statusOpen ? "OPEN NOW" : "CLOSED"}
+            </span>
+          </div>
+          <div className="text-right text-[11px] leading-snug text-slate-500">
+            <div className="whitespace-nowrap">{openDays}</div>
+            <div className="whitespace-nowrap">{openHours}</div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-1 bg-amber-50 text-[15px] font-bold text-slate-900">
+          <span className="text-amber-500">★</span>
+          {rating}
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div
+        className="grid items-start gap-5 p-5"
+        style={{
+          gridTemplateColumns:
+            "minmax(120px, 150px) minmax(0, 1.25fr) minmax(0, 1.1fr) minmax(100px, 118px)",
+        }}
+      >
+        <img
+          src={imageUrl}
+          alt={businessName}
+          className="h-[108px] w-full rounded-lg object-cover"
+        />
+
+        <div className="min-w-0">
+          <h2 className="mb-1.5 text-xl font-bold leading-tight text-slate-900">
+            {businessName}
+          </h2>
+          <p className="mb-3 text-[13px] leading-relaxed text-slate-600">
+            {businessAddress}
+            <br />
+            {city}
+            {pincode && (
+              <>
+                <br />
+                Pincode: {pincode}
+              </>
+            )}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+              {statusOpen ? "Open" : "Closed"}
+            </span>
+            <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] text-blue-700">
+              {openDays}
+            </span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] text-slate-600">
+              {openHours}
+            </span>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <p className="mb-2.5 text-[13px] font-bold text-slate-900">
+            Services
+          </p>
+          <ul
+            className="grid list-none gap-x-4 gap-y-1.5 p-0"
+            style={{
+              gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+            }}
+          >
+            {servicesToShow.map((service, index) => (
+              <li
+                key={`${service}-${index}`}
+                className="flex min-w-0 items-start gap-1.5 text-[12px] leading-snug text-slate-600"
+              >
+                <span className="mt-px shrink-0 font-bold text-emerald-500">
+                  ✓
+                </span>
+                <span className="min-w-0">{service}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-3 text-center">
+          <span className="text-[26px] font-bold leading-none text-slate-900">
+            {rating}
+          </span>
+          <span className="mt-1 text-[13px] tracking-wide text-amber-500">
+            ★★★★★
+          </span>
+          <span className="mt-1.5 text-[11px] text-slate-500">
+            {reviewCount} Reviews
+          </span>
+          <span className="mt-0.5 text-[10px] text-slate-400">{reviewDate}</span>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div
+        className="grid items-center gap-2 bg-slate-900 px-4 py-2.5 text-[12px] text-white"
+        style={{
+          gridTemplateColumns:
+            "minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr)",
+        }}
+      >
+        <span className="truncate font-medium">{businessName}</span>
+        <span className="truncate text-center text-slate-200">
+          {businessAddress} • {city}
+        </span>
+        <span className="truncate text-right text-slate-200">
+          {openDays} | {openHours}
+        </span>
+      </div>
+    </div>
+  );
 };
 
-// Simple Modal Component
 type ModalProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -172,6 +408,7 @@ type ModalProps = {
   children: React.ReactNode;
 };
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+  // ...unchanged...
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
@@ -193,7 +430,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
   );
 };
 
-// Utilities for color badges:
+// Helper badge/status functions
 function getStatus(owner: AutoShopOwnerType) {
   if (owner.isDisabled) return "Suspended";
   if (
@@ -215,6 +452,74 @@ function getStatusColor(owner: AutoShopOwnerType) {
   return "default";
 }
 
+// --- Export (CSV) feature ---
+// Utility: Convert array of objects to CSV
+function toCsv(data: string[][], headers: string[]): string {
+  const escapeCsv = (val: any) => {
+    if (val == null) return "";
+    let s = String(val);
+    if (/[,\"\n]/.test(s)) {
+      s = '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+  return (
+    headers.map(escapeCsv).join(",") +
+    "\n" +
+    data.map((row) => row.map(escapeCsv).join(",")).join("\n")
+  );
+}
+
+// Download as file
+function downloadAsFile(filename: string, content: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// Convert owners array to CSV (flat detail)
+function autoShopOwnersToCsvRows(owners: AutoShopOwnerType[]): [string[], string[][]] {
+  const headers = [
+    "Name",
+    "Email",
+    "Phone",
+    "Shop Name",
+    "Shop Address",
+    "Shop City",
+    "Pincode",
+    "Status",
+    "Customers Count",
+    "Deals Count",
+    "JobCards Count",
+    "Created At",
+    "Profile Complete",
+    "Business Profile Complete"
+  ];
+  const rows = owners.map(owner => [
+    owner.name ?? "",
+    owner.email ?? "",
+    (owner.countryCode ? owner.countryCode + " " : "") + (owner.phone ?? ""),
+    owner.businessProfile?.businessName ?? "",
+    owner.businessProfile?.businessAddress ?? "",
+    owner.businessProfile?.city ?? "",
+    owner.businessProfile?.pincode ?? "",
+    getStatus(owner),
+    owner.myCustomers ? owner.myCustomers.length.toString() : "0",
+    owner.deals ? owner.deals.length.toString() : "0",
+    owner.jobCards ? owner.jobCards.length.toString() : "0",
+    owner.createdAt ? new Date(owner.createdAt).toLocaleString() : "",
+    owner.isProfileComplete ? "Yes" : "No",
+    (owner.isBusinessProfileCompleted ?? !!owner.businessProfile) ? "Yes" : "No"
+  ]);
+  return [headers, rows];
+}
+
+// --- End CSV helpers ---
+
 // New: Job Card Detail Modal
 const JobCardDetailModal: React.FC<{
   isOpen: boolean;
@@ -223,6 +528,7 @@ const JobCardDetailModal: React.FC<{
   owner: AutoShopOwnerType | null;
   UPLOADS_URL: string;
 }> = ({ isOpen, onClose, card, owner, UPLOADS_URL }) => {
+  // ...unchanged... (see original code for details)
   if (!isOpen || !card || !owner) return null;
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Job Card Details - ${card._id}`}>
@@ -356,7 +662,6 @@ const JobCardDetailModal: React.FC<{
   );
 };
 
-
 const AutoShopOwners: React.FC = () => {
   const [owners, setOwners] = useState<AutoShopOwnerType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -375,6 +680,11 @@ const AutoShopOwners: React.FC = () => {
 
   // For disabling/enabling owners
   const [actionLoadingMap, setActionLoadingMap] = useState<{ [ownerId: string]: boolean }>({});
+
+  const [exporting, setExporting] = useState(false); // Export UI state
+
+  // Selection state
+  const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
 
   // Vehicle image base url from VITE_UPLOADS_URL
   const UPLOADS_URL = import.meta.env.VITE_UPLOADS_URL;
@@ -428,15 +738,68 @@ const AutoShopOwners: React.FC = () => {
     }
   };
 
+  // Export handler
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      let dataToExport: AutoShopOwnerType[] = [];
+      if (selectedOwnerIds.length > 0) {
+        dataToExport = owners.filter(owner => selectedOwnerIds.includes(owner._id));
+      } else {
+        alert("Please select at least one row to export.");
+        setExporting(false);
+        return;
+      }
+      if (dataToExport.length === 0) {
+        alert("No owners selected.");
+        setExporting(false);
+        return;
+      }
+      const [headers, rows] = autoShopOwnersToCsvRows(dataToExport);
+      const csvString = toCsv(rows, headers);
+
+      downloadAsFile(
+        `autoshop-owners-${new Date().toISOString().slice(0, 10)}.csv`,
+        csvString
+      );
+    } catch (err: any) {
+      alert("Failed to export data.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // For bulk selection
+  const isAllSelected = owners.length > 0 && selectedOwnerIds.length === owners.length;
+  const handleCheckAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedOwnerIds(owners.map(owner => owner._id));
+    } else {
+      setSelectedOwnerIds([]);
+    }
+  };
+  const handleCheckRow = (ownerId: string, checked: boolean) => {
+    setSelectedOwnerIds(current => {
+      if (checked) {
+        return [...current, ownerId];
+      } else {
+        return current.filter(id => id !== ownerId);
+      }
+    });
+  };
+
   useEffect(() => {
     fetchOwners();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ...all modal render helpers unchanged...
+  // (code below is from original selection, not repeated here for brevity, stays the same)
 
-  // Business Profile, Customers, Deals: unchanged
-  // Modal for team members + business profile full info (unchanged except new ShopOverviewCard at top)
+  // Previous code: renderBusinessProfileModal, renderCustomersModal, etc.
+  // ...start unchanged modal code...
   const renderBusinessProfileModal = () => {
+    // ...unchanged...
     if (!modalOwner || !modalOwner.businessProfile) return null;
     const bp = modalOwner.businessProfile;
 
@@ -677,6 +1040,7 @@ const AutoShopOwners: React.FC = () => {
 
   // Customers Modal unchanged
   const renderCustomersModal = () => {
+    // ...unchanged...
     if (!modalOwner) return null;
     return (
       <Modal
@@ -724,8 +1088,8 @@ const AutoShopOwners: React.FC = () => {
     );
   };
 
-  // Deals Modal unchanged
   const renderDealsModal = () => {
+    // ...unchanged...
     if (!modalOwner) return null;
     return (
       <Modal
@@ -813,8 +1177,8 @@ const AutoShopOwners: React.FC = () => {
     );
   };
 
-  // Job Cards Modal - SHOW ONLY JobCard No., Date, phone, name; click on row to show details
   const renderJobCardsModal = () => {
+    // ...unchanged...
     if (!modalOwner) return null;
     return (
       <Modal
@@ -843,7 +1207,7 @@ const AutoShopOwners: React.FC = () => {
                       setJobCardDetailModalOpen(true);
                     }}
                   >
-                    <td className="p-2 border-b">{card._id}</td>
+                    <td className="p-2 border-b">{card.jobNo}</td>
                     <td className="p-2 border-b">
                       {card.createdAt
                         ? new Date(card.createdAt).toLocaleString()
@@ -892,6 +1256,57 @@ const AutoShopOwners: React.FC = () => {
       <div className="overflow-y-auto h-full pb-20 rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03] p-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-2">
           <h2 className="text-xl font-semibold">Auto Shop Owners</h2>
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={handleExport}
+              className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center space-x-2"
+              disabled={exporting || loading}
+            >
+              {exporting ? (
+                <svg
+                  className="animate-spin mr-2 h-4 w-4 text-white"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="h-5 w-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+              )}
+              <span>
+                Export
+                {selectedOwnerIds.length > 0
+                  ? ` (${selectedOwnerIds.length} selected)`
+                  : ""}
+                (.csv)
+              </span>
+            </button>
+          </div>
         </div>
         {loading && (
           <div className="py-10 text-center font-medium text-gray-600">
@@ -908,6 +1323,19 @@ const AutoShopOwners: React.FC = () => {
             <Table>
               <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                 <TableRow>
+                  <TableCell
+                    isHeader
+                    className="px-3 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
+                  >
+                    {/* Checkbox for select all */}
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={handleCheckAll}
+                      aria-label="Select all shop owners"
+                      data-testid="select-all-checkbox"
+                    />
+                  </TableCell>
                   <TableCell
                     isHeader
                     className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
@@ -989,7 +1417,7 @@ const AutoShopOwners: React.FC = () => {
                     <TableCell
                       className="text-center py-8 text-gray-400"
                       isHeader={false}
-                      colSpan={12}
+
                     >
                       No auto shop owners found.
                     </TableCell>
@@ -998,8 +1426,21 @@ const AutoShopOwners: React.FC = () => {
                 {owners.map((owner) => {
                   const isSuspended = !!owner.isDisabled;
                   const isLoading = !!actionLoadingMap[owner._id];
+                  const isChecked = selectedOwnerIds.includes(owner._id);
                   return (
                     <TableRow key={owner._id}>
+                      {/* Checkbox */}
+                      <TableCell className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={e =>
+                            handleCheckRow(owner._id, e.target.checked)
+                          }
+                          aria-label={`Select ${owner.name}`}
+                          data-testid={`select-owner-checkbox-${owner._id}`}
+                        />
+                      </TableCell>
                       {/* Name */}
                       <TableCell className="px-5 py-3 text-gray-800 text-theme-sm dark:text-white/90">
                         <span className="block font-medium">{owner.name}</span>
