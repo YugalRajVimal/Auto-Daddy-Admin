@@ -138,6 +138,145 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
   );
 };
 
+// --- Add: Send Notification Modal ---
+const SendNotificationModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  selectedOwnerIds: string[];
+  onNotificationSent: () => void;
+}> = ({ isOpen, onClose, selectedOwnerIds, onNotificationSent }) => {
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Reset state on modal re-open
+  useEffect(() => {
+    if (isOpen) {
+      setTitle("");
+      setBody("");
+      setSending(false);
+      setError(null);
+      setSuccess(null);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSending(true);
+    setError(null);
+    setSuccess(null);
+
+    // Validate
+    if (!title.trim() || !body.trim()) {
+      setSending(false);
+      setError("Please enter both a title and a body for the notification.");
+      return;
+    }
+    if (!selectedOwnerIds || selectedOwnerIds.length === 0) {
+      setSending(false);
+      setError("No recipients selected.");
+      return;
+    }
+
+    try {
+      // API: POST /api/admin/send-custom-notification
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/admin/notification/custom/send`,
+        {
+          userType: "carOwner",
+          userIds: selectedOwnerIds,
+          title,
+          message: body,
+        }
+      );
+      if (res.data && res.data.success) {
+        setSuccess("Notification sent successfully.");
+        setTimeout(() => {
+          onClose();
+          onNotificationSent();
+        }, 1000);
+      } else {
+        setError(res.data.message || "Failed to send notification.");
+      }
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          "An error occurred while sending the notification."
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return isOpen ? (
+    <Modal isOpen={isOpen} onClose={onClose} title="Send custom notification">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Notification Title<span className="text-red-500">*</span>
+          </label>
+          <input
+            className="w-full border rounded px-3 py-2 text-sm"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            maxLength={100}
+            required
+            disabled={sending}
+            placeholder="Title for push notification"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Notification Body<span className="text-red-500">*</span>
+          </label>
+          <textarea
+            className="w-full border rounded px-3 py-2 text-sm resize-vertical"
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            rows={4}
+            maxLength={1000}
+            required
+            disabled={sending}
+            placeholder="Notification message to send"
+          />
+        </div>
+        <div className="font-xs text-blue-800 mb-1">
+          <div>To: <span className="font-semibold">{selectedOwnerIds.length} car owners selected</span></div>
+        </div>
+        {error && (
+          <div className="text-red-500 text-xs font-medium">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="text-green-600 text-xs font-medium">
+            {success}
+          </div>
+        )}
+        <div className="flex gap-2 justify-end">
+          <button
+            type="button"
+            className="bg-gray-200 px-4 py-2 rounded text-gray-700 text-xs font-medium hover:bg-gray-300"
+            onClick={onClose}
+            disabled={sending}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="bg-green-600 text-white px-5 py-2 rounded text-xs font-semibold hover:bg-green-700 shadow disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={sending}
+          >
+            {sending ? "Sending..." : "Send Notification"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  ) : null;
+};
+
 // --- Utilities ---
 function processOpenDays(openDays: string[] | undefined): string {
   if (!openDays) return "-";
@@ -250,6 +389,8 @@ const HeartIcon: React.FC<{ filled: boolean }> = ({ filled }) => (
   </svg>
 );
 
+// ... ShopOverviewCard and other helpers unchanged ... (TRIM HERE FOR SPACE; see original)
+
 function ShopOverviewCard(shop: BusinessProfileType) {
   const {
     phone,
@@ -283,6 +424,7 @@ function ShopOverviewCard(shop: BusinessProfileType) {
 
   const servicesToShow = displayServices.slice(0, 6);
 
+  // For brevity: keep as in original!
   return (
     <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.06)] relative">
       <div
@@ -763,6 +905,9 @@ const CarOwners: React.FC = () => {
   const [openServicedShopsFor, setOpenServicedShopsFor] = useState<CarOwnerType | null>(null);
   const [openJobCardsFor, setOpenJobCardsFor] = useState<CarOwnerType | null>(null);
 
+  // Added for notification modal
+  const [openNotificationModal, setOpenNotificationModal] = useState<boolean>(false);
+
   // --- ADDED: selectedRows State ---
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
@@ -773,7 +918,7 @@ const CarOwners: React.FC = () => {
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/carowners`);
       if (res.data.success && Array.isArray(res.data.data)) {
         setCarOwners(res.data.data);
-        console.log(res.data);
+        // console.log(res.data);
       } else {
         setError("Failed to fetch car owners");
       }
@@ -832,7 +977,7 @@ const CarOwners: React.FC = () => {
 
     // Utility for JobCard Numbers (IDs)
     function jobCardsString(jobCards?: JobCardTypePopulated[]): string {
-      console.log(jobCards);
+      // console.log(jobCards);
       if (!jobCards || jobCards.length === 0) return "-";
       // If JobCards have a jobCardNumber property use that, else use _id or an increment number
       return jobCards.map((jc) =>
@@ -840,7 +985,7 @@ const CarOwners: React.FC = () => {
           ? String((jc as any).jobNo)
           : jc._id
       ).join('\n');
- 
+
     }
 
     // Compose Excel rows
@@ -864,17 +1009,24 @@ const CarOwners: React.FC = () => {
     // Sheet and Download
     const ws = XLSX.utils.json_to_sheet(data, { skipHeader: false });
 
-    // Style: row height for newline in cells
-    // not part of core XLSX, but Excel displays line breaks from "\n" in plain cells
-
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Car Owners");
     XLSX.writeFile(wb, "car-owners.xlsx");
   };
 
-  // --- ADD: Toolbar for Export ---
+  // --- ADD: Toolbar for Export & Send Notification ---
   return (
     <>
+      {/* NOTIFICATION MODAL */}
+      <SendNotificationModal
+        isOpen={openNotificationModal}
+        onClose={() => setOpenNotificationModal(false)}
+        selectedOwnerIds={Array.from(selectedRows)}
+        onNotificationSent={() => {
+          // Optionally re-fetch data or show toast
+        }}
+      />
+
       {openVehiclesFor && (
         <Modal
           isOpen={!!openVehiclesFor}
@@ -904,10 +1056,21 @@ const CarOwners: React.FC = () => {
       )}
 
       <div className="overflow-y-auto h-full pb-20 rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03] p-4">
-        {/* Export & Selection toolbar */}
+        {/* Export, Selection, Send Notification toolbar */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-2">
           <h2 className="text-xl font-semibold">Car Owners</h2>
           <div className="flex items-center gap-3">
+            {/* Send Notification Button */}
+            <button
+              className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded shadow disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setOpenNotificationModal(true)}
+              disabled={selectedRows.size === 0}
+              title="Send custom notification to selected car owners"
+              type="button"
+              style={{ whiteSpace: "nowrap" }}
+            >
+              Send Notification
+            </button>
             <button
               className="text-white bg-blue-600 hover:bg-blue-700 text-xs font-semibold px-4 py-2 rounded shadow disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ whiteSpace: "nowrap" }}
@@ -921,7 +1084,7 @@ const CarOwners: React.FC = () => {
             <span className="text-xs text-gray-500">
               {selectedRows.size > 0
                 ? `Selected: ${selectedRows.size}`
-                : "Select rows to export"}
+                : "Select rows to export or notify"}
             </span>
           </div>
         </div>

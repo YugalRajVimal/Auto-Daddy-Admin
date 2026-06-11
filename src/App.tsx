@@ -52,6 +52,10 @@ import CarCompany from "./pages/AdminPages/CarCompany/CarCompany";
 import Cities from "./pages/AdminPages/Cities/Cities";
 import Ads from "./pages/AdminPages/Ads/Ads";
 import RunningDeals from "./pages/AdminPages/Deals/RunningDeals";
+import Wallet from "./pages/AdminPages/Wallet/Wallet";
+import SubServicesPage from "./pages/AdminPages/Services/Categories";
+import Provinces from "./pages/AdminPages/Cities/Provinces";
+import Invitehelp from "./pages/AdminPages/InviteHelpSection/Invitehelp";
 
 
 export default function App() {
@@ -102,10 +106,20 @@ export default function App() {
             {/* <Route path="/admin/all-users" element={<AllUsers/>} /> */}
             <Route path="/admin/car-owners" element={<CarOwners/>} />
             <Route path="/admin/auto-shop-owners" element={<AutoShopOwners/>} />
+            
             <Route path="/admin/services" element={<Services />} />
+            <Route path="/admin/categories" element={<SubServicesPage />} />
+
+            <Route path="/admin/provinces" element={<Provinces />} />
             <Route path="/admin/cities" element={<Cities />} />
+
+            <Route path="/admin/invite-help" element={<Invitehelp />} />
+
+
             <Route path="/admin/ads" element={<Ads />} />
             <Route path="/admin/running-deals" element={<RunningDeals />} />
+            <Route path="/admin/wallet" element={<Wallet />} />
+
 
 
 

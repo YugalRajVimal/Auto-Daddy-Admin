@@ -1,26 +1,17 @@
-
-
 import React, { useEffect, useState, FormEvent, ChangeEvent } from "react";
 import axios, { AxiosError } from "axios";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
-type CityStatus = "Active" | "Inactive";
 type ProvinceStatus = "Active" | "Inactive";
-
-interface City {
-  name: string;
-  _id?: string;
-  status?: CityStatus;
-  createdAt?: string;
-}
 
 interface Province {
   _id: string;
   name: string;
   nickName?: string;
   status?: ProvinceStatus;
-  cities: City[];
+  cities: { name: string; status?: string }[];
+  createdAt?: string;
 }
 
 /* ── Shared sub-components ── */
@@ -57,26 +48,24 @@ const PaginationBtn: React.FC<{ label: string; onClick: () => void; active?: boo
   </button>
 );
 
-// const capitalizeStatus = (status?: string) => {
-//   if (!status) return "Active";
-//   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-// };
-
-const Cities: React.FC = () => {
+const Provinces: React.FC = () => {
   const [provinces, setProvinces] = useState<Province[]>([]);
-  // Default selectedProvinceId to "", i.e., show all provinces' cities by default
-  const [selectedProvinceId, setSelectedProvinceId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Modal state
+  // Add form
+  const [newName, setNewName] = useState("");
+  const [newNick, setNewNick] = useState("");
+  const [newStatus, setNewStatus] = useState<ProvinceStatus>("Active");
+
+  // Edit modal
   const [showModal, setShowModal] = useState(false);
-  const [editingCity, setEditingCity] = useState<City | null>(null);
-  const [formName, setFormName] = useState("");
-  const [formStatus, setFormStatus] = useState<CityStatus>("Active");
-  const [formProvinceId, setFormProvinceId] = useState<string>("");
+  const [editingProvince, setEditingProvince] = useState<Province | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editNick, setEditNick] = useState("");
+  const [editStatus, setEditStatus] = useState<ProvinceStatus>("Active");
 
   // Table controls
   const [search, setSearch] = useState("");
@@ -90,113 +79,94 @@ const Cities: React.FC = () => {
     setError("");
     try {
       const res = await axios.get<{ data: Province[] }>(`${API_BASE}/admin/provinces`);
-      const data = res.data.data || [];
-      setProvinces(data);
-      // Do not set selectedProvinceId when initially loading. Keep as "" so ALL cities show by default.
-      // (If the user selects a province, it will change below.)
-      // if (data.length > 0 && !selectedProvinceId) setSelectedProvinceId(data[0]._id);
+      setProvinces(res.data.data || []);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
       setError(axErr?.response?.data?.message || axErr?.message || "Failed to fetch provinces");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const openAddModal = () => {
-    setEditingCity(null);
-    setFormName("");
-    setFormStatus("Active");
-    setFormProvinceId(selectedProvinceId);
-    setError("");
-    setShowModal(true);
-  };
-
-  const openEditModal = (city: City, provinceId: string) => {
-    setEditingCity(city);
-    setFormName(city.name);
-    setFormStatus(city.status || "Active");
-    setFormProvinceId(provinceId);
-    setError("");
-    setShowModal(true);
-  };
-
-  const handleFormSubmit = async (e: FormEvent) => {
+  const handleAddProvince = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formProvinceId) { setError("Please select a province."); return; }
     setActionLoading(true);
     setError(""); setSuccessMsg("");
     try {
-      if (editingCity) {
-        await axios.patch(
-          `${API_BASE}/admin/provinces/${formProvinceId}/cities/${encodeURIComponent(editingCity.name)}`,
-          { name: formName.trim(), status: formStatus }
-        );
-        setSuccessMsg("City updated successfully.");
-      } else {
-        await axios.post(`${API_BASE}/admin/provinces/${formProvinceId}/cities`, { name: formName.trim(), status: formStatus });
-        setSuccessMsg("City added successfully.");
-      }
+      await axios.post(`${API_BASE}/admin/provinces`, { name: newName.trim(), nickName: newNick.trim(), status: newStatus });
+      setSuccessMsg("Province added successfully.");
+      setNewName(""); setNewNick(""); setNewStatus("Active");
+      fetchProvinces();
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      setError(axErr?.response?.data?.message || axErr?.message || "Failed to add province");
+    } finally { setActionLoading(false); }
+  };
+
+  const openEditModal = (province: Province) => {
+    setEditingProvince(province);
+    setEditName(province.name);
+    setEditNick(province.nickName || "");
+    setEditStatus(province.status || "Active");
+    setError(""); setSuccessMsg("");
+    setShowModal(true);
+  };
+
+  const handleEditSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingProvince) return;
+    setActionLoading(true);
+    setError(""); setSuccessMsg("");
+    try {
+      await axios.patch(`${API_BASE}/admin/provinces/${editingProvince._id}`, { name: editName.trim(), nickName: editNick.trim(), status: editStatus });
+      setSuccessMsg("Province updated successfully.");
       setShowModal(false);
       fetchProvinces();
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Error saving city");
+      setError(axErr?.response?.data?.message || axErr?.message || "Failed to update province");
     } finally { setActionLoading(false); }
   };
 
-  const handleToggleStatus = async (city: City, provinceId: string) => {
-    const newStatus: CityStatus = city.status === "Active" ? "Inactive" : "Active";
+  const handleToggleStatus = async (province: Province) => {
+    const newStatus: ProvinceStatus = province.status === "Active" ? "Inactive" : "Active";
     try {
-      await axios.patch(
-        `${API_BASE}/admin/provinces/${provinceId}/cities/${encodeURIComponent(city.name)}`,
-        { name: city.name, status: newStatus }
-      );
+      await axios.patch(`${API_BASE}/admin/provinces/${province._id}`, { ...province, status: newStatus });
       fetchProvinces();
     } catch { setError("Error updating status"); }
   };
 
-  const handleDelete = async (city: City, provinceId: string) => {
-    if (!window.confirm(`Delete city "${city.name}"?`)) return;
+  const handleDelete = async (province: Province) => {
+    if (!window.confirm(`Delete province "${province.name}"? All cities will also be deleted.`)) return;
     setActionLoading(true);
     setError(""); setSuccessMsg("");
     try {
-      await axios.delete(`${API_BASE}/admin/provinces/${provinceId}/cities/${encodeURIComponent(city.name)}`);
-      setSuccessMsg("City deleted successfully.");
+      await axios.delete(`${API_BASE}/admin/provinces/${province._id}`);
+      setSuccessMsg("Province deleted successfully.");
       fetchProvinces();
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Failed to delete city");
+      setError(axErr?.response?.data?.message || axErr?.message || "Failed to delete province");
     } finally { setActionLoading(false); }
   };
 
-  // Build flat list: if a province is selected, show only its cities; else show all
-  const allCities: (City & { provinceName: string; provinceId: string })[] = selectedProvinceId
-    ? (provinces.find((p) => p._id === selectedProvinceId)?.cities || []).map((c) => ({
-        ...c,
-        provinceName: provinces.find((p) => p._id === selectedProvinceId)?.name || "",
-        provinceId: selectedProvinceId,
-      }))
-    : provinces.flatMap((p) => (p.cities || []).map((c) => ({ ...c, provinceName: p.name, provinceId: p._id })));
-
-  const filtered = allCities.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.provinceName.toLowerCase().includes(search.toLowerCase())
+  // Filtered + paginated
+  const filtered = provinces.filter(
+    (p) => p.name.toLowerCase().includes(search.toLowerCase()) || (p.nickName || "").toLowerCase().includes(search.toLowerCase())
   );
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const showingFrom = filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const showingTo = Math.min(currentPage * pageSize, filtered.length);
 
-  const selectedProvince = provinces.find((p) => p._id === selectedProvinceId);
-
   return (
     <div className="min-h-screen bg-[#f0f0f0] px-6 py-5 font-sans">
       {/* Page Header */}
       <div className="flex items-start justify-between mb-4">
-        <h1 className="text-2xl font-semibold text-gray-800">City Management</h1>
+        <h1 className="text-2xl font-semibold text-gray-800">Province Management</h1>
         <div className="text-sm text-right">
           <span className="text-blue-600 hover:underline cursor-pointer">Dashboard</span>
-          <span className="text-gray-500"> / Cities</span>
+          <span className="text-gray-500"> / Provinces</span>
         </div>
       </div>
 
@@ -208,25 +178,12 @@ const Cities: React.FC = () => {
       <div className="bg-white rounded shadow-sm">
         {/* Card Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <span className="text-base font-medium text-gray-700">City List</span>
-            {/* Province filter inline in header */}
-            <select
-              value={selectedProvinceId}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => { setSelectedProvinceId(e.target.value); setCurrentPage(1); }}
-              className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400 bg-white text-gray-700 min-w-[180px]"
-            >
-              <option value="">All Provinces</option>
-              {provinces.map((p) => (
-                <option key={p._id} value={p._id}>{p.name}{p.nickName ? ` (${p.nickName})` : ""}</option>
-              ))}
-            </select>
-          </div>
+          <span className="text-base font-medium text-gray-700">Province List</span>
           <button
-            onClick={openAddModal}
+            onClick={() => { setEditingProvince(null); setEditName(""); setEditNick(""); setEditStatus("Active"); setError(""); setShowModal(true); }}
             className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded transition-colors"
           >
-            <span className="text-lg leading-none">+</span> Add City
+            <span className="text-lg leading-none">+</span> Add Province
           </button>
         </div>
 
@@ -254,7 +211,7 @@ const Cities: React.FC = () => {
               <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
             </svg>
-            <span className="text-blue-600 text-sm font-medium">Loading cities...</span>
+            <span className="text-blue-600 text-sm font-medium">Loading provinces...</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -262,36 +219,36 @@ const Cities: React.FC = () => {
               <thead>
                 <tr className="border-t border-b border-gray-200 bg-gray-50">
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 w-16"><span className="flex items-center gap-1">ID <SortIcon /></span></th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700"><span className="flex items-center gap-1">City Name <SortIcon /></span></th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700 w-48"><span className="flex items-center gap-1">Province <SortIcon /></span></th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700"><span className="flex items-center gap-1">Province Name <SortIcon /></span></th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 w-40"><span className="flex items-center gap-1">Nickname <SortIcon /></span></th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 w-24"><span className="flex items-center gap-1">Cities <SortIcon /></span></th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 w-32"><span className="flex items-center gap-1">Status <SortIcon /></span></th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 w-28"><span className="flex items-center gap-1">Actions <SortIcon /></span></th>
                 </tr>
               </thead>
               <tbody>
                 {paginated.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center py-10 text-gray-400">
-                    {selectedProvinceId ? `No cities found in ${selectedProvince?.name || "this province"}.` : "No cities found."}
-                  </td></tr>
+                  <tr><td colSpan={6} className="text-center py-10 text-gray-400">No provinces found.</td></tr>
                 ) : (
-                  paginated.map((city, idx) => (
-                    <tr key={`${city.provinceId}-${city.name}`} className={`border-b border-gray-100 ${idx % 2 === 1 ? "bg-white" : "bg-[#f9f9f9]"}`}>
-                      <td className="px-4 py-3 text-gray-700">{showingFrom + idx}</td>
-                      <td className="px-4 py-3 text-gray-800 font-medium">{city.name}</td>
-                      <td className="px-4 py-3 text-gray-600 text-xs uppercase font-medium tracking-wide">{city.provinceName}</td>
+                  paginated.map((province, idx) => (
+                    <tr key={province._id} className={`border-b border-gray-100 ${idx % 2 === 1 ? "bg-white" : "bg-[#f9f9f9]"}`}>
+                      <td className="px-4 py-3 text-gray-700">{(currentPage - 1) * pageSize + idx + 1}</td>
+                      <td className="px-4 py-3 text-gray-800 font-medium">{province.name}</td>
+                      <td className="px-4 py-3 text-gray-500 italic text-xs">{province.nickName || "—"}</td>
+                      <td className="px-4 py-3 text-gray-700">{province.cities?.length ?? 0}</td>
                       <td className="px-4 py-3">
-                        <ToggleSwitch active={city.status !== "Inactive"} onToggle={() => handleToggleStatus(city, city.provinceId)} />
+                        <ToggleSwitch active={province.status !== "Inactive"} onToggle={() => handleToggleStatus(province)} />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <button onClick={() => openEditModal(city, city.provinceId)}
+                          <button onClick={() => openEditModal(province)}
                             className="w-8 h-8 rounded flex items-center justify-center bg-teal-500 hover:bg-teal-600 text-white transition-colors"
-                            aria-label={`Edit ${city.name}`}>
+                            aria-label={`Edit ${province.name}`}>
                             <EditIcon />
                           </button>
-                          <button onClick={() => handleDelete(city, city.provinceId)} disabled={actionLoading}
+                          <button onClick={() => handleDelete(province)} disabled={actionLoading}
                             className="w-8 h-8 rounded flex items-center justify-center bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
-                            aria-label={`Delete ${city.name}`}>
+                            aria-label={`Delete ${province.name}`}>
                             <DeleteIcon />
                           </button>
                         </div>
@@ -322,36 +279,34 @@ const Cities: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded shadow-xl w-full max-w-md mx-4 animate-fadein" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 pt-5 pb-3">
-              <h3 className="text-lg font-semibold text-gray-800">{editingCity ? "Edit City" : "Add New City"}</h3>
+              <h3 className="text-lg font-semibold text-gray-800">{editingProvince ? "Edit Province" : "Add New Province"}</h3>
               <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-gray-800 text-xl leading-none">×</button>
             </div>
             <hr className="border-gray-200" />
             <div className="px-6 py-5 bg-blue-50/40">
               {error && <div className="mb-3 text-sm rounded bg-red-100 text-red-700 px-3 py-2 border border-red-200">{error}</div>}
-              <form onSubmit={handleFormSubmit} autoComplete="off">
+              <form onSubmit={editingProvince ? handleEditSubmit : handleAddProvince} autoComplete="off">
                 <div className="mb-4">
-                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">City Name</label>
-                  <input type="text" required autoFocus
-                    value={formName}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => setFormName(e.target.value)}
+                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Province Name</label>
+                  <input type="text" required
+                    value={editingProvince ? editName : newName}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => editingProvince ? setEditName(e.target.value) : setNewName(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400 bg-white placeholder:text-gray-400"
-                    placeholder="Enter city name" />
+                    placeholder="Enter province name" autoFocus />
                 </div>
                 <div className="mb-4">
-                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Select Province</label>
-                  <select required
-                    value={formProvinceId}
-                    onChange={(e) => setFormProvinceId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400 bg-white text-gray-600">
-                    <option value="">Select Province</option>
-                    {provinces.map((p) => (
-                      <option key={p._id} value={p._id}>{p.name}{p.nickName ? ` (${p.nickName})` : ""}</option>
-                    ))}
-                  </select>
+                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Nickname <span className="font-normal text-gray-400">(optional)</span></label>
+                  <input type="text"
+                    value={editingProvince ? editNick : newNick}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => editingProvince ? setEditNick(e.target.value) : setNewNick(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400 bg-white placeholder:text-gray-400"
+                    placeholder="Enter nickname" />
                 </div>
                 <div className="mb-4">
                   <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Status</label>
-                  <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as CityStatus)}
+                  <select
+                    value={editingProvince ? editStatus : newStatus}
+                    onChange={(e) => editingProvince ? setEditStatus(e.target.value as ProvinceStatus) : setNewStatus(e.target.value as ProvinceStatus)}
                     className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400 bg-white">
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
@@ -364,7 +319,7 @@ const Cities: React.FC = () => {
                   </button>
                   <button type="submit" disabled={actionLoading}
                     className="px-5 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded transition disabled:opacity-70">
-                    {actionLoading ? "Saving..." : editingCity ? "Update City" : "Add City"}
+                    {actionLoading ? "Saving..." : editingProvince ? "Update Province" : "Add Province"}
                   </button>
                 </div>
               </form>
@@ -381,4 +336,4 @@ const Cities: React.FC = () => {
   );
 };
 
-export default Cities;
+export default Provinces;

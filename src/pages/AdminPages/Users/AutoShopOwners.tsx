@@ -11,11 +11,11 @@ import Badge from "../../../components/ui/badge/Badge";
 
 // ====================
 // Types based on data sample for businessProfile with teamMembers and myDeals
+// (Unchanged Types)
 // ====================
 
 type SubService = {
   subService: string;
-  // Additional fields?
 };
 
 type IndividualService = {
@@ -119,7 +119,7 @@ type JobCardServiceType = {
 
 type JobCardType = {
   _id: string;
-  jobNo:string;
+  jobNo: string;
   business: string;
   customerId: string;
   vehicleId: string;
@@ -145,7 +145,6 @@ type AutoShopOwnerType = {
   countryCode?: string;
   phone?: string;
   pincode?: string;
- 
   address?: string;
   isDisabled?: boolean;
   isProfileComplete?: boolean;
@@ -157,7 +156,8 @@ type AutoShopOwnerType = {
   jobCards?: JobCardType[];
 };
 
-// ShopOverviewCard component using the provided design
+// ShopOverviewCard, Modal, Badge helpers, etc.: unchanged
+
 const ShopOverviewCard: React.FC<{ shopData: BusinessProfileType }> = ({
   shopData = {},
 }) => {
@@ -242,6 +242,8 @@ const ShopOverviewCard: React.FC<{ shopData: BusinessProfileType }> = ({
   const statusOpen = isOpen;
 
   return (
+    // ...as in original code...
+    // (No changes made here)
     <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.06)] mb-7">
       {/* Top action bar */}
       <div
@@ -408,7 +410,6 @@ type ModalProps = {
   children: React.ReactNode;
 };
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
-  // ...unchanged...
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
@@ -430,7 +431,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
   );
 };
 
-// Helper badge/status functions
+// Helper badge/status functions: unchanged
 function getStatus(owner: AutoShopOwnerType) {
   if (owner.isDisabled) return "Suspended";
   if (
@@ -452,8 +453,7 @@ function getStatusColor(owner: AutoShopOwnerType) {
   return "default";
 }
 
-// --- Export (CSV) feature ---
-// Utility: Convert array of objects to CSV
+// Export helpers: unchanged
 function toCsv(data: string[][], headers: string[]): string {
   const escapeCsv = (val: any) => {
     if (val == null) return "";
@@ -469,8 +469,6 @@ function toCsv(data: string[][], headers: string[]): string {
     data.map((row) => row.map(escapeCsv).join(",")).join("\n")
   );
 }
-
-// Download as file
 function downloadAsFile(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -480,9 +478,9 @@ function downloadAsFile(filename: string, content: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
-
-// Convert owners array to CSV (flat detail)
-function autoShopOwnersToCsvRows(owners: AutoShopOwnerType[]): [string[], string[][]] {
+function autoShopOwnersToCsvRows(
+  owners: AutoShopOwnerType[]
+): [string[], string[][]] {
   const headers = [
     "Name",
     "Email",
@@ -497,9 +495,9 @@ function autoShopOwnersToCsvRows(owners: AutoShopOwnerType[]): [string[], string
     "JobCards Count",
     "Created At",
     "Profile Complete",
-    "Business Profile Complete"
+    "Business Profile Complete",
   ];
-  const rows = owners.map(owner => [
+  const rows = owners.map((owner) => [
     owner.name ?? "",
     owner.email ?? "",
     (owner.countryCode ? owner.countryCode + " " : "") + (owner.phone ?? ""),
@@ -513,12 +511,163 @@ function autoShopOwnersToCsvRows(owners: AutoShopOwnerType[]): [string[], string
     owner.jobCards ? owner.jobCards.length.toString() : "0",
     owner.createdAt ? new Date(owner.createdAt).toLocaleString() : "",
     owner.isProfileComplete ? "Yes" : "No",
-    (owner.isBusinessProfileCompleted ?? !!owner.businessProfile) ? "Yes" : "No"
+    (owner.isBusinessProfileCompleted ?? !!owner.businessProfile) ? "Yes" : "No",
   ]);
   return [headers, rows];
 }
 
-// --- End CSV helpers ---
+// --- Send Custom Notification Modal ---
+const SendNotificationModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  selectedOwnerIds: string[];
+  onSuccess: () => void;
+}> = ({ isOpen, onClose, selectedOwnerIds, onSuccess }) => {
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const ownersCount = selectedOwnerIds.length;
+
+  const resetForm = () => {
+    setTitle("");
+    setBody("");
+    setError(null);
+    setSuccessMsg(null);
+    setSending(false);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+
+    if (!title.trim() || !body.trim()) {
+      setError("Please provide both title and message body");
+      return;
+    }
+    if (!Array.isArray(selectedOwnerIds) || selectedOwnerIds.length === 0) {
+      setError("No shop owners selected.");
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/admin/notification/custom/send`,
+        {
+          userType:"autoshopowner",
+          userIds: selectedOwnerIds,
+          title,
+          message: body,
+        }
+      );
+      if (res.data.success) {
+        setSuccessMsg("Notification sent successfully!");
+        onSuccess();
+        setTimeout(handleClose, 1500);
+      } else {
+        setError(res.data.message || "Failed to send notification");
+      }
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          (err?.message || "Failed to send notification")
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} title="Send Custom Notification">
+      <form className="space-y-5 max-w-lg mx-auto" onSubmit={handleSend}>
+        <div>
+          <label className="block font-semibold mb-1" htmlFor="noti-title">
+            Notification Title
+          </label>
+          <input
+            id="noti-title"
+            type="text"
+            className="w-full border-gray-300 rounded px-3 py-2"
+            value={title}
+            disabled={sending}
+            onChange={e => setTitle(e.target.value)}
+            maxLength={80}
+            placeholder="Eg. Important update for your shop account"
+            required
+          />
+        </div>
+        <div>
+          <label className="block font-semibold mb-1" htmlFor="noti-body">
+            Notification Body
+          </label>
+          <textarea
+            id="noti-body"
+            className="w-full border-gray-300 rounded px-3 py-2 min-h-[92px]"
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            disabled={sending}
+            maxLength={240}
+            placeholder="Write your message to send to selected shop owners..."
+            required
+          />
+        </div>
+        {error ? <div className="text-red-600 text-sm">{error}</div> : null}
+        {successMsg ? (
+          <div className="text-green-600 text-sm">{successMsg}</div>
+        ) : null}
+        <div className="flex items-center gap-4 justify-end mt-4">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={sending}
+            className="px-4 py-2 rounded bg-slate-100 text-gray-850 hover:bg-slate-200 font-semibold"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={sending}
+            className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center space-x-2"
+          >
+            {sending && (
+              <svg
+                className="animate-spin mr-2 h-4 w-4 text-white"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                />
+              </svg>
+            )}
+            <span>
+              Send Notification to {ownersCount} shop owner
+              {ownersCount > 1 ? "s" : ""}
+            </span>
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
 
 // New: Job Card Detail Modal
 const JobCardDetailModal: React.FC<{
@@ -528,8 +677,10 @@ const JobCardDetailModal: React.FC<{
   owner: AutoShopOwnerType | null;
   UPLOADS_URL: string;
 }> = ({ isOpen, onClose, card, owner, UPLOADS_URL }) => {
-  // ...unchanged... (see original code for details)
+  // ...unchanged... (as before)
   if (!isOpen || !card || !owner) return null;
+  // ...rest of modal unchanged...
+  // ...omitted for brevity...
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Job Card Details - ${card._id}`}>
       <div className="space-y-2 text-sm text-gray-800 dark:text-white">
@@ -662,6 +813,9 @@ const JobCardDetailModal: React.FC<{
   );
 };
 
+// -----------------------------
+// Main Component
+// -----------------------------
 const AutoShopOwners: React.FC = () => {
   const [owners, setOwners] = useState<AutoShopOwnerType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -675,16 +829,23 @@ const AutoShopOwners: React.FC = () => {
   const [modalOwner, setModalOwner] = useState<AutoShopOwnerType | null>(null);
 
   // Job Card detail modal state
-  const [jobCardDetailModalOpen, setJobCardDetailModalOpen] = useState<boolean>(false);
-  const [selectedJobCard, setSelectedJobCard] = useState<JobCardType | null>(null);
+  const [jobCardDetailModalOpen, setJobCardDetailModalOpen] =
+    useState<boolean>(false);
+  const [selectedJobCard, setSelectedJobCard] =
+    useState<JobCardType | null>(null);
 
   // For disabling/enabling owners
-  const [actionLoadingMap, setActionLoadingMap] = useState<{ [ownerId: string]: boolean }>({});
+  const [actionLoadingMap, setActionLoadingMap] = useState<{
+    [ownerId: string]: boolean;
+  }>({});
 
   const [exporting, setExporting] = useState(false); // Export UI state
 
   // Selection state
   const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
+
+  // Notification modal state
+  const [notificationOpen, setNotificationOpen] = useState(false);
 
   // Vehicle image base url from VITE_UPLOADS_URL
   const UPLOADS_URL = import.meta.env.VITE_UPLOADS_URL;
@@ -716,14 +877,12 @@ const AutoShopOwners: React.FC = () => {
   ) => {
     setActionLoadingMap((prev) => ({ ...prev, [ownerId]: true }));
     try {
-      // Required fields in body: userId and disable (boolean)
       const disable = action === "disable";
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL}/api/admin/autoshopowners/toggle-status`,
         { userId: ownerId, disable }
       );
       if (res.data.success) {
-        // Refetch
         await fetchOwners();
       } else {
         alert("Failed to update status");
@@ -744,7 +903,9 @@ const AutoShopOwners: React.FC = () => {
     try {
       let dataToExport: AutoShopOwnerType[] = [];
       if (selectedOwnerIds.length > 0) {
-        dataToExport = owners.filter(owner => selectedOwnerIds.includes(owner._id));
+        dataToExport = owners.filter((owner) =>
+          selectedOwnerIds.includes(owner._id)
+        );
       } else {
         alert("Please select at least one row to export.");
         setExporting(false);
@@ -770,20 +931,21 @@ const AutoShopOwners: React.FC = () => {
   };
 
   // For bulk selection
-  const isAllSelected = owners.length > 0 && selectedOwnerIds.length === owners.length;
+  const isAllSelected =
+    owners.length > 0 && selectedOwnerIds.length === owners.length;
   const handleCheckAll = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      setSelectedOwnerIds(owners.map(owner => owner._id));
+      setSelectedOwnerIds(owners.map((owner) => owner._id));
     } else {
       setSelectedOwnerIds([]);
     }
   };
   const handleCheckRow = (ownerId: string, checked: boolean) => {
-    setSelectedOwnerIds(current => {
+    setSelectedOwnerIds((current) => {
       if (checked) {
         return [...current, ownerId];
       } else {
-        return current.filter(id => id !== ownerId);
+        return current.filter((id) => id !== ownerId);
       }
     });
   };
@@ -1253,10 +1415,51 @@ const AutoShopOwners: React.FC = () => {
       {renderDealsModal()}
       {renderJobCardsModal()}
 
+      {/* Send Notification Modal */}
+      <SendNotificationModal
+        isOpen={notificationOpen}
+        onClose={() => setNotificationOpen(false)}
+        selectedOwnerIds={selectedOwnerIds}
+        onSuccess={() => {}}
+      />
+
       <div className="overflow-y-auto h-full pb-20 rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03] p-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-2">
           <h2 className="text-xl font-semibold">Auto Shop Owners</h2>
           <div className="ml-auto flex gap-2">
+            {/* Send Custom Notification button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!selectedOwnerIds.length) {
+                  alert("Select at least one shop owner to send notification.");
+                  return;
+                }
+                setNotificationOpen(true);
+              }}
+              disabled={loading}
+              className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center space-x-2"
+            >
+              <svg
+                className="h-5 w-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13 16h-1v-4h-1m0-4h.01M21 12A9 9 0 113 12a9 9 0 0118 0z"
+                />
+              </svg>
+              <span>
+                Send Notification
+                {selectedOwnerIds.length > 0
+                  ? ` (${selectedOwnerIds.length} selected)`
+                  : ""}
+              </span>
+            </button>
             <button
               type="button"
               onClick={handleExport}
@@ -1417,7 +1620,6 @@ const AutoShopOwners: React.FC = () => {
                     <TableCell
                       className="text-center py-8 text-gray-400"
                       isHeader={false}
-
                     >
                       No auto shop owners found.
                     </TableCell>
@@ -1583,6 +1785,7 @@ const AutoShopOwners: React.FC = () => {
                             {isSuspended ? "Enable" : "Suspend"}
                           </span>
                         </button>
+                        
                       </TableCell>
                     </TableRow>
                   );

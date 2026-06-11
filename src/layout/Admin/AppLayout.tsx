@@ -49,7 +49,7 @@ const LayoutContent: React.FC<{
           </div>
         )}
         <SubAdminAppHeader />
-        <div className="p-4 mx-auto w-full h-full md:p-6">
+        <div className=" mx-auto w-full h-full ">
           <Outlet />
         </div>
       </div>
