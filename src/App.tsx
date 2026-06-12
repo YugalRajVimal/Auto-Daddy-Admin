@@ -38,8 +38,7 @@ import LogOutAdmin from "./pages/AdminPages/LogOutAdmin";
 import AdminSignInPage from "./pages/AuthPages/AdminSignInPage";
 
 import Tasks from "./pages/AdminPages/Tasks/Tasks";
-import Payments from "./pages/AdminPages/Payments/Payments";
-import PackagesPage from "./pages/AdminPages/Packages/Packages";
+
 import CarOwners from "./pages/AdminPages/Users/CarOwners";
 import AutoShopOwners from "./pages/AdminPages/Users/AutoShopOwners";
 
@@ -123,90 +122,19 @@ export default function App() {
 
 
 
-            <Route path="/admin/manage-packages" element={<PackagesPage/>} />
-            <Route path="/admin/manage-task" element={<Tasks />} />
-            <Route path="/admin/manage-rewards" element={<div>Manage Rewards (HTML placeholder)</div>} />
-            <Route path="/admin/profile" element={<AdminProfile />} />
-            <Route path="/admin/finances" element={<Payments />} />
-            <Route path="/admin/logout" element={<LogOutAdmin />} />
 
+            <Route path="/admin/manage-task" element={<Tasks />} />
+            <Route path="/admin/profile" element={<AdminProfile />} />
+            <Route path="/admin/logout" element={<LogOutAdmin />} />
             {/* <Route path="/admin/vehicle-types" element={<VehicleType />} /> */}
             <Route path="/admin/website-templates" element={<WebsiteTemplates />} />
             <Route path="/admin/dashboard-data" element={<DashboardData />} />
             <Route path="/admin/car-companies" element={<CarCompany />} />
-     
-     
-     
           </Route>
 
 
           <Route path="/admin/signin" element={<AdminSignInPage />} />
-
           <Route path="/auto-shop-owner/onboarding" element={<AutoShopOwnerOnboarding />} />
-
-         
-    
-
-
-
-
-         {/*  <Route element={<SupervisorAppLayout />}>
-            <Route index path="/therapist" element={<SupervisorHome />} />
-            <Route path="/therapist/appointments" element={<TherapistMyAppointments />} />
-            <Route path="/therapist/calendar" element={<CalendarAndSchedule />} />
-            <Route path="/therapist/earnings" element={<MyEarningsTherapist/>} />
-            <Route path="/therapist/profile" element={<TherpaistProfile />} />
-            <Route path="/therapist/earnings" element={<MyEarningsTherapist/>} />
-          
-
-          </Route> */}
-
-          {/* <Route path="/therapist/signup" element={<TherapistSignUp />} />
-          <Route path="/therapist/complete-profile" element={<CompleteProfilePage />} />
-          <Route path="/therapist/pending-approval" element={<ApprovalPending/>} />
-          <Route path="/therapist/logout" element={<LogOutTherapist/>} /> */}
-
-
-          {/* <Route  element={<ParentAppLayout />}>
-            <Route index path="/user" element={<ParentDashboard />} />
-            <Route index path="/tasks" element={<AllTasks />} />
-            <Route index path="/referral" element={<Referrals />} />
-            <Route index path="/promotional-page" element={<PromotionalIncomePage />} />
-            <Route index path="/rewards" element={<Rewards />} />
-
-            <Route path="/user/profile" element={<ParentProfile />} />
-            <Route path="/wallet-history" element={<WalletAndHistory />} />
-          
-
-
-
-
-
-            <Route path="/user/children" element={<MyChildrens />} />
-            <Route path="/user/appointments" element={<MyChildrenAppointmentsPage  />} />
-            <Route path="/user/invoices-payments" element={<InvoiveAndPaymentsPage/>} />
-            <Route path="/user/request-appointment" element={<RequestAppointment />} />
-            <Route path="/user/request-edit-appointment" element={<RequestEditAppointments />} />
-
-
-          </Route>        */}
-{/* 
-          <Route path="/user/signup" element={<ParentSignUp />} />
-          <Route path="/user/complete-parent-profile" element={<ParentCompleteProfile />} />
-          <Route path="/user/logout" element={<LogOutParent />} /> */}
-
-
-
-          {/* <Route path="/signin" element={<AuthPage />} />
-          <Route path="/signup" element={<SignUpPage/>} />
-          <Route path="/complete-kyc" element={<CompleteKYC />} />
-          <Route path="/kyc-pending" element={<KycApprovalPending />} />
-          <Route path="/purchase-package" element={<PurchasePackage />} /> */}
-        
-          {/* <Route path="/privacy-policy" element={<PrivacyPolicy />} /> */}
-
-          {/* <Route path="/sub-admin/signup" element={<SubAdminSignUpForm />} /> */}
-
           <Route path="/calendar" element={<Calendar />} />
             <Route path="/blank" element={<Blank />} />
 
