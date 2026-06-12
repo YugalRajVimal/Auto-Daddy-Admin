@@ -146,7 +146,11 @@ const SubServicesPage: React.FC = () => {
   const showingToCurrent = Math.min(currentPage * pageSize, filteredForTable.length);
 
   return (
-    <div className="min-h-screen bg-[#f0f0f0] px-6 py-5 font-sans">
+    <div
+    // You may use Tailwind class if setup, or fallback to CSS below.
+    className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
+  
+  >
       {/* Page Header */}
       <div className="flex items-start justify-between mb-4">
         <h1 className="text-2xl font-semibold text-gray-800">Category Management</h1>
@@ -161,7 +165,7 @@ const SubServicesPage: React.FC = () => {
       {successMsg && <div className="mb-3 text-sm rounded bg-green-100 text-green-800 px-3 py-2 border border-green-200">{successMsg}</div>}
 
       {/* Card */}
-      <div className="bg-white rounded shadow-sm">
+      <div  className=" mb-10 bg-white rounded shadow-sm">
         {/* Card Header with Service dropdown (like cities page) */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <span className="text-base font-medium text-gray-700 flex items-center gap-3">

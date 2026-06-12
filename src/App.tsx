@@ -4,19 +4,19 @@ import "react-toastify/dist/ReactToastify.css";
 
 // import SignIn from "./pages/SuperAdminPages/AuthPages/SignIn";
 
-import NotFound from "./pages/SuperAdminPages/OtherPage/NotFound";
-import Videos from "./pages/SuperAdminPages/UiElements/Videos";
-import Images from "./pages/SuperAdminPages/UiElements/Images";
-import Alerts from "./pages/SuperAdminPages/UiElements/Alerts";
-import Badges from "./pages/SuperAdminPages/UiElements/Badges";
-import Avatars from "./pages/SuperAdminPages/UiElements/Avatars";
-import Buttons from "./pages/SuperAdminPages/UiElements/Buttons";
-import LineChart from "./pages/SuperAdminPages/Charts/LineChart";
-import BarChart from "./pages/SuperAdminPages/Charts/BarChart";
-import Calendar from "./pages/SuperAdminPages/Calendar";
-import BasicTables from "./pages/SuperAdminPages/Tables/BasicTables";
-import FormElements from "./pages/SuperAdminPages/Forms/FormElements";
-import Blank from "./pages/SuperAdminPages/Blank";
+import NotFound from "./pages/AdminPages/OtherPage/NotFound";
+import Videos from "./pages/AdminPages/UiElements/Videos";
+import Images from "./pages/AdminPages/UiElements/Images";
+import Alerts from "./pages/AdminPages/UiElements/Alerts";
+import Badges from "./pages/AdminPages/UiElements/Badges";
+import Avatars from "./pages/AdminPages/UiElements/Avatars";
+import Buttons from "./pages/AdminPages/UiElements/Buttons";
+import LineChart from "./pages/AdminPages/Charts/LineChart";
+import BarChart from "./pages/AdminPages/Charts/BarChart";
+import Calendar from "./pages/AdminPages/Calendar";
+import BasicTables from "./pages/AdminPages/Tables/BasicTables";
+import FormElements from "./pages/AdminPages/Forms/FormElements";
+import Blank from "./pages/AdminPages/Blank";
 
 
 import { ScrollToTop } from "./components/common/ScrollToTop";

@@ -83,22 +83,10 @@ const RunningDeals: React.FC = () => {
 
   return (
     <div
-      style={{
-        padding: '0',
-        maxWidth: 1300,
-        margin: '0 auto',
-        background: '#f8fafc',
-        minHeight: '80vh',
-        height: '85vh',
-        display: 'flex',
-        flexDirection: 'column',
-        borderRadius: '16px',
-      overflow: 'hidden',
- 
-     
- 
-      }}
-    >
+        // You may use Tailwind class if setup, or fallback to CSS below.
+        className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
+      
+      >
       <div ref={headerRef} style={{padding: '32px 24px 0 24px', background:'#f8fafc'}}>
         <h2 style={{
           fontWeight: 700,
@@ -118,6 +106,7 @@ const RunningDeals: React.FC = () => {
         <p style={{color: '#64748b', marginBottom: '28px'}}>All currently active offers and deals for Auto Shop Owners</p>
       </div>
       <div
+      className='mb-10'
         style={{
           padding: '0 24px 32px 24px',
           flex: 1,
