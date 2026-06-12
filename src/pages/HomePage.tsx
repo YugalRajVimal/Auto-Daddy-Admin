@@ -1,11 +1,8 @@
 import { Link } from "react-router";
 import {
   FaUsers,
-
   FaRocket,
-
 } from "react-icons/fa";
-
 import { HiOutlineArrowNarrowRight } from "react-icons/hi";
 
 const HomePage = () => {
@@ -35,12 +32,8 @@ const HomePage = () => {
             <span className="text-blue-600">AutoDaddy Admin Panel</span>
           </h1>
 
-
-     
-
           {/* Main CTA */}
           <div className="mt-12 flex flex-col items-center gap-4">
-
             <Link
               to="/admin"
               className="group inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg shadow-lg transition-all"
@@ -50,11 +43,16 @@ const HomePage = () => {
               <HiOutlineArrowNarrowRight className="h-5 w-5 group-hover:translate-x-1 transition" />
             </Link>
 
-          
-
+            {/* Sub Admin Sign In CTA */}
+            <Link
+              to="/subadmin/signin"
+              className="group inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-slate-200 hover:bg-slate-300 text-blue-700 font-bold text-lg shadow transition-all"
+            >
+              <FaUsers className="h-5 w-5" />
+              Sub Admin Sign In
+              <HiOutlineArrowNarrowRight className="h-5 w-5 group-hover:translate-x-1 transition" />
+            </Link>
           </div>
-
-
 
           {/* Footer */}
           <div className="mt-6 text-xs text-slate-300">

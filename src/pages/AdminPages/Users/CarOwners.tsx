@@ -2071,7 +2071,12 @@ const CarOwners: React.FC = () => {
   const fetchCarOwners = async () => {
     setLoading(true); setError("");
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/carowners`);
+      const token = localStorage.getItem("admin-token");
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/carowners`, {
+        headers: {
+          Authorization: token ? token : "",
+        },
+      });
       if (res.data.success && Array.isArray(res.data.data)) {
         setCarOwners(res.data.data);
       } else {

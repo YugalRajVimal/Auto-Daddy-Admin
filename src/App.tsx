@@ -2,8 +2,6 @@ import { BrowserRouter as Router, Routes, Route } from "react-router";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-// import SignIn from "./pages/SuperAdminPages/AuthPages/SignIn";
-
 import NotFound from "./pages/AdminPages/OtherPage/NotFound";
 import Videos from "./pages/AdminPages/UiElements/Videos";
 import Images from "./pages/AdminPages/UiElements/Images";
@@ -18,21 +16,13 @@ import BasicTables from "./pages/AdminPages/Tables/BasicTables";
 import FormElements from "./pages/AdminPages/Forms/FormElements";
 import Blank from "./pages/AdminPages/Blank";
 
-
 import { ScrollToTop } from "./components/common/ScrollToTop";
-// import Home from "./pages/SuperAdminPages/Dashboard/Home";
-// import SubAdminSignIn from "./pages/SuperAdminPages/AuthPages/SubAdmin/SignIn";
 
-import SubAdminAppLayout from "./layout/Admin/AppLayout";
-
-// import UploadedExcelSheets from "./pages/SubAdminPages/UploadedExcelSheets/UploadedExcelSheets";
+import AdminAppLayout from "./layout/Admin/AppLayout";
 
 import HomePage from "./pages/HomePage";
 
-import SubAdminHome from "./pages/AdminPages/Dashboard/Home";
-
-
-
+import AdminHome from "./pages/AdminPages/Dashboard/Home";
 import AdminProfile from "./pages/AdminPages/ProfilePage/AdminProfile";
 import LogOutAdmin from "./pages/AdminPages/LogOutAdmin";
 import AdminSignInPage from "./pages/AuthPages/AdminSignInPage";
@@ -55,6 +45,10 @@ import Wallet from "./pages/AdminPages/Wallet/Wallet";
 import SubServicesPage from "./pages/AdminPages/Services/Categories";
 import Provinces from "./pages/AdminPages/Cities/Provinces";
 import Invitehelp from "./pages/AdminPages/InviteHelpSection/Invitehelp";
+import SubAdminManagement from "./pages/AdminPages/SubAdminManagement/SubAdminManagement";
+import SubAdminSignInPage from "./pages/AuthPages/SubAdminSignInPage";
+import ProtectedRoute from "./components/common/ProtectedRoute";
+import Unauthorized from "./pages/AdminPages/OtherPage/Unauthorized";
 
 
 export default function App() {
@@ -77,85 +71,124 @@ export default function App() {
         
         <Routes>
           <Route index path="/" element={<HomePage />} />
-          {/* Dashboard Layout */}
-          {/* <Route element={<AppLayout />}>
-         
-            <Route index path="/super-admin" element={<SubAdminHome />} />
-            <Route path="/super-admin/all-users" element={<AllUsers />} />
-            <Route path="/super-admin/all-appointments" element={<AllAppointments />} />
-            <Route path="/super-admin/onboard-sub-admin" element={<OnboardSubAdmin />} />
-            <Route path="/super-admin/therapy-types" element={<TherapyTypesPage />} />
-            <Route path="/super-admin/packages" element={<PackagesPage />} />
-            <Route path="/super-admin/discount-coupons" element={<ManageDiscounts />} />
-            <Route path="/super-admin/audit-logs" element={<AllLogs/>} />
-            <Route path="/super-admin/finances" element={<FinancesSuperAdminPage/>} />
-            <Route path="/super-admin/full-calendar" element={<SuperAdminFullCalendar/>} />
-            <Route path="/super-admin/therapists" element={<SuperAdminTherapistsPage/>} />
+          <Route element={<AdminAppLayout />}>
+            <Route index path="/admin" element={
+              <ProtectedRoute module="dashboard" action="view">
+                <AdminHome />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/car-owners" element={
+              <ProtectedRoute module="users" action="view">
+                <CarOwners />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/auto-shop-owners" element={
+              <ProtectedRoute module="users" action="view">
+                <AutoShopOwners />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/services" element={
+              <ProtectedRoute module="services" action="view">
+                <Services />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/categories" element={
+              <ProtectedRoute module="categories" action="view">
+                <SubServicesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/provinces" element={
+              <ProtectedRoute module="provinces" action="view">
+                <Provinces />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/cities" element={
+              <ProtectedRoute module="cities" action="view">
+                <Cities />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/invite-help" element={
+              <ProtectedRoute module="inviteHelp" action="view">
+                <Invitehelp />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/ads" element={
+              <ProtectedRoute module="ads" action="view">
+                <Ads />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/running-deals" element={
+              <ProtectedRoute module="runningDeals" action="view">
+                <RunningDeals />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/wallet" element={
+              <ProtectedRoute module="wallet" action="view">
+                <Wallet />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/manage-task" element={
+              <ProtectedRoute module="tasks" action="view">
+                <Tasks />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/profile" element={
+              <ProtectedRoute module="dashboard" action="view">
+                <AdminProfile />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/logout" element={
 
+                <LogOutAdmin />
 
-
-
-            <Route path="/super-admin/profile" element={<SuperAdminProfile />} />
-            <Route path="/super-admin/logout" element={<LogOutSuperAdmin />} />
-       
-          </Route> */}
-
-          <Route element={<SubAdminAppLayout />}>
-            <Route index path="/admin" element={<SubAdminHome />} />
-            {/* <Route path="/admin/all-users" element={<AllUsers/>} /> */}
-            <Route path="/admin/car-owners" element={<CarOwners/>} />
-            <Route path="/admin/auto-shop-owners" element={<AutoShopOwners/>} />
-            
-            <Route path="/admin/services" element={<Services />} />
-            <Route path="/admin/categories" element={<SubServicesPage />} />
-
-            <Route path="/admin/provinces" element={<Provinces />} />
-            <Route path="/admin/cities" element={<Cities />} />
-
-            <Route path="/admin/invite-help" element={<Invitehelp />} />
-
-
-            <Route path="/admin/ads" element={<Ads />} />
-            <Route path="/admin/running-deals" element={<RunningDeals />} />
-            <Route path="/admin/wallet" element={<Wallet />} />
-
-
-
-
-
-            <Route path="/admin/manage-task" element={<Tasks />} />
-            <Route path="/admin/profile" element={<AdminProfile />} />
-            <Route path="/admin/logout" element={<LogOutAdmin />} />
-            {/* <Route path="/admin/vehicle-types" element={<VehicleType />} /> */}
-            <Route path="/admin/website-templates" element={<WebsiteTemplates />} />
-            <Route path="/admin/dashboard-data" element={<DashboardData />} />
-            <Route path="/admin/car-companies" element={<CarCompany />} />
+            } />
+            <Route path="/admin/website-templates" element={
+              <ProtectedRoute module="websiteTemplates" action="view">
+                <WebsiteTemplates />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/dashboard-data" element={
+              <ProtectedRoute module="dashboardData" action="view">
+                <DashboardData />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/car-companies" element={
+              <ProtectedRoute module="carCompanies" action="view">
+                <CarCompany />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/subadmins" element={
+              <ProtectedRoute module="subAdminManagement" action="view">
+                <SubAdminManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/unauthorized" element={<Unauthorized />} />
           </Route>
+     
 
 
           <Route path="/admin/signin" element={<AdminSignInPage />} />
+
+          <Route path="/subadmin/signin" element={<SubAdminSignInPage />} />
+     
+
+
           <Route path="/auto-shop-owner/onboarding" element={<AutoShopOwnerOnboarding />} />
+
+
+
           <Route path="/calendar" element={<Calendar />} />
             <Route path="/blank" element={<Blank />} />
-
-
             <Route path="/form-elements" element={<FormElements />} />
-
-
             <Route path="/basic-tables" element={<BasicTables />} />
-
-
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/avatars" element={<Avatars />} />
             <Route path="/badge" element={<Badges />} />
             <Route path="/buttons" element={<Buttons />} />
             <Route path="/images" element={<Images />} />
             <Route path="/videos" element={<Videos />} />
-
-
             <Route path="/line-chart" element={<LineChart />} />
             <Route path="/bar-chart" element={<BarChart />} />
-
           {/* Fallback Route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
