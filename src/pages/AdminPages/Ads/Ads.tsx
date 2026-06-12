@@ -1193,6 +1193,7 @@
 // export default Ads;
 
 // Ads.tsx
+
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 
@@ -1223,8 +1224,155 @@ function getOwnerStatus(owner: AutoShopOwner): { label: string; color: string } 
   return { label: "Active", color: "#28a745" };
 }
 
-// ---- Modal Component ----
-const AdsModal: React.FC<{
+// ---- Modal for Viewing & Managing Ads for each Shop Owner ----
+const OwnerAdsModal: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  owner: AutoShopOwner | null;
+  ads: Ad[];
+  adsLoading: boolean;
+  adsError: string | null;
+  onAdd: () => void;
+  onEdit: (ad: Ad) => void;
+  onDelete: (adId: string) => void;
+}> = ({
+  open,
+  onClose,
+  owner,
+  ads,
+  adsLoading,
+  adsError,
+  onAdd,
+  onEdit,
+  onDelete,
+}) => {
+  if (!open || !owner) return null;
+
+  React.useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-3xl rounded border border-[#d2d6de] bg-white shadow-lg"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[#f4f4f4] px-6 py-4">
+          <div>
+            <span className="font-bold text-[#007bff] text-lg">
+              {owner.businessProfile?.businessName || owner.name}
+            </span>
+            <span className="ml-3 text-[#777] text-sm">
+              {owner.name}
+              {owner.businessProfile?.businessAddress ? ` · ${owner.businessProfile.businessAddress}` : ""}
+            </span>
+          </div>
+          <button
+            aria-label="Close"
+            onClick={onClose}
+            className="text-2xl text-[#999] hover:text-[#555]"
+          >
+            ×
+          </button>
+        </div>
+        <div className="p-6 max-h-[60vh] overflow-auto">
+          <div className="flex justify-between mb-5">
+            <h3 className="text-[18px] font-bold text-[#333]">Ads List</h3>
+            <button
+              onClick={onAdd}
+              className="rounded bg-[#007bff] px-5 py-2 font-bold text-white hover:bg-[#0069d9] text-sm"
+            >
+              + Add Ad
+            </button>
+          </div>
+          {adsLoading && (
+            <div className="text-center text-[#007bff] font-bold mb-5">Loading Ads…</div>
+          )}
+          {adsError && (
+            <div className="rounded border border-[#f5c6cb] bg-[#f8d7da] px-4 py-2 text-[#721c24] mb-5">
+              {adsError}
+            </div>
+          )}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  {["Image", "Category", "Website URL", "Created", "Actions"].map((h, i) => (
+                    <th
+                      key={h}
+                      className={`border border-[#d2d6de] bg-[#f9fafc] px-4 py-3 font-bold whitespace-nowrap ${i === 4 ? "text-center" : "text-left"}`}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {ads.length === 0 && !adsLoading && (
+                  <tr>
+                    <td colSpan={5} className="border border-[#d2d6de] px-4 py-10 text-center text-[#999]">
+                      No ads yet for this shop.
+                    </td>
+                  </tr>
+                )}
+                {ads.map((ad) => (
+                  <tr key={ad._id} className="hover:bg-[#f9fafc]">
+                    <td className="border border-[#d2d6de] px-4 py-4">
+                      {ad.imageUpload ? (
+                        <img
+                          src={ad.imageUpload.startsWith("http") ? ad.imageUpload : `${API_URL}/${ad.imageUpload.replace(/^\.?\/?/, "")}`}
+                          alt={ad.category}
+                          className="h-14 w-20 rounded object-cover border border-[#f1f5f9] bg-[#f3f4f6]"
+                        />
+                      ) : (
+                        <span className="italic text-[#bbb]">No Image</span>
+                      )}
+                    </td>
+                    <td className="border border-[#d2d6de] px-4 py-4">
+                      <span className="rounded bg-[#f4f4f4] px-3 py-1 text-xs font-bold text-[#555]">
+                        {ad.category}
+                      </span>
+                    </td>
+                    <td className="border border-[#d2d6de] px-4 py-4">
+                      <a href={ad.websiteURL} target="_blank" rel="noopener noreferrer" className="text-[#007bff] underline break-all">
+                        {ad.websiteURL}
+                      </a>
+                    </td>
+                    <td className="border border-[#d2d6de] px-4 py-4 text-[#777]">
+                      {new Date(ad.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="border border-[#d2d6de] h-full px-4 py-4 text-center">
+                      <button
+                        onClick={() => onEdit(ad)}
+                        className="mr-2 my-2 rounded bg-[#17a2b8] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => onDelete(ad._id)}
+                        className="rounded bg-[#dc3545] my-2 px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---- Modal for Add/Edit Ad ----
+const AdFormModal: React.FC<{
   open: boolean;
   onClose: () => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
@@ -1245,7 +1393,7 @@ const AdsModal: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/30"
+      className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/30"
       onClick={onClose}
     >
       <div
@@ -1276,7 +1424,6 @@ const AdsModal: React.FC<{
               ))}
             </select>
           </div>
-
           <div className="mb-4">
             <label className="mb-1 block text-[14px] font-bold text-[#333]">Website URL</label>
             <input
@@ -1337,40 +1484,37 @@ const AdsModal: React.FC<{
   );
 };
 
-// ---- Component ----
+
+// ---- Main Component ----
 const Ads: React.FC = () => {
   const [owners, setOwners] = useState<AutoShopOwner[]>([]);
   const [ownersLoading, setOwnersLoading] = useState(false);
   const [ownersError, setOwnersError] = useState<string | null>(null);
-  const [selectedOwner, setSelectedOwner] = useState<AutoShopOwner | null>(null);
-  const [ownerSearch, setOwnerSearch] = useState("");
 
+  // For modal handling:
+  const [selectedOwnerForModal, setSelectedOwnerForModal] = useState<AutoShopOwner | null>(null);
+
+  // For showing/hiding modals:
+  const [showOwnerAdsModal, setShowOwnerAdsModal] = useState(false);
+  const [showAdFormModal, setShowAdFormModal] = useState(false);
+
+  // For ads list inside modal:
   const [ads, setAds] = useState<Ad[]>([]);
   const [adsLoading, setAdsLoading] = useState(false);
   const [adsError, setAdsError] = useState<string | null>(null);
 
+  // For add/edit form:
   const [form, setForm] = useState<{ category: string; websiteURL: string; imageUpload: File | null }>({
     category: "", websiteURL: "", imageUpload: null,
   });
   const [formMode, setFormMode] = useState<"CREATE" | "EDIT" | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
-  const adsSectionRef = useRef<HTMLDivElement | null>(null);
 
-  const businessId = selectedOwner?.businessProfile?._id;
+  // Owner filtering:
+  const [ownerSearch, setOwnerSearch] = useState("");
 
   useEffect(() => { fetchOwners(); }, []);
-
-  useEffect(() => {
-    resetForm();
-    setAdsError(null);
-    if (businessId) {
-      fetchAds(businessId);
-    } else {
-      setAds([]);
-    }
-    // eslint-disable-next-line
-  }, [businessId]);
 
   const fetchOwners = async () => {
     setOwnersLoading(true);
@@ -1385,24 +1529,24 @@ const Ads: React.FC = () => {
     }
   };
 
-  const fetchAds = async (bId: string) => {
+  const fetchAds = async (owner: AutoShopOwner) => {
     setAdsLoading(true);
     setAdsError(null);
+    setAds([]);
     try {
-      const res = await axios.get(`${API_URL}/api/admin/business-profiles/${bId}/ads`);
+      const businessId = owner.businessProfile?._id;
+      if (!businessId) {
+        setAds([]);
+        setAdsLoading(false);
+        return;
+      }
+      const res = await axios.get(`${API_URL}/api/admin/business-profiles/${businessId}/ads`);
       setAds(res.data.data || []);
     } catch (err: any) {
       setAdsError(err?.response?.data?.message || "Failed to fetch ads");
     } finally {
       setAdsLoading(false);
     }
-  };
-
-  const resetForm = () => {
-    setForm({ category: "", websiteURL: "", imageUpload: null });
-    setFormMode(null);
-    setEditId(null);
-    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -1414,27 +1558,63 @@ const Ads: React.FC = () => {
     }
   };
 
-  const handleOpenCreate = () => {
-    resetForm();
-    setFormMode("CREATE");
-    setTimeout(() => adsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  const resetForm = () => {
+    setForm({ category: "", websiteURL: "", imageUpload: null });
+    setFormMode(null);
+    setEditId(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
-  const handleEdit = (ad: Ad) => {
+  // Open owner ads modal and fetch ads for that owner
+  const handleOpenOwnerAdsModal = async (owner: AutoShopOwner) => {
+    setSelectedOwnerForModal(owner);
+    setShowOwnerAdsModal(true);
+    setAds([]);
+    setAdsError(null);
+    setFormMode(null);
     resetForm();
+    await fetchAds(owner);
+  };
+
+  // Close owner ads modal and reset
+  const handleCloseOwnerAdsModal = () => {
+    setShowOwnerAdsModal(false);
+    setSelectedOwnerForModal(null);
+    setAds([]);
+    setFormMode(null);
+    resetForm();
+  };
+
+  // Open form modal for add
+  const handleOpenAddAd = () => {
+    setFormMode("CREATE");
+    resetForm();
+    setShowAdFormModal(true);
+  };
+
+  // Open form modal for edit
+  const handleEdit = (ad: Ad) => {
     setFormMode("EDIT");
     setEditId(ad._id);
     setForm({ category: ad.category, websiteURL: ad.websiteURL, imageUpload: null });
-    setTimeout(() => adsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+    setShowAdFormModal(true);
+    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
-  const handleDelete = async (id: string) => {
-    if (!businessId || !window.confirm("Delete this ad?")) return;
+  // Close ad form modal
+  const handleCloseAdFormModal = () => {
+    setFormMode(null);
+    setShowAdFormModal(false);
+    resetForm();
+  };
+
+  const handleDelete = async (adId: string) => {
+    if (!selectedOwnerForModal?.businessProfile?._id || !window.confirm("Delete this ad?")) return;
     setAdsLoading(true);
     setAdsError(null);
     try {
-      await axios.delete(`${API_URL}/api/admin/business-profiles/${businessId}/ads/${id}`);
-      fetchAds(businessId);
+      await axios.delete(`${API_URL}/api/admin/business-profiles/${selectedOwnerForModal.businessProfile._id}/ads/${adId}`);
+      await fetchAds(selectedOwnerForModal);
     } catch (err: any) {
       setAdsError(err?.response?.data?.message || "Failed to delete ad");
     } finally {
@@ -1444,7 +1624,8 @@ const Ads: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!businessId) return;
+    if (!selectedOwnerForModal?.businessProfile?._id) return;
+    const businessId = selectedOwnerForModal.businessProfile._id;
     if (!form.category || !form.websiteURL || (formMode === "CREATE" && !form.imageUpload)) {
       setAdsError("All fields are required.");
       return;
@@ -1463,8 +1644,8 @@ const Ads: React.FC = () => {
       } else if (formMode === "EDIT" && editId) {
         await axios.patch(`${API_URL}/api/admin/business-profiles/${businessId}/ads/${editId}`, fd, { headers });
       }
-      resetForm();
-      fetchAds(businessId);
+      handleCloseAdFormModal();
+      await fetchAds(selectedOwnerForModal);
     } catch (err: any) {
       setAdsError(err?.response?.data?.message || "Failed to save ad");
     } finally {
@@ -1483,11 +1664,7 @@ const Ads: React.FC = () => {
   });
 
   return (
-<div
-        // You may use Tailwind class if setup, or fallback to CSS below.
-        className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
-      
-      >
+    <div className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans">
       {/* Heading */}
       <h1 className="mb-6 text-[52px] font-light text-[#333]">Manage Ads</h1>
 
@@ -1526,8 +1703,11 @@ const Ads: React.FC = () => {
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
-                    {["Owner Name", "Shop Name", "Address / City", "Phone", "Status"].map((h) => (
-                      <th key={h} className="sticky top-0 border border-[#d2d6de] bg-[#f9fafc] px-4 py-4 text-left font-bold whitespace-nowrap">
+                    {["Owner Name", "Shop Name", "Address / City", "Phone", "Status", "Actions"].map((h) => (
+                      <th
+                        key={h}
+                        className="sticky top-0 border border-[#d2d6de] bg-[#f9fafc] px-4 py-4 text-left font-bold whitespace-nowrap"
+                      >
                         {h}
                       </th>
                     ))}
@@ -1536,25 +1716,21 @@ const Ads: React.FC = () => {
                 <tbody>
                   {filteredOwners.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="border border-[#d2d6de] px-4 py-10 text-center text-[#999]">
+                      <td colSpan={6} className="border border-[#d2d6de] px-4 py-10 text-center text-[#999]">
                         No owners found.
                       </td>
                     </tr>
                   )}
                   {filteredOwners.map((owner) => {
-                    const isSelected = selectedOwner?._id === owner._id;
                     const canSelect = !!owner.businessProfile?._id;
                     const status = getOwnerStatus(owner);
 
                     return (
                       <tr
                         key={owner._id}
-                        onClick={() => canSelect && setSelectedOwner(owner)}
-                        title={!canSelect ? "This owner has no business profile — ads unavailable" : undefined}
-                        className={`${isSelected ? "bg-[#eff6ff]" : "bg-white hover:bg-[#f9fafc]"} ${canSelect ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}
+                        className={`${canSelect ? "bg-white hover:bg-[#f9fafc]" : "cursor-not-allowed opacity-50"}`}
                       >
                         <td className="border border-[#d2d6de] px-4 py-5 font-medium text-[#333]">
-                          {isSelected && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-[#007bff]" />}
                           {owner.name || "—"}
                         </td>
                         <td className="border border-[#d2d6de] px-4 py-5">
@@ -1577,6 +1753,24 @@ const Ads: React.FC = () => {
                             {status.label}
                           </span>
                         </td>
+                        <td className="border border-[#d2d6de] px-4 py-5">
+                          <button
+                            disabled={!canSelect}
+                            title={
+                              !canSelect
+                                ? "This owner has no business profile — ads unavailable"
+                                : "Show Ads"
+                            }
+                            onClick={() => canSelect && handleOpenOwnerAdsModal(owner)}
+                            className={`rounded px-4 py-1 text-sm font-semibold text-white ${
+                              canSelect
+                                ? "bg-[#10b981] hover:bg-[#059669] cursor-pointer"
+                                : "bg-[#ddd] cursor-not-allowed"
+                            }`}
+                          >
+                            View Ads
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -1587,138 +1781,32 @@ const Ads: React.FC = () => {
         </div>
       </div>
 
-      {/* ── SECTION 2: Ads ── */}
-      {!selectedOwner ? (
-        <div className=" mb-10 rounded border-2 border-dashed border-[#d2d6de] bg-white py-16 text-center shadow-sm">
-          <div className="mb-2 text-[40px]">🗂️</div>
-          <div className="mb-1 text-[16px] font-bold text-[#555]">No shop owner selected</div>
-          <div className="text-[14px] text-[#999]">Click a row in the table above to view and manage their ads</div>
-        </div>
-      ) : (
-        <div ref={adsSectionRef} className="mb-10 overflow-hidden rounded border border-[#d2d6de] bg-white shadow-sm">
-          {/* Owner info bar + actions */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f4f4f4] px-6 py-4">
-            <div className="min-w-0">
-              <span className="text-[18px] font-bold text-[#007bff]">
-                {selectedOwner.businessProfile?.businessName || selectedOwner.name}
-              </span>
-              <span className="ml-2 text-[14px] text-[#777]">
-                {selectedOwner.name}
-                {selectedOwner.businessProfile?.businessAddress ? ` · ${selectedOwner.businessProfile.businessAddress}` : ""}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleOpenCreate}
-                className="h-9 rounded bg-[#007bff] px-5 font-bold text-white hover:bg-[#0069d9]"
-              >
-                + Add Ad
-              </button>
-              <button
-                onClick={() => { setSelectedOwner(null); setAds([]); resetForm(); }}
-                className="h-9 rounded border border-[#d2d6de] bg-white px-4 font-bold text-[#777] hover:bg-[#f4f4f4]"
-              >
-                ✕ Clear
-              </button>
-            </div>
-          </div>
+      {/* Owner Ads Modal */}
+      <OwnerAdsModal
+        open={showOwnerAdsModal}
+        onClose={handleCloseOwnerAdsModal}
+        owner={selectedOwnerForModal}
+        ads={ads}
+        adsLoading={adsLoading}
+        adsError={adsError}
+        onAdd={handleOpenAddAd}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
 
-          <AdsModal
-            open={formMode === "CREATE" || formMode === "EDIT"}
-            onClose={resetForm}
-            onSubmit={handleSubmit}
-            form={form}
-            handleFormChange={handleFormChange}
-            formMode={formMode as "CREATE" | "EDIT"}
-            imageInputRef={imageInputRef as React.RefObject<HTMLInputElement>}
-            adsLoading={adsLoading}
-            adsError={adsError}
-            onCancel={resetForm}
-          />
-
-          <div className="p-6">
-            {adsLoading && (
-              <div className="mb-4 text-[15px] font-bold text-[#007bff]">Loading…</div>
-            )}
-            {adsError && !formMode && (
-              <div className="mb-4 rounded border border-[#f5c6cb] bg-[#f8d7da] px-4 py-3 text-[#721c24]">
-                {adsError}
-              </div>
-            )}
-
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    {["Image", "Category", "Website URL", "Created", "Actions"].map((h, i) => (
-                      <th
-                        key={h}
-                        className={`border border-[#d2d6de] bg-[#f9fafc] px-4 py-4 font-bold whitespace-nowrap ${i === 4 ? "text-center" : "text-left"}`}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ads.length === 0 && !adsLoading && (
-                    <tr>
-                      <td colSpan={5} className="border border-[#d2d6de] px-4 py-10 text-center text-[#999]">
-                        No ads yet for this shop.{" "}
-                        <button onClick={handleOpenCreate} className="font-bold text-[#007bff] underline">
-                          Add the first one →
-                        </button>
-                      </td>
-                    </tr>
-                  )}
-                  {ads.map((ad) => (
-                    <tr key={ad._id} className="hover:bg-[#f9fafc]">
-                      <td className="border border-[#d2d6de] px-4 py-5">
-                        {ad.imageUpload ? (
-                          <img
-                            src={ad.imageUpload.startsWith("http") ? ad.imageUpload : `${API_URL}/${ad.imageUpload.replace(/^\.?\/?/, "")}`}
-                            alt={ad.category}
-                            className="h-14 w-20 rounded object-cover border border-[#f1f5f9] bg-[#f3f4f6]"
-                          />
-                        ) : (
-                          <span className="italic text-[#bbb]">No Image</span>
-                        )}
-                      </td>
-                      <td className="border border-[#d2d6de] px-4 py-5">
-                        <span className="rounded bg-[#f4f4f4] px-3 py-1 text-xs font-bold text-[#555]">
-                          {ad.category}
-                        </span>
-                      </td>
-                      <td className="border border-[#d2d6de] px-4 py-5">
-                        <a href={ad.websiteURL} target="_blank" rel="noopener noreferrer" className="text-[#007bff] underline break-all">
-                          {ad.websiteURL}
-                        </a>
-                      </td>
-                      <td className="border border-[#d2d6de] px-4 py-5 text-[#777]">
-                        {new Date(ad.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </td>
-                      <td className="border border-[#d2d6de] px-4 py-5 text-center">
-                        <button
-                          onClick={() => handleEdit(ad)}
-                          className="mr-2 rounded bg-[#17a2b8] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(ad._id)}
-                          className="rounded bg-[#dc3545] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Ad Form Modal */}
+      <AdFormModal
+        open={showAdFormModal}
+        onClose={handleCloseAdFormModal}
+        onSubmit={handleSubmit}
+        form={form}
+        handleFormChange={handleFormChange}
+        formMode={formMode as "CREATE" | "EDIT"}
+        imageInputRef={imageInputRef as React.RefObject<HTMLInputElement>}
+        adsLoading={adsLoading}
+        adsError={adsError}
+        onCancel={handleCloseAdFormModal}
+      />
     </div>
   );
 };

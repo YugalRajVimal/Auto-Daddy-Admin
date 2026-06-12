@@ -1247,7 +1247,21 @@
 
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import * as XLSX from "xlsx";
+
+// ===================== CarOwners Export Column Config ========================
+const ALL_EXPORT_COLUMNS: { key: string; label: string }[] = [
+  { key: "name", label: "Name" },
+  { key: "email", label: "Email" },
+  { key: "phone", label: "Phone" },
+  { key: "countryCode", label: "Country Code" },
+  { key: "address", label: "Address" },
+  { key: "pincode", label: "Pincode" },
+  { key: "profileComplete", label: "Profile Complete" },
+  { key: "disabled", label: "Disabled" },
+  { key: "vehicles", label: "Vehicles" },
+  { key: "servicedAutoShops", label: "Serviced AutoShops" },
+  { key: "jobCards", label: "Job Cards" },
+];
 
 // --- Types ---
 type TeamMember = {
@@ -1312,7 +1326,6 @@ type JobCardTypePopulated = {
   business: BusinessProfileType;
   [key: string]: any;
 };
-
 type CarOwnerType = {
   _id: string;
   name: string;
@@ -1342,6 +1355,73 @@ function getAutoshopsReceivedServiceFrom(owner: CarOwnerType): BusinessProfileTy
     }
   }
   return shops;
+}
+
+// --- Export helpers ---
+function vehicleDetailsString(vehicles?: VehicleType[]): string {
+  if (!vehicles || !vehicles.length) return "-";
+  return vehicles
+    .map(
+      (v) =>
+        `${v.licensePlateNo || "-"} (${typeof v.make === "object" && v.make ? v.make.name || "-" : "-"}, ${
+          typeof v.make === "object" && v.make ? v.make.model || "-" : "-"
+        }, ${v.year || "-"})`
+    )
+    .join("\n");
+}
+function shopsString(shops?: BusinessProfileType[]): string {
+  if (!shops || !shops.length) return "-";
+  return shops.map((s) => `${s.businessName || "-"}${s.businessPhone ? " (" + s.businessPhone + ")" : ""}`).join("\n");
+}
+function jobCardsString(jobCards?: JobCardTypePopulated[]): string {
+  if (!jobCards || !jobCards.length) return "-";
+  return jobCards.map((jc) => (jc as any).jobNo ? String((jc as any).jobNo) : jc._id).join("\n");
+}
+function getOwnerColValue(owner: CarOwnerType, key: string): string {
+  switch (key) {
+    case "name":
+      return owner.name || "-";
+    case "email":
+      return owner.email || "-";
+    case "phone":
+      return owner.phone || "-";
+    case "countryCode":
+      return owner.countryCode || "-";
+    case "address":
+      return owner.address || "-";
+    case "pincode":
+      return owner.pincode || "-";
+    case "profileComplete":
+      return owner.isProfileComplete ? "Yes" : "No";
+    case "disabled":
+      return owner.isDisabled ? "Yes" : "No";
+    case "vehicles":
+      return vehicleDetailsString(owner.myVehicles);
+    case "servicedAutoShops":
+      return shopsString(owner.autoshopsReceivedServiceFrom ?? getAutoshopsReceivedServiceFrom(owner));
+    case "jobCards":
+      return jobCardsString(owner.jobCards);
+    default:
+      return "-";
+  }
+}
+function toCsv(data: string[][], headers: string[]): string {
+  const esc = (val: any) => {
+    if (val == null) return "";
+    let s = String(val);
+    if (/[,"\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  };
+  return headers.map(esc).join(",") + "\n" + data.map((row) => row.map(esc).join(",")).join("\n");
+}
+function downloadAsCsvFile(filename: string, content: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 // ─── MODAL (AdminLTE style) ───────────────────────────────────────────────────
@@ -1411,7 +1491,110 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, wide })
   );
 };
 
+// ─── EXPORT COLUMNS MODAL ────────────────────────────────────────────────────
+const ExportColumnsModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  selectedOwnerIds: string[];
+  owners: CarOwnerType[];
+}> = ({ isOpen, onClose, selectedOwnerIds, owners }) => {
+  const [selectedCols, setSelectedCols] = useState<string[]>(ALL_EXPORT_COLUMNS.map((c) => c.key));
+  useEffect(() => {
+    if (isOpen) setSelectedCols(ALL_EXPORT_COLUMNS.map((c) => c.key));
+  }, [isOpen]);
+  const toggleCol = (key: string) => {
+    setSelectedCols((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+  const allSelected = selectedCols.length === ALL_EXPORT_COLUMNS.length;
+  const toggleAll = () => {
+    setSelectedCols(allSelected ? [] : ALL_EXPORT_COLUMNS.map((c) => c.key));
+  };
+  const handleExport = () => {
+    if (!selectedCols.length) {
+      alert("Please select at least one column.");
+      return;
+    }
+    const orderedCols = ALL_EXPORT_COLUMNS.filter((c) => selectedCols.includes(c.key));
+    const headers = orderedCols.map((c) => c.label);
+    const dataToExport = owners.filter((o) => selectedOwnerIds.includes(o._id));
+    const rows = dataToExport.map((owner) => orderedCols.map((c) => getOwnerColValue(owner, c.key)));
+    downloadAsCsvFile(`car-owners-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows, headers));
+    onClose();
+  };
+  if (!isOpen) return null;
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Select Columns to Export">
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ fontSize: 13, color: "#555" }}>
+            Exporting <strong>{selectedOwnerIds.length}</strong> row{selectedOwnerIds.length !== 1 ? "s" : ""}
+          </span>
+          <button
+            type="button"
+            onClick={toggleAll}
+            style={{ fontSize: 12, color: "#0073b7", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+          >
+            {allSelected ? "Deselect All" : "Select All"}
+          </button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 20px" }}>
+          {ALL_EXPORT_COLUMNS.map((col) => (
+            <label
+              key={col.key}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                fontSize: 13, color: "#333", padding: "6px 10px", borderRadius: 3,
+                background: selectedCols.includes(col.key) ? "#f0f7ff" : "#fafafa",
+                border: `1px solid ${selectedCols.includes(col.key) ? "#0073b7" : "#d2d6de"}`,
+                transition: "all 0.15s",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={selectedCols.includes(col.key)}
+                onChange={() => toggleCol(col.key)}
+                style={{ accentColor: "#0073b7", width: 14, height: 14, cursor: "pointer", flexShrink: 0 }}
+              />
+              {col.label}
+            </label>
+          ))}
+        </div>
+      </div>
+      {selectedCols.length === 0 && (
+        <div style={{ color: "#c0392b", fontSize: 12, marginBottom: 10, background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, padding: "6px 10px" }}>
+          Please select at least one column to export.
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{ padding: "7px 18px", borderRadius: 3, border: "1px solid #d2d6de", background: "#fff", color: "#444", fontSize: 13, cursor: "pointer" }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={selectedCols.length === 0}
+          style={{
+            padding: "7px 20px", borderRadius: 3, border: "none",
+            background: selectedCols.length === 0 ? "#aaa" : "#00a65a",
+            color: "#fff", fontSize: 13, fontWeight: 600,
+            cursor: selectedCols.length === 0 ? "not-allowed" : "pointer",
+          }}
+        >
+          ↓ Export {selectedCols.length} Column{selectedCols.length !== 1 ? "s" : ""}
+        </button>
+      </div>
+    </Modal>
+  );
+};
+
 // ─── SEND NOTIFICATION MODAL ──────────────────────────────────────────────────
+// (no changes - same as in your code)
 const SendNotificationModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -1423,13 +1606,11 @@ const SendNotificationModal: React.FC<{
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
   useEffect(() => {
     if (isOpen) {
       setTitle(""); setBody(""); setSending(false); setError(null); setSuccess(null);
     }
   }, [isOpen]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true); setError(null); setSuccess(null);
@@ -1458,7 +1639,6 @@ const SendNotificationModal: React.FC<{
       setSending(false);
     }
   };
-
   if (!isOpen) return null;
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Send Custom Notification">
@@ -1541,7 +1721,8 @@ const SendNotificationModal: React.FC<{
   );
 };
 
-// ─── SHOP CARD (UNCHANGED) ────────────────────────────────────────────────────
+// --- Shop Card, Serviced Shops, Vehicles, JobCards and their helpers ---
+// (all unchanged from your code)
 function processOpenDays(openDays: string[] | undefined): string {
   if (!openDays) return "-";
   try {
@@ -1741,7 +1922,8 @@ const renderVehiclesModalContent = (owner: CarOwnerType) => (
   </>
 );
 
-// ─── JOB CARDS MODAL CONTENT ──────────────────────────────────────────────────
+// --- Job cards (unchanged)
+//... (copied from your code, no changes) ...
 function renderCustomerSummary(customer: any) {
   return customer ? `${customer.name ?? "-"}${customer.email ? ` (${customer.email})` : ""}` : "-";
 }
@@ -1884,6 +2066,7 @@ const CarOwners: React.FC = () => {
   const [openJobCardsFor, setOpenJobCardsFor] = useState<CarOwnerType | null>(null);
   const [openNotificationModal, setOpenNotificationModal] = useState<boolean>(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [exportModalOpen, setExportModalOpen] = useState<boolean>(false);
 
   const fetchCarOwners = async () => {
     setLoading(true); setError("");
@@ -1927,41 +2110,13 @@ const CarOwners: React.FC = () => {
   const isRowSelected = (id: string) => selectedRows.has(id);
   const allPageSelected = paginated.length > 0 && paginated.every((o) => selectedRows.has(o._id));
 
-  // Export
-  const exportSelected = () => {
-    const ownersToExport = carOwners.filter((o) => selectedRows.has(o._id));
-    if (!ownersToExport.length) { alert("Please select at least one Car Owner to export."); return; }
-
-    function vehicleDetailsString(vehicles?: VehicleType[]): string {
-      if (!vehicles || !vehicles.length) return "-";
-      return vehicles.map((v) => `${v.licensePlateNo || "-"} (${typeof v.make === "object" && v.make ? v.make.name || "-" : "-"}, ${typeof v.make === "object" && v.make ? v.make.model || "-" : "-"}, ${v.year || "-"})`).join("\n");
+  // Export modal open handler
+  const openExportModal = () => {
+    if (!selectedRows.size) {
+      alert("Please select at least one Car Owner to export.");
+      return;
     }
-    function shopsString(shops?: BusinessProfileType[]): string {
-      if (!shops || !shops.length) return "-";
-      return shops.map((s) => `${s.businessName || "-"}${s.businessPhone ? " (" + s.businessPhone + ")" : ""}`).join("\n");
-    }
-    function jobCardsString(jobCards?: JobCardTypePopulated[]): string {
-      if (!jobCards || !jobCards.length) return "-";
-      return jobCards.map((jc) => (jc as any).jobNo ? String((jc as any).jobNo) : jc._id).join("\n");
-    }
-
-    const data = ownersToExport.map((owner) => ({
-      "Name": owner.name || "-",
-      "Phone": owner.phone || "-",
-      "Country Code": owner.countryCode || "-",
-      "Address": owner.address || "-",
-      "Pincode": owner.pincode || "-",
-      "Profile Complete": owner.isProfileComplete ? "Yes" : "No",
-      "Disabled": owner.isDisabled ? "Yes" : "No",
-      "Vehicles": vehicleDetailsString(owner.myVehicles),
-      "Serviced AutoShops": shopsString(owner.autoshopsReceivedServiceFrom ?? getAutoshopsReceivedServiceFrom(owner)),
-      "Job Cards": jobCardsString(owner.jobCards),
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Car Owners");
-    XLSX.writeFile(wb, "car-owners.xlsx");
+    setExportModalOpen(true);
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -1973,6 +2128,12 @@ const CarOwners: React.FC = () => {
         onClose={() => setOpenNotificationModal(false)}
         selectedOwnerIds={Array.from(selectedRows)}
         onNotificationSent={() => {}}
+      />
+      <ExportColumnsModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        selectedOwnerIds={Array.from(selectedRows)}
+        owners={carOwners}
       />
       {openVehiclesFor && (
         <Modal isOpen wide onClose={() => setOpenVehiclesFor(null)} title={`Vehicles — ${openVehiclesFor.name}`}>
@@ -1993,11 +2154,8 @@ const CarOwners: React.FC = () => {
       {/* ── Page ── */}
       {/* Add h-[92vh] and scroll behavior on overflow (tailwind and fallback inline style) */}
       <div
-        // You may use Tailwind class if setup, or fallback to CSS below.
         className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
-      
       >
-
         {/* Page Heading */}
         <h1 style={{ fontSize: 34, fontWeight: 300, color: "#333", marginBottom: 20, marginTop: 0 }}>
           Car Owners
@@ -2005,7 +2163,6 @@ const CarOwners: React.FC = () => {
 
         {/* Card */}
         <div className="mb-10" style={{ background: "#fff", border: "1px solid #d2d6de", borderRadius: 3, boxShadow: "0 1px 1px rgba(0,0,0,.1)" }}>
-
           {/* Card Header */}
           <div style={{ padding: "10px 16px", borderBottom: "1px solid #f4f4f4", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 400, color: "#444" }}>
@@ -2032,7 +2189,7 @@ const CarOwners: React.FC = () => {
                 ✉ Send Notification
               </button>
               <button
-                onClick={exportSelected}
+                onClick={openExportModal}
                 disabled={selectedRows.size === 0}
                 type="button"
                 style={{
@@ -2042,7 +2199,7 @@ const CarOwners: React.FC = () => {
                   whiteSpace: "nowrap",
                 }}
               >
-                ↓ Export Excel
+                ↓ Export (.csv)
               </button>
             </div>
           </div>

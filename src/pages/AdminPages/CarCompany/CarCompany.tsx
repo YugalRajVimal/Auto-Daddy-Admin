@@ -674,19 +674,20 @@ import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import axios from "axios";
 
 // --- Types ---
-interface CarModel { modelName: string; years?: number[] }
+interface CarModel { modelName: string; } // years REMOVED
 interface CarCompanyType { _id: string; companyName: string; models: CarModel[]; brandLogo?: string | null }
 type CarCompanyFormState = {
   companyName: string;
-  models: { modelName: string; years?: string[] }[];
+  models: { modelName: string }[]; // years REMOVED
   brandLogoFile: File | null;
   brandLogoPreviewUrl: string | null;
 };
-const EMPTY_FORM: CarCompanyFormState = { companyName: "", models: [{ modelName: "", years: undefined }], brandLogoFile: null, brandLogoPreviewUrl: null };
+const EMPTY_FORM: CarCompanyFormState = { companyName: "", models: [{ modelName: "" }], brandLogoFile: null, brandLogoPreviewUrl: null };
 
 // ─── STYLE HELPERS ─────────────────────────────────────────────────────────────
-const thStyle: React.CSSProperties = { border: "1px solid #d2d6de", background: "#f9fafc", padding: "10px 12px", textAlign: "left", fontWeight: 700, fontSize: 13, color: "#333", whiteSpace: "nowrap" };
-const tdStyle: React.CSSProperties = { border: "1px solid #d2d6de", padding: "10px 12px", fontSize: 13, color: "#555", verticalAlign: "middle" };
+// Increased font sizes
+const thStyle: React.CSSProperties = { border: "1px solid #d2d6de", background: "#f9fafc", padding: "14px 16px", textAlign: "left", fontWeight: 700, fontSize: 18, color: "#333", whiteSpace: "nowrap" };
+const tdStyle: React.CSSProperties = { border: "1px solid #d2d6de", padding: "14px 16px", fontSize: 17, color: "#555", verticalAlign: "middle" };
 
 const CarCompany: React.FC = () => {
   const [companies, setCompanies] = useState<CarCompanyType[]>([]);
@@ -722,56 +723,125 @@ const CarCompany: React.FC = () => {
   }
 
   const openAddModal = () => {
-    clearAlerts(); setEditingCompany(null); setForm({ ...EMPTY_FORM }); setShowModal(true);
+    clearAlerts();
+    setEditingCompany(null);
+    setForm({ ...EMPTY_FORM });
+    setShowModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 150);
   };
+
   const openEditModal = (company: CarCompanyType) => {
-    clearAlerts(); setEditingCompany(company);
-    setForm({ companyName: company.companyName, models: company.models.map((m) => ({ modelName: m.modelName, years: m.years ? m.years.map((y) => y.toString()) : undefined })), brandLogoFile: null, brandLogoPreviewUrl: company.brandLogo ? getBackendImageUrl(company.brandLogo) : null });
-    setShowModal(true); setTimeout(() => nameInputRef.current?.focus(), 150);
+    clearAlerts();
+    setEditingCompany(company);
+    setForm({
+      companyName: company.companyName,
+      models: company.models.map((m) => ({
+        modelName: m.modelName
+      })),
+      brandLogoFile: null,
+      brandLogoPreviewUrl: company.brandLogo ? getBackendImageUrl(company.brandLogo) : null
+    });
+    setShowModal(true);
+    setTimeout(() => nameInputRef.current?.focus(), 150);
   };
 
-  const updateFormField = (field: keyof CarCompanyFormState, value: any) => setForm((curr) => ({ ...curr, [field]: value }));
-  const updateModelName = (idx: number, value: string) => setForm((curr) => { const models = [...curr.models]; models[idx].modelName = value; return { ...curr, models }; });
-  const updateModelYear = (modelIdx: number, yearIdx: number, value: string) => setForm((curr) => { const models = [...curr.models]; if (!models[modelIdx].years) models[modelIdx].years = []; models[modelIdx].years![yearIdx] = value; return { ...curr, models }; });
-  const addModel = () => setForm((curr) => ({ ...curr, models: [...curr.models, { modelName: "", years: undefined }] }));
-  const removeModel = (idx: number) => setForm((curr) => { const m = [...curr.models]; m.splice(idx, 1); return { ...curr, models: m.length ? m : [{ modelName: "", years: undefined }] }; });
-  const addYearToModel = (modelIdx: number) => setForm((curr) => { const models = [...curr.models]; if (!models[modelIdx].years) models[modelIdx].years = [""]; else models[modelIdx].years!.push(""); return { ...curr, models }; });
-  const removeYearFromModel = (modelIdx: number, yearIdx: number) => setForm((curr) => { const models = [...curr.models]; if (models[modelIdx].years) { models[modelIdx].years!.splice(yearIdx, 1); if (models[modelIdx].years!.length === 0) models[modelIdx].years = undefined; } return { ...curr, models }; });
+  const updateFormField = (field: keyof CarCompanyFormState, value: any) =>
+    setForm((curr) => ({ ...curr, [field]: value }));
+  const updateModelName = (idx: number, value: string) =>
+    setForm((curr) => {
+      const models = [...curr.models];
+      models[idx].modelName = value;
+      return { ...curr, models };
+    });
+  const addModel = () =>
+    setForm((curr) => ({
+      ...curr,
+      models: [...curr.models, { modelName: "" }]
+    }));
+  const removeModel = (idx: number) =>
+    setForm((curr) => {
+      const m = [...curr.models];
+      m.splice(idx, 1);
+      return { ...curr, models: m.length ? m : [{ modelName: "" }] };
+    });
 
   const handleBrandLogoChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files.length) return;
     const file = e.target.files[0];
-    setForm((curr) => { if (curr.brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(curr.brandLogoPreviewUrl); return { ...curr, brandLogoFile: file, brandLogoPreviewUrl: URL.createObjectURL(file) }; });
+    setForm((curr) => {
+      if (curr.brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(curr.brandLogoPreviewUrl);
+      return { ...curr, brandLogoFile: file, brandLogoPreviewUrl: URL.createObjectURL(file) };
+    });
   };
-  const handleRemoveBrandLogo = () => setForm((curr) => { if (curr.brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(curr.brandLogoPreviewUrl); return { ...curr, brandLogoFile: null, brandLogoPreviewUrl: null }; });
+  const handleRemoveBrandLogo = () =>
+    setForm((curr) => {
+      if (curr.brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(curr.brandLogoPreviewUrl);
+      return { ...curr, brandLogoFile: null, brandLogoPreviewUrl: null };
+    });
 
   const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); clearAlerts();
-    if (!form.companyName.trim() || !form.models.length || form.models.some((m) => !m.modelName.trim())) { setError("Company name and model names are required."); return; }
-    for (const m of form.models) { if (Array.isArray(m.years) && m.years.length) { for (const y of m.years) { if (y && (isNaN(Number(y)) || !y.trim())) { setError("Provided years must be valid numbers."); return; } } } }
+    e.preventDefault();
+    clearAlerts();
+    if (!form.companyName.trim() || !form.models.length || form.models.some((m) => !m.modelName.trim())) {
+      setError("Company name and model names are required.");
+      return;
+    }
     setLoading(true);
     try {
       const formData = new FormData();
       formData.append("companyName", form.companyName.trim());
-      formData.append("models", JSON.stringify(form.models.map((m) => ({ modelName: m.modelName.trim(), ...(Array.isArray(m.years) && m.years.some((y) => y.trim()) ? { years: m.years.filter((y) => y.trim() !== "").map((y) => Number(y)) } : {}) }))));
+      formData.append(
+        "models",
+        JSON.stringify(form.models.map((m) => ({
+          modelName: m.modelName.trim()
+        })))
+      );
       if (form.brandLogoFile) formData.append("brandLogo", form.brandLogoFile);
-      if (editingCompany) { await axios.patch(`${import.meta.env.VITE_API_URL}/api/admin/car-company/${editingCompany._id}`, formData, { headers: { "Content-Type": "multipart/form-data" } }); setSuccessMsg("Car company updated successfully."); }
-      else { await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/car-company`, formData, { headers: { "Content-Type": "multipart/form-data" } }); setSuccessMsg("Car company added successfully."); }
-      setShowModal(false); setForm({ ...EMPTY_FORM }); setEditingCompany(null); fetchCompanies(query);
-    } catch (err: any) { setError(err?.response?.data?.message || (editingCompany ? "Failed to update" : "Failed to add") + " car company"); }
+      if (editingCompany) {
+        await axios.patch(
+          `${import.meta.env.VITE_API_URL}/api/admin/car-company/${editingCompany._id}`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+        setSuccessMsg("Car company updated successfully.");
+      } else {
+        await axios.post(
+          `${import.meta.env.VITE_API_URL}/api/admin/car-company`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+        setSuccessMsg("Car company added successfully.");
+      }
+      setShowModal(false);
+      setForm({ ...EMPTY_FORM });
+      setEditingCompany(null);
+      fetchCompanies(query);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || (editingCompany ? "Failed to update" : "Failed to add") + " car company");
+    }
     setLoading(false);
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Delete this car company?")) return;
-    setDeletingId(id); setError(""); setSuccessMsg("");
-    try { await axios.delete(`${import.meta.env.VITE_API_URL}/api/admin/car-company/${id}`); setSuccessMsg("Car company deleted."); fetchCompanies(query); }
-    catch (err: any) { setError(err?.response?.data?.message || "Failed to delete car company"); }
+    setDeletingId(id);
+    setError("");
+    setSuccessMsg("");
+    try {
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/admin/car-company/${id}`);
+      setSuccessMsg("Car company deleted.");
+      fetchCompanies(query);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to delete car company");
+    }
     setDeletingId(null);
   };
 
-  useEffect(() => { return () => { if (form.brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(form.brandLogoPreviewUrl); }; }, [showModal]);
+  useEffect(() => {
+    return () => {
+      if (form.brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(form.brandLogoPreviewUrl);
+    };
+  }, [showModal]);
 
   return (
     <>
@@ -786,38 +856,38 @@ const CarCompany: React.FC = () => {
             style={{ background: "#fff", borderRadius: 4, width: "min(560px, 96vw)", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 5px 15px rgba(0,0,0,.5)" }}
           >
             {/* Modal Header */}
-            <div style={{ background: "#3c8dbc", color: "#fff", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "4px 4px 0 0", flexShrink: 0 }}>
-              <span style={{ fontWeight: 600, fontSize: 16 }}>{editingCompany ? "Edit Car Company" : "Add New Car Company"}</span>
-              <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", color: "#fff", fontSize: 22, lineHeight: 1, cursor: "pointer" }} type="button">×</button>
+            <div style={{ background: "#3c8dbc", color: "#fff", padding: "14px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "4px 4px 0 0", flexShrink: 0 }}>
+              <span style={{ fontWeight: 600, fontSize: 22 }}>{editingCompany ? "Edit Car Company" : "Add New Car Company"}</span>
+              <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", color: "#fff", fontSize: 28, lineHeight: 1, cursor: "pointer" }} type="button">×</button>
             </div>
             {/* Modal Body */}
-            <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
-              {error && <div style={{ marginBottom: 12, padding: "8px 12px", background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, color: "#c0392b", fontSize: 13 }}>{error}</div>}
+            <div style={{ padding: "28px 34px", overflowY: "auto", flex: 1 }}>
+              {error && <div style={{ marginBottom: 18, padding: "12px 16px", background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, color: "#c0392b", fontSize: 18 }}>{error}</div>}
               <form onSubmit={handleFormSubmit} autoComplete="off" encType="multipart/form-data">
 
                 {/* Company Name */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: "block", fontWeight: 600, fontSize: 13, marginBottom: 5 }}>Company Name <span style={{ color: "#e73d3d" }}>*</span></label>
+                <div style={{ marginBottom: 22 }}>
+                  <label style={{ display: "block", fontWeight: 600, fontSize: 18, marginBottom: 7 }}>Company Name <span style={{ color: "#e73d3d" }}>*</span></label>
                   <input ref={nameInputRef} type="text" value={form.companyName} required autoFocus
                     onChange={(e) => updateFormField("companyName", e.target.value)}
-                    style={{ width: "100%", border: "1px solid #d2d6de", borderRadius: 3, padding: "7px 10px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                    style={{ width: "100%", border: "1px solid #d2d6de", borderRadius: 3, padding: "12px 13px", fontSize: 19, outline: "none", boxSizing: "border-box" }}
                     placeholder="Enter company name" />
                 </div>
 
                 {/* Brand Logo */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: "block", fontWeight: 600, fontSize: 13, marginBottom: 5 }}>Brand Logo <span style={{ color: "#888", fontWeight: 400 }}>(optional)</span></label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ marginBottom: 22 }}>
+                  <label style={{ display: "block", fontWeight: 600, fontSize: 17, marginBottom: 7 }}>Brand Logo <span style={{ color: "#888", fontWeight: 400 }}>(optional)</span></label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
                     {form.brandLogoPreviewUrl ? (
-                      <div style={{ position: "relative", width: 72, height: 56 }}>
-                        <img src={form.brandLogoPreviewUrl} alt="Logo Preview" style={{ width: 72, height: 56, objectFit: "contain", border: "1px solid #d2d6de", borderRadius: 3, background: "#fafafa" }} />
+                      <div style={{ position: "relative", width: 84, height: 64 }}>
+                        <img src={form.brandLogoPreviewUrl} alt="Logo Preview" style={{ width: 84, height: 64, objectFit: "contain", border: "1px solid #d2d6de", borderRadius: 3, background: "#fafafa" }} />
                         <button type="button" onClick={handleRemoveBrandLogo}
-                          style={{ position: "absolute", top: -8, right: -8, width: 20, height: 20, borderRadius: "50%", background: "#555", color: "#fff", border: "none", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>×</button>
+                          style={{ position: "absolute", top: -9, right: -9, width: 24, height: 24, borderRadius: "50%", background: "#555", color: "#fff", border: "none", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>×</button>
                       </div>
                     ) : (
-                      <span style={{ fontSize: 12, color: "#aaa", fontStyle: "italic" }}>No logo selected</span>
+                      <span style={{ fontSize: 15, color: "#aaa", fontStyle: "italic" }}>No logo selected</span>
                     )}
-                    <label style={{ padding: "5px 12px", border: "1px solid #0073b7", borderRadius: 3, color: "#0073b7", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    <label style={{ padding: "7px 16px", border: "1px solid #0073b7", borderRadius: 3, color: "#0073b7", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
                       <input type="file" accept="image/*" style={{ display: "none" }} onChange={handleBrandLogoChange} />
                       {form.brandLogoPreviewUrl ? "Change" : "Upload"}
                     </label>
@@ -825,44 +895,31 @@ const CarCompany: React.FC = () => {
                 </div>
 
                 {/* Models */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: "block", fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Car Models & Years <span style={{ color: "#e73d3d" }}>*</span></label>
+                <div style={{ marginBottom: 22 }}>
+                  <label style={{ display: "block", fontWeight: 600, fontSize: 18, marginBottom: 12 }}>Car Models <span style={{ color: "#e73d3d" }}>*</span></label>
                   {form.models.map((model, modelIdx) => (
-                    <div key={modelIdx} style={{ border: "1px solid #d2d6de", borderRadius: 3, padding: "12px 14px", marginBottom: 10, background: "#f9fafc" }}>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                    <div key={modelIdx} style={{ border: "1px solid #d2d6de", borderRadius: 3, padding: "14px 19px", marginBottom: 14, background: "#f9fafc" }}>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 0 }}>
                         <input type="text" value={model.modelName} placeholder="Model Name" required
                           onChange={(e) => updateModelName(modelIdx, e.target.value)}
-                          style={{ flex: 1, border: "1px solid #d2d6de", borderRadius: 3, padding: "6px 10px", fontSize: 13, outline: "none" }} />
+                          style={{ flex: 1, border: "1px solid #d2d6de", borderRadius: 3, padding: "9px 13px", fontSize: 17, outline: "none" }} />
                         <button type="button" onClick={() => removeModel(modelIdx)} disabled={form.models.length === 1}
-                          style={{ padding: "5px 10px", border: "1px solid #d2d6de", borderRadius: 3, background: form.models.length === 1 ? "#f4f4f4" : "#f2dede", color: form.models.length === 1 ? "#aaa" : "#a94442", fontSize: 12, cursor: form.models.length === 1 ? "not-allowed" : "pointer" }}>
+                          style={{ padding: "8px 15px", border: "1px solid #d2d6de", borderRadius: 3, background: form.models.length === 1 ? "#f4f4f4" : "#f2dede", color: form.models.length === 1 ? "#aaa" : "#a94442", fontSize: 15, cursor: form.models.length === 1 ? "not-allowed" : "pointer" }}>
                           Remove
                         </button>
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                        {Array.isArray(model.years) && model.years.map((year, yearIdx) => (
-                          <div key={yearIdx} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <input type="number" value={year} min="1900" max={new Date().getFullYear() + 2} placeholder="Year"
-                              onChange={(e) => updateModelYear(modelIdx, yearIdx, e.target.value)}
-                              style={{ width: 90, border: "1px solid #d2d6de", borderRadius: 3, padding: "5px 8px", fontSize: 13, outline: "none" }} />
-                            <button type="button" onClick={() => removeYearFromModel(modelIdx, yearIdx)}
-                              style={{ background: "none", border: "none", color: "#a94442", fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1 }}>×</button>
-                          </div>
-                        ))}
-                        <button type="button" onClick={() => addYearToModel(modelIdx)}
-                          style={{ padding: "4px 10px", border: "1px solid #0073b7", borderRadius: 3, color: "#0073b7", fontSize: 12, cursor: "pointer", background: "#fff" }}>+ Year</button>
                       </div>
                     </div>
                   ))}
                   <button type="button" onClick={addModel}
-                    style={{ padding: "6px 14px", border: "1px solid #0073b7", borderRadius: 3, color: "#0073b7", fontSize: 13, fontWeight: 600, cursor: "pointer", background: "#fff" }}>+ Add Model</button>
+                    style={{ padding: "8px 18px", border: "1px solid #0073b7", borderRadius: 3, color: "#0073b7", fontSize: 16, fontWeight: 600, cursor: "pointer", background: "#fff" }}>+ Add Model</button>
                 </div>
 
                 {/* Footer Buttons */}
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
+                <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 14 }}>
                   <button type="button" onClick={() => setShowModal(false)}
-                    style={{ padding: "7px 18px", borderRadius: 3, border: "1px solid #d2d6de", background: "#fff", color: "#444", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                    style={{ padding: "10px 26px", borderRadius: 3, border: "1px solid #d2d6de", background: "#fff", color: "#444", fontSize: 16, cursor: "pointer" }}>Cancel</button>
                   <button type="submit" disabled={loading}
-                    style={{ padding: "7px 20px", borderRadius: 3, border: "none", background: loading ? "#aaa" : "#0073b7", color: "#fff", fontSize: 13, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
+                    style={{ padding: "10px 28px", borderRadius: 3, border: "none", background: loading ? "#aaa" : "#0073b7", color: "#fff", fontSize: 18, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
                     {editingCompany ? "Update" : "Add Company"}
                   </button>
                 </div>
@@ -876,45 +933,44 @@ const CarCompany: React.FC = () => {
       <div
         // You may use Tailwind class if setup, or fallback to CSS below.
         className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
-      
       >
 
         {/* Heading */}
-        <h1 style={{ fontSize: 34, fontWeight: 300, color: "#333", marginBottom: 20, marginTop: 0 }}>Car Companies</h1>
+        <h1 style={{ fontSize: 46, fontWeight: 300, color: "#333", marginBottom: 28, marginTop: 0 }}>Car Companies</h1>
 
         {/* Card */}
         <div className="mb-10" style={{ background: "#fff", border: "1px solid #d2d6de", borderRadius: 3, boxShadow: "0 1px 1px rgba(0,0,0,.1)" }}>
 
           {/* Card Header */}
-          <div style={{ padding: "10px 16px", borderBottom: "1px solid #f4f4f4", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 400, color: "#444" }}>Company List</h3>
+          <div style={{ padding: "14px 22px", borderBottom: "1px solid #f4f4f4", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 23, fontWeight: 400, color: "#444" }}>Company List</h3>
             <button type="button" onClick={openAddModal}
-              style={{ padding: "6px 16px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "8px 20px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
               + Add New
             </button>
           </div>
 
           {/* Card Body */}
-          <div style={{ padding: 20 }}>
+          <div style={{ padding: 30 }}>
 
             {/* Search Bar */}
-            <div style={{ marginBottom: 16 }}>
-              <form onSubmit={(e) => { e.preventDefault(); fetchCompanies(query); }} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ marginBottom: 28 }}>
+              <form onSubmit={(e) => { e.preventDefault(); fetchCompanies(query); }} style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                 <input value={query} onChange={(e) => setQuery(e.target.value)} type="text" placeholder="Search by company name…"
-                  style={{ height: 34, width: 260, border: "1px solid #d2d6de", borderRadius: 3, padding: "0 10px", fontSize: 14, outline: "none" }} />
-                <button type="submit" style={{ padding: "6px 14px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Search</button>
+                  style={{ height: 40, width: 320, border: "1px solid #d2d6de", borderRadius: 3, padding: "0 13px", fontSize: 18, outline: "none" }} />
+                <button type="submit" style={{ padding: "8px 18px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>Search</button>
                 <button type="button" onClick={() => { setQuery(""); fetchCompanies(""); }}
-                  style={{ padding: "6px 14px", borderRadius: 3, border: "1px solid #d2d6de", background: "#fff", color: "#555", fontSize: 13, cursor: "pointer" }}>Clear</button>
+                  style={{ padding: "8px 18px", borderRadius: 3, border: "1px solid #d2d6de", background: "#fff", color: "#555", fontSize: 16, cursor: "pointer" }}>Clear</button>
               </form>
             </div>
 
             {/* Alerts */}
-            {error && <div style={{ marginBottom: 14, padding: "8px 14px", background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, color: "#c0392b", fontSize: 13 }}>{error}</div>}
-            {successMsg && <div style={{ marginBottom: 14, padding: "8px 14px", background: "#f0fff4", border: "1px solid #c3e6cb", borderRadius: 3, color: "#27ae60", fontSize: 13 }}>{successMsg}</div>}
+            {error && <div style={{ marginBottom: 18, padding: "12px 18px", background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, color: "#c0392b", fontSize: 18 }}>{error}</div>}
+            {successMsg && <div style={{ marginBottom: 18, padding: "12px 18px", background: "#f0fff4", border: "1px solid #c3e6cb", borderRadius: 3, color: "#27ae60", fontSize: 18 }}>{successMsg}</div>}
 
             {/* Table */}
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 19 }}>
                 <thead>
                   <tr>
                     <th style={thStyle}>Company Name</th>
@@ -925,39 +981,36 @@ const CarCompany: React.FC = () => {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "#888", padding: "40px 0" }}>Loading…</td></tr>
+                    <tr><td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "#888", fontSize: 19, padding: "56px 0" }}>Loading…</td></tr>
                   ) : companies.length === 0 ? (
-                    <tr><td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "#aaa", padding: "40px 0" }}>No car companies found.</td></tr>
+                    <tr><td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "#aaa", fontSize: 19, padding: "56px 0" }}>No car companies found.</td></tr>
                   ) : (
                     companies.map((company) => (
                       <tr key={company._id}>
-                        <td style={{ ...tdStyle, fontWeight: 500 }}>{company.companyName}</td>
+                        <td style={{ ...tdStyle, fontWeight: 600, fontSize: 18 }}>{company.companyName}</td>
                         <td style={tdStyle}>
                           {company.models.map((m, idx) => (
-                            <div key={idx} style={{ fontSize: 12, lineHeight: "1.7" }}>
-                              <span style={{ fontWeight: 600 }}>{m.modelName}</span>
-                              {Array.isArray(m.years) && m.years.length > 0 && (
-                                <span style={{ color: "#777" }}>: {m.years.join(", ")}</span>
-                              )}
+                            <div key={idx} style={{ fontSize: 17, lineHeight: "1.7" }}>
+                              <span style={{ fontWeight: 700 }}>{m.modelName}</span>
                             </div>
                           ))}
                         </td>
                         <td style={tdStyle}>
                           {company.brandLogo ? (
                             <img src={getBackendImageUrl(company.brandLogo)} alt="Brand Logo"
-                              style={{ height: 40, maxWidth: 72, objectFit: "contain", border: "1px solid #d2d6de", borderRadius: 3, background: "#fafafa" }} loading="lazy" />
+                              style={{ height: 56, maxWidth: 94, objectFit: "contain", border: "1px solid #d2d6de", borderRadius: 3, background: "#fafafa" }} loading="lazy" />
                           ) : (
-                            <span style={{ fontSize: 12, color: "#aaa", fontStyle: "italic" }}>No logo</span>
+                            <span style={{ fontSize: 17, color: "#aaa", fontStyle: "italic" }}>No logo</span>
                           )}
                         </td>
                         <td style={tdStyle}>
-                          <div style={{ display: "flex", gap: 6 }}>
+                          <div style={{ display: "flex", gap: 10 }}>
                             <button type="button" onClick={() => openEditModal(company)}
-                              style={{ padding: "4px 12px", borderRadius: 3, border: "1px solid #0073b7", background: "#fff", color: "#0073b7", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                              style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #0073b7", background: "#fff", color: "#0073b7", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
                               Edit
                             </button>
                             <button type="button" disabled={deletingId === company._id} onClick={() => handleDelete(company._id)}
-                              style={{ padding: "4px 12px", borderRadius: 3, border: "1px solid #d2d6de", background: deletingId === company._id ? "#f4f4f4" : "#f2dede", color: deletingId === company._id ? "#aaa" : "#a94442", fontSize: 12, fontWeight: 600, cursor: deletingId === company._id ? "not-allowed" : "pointer" }}>
+                              style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #d2d6de", background: deletingId === company._id ? "#f4f4f4" : "#f2dede", color: deletingId === company._id ? "#aaa" : "#a94442", fontSize: 16, fontWeight: 700, cursor: deletingId === company._id ? "not-allowed" : "pointer" }}>
                               {deletingId === company._id ? "Deleting…" : "Delete"}
                             </button>
                           </div>
