@@ -17,9 +17,7 @@ const LayoutContent: React.FC<{
   return (
     <div
       className="h-screen overflow-hidden"
-      style={{
-        background: "linear-gradient(135deg, #dbeafe 0%, #93c5fd 45%, #60a5fa 100%)",
-      }}
+     
 
     >
       <div>

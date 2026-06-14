@@ -162,6 +162,17 @@ export default function App() {
                 <SubAdminManagement />
               </ProtectedRoute>
             } />
+            <Route path="/admin/associates" element={
+              <div style={{ padding: 48, textAlign: "center", fontSize: 24, fontWeight: 600 }}>
+                Associates - Coming Soon
+              </div>
+            } />
+            <Route path="/admin/dealers" element={
+              <div style={{ padding: 48, textAlign: "center", fontSize: 24, fontWeight: 600 }}>
+                Dealers - Coming Soon
+              </div>
+            } />
+       
             <Route path="/admin/unauthorized" element={<Unauthorized />} />
           </Route>
      

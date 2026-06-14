@@ -411,8 +411,10 @@ const navItems: NavItem[] = [
   {
     icon: <FaUsers />, name: "All Users",
     subItems: [
-      { name: "Car Owners",       path: "/admin/car-owners",       permissionModule: "users" },
-      { name: "Auto Shop Owners", path: "/admin/auto-shop-owners", permissionModule: "users" },
+      { name: "Car Owners",        path: "/admin/car-owners",        permissionModule: "users" },
+      { name: "Auto Shop Owners",  path: "/admin/auto-shop-owners",  permissionModule: "users" },
+      { name: "Associates",        path: "/admin/associates",        permissionModule: "associates" },
+      { name: "Dealers",           path: "/admin/dealers",           permissionModule: "dealers" },
     ],
   },
   {
