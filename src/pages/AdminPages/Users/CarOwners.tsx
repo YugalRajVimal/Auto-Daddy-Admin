@@ -3260,6 +3260,17 @@ const ProfileModal: React.FC<{
             }
           />
           <GCRow label="Joining Date" value={fmtDate(owner.createdAt)} />
+          <GCRow label="URL" value={
+            <a 
+              href={`https://autodaddy.ca/user`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{ color: "#0073b7", textDecoration: "underline" }}
+            >
+              https://autodaddy.ca/user
+            </a>
+          } />
+     
           <div style={{ marginTop: 14 }}>
             <span style={GC_LABEL}>Image</span>
             <div style={{ display: "inline-flex", marginLeft: 18, border: "1px solid #bbb", background: "#fff", width: 120, height: 120, borderRadius: 6, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
