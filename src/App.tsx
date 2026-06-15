@@ -87,12 +87,12 @@ export default function App() {
                 <AutoShopOwners />
               </ProtectedRoute>
             } />
-            <Route path="/admin/services" element={
+            <Route path="/admin/categories" element={
               <ProtectedRoute module="services" action="view">
                 <Services />
               </ProtectedRoute>
             } />
-            <Route path="/admin/categories" element={
+            <Route path="/admin/services" element={
               <ProtectedRoute module="categories" action="view">
                 <SubServicesPage />
               </ProtectedRoute>

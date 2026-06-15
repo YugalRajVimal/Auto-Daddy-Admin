@@ -14,51 +14,50 @@ export interface Service {
   subServices?: SubService[];
 }
 
-const SubServicesPage: React.FC = () => {
-  const [services, setServices] = useState<Service[]>([]);
-  // "" means "All Services"
-  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
-  const [subServices, setSubServices] = useState<SubService[]>([]);
+const CategoriesPage: React.FC = () => {
+  const [categories, setCategories] = useState<Service[]>([]);
+  // "" means "All Categories"
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [subCategories, setSubCategories] = useState<SubService[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
   const [successMsg, setSuccessMsg] = useState<string>("");
 
   const [showModal, setShowModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [subServiceForm, setSubServiceForm] = useState<SubService>({ name: "", status: "active" });
+  const [subCategoryForm, setSubCategoryForm] = useState<SubService>({ name: "", status: "active" });
   const inputRef = useRef<HTMLInputElement>(null);
-//   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
 
   // Table controls
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => { fetchServices(); }, []);
+  useEffect(() => { fetchCategories(); }, []);
 
   useEffect(() => {
-    if (selectedServiceId) {
-      const service = services.find((s) => s._id === selectedServiceId);
-      setSubServices(service?.subServices || []);
+    if (selectedCategoryId) {
+      const category = categories.find((s) => s._id === selectedCategoryId);
+      setSubCategories(category?.subServices || []);
       setCurrentPage(1);
     } else {
-      setSubServices([]);
+      setSubCategories([]);
       setCurrentPage(1);
     }
-  }, [selectedServiceId, services]);
+  }, [selectedCategoryId, categories]);
 
   const clearAlerts = () => { setError(""); setSuccessMsg(""); };
 
-  const fetchServices = async () => {
+  const fetchCategories = async () => {
     setLoading(true);
     clearAlerts();
     try {
       const baseURL = import.meta.env.VITE_API_URL;
       const response = await axios.get(`${baseURL}/api/admin/services`);
-      if (response.data.success) setServices(response.data.data);
-      else setError("Failed to fetch services.");
+      if (response.data.success) setCategories(response.data.data);
+      else setError("Failed to fetch categories.");
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Error fetching services");
+      setError(err?.response?.data?.message || "Error fetching categories");
     }
     setLoading(false);
   };
@@ -66,80 +65,61 @@ const SubServicesPage: React.FC = () => {
   const openAddModal = () => {
     setShowModal(true);
     setEditingIndex(null);
-    setSubServiceForm({ name: "", status: "active" });
+    setSubCategoryForm({ name: "", status: "active" });
     setTimeout(() => inputRef.current?.focus(), 120);
   };
 
-//   const openEditModal = (index: number) => {
-//     setShowModal(true);
-//     setEditingIndex(index);
-//     setSubServiceForm({ name: subServices[index].name, status: subServices[index].status });
-//     setTimeout(() => inputRef.current?.focus(), 120);
-//   };
-
-//   const handleToggleStatus = async (index: number) => {
-//     const sub = subServices[index];
-//     const newStatus = sub.status === "active" ? "inactive" : "active";
-//     const updated = subServices.map((s, i) => i === index ? { ...s, status: newStatus as "active" | "inactive" } : s);
-//     try {
-//       const baseURL = import.meta.env.VITE_API_URL;
-//       await axios.put(`${baseURL}/api/admin/services/${selectedServiceId}`, { subServices: updated });
-//       await fetchServices();
-//     } catch {
-//       setError("Error updating status");
-//     }
-//   };
-
-  const saveSubService = async (e: React.FormEvent) => {
+  const saveSubCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedServiceId) { setError("Please select a service first."); return; }
+    if (!selectedCategoryId) { setError("Please select a category first."); return; }
     clearAlerts();
     const updated =
       editingIndex !== null
-        ? subServices.map((s, i) => (i === editingIndex ? { ...s, ...subServiceForm } : s))
-        : [...subServices, { ...subServiceForm }];
+        ? subCategories.map((s, i) => (i === editingIndex ? { ...s, ...subCategoryForm } : s))
+        : [...subCategories, { ...subCategoryForm }];
     try {
       setLoading(true);
       const baseURL = import.meta.env.VITE_API_URL;
-      await axios.put(`${baseURL}/api/admin/services/${selectedServiceId}`, { subServices: updated });
+      // Note: backend route/prop is still "services" and "subServices"
+      await axios.put(`${baseURL}/api/admin/services/${selectedCategoryId}`, { subServices: updated });
       setSuccessMsg(editingIndex !== null ? "Category updated." : "Category added.");
       setShowModal(false);
-      await fetchServices();
+      await fetchCategories();
     } catch (err: any) {
       setError(err?.response?.data?.message || "Error saving category.");
     }
     setLoading(false);
   };
 
-  // -- Filtering logic for "All Services" or filtered by one service --
-  // If selectedServiceId is set, show only categories under that service, else show all
-  const allCategories = services.flatMap((svc) =>
-    (svc.subServices || []).map((sub) => ({ ...sub, serviceName: svc.name, serviceId: svc._id }))
+  // -- Filtering logic for "All Categories" or filtered by one category --
+  // If selectedCategoryId is set, show only subcategories under that category, else show all
+  const allCategories = categories.flatMap((cat) =>
+    (cat.subServices || []).map((sub) => ({ ...sub, categoryName: cat.name, categoryId: cat._id }))
   );
 
   // Filtering for table
-  const filterCategories = () => {
-    if (selectedServiceId) {
-      // Only subServices for selected service
-      const svc = services.find((s) => s._id === selectedServiceId);
-      const subs = (svc?.subServices || []).map((sub) => ({
+  const filterCategoriesForTable = () => {
+    if (selectedCategoryId) {
+      // Only subCategories for selected category
+      const cat = categories.find((s) => s._id === selectedCategoryId);
+      const subs = (cat?.subServices || []).map((sub) => ({
         ...sub,
-        serviceName: svc?.name || "",
-        serviceId: svc?._id || "",
+        categoryName: cat?.name || "",
+        categoryId: cat?._id || "",
       }));
       return subs.filter(
-        (c) => c.name.toLowerCase().includes(search.toLowerCase()) || c.serviceName.toLowerCase().includes(search.toLowerCase())
+        (c) => c.name.toLowerCase().includes(search.toLowerCase()) || c.categoryName.toLowerCase().includes(search.toLowerCase())
       );
     }
-    // "All Services"
+    // "All Categories"
     return allCategories.filter(
       (c) =>
         c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.serviceName.toLowerCase().includes(search.toLowerCase())
+        c.categoryName.toLowerCase().includes(search.toLowerCase())
     );
   };
 
-  const filteredForTable = filterCategories();
+  const filteredForTable = filterCategoriesForTable();
   const totalPagesCurrent = Math.max(1, Math.ceil(filteredForTable.length / pageSize));
   const paginatedCurrent = filteredForTable.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const showingFromCurrent = filteredForTable.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
@@ -147,10 +127,8 @@ const SubServicesPage: React.FC = () => {
 
   return (
     <div
-    // You may use Tailwind class if setup, or fallback to CSS below.
-    className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
-  
-  >
+      className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
+    >
       {/* Page Header */}
       <div className="flex items-start justify-between mb-4">
         <h1 className="text-2xl font-semibold text-gray-800">Category Management</h1>
@@ -166,19 +144,19 @@ const SubServicesPage: React.FC = () => {
 
       {/* Card */}
       <div  className=" mb-10 bg-white rounded shadow-sm">
-        {/* Card Header with Service dropdown (like cities page) */}
+        {/* Card Header with Category dropdown */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <span className="text-base font-medium text-gray-700 flex items-center gap-3">
             Category List
             <select
-              value={selectedServiceId}
-              onChange={(e) => { setSelectedServiceId(e.target.value); setCurrentPage(1); }}
+              value={selectedCategoryId}
+              onChange={(e) => { setSelectedCategoryId(e.target.value); setCurrentPage(1); }}
               className="ml-3 px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 bg-white"
               style={{ minWidth: 170 }}
             >
-              <option value="">All Services</option>
-              {services.map((s) => (
-                <option key={s._id} value={s._id}>{s.name}</option>
+              <option value="">All Categories</option>
+              {categories.map((c) => (
+                <option key={c._id} value={c._id}>{c.name}</option>
               ))}
             </select>
           </span>
@@ -235,7 +213,7 @@ const SubServicesPage: React.FC = () => {
                     <span className="flex items-center gap-1">Name <SortIcon /></span>
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 w-56">
-                    <span className="flex items-center gap-1">Service <SortIcon /></span>
+                    <span className="flex items-center gap-1">Category <SortIcon /></span>
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 w-32">
                     <span className="flex items-center gap-1">Status <SortIcon /></span>
@@ -252,24 +230,24 @@ const SubServicesPage: React.FC = () => {
                   </tr>
                 ) : (
                   paginatedCurrent.map((cat, idx) => (
-                    <tr key={`${cat.serviceId}-${idx}`} className={`border-b border-gray-100 ${idx % 2 === 1 ? "bg-white" : "bg-[#f9f9f9]"}`}>
+                    <tr key={`${cat.categoryId}-${idx}`} className={`border-b border-gray-100 ${idx % 2 === 1 ? "bg-white" : "bg-[#f9f9f9]"}`}>
                       <td className="px-4 py-3 text-gray-700">{showingFromCurrent + idx}</td>
                       <td className="px-4 py-3 text-gray-800">{cat.name}</td>
-                      <td className="px-4 py-3 text-gray-700 uppercase text-xs font-medium tracking-wide">{cat.serviceName}</td>
+                      <td className="px-4 py-3 text-gray-700 uppercase text-xs font-medium tracking-wide">{cat.categoryName}</td>
                       <td className="px-4 py-3">
                         <ToggleSwitch
                           active={cat.status === "active"}
                           onToggle={async () => {
-                            const svc = services.find((s) => s._id === cat.serviceId);
-                            if (!svc) return;
+                            const category = categories.find((c) => c._id === cat.categoryId);
+                            if (!category) return;
                             const newStatus = cat.status === "active" ? "inactive" : "active";
-                            const updatedSubs = (svc.subServices || []).map((s) =>
+                            const updatedSubs = (category.subServices || []).map((s) =>
                               s.name === cat.name ? { ...s, status: newStatus as "active" | "inactive" } : s
                             );
                             try {
                               const baseURL = import.meta.env.VITE_API_URL;
-                              await axios.put(`${baseURL}/api/admin/services/${svc._id}`, { subServices: updatedSubs });
-                              await fetchServices();
+                              await axios.put(`${baseURL}/api/admin/services/${category._id}`, { subServices: updatedSubs });
+                              await fetchCategories();
                             } catch {
                               setError("Error updating status");
                             }
@@ -279,12 +257,12 @@ const SubServicesPage: React.FC = () => {
                       <td className="px-4 py-3">
                         <button
                           onClick={() => {
-                            setSelectedServiceId(cat.serviceId);
-                            const svc = services.find((s) => s._id === cat.serviceId);
-                            const subIdx = (svc?.subServices || []).findIndex((s) => s.name === cat.name);
+                            setSelectedCategoryId(cat.categoryId);
+                            const category = categories.find((c) => c._id === cat.categoryId);
+                            const subIdx = (category?.subServices || []).findIndex((s) => s.name === cat.name);
                             if (subIdx !== -1) {
                               setEditingIndex(subIdx);
-                              setSubServiceForm({ name: cat.name, status: cat.status });
+                              setSubCategoryForm({ name: cat.name, status: cat.status });
                               setShowModal(true);
                               setTimeout(() => inputRef.current?.focus(), 120);
                             }
@@ -349,31 +327,31 @@ const SubServicesPage: React.FC = () => {
             {/* Modal Body */}
             <div className="px-6 py-5 bg-blue-50/40">
               {error && <div className="mb-3 text-sm rounded bg-red-100 text-red-700 px-3 py-2 border border-red-200">{error}</div>}
-              <form onSubmit={saveSubService} autoComplete="off">
+              <form onSubmit={saveSubCategory} autoComplete="off">
                 <div className="mb-4">
                   <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Category Name</label>
                   <input
                     type="text"
                     ref={inputRef}
-                    value={subServiceForm.name}
+                    value={subCategoryForm.name}
                     required
-                    onChange={(e) => setSubServiceForm((p) => ({ ...p, name: e.target.value }))}
+                    onChange={(e) => setSubCategoryForm((p) => ({ ...p, name: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400 bg-white placeholder:text-gray-400"
                     placeholder="Enter category name"
                   />
                 </div>
 
                 <div className="mb-4">
-                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Select Service</label>
+                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Select Category</label>
                   <select
-                    value={selectedServiceId}
-                    onChange={(e) => setSelectedServiceId(e.target.value)}
+                    value={selectedCategoryId}
+                    onChange={(e) => setSelectedCategoryId(e.target.value)}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400 bg-white text-gray-600"
                   >
-                    <option value="">Select Service</option>
-                    {services.map((s) => (
-                      <option key={s._id} value={s._id}>{s.name}</option>
+                    <option value="">Select Category</option>
+                    {categories.map((c) => (
+                      <option key={c._id} value={c._id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
@@ -474,4 +452,4 @@ const PaginationBtn: React.FC<{
   </button>
 );
 
-export default SubServicesPage;
+export default CategoriesPage;

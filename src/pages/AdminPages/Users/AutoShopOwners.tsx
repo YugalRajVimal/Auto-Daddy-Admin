@@ -4148,6 +4148,7 @@ const AutoShopOwners: React.FC = () => {
     setLoading(true); setError("");
     try {
       const res = await axios.get(`${API()}/api/admin/autoshopowners`, { headers: getToken() });
+      console.log(res.data.data);
       if (res.data?.success && Array.isArray(res.data.data)) setAllOwners(res.data.data);
       else setError("Failed to fetch auto shop owners");
     } catch (e: any) { setError(e?.response?.data?.message || "Something went wrong"); }
@@ -4192,7 +4193,7 @@ const AutoShopOwners: React.FC = () => {
   // We reuse the existing toggle-status endpoint; for hard delete use disable:true
   // Revive = disable: false
   async function deleteOwner(ownerId: string) {
-    if (!window.confirm("Delete this auto shop owner? They can be revived later.")) return;
+    if (!window.confirm("Delete this auto shop owner? They can be restore later.")) return;
     setActionBusy(prev => ({ ...prev, [ownerId]: true }));
     try {
       // Use car-owner status toggle pattern if available for autoshop owners,
@@ -4286,7 +4287,7 @@ const AutoShopOwners: React.FC = () => {
               </>
             ) : (
               <>
-                {selCount === 1 && tbBtn("♻️ Revive", "#27ae60", () => reviveOwner(selected[0]))}
+                {selCount === 1 && tbBtn("♻️ Restore Active", "#27ae60", () => reviveOwner(selected[0]))}
               </>
             )}
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
@@ -4300,7 +4301,7 @@ const AutoShopOwners: React.FC = () => {
           {viewMode === "deleted" && (
             <div style={{ background: "#fdf3f2", borderBottom: "1px solid #f5c6cb", padding: "8px 20px", display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 13, color: "#a94442", fontWeight: 600 }}>🗑️ Showing Deleted Auto Shop Owners ({deletedOwners.length})</span>
-              <span style={{ fontSize: 12, color: "#888" }}>— Select a deleted owner and click Revive to restore them</span>
+              <span style={{ fontSize: 12, color: "#888" }}>— Select a deleted owner and click restore to set active</span>
             </div>
           )}
 
@@ -4329,7 +4330,7 @@ const AutoShopOwners: React.FC = () => {
                       </th>
                       {ALL_COLUMNS.filter(c => viewMode === "active" ? visibleCols.includes(c.key) : DEFAULT_VISIBLE.includes(c.key)).map(c => <th key={c.key} style={thS}>{c.label}</th>)}
                       {viewMode === "active" && <th style={thS}>Action</th>}
-                      {viewMode === "deleted" && <th style={thS}>Revive</th>}
+                      {viewMode === "deleted" && <th style={thS}>Restore Active</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -4361,7 +4362,7 @@ const AutoShopOwners: React.FC = () => {
                           {viewMode === "deleted" && (
                             <td style={tdS}>
                               <button type="button" disabled={busy} onClick={() => reviveOwner(owner._id)} style={{ padding: "4px 12px", borderRadius: 3, border: "none", background: busy ? "#aaa" : "#27ae60", color: "#fff", fontSize: 12, fontWeight: 600, cursor: busy ? "not-allowed" : "pointer" }}>
-                                {busy ? "…" : "♻️ Revive"}
+                                {busy ? "…" : "♻️ Restore Active"}
                               </button>
                             </td>
                           )}

@@ -313,6 +313,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
+// Keep backend as-is (Service object, API endpoints), 
+// but on the UI use "Category" instead of "Service"
+// (i.e., use "Category" in all labels, titles, placeholders, etc.)
+
 export interface Service {
   _id: string;
   name: string;
@@ -348,9 +352,9 @@ const Services: React.FC = () => {
       const baseURL = import.meta.env.VITE_API_URL;
       const response = await axios.get(`${baseURL}/api/admin/services`);
       if (response.data.success) setServices(response.data.data);
-      else setError("Failed to fetch services.");
+      else setError("Failed to fetch categories.");
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Error fetching services");
+      setError(err?.response?.data?.message || "Error fetching categories");
     }
     setLoading(false);
   };
@@ -378,15 +382,15 @@ const Services: React.FC = () => {
     try {
       if (editingService) {
         await axios.put(`${baseURL}/api/admin/services/${editingService._id}`, formValues);
-        setSuccessMsg("Service updated successfully.");
+        setSuccessMsg("Category updated successfully.");
       } else {
         await axios.post(`${baseURL}/api/admin/services`, formValues);
-        setSuccessMsg("Service added successfully.");
+        setSuccessMsg("Category added successfully.");
       }
       setShowModal(false);
       fetchServices();
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.response?.data?.error || "Error saving service");
+      setError(err?.response?.data?.message || err?.response?.data?.error || "Error saving category");
     }
   };
 
@@ -412,17 +416,17 @@ const Services: React.FC = () => {
 
   return (
     // <div className="min-h-screen bg-[#f0f0f0] px-6 py-5 font-sans">
-       <div
-        // You may use Tailwind class if setup, or fallback to CSS below.
-        className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
-      
-      >
+    <div
+      // You may use Tailwind class if setup, or fallback to CSS below.
+      className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
+
+    >
       {/* Page Header */}
       <div className="flex items-start justify-between mb-4">
-        <h1 className="text-2xl font-semibold text-gray-800">Service Management</h1>
+        <h1 className="text-2xl font-semibold text-gray-800">Category Management</h1>
         <div className="text-sm text-right">
           <span className="text-blue-600 hover:underline cursor-pointer">Dashboard</span>
-          <span className="text-gray-500"> / Services</span>
+          <span className="text-gray-500"> / Categories</span>
         </div>
       </div>
 
@@ -431,15 +435,15 @@ const Services: React.FC = () => {
       {successMsg && <div className="mb-3 text-sm rounded bg-green-100 text-green-800 px-3 py-2 border border-green-200">{successMsg}</div>}
 
       {/* Card */}
-      <div  className="mb-10 bg-white rounded shadow-sm">
+      <div className="mb-10 bg-white rounded shadow-sm">
         {/* Card Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <span className="text-base font-medium text-gray-700">Service List</span>
+          <span className="text-base font-medium text-gray-700">Category List</span>
           <button
             onClick={openAddModal}
             className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded transition-colors"
           >
-            <span className="text-lg leading-none">+</span> Add Service
+            <span className="text-lg leading-none">+</span> Add Category
           </button>
         </div>
 
@@ -474,7 +478,7 @@ const Services: React.FC = () => {
               <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
             </svg>
-            <span className="text-blue-600 text-sm font-medium">Loading services...</span>
+            <span className="text-blue-600 text-sm font-medium">Loading categories...</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -498,7 +502,7 @@ const Services: React.FC = () => {
               <tbody>
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="text-center py-10 text-gray-400">No services found.</td>
+                    <td colSpan={4} className="text-center py-10 text-gray-400">No categories found.</td>
                   </tr>
                 ) : (
                   paginated.map((service, idx) => (
@@ -558,7 +562,7 @@ const Services: React.FC = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 pt-5 pb-3">
               <h3 className="text-lg font-semibold text-gray-800">
-                {editingService ? "Edit Service" : "Add New Service"}
+                {editingService ? "Edit Category" : "Add New Category"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
@@ -576,7 +580,7 @@ const Services: React.FC = () => {
               {error && <div className="mb-3 text-sm rounded bg-red-100 text-red-700 px-3 py-2 border border-red-200">{error}</div>}
               <form onSubmit={handleFormSubmit} autoComplete="off">
                 <div className="mb-4">
-                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Service Name</label>
+                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Category Name</label>
                   <input
                     type="text"
                     ref={nameInputRef}
@@ -584,7 +588,7 @@ const Services: React.FC = () => {
                     required
                     onChange={(e) => setFormValues((p) => ({ ...p, name: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400 bg-white placeholder:text-gray-400"
-                    placeholder="Enter service name"
+                    placeholder="Enter category name"
                   />
                 </div>
 
@@ -601,7 +605,7 @@ const Services: React.FC = () => {
                     type="submit"
                     className="px-5 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded transition"
                   >
-                    {editingService ? "Update Service" : "Add Service"}
+                    {editingService ? "Update Category" : "Add Category"}
                   </button>
                 </div>
               </form>
