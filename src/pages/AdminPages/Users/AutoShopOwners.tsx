@@ -3452,12 +3452,25 @@ type JobCardType = {
   totalPayableAmount?: number; paymentStatus?: string; technicalRemarks?: string;
   createdAt?: string; updatedAt?: string; status?: string; [k: string]: any;
 };
+type ShopType = "autoShop" | "tyreShop" | "carWash" | "towTruck";
 type AutoShopOwnerType = {
-  _id: string; name: string; email?: string; countryCode?: string; phone?: string;
-  pincode?: string; address?: string; isDisabled?: boolean; isProfileComplete?: boolean;
-  isBusinessProfileCompleted?: boolean; businessProfile?: BusinessProfileType | null;
-  myCustomers?: CustomerType[]; createdAt?: string; deals?: DealType[]; jobCards?: JobCardType[];
+  _id: string;
+  name: string;
+  email?: string;
+  countryCode?: string;
+  phone?: string;
+  pincode?: string;
+  address?: string;
+  isDisabled?: boolean;
+  isProfileComplete?: boolean;
+  isBusinessProfileCompleted?: boolean;
+  businessProfile?: BusinessProfileType | null;
+  myCustomers?: CustomerType[];
+  createdAt?: string;
+  deals?: DealType[];
+  jobCards?: JobCardType[];
   status?: string;
+  shopType?: ShopType; // ADDED shopType
 };
 
 // ─── Column Config ────────────────────────────────────────────────────────────
@@ -3465,6 +3478,7 @@ const ALL_COLUMNS = [
   { key: "name", label: "Name" },
   { key: "phone", label: "Phone" },
   { key: "shopName", label: "Shop Name" },
+  { key: "shopType", label: "Shop Type" }, // ADDED Shop Type Column
   { key: "city", label: "City" },
   { key: "date", label: "Date" },
   { key: "customers", label: "Customers" },
@@ -3472,7 +3486,7 @@ const ALL_COLUMNS = [
   { key: "jobCards", label: "Job Cards" },
   { key: "status", label: "Status" },
 ];
-const DEFAULT_VISIBLE = ["name", "phone", "shopName", "city", "date", "customers", "deals", "jobCards", "status"];
+const DEFAULT_VISIBLE = ["name", "phone", "shopName", "shopType", "city", "date", "customers", "deals", "jobCards", "status"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const API = () => (import.meta.env.VITE_API_URL as string) || "";
@@ -3537,6 +3551,14 @@ const lStyle: React.CSSProperties = {
   color: "#555", textTransform: "uppercase", letterSpacing: "0.04em",
 };
 
+// Shop Type Options
+const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
+  { value: "autoShop", label: "Auto Shop" },
+  { value: "tyreShop", label: "Tyre Shop" },
+  { value: "carWash", label: "Car Wash" },
+  { value: "towTruck", label: "Tow Truck" },
+];
+
 // ─── BASE MODAL ───────────────────────────────────────────────────────────────
 const BaseModal: React.FC<{
   isOpen: boolean; onClose: () => void; title: string;
@@ -3584,6 +3606,8 @@ const AddEditModal: React.FC<{
   const [phone, setPhone] = useState("");
   const [pincode, setPincode] = useState("");
   const [address, setAddress] = useState("");
+  // SHOP TYPE handling
+  const [shopType, setShopType] = useState<ShopType>("autoShop");
   const [submitting, setSubmitting] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -3595,8 +3619,10 @@ const AddEditModal: React.FC<{
       setName(owner.name || ""); setEmail(owner.email || "");
       setDialCode(owner.countryCode || "+1"); setPhone(owner.phone || "");
       setPincode(owner.pincode || ""); setAddress(owner.address || "");
+      setShopType((owner.shopType as ShopType) || "autoShop");
     } else {
       setName(""); setEmail(""); setDialCode("+1"); setPhone(""); setPincode(""); setAddress("");
+      setShopType("autoShop");
     }
   }, [isOpen, isEdit, owner]);
 
@@ -3605,6 +3631,7 @@ const AddEditModal: React.FC<{
     if (!email.trim() || !isEmail(email)) return "Valid email required.";
     if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
     if (!pincode.trim()) return "Zip / Postal code is required.";
+    if (!shopType) return "Shop type required.";
     return null;
   }
 
@@ -3616,14 +3643,13 @@ const AddEditModal: React.FC<{
       name: name.trim(), email: email.trim(), countryCode: dialCode,
       phone: phone.replace(/\D/g, ""), pincode: pincode.trim(),
       address: address.trim(), role: "autoshopowner",
+      shopType,
     };
     setSubmitting(true);
     try {
       if (isEdit && owner) {
-        // Use the edit-profile endpoint or a general update — adjust to your actual route
         await axios.put(`${API()}/api/admin/autoshopowners/${owner._id}`, payload, { headers: getToken() });
       } else {
-        // Register a new auto shop owner via auth or admin endpoint
         await axios.post(`${API()}/api/admin/autoshopowners`, payload, { headers: getToken() });
       }
       onSaved(); onClose();
@@ -3671,6 +3697,24 @@ const AddEditModal: React.FC<{
             <div>
               <label style={lStyle}>Role</label>
               <div style={{ ...iStyle, background: "#f5f6f8", color: "#888", fontWeight: 600, cursor: "default" }}>autoshopowner</div>
+            </div>
+            {/* ADD SHOP TYPE */}
+            <div>
+              <label style={lStyle}>Shop Type <span style={{ color: "#e73d3d" }}>*</span></label>
+              <select
+                style={iStyle}
+                value={shopType}
+                onChange={e => setShopType(e.target.value as ShopType)}
+              >
+                {SHOP_TYPE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              {attempted && !shopType && (
+                <p style={{ color: "#c0392b", fontSize: 11, margin: "3px 0 0", fontWeight: 600 }}>Required</p>
+              )}
             </div>
             <div style={{ gridColumn: "1/-1" }}>
               <label style={lStyle}>Address</label>
@@ -4098,10 +4142,15 @@ const ColSelector: React.FC<{ visible: string[]; onChange: (v: string[]) => void
 // ─── EXPORT CSV ───────────────────────────────────────────────────────────────
 function exportCsv(owners: AutoShopOwnerType[], visibleCols: string[]) {
   const colMap: Record<string, (o: AutoShopOwnerType) => string> = {
-    name: o => o.name || "-", phone: o => `${o.countryCode ?? ""} ${o.phone ?? ""}`.trim() || "-",
-    shopName: o => o.businessProfile?.businessName || "-", city: o => o.businessProfile?.city || "-",
-    date: o => fmtDate(o.createdAt), customers: o => String(o.myCustomers?.length ?? 0),
-    deals: o => String(o.deals?.length ?? 0), jobCards: o => String(o.jobCards?.length ?? 0),
+    name: o => o.name || "-",
+    phone: o => `${o.countryCode ?? ""} ${o.phone ?? ""}`.trim() || "-",
+    shopName: o => o.businessProfile?.businessName || "-",
+    shopType: o => o.shopType ? SHOP_TYPE_OPTIONS.find(x => x.value === o.shopType)?.label || o.shopType : "-",
+    city: o => o.businessProfile?.city || "-",
+    date: o => fmtDate(o.createdAt),
+    customers: o => String(o.myCustomers?.length ?? 0),
+    deals: o => String(o.deals?.length ?? 0),
+    jobCards: o => String(o.jobCards?.length ?? 0),
     status: o => getStatus(o),
   };
   const cols = ALL_COLUMNS.filter(c => visibleCols.includes(c.key));
@@ -4148,7 +4197,6 @@ const AutoShopOwners: React.FC = () => {
     setLoading(true); setError("");
     try {
       const res = await axios.get(`${API()}/api/admin/autoshopowners`, { headers: getToken() });
-      console.log(res.data.data);
       if (res.data?.success && Array.isArray(res.data.data)) setAllOwners(res.data.data);
       else setError("Failed to fetch auto shop owners");
     } catch (e: any) { setError(e?.response?.data?.message || "Something went wrong"); }
@@ -4168,7 +4216,8 @@ const AutoShopOwners: React.FC = () => {
       || (o.email || "").toLowerCase().includes(q)
       || (o.phone || "").toLowerCase().includes(q)
       || (o.businessProfile?.businessName || "").toLowerCase().includes(q)
-      || (o.businessProfile?.city || "").toLowerCase().includes(q);
+      || (o.businessProfile?.city || "").toLowerCase().includes(q)
+      || (o.shopType || "").toLowerCase().includes(q); // search on shopType as well
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -4189,17 +4238,11 @@ const AutoShopOwners: React.FC = () => {
     finally { setActionBusy(prev => ({ ...prev, [ownerId]: false })); }
   }
 
-  // Delete = set status "deleted" via toggle endpoint (disable: true) then mark deleted
-  // We reuse the existing toggle-status endpoint; for hard delete use disable:true
-  // Revive = disable: false
   async function deleteOwner(ownerId: string) {
     if (!window.confirm("Delete this auto shop owner? They can be restore later.")) return;
     setActionBusy(prev => ({ ...prev, [ownerId]: true }));
     try {
-      // Use car-owner status toggle pattern if available for autoshop owners,
-      // otherwise use suspend (disable:true) to mark them as disabled/deleted
       await axios.delete(`${API()}/api/admin/autoshopowners/${ownerId}`, { headers: getToken() });
-      // Optimistically move them to deleted view by marking locally until next fetch
       setAllOwners(prev => prev.map(o => o._id === ownerId ? { ...o, status: "deleted", isDisabled: true } : o));
       setSelectedRows(prev => { const c = new Set(prev); c.delete(ownerId); return c; });
       await fetchOwners();
@@ -4218,16 +4261,38 @@ const AutoShopOwners: React.FC = () => {
 
   function renderCell(owner: AutoShopOwnerType, key: string) {
     switch (key) {
-      case "name": return <td key={key} style={{ ...tdS, fontWeight: 500 }}><button type="button" onClick={() => setProfileFor(owner)} style={{ ...linkBtn, color: "#8a00d4", fontWeight: 600, fontSize: 13 }}>{owner.name}</button></td>;
-      case "phone": return <td key={key} style={tdS}>{owner.countryCode ? `${owner.countryCode} ` : ""}{owner.phone || "-"}</td>;
-      case "shopName": return <td key={key} style={tdS}><button type="button" onClick={() => setBusinessFor(owner)} style={linkBtn}>{owner.businessProfile?.businessName || "-"}</button></td>;
-      case "city": return <td key={key} style={tdS}>{owner.businessProfile?.city || "-"}</td>;
-      case "date": return <td key={key} style={tdS}>{fmtDate(owner.createdAt)}</td>;
-      case "customers": return <td key={key} style={tdS}><button type="button" onClick={() => setCustomersFor(owner)} style={linkBtn}>{owner.myCustomers?.length ?? 0}</button></td>;
-      case "deals": return <td key={key} style={tdS}><button type="button" onClick={() => setDealsFor(owner)} style={linkBtn}>{owner.deals?.length ?? 0}</button></td>;
-      case "jobCards": return <td key={key} style={tdS}><button type="button" onClick={() => setJobCardsFor(owner)} style={linkBtn}>{owner.jobCards?.length ?? 0}</button></td>;
-      case "status": return <td key={key} style={tdS}><span style={{ ...getStatusColors(getStatus(owner)), display: "inline-block", padding: "2px 10px", borderRadius: 3, fontSize: 12, fontWeight: 600 }}>{getStatus(owner)}</span></td>;
-      default: return <td key={key} style={tdS}>-</td>;
+      case "name":
+        return (
+          <td key={key} style={{ ...tdS, fontWeight: 500 }}>
+            <button type="button" onClick={() => setProfileFor(owner)} style={{ ...linkBtn, color: "#8a00d4", fontWeight: 600, fontSize: 13 }}>
+              {owner.name}
+            </button>
+          </td>
+        );
+      case "phone":
+        return <td key={key} style={tdS}>{owner.countryCode ? `${owner.countryCode} ` : ""}{owner.phone || "-"}</td>;
+      case "shopName":
+        return <td key={key} style={tdS}><button type="button" onClick={() => setBusinessFor(owner)} style={linkBtn}>{owner.businessProfile?.businessName || "-"}</button></td>;
+      case "shopType":
+        return (
+          <td key={key} style={tdS}>
+            {(owner.shopType && SHOP_TYPE_OPTIONS.find(x => x.value === owner.shopType)?.label) || "-"}
+          </td>
+        );
+      case "city":
+        return <td key={key} style={tdS}>{owner.businessProfile?.city || "-"}</td>;
+      case "date":
+        return <td key={key} style={tdS}>{fmtDate(owner.createdAt)}</td>;
+      case "customers":
+        return <td key={key} style={tdS}><button type="button" onClick={() => setCustomersFor(owner)} style={linkBtn}>{owner.myCustomers?.length ?? 0}</button></td>;
+      case "deals":
+        return <td key={key} style={tdS}><button type="button" onClick={() => setDealsFor(owner)} style={linkBtn}>{owner.deals?.length ?? 0}</button></td>;
+      case "jobCards":
+        return <td key={key} style={tdS}><button type="button" onClick={() => setJobCardsFor(owner)} style={linkBtn}>{owner.jobCards?.length ?? 0}</button></td>;
+      case "status":
+        return <td key={key} style={tdS}><span style={{ ...getStatusColors(getStatus(owner)), display: "inline-block", padding: "2px 10px", borderRadius: 3, fontSize: 12, fontWeight: 600 }}>{getStatus(owner)}</span></td>;
+      default:
+        return <td key={key} style={tdS}>-</td>;
     }
   }
 
@@ -4240,6 +4305,7 @@ const AutoShopOwners: React.FC = () => {
   return (
     <>
       {/* ── MODALS ── */}
+      {/* unchanged, same as previous code for modals... */}
       {profileFor && (
         <ProfileModal
           owner={profileFor}

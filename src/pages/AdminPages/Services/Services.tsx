@@ -310,20 +310,33 @@
 
 // export default Services;
 
+
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
 // Keep backend as-is (Service object, API endpoints), 
 // but on the UI use "Category" instead of "Service"
 // (i.e., use "Category" in all labels, titles, placeholders, etc.)
+// Add shopType - all / autoShop / tyreShop / carWash / towTruck
+// Also add filter - shopType
+
+export type ShopType = "autoShop" | "tyreShop" | "carWash" | "towTruck";
 
 export interface Service {
   _id: string;
   name: string;
   status: "active" | "inactive";
+  shopType: ShopType;
 }
 
 type ServiceFormValues = Omit<Service, "_id">;
+
+const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
+  { value: "autoShop", label: "Auto Shop" },
+  { value: "tyreShop", label: "Tyre Shop" },
+  { value: "carWash", label: "Car Wash" },
+  { value: "towTruck", label: "Tow Truck" },
+];
 
 const Services: React.FC = () => {
   const [services, setServices] = useState<Service[]>([]);
@@ -331,8 +344,7 @@ const Services: React.FC = () => {
   const [error, setError] = useState<string>("");
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
-  const [formValues, setFormValues] = useState<ServiceFormValues>({ name: "", status: "active" });
-  // const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [formValues, setFormValues] = useState<ServiceFormValues>({ name: "", status: "active", shopType: "autoShop" });
   const [successMsg, setSuccessMsg] = useState<string>("");
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -341,16 +353,24 @@ const Services: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => { fetchServices(); }, []);
+  // shop type filter
+  const [filterShopType, setFilterShopType] = useState<"all" | ShopType>("all");
+
+  useEffect(() => {
+    fetchServices();
+  }, [filterShopType]);
 
   const clearAlerts = () => { setError(""); setSuccessMsg(""); };
 
+  // Fetch categories with optional shopType filter
   const fetchServices = async () => {
     setLoading(true);
     clearAlerts();
     try {
       const baseURL = import.meta.env.VITE_API_URL;
-      const response = await axios.get(`${baseURL}/api/admin/services`);
+      let url = `${baseURL}/api/admin/services`;
+      if (filterShopType !== "all") url += `?shopType=${filterShopType}`;
+      const response = await axios.get(url);
       if (response.data.success) setServices(response.data.data);
       else setError("Failed to fetch categories.");
     } catch (err: any) {
@@ -362,7 +382,7 @@ const Services: React.FC = () => {
   const openAddModal = () => {
     clearAlerts();
     setEditingService(null);
-    setFormValues({ name: "", status: "active" });
+    setFormValues({ name: "", status: "active", shopType: "autoShop" });
     setShowModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 150);
   };
@@ -370,7 +390,7 @@ const Services: React.FC = () => {
   const openEditModal = (service: Service) => {
     clearAlerts();
     setEditingService(service);
-    setFormValues({ name: service.name, status: service.status || "active" });
+    setFormValues({ name: service.name, status: service.status || "active", shopType: service.shopType });
     setShowModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 150);
   };
@@ -405,8 +425,8 @@ const Services: React.FC = () => {
     }
   };
 
-  // Filtered + paginated
-  const filtered = services.filter((s) =>
+  // Filtered + paginated by name and filterShopType
+  const filtered = services.filter((s) => 
     s.name.toLowerCase().includes(search.toLowerCase())
   );
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -415,12 +435,7 @@ const Services: React.FC = () => {
   const showingTo = Math.min(currentPage * pageSize, filtered.length);
 
   return (
-    // <div className="min-h-screen bg-[#f0f0f0] px-6 py-5 font-sans">
-    <div
-      // You may use Tailwind class if setup, or fallback to CSS below.
-      className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
-
-    >
+    <div className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans">
       {/* Page Header */}
       <div className="flex items-start justify-between mb-4">
         <h1 className="text-2xl font-semibold text-gray-800">Category Management</h1>
@@ -439,16 +454,32 @@ const Services: React.FC = () => {
         {/* Card Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <span className="text-base font-medium text-gray-700">Category List</span>
+          <div className="flex gap-2 ">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Shop type:</span>
+            <select
+              value={filterShopType}
+              onChange={e => { setFilterShopType(e.target.value as any); setCurrentPage(1); }}
+              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400"
+            >
+              <option value="all">All</option>
+              {SHOP_TYPE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={openAddModal}
             className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded transition-colors"
           >
             <span className="text-lg leading-none">+</span> Add Category
           </button>
+          </div>
+        
         </div>
 
         {/* Table Controls */}
-        <div className="flex items-center justify-between px-5 py-3">
+        <div className="flex items-center justify-between px-5 py-3 flex-wrap gap-y-2">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             Show
             <select
@@ -460,6 +491,8 @@ const Services: React.FC = () => {
             </select>
             entries
           </div>
+
+     
           <div className="flex items-center gap-2 text-sm text-gray-600">
             Search:
             <input
@@ -469,6 +502,9 @@ const Services: React.FC = () => {
               className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400 w-44"
             />
           </div>
+
+
+       
         </div>
 
         {/* Table */}
@@ -491,6 +527,9 @@ const Services: React.FC = () => {
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">
                     <span className="flex items-center gap-1">Name <SortIcon /></span>
                   </th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 w-36">
+                    <span className="flex items-center gap-1">Shop Type <SortIcon /></span>
+                  </th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 w-32">
                     <span className="flex items-center gap-1">Status <SortIcon /></span>
                   </th>
@@ -502,13 +541,16 @@ const Services: React.FC = () => {
               <tbody>
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="text-center py-10 text-gray-400">No categories found.</td>
+                    <td colSpan={5} className="text-center py-10 text-gray-400">No categories found.</td>
                   </tr>
                 ) : (
                   paginated.map((service, idx) => (
                     <tr key={service._id} className={`border-b border-gray-100 ${idx % 2 === 1 ? "bg-white" : "bg-[#f9f9f9]"}`}>
                       <td className="px-4 py-3 text-gray-700">{(currentPage - 1) * pageSize + idx + 1}</td>
                       <td className="px-4 py-3 text-gray-800 font-medium">{service.name}</td>
+                      <td className="px-4 py-3 text-gray-800">
+                        {SHOP_TYPE_OPTIONS.find(opt => opt.value === service.shopType)?.label || service.shopType}
+                      </td>
                       <td className="px-4 py-3">
                         <ToggleSwitch
                           active={service.status === "active"}
@@ -590,6 +632,19 @@ const Services: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400 bg-white placeholder:text-gray-400"
                     placeholder="Enter category name"
                   />
+                </div>
+                <div className="mb-4">
+                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Shop Type</label>
+                  <select
+                    value={formValues.shopType}
+                    onChange={e => setFormValues((p) => ({ ...p, shopType: e.target.value as ShopType }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400 bg-white"
+                    required
+                  >
+                    {SHOP_TYPE_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Modal Footer */}

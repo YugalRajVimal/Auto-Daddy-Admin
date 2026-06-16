@@ -2,17 +2,29 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 
+export type ShopType = "all" | "autoShop" | "tyreShop" | "carWash" | "towTruck";
+
 export interface SubService {
   _id?: string;
   name: string;
   status: "active" | "inactive";
+  // Optionally, you could also add shopType to subService if backend supports
 }
 export interface Service {
   _id: string;
   name: string;
   status: "active" | "inactive";
+  shopType?: ShopType; // add shopType to service
   subServices?: SubService[];
 }
+
+const SHOP_TYPE_LIST: { value: ShopType; label: string }[] = [
+  { value: "all", label: "All Shop Types" },
+  { value: "autoShop", label: "Auto Shop" },
+  { value: "tyreShop", label: "Tyre Shop" },
+  { value: "carWash", label: "Car Wash" },
+  { value: "towTruck", label: "Tow Truck" },
+];
 
 const CategoriesPage: React.FC = () => {
   const [categories, setCategories] = useState<Service[]>([]);
@@ -33,7 +45,12 @@ const CategoriesPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => { fetchCategories(); }, []);
+  // Shop type filter
+  const [shopType, setShopType] = useState<ShopType>("all");
+
+  useEffect(() => {
+    fetchCategories();
+  }, [shopType]);
 
   useEffect(() => {
     if (selectedCategoryId) {
@@ -46,14 +63,22 @@ const CategoriesPage: React.FC = () => {
     }
   }, [selectedCategoryId, categories]);
 
-  const clearAlerts = () => { setError(""); setSuccessMsg(""); };
+  const clearAlerts = () => {
+    setError("");
+    setSuccessMsg("");
+  };
 
   const fetchCategories = async () => {
     setLoading(true);
     clearAlerts();
     try {
       const baseURL = import.meta.env.VITE_API_URL;
-      const response = await axios.get(`${baseURL}/api/admin/services`);
+      // Pass shopType as filter if not "all"
+      let url = `${baseURL}/api/admin/services`;
+      if (shopType && shopType !== "all") {
+        url += `?shopType=${shopType}`;
+      }
+      const response = await axios.get(url);
       if (response.data.success) setCategories(response.data.data);
       else setError("Failed to fetch categories.");
     } catch (err: any) {
@@ -71,7 +96,10 @@ const CategoriesPage: React.FC = () => {
 
   const saveSubCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCategoryId) { setError("Please select a category first."); return; }
+    if (!selectedCategoryId) {
+      setError("Please select a category first.");
+      return;
+    }
     clearAlerts();
     const updated =
       editingIndex !== null
@@ -91,14 +119,21 @@ const CategoriesPage: React.FC = () => {
     setLoading(false);
   };
 
-  // -- Filtering logic for "All Categories" or filtered by one category --
+  // -- Filtering logic for "All Categories" or filtered by one category, also filter by shopType --
   // If selectedCategoryId is set, show only subcategories under that category, else show all
   const allCategories = categories.flatMap((cat) =>
-    (cat.subServices || []).map((sub) => ({ ...sub, categoryName: cat.name, categoryId: cat._id }))
+    (cat.subServices || []).map((sub) => ({
+      ...sub,
+      categoryName: cat.name,
+      categoryId: cat._id,
+      shopType: cat.shopType,
+    }))
   );
 
   // Filtering for table
   const filterCategoriesForTable = () => {
+    let filtered: (SubService & { categoryName: string; categoryId: string; shopType?: ShopType })[] = [];
+
     if (selectedCategoryId) {
       // Only subCategories for selected category
       const cat = categories.find((s) => s._id === selectedCategoryId);
@@ -106,16 +141,25 @@ const CategoriesPage: React.FC = () => {
         ...sub,
         categoryName: cat?.name || "",
         categoryId: cat?._id || "",
+        shopType: cat?.shopType,
       }));
-      return subs.filter(
-        (c) => c.name.toLowerCase().includes(search.toLowerCase()) || c.categoryName.toLowerCase().includes(search.toLowerCase())
-      );
+      filtered = subs;
+    } else {
+      // "All Categories"
+      filtered = allCategories;
     }
-    // "All Categories"
-    return allCategories.filter(
+
+    // ShopType filter is already handled server side, but if in the future the backend sends all, filter here as fallback
+    if (shopType !== "all") {
+      filtered = filtered.filter((c) => c.shopType === shopType);
+    }
+
+    // Search filtering
+    return filtered.filter(
       (c) =>
         c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.categoryName.toLowerCase().includes(search.toLowerCase())
+        c.categoryName.toLowerCase().includes(search.toLowerCase()) ||
+        (c.shopType && SHOP_TYPE_LIST.find((t) => t.value === c.shopType)?.label.toLowerCase().includes(search.toLowerCase()))
     );
   };
 
@@ -126,9 +170,7 @@ const CategoriesPage: React.FC = () => {
   const showingToCurrent = Math.min(currentPage * pageSize, filteredForTable.length);
 
   return (
-    <div
-      className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
-    >
+    <div className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans">
       {/* Page Header */}
       <div className="flex items-start justify-between mb-4">
         <h1 className="text-2xl font-semibold text-gray-800">Category Management</h1>
@@ -143,14 +185,40 @@ const CategoriesPage: React.FC = () => {
       {successMsg && <div className="mb-3 text-sm rounded bg-green-100 text-green-800 px-3 py-2 border border-green-200">{successMsg}</div>}
 
       {/* Card */}
-      <div  className=" mb-10 bg-white rounded shadow-sm">
-        {/* Card Header with Category dropdown */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+      <div className="mb-10 bg-white rounded shadow-sm">
+        {/* Card Header with Category dropdown and shopType filter */}
+        <div className="flex flex-wrap items-center justify-between px-5 py-4 border-b border-gray-200 gap-3">
           <span className="text-base font-medium text-gray-700 flex items-center gap-3">
             Category List
+         
+          </span>
+
+          <div className="flex gap-2 ">
+    {/* Add ShopType filter dropdown */}
+    <div className="flex items-center gap-2">
+            <label htmlFor="shopTypeFilter" className="text-sm font-medium text-gray-700">Shop Type:</label>
             <select
+              id="shopTypeFilter"
+              value={shopType}
+              onChange={(e) => {
+                setShopType(e.target.value as ShopType);
+                setSelectedCategoryId("");
+                setCurrentPage(1);
+              }}
+              className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 bg-white"
+              style={{ minWidth: 145 }}
+            >
+              {SHOP_TYPE_LIST.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          <select
               value={selectedCategoryId}
-              onChange={(e) => { setSelectedCategoryId(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => {
+                setSelectedCategoryId(e.target.value);
+                setCurrentPage(1);
+              }}
               className="ml-3 px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 bg-white"
               style={{ minWidth: 170 }}
             >
@@ -159,25 +227,34 @@ const CategoriesPage: React.FC = () => {
                 <option key={c._id} value={c._id}>{c.name}</option>
               ))}
             </select>
-          </span>
           <button
+
             onClick={openAddModal}
             className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded transition-colors"
           >
             <span className="text-lg leading-none">+</span> Add Category
           </button>
+          </div>
+      
         </div>
 
         {/* Table Controls */}
-        <div className="flex items-center justify-between px-5 py-3">
+        <div className="flex items-center justify-between px-5 py-3 flex-wrap gap-3">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             Show
             <select
               value={pageSize}
-              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
               className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400"
             >
-              {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+              {[10, 25, 50, 100].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
             </select>
             entries
           </div>
@@ -186,7 +263,10 @@ const CategoriesPage: React.FC = () => {
             <input
               type="text"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
               className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400 w-44"
             />
           </div>
@@ -207,33 +287,61 @@ const CategoriesPage: React.FC = () => {
               <thead>
                 <tr className="border-t border-b border-gray-200 bg-gray-50">
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 w-16">
-                    <span className="flex items-center gap-1">ID <SortIcon /></span>
+                    <span className="flex items-center gap-1">
+                      ID <SortIcon />
+                    </span>
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                    <span className="flex items-center gap-1">Name <SortIcon /></span>
+                    <span className="flex items-center gap-1">
+                      Name <SortIcon />
+                    </span>
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 w-56">
-                    <span className="flex items-center gap-1">Category <SortIcon /></span>
+                    <span className="flex items-center gap-1">
+                      Category <SortIcon />
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 w-40">
+                    <span className="flex items-center gap-1">
+                      Shop Type <SortIcon />
+                    </span>
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 w-32">
-                    <span className="flex items-center gap-1">Status <SortIcon /></span>
+                    <span className="flex items-center gap-1">
+                      Status <SortIcon />
+                    </span>
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 w-28">
-                    <span className="flex items-center gap-1">Actions <SortIcon /></span>
+                    <span className="flex items-center gap-1">
+                      Actions <SortIcon />
+                    </span>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedCurrent.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-10 text-gray-400">No categories found.</td>
+                    <td colSpan={6} className="text-center py-10 text-gray-400">
+                      No categories found.
+                    </td>
                   </tr>
                 ) : (
                   paginatedCurrent.map((cat, idx) => (
-                    <tr key={`${cat.categoryId}-${idx}`} className={`border-b border-gray-100 ${idx % 2 === 1 ? "bg-white" : "bg-[#f9f9f9]"}`}>
+                    <tr
+                      key={`${cat.categoryId}-${idx}`}
+                      className={`border-b border-gray-100 ${idx % 2 === 1 ? "bg-white" : "bg-[#f9f9f9]"}`}
+                    >
                       <td className="px-4 py-3 text-gray-700">{showingFromCurrent + idx}</td>
                       <td className="px-4 py-3 text-gray-800">{cat.name}</td>
-                      <td className="px-4 py-3 text-gray-700 uppercase text-xs font-medium tracking-wide">{cat.categoryName}</td>
+                      <td className="px-4 py-3 text-gray-700 uppercase text-xs font-medium tracking-wide">
+                        {cat.categoryName}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 text-xs font-medium tracking-wide capitalize">
+                        {
+                          SHOP_TYPE_LIST.find((type) => type.value === cat.shopType)?.label ||
+                          "-"
+                        }
+                      </td>
                       <td className="px-4 py-3">
                         <ToggleSwitch
                           active={cat.status === "active"}
@@ -242,7 +350,9 @@ const CategoriesPage: React.FC = () => {
                             if (!category) return;
                             const newStatus = cat.status === "active" ? "inactive" : "active";
                             const updatedSubs = (category.subServices || []).map((s) =>
-                              s.name === cat.name ? { ...s, status: newStatus as "active" | "inactive" } : s
+                              s.name === cat.name
+                                ? { ...s, status: newStatus as "active" | "inactive" }
+                                : s
                             );
                             try {
                               const baseURL = import.meta.env.VITE_API_URL;
@@ -326,16 +436,27 @@ const CategoriesPage: React.FC = () => {
 
             {/* Modal Body */}
             <div className="px-6 py-5 bg-blue-50/40">
-              {error && <div className="mb-3 text-sm rounded bg-red-100 text-red-700 px-3 py-2 border border-red-200">{error}</div>}
+              {error && (
+                <div className="mb-3 text-sm rounded bg-red-100 text-red-700 px-3 py-2 border border-red-200">
+                  {error}
+                </div>
+              )}
               <form onSubmit={saveSubCategory} autoComplete="off">
                 <div className="mb-4">
-                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">Category Name</label>
+                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">
+                    Category Name
+                  </label>
                   <input
                     type="text"
                     ref={inputRef}
                     value={subCategoryForm.name}
                     required
-                    onChange={(e) => setSubCategoryForm((p) => ({ ...p, name: e.target.value }))}
+                    onChange={(e) =>
+                      setSubCategoryForm((p) => ({
+                        ...p,
+                        name: e.target.value,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-400 bg-white placeholder:text-gray-400"
                     placeholder="Enter category name"
                   />
@@ -351,10 +472,22 @@ const CategoriesPage: React.FC = () => {
                   >
                     <option value="">Select Category</option>
                     {categories.map((c) => (
-                      <option key={c._id} value={c._id}>{c.name}</option>
+                      <option key={c._id} value={c._id}>
+                        {c.name}
+                      </option>
                     ))}
                   </select>
                 </div>
+
+                <div className="mb-4">
+                  <label className="block mb-1.5 font-semibold text-gray-800 text-sm">
+                    Shop Type
+                  </label>
+                  <div className="text-xs text-gray-700 mt-1">
+                    {SHOP_TYPE_LIST.find((t) => t.value === shopType)?.label || ""}
+                  </div>
+                </div>
+           
 
                 {/* Modal Footer */}
                 <div className="flex justify-end gap-3 pt-2">
