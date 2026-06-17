@@ -1,7 +1,8 @@
 
 
-import React, { useState, useEffect, useRef, ChangeEvent } from "react";
+import React, { useState, useEffect, useRef, ChangeEvent, useMemo } from "react";
 import axios from "axios";
+import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
 // --- Types ---
 interface CarModel { modelName: string; } // years REMOVED
@@ -15,10 +16,6 @@ type CarCompanyFormState = {
 const EMPTY_FORM: CarCompanyFormState = { companyName: "", models: [{ modelName: "" }], brandLogoFile: null, brandLogoPreviewUrl: null };
 
 // ─── STYLE HELPERS ─────────────────────────────────────────────────────────────
-// Increased font sizes
-const thStyle: React.CSSProperties = { border: "1px solid #d2d6de", background: "#f9fafc", padding: "14px 16px", textAlign: "left", fontWeight: 700, fontSize: 18, color: "#333", whiteSpace: "nowrap" };
-const tdStyle: React.CSSProperties = { border: "1px solid #d2d6de", padding: "14px 16px", fontSize: 17, color: "#555", verticalAlign: "middle" };
-
 const CarCompany: React.FC = () => {
   const [companies, setCompanies] = useState<CarCompanyType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -29,6 +26,10 @@ const CarCompany: React.FC = () => {
   const [form, setForm] = useState<CarCompanyFormState>(EMPTY_FORM);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [query, setQuery] = useState<string>("");
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [visibleCols, setVisibleCols] = useState(["companyName", "models", "brandLogo"]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const clearAlerts = () => { setError(""); setSuccessMsg(""); };
@@ -145,7 +146,7 @@ const CarCompany: React.FC = () => {
       setShowModal(false);
       setForm({ ...EMPTY_FORM });
       setEditingCompany(null);
-      fetchCompanies(query);
+      fetchCompanies();
     } catch (err: any) {
       setError(err?.response?.data?.message || (editingCompany ? "Failed to update" : "Failed to add") + " car company");
     }
@@ -160,7 +161,7 @@ const CarCompany: React.FC = () => {
     try {
       await axios.delete(`${import.meta.env.VITE_API_URL}/api/admin/car-company/${id}`);
       setSuccessMsg("Car company deleted.");
-      fetchCompanies(query);
+      fetchCompanies();
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to delete car company");
     }
@@ -172,6 +173,58 @@ const CarCompany: React.FC = () => {
       if (form.brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(form.brandLogoPreviewUrl);
     };
   }, [showModal]);
+
+  const filtered = companies.filter((c) =>
+    c.companyName.toLowerCase().includes(query.toLowerCase()) ||
+    c.models.some((m) => m.modelName.toLowerCase().includes(query.toLowerCase()))
+  );
+
+  const tableColumns = useMemo(
+    () => [
+      {
+        key: "companyName",
+        label: "Company Name",
+        render: (company: CarCompanyType) =>
+          tableCell(<span style={{ fontWeight: 600 }}>{company.companyName}</span>),
+        exportValue: (company: CarCompanyType) => company.companyName,
+      },
+      {
+        key: "models",
+        label: "Models",
+        render: (company: CarCompanyType) =>
+          tableCell(
+            <>
+              {company.models.map((m, idx) => (
+                <div key={idx} style={{ lineHeight: 1.7 }}>
+                  <span style={{ fontWeight: 700 }}>{m.modelName}</span>
+                </div>
+              ))}
+            </>
+          ),
+        exportValue: (company: CarCompanyType) => company.models.map((m) => m.modelName).join("; "),
+      },
+      {
+        key: "brandLogo",
+        label: "Brand Logo",
+        render: (company: CarCompanyType) =>
+          tableCell(
+            company.brandLogo ? (
+              <img
+                src={getBackendImageUrl(company.brandLogo)}
+                alt="Brand Logo"
+                style={{ height: 56, maxWidth: 94, objectFit: "contain", border: "1px solid #d2d6de", borderRadius: 3, background: "#fafafa" }}
+                loading="lazy"
+              />
+            ) : (
+              <span style={{ color: "#aaa", fontStyle: "italic" }}>No logo</span>
+            )
+          ),
+        exportValue: (company: CarCompanyType) => (company.brandLogo ? "Yes" : "No logo"),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [companies]
+  );
 
   return (
     <>
@@ -280,77 +333,57 @@ const CarCompany: React.FC = () => {
             </button>
           </div>
 
-          {/* Card Body */}
-          <div style={{ padding: 30 }}>
-
-            {/* Search Bar */}
-            <div style={{ marginBottom: 28 }}>
-              <form onSubmit={(e) => { e.preventDefault(); fetchCompanies(query); }} style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                <input value={query} onChange={(e) => setQuery(e.target.value)} type="text" placeholder="Search by company name…"
-                  style={{ height: 40, width: 320, border: "1px solid #d2d6de", borderRadius: 3, padding: "0 13px", fontSize: 18, outline: "none" }} />
-                <button type="submit" style={{ padding: "8px 18px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>Search</button>
-                <button type="button" onClick={() => { setQuery(""); fetchCompanies(""); }}
-                  style={{ padding: "8px 18px", borderRadius: 3, border: "1px solid #d2d6de", background: "#fff", color: "#555", fontSize: 16, cursor: "pointer" }}>Clear</button>
-              </form>
-            </div>
-
-            {/* Alerts */}
+          {/* Alerts */}
+          <div style={{ padding: "0 30px", paddingTop: 30 }}>
             {error && <div style={{ marginBottom: 18, padding: "12px 18px", background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, color: "#c0392b", fontSize: 18 }}>{error}</div>}
             {successMsg && <div style={{ marginBottom: 18, padding: "12px 18px", background: "#f0fff4", border: "1px solid #c3e6cb", borderRadius: 3, color: "#27ae60", fontSize: 18 }}>{successMsg}</div>}
+          </div>
 
-            {/* Table */}
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 19 }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Company Name</th>
-                    <th style={thStyle}>Models</th>
-                    <th style={thStyle}>Brand Logo</th>
-                    <th style={thStyle}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "#888", fontSize: 19, padding: "56px 0" }}>Loading…</td></tr>
-                  ) : companies.length === 0 ? (
-                    <tr><td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "#aaa", fontSize: 19, padding: "56px 0" }}>No car companies found.</td></tr>
-                  ) : (
-                    companies.map((company) => (
-                      <tr key={company._id}>
-                        <td style={{ ...tdStyle, fontWeight: 600, fontSize: 18 }}>{company.companyName}</td>
-                        <td style={tdStyle}>
-                          {company.models.map((m, idx) => (
-                            <div key={idx} style={{ fontSize: 17, lineHeight: "1.7" }}>
-                              <span style={{ fontWeight: 700 }}>{m.modelName}</span>
-                            </div>
-                          ))}
-                        </td>
-                        <td style={tdStyle}>
-                          {company.brandLogo ? (
-                            <img src={getBackendImageUrl(company.brandLogo)} alt="Brand Logo"
-                              style={{ height: 56, maxWidth: 94, objectFit: "contain", border: "1px solid #d2d6de", borderRadius: 3, background: "#fafafa" }} loading="lazy" />
-                          ) : (
-                            <span style={{ fontSize: 17, color: "#aaa", fontStyle: "italic" }}>No logo</span>
-                          )}
-                        </td>
-                        <td style={tdStyle}>
-                          <div style={{ display: "flex", gap: 10 }}>
-                            <button type="button" onClick={() => openEditModal(company)}
-                              style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #0073b7", background: "#fff", color: "#0073b7", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
-                              Edit
-                            </button>
-                            <button type="button" disabled={deletingId === company._id} onClick={() => handleDelete(company._id)}
-                              style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #d2d6de", background: deletingId === company._id ? "#f4f4f4" : "#f2dede", color: deletingId === company._id ? "#aaa" : "#a94442", fontSize: 16, fontWeight: 700, cursor: deletingId === company._id ? "not-allowed" : "pointer" }}>
-                              {deletingId === company._id ? "Deleting…" : "Delete"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+          <div style={{ padding: "0 30px 30px" }}>
+            <AdminDataTable
+              items={filtered}
+              columns={tableColumns}
+              getRowId={(c) => c._id}
+              loading={loading}
+              emptyMessage="No car companies found."
+              search={query}
+              onSearchChange={setQuery}
+              searchPlaceholder="Search by company or model…"
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+              currentPage={currentPage}
+              onCurrentPageChange={setCurrentPage}
+              visibleColumnKeys={visibleCols}
+              onVisibleColumnKeysChange={setVisibleCols}
+              selectedIds={selectedIds}
+              onSelectedIdsChange={setSelectedIds}
+              exportFilename="car-companies"
+              totalBeforeFilter={companies.length}
+              extraToolbarActions={[
+                {
+                  label: "✏️ Update",
+                  color: "#0073b7",
+                  minSelected: 1,
+                  maxSelected: 1,
+                  onClick: (ids) => {
+                    const company = companies.find((c) => c._id === ids[0]);
+                    if (company) openEditModal(company);
+                  },
+                },
+              ]}
+              renderActions={(company) => (
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button type="button" onClick={() => openEditModal(company)}
+                    style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #0073b7", background: "#fff", color: "#0073b7", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
+                    Edit
+                  </button>
+                  <button type="button" disabled={deletingId === company._id} onClick={() => handleDelete(company._id)}
+                    style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #d2d6de", background: deletingId === company._id ? "#f4f4f4" : "#f2dede", color: deletingId === company._id ? "#aaa" : "#a94442", fontSize: 16, fontWeight: 700, cursor: deletingId === company._id ? "not-allowed" : "pointer" }}>
+                    {deletingId === company._id ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
+              )}
+            />
           </div>
         </div>
       </div>

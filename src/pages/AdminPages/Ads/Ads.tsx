@@ -1,8 +1,9 @@
 
 
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import axios from "axios";
+import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
 // ---- Types ----
 interface BusinessProfile {
@@ -320,6 +321,10 @@ const Ads: React.FC = () => {
 
   // Owner filtering:
   const [ownerSearch, setOwnerSearch] = useState("");
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [visibleCols, setVisibleCols] = useState(["ownerName", "shopName", "address", "phone", "status"]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => { fetchOwners(); }, []);
 
@@ -470,14 +475,83 @@ const Ads: React.FC = () => {
     );
   });
 
+  const tableColumns = useMemo(
+    () => [
+      {
+        key: "ownerName",
+        label: "Owner Name",
+        render: (owner: AutoShopOwner) =>
+          tableCell(<span style={{ fontWeight: 500 }}>{owner.name || "—"}</span>),
+        exportValue: (owner: AutoShopOwner) => owner.name || "—",
+      },
+      {
+        key: "shopName",
+        label: "Shop Name",
+        render: (owner: AutoShopOwner) =>
+          tableCell(
+            owner.businessProfile?.businessName || (
+              <span style={{ fontStyle: "italic", color: "#bbb" }}>No business profile</span>
+            )
+          ),
+        exportValue: (owner: AutoShopOwner) => owner.businessProfile?.businessName || "—",
+      },
+      {
+        key: "address",
+        label: "Address / City",
+        render: (owner: AutoShopOwner) =>
+          tableCell(
+            [owner.businessProfile?.businessAddress, owner.businessProfile?.city].filter(Boolean).join(", ") || "—",
+            { maxWidth: 220 }
+          ),
+        exportValue: (owner: AutoShopOwner) =>
+          [owner.businessProfile?.businessAddress, owner.businessProfile?.city].filter(Boolean).join(", ") || "—",
+      },
+      {
+        key: "phone",
+        label: "Phone",
+        render: (owner: AutoShopOwner) =>
+          tableCell(`${owner.countryCode ? `${owner.countryCode} ` : ""}${owner.phone || "—"}`),
+        exportValue: (owner: AutoShopOwner) =>
+          `${owner.countryCode ? `${owner.countryCode} ` : ""}${owner.phone || "—"}`,
+      },
+      {
+        key: "status",
+        label: "Status",
+        render: (owner: AutoShopOwner) => {
+          const status = getOwnerStatus(owner);
+          return tableCell(
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                borderRadius: 999,
+                padding: "4px 12px",
+                fontSize: 12,
+                fontWeight: 700,
+                background: `${status.color}1a`,
+                color: status.color,
+              }}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: status.color }} />
+              {status.label}
+            </span>
+          );
+        },
+        exportValue: (owner: AutoShopOwner) => getOwnerStatus(owner).label,
+      },
+    ],
+    []
+  );
+
   return (
     <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
       {/* Heading */}
       <h1 className="mb-6 text-xl md:text-2xl font-bold text-ad-green mb-4">Manage Ads</h1>
 
       {/* ── SECTION 1: Owners ── */}
-      <div className="mb-6 overflow-hidden rounded border border-[#d2d6de] bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f4f4f4] px-6 py-4">
+      <div className="mb-6">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="inline text-[18px] font-normal text-[#444]">Auto Shop Owners</h3>
             {!ownersLoading && (
@@ -486,106 +560,68 @@ const Ads: React.FC = () => {
               </span>
             )}
           </div>
-          <input
-            type="text"
-            placeholder="Search by name, shop or phone…"
-            value={ownerSearch}
-            onChange={(e) => setOwnerSearch(e.target.value)}
-            className="h-9 w-[260px] rounded border border-[#d2d6de] px-3 outline-none"
-          />
         </div>
 
-        <div className="p-6">
-          {ownersLoading && (
-            <div className="py-8 text-center text-[15px] font-bold text-[#007bff]">Loading shop owners…</div>
-          )}
-          {ownersError && (
-            <div className="rounded border border-[#f5c6cb] bg-[#f8d7da] px-4 py-3 text-[#721c24]">
-              {ownersError}
-            </div>
-          )}
-
-          {!ownersLoading && !ownersError && (
-            <div className="max-h-[320px] overflow-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    {["Owner Name", "Shop Name", "Address / City", "Phone", "Status", "Actions"].map((h) => (
-                      <th
-                        key={h}
-                        className="sticky top-0 border border-[#d2d6de] bg-[#f9fafc] px-4 py-4 text-left font-bold whitespace-nowrap"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredOwners.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="border border-[#d2d6de] px-4 py-10 text-center text-[#999]">
-                        No owners found.
-                      </td>
-                    </tr>
-                  )}
-                  {filteredOwners.map((owner) => {
-                    const canSelect = !!owner.businessProfile?._id;
-                    const status = getOwnerStatus(owner);
-
-                    return (
-                      <tr
-                        key={owner._id}
-                        className={`${canSelect ? "bg-white hover:bg-[#f9fafc]" : "cursor-not-allowed opacity-50"}`}
-                      >
-                        <td className="border border-[#d2d6de] px-4 py-5 font-medium text-[#333]">
-                          {owner.name || "—"}
-                        </td>
-                        <td className="border border-[#d2d6de] px-4 py-5">
-                          {owner.businessProfile?.businessName || (
-                            <span className="italic text-[#bbb]">No business profile</span>
-                          )}
-                        </td>
-                        <td className="border border-[#d2d6de] px-4 py-5 text-[#777] max-w-[220px] overflow-hidden truncate">
-                          {[owner.businessProfile?.businessAddress, owner.businessProfile?.city].filter(Boolean).join(", ") || "—"}
-                        </td>
-                        <td className="border border-[#d2d6de] px-4 py-5 text-[#777]">
-                          {owner.countryCode ? `${owner.countryCode} ` : ""}{owner.phone || "—"}
-                        </td>
-                        <td className="border border-[#d2d6de] px-4 py-5">
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold"
-                            style={{ background: status.color + "1a", color: status.color }}
-                          >
-                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: status.color }} />
-                            {status.label}
-                          </span>
-                        </td>
-                        <td className="border border-[#d2d6de] px-4 py-5">
-                          <button
-                            disabled={!canSelect}
-                            title={
-                              !canSelect
-                                ? "This owner has no business profile — ads unavailable"
-                                : "Show Ads"
-                            }
-                            onClick={() => canSelect && handleOpenOwnerAdsModal(owner)}
-                            className={`rounded px-4 py-1 text-sm font-semibold text-white ${
-                              canSelect
-                                ? "bg-[#10b981] hover:bg-[#059669] cursor-pointer"
-                                : "bg-[#ddd] cursor-not-allowed"
-                            }`}
-                          >
-                            View Ads
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <AdminDataTable
+          items={filteredOwners}
+          columns={tableColumns}
+          getRowId={(o) => o._id}
+          loading={ownersLoading}
+          error={ownersError}
+          emptyMessage="No owners found."
+          search={ownerSearch}
+          onSearchChange={setOwnerSearch}
+          searchPlaceholder="Search by name, shop or phone…"
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          currentPage={currentPage}
+          onCurrentPageChange={setCurrentPage}
+          visibleColumnKeys={visibleCols}
+          onVisibleColumnKeysChange={setVisibleCols}
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
+          exportFilename="ads-owners"
+          totalBeforeFilter={owners.length}
+          extraToolbarActions={[
+            {
+              label: "View Ads",
+              color: "#10b981",
+              minSelected: 1,
+              maxSelected: 1,
+              onClick: (ids) => {
+                const owner = owners.find((o) => o._id === ids[0]);
+                if (owner?.businessProfile?._id) handleOpenOwnerAdsModal(owner);
+              },
+            },
+          ]}
+          renderActions={(owner) => {
+            const canSelect = !!owner.businessProfile?._id;
+            return (
+              <button
+                disabled={!canSelect}
+                title={
+                  !canSelect
+                    ? "This owner has no business profile — ads unavailable"
+                    : "Show Ads"
+                }
+                onClick={() => canSelect && handleOpenOwnerAdsModal(owner)}
+                type="button"
+                style={{
+                  borderRadius: 4,
+                  padding: "4px 16px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#fff",
+                  border: "none",
+                  cursor: canSelect ? "pointer" : "not-allowed",
+                  background: canSelect ? "#10b981" : "#ddd",
+                }}
+              >
+                View Ads
+              </button>
+            );
+          }}
+        />
       </div>
 
       {/* Owner Ads Modal */}

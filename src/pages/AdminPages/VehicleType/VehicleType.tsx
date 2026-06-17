@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
+import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
 // Representation according to CarDetails.schema.js (companyName, models)
 interface CarModel {
@@ -35,6 +36,11 @@ const VehicleType: React.FC = () => {
     { modelName: "", years: [] },
   ]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [visibleCols, setVisibleCols] = useState(["companyName", "models"]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const companyNameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -260,6 +266,58 @@ const VehicleType: React.FC = () => {
     setDeletingId(null);
   };
 
+  const filtered = carDetails.filter((cd) => {
+    const q = search.toLowerCase();
+    return (
+      cd.companyName.toLowerCase().includes(q) ||
+      cd.models.some(
+        (m) =>
+          m.modelName.toLowerCase().includes(q) ||
+          (Array.isArray(m.years) ? m.years.join(", ") : String(m.years)).toLowerCase().includes(q)
+      )
+    );
+  });
+
+  const tableColumns = useMemo(
+    () => [
+      {
+        key: "companyName",
+        label: "Company",
+        render: (cd: CarDetailsItem) =>
+          tableCell(<span style={{ fontWeight: 500 }}>{cd.companyName}</span>),
+        exportValue: (cd: CarDetailsItem) => cd.companyName,
+      },
+      {
+        key: "models",
+        label: "Models",
+        render: (cd: CarDetailsItem) =>
+          tableCell(
+            cd.models.length === 0 ? (
+              <span style={{ color: "#aaa", fontStyle: "italic" }}>No models</span>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {cd.models.map((m, idx) => (
+                  <div key={m.modelName + idx}>
+                    <span style={{ fontWeight: 600 }}>{m.modelName}</span>
+                    {m.years && m.years.length > 0 && (
+                      <span style={{ color: "#666", fontSize: 12, marginLeft: 8 }}>
+                        (Years: {Array.isArray(m.years) ? m.years.join(", ") : m.years})
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          ),
+        exportValue: (cd: CarDetailsItem) =>
+          cd.models
+            .map((m) => `${m.modelName}${m.years?.length ? ` (${m.years.join(", ")})` : ""}`)
+            .join("; "),
+      },
+    ],
+    []
+  );
+
   return (
     <div className="h-[85vh] overflow-y-auto bg-gray-50 px-2 py-6 sm:px-8">
       <div className="mb-6 flex items-center justify-between flex-wrap gap-x-4 gap-y-2">
@@ -283,129 +341,62 @@ const VehicleType: React.FC = () => {
           {successMsg}
         </div>
       )}
-      {loading ? (
-        <div className="mt-12 flex justify-center">
-          <svg
-            className="animate-spin h-7 w-7 text-blue-500"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-20"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-              fill="none"
-            />
-            <path
-              className="opacity-80"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-            />
-          </svg>
-          <span className="ml-3 text-blue-600 font-medium">
-            Loading car companies...
-          </span>
-        </div>
-      ) : (
-        <div className="overflow-x-auto mt-2">
-          {carDetails.length === 0 ? (
-            <div className="text-center text-gray-500 text-lg py-8">
-              No car companies found.
+
+      <div className="mb-10">
+        <AdminDataTable
+          items={filtered}
+          columns={tableColumns}
+          getRowId={(cd) => cd._id}
+          loading={loading}
+          error={error || null}
+          emptyMessage="No car companies found."
+          search={search}
+          onSearchChange={setSearch}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          currentPage={currentPage}
+          onCurrentPageChange={setCurrentPage}
+          visibleColumnKeys={visibleCols}
+          onVisibleColumnKeysChange={setVisibleCols}
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
+          exportFilename="vehicle-types"
+          totalBeforeFilter={carDetails.length}
+          extraToolbarActions={[
+            {
+              label: "✏️ Update",
+              color: "#0073b7",
+              minSelected: 1,
+              maxSelected: 1,
+              onClick: (ids) => {
+                const car = carDetails.find((c) => c._id === ids[0]);
+                if (car) openEditModal(car);
+              },
+            },
+          ]}
+          renderActions={(cd) => (
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => openEditModal(cd)}
+                className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-3 py-1 rounded transition shadow-sm"
+                aria-label={`Edit ${cd.companyName}`}
+                type="button"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => handleDelete(cd._id)}
+                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition shadow-sm disabled:opacity-60"
+                disabled={!!deletingId}
+                aria-label={`Delete ${cd.companyName}`}
+                type="button"
+              >
+                Delete
+              </button>
             </div>
-          ) : (
-            <table className="w-full border rounded overflow-hidden bg-white shadow-sm">
-              <thead className="bg-gradient-to-br from-gray-100 to-gray-50">
-                <tr>
-                  <th className="py-3 px-3 font-semibold text-left text-gray-700 border-b">
-                    Company
-                  </th>
-                  <th className="py-3 px-3 font-semibold text-left text-gray-700 border-b">
-                    Models
-                  </th>
-                  <th className="py-3 px-3 font-semibold text-left text-gray-700 border-b">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {carDetails.map((cd) => (
-                  <tr
-                    key={cd._id}
-                    className="transition hover:bg-blue-50 group border-b last:border-b-0"
-                  >
-                    <td className="px-3 py-3 whitespace-nowrap font-medium text-gray-900">
-                      {cd.companyName}
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-gray-900">
-                      {cd.models.length === 0 ? (
-                        <span className="text-gray-400 italic">No models</span>
-                      ) : (
-                        <div className="flex flex-col gap-2">
-                          {cd.models.map((m, idx) => (
-                            <div key={m.modelName + idx}>
-                              <span className="font-semibold">
-                                {m.modelName}
-                              </span>{" "}
-                              <span className="text-gray-600 text-xs ml-2">
-                                {m.years && m.years.length
-                                  ? `(Years: ${
-                                      Array.isArray(m.years)
-                                        ? m.years.join(", ")
-                                        : m.years
-                                    })`
-                                  : ""}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap flex gap-2 items-center">
-                      <button
-                        onClick={() => openEditModal(cd)}
-                        className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-3 py-1 rounded transition group-hover:scale-105 shadow-sm"
-                        aria-label={`Edit ${cd.companyName}`}
-                      >
-                        <svg
-                          viewBox="0 0 20 20"
-                          className="w-4 h-4 mr-1 inline-block"
-                          fill="none"
-                        >
-                          <path
-                            d="M15.232 5.232l-.464-.464a2 2 0 0 0-2.828 0l-6.036 6.036a1 1 0 0 0-.263.493l-.732 2.928a.5.5 0 0 0 .605.605l2.929-.732a1 1 0 0 0 .492-.263l6.036-6.036a2 2 0 0 0 0-2.828zM17.414 2.586a4 4 0 0 0-5.656 0l-6.036 6.036a3 3 0 0 0-.79 1.477l-.732 2.929a2 2 0 0 0 2.41 2.41l2.928-.732a3 3 0 0 0 1.477-.79l6.036-6.036a4 4 0 0 0 0-5.656z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(cd._id)}
-                        className={`bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition group-hover:scale-105 shadow-sm disabled:opacity-60`}
-                        disabled={!!deletingId}
-                        aria-label={`Delete ${cd.companyName}`}
-                      >
-                        <svg
-                          viewBox="0 0 20 20"
-                          className="w-4 h-4 mr-1 inline-block"
-                          fill="none"
-                        >
-                          <path
-                            d="M6.5 4a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7H3a1 1 0 1 1 0-2h4V4zm2 0v1h3V4h-3zm-3 3h9v10H5V7zm3 2a1 1 0 0 1 2 0v5a1 1 0 1 1-2 0V9z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           )}
-        </div>
-      )}
+        />
+      </div>
 
       {/* Modal for add/edit company and models */}
       {showModal && (

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -35,6 +36,10 @@ const Wallet: React.FC = () => {
   const [filter, setFilter] = useState<WalletFilter>({ page: 1, limit: 20 });
   const [total, setTotal] = useState<number>(0);
   const [searchInput, setSearchInput] = useState(filter.search ?? "");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [visibleCols, setVisibleCols] = useState([
+    "jobNo", "business", "customer", "vehicle", "amount", "status", "method", "created",
+  ]);
 
   const fetchPayments = async (params: WalletFilter = filter) => {
     setLoading(true);
@@ -59,7 +64,7 @@ const Wallet: React.FC = () => {
   useEffect(() => {
     fetchPayments(filter);
     // eslint-disable-next-line
-  }, [filter.paymentStatus, filter.paymentMethod, filter.fromDate, filter.toDate, filter.business, filter.unpaid, filter.page, filter.limit]);
+  }, [filter.paymentStatus, filter.paymentMethod, filter.fromDate, filter.toDate, filter.business, filter.unpaid, filter.page, filter.limit, filter.search]);
 
   useEffect(() => {
     setSearchInput(filter.search ?? "");
@@ -84,192 +89,183 @@ const Wallet: React.FC = () => {
     setFilter((prev) => ({ ...prev, search: searchInput, page: 1 }));
   };
 
-  const handlePageChange = (newPage: number) => {
-    setFilter((prev) => ({ ...prev, page: newPage }));
-  };
+  const getRowId = (item: JobCardPayment) => item._id || item.jobNo;
 
-  const totalPages = Math.max(1, Math.ceil(total / (filter.limit || 20)));
+  const tableColumns = useMemo(
+    () => [
+      {
+        key: "jobNo",
+        label: "Job No",
+        render: (item: JobCardPayment) => tableCell(item.jobNo),
+        exportValue: (item: JobCardPayment) => item.jobNo,
+      },
+      {
+        key: "business",
+        label: "Business",
+        render: (item: JobCardPayment) =>
+          tableCell(<span style={{ fontWeight: 500 }}>{item.business?.businessName ?? "-"}</span>),
+        exportValue: (item: JobCardPayment) => item.business?.businessName ?? "-",
+      },
+      {
+        key: "customer",
+        label: "Customer",
+        render: (item: JobCardPayment) =>
+          tableCell(item.customer?.name || item.customer?.email || "-"),
+        exportValue: (item: JobCardPayment) => item.customer?.name || item.customer?.email || "-",
+      },
+      {
+        key: "vehicle",
+        label: "Vehicle (Name / Model / Plate)",
+        render: (item: JobCardPayment) =>
+          tableCell(
+            <div>
+              <div style={{ fontWeight: 700 }}>{item.vehicle?.make?.name || "-"}</div>
+              <div style={{ color: "#777" }}>{item.vehicle?.make?.model || "-"}</div>
+              <span
+                style={{
+                  display: "inline-block",
+                  marginTop: 4,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "#f4f4f4",
+                  fontFamily: "monospace",
+                  fontSize: 12,
+                }}
+              >
+                {item.vehicle?.licensePlateNo || "-"}
+              </span>
+            </div>
+          ),
+        exportValue: (item: JobCardPayment) =>
+          `${item.vehicle?.make?.name || "-"} / ${item.vehicle?.make?.model || "-"} / ${item.vehicle?.licensePlateNo || "-"}`,
+      },
+      {
+        key: "amount",
+        label: "Amount",
+        render: (item: JobCardPayment) =>
+          tableCell(
+            <span style={{ fontWeight: 700 }}>
+              ₹{item.totalPayableAmount?.toLocaleString?.() ?? "-"}
+            </span>
+          ),
+        exportValue: (item: JobCardPayment) => String(item.totalPayableAmount ?? "-"),
+      },
+      {
+        key: "status",
+        label: "Status",
+        render: (item: JobCardPayment) =>
+          tableCell(
+            <span
+              className={`inline-block rounded px-3 py-1 text-xs font-bold ${statusBadge[item.paymentStatus] || "bg-[#777] text-white"}`}
+            >
+              {item.paymentStatus}
+            </span>
+          ),
+        exportValue: (item: JobCardPayment) => item.paymentStatus,
+      },
+      {
+        key: "method",
+        label: "Method",
+        render: (item: JobCardPayment) => tableCell(item.paymentMethod),
+        exportValue: (item: JobCardPayment) => item.paymentMethod,
+      },
+      {
+        key: "created",
+        label: "Created",
+        render: (item: JobCardPayment) =>
+          tableCell(item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"),
+        exportValue: (item: JobCardPayment) =>
+          item.createdAt ? new Date(item.createdAt).toLocaleString() : "-",
+      },
+    ],
+    []
+  );
+
+  const filterForm = (
+    <form onSubmit={handleSearch} autoComplete="off" style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "12px 20px", borderBottom: "1px solid #f4f4f4" }}>
+      <input
+        name="search"
+        placeholder="Search job, customer, business, vehicle..."
+        value={searchInput}
+        onChange={handleInputChange}
+        style={{ height: 30, width: 220, border: "1px solid #d2d6de", borderRadius: 2, padding: "0 10px", fontSize: 13 }}
+      />
+      <select
+        name="paymentStatus"
+        value={filter.paymentStatus ?? ""}
+        onChange={handleInputChange}
+        style={{ height: 30, border: "1px solid #d2d6de", borderRadius: 2, padding: "0 8px", fontSize: 13 }}
+      >
+        <option value="">All Status</option>
+        <option value="Paid">Paid</option>
+        <option value="Pending">Pending</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
+      <select
+        name="paymentMethod"
+        value={filter.paymentMethod ?? ""}
+        onChange={handleInputChange}
+        style={{ height: 30, border: "1px solid #d2d6de", borderRadius: 2, padding: "0 8px", fontSize: 13 }}
+      >
+        <option value="">All Methods</option>
+        <option value="Cash">Cash</option>
+        <option value="Online">Online</option>
+      </select>
+      <input
+        type="date"
+        name="fromDate"
+        value={filter.fromDate ?? ""}
+        onChange={handleDateChange}
+        max={filter.toDate || undefined}
+        title="From date"
+        style={{ height: 30, border: "1px solid #d2d6de", borderRadius: 2, padding: "0 8px", fontSize: 13 }}
+      />
+      <input
+        type="date"
+        name="toDate"
+        value={filter.toDate ?? ""}
+        onChange={handleDateChange}
+        min={filter.fromDate || undefined}
+        title="To date"
+        style={{ height: 30, border: "1px solid #d2d6de", borderRadius: 2, padding: "0 8px", fontSize: 13 }}
+      />
+      <button
+        type="submit"
+        style={{ height: 30, padding: "0 16px", borderRadius: 2, border: "none", background: "#0073b7", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+      >
+        Search
+      </button>
+    </form>
+  );
 
   return (
-<div
-        // You may use Tailwind class if setup, or fallback to CSS below.
-        className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans"
-      
-      >
-      {/* Heading */}
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
       <h1 className="mb-6 text-xl md:text-2xl font-bold text-ad-green mb-4">
         Wallet <span className="text-[28px] text-[#999]">(Job Card Payments)</span>
       </h1>
 
-      {/* Card */}
-      <div className="mb-10 overflow-hidden rounded border border-[#d2d6de] bg-white shadow-sm">
-        {/* Header */}
-        <div className="border-b border-[#f4f4f4] px-6 py-4">
-          <h3 className="text-[18px] font-normal text-[#444]">Payments List</h3>
-        </div>
-
-        {/* Body */}
-        <div className="p-6">
-          {/* Filters */}
-          <form onSubmit={handleSearch} autoComplete="off" className="mb-5 flex flex-wrap items-center gap-3">
-            <input
-              name="search"
-              placeholder="Search job, customer, business, vehicle..."
-              value={searchInput}
-              onChange={handleInputChange}
-              className="h-9 w-[260px] rounded border border-[#d2d6de] px-3 outline-none"
-            />
-            <select
-              name="paymentStatus"
-              value={filter.paymentStatus ?? ""}
-              onChange={handleInputChange}
-              className="h-9 rounded border border-[#d2d6de] px-3 outline-none"
-            >
-              <option value="">All Status</option>
-              <option value="Paid">Paid</option>
-              <option value="Pending">Pending</option>
-              <option value="Cancelled">Cancelled</option>
-            </select>
-            <select
-              name="paymentMethod"
-              value={filter.paymentMethod ?? ""}
-              onChange={handleInputChange}
-              className="h-9 rounded border border-[#d2d6de] px-3 outline-none"
-            >
-              <option value="">All Methods</option>
-              <option value="Cash">Cash</option>
-              <option value="Online">Online</option>
-            </select>
-            <input
-              type="date"
-              name="fromDate"
-              value={filter.fromDate ?? ""}
-              onChange={handleDateChange}
-              max={filter.toDate || undefined}
-              title="From date"
-              className="h-9 rounded border border-[#d2d6de] px-3 outline-none"
-            />
-            <input
-              type="date"
-              name="toDate"
-              value={filter.toDate ?? ""}
-              onChange={handleDateChange}
-              min={filter.fromDate || undefined}
-              title="To date"
-              className="h-9 rounded border border-[#d2d6de] px-3 outline-none"
-            />
-            <button
-              type="submit"
-              className="h-9 rounded bg-[#007bff] px-5 font-bold text-white hover:bg-[#0069d9]"
-            >
-              Search
-            </button>
-          </form>
-
-          {/* States */}
-          {loading && (
-            <p className="py-8 text-center text-[15px] font-bold text-[#007bff]">Loading...</p>
-          )}
-          {error && (
-            <div className="mb-4 rounded border border-[#f5c6cb] bg-[#f8d7da] px-4 py-3 text-[#721c24]">
-              {error}
-            </div>
-          )}
-
-          {!loading && !error && (
-            <>
-              <p className="mb-3 text-[15px] text-[#333]">
-                Showing <strong>{data.length}</strong> of <strong>{total}</strong> results
-              </p>
-
-              {/* Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      {["Job No", "Business", "Customer", "Vehicle (Name / Model / Plate)", "Amount", "Status", "Method", "Created"].map((h) => (
-                        <th key={h} className="border border-[#d2d6de] bg-[#f9fafc] px-4 py-4 text-left font-bold whitespace-nowrap">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.length === 0 && (
-                      <tr>
-                        <td colSpan={8} className="border border-[#d2d6de] px-4 py-10 text-center text-[#777]">
-                          No results found
-                        </td>
-                      </tr>
-                    )}
-                    {data.map((item, idx) => (
-                      <tr key={item.jobNo || idx}>
-                        <td className="border border-[#d2d6de] px-4 py-5">{item.jobNo}</td>
-                        <td className="border border-[#d2d6de] px-4 py-5 font-medium text-[#333]">
-                          {item.business?.businessName ?? "-"}
-                        </td>
-                        <td className="border border-[#d2d6de] px-4 py-5">
-                          {item.customer?.name || item.customer?.email || "-"}
-                        </td>
-                        <td className="border border-[#d2d6de] px-4 py-5">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-[#333]">
-                              {item.vehicle?.make?.name || "-"}
-                            </span>
-                            <span className="text-[#777]">
-                              {item.vehicle?.make?.model || "-"}
-                            </span>
-                            <span className="mt-1 inline-block w-fit rounded bg-[#f4f4f4] px-2 py-0.5 font-mono text-[13px] text-[#333]">
-                              {item.vehicle?.licensePlateNo || "-"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="border border-[#d2d6de] px-4 py-5 font-bold text-[#333]">
-                          ₹{item.totalPayableAmount?.toLocaleString?.() ?? "-"}
-                        </td>
-                        <td className="border border-[#d2d6de] px-4 py-5">
-                          <span className={`inline-block rounded px-3 py-1 text-xs font-bold ${statusBadge[item.paymentStatus] || "bg-[#777] text-white"}`}>
-                            {item.paymentStatus}
-                          </span>
-                        </td>
-                        <td className="border border-[#d2d6de] px-4 py-5">{item.paymentMethod}</td>
-                        <td className="border border-[#d2d6de] px-4 py-5 text-[#555]">
-                          {item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination */}
-              <div className="mt-4 flex items-center justify-between">
-                <p className="text-[15px] text-[#333]">
-                  Page {filter.page} of {totalPages}
-                </p>
-                <div className="flex">
-                  <button
-                    onClick={() => handlePageChange(filter.page ? filter.page - 1 : 1)}
-                    disabled={filter.page === 1}
-                    className="border border-[#ddd] bg-white px-4 py-2 text-[#777] disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  <button className="border border-[#007bff] bg-[#007bff] px-4 py-2 text-white">
-                    {filter.page}
-                  </button>
-                  <button
-                    onClick={() => handlePageChange((filter.page || 1) + 1)}
-                    disabled={data.length < (filter.limit || 20)}
-                    className="border border-[#ddd] bg-white px-4 py-2 text-[#777] disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+      <div className="mb-10">
+        {filterForm}
+        <AdminDataTable
+          items={data}
+          columns={tableColumns}
+          getRowId={getRowId}
+          loading={loading}
+          error={error}
+          emptyMessage="No results found."
+          showSearch={false}
+          serverPaginated
+          totalItemCount={total}
+          currentPage={filter.page || 1}
+          onCurrentPageChange={(p) => setFilter((prev) => ({ ...prev, page: p }))}
+          pageSize={filter.limit || 20}
+          onPageSizeChange={(n) => setFilter((prev) => ({ ...prev, limit: n, page: 1 }))}
+          visibleColumnKeys={visibleCols}
+          onVisibleColumnKeysChange={setVisibleCols}
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
+          exportFilename="wallet-payments"
+        />
       </div>
     </div>
   );

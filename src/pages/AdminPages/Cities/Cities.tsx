@@ -1,7 +1,7 @@
 
-
-import React, { useEffect, useState, FormEvent, ChangeEvent } from "react";
+import React, { useEffect, useState, useMemo, FormEvent, ChangeEvent } from "react";
 import axios, { AxiosError } from "axios";
+import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -23,13 +23,11 @@ interface Province {
   cities: City[];
 }
 
+type CityRow = City & { provinceName: string; provinceId: string };
+
+const getCityRowId = (city: CityRow) => `${city.provinceId}-${city.name}`;
+
 /* ── Shared sub-components ── */
-const SortIcon = () => (
-  <svg className="w-3 h-3 text-gray-400 flex-shrink-0" viewBox="0 0 10 14" fill="currentColor">
-    <path d="M5 0L9 5H1L5 0Z" />
-    <path d="M5 14L1 9H9L5 14Z" />
-  </svg>
-);
 const EditIcon = () => (
   <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none">
     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" fill="currentColor" />
@@ -50,38 +48,26 @@ const ToggleSwitch: React.FC<{ active: boolean; onToggle: () => void }> = ({ act
     </span>
   </button>
 );
-const PaginationBtn: React.FC<{ label: string; onClick: () => void; active?: boolean; disabled?: boolean }> = ({ label, onClick, active, disabled }) => (
-  <button onClick={onClick} disabled={disabled}
-    className={`px-3 py-1 text-sm rounded border transition-colors ${active ? "bg-blue-600 text-white border-blue-600" : disabled ? "text-gray-400 border-gray-200 cursor-not-allowed bg-white" : "text-gray-600 border-gray-300 bg-white hover:bg-gray-50"}`}>
-    {label}
-  </button>
-);
-
-// const capitalizeStatus = (status?: string) => {
-//   if (!status) return "Active";
-//   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-// };
 
 const Cities: React.FC = () => {
   const [provinces, setProvinces] = useState<Province[]>([]);
-  // Default selectedProvinceId to "", i.e., show all provinces' cities by default
   const [selectedProvinceId, setSelectedProvinceId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingCity, setEditingCity] = useState<City | null>(null);
   const [formName, setFormName] = useState("");
   const [formStatus, setFormStatus] = useState<CityStatus>("Active");
   const [formProvinceId, setFormProvinceId] = useState<string>("");
 
-  // Table controls
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [visibleCols, setVisibleCols] = useState(["name", "provinceName", "status"]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => { fetchProvinces(); }, []);
 
@@ -92,9 +78,6 @@ const Cities: React.FC = () => {
       const res = await axios.get<{ data: Province[] }>(`${API_BASE}/admin/provinces`);
       const data = res.data.data || [];
       setProvinces(data);
-      // Do not set selectedProvinceId when initially loading. Keep as "" so ALL cities show by default.
-      // (If the user selects a province, it will change below.)
-      // if (data.length > 0 && !selectedProvinceId) setSelectedProvinceId(data[0]._id);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
       setError(axErr?.response?.data?.message || axErr?.message || "Failed to fetch provinces");
@@ -168,8 +151,7 @@ const Cities: React.FC = () => {
     } finally { setActionLoading(false); }
   };
 
-  // Build flat list: if a province is selected, show only its cities; else show all
-  const allCities: (City & { provinceName: string; provinceId: string })[] = selectedProvinceId
+  const allCities: CityRow[] = selectedProvinceId
     ? (provinces.find((p) => p._id === selectedProvinceId)?.cities || []).map((c) => ({
         ...c,
         provinceName: provinces.find((p) => p._id === selectedProvinceId)?.name || "",
@@ -182,19 +164,46 @@ const Cities: React.FC = () => {
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.provinceName.toLowerCase().includes(search.toLowerCase())
   );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const showingFrom = filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const showingTo = Math.min(currentPage * pageSize, filtered.length);
 
   const selectedProvince = provinces.find((p) => p._id === selectedProvinceId);
 
+  const findCityById = (id: string) => allCities.find((c) => getCityRowId(c) === id);
+
+  const tableColumns = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "City Name",
+        render: (city: CityRow) => tableCell(<span style={{ fontWeight: 500 }}>{city.name}</span>),
+        exportValue: (city: CityRow) => city.name,
+      },
+      {
+        key: "provinceName",
+        label: "Province",
+        render: (city: CityRow) =>
+          tableCell(
+            <span style={{ textTransform: "uppercase", fontSize: 12, fontWeight: 500, letterSpacing: "0.04em" }}>
+              {city.provinceName}
+            </span>
+          ),
+        exportValue: (city: CityRow) => city.provinceName,
+      },
+      {
+        key: "status",
+        label: "Status",
+        render: (city: CityRow) =>
+          tableCell(
+            <ToggleSwitch active={city.status !== "Inactive"} onToggle={() => handleToggleStatus(city, city.provinceId)} />
+          ),
+        exportValue: (city: CityRow) => city.status || "Active",
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [provinces]
+  );
+
   return (
-<div
-        // You may use Tailwind class if setup, or fallback to CSS below.
-        className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans"
-      
-      >
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
       {/* Page Header */}
       <div className="flex items-start justify-between mb-4">
         <h1 className="text-2xl font-semibold text-gray-800">City Management</h1>
@@ -208,17 +217,15 @@ const Cities: React.FC = () => {
       {error && <div className="mb-3 text-sm rounded bg-red-100 text-red-800 px-3 py-2 border border-red-200">{error}</div>}
       {successMsg && <div className="mb-3 text-sm rounded bg-green-100 text-green-800 px-3 py-2 border border-green-200">{successMsg}</div>}
 
-      {/* Card */}
-      <div className="mb-10 bg-white rounded shadow-sm">
-        {/* Card Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <span className="text-base font-medium text-gray-700">City List</span>
-            {/* Province filter inline in header */}
+      <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
+        <span className="text-base font-medium text-gray-700">City List</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Province:</span>
             <select
               value={selectedProvinceId}
               onChange={(e: ChangeEvent<HTMLSelectElement>) => { setSelectedProvinceId(e.target.value); setCurrentPage(1); }}
-              className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400 bg-white text-gray-700 min-w-[180px]"
+              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400 bg-white text-gray-700 min-w-[180px]"
             >
               <option value="">All Provinces</option>
               {provinces.map((p) => (
@@ -228,97 +235,80 @@ const Cities: React.FC = () => {
           </div>
           <button
             onClick={openAddModal}
-            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded transition-colors"
+            style={{ background: "#00a65a", color: "#fff", padding: "8px 18px", borderRadius: 4, border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
           >
-            <span className="text-lg leading-none">+</span> Add City
+            + Add City
           </button>
         </div>
+      </div>
 
-        {/* Table Controls */}
-        <div className="flex items-center justify-between px-5 py-3">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            Show
-            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400">
-              {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-            entries
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            Search:
-            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400 w-44" />
-          </div>
-        </div>
-
-        {/* Table */}
-        {loading ? (
-          <div className="flex justify-center items-center py-16 gap-3">
-            <svg className="animate-spin h-6 w-6 text-blue-500" viewBox="0 0 24 24">
-              <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-            </svg>
-            <span className="text-blue-600 text-sm font-medium">Loading cities...</span>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-t border-b border-gray-200 bg-gray-50">
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700 w-16"><span className="flex items-center gap-1">ID <SortIcon /></span></th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700"><span className="flex items-center gap-1">City Name <SortIcon /></span></th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700 w-48"><span className="flex items-center gap-1">Province <SortIcon /></span></th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700 w-32"><span className="flex items-center gap-1">Status <SortIcon /></span></th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700 w-28"><span className="flex items-center gap-1">Actions <SortIcon /></span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center py-10 text-gray-400">
-                    {selectedProvinceId ? `No cities found in ${selectedProvince?.name || "this province"}.` : "No cities found."}
-                  </td></tr>
-                ) : (
-                  paginated.map((city, idx) => (
-                    <tr key={`${city.provinceId}-${city.name}`} className={`border-b border-gray-100 ${idx % 2 === 1 ? "bg-white" : "bg-[#f9f9f9]"}`}>
-                      <td className="px-4 py-3 text-gray-700">{showingFrom + idx}</td>
-                      <td className="px-4 py-3 text-gray-800 font-medium">{city.name}</td>
-                      <td className="px-4 py-3 text-gray-600 text-xs uppercase font-medium tracking-wide">{city.provinceName}</td>
-                      <td className="px-4 py-3">
-                        <ToggleSwitch active={city.status !== "Inactive"} onToggle={() => handleToggleStatus(city, city.provinceId)} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => openEditModal(city, city.provinceId)}
-                            className="w-8 h-8 rounded flex items-center justify-center bg-teal-500 hover:bg-teal-600 text-white transition-colors"
-                            aria-label={`Edit ${city.name}`}>
-                            <EditIcon />
-                          </button>
-                          <button onClick={() => handleDelete(city, city.provinceId)} disabled={actionLoading}
-                            className="w-8 h-8 rounded flex items-center justify-center bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
-                            aria-label={`Delete ${city.name}`}>
-                            <DeleteIcon />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 text-sm text-gray-600">
-          <span>{filtered.length === 0 ? "Showing 0 entries" : `Showing ${showingFrom} to ${showingTo} of ${filtered.length} entries`}</span>
-          <div className="flex items-center gap-1">
-            <PaginationBtn label="Previous" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)} />
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <PaginationBtn key={p} label={String(p)} active={p === currentPage} onClick={() => setCurrentPage(p)} />
-            ))}
-            <PaginationBtn label="Next" disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => p + 1)} />
-          </div>
-        </div>
+      <div className="mb-10">
+        <AdminDataTable
+          items={filtered}
+          columns={tableColumns}
+          getRowId={getCityRowId}
+          loading={loading}
+          emptyMessage={
+            selectedProvinceId
+              ? `No cities found in ${selectedProvince?.name || "this province"}.`
+              : "No cities found."
+          }
+          search={search}
+          onSearchChange={setSearch}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          currentPage={currentPage}
+          onCurrentPageChange={setCurrentPage}
+          visibleColumnKeys={visibleCols}
+          onVisibleColumnKeysChange={setVisibleCols}
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
+          exportFilename="cities"
+          totalBeforeFilter={allCities.length}
+          extraToolbarActions={[
+            {
+              label: "✏️ Update",
+              color: "#0073b7",
+              minSelected: 1,
+              maxSelected: 1,
+              onClick: (ids) => {
+                const city = findCityById(ids[0]);
+                if (city) openEditModal(city, city.provinceId);
+              },
+            },
+            {
+              label: "🗑 Delete",
+              color: "#e74c3c",
+              minSelected: 1,
+              maxSelected: 1,
+              onClick: (ids) => {
+                const city = findCityById(ids[0]);
+                if (city) handleDelete(city, city.provinceId);
+              },
+            },
+          ]}
+          renderActions={(city) => (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openEditModal(city, city.provinceId)}
+                className="w-8 h-8 rounded flex items-center justify-center bg-teal-500 hover:bg-teal-600 text-white transition-colors"
+                aria-label={`Edit ${city.name}`}
+                type="button"
+              >
+                <EditIcon />
+              </button>
+              <button
+                onClick={() => handleDelete(city, city.provinceId)}
+                disabled={actionLoading}
+                className="w-8 h-8 rounded flex items-center justify-center bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
+                aria-label={`Delete ${city.name}`}
+                type="button"
+              >
+                <DeleteIcon />
+              </button>
+            </div>
+          )}
+        />
       </div>
 
       {/* Add / Edit Modal */}

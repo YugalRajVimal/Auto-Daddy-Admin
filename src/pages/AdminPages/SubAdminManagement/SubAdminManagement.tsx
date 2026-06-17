@@ -1,6 +1,7 @@
 // pages/AdminPages/SubAdmins/SubAdminManagement.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
+import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 const MODULES = [
@@ -61,12 +62,6 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   border: "1px solid #d2d6de", padding: "10px 12px", fontSize: 13, color: "#555", verticalAlign: "middle",
 };
-const pageBtn = (active: boolean, disabled: boolean): React.CSSProperties => ({
-  border: "1px solid", borderColor: active ? "#0073b7" : "#ddd",
-  background: active ? "#0073b7" : "#fff", color: active ? "#fff" : disabled ? "#bbb" : "#777",
-  padding: "6px 13px", fontSize: 13, cursor: disabled ? "not-allowed" : "pointer", marginLeft: -1,
-});
-
 // ─── Modal wrapper ────────────────────────────────────────────────────────────
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean }> =
   ({ isOpen, onClose, title, children, wide }) => {
@@ -165,7 +160,9 @@ const SubAdminManagement: React.FC = () => {
   const [success, setSuccess] = useState("");
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(10);
-  const [page, setPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [visibleCols, setVisibleCols] = useState(["name", "email", "phone", "status", "createdDate", "lastLogin"]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -215,8 +212,59 @@ const SubAdminManagement: React.FC = () => {
     const q = search.toLowerCase();
     return s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q) || (s.phone || "").includes(q);
   });
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  const tableColumns = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Name",
+        render: (sa: SubAdmin) => tableCell(<span style={{ fontWeight: 500 }}>{sa.name}</span>),
+        exportValue: (sa: SubAdmin) => sa.name,
+      },
+      {
+        key: "email",
+        label: "Email",
+        render: (sa: SubAdmin) => tableCell(sa.email),
+        exportValue: (sa: SubAdmin) => sa.email,
+      },
+      {
+        key: "phone",
+        label: "Phone",
+        render: (sa: SubAdmin) => tableCell(sa.phone || "—"),
+        exportValue: (sa: SubAdmin) => sa.phone || "—",
+      },
+      {
+        key: "status",
+        label: "Status",
+        render: (sa: SubAdmin) =>
+          tableCell(
+            <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 3, fontSize: 12, fontWeight: 600, background: sa.isActive ? "#dff0d8" : "#f2dede", color: sa.isActive ? "#3c763d" : "#a94442", border: `1px solid ${sa.isActive ? "#d6e9c6" : "#ebccd1"}` }}>
+              {sa.isActive ? "Active" : "Inactive"}
+            </span>
+          ),
+        exportValue: (sa: SubAdmin) => (sa.isActive ? "Active" : "Inactive"),
+      },
+      {
+        key: "createdDate",
+        label: "Created Date",
+        render: (sa: SubAdmin) => tableCell(new Date(sa.createdAt).toLocaleDateString()),
+        exportValue: (sa: SubAdmin) => new Date(sa.createdAt).toLocaleDateString(),
+      },
+      {
+        key: "lastLogin",
+        label: "Last Login",
+        render: (sa: SubAdmin) => tableCell(sa.lastLogin ? new Date(sa.lastLogin).toLocaleString() : "Never"),
+        exportValue: (sa: SubAdmin) => (sa.lastLogin ? new Date(sa.lastLogin).toLocaleString() : "Never"),
+      },
+    ],
+    []
+  );
+
+  const actionBtn = (label: string, onClick: () => void, style: React.CSSProperties) => (
+    <button onClick={onClick} type="button" style={{ padding: "3px 10px", borderRadius: 3, fontSize: 12, cursor: "pointer", ...style }}>
+      {label}
+    </button>
+  );
 
   // Create / Edit
   const openCreate = () => {
@@ -508,102 +556,58 @@ const SubAdminManagement: React.FC = () => {
           <div style={{ marginBottom: 12, padding: "10px 14px", background: "#f0fff4", border: "1px solid #c3e6cb", borderRadius: 3, color: "#27ae60", fontSize: 13 }}>{success}</div>
         )}
 
-        <div className="mb-10" style={{ background: "#fff", border: "1px solid #d2d6de", borderRadius: 3, boxShadow: "0 1px 1px rgba(0,0,0,.1)" }}>
-          {/* Card Header */}
-          <div style={{ padding: "10px 16px", borderBottom: "1px solid #f4f4f4", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 400, color: "#444" }}>Sub Admin List</h3>
-            <button onClick={openCreate} type="button"
-              style={{ padding: "6px 16px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-              + Add Sub Admin
-            </button>
-          </div>
+        <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 400, color: "#444" }}>Sub Admin List</h3>
+          <button onClick={openCreate} type="button"
+            style={{ padding: "6px 16px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            + Add Sub Admin
+          </button>
+        </div>
 
-          {/* Controls */}
-          <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#333" }}>
-              Show
-              <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-                style={{ height: 32, border: "1px solid #d2d6de", borderRadius: 3, padding: "0 8px", fontSize: 13, outline: "none" }}>
-                {[10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-              entries
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-              Search:
-              <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                style={{ height: 32, width: 180, border: "1px solid #d2d6de", borderRadius: 3, padding: "0 10px", fontSize: 13, outline: "none" }} />
-            </div>
-          </div>
-
-          {/* Table */}
-          {loading ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "#888" }}>Loading SubAdmins...</div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr>
-                    {["Name", "Email", "Phone", "Status", "Created Date", "Last Login", "Actions"].map((h) => (
-                      <th key={h} style={thStyle}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginated.length === 0 && (
-                    <tr><td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "#aaa", padding: "32px 0" }}>No sub admins found.</td></tr>
-                  )}
-                  {paginated.map((sa) => (
-                    <tr key={sa._id}>
-                      <td style={{ ...tdStyle, fontWeight: 500 }}>{sa.name}</td>
-                      <td style={tdStyle}>{sa.email}</td>
-                      <td style={tdStyle}>{sa.phone || "—"}</td>
-                      <td style={tdStyle}>
-                        <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 3, fontSize: 12, fontWeight: 600, background: sa.isActive ? "#dff0d8" : "#f2dede", color: sa.isActive ? "#3c763d" : "#a94442", border: `1px solid ${sa.isActive ? "#d6e9c6" : "#ebccd1"}` }}>
-                          {sa.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td style={tdStyle}>{new Date(sa.createdAt).toLocaleDateString()}</td>
-                      <td style={tdStyle}>{sa.lastLogin ? new Date(sa.lastLogin).toLocaleString() : "Never"}</td>
-                      <td style={tdStyle}>
-                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                          <button onClick={() => setShowViewModal(sa)} type="button"
-                            style={{ padding: "3px 10px", borderRadius: 3, border: "1px solid #0073b7", background: "#fff", color: "#0073b7", fontSize: 12, cursor: "pointer" }}>View</button>
-                          <button onClick={() => openEdit(sa)} type="button"
-                            style={{ padding: "3px 10px", borderRadius: 3, border: "1px solid #0073b7", background: "#0073b7", color: "#fff", fontSize: 12, cursor: "pointer" }}>Edit</button>
-                          <button onClick={() => openPermModal(sa)} type="button"
-                            style={{ padding: "3px 10px", borderRadius: 3, border: "1px solid #f39c12", background: "#f39c12", color: "#fff", fontSize: 12, cursor: "pointer" }}>Perms</button>
-                          <button onClick={() => handleToggleStatus(sa)} type="button"
-                            style={{ padding: "3px 10px", borderRadius: 3, border: "1px solid #d2d6de", background: sa.isActive ? "#f2dede" : "#dff0d8", color: sa.isActive ? "#a94442" : "#3c763d", fontSize: 12, cursor: "pointer" }}>
-                            {sa.isActive ? "Disable" : "Enable"}
-                          </button>
-                          <button onClick={() => openActivityModal(sa)} type="button"
-                            style={{ padding: "3px 10px", borderRadius: 3, border: "1px solid #17a2b8", background: "#17a2b8", color: "#fff", fontSize: 12, cursor: "pointer" }}>Logs</button>
-                          <button onClick={() => setShowResetModal(sa)} type="button"
-                            style={{ padding: "3px 10px", borderRadius: 3, border: "1px solid #777", background: "#777", color: "#fff", fontSize: 12, cursor: "pointer" }}>Reset PW</button>
-                          <button onClick={() => handleDelete(sa)} type="button"
-                            style={{ padding: "3px 10px", borderRadius: 3, border: "1px solid #d2d6de", background: "#f2dede", color: "#a94442", fontSize: 12, cursor: "pointer" }}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Footer */}
-          <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <span style={{ fontSize: 13, color: "#333" }}>
-              {filtered.length === 0 ? "No entries" : `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, filtered.length)} of ${filtered.length} entries`}
-            </span>
-            <div style={{ display: "flex" }}>
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={pageBtn(false, page === 1)}>Previous</button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                <button key={pg} onClick={() => setPage(pg)} style={pageBtn(pg === page, false)}>{pg}</button>
-              ))}
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={pageBtn(false, page === totalPages)}>Next</button>
-            </div>
-          </div>
+        <div className="mb-10">
+          <AdminDataTable
+            items={filtered}
+            columns={tableColumns}
+            getRowId={(sa) => sa._id}
+            loading={loading}
+            error={error || null}
+            emptyMessage="No sub admins found."
+            search={search}
+            onSearchChange={setSearch}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+            currentPage={currentPage}
+            onCurrentPageChange={setCurrentPage}
+            visibleColumnKeys={visibleCols}
+            onVisibleColumnKeysChange={setVisibleCols}
+            selectedIds={selectedIds}
+            onSelectedIdsChange={setSelectedIds}
+            exportFilename="sub-admins"
+            totalBeforeFilter={subAdmins.length}
+            extraToolbarActions={[
+              {
+                label: "✏️ Update",
+                color: "#0073b7",
+                minSelected: 1,
+                maxSelected: 1,
+                onClick: (ids) => {
+                  const sa = subAdmins.find((s) => s._id === ids[0]);
+                  if (sa) openEdit(sa);
+                },
+              },
+            ]}
+            renderActions={(sa) => (
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                {actionBtn("View", () => setShowViewModal(sa), { border: "1px solid #0073b7", background: "#fff", color: "#0073b7" })}
+                {actionBtn("Edit", () => openEdit(sa), { border: "1px solid #0073b7", background: "#0073b7", color: "#fff" })}
+                {actionBtn("Perms", () => openPermModal(sa), { border: "1px solid #f39c12", background: "#f39c12", color: "#fff" })}
+                {actionBtn(sa.isActive ? "Disable" : "Enable", () => handleToggleStatus(sa), { border: "1px solid #d2d6de", background: sa.isActive ? "#f2dede" : "#dff0d8", color: sa.isActive ? "#a94442" : "#3c763d" })}
+                {actionBtn("Logs", () => openActivityModal(sa), { border: "1px solid #17a2b8", background: "#17a2b8", color: "#fff" })}
+                {actionBtn("Reset PW", () => setShowResetModal(sa), { border: "1px solid #777", background: "#777", color: "#fff" })}
+                {actionBtn("Delete", () => handleDelete(sa), { border: "1px solid #d2d6de", background: "#f2dede", color: "#a94442" })}
+              </div>
+            )}
+          />
         </div>
       </div>
     </>
