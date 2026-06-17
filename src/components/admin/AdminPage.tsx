@@ -19,7 +19,7 @@ export default function AdminPage({
   noPanel = false,
 }: AdminPageProps) {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-6 py-4 md:px-12 md:py-5 lg:px-16">
       <h1 className="mb-4 text-xl font-bold text-ad-green md:text-2xl">{title}</h1>
       {noPanel ? (
         children

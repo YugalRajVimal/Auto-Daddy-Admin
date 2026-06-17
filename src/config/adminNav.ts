@@ -16,6 +16,85 @@ export type NavItem = {
 
 export const primaryNav: NavItem[] = [
   {
+    name: "Home",
+    path: "/admin",
+    permissionModule: "dashboard",
+    subItems: [
+      { name: "Dashboard", path: "/admin", permissionModule: "dashboard" },
+      { name: "Thought of Day", path: "/admin/thought-of-day", permissionModule: "dashboardData" },
+      { name: "Features", path: "/admin/features", permissionModule: "dashboardData" },
+      { name: "FAQs", path: "/admin/faqs", permissionModule: "dashboardData" },
+      { name: "Privacy", path: "/admin/privacy", permissionModule: "dashboardData" },
+      { name: "Website Templates", path: "/admin/website-templates", permissionModule: "websiteTemplates" },
+      { name: "Invoice Templates", path: "/admin/invoice-templates", permissionModule: "websiteTemplates" },
+    ],
+    matchPaths: [
+      "/admin",
+      "/admin/thought-of-day",
+      "/admin/features",
+      "/admin/faqs",
+      "/admin/privacy",
+      "/admin/website-templates",
+      "/admin/invoice-templates",
+    ],
+  },
+  {
+    name: "Locations",
+    subItems: [
+      { name: "Provinces", path: "/admin/provinces", permissionModule: "provinces" },
+      { name: "Cities", path: "/admin/cities", permissionModule: "cities" },
+    ],
+    matchPaths: ["/admin/provinces", "/admin/cities"],
+  },
+  {
+    name: "Services",
+    subItems: [
+      { name: "Categories", path: "/admin/categories", permissionModule: "services" },
+      { name: "Services", path: "/admin/services", permissionModule: "categories" },
+    ],
+    matchPaths: ["/admin/categories", "/admin/services"],
+  },
+  {
+    name: "Users",
+    permissionModule: "users",
+    subItems: [
+      { name: "Car Owners", path: "/admin/car-owners", permissionModule: "users" },
+      { name: "Auto Shop Owners", path: "/admin/auto-shop-owners", permissionModule: "users" },
+      { name: "Associates", path: "/admin/associates", permissionModule: "users" },
+      { name: "Dealers", path: "/admin/dealers", permissionModule: "users" },
+    ],
+    matchPaths: ["/admin/car-owners", "/admin/auto-shop-owners", "/admin/associates", "/admin/dealers"],
+  },
+  {
+    name: "Leads",
+    path: "/admin/leads",
+    permissionModule: "dashboard",
+  },
+  {
+    name: "Accounts",
+    path: "/admin/accounts",
+    permissionModule: "dashboard",
+  },
+  {
+    name: "Messages",
+    path: "/admin/messages",
+    permissionModule: "dashboard",
+  },
+  {
+    name: "Reports",
+    path: "/admin/reports",
+    permissionModule: "dashboard",
+  },
+  {
+    name: "Ads",
+    path: "/admin/ads",
+    permissionModule: "ads",
+  },
+];
+
+/* ── Legacy nav items (commented out — routes still reachable by URL) ──
+export const legacyPrimaryNav: NavItem[] = [
+  {
     name: "Dashboard",
     path: "/admin",
     permissionModule: "dashboard",
@@ -69,11 +148,6 @@ export const primaryNav: NavItem[] = [
     matchPaths: ["/admin/provinces", "/admin/cities"],
   },
   {
-    name: "Ads",
-    path: "/admin/ads",
-    permissionModule: "ads",
-  },
-  {
     name: "Running Deals",
     path: "/admin/running-deals",
     permissionModule: "runningDeals",
@@ -94,14 +168,17 @@ export const primaryNav: NavItem[] = [
     permissionModule: "tasks",
   },
 ];
+*/
 
 export const adminOnlyNav: NavItem[] = [
+  /* ── Legacy admin-only nav (commented out — route still reachable by URL) ──
   {
     name: "Administration",
     adminOnly: true,
     subItems: [{ name: "Sub Admin Management", path: "/admin/subadmins" }],
     matchPaths: ["/admin/subadmins"],
   },
+  */
 ];
 
 export function getActivePrimaryItem(pathname: string, items: NavItem[]): NavItem | null {

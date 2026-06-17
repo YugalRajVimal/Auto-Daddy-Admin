@@ -20,7 +20,7 @@ export default function PrivacyPage() {
         </button>
       }
       footer={
-        <PanelFooter message="You are creating FAQs" actionLabel="Save" onAction={() => {}} />
+        <PanelFooter message="You are creating Privacy and Disclaimer" actionLabel="Save" onAction={() => {}} />
       }
     >
       <div className="space-y-4">

@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
-import { FiMail, FiLock } from "react-icons/fi";
+import { FiLock } from "react-icons/fi";
 
 const ADMIN_ROLE = "admin";
 const ADMIN_TOKEN_KEY = "admin-token";
@@ -71,109 +70,123 @@ export default function AdminSignInPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-white px-4 py-10">
-      <p className="absolute right-6 top-6 text-sm font-medium text-ad-green-dark md:text-base">
-        Login to your account
-      </p>
-
-      <div className="flex w-full max-w-3xl overflow-hidden rounded-3xl border border-ad-green/30 bg-ad-mint shadow-[8px_8px_24px_rgba(0,0,0,0.12)]">
-        {/* Left branding */}
-        <div className="hidden w-1/2 flex-col items-center justify-center border-r border-ad-green/40 p-8 md:flex">
-          <img src={LOGO} alt="AutoDaddy" className="mb-6 h-24 w-auto" />
-          <p className="text-center font-serif italic text-ad-green-dark">
-            A Digital Bridge - that connects with
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#eefbee] px-6 py-12 md:px-10">
+      <div className="w-full max-w-5xl">
+        <div className="relative">
+          <p className="mb-3 text-right text-base font-medium text-ad-green-dark md:absolute md:-top-9 md:right-0 md:mb-0">
+            Login to your account
           </p>
-          <p className="mt-2 text-center text-lg font-bold text-black">
-            Voice of your &lsquo;Happy Customers&rsquo;
-          </p>
-        </div>
 
-        {/* Right form */}
-        <div className="flex w-full flex-col justify-center p-8 md:w-1/2">
-          <div className="mb-6 flex justify-center md:hidden">
-            <img src={LOGO} alt="AutoDaddy" className="h-16 w-auto" />
+          <div className="flex min-h-[440px] overflow-hidden rounded-2xl bg-ad-mint shadow-[10px_10px_28px_rgba(0,0,0,0.14)] md:min-h-[500px] lg:min-h-[540px]">
+            {/* Left branding */}
+            <div className="hidden w-1/2 flex-col items-center justify-center border-r border-ad-green-dark/50 px-10 py-14 md:flex lg:px-14 lg:py-16">
+              <img
+                src={LOGO}
+                alt="AutoDaddy"
+                className="mb-10 block h-auto w-full max-w-[280px] shrink-0 object-contain lg:max-w-[340px]"
+              />
+              <p className="max-w-xs text-center font-serif text-lg italic leading-relaxed text-ad-green-dark">
+                A Digital Bridge - that connects with
+              </p>
+              <p className="mt-3 max-w-xs text-center text-xl font-bold leading-snug text-black">
+                Voice of your &lsquo;Happy Customers&rsquo;
+              </p>
+            </div>
+
+            {/* Right form */}
+            <div className="flex w-full flex-col justify-center px-8 py-12 sm:px-12 md:w-1/2 md:px-14 md:py-16 lg:px-16">
+              <div className="mb-8 flex justify-center md:hidden">
+                <img
+                  src={LOGO}
+                  alt="AutoDaddy"
+                  className="block h-auto w-full max-w-[220px] object-contain"
+                />
+              </div>
+
+              {status && (
+                <div
+                  className={`mb-6 rounded-lg border px-3 py-2 text-sm ${
+                    status.includes("successful") || status.includes("sent")
+                      ? "border-green-300 bg-green-50 text-green-800"
+                      : "border-red-300 bg-red-50 text-red-700"
+                  }`}
+                >
+                  {status}
+                </div>
+              )}
+
+              {!otpSent ? (
+                <div className="mx-auto w-full max-w-sm space-y-6">
+                  <label className="block text-sm text-gray-500">Mobile Number</label>
+                  <div className="flex">
+                    <div className="flex items-center rounded-l-md border border-r-0 border-gray-400 bg-gray-300 px-4 py-3 text-sm text-gray-700">
+                      <span>+1</span>
+                      <span className="ml-1.5 text-[10px]">v</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={email}
+                      autoComplete="username"
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={loading}
+                      className="w-full rounded-r-md border border-gray-400 bg-white py-3 px-3 text-base focus:border-ad-green focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSendOtp}
+                    disabled={loading || !email.trim()}
+                    className="w-full rounded-md bg-ad-green py-4 text-base font-bold uppercase tracking-wide text-white shadow-sm hover:bg-ad-green-dark disabled:opacity-60"
+                  >
+                    {loading ? "Sending..." : "Get OTP"}
+                  </button>
+                </div>
+              ) : (
+                <div className="mx-auto w-full max-w-sm space-y-6">
+                  <label className="block text-sm text-ad-green-dark">OTP</label>
+                  <div className="relative">
+                    <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      placeholder="Enter OTP from email"
+                      disabled={loading}
+                      className="w-full rounded-md border border-gray-400 bg-white py-3 pl-10 pr-3 text-base focus:border-ad-green focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleVerifyOtp}
+                    disabled={loading || !otp.trim()}
+                    className="w-full rounded-md bg-ad-green py-4 text-base font-bold uppercase tracking-wide text-white shadow-sm hover:bg-ad-green-dark disabled:opacity-60"
+                  >
+                    {loading ? "Verifying..." : "Verify & Login"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtp("");
+                      setOtpSent(false);
+                      setStatus(null);
+                    }}
+                    disabled={loading}
+                    className="w-full text-sm text-ad-green-dark hover:underline"
+                  >
+                    ← Back to Mobile Number
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-
-          {status && (
-            <div
-              className={`mb-4 rounded-lg border px-3 py-2 text-sm ${
-                status.includes("successful") || status.includes("sent")
-                  ? "border-green-300 bg-green-50 text-green-800"
-                  : "border-red-300 bg-red-50 text-red-700"
-              }`}
-            >
-              {status}
-            </div>
-          )}
-
-          {!otpSent ? (
-            <div className="space-y-4">
-              <label className="block text-sm text-ad-green-dark">Email Address</label>
-              <div className="relative">
-                <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="email"
-                  value={email}
-                  autoComplete="username"
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your admin email"
-                  disabled={loading}
-                  className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 focus:border-ad-green focus:outline-none focus:ring-1 focus:ring-ad-green"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleSendOtp}
-                disabled={loading || !email.trim()}
-                className="w-full rounded-lg bg-ad-green py-3 text-sm font-bold uppercase tracking-wide text-white hover:bg-ad-green-dark disabled:opacity-60"
-              >
-                {loading ? "Sending..." : "Get OTP"}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <label className="block text-sm text-ad-green-dark">OTP</label>
-              <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  placeholder="Enter OTP from email"
-                  disabled={loading}
-                  className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 focus:border-ad-green focus:outline-none focus:ring-1 focus:ring-ad-green"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleVerifyOtp}
-                disabled={loading || !otp.trim()}
-                className="w-full rounded-lg bg-ad-green py-3 text-sm font-bold uppercase tracking-wide text-white hover:bg-ad-green-dark disabled:opacity-60"
-              >
-                {loading ? "Verifying..." : "Verify & Login"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setOtp("");
-                  setOtpSent(false);
-                  setStatus(null);
-                }}
-                disabled={loading}
-                className="w-full text-xs text-ad-green-dark hover:underline"
-              >
-                ← Back to Email
-              </button>
-            </div>
-          )}
         </div>
-      </div>
 
-      <Link
-        to="/"
-        className="mt-6 text-sm font-bold text-ad-green-dark hover:underline"
-      >
-        &lt;&lt; Back to Website
-      </Link>
+        <a
+          href="https://autodaddy.ca"
+          className="mt-8 inline-block text-sm font-bold text-ad-green-dark hover:underline"
+        >
+          &lt;&lt; Back to Website
+        </a>
+      </div>
     </div>
   );
 }

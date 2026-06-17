@@ -20,7 +20,7 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 
 import AdminAppLayout from "./layout/Admin/AppLayout";
 
-import HomePage from "./pages/HomePage";
+// import HomePage from "./pages/HomePage";
 
 import AdminHome from "./pages/AdminPages/Dashboard/Home";
 import AdminProfile from "./pages/AdminPages/ProfilePage/AdminProfile";
@@ -36,7 +36,7 @@ import AutoShopOwners from "./pages/AdminPages/Users/AutoShopOwners";
 import Services from "./pages/AdminPages/Services/Services";
 import AutoShopOwnerOnboarding from "./pages/AutoShopOwnerOnboarding";
 import WebsiteTemplates from "./pages/AdminPages/WebsiteTemplates/WebsiteTemplates";
-import DashboardData from "./pages/AdminPages/Dashboarddata/DashboardData";
+// import DashboardData from "./pages/AdminPages/Dashboarddata/DashboardData";
 import CarCompany from "./pages/AdminPages/CarCompany/CarCompany";
 import Cities from "./pages/AdminPages/Cities/Cities";
 import Ads from "./pages/AdminPages/Ads/Ads";
@@ -46,12 +46,16 @@ import SubServicesPage from "./pages/AdminPages/Services/Categories";
 import Provinces from "./pages/AdminPages/Cities/Provinces";
 import Invitehelp from "./pages/AdminPages/InviteHelpSection/Invitehelp";
 import SubAdminManagement from "./pages/AdminPages/SubAdminManagement/SubAdminManagement";
-import SubAdminSignInPage from "./pages/AuthPages/SubAdminSignInPage";
+// import SubAdminSignInPage from "./pages/AuthPages/SubAdminSignInPage";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import Unauthorized from "./pages/AdminPages/OtherPage/Unauthorized";
 import FAQsPage from "./pages/AdminPages/Content/FAQs";
 import PrivacyPage from "./pages/AdminPages/Content/Privacy";
 import InvoiceTemplatesPage from "./pages/AdminPages/Content/InvoiceTemplates";
+import FeaturesPage from "./pages/AdminPages/Content/Features";
+import ThoughtOfDayPage from "./pages/AdminPages/Content/ThoughtOfDay";
+import ThoughtOfDayNewPage from "./pages/AdminPages/Content/ThoughtOfDayNew";
+import ComingSoon from "./components/admin/ComingSoon";
 
 
 export default function App() {
@@ -73,11 +77,49 @@ export default function App() {
         <ScrollToTop />
         
         <Routes>
-          <Route index path="/" element={<HomePage />} />
+          {/* Login is the first page — no public homepage */}
+          <Route index path="/" element={<AdminSignInPage />} />
+          {/* <Route index path="/" element={<HomePage />} /> */}
+
           <Route element={<AdminAppLayout />}>
             <Route index path="/admin" element={
               <ProtectedRoute module="dashboard" action="view">
                 <AdminHome />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/thought-of-day" element={
+              <ProtectedRoute module="dashboardData" action="view">
+                <ThoughtOfDayPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/thought-of-day/new" element={
+              <ProtectedRoute module="dashboardData" action="view">
+                <ThoughtOfDayNewPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/features" element={
+              <ProtectedRoute module="dashboardData" action="view">
+                <FeaturesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/leads" element={
+              <ProtectedRoute module="dashboard" action="view">
+                <ComingSoon title="Leads" />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/accounts" element={
+              <ProtectedRoute module="dashboard" action="view">
+                <ComingSoon title="Accounts" />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/messages" element={
+              <ProtectedRoute module="dashboard" action="view">
+                <ComingSoon title="Messages" />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/reports" element={
+              <ProtectedRoute module="dashboard" action="view">
+                <ComingSoon title="Reports" />
               </ProtectedRoute>
             } />
             <Route path="/admin/car-owners" element={
@@ -165,11 +207,13 @@ export default function App() {
                 <PrivacyPage />
               </ProtectedRoute>
             } />
+            {/* Dashboard Data route commented out — functionality split into Thought of Day + Features
             <Route path="/admin/dashboard-data" element={
               <ProtectedRoute module="dashboardData" action="view">
                 <DashboardData />
               </ProtectedRoute>
             } />
+            */}
             <Route path="/admin/car-companies" element={
               <ProtectedRoute module="carCompanies" action="view">
                 <CarCompany />
@@ -202,7 +246,9 @@ export default function App() {
 
           <Route path="/admin/signin" element={<AdminSignInPage />} />
 
+          {/* Sub-admin login flow not needed for now
           <Route path="/subadmin/signin" element={<SubAdminSignInPage />} />
+          */}
      
 
 

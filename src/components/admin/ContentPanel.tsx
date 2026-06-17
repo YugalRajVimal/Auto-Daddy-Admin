@@ -29,25 +29,40 @@ export function PanelFooter({
   message,
   actionLabel = "Save",
   onAction,
+  cancelLabel,
+  onCancel,
   actionType = "button",
 }: {
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  cancelLabel?: string;
+  onCancel?: () => void;
   actionType?: "button" | "submit";
 }) {
   return (
     <div className="flex items-center justify-between bg-ad-purple px-5 py-2.5 text-sm text-white">
       <span className="font-serif italic">{message}</span>
-      {onAction || actionLabel ? (
-        <button
-          type={actionType}
-          onClick={onAction}
-          className="font-bold underline hover:opacity-90"
-        >
-          {actionLabel}
-        </button>
-      ) : null}
+      <div className="flex items-center gap-4">
+        {onCancel && cancelLabel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="font-bold underline hover:opacity-90"
+          >
+            {cancelLabel}
+          </button>
+        ) : null}
+        {onAction || actionLabel ? (
+          <button
+            type={actionType}
+            onClick={onAction}
+            className="font-bold underline hover:opacity-90"
+          >
+            {actionLabel}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

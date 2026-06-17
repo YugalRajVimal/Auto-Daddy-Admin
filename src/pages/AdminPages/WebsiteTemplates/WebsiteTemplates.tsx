@@ -6,8 +6,10 @@ const CATEGORIES = ["Mechanics", "Washing", "Tire Master", "Tow Truck"];
 
 const SAMPLE_SITES = [
   { id: 1, url: "Mechanic1.autodaddy.ca" },
-  { id: 2, url: "Preview - 2" },
-  { id: 3, url: "Preview - 3" },
+  { id: 2, url: "Mechanic2.autodaddy.ca" },
+  { id: 3, url: "Mechanic3.autodaddy.ca" },
+  { id: 4, url: "Mechanic4.autodaddy.ca" },
+  { id: 5, url: "Mechanic5.autodaddy.ca" },
 ];
 
 const WebsiteTemplates: React.FC = () => {

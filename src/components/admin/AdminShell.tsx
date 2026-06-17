@@ -52,7 +52,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   return (
     <div className="flex min-h-screen flex-col bg-white font-sans">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 md:px-6">
+      <div className="relative flex items-center justify-between px-4 py-3 md:px-6">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -67,9 +67,17 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </svg>
           </button>
           <Link to="/admin">
-            <img src={LOGO} alt="AutoDaddy" className="h-10 w-auto md:h-12" />
+            <img
+              src={LOGO}
+              alt="AutoDaddy"
+              className="block h-auto w-auto max-h-10 max-w-[140px] object-contain md:max-h-12 md:max-w-[168px]"
+            />
           </Link>
         </div>
+
+        <span className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 font-canada text-2xl text-ad-green md:block md:text-3xl">
+          Canada
+        </span>
 
         <div className="flex items-center gap-1 md:gap-2">
           <span className="bg-ad-grey-light px-3 py-1.5 text-xs font-medium text-black md:px-4 md:text-sm">

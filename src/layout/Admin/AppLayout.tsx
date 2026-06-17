@@ -41,7 +41,7 @@ const SubAdminAppLayout: React.FC = () => {
         if (!token) {
           setIsAdminAuthenticated(false);
           if (window.location.pathname.startsWith("/admin")) {
-            window.location.href = "/admin/signin";
+            window.location.href = "/";
           }
           return;
         }
@@ -68,16 +68,16 @@ const SubAdminAppLayout: React.FC = () => {
             setSuperAdminName(data.name);
             setSuperAdminEmail(data.email);
           }
-          if (window.location.pathname === "/admin/signin") {
+          if (window.location.pathname === "/admin/signin" || window.location.pathname === "/") {
             window.location.href = "/admin";
           }
         } else {
           setIsAdminAuthenticated(false);
-          window.location.href = "/admin/signin";
+          window.location.href = "/";
         }
       } catch {
         setIsAdminAuthenticated(false);
-        window.location.href = "/admin/signin";
+        window.location.href = "/";
       }
     };
 
