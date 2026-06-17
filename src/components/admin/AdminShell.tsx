@@ -1,0 +1,165 @@
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router";
+import usePermissions from "../../hooks/usePermission";
+import {
+  primaryNav,
+  adminOnlyNav,
+  getActivePrimaryItem,
+  type NavItem,
+  type NavSubItem,
+} from "../../config/adminNav";
+
+const LOGO = "/autodaddy-logo.png";
+
+function filterNavItem(item: NavItem, canView: (m: string) => boolean, isAdmin: boolean): NavItem | null {
+  if (item.adminOnly && !isAdmin) return null;
+  if (item.subItems) {
+    const visibleSubs = item.subItems.filter(
+      (s) => !s.permissionModule || canView(s.permissionModule)
+    );
+    if (visibleSubs.length === 0) return null;
+    return { ...item, subItems: visibleSubs };
+  }
+  if (item.permissionModule && !canView(item.permissionModule)) return null;
+  return item;
+}
+
+function isPathActive(pathname: string, path: string) {
+  if (path === "/admin") return pathname === "/admin";
+  return pathname === path || pathname.startsWith(path + "/");
+}
+
+export default function AdminShell({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { isAdmin, canView } = usePermissions();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const visibleNav = [
+    ...primaryNav.map((n) => filterNavItem(n, canView, isAdmin)).filter(Boolean) as NavItem[],
+    ...adminOnlyNav.map((n) => filterNavItem(n, canView, isAdmin)).filter(Boolean) as NavItem[],
+  ];
+
+  const activePrimary = getActivePrimaryItem(location.pathname, visibleNav);
+  const subItems: NavSubItem[] = activePrimary?.subItems ?? [];
+
+  const handlePrimaryClick = (item: NavItem) => {
+    const target = item.path ?? item.subItems?.[0]?.path;
+    if (target) navigate(target);
+    setMobileOpen(false);
+  };
+
+  return (
+    <div className="flex min-h-screen flex-col bg-white font-sans">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-4 py-3 md:px-6">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="rounded border border-gray-300 p-2 lg:hidden"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Toggle menu"
+          >
+            <svg width="20" height="16" viewBox="0 0 16 12" fill="currentColor">
+              <rect width="16" height="2" y="0" />
+              <rect width="16" height="2" y="5" />
+              <rect width="16" height="2" y="10" />
+            </svg>
+          </button>
+          <Link to="/admin">
+            <img src={LOGO} alt="AutoDaddy" className="h-10 w-auto md:h-12" />
+          </Link>
+        </div>
+
+        <div className="flex items-center gap-1 md:gap-2">
+          <span className="bg-ad-grey-light px-3 py-1.5 text-xs font-medium text-black md:px-4 md:text-sm">
+            Admin
+          </span>
+          <a
+            href="https://autodaddy.ca"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-ad-grey px-3 py-1.5 text-xs font-medium text-black hover:bg-gray-400 md:px-4 md:text-sm"
+          >
+            Help
+          </a>
+          <Link
+            to="/admin/logout"
+            className="bg-ad-grey-dark px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 md:px-4 md:text-sm"
+          >
+            Log out
+          </Link>
+        </div>
+      </div>
+
+      {/* Primary nav */}
+      <nav
+        className={`bg-ad-purple ${mobileOpen ? "block" : "hidden lg:block"}`}
+      >
+        <ul className="flex flex-col lg:flex-row lg:overflow-x-auto">
+          {visibleNav.map((item) => {
+            const isActive = activePrimary?.name === item.name;
+            const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
+            return (
+              <li key={item.name} className="flex-shrink-0">
+                {item.subItems ? (
+                  <button
+                    type="button"
+                    onClick={() => handlePrimaryClick(item)}
+                    className={`w-full border-b border-white/20 px-4 py-2.5 text-sm font-medium transition-colors lg:border-b-0 lg:border-r lg:px-5 lg:py-3 ${
+                      isActive
+                        ? "rounded-t-lg bg-white text-ad-purple"
+                        : "text-white hover:bg-white/10"
+                    }`}
+                  >
+                    {item.name}
+                  </button>
+                ) : (
+                  <Link
+                    to={firstPath}
+                    onClick={() => setMobileOpen(false)}
+                    className={`block border-b border-white/20 px-4 py-2.5 text-sm font-medium transition-colors lg:border-b-0 lg:border-r lg:px-5 lg:py-3 ${
+                      isActive
+                        ? "rounded-t-lg bg-white text-ad-purple"
+                        : "text-white hover:bg-white/10"
+                    }`}
+                  >
+                    {item.name}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      {/* Sub nav */}
+      {subItems.length > 0 && (
+        <div className="relative border-b-2 border-ad-purple bg-white">
+          <ul className="flex flex-wrap items-center gap-1 px-3 py-2 md:gap-0 md:px-4">
+            {subItems.map((sub) => {
+              const active = isPathActive(location.pathname, sub.path);
+              return (
+                <li key={sub.path} className="relative">
+                  {active && (
+                    <span className="absolute -top-[9px] left-1/2 hidden h-0 w-0 -translate-x-1/2 border-x-[7px] border-b-[7px] border-x-transparent border-b-ad-purple md:block" />
+                  )}
+                  <Link
+                    to={sub.path}
+                    className={`block px-3 py-1.5 text-sm text-blue-700 underline-offset-2 hover:underline ${
+                      active ? "bg-gray-200 font-medium" : ""
+                    }`}
+                  >
+                    {sub.name}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+    </div>
+  );
+}

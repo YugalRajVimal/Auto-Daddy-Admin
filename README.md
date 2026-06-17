@@ -1,192 +1,172 @@
-# TailAdmin React - Free React Tailwind Admin Dashboard Template
+# AutoDaddy Admin
 
-TailAdmin is a free and open-source admin dashboard template built on **React and Tailwind CSS**, providing developers
-with everything they need to create a comprehensive, data-driven back-end,
-dashboard, or admin panel solution for upcoming web projects.
+Admin and sub-admin panel for [AutoDaddy](https://autodaddy.ca) — an automotive services platform connecting car owners, auto shop owners, deals, ads, and related operations.
 
-With TailAdmin, you get access to all the necessary dashboard UI components, elements, and pages required to build a
-feature-rich and complete dashboard or admin panel. Whether you're building dashboard or admin panel for a complex web
-application or a simple website, TailAdmin is the perfect solution to help you get up and running quickly.
-
-![TailAdmin React.js Dashboard Preview](./banner.png)
+Built on the [TailAdmin](https://tailadmin.com) React dashboard template and customized for AutoDaddy’s domain.
 
 ## Overview
 
-TailAdmin provides essential UI components and layouts for building feature-rich, data-driven admin dashboards and
-control panels. It's built on:
+This is the **operations back office** for the AutoDaddy ecosystem. It lets administrators manage users, services, geography, marketing content, wallets, tasks, and delegated sub-admin access. All data is served by a separate backend API configured via environment variables.
 
-- React 19
-- TypeScript
-- Tailwind CSS
+### User roles
 
-### Quick Links
+| Role | Sign-in | Access |
+|------|---------|--------|
+| **Admin** | Email + OTP at `/admin/signin` | Full access to all modules |
+| **Sub-admin** | Email + password at `/subadmin/signin` | Module-level permissions (view / add / edit / delete) |
 
-- [✨ Visit Website](https://tailadmin.com)
-- [📄 Documentation](https://tailadmin.com/docs)
-- [⬇️ Download](https://tailadmin.com/download)
-- [🖌️ Figma Design File (Community Edition)](https://www.figma.com/community/file/1214477970819985778)
-- [⚡ Get PRO Version](https://tailadmin.com/pricing)
+## Features
 
-### Demos
+- **Dashboard** — Metrics for car owners, auto shop owners, job cards, deals, and services
+- **Users** — Car owners and auto shop owners (associates and dealers planned)
+- **Services** — Categories and sub-services
+- **Location** — Provinces and cities
+- **Marketing** — Ads and running deals
+- **Wallet** — Wallet management
+- **Content** — Website templates, dashboard data, invite/help section
+- **Operations** — Tasks, car companies, sub-admin management
+- **Onboarding** — Public auto shop owner onboarding flow
 
-- [Free Version](https://free-react-demo.tailadmin.com/)
-- [Pro Version](https://react-demo.tailadmin.com)
+## Tech stack
 
-### Other Versions
+- [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- [Vite](https://vite.dev/)
+- [Tailwind CSS v4](https://tailwindcss.com/)
+- [React Router](https://reactrouter.com/)
+- [Ant Design](https://ant.design/), [Recharts](https://recharts.org/), [Framer Motion](https://www.framer.com/motion/)
+- [Axios](https://axios-http.com/) / `fetch` for API calls
 
-- [HTML Version](https://github.com/TailAdmin/tailadmin-free-tailwind-dashboard-template)
-- [Next.js Version](https://github.com/TailAdmin/free-nextjs-admin-dashboard)
-- [Vue.js Version](https://github.com/TailAdmin/vue-tailwind-admin-dashboard)
+## Prerequisites
 
-## Installation
+- **Node.js** 18.x or later (20.x recommended)
+- Access to the AutoDaddy backend API
 
-### Prerequisites
+## Getting started
 
-To get started with TailAdmin, ensure you have the following prerequisites installed and set up:
-
-- Node.js 18.x or later (recommended to use Node.js 20.x or later)
-
-### Cloning the Repository
-
-Clone the repository using the following command:
+### 1. Clone and install
 
 ```bash
-git clone https://github.com/TailAdmin/free-react-tailwind-admin-dashboard.git
+git clone <repository-url>
+cd Auto-Daddy-Admin
+npm install
 ```
 
-> Windows Users: place the repository near the root of your drive if you face issues while cloning.
+If you hit peer dependency issues:
 
-1. Install dependencies:
+```bash
+npm install --legacy-peer-deps
+```
 
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
+### 2. Environment variables
 
-   > Use the `--legacy-peer-deps` flag, if you face issues while installing.
+Create a `.env` file in the project root:
 
-2. Start the development server:
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
+```env
+VITE_API_URL=https://app.autodaddy.ca
+VITE_UPLOADS_URL=https://app.autodaddy.ca
+```
 
-## Components
+| Variable | Description |
+|----------|-------------|
+| `VITE_API_URL` | Base URL for the AutoDaddy backend API |
+| `VITE_UPLOADS_URL` | Base URL for uploaded assets (images, files) |
+| `VITE_IMAGE_URL` | Optional; used in some user management views |
 
-TailAdmin is a pre-designed starting point for building a web-based dashboard using React.js and Tailwind CSS. The
-template includes:
+### 3. Run the dev server
 
-- Sophisticated and accessible sidebar
-- Data visualization components
-- Prebuilt profile management and 404 page
-- Tables and Charts(Line and Bar)
-- Authentication forms and input elements
-- Alerts, Dropdowns, Modals, Buttons and more
-- Can't forget Dark Mode 🕶️
+```bash
+npm run dev
+```
 
-All components are built with React and styled using Tailwind CSS for easy customization.
+Open the URL shown in the terminal (typically `http://localhost:5173`).
 
-## Feature Comparison
+### 4. Build for production
 
-### Free Version
+```bash
+npm run build
+npm run preview
+```
 
-- 1 Unique Dashboard
-- 30+ dashboard components
-- 50+ UI elements
-- Basic Figma design files
-- Community support
+## Scripts
 
-### Pro Version
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Vite development server |
+| `npm run build` | Type-check and build for production |
+| `npm run preview` | Preview production build locally |
+| `npm run lint` | Run ESLint |
 
-- 5 Unique Dashboards: Analytics, Ecommerce, Marketing, CRM, Stocks (more coming soon)
-- 400+ dashboard components and UI elements
-- Complete Figma design file
-- Email support
+## Routes
 
-To learn more about pro version features and pricing, visit our [pricing page](https://tailadmin.com/pricing).
+| Path | Description |
+|------|-------------|
+| `/` | Landing page (admin / sub-admin entry) |
+| `/admin/signin` | Admin OTP sign-in |
+| `/subadmin/signin` | Sub-admin email/password sign-in |
+| `/admin` | Dashboard |
+| `/admin/car-owners` | Car owner management |
+| `/admin/auto-shop-owners` | Auto shop owner management |
+| `/admin/categories` | Service categories |
+| `/admin/services` | Sub-services |
+| `/admin/provinces` | Province management |
+| `/admin/cities` | City management |
+| `/admin/ads` | Ads management |
+| `/admin/running-deals` | Running deals |
+| `/admin/wallet` | Wallet |
+| `/admin/invite-help` | Invite help section |
+| `/admin/manage-task` | Task management |
+| `/admin/website-templates` | Website templates |
+| `/admin/dashboard-data` | Dashboard content (e.g. thought of the day) |
+| `/admin/car-companies` | Car company management |
+| `/admin/subadmins` | Sub-admin management (admin only) |
+| `/auto-shop-owner/onboarding` | Auto shop owner onboarding |
 
-## Changelog
+## Authentication
 
-### Version 2.0.2 - [March 25, 2025]
+- **Admin** — OTP flow via `POST /api/auth/admin/signin`; token stored in `localStorage` as `admin-token`.
+- **Sub-admin** — Login via `POST /api/auth/subadmin/login`; permissions stored as `subadmin-permissions`.
+- Session checks use `GET /api/auth/admin/check-auth/` from the admin layout.
 
-- Upgraded to React 19
-- Included overrides for packages to prevent peer dependency errors.
-- Migrated from react-flatpickr to flatpickr package for React 19 support
+## Permissions
 
-### Version 2.0.1 - [February 27, 2025]
+Sub-admin access is enforced by `ProtectedRoute` and the `usePermissions` hook. Each module supports granular actions:
 
-#### Update Overview
+- `view`, `add`, `edit`, `delete`
 
-- Upgraded to Tailwind CSS v4 for better performance and efficiency.
-- Updated class usage to match the latest syntax and features.
-- Replaced deprecated class and optimized styles.
+Main admin (`admin-role` = `admin`) bypasses all permission checks.
 
-#### Next Steps
+Permission modules include: `dashboard`, `users`, `services`, `categories`, `websiteTemplates`, `dashboardData`, `carCompanies`, `provinces`, `cities`, `ads`, `runningDeals`, `wallet`, `inviteHelp`, `tasks`, and `subAdminManagement`.
 
-- Run npm install or yarn install to update dependencies.
-- Check for any style changes or compatibility issues.
-- Refer to the Tailwind CSS v4 [Migration Guide](https://tailwindcss.com/docs/upgrade-guide) on this release. if needed.
-- This update keeps the project up to date with the latest Tailwind improvements. 🚀
+## Project structure
 
-### Version 2.0.0 - [February 2025]
+```
+src/
+├── components/       # Shared UI, auth forms, charts, tables
+├── context/          # Theme and sidebar state
+├── hooks/            # usePermissions, useModal, etc.
+├── layout/Admin/     # App shell (sidebar, header, layout)
+├── pages/
+│   ├── AdminPages/   # Domain-specific admin screens
+│   ├── AuthPages/    # Admin and sub-admin sign-in
+│   └── HomePage.tsx  # Public landing page
+├── utils/            # Helpers (e.g. Razorpay)
+├── App.tsx           # Route definitions
+└── main.tsx          # App entry point
+```
 
-A major update with comprehensive redesign and modern React patterns implementation.
+## API integration
 
-#### Major Improvements
+Most admin pages call endpoints under:
 
-- Complete UI redesign with modern React patterns
-- New features: collapsible sidebar, chat, and calendar
-- Improved performance and accessibility
-- Updated data visualization using ApexCharts
+- `/api/auth/*` — Authentication
+- `/api/admin/*` — Admin CRUD and dashboard data
 
-#### Key Features
+The base URL is always `${VITE_API_URL}` from your `.env` file.
 
-- Redesigned dashboards (Ecommerce, Analytics, Marketing, CRM)
-- Enhanced navigation with React Router integration
-- Advanced tables with sorting and filtering
-- Calendar with drag-and-drop support
-- New UI components and improved existing ones
+## Template credit
 
-#### Breaking Changes
-
-- Updated sidebar component API
-- Migrated charts to ApexCharts
-- Revised authentication system
-
-[Read more](https://tailadmin.com/docs/update-logs/react) on this release.
-
-### Version 1.3.7 - [June 20, 2024]
-
-#### Enhancements
-
-1. Remove Repetition of DefaultLayout in every Pages
-2. Add ClickOutside Component for reduce repeated functionality in Header Message, Notification and User Dropdowns.
-
-### Version 1.3.6 - [Jan 31, 2024]
-
-#### Enhancements
-
-1. Integrate flatpickr in [Date Picker/Form Elements]
-2. Change color after select an option [Select Element/Form Elements].
-3. Make it functional [Multiselect Dropdown/Form Elements].
-4. Make best value editable [Pricing Table One/Pricing Table].
-5. Rearrange Folder structure.
-
-### Version 1.2.0 - [Apr 28, 2023]
-
-- Add Typescript in TailAdmin React.
-
-### Version 1.0.0 - Initial Release - [Mar 13, 2023]
-
-- Initial release of TailAdmin React.
+UI foundation: [TailAdmin React](https://github.com/TailAdmin/free-react-tailwind-admin-dashboard) (MIT License). Demo routes from the original template (charts, form elements, etc.) may still exist but are not part of the core AutoDaddy product.
 
 ## License
 
-TailAdmin React.js Free Version is released under the MIT License.
-
-## Support
-
-If you find this project helpful, please consider giving it a star on GitHub. Your support helps us continue developing
-and maintaining this template.
+Private project. TailAdmin template components remain under the MIT License where applicable.

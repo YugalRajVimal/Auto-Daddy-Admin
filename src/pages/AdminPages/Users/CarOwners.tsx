@@ -106,7 +106,7 @@ const BaseModal: React.FC<{
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "30px 10px" }}>
       <div style={{ background: "#fff", borderRadius: 4, width: maxW ?? (wide ? "min(920px,96vw)" : "min(720px,95vw)"), boxShadow: "0 5px 24px rgba(0,0,0,.35)", display: "flex", flexDirection: "column" }}>
-        <div style={{ background: "#3c8dbc", color: "#fff", padding: "11px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "4px 4px 0 0", flexShrink: 0 }}>
+        <div style={{ background: "#9b308d", color: "#fff", padding: "11px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "4px 4px 0 0", flexShrink: 0 }}>
           <span style={{ fontWeight: 700, fontSize: 15 }}>{title}</span>
           <button onClick={onClose} type="button" style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
         </div>
@@ -508,7 +508,7 @@ function VehicleRowForm({ v, i, attempted, onChange, onRemove, canRemove }: {
   return (
     <div style={{ border: "1px solid #d2d6de", borderRadius: 4, padding: "12px 14px", background: "#f9fafc", marginBottom: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: "#3c8dbc" }}>Vehicle #{i + 1}</span>
+        <span style={{ fontWeight: 700, fontSize: 13, color: "#9b308d" }}>Vehicle #{i + 1}</span>
         {canRemove && <button type="button" onClick={onRemove} style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✕ Remove</button>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 14px" }}>
@@ -629,12 +629,12 @@ const AddEditModal: React.FC<{ isOpen: boolean; onClose: () => void; onSaved: ()
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", background: "rgba(0,0,0,0.48)", overflowY: "auto", padding: "30px 12px" }}>
       <div style={{ background: "#fff", borderRadius: 4, width: "min(960px,96vw)", boxShadow: "0 8px 32px rgba(0,0,0,0.22)" }}>
-        <div style={{ background: "#3c8dbc", color: "#fff", padding: "13px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "4px 4px 0 0" }}>
+        <div style={{ background: "#9b308d", color: "#fff", padding: "13px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "4px 4px 0 0" }}>
           <span style={{ fontWeight: 700, fontSize: 16 }}>{isEdit ? "✏️ Edit Car Owner" : "➕ Add New Car Owner"}</span>
           <button onClick={onClose} disabled={submitting} type="button" style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer" }}>×</button>
         </div>
         <form onSubmit={handleSubmit} style={{ padding: "22px 24px" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#3c8dbc", borderBottom: "2px solid #3c8dbc", paddingBottom: 6, marginBottom: 16, textTransform: "uppercase" }}>Personal Information</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#9b308d", borderBottom: "2px solid #9b308d", paddingBottom: 6, marginBottom: 16, textTransform: "uppercase" }}>Personal Information</div>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
             <div style={{ width: 56, height: 56, borderRadius: "50%", border: "2px solid #d2d6de", background: "#e3f2fd", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               {profilePreview ? <img src={profilePreview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 20, color: "#90caf9", fontWeight: 700 }}>?</span>}
@@ -657,9 +657,9 @@ const AddEditModal: React.FC<{ isOpen: boolean; onClose: () => void; onSaved: ()
             <div><label style={lStyle}>Role</label><div style={{ ...iStyle, background: "#f5f6f8", color: "#888", fontWeight: 600, cursor: "default" }}>carowner</div></div>
             <div style={{ gridColumn: "1/-1" }}><label style={lStyle}>Address</label><textarea style={{ ...iStyle, minHeight: 60, resize: "vertical", fontFamily: "inherit" }} value={address} onChange={e => setAddress(e.target.value.slice(0, 50))} placeholder="Max 50 chars" rows={2} /></div>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#3c8dbc", borderBottom: "2px solid #3c8dbc", paddingBottom: 6, marginBottom: 14, textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#9b308d", borderBottom: "2px solid #9b308d", paddingBottom: 6, marginBottom: 14, textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span>Vehicles</span>
-            {vehicles.length < 5 && <button type="button" onClick={() => setVehicles(v => [...v, emptyVehicle()])} style={{ fontSize: 12, background: "#3c8dbc", color: "#fff", border: "none", borderRadius: 3, padding: "4px 12px", cursor: "pointer", fontWeight: 600 }}>+ Add Vehicle</button>}
+            {vehicles.length < 5 && <button type="button" onClick={() => setVehicles(v => [...v, emptyVehicle()])} style={{ fontSize: 12, background: "#9b308d", color: "#fff", border: "none", borderRadius: 3, padding: "4px 12px", cursor: "pointer", fontWeight: 600 }}>+ Add Vehicle</button>}
           </div>
           {vehicles.map((v, i) => (
             <VehicleRowForm key={i} v={v} i={i} attempted={attempted} onChange={patch => setVehicles(prev => { const n = [...prev]; n[i] = { ...n[i], ...patch }; return n; })} onRemove={() => setVehicles(prev => prev.filter((_, idx) => idx !== i))} canRemove={vehicles.length > 1} />
@@ -889,11 +889,11 @@ const CarOwners: React.FC = () => {
       <SendNotifModal isOpen={notifOpen} onClose={() => setNotifOpen(false)} ids={selected} onDone={() => {}} />
 
       {/* ── PAGE ── */}
-      <div className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
 
         {/* Header row */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 34, fontWeight: 300, color: "#333", margin: 0 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#2c8c2c", margin: 0 }}>
             {showDeleted ? "Deleted Car Owners" : "Car Owners"}
           </h1>
           {/* Only show Add New button when not in deleted view */}

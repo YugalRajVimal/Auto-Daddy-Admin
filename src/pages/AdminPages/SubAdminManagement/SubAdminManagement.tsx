@@ -74,7 +74,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}>
         <div style={{ background: "#fff", borderRadius: 4, width: wide ? "min(960px,96vw)" : "min(600px,94vw)", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 5px 15px rgba(0,0,0,.5)" }}>
-          <div style={{ background: "#3c8dbc", color: "#fff", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "4px 4px 0 0", flexShrink: 0 }}>
+          <div style={{ background: "#9b308d", color: "#fff", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "4px 4px 0 0", flexShrink: 0 }}>
             <span style={{ fontWeight: 600, fontSize: 16 }}>{title}</span>
             <button onClick={onClose} style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer" }} type="button">×</button>
           </div>
@@ -381,7 +381,7 @@ const SubAdminManagement: React.FC = () => {
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #3c8dbc", paddingBottom: 6, color: "#3c8dbc" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #9b308d", paddingBottom: 6, color: "#9b308d" }}>
               Permission Matrix
             </div>
             <PermissionMatrix permissions={formPerms} onChange={setFormPerms} />
@@ -470,7 +470,7 @@ const SubAdminManagement: React.FC = () => {
                 <div key={label as string}><span style={{ fontWeight: 600 }}>{label}:</span> {value as string}</div>
               ))}
             </div>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #3c8dbc", paddingBottom: 6, color: "#3c8dbc" }}>Permissions</div>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #9b308d", paddingBottom: 6, color: "#9b308d" }}>Permissions</div>
             <PermissionMatrix permissions={{ ...DEFAULT_PERMS(), ...showViewModal.permissions }} onChange={() => {}} readOnly />
           </>
         )}
@@ -498,8 +498,8 @@ const SubAdminManagement: React.FC = () => {
       </Modal>
 
       {/* ── Page ─────────────────────────────────────────────────────────────── */}
-      <div className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans">
-        <h1 style={{ fontSize: 34, fontWeight: 300, color: "#333", marginBottom: 20 }}>Sub Admin Management</h1>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
+        <h1 className="mb-4 text-xl font-bold text-ad-green md:text-2xl">Sub Admin Management</h1>
 
         {error && (
           <div style={{ marginBottom: 12, padding: "10px 14px", background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, color: "#c0392b", fontSize: 13 }}>{error}</div>

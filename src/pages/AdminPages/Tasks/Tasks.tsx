@@ -250,8 +250,8 @@ const Tasks: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen py-6 px-4 md:px-8">
-      <h1 className="text-xl md:text-2xl font-bold text-slate-800 mb-5">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5">
+      <h1 className="mb-4 text-xl font-bold text-ad-green md:text-2xl">
         Manage Tasks
       </h1>
 

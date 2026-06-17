@@ -1,25 +1,24 @@
-// pages/AuthPages/SubAdminSignInPage.tsx
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { FiMail, FiLock, FiHome } from "react-icons/fi";
+import { Link } from "react-router";
+import { FiMail, FiLock } from "react-icons/fi";
 
 const SUBADMIN_TOKEN_KEY = "admin-token";
-const SUBADMIN_ROLE_KEY  = "admin-role";
-const ADMIN_HOME         = "/admin";
-const API_BASE           = `${import.meta.env.VITE_API_URL}/api/auth`;
-const PRIMARY            = "#3d61e7";
+const SUBADMIN_ROLE_KEY = "admin-role";
+const ADMIN_HOME = "/admin";
+const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
+const LOGO = "/autodaddy-logo.png";
 
 export default function SubAdminSignInPage() {
-  const [email,    setEmail]    = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [status,   setStatus]   = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   async function handleLogin() {
     setStatus(null);
     setLoading(true);
     try {
-      const res  = await fetch(`${API_BASE}/subadmin/login`, {
+      const res = await fetch(`${API_BASE}/subadmin/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
@@ -42,74 +41,79 @@ export default function SubAdminSignInPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4"
-      style={{ background: "linear-gradient(135deg, #f7faff 40%, #aac9fe 100%)" }}>
-      <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md rounded-3xl p-10 shadow-2xl"
-        style={{ background: "#fff", border: `2.5px solid ${PRIMARY}33`, boxShadow: "0 8px 40px 0 #3d61e733" }}>
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-white px-4 py-10">
+      <p className="absolute right-6 top-6 text-sm font-medium text-ad-green-dark md:text-base">
+        Sub Admin Sign In
+      </p>
 
-        <div className="text-center mb-7">
-          <div className="mb-2 flex justify-center">
-            <svg width={38} height={38} viewBox="0 0 38 38" fill="none"
-              style={{ filter: "drop-shadow(0 2px 16px #3d61e733)" }}>
-              <circle cx="19" cy="19" r="18" fill="#3d61e7" />
-              <text x="19" y="24" textAnchor="middle" fontWeight="bold" fontSize="14" fill="#fff" fontFamily="Inter, sans-serif">SA</text>
-            </svg>
-          </div>
-          <h1 className="text-[1.9rem] font-extrabold" style={{ color: PRIMARY, letterSpacing: "-1px" }}>
-            Sub Admin Sign In
-          </h1>
-          <p className="text-sm font-medium text-[#6170a9] mt-1">Sign in with your Sub Admin credentials</p>
+      <div className="flex w-full max-w-3xl overflow-hidden rounded-3xl border border-ad-green/30 bg-ad-mint shadow-[8px_8px_24px_rgba(0,0,0,0.12)]">
+        <div className="hidden w-1/2 flex-col items-center justify-center border-r border-ad-green/40 p-8 md:flex">
+          <img src={LOGO} alt="AutoDaddy" className="mb-6 h-24 w-auto" />
+          <p className="text-center font-serif italic text-ad-green-dark">
+            A Digital Bridge - that connects with
+          </p>
+          <p className="mt-2 text-center text-lg font-bold text-black">
+            Voice of your &lsquo;Happy Customers&rsquo;
+          </p>
         </div>
 
-        <button type="button" onClick={() => window.location.href = "/"}
-          className="flex items-center text-xs font-medium text-[#3d61e7] hover:underline mb-4 bg-transparent border-0 p-0">
-          <FiHome className="mr-1" /> Back to Home
-        </button>
+        <div className="flex w-full flex-col justify-center p-8 md:w-1/2">
+          <div className="mb-6 flex justify-center md:hidden">
+            <img src={LOGO} alt="AutoDaddy" className="h-16 w-auto" />
+          </div>
 
-        <div className="space-y-4">
           {status && (
-            <div className={`text-sm px-3 py-[6px] rounded-xl border ${status.includes("successful") ? "bg-green-100 text-green-800 border-green-200" : "bg-red-100 text-red-700 border-red-200"}`}>
+            <div
+              className={`mb-4 rounded-lg border px-3 py-2 text-sm ${
+                status.includes("successful")
+                  ? "border-green-300 bg-green-50 text-green-800"
+                  : "border-red-300 bg-red-50 text-red-700"
+              }`}
+            >
               {status}
             </div>
           )}
 
-          <div>
-            <label className="text-sm font-semibold text-[#313e66]">Email Address</label>
-            <div className="relative mt-1">
-              <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a2b4e0]" />
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="subadmin@company.com" disabled={loading}
-                className="w-full rounded-xl border border-[#d3dbf3] pl-10 pr-3 py-2.5 text-[#222d51] bg-[#f7f9fc] focus:outline-none focus:ring-2 focus:ring-[#3d61e7] text-sm" />
+          <div className="space-y-4">
+            <label className="block text-sm text-ad-green-dark">Email Address</label>
+            <div className="relative">
+              <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                disabled={loading}
+                className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 focus:border-ad-green focus:outline-none focus:ring-1 focus:ring-ad-green"
+              />
             </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-[#313e66]">Password</label>
-            <div className="relative mt-1">
-              <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a2b4e0]" />
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder="Your password" disabled={loading}
-                className="w-full rounded-xl border border-[#d3dbf3] pl-10 pr-3 py-2.5 text-[#222d51] bg-[#f7f9fc] focus:outline-none focus:ring-2 focus:ring-[#3d61e7] text-sm" />
+            <label className="block text-sm text-ad-green-dark">Password</label>
+            <div className="relative">
+              <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                disabled={loading}
+                className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 focus:border-ad-green focus:outline-none focus:ring-1 focus:ring-ad-green"
+              />
             </div>
+            <button
+              type="button"
+              onClick={handleLogin}
+              disabled={loading || !email.trim() || !password}
+              className="w-full rounded-lg bg-ad-green py-3 text-sm font-bold uppercase tracking-wide text-white hover:bg-ad-green-dark disabled:opacity-60"
+            >
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
           </div>
-
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            type="button" onClick={handleLogin} disabled={loading || !email || !password}
-            className="w-full rounded-xl bg-[#3d61e7] py-2.5 font-extrabold text-white text-base shadow-lg hover:bg-[#2445ad] transition-all">
-            {loading ? "Signing in..." : "Sign In →"}
-          </motion.button>
-
-          <p className="text-xs text-center text-[#6170a9] mt-2">
-            Are you the main admin?{" "}
-            <a href="/admin/signin" className="text-[#3d61e7] hover:underline font-semibold">Sign in here</a>
-          </p>
         </div>
+      </div>
 
-        <p className="mt-8 text-center text-xs text-slate-400">
-          © {new Date().getFullYear()} AutoDaddy • All rights reserved
-        </p>
-      </motion.div>
+      <Link to="/" className="mt-6 text-sm font-bold text-ad-green-dark hover:underline">
+        &lt;&lt; Back to Website
+      </Link>
     </div>
   );
 }

@@ -144,7 +144,7 @@ const BaseModal: React.FC<{
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "30px 10px" }}>
       <div style={{ background: "#fff", borderRadius: 4, width: maxW ?? (wide ? "min(980px,96vw)" : "min(720px,95vw)"), boxShadow: "0 5px 24px rgba(0,0,0,.35)", display: "flex", flexDirection: "column" }}>
-        <div style={{ background: "#3c8dbc", color: "#fff", padding: "11px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "4px 4px 0 0", flexShrink: 0 }}>
+        <div style={{ background: "#9b308d", color: "#fff", padding: "11px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "4px 4px 0 0", flexShrink: 0 }}>
           <span style={{ fontWeight: 700, fontSize: 15 }}>{title}</span>
           <button onClick={onClose} type="button" style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
         </div>
@@ -238,12 +238,12 @@ const AddEditModal: React.FC<{
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", background: "rgba(0,0,0,0.48)", overflowY: "auto", padding: "30px 12px" }}>
       <div style={{ background: "#fff", borderRadius: 4, width: "min(680px,96vw)", boxShadow: "0 8px 32px rgba(0,0,0,0.22)" }}>
-        <div style={{ background: "#3c8dbc", color: "#fff", padding: "13px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "4px 4px 0 0" }}>
+        <div style={{ background: "#9b308d", color: "#fff", padding: "13px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "4px 4px 0 0" }}>
           <span style={{ fontWeight: 700, fontSize: 16 }}>{isEdit ? "✏️ Edit Auto Shop Owner" : "➕ Add Auto Shop Owner"}</span>
           <button onClick={onClose} disabled={submitting} type="button" style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer" }}>×</button>
         </div>
         <form onSubmit={handleSubmit} style={{ padding: "22px 24px" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#3c8dbc", borderBottom: "2px solid #3c8dbc", paddingBottom: 6, marginBottom: 18, textTransform: "uppercase" }}>Owner Information</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#9b308d", borderBottom: "2px solid #9b308d", paddingBottom: 6, marginBottom: 18, textTransform: "uppercase" }}>Owner Information</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px" }}>
             <div>
               <label style={lStyle}>Full Name <span style={{ color: "#e73d3d" }}>*</span></label>
@@ -544,7 +544,7 @@ const BusinessProfileModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => 
   return (
     <BaseModal isOpen wide onClose={onClose} title={`Business Profile — ${bp.businessName || "-"}`}>
       <ShopOverviewCard bp={bp} />
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #3c8dbc", paddingBottom: 6, color: "#3c8dbc", marginTop: 16 }}>Team Members</div>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #9b308d", paddingBottom: 6, color: "#9b308d", marginTop: 16 }}>Team Members</div>
       {Array.isArray(bp.teamMembers) && bp.teamMembers.length > 0 ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
           {bp.teamMembers.map((tm: TeamMemberType) => (
@@ -563,7 +563,7 @@ const BusinessProfileModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => 
           ))}
         </div>
       ) : <div style={{ color: "#aaa", fontSize: 13, marginBottom: 20 }}>No team members.</div>}
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #3c8dbc", paddingBottom: 6, color: "#3c8dbc" }}>Services</div>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #9b308d", paddingBottom: 6, color: "#9b308d" }}>Services</div>
       {Object.keys(serviceMap).length > 0 ? (
         <div style={{ marginBottom: 20 }}>
           {Object.values(serviceMap).map(({ service, subServices }) => (
@@ -574,7 +574,7 @@ const BusinessProfileModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => 
           ))}
         </div>
       ) : <div style={{ color: "#aaa", fontSize: 13, marginBottom: 20 }}>No services listed.</div>}
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #3c8dbc", paddingBottom: 6, color: "#3c8dbc" }}>My Deals</div>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #9b308d", paddingBottom: 6, color: "#9b308d" }}>My Deals</div>
       {Array.isArray(bp.myDeals) && bp.myDeals.length > 0 ? (
         <div style={{ overflowX: "auto", marginBottom: 16 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -903,10 +903,10 @@ const AutoShopOwners: React.FC = () => {
       />
 
       {/* ── PAGE ── */}
-      <div className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 34, fontWeight: 300, color: "#333", margin: 0 }}>Auto Shop Owners</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#2c8c2c", margin: 0 }}>Auto Shop Owners</h1>
           <button
             onClick={() => setAddEdit({ open: true, mode: "add", owner: null })}
             style={{ background: "#00a65a", color: "#fff", padding: "8px 18px", borderRadius: 4, border: "none", fontSize: 16, fontWeight: 600, cursor: "pointer" }}

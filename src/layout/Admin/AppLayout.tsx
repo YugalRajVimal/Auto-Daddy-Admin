@@ -1,57 +1,30 @@
-import { SidebarProvider, useSidebar } from "../../context/SidebarContext";
 import { Outlet } from "react-router";
-import SubAdminAppSidebar from "./AppSidebar";
-import SubAdminBackdrop from "./Backdrop";
 import { useEffect, useState } from "react";
-import SubAdminAppHeader from "./AppHeader";
-
-
+import AdminShell from "../../components/admin/AdminShell";
 
 const LayoutContent: React.FC<{
   superAdminName?: string;
   superAdminEmail?: string;
   isLoggedInViaSuperAdmin?: boolean;
 }> = ({ superAdminName, superAdminEmail, isLoggedInViaSuperAdmin }) => {
-  const { isExpanded, isHovered, isMobileOpen } = useSidebar();
-
   return (
-    <div
-      className="h-screen overflow-hidden"
-     
-
-    >
-      <div>
-        <SubAdminAppSidebar />
-        <SubAdminBackdrop />
-      </div>
-      <div
-        className={`transition-all duration-300 ease-in-out h-full ${
-          isExpanded || isHovered ? "lg:ml-[290px]" : "lg:ml-[90px]"
-        } ${isMobileOpen ? "ml-0" : ""}`}
-        // style={{ width: "100%" }}
-      >
-        {isLoggedInViaSuperAdmin && (
-          <div className="bg-yellow-100 text-yellow-900 text-xs px-3 py-2 rounded-b shadow mb-2 flex items-center gap-2 border-b border-yellow-200">
-            <span className="font-semibold mr-2">
-              You are logged in as Admin
+    <AdminShell>
+      {isLoggedInViaSuperAdmin && (
+        <div className="flex items-center gap-2 border-b border-yellow-200 bg-yellow-100 px-4 py-2 text-xs text-yellow-900">
+          <span className="font-semibold">You are logged in as Admin</span>
+          {superAdminName && (
+            <span>
+              (<span className="font-medium">{superAdminName}</span>
+              {superAdminEmail && (
+                <span className="ml-1 text-gray-600">| {superAdminEmail}</span>
+              )}
+              )
             </span>
-            {superAdminName && (
-              <span>
-                (<span className="font-medium">{superAdminName}</span>
-                {superAdminEmail && (
-                  <span className="text-gray-600 ml-1">| {superAdminEmail}</span>
-                )}
-                )
-              </span>
-            )}
-          </div>
-        )}
-        <SubAdminAppHeader />
-        <div className=" mx-auto w-full h-full ">
-          <Outlet />
+          )}
         </div>
-      </div>
-    </div>
+      )}
+      <Outlet />
+    </AdminShell>
   );
 };
 
@@ -73,7 +46,6 @@ const SubAdminAppLayout: React.FC = () => {
           return;
         }
 
-        // Check if login is via super admin
         const isViaSuperAdmin = localStorage.getItem("isLogInViaSuperAdmin") === "true";
         setIsLoggedInViaSuperAdmin(isViaSuperAdmin);
 
@@ -92,8 +64,7 @@ const SubAdminAppLayout: React.FC = () => {
         if (res.ok) {
           setIsAdminAuthenticated(true);
           const data = await res.json();
-          // API returns { message, name, email } according to backend
-          if (isViaSuperAdmin && data && data.name && data.email) {
+          if (isViaSuperAdmin && data?.name && data?.email) {
             setSuperAdminName(data.name);
             setSuperAdminEmail(data.email);
           }
@@ -104,7 +75,7 @@ const SubAdminAppLayout: React.FC = () => {
           setIsAdminAuthenticated(false);
           window.location.href = "/admin/signin";
         }
-      } catch (err) {
+      } catch {
         setIsAdminAuthenticated(false);
         window.location.href = "/admin/signin";
       }
@@ -115,20 +86,18 @@ const SubAdminAppLayout: React.FC = () => {
 
   if (isAdminAuthenticated === null || !isAdminAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
-        <div className="w-40 h-40 border-4 border-t-4 border-gray-200 border-t-brand-500 rounded-full animate-spin"></div>
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
       </div>
     );
   }
 
   return (
-    <SidebarProvider>
-      <LayoutContent
-        superAdminName={superAdminName}
-        superAdminEmail={superAdminEmail}
-        isLoggedInViaSuperAdmin={isLoggedInViaSuperAdmin}
-      />
-    </SidebarProvider>
+    <LayoutContent
+      superAdminName={superAdminName}
+      superAdminEmail={superAdminEmail}
+      isLoggedInViaSuperAdmin={isLoggedInViaSuperAdmin}
+    />
   );
 };
 

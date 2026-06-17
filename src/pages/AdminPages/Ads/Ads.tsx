@@ -471,9 +471,9 @@ const Ads: React.FC = () => {
   });
 
   return (
-    <div className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
       {/* Heading */}
-      <h1 className="mb-6 text-[52px] font-light text-[#333]">Manage Ads</h1>
+      <h1 className="mb-6 text-xl md:text-2xl font-bold text-ad-green mb-4">Manage Ads</h1>
 
       {/* ── SECTION 1: Owners ── */}
       <div className="mb-6 overflow-hidden rounded border border-[#d2d6de] bg-white shadow-sm">

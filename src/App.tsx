@@ -49,6 +49,9 @@ import SubAdminManagement from "./pages/AdminPages/SubAdminManagement/SubAdminMa
 import SubAdminSignInPage from "./pages/AuthPages/SubAdminSignInPage";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import Unauthorized from "./pages/AdminPages/OtherPage/Unauthorized";
+import FAQsPage from "./pages/AdminPages/Content/FAQs";
+import PrivacyPage from "./pages/AdminPages/Content/Privacy";
+import InvoiceTemplatesPage from "./pages/AdminPages/Content/InvoiceTemplates";
 
 
 export default function App() {
@@ -147,6 +150,21 @@ export default function App() {
                 <WebsiteTemplates />
               </ProtectedRoute>
             } />
+            <Route path="/admin/invoice-templates" element={
+              <ProtectedRoute module="websiteTemplates" action="view">
+                <InvoiceTemplatesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/faqs" element={
+              <ProtectedRoute module="dashboardData" action="view">
+                <FAQsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/privacy" element={
+              <ProtectedRoute module="dashboardData" action="view">
+                <PrivacyPage />
+              </ProtectedRoute>
+            } />
             <Route path="/admin/dashboard-data" element={
               <ProtectedRoute module="dashboardData" action="view">
                 <DashboardData />
@@ -163,13 +181,17 @@ export default function App() {
               </ProtectedRoute>
             } />
             <Route path="/admin/associates" element={
-              <div style={{ padding: 48, textAlign: "center", fontSize: 24, fontWeight: 600 }}>
-                Associates - Coming Soon
+              <div className="flex min-h-[40vh] flex-1 items-center justify-center bg-white px-6">
+                <div className="rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light px-12 py-10 text-center shadow-sm">
+                  <p className="text-xl font-bold text-ad-green-dark">Associates — Coming Soon</p>
+                </div>
               </div>
             } />
             <Route path="/admin/dealers" element={
-              <div style={{ padding: 48, textAlign: "center", fontSize: 24, fontWeight: 600 }}>
-                Dealers - Coming Soon
+              <div className="flex min-h-[40vh] flex-1 items-center justify-center bg-white px-6">
+                <div className="rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light px-12 py-10 text-center shadow-sm">
+                  <p className="text-xl font-bold text-ad-green-dark">Dealers — Coming Soon</p>
+                </div>
               </div>
             } />
        

@@ -70,11 +70,11 @@ const RunningDeals: React.FC = () => {
   return (
 <div
         // You may use Tailwind class if setup, or fallback to CSS below.
-        className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
+        className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans"
       
       >
       {/* Heading */}
-      <h1 className="mb-1 text-[52px] font-light text-[#333]">Running Deals</h1>
+      <h1 className="mb-1 text-xl md:text-2xl font-bold text-ad-green mb-4">Running Deals</h1>
       <p className="mb-6 text-[15px] text-[#777]">
         All currently active offers and deals for Auto Shop Owners
       </p>

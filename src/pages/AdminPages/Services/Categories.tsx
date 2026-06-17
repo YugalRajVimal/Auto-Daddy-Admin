@@ -170,7 +170,7 @@ const CategoriesPage: React.FC = () => {
   const showingToCurrent = Math.min(currentPage * pageSize, filteredForTable.length);
 
   return (
-    <div className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
       {/* Page Header */}
       <div className="flex items-start justify-between mb-4">
         <h1 className="text-2xl font-semibold text-gray-800">Category Management</h1>

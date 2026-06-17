@@ -1,5 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap")
 layer(base);
+@import url("https://fonts.googleapis.com/css2?family=Pacifico&family=Georgia:ital,wght@0,400;0,700;1,400&display=swap")
+layer(base);
 
 @import "tailwindcss";
 
@@ -11,6 +13,22 @@ layer(base);
 @theme {
   --font-*: initial;
   --font-outfit: Outfit, sans-serif;
+  --font-canada: Pacifico, cursive;
+  --font-serif: Georgia, "Times New Roman", serif;
+
+  --color-ad-purple: #9b308d;
+  --color-ad-purple-dark: #7a256f;
+  --color-ad-green: #2c8c2c;
+  --color-ad-green-dark: #1e6b1e;
+  --color-ad-green-light: #d4fcd4;
+  --color-ad-mint: #dfffd6;
+  --color-ad-grey-light: #d9d9d9;
+  --color-ad-grey: #b0b0b0;
+  --color-ad-grey-dark: #888888;
+  --color-ad-pink: #e8a0c8;
+  --color-ad-pink-dark: #c06090;
+  --color-ad-blue-light: #a8d4f0;
+  --color-ad-blue-dark: #2060a0;
 
   --breakpoint-*: initial;
   --breakpoint-2xsm: 375px;

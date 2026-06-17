@@ -4,27 +4,27 @@ import { PanelCard } from "../../../components/admin/ContentPanel";
 
 const CATEGORIES = ["Mechanics", "Washing", "Tire Master", "Tow Truck"];
 
-const SAMPLE_SITES = [
-  { id: 1, url: "Mechanic1.autodaddy.ca" },
-  { id: 2, url: "Preview - 2" },
-  { id: 3, url: "Preview - 3" },
+const SAMPLE_TEMPLATES = [
+  { id: 1, label: "Invoice Template - 1" },
+  { id: 2, label: "Invoice Template - 2" },
+  { id: 3, label: "Invoice Template - 3" },
 ];
 
-const WebsiteTemplates: React.FC = () => {
+export default function InvoiceTemplatesPage() {
   const [categories, setCategories] = useState<Record<string, boolean>>({
     Mechanics: true,
     Washing: false,
     "Tire Master": false,
     "Tow Truck": false,
   });
-  const [sites, setSites] = useState(SAMPLE_SITES);
+  const [templates, setTemplates] = useState(SAMPLE_TEMPLATES);
 
   const toggleCategory = (cat: string) => {
     setCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
   };
 
   return (
-    <AdminPage title="Website Templates">
+    <AdminPage title="Invoice Templates">
       <div className="rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light p-4 md:p-5">
         <div className="mb-4 flex flex-wrap gap-4 border-b border-ad-green-dark/40 pb-4">
           {CATEGORIES.map((cat) => (
@@ -39,20 +39,15 @@ const WebsiteTemplates: React.FC = () => {
             </label>
           ))}
         </div>
-        {sites.map((site) => (
-          <PanelCard key={site.id}>
-            <a
-              href={`https://${site.url}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-700 underline hover:opacity-80"
-            >
-              {site.url}
+        {templates.map((t) => (
+          <PanelCard key={t.id}>
+            <a href="#" className="text-blue-700 underline hover:opacity-80">
+              {t.label}
             </a>
             <button
               type="button"
               className="text-ad-green hover:opacity-80"
-              onClick={() => setSites((prev) => prev.filter((s) => s.id !== site.id))}
+              onClick={() => setTemplates((prev) => prev.filter((x) => x.id !== t.id))}
             >
               🗑
             </button>
@@ -61,6 +56,4 @@ const WebsiteTemplates: React.FC = () => {
       </div>
     </AdminPage>
   );
-};
-
-export default WebsiteTemplates;
+}

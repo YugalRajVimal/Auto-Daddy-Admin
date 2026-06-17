@@ -176,8 +176,8 @@ const DashboardData: React.FC = () => {
     });
   }
 
-  const inputCls = "h-9 w-full rounded border border-[#d2d6de] px-3 outline-none focus:border-[#3c8dbc]";
-  const textareaCls = "w-full rounded border border-[#d2d6de] px-3 py-2 outline-none focus:border-[#3c8dbc]";
+  const inputCls = "h-9 w-full rounded border border-[#d2d6de] px-3 outline-none focus:border-[#9b308d]";
+  const textareaCls = "w-full rounded border border-[#d2d6de] px-3 py-2 outline-none focus:border-[#9b308d]";
 
   const renderModalFields = (): React.ReactNode => {
     if (modalSection === "thought") {
@@ -294,18 +294,18 @@ const DashboardData: React.FC = () => {
   return (
 <div
         // You may use Tailwind class if setup, or fallback to CSS below.
-        className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
+        className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans"
       
       >
       {/* Heading */}
-      <h1 className="mb-6 text-[52px] font-light text-[#333]">Dashboard Data</h1>
+      <h1 className="mb-6 text-xl md:text-2xl font-bold text-ad-green mb-4">Dashboard Data</h1>
 
       {/* Card */}
-      <div className="mb-10 overflow-hidden rounded border border-[#d2d6de] bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-[#f4f4f4] px-6 py-4">
-          <h3 className="text-[18px] font-normal text-[#444]">Dashboard Content</h3>
+      <div className="mb-10 overflow-hidden rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light shadow-sm">
+        <div className="flex items-center justify-between border-b border-ad-green-dark/40 px-6 py-4">
+          <h3 className="text-lg font-bold text-ad-green-dark">Dashboard Content</h3>
           <button
-            className="h-9 rounded bg-[#007bff] px-5 font-bold text-white hover:bg-[#0069d9]"
+            className="h-9 rounded bg-ad-purple px-5 font-bold text-white hover:bg-ad-purple-dark"
             onClick={() => openModal("all", dashboardData)}
           >
             {dashboardData ? "Edit All" : "Create"}

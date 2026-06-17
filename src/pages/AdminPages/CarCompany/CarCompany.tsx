@@ -186,7 +186,7 @@ const CarCompany: React.FC = () => {
             style={{ background: "#fff", borderRadius: 4, width: "min(560px, 96vw)", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 5px 15px rgba(0,0,0,.5)" }}
           >
             {/* Modal Header */}
-            <div style={{ background: "#3c8dbc", color: "#fff", padding: "14px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "4px 4px 0 0", flexShrink: 0 }}>
+            <div style={{ background: "#9b308d", color: "#fff", padding: "14px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "4px 4px 0 0", flexShrink: 0 }}>
               <span style={{ fontWeight: 600, fontSize: 22 }}>{editingCompany ? "Edit Car Company" : "Add New Car Company"}</span>
               <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", color: "#fff", fontSize: 28, lineHeight: 1, cursor: "pointer" }} type="button">×</button>
             </div>
@@ -262,7 +262,7 @@ const CarCompany: React.FC = () => {
       {/* ── Page ──────────────────────────────────────────────────────────── */}
       <div
         // You may use Tailwind class if setup, or fallback to CSS below.
-        className="h-[92vh] overflow-y-auto bg-[#f0f0f0] px-6 py-5 font-sans"
+        className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans"
       >
 
         {/* Heading */}
