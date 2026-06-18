@@ -31,6 +31,8 @@ import Tasks from "./pages/AdminPages/Tasks/Tasks";
 
 import CarOwners from "./pages/AdminPages/Users/CarOwners";
 import AutoShopOwners from "./pages/AdminPages/Users/AutoShopOwners";
+import Associates from "./pages/AdminPages/Users/Associates";
+import Dealers from "./pages/AdminPages/Users/Dealers";
 
 
 import Services from "./pages/AdminPages/Services/Services";
@@ -55,8 +57,9 @@ import InvoiceTemplatesPage from "./pages/AdminPages/Content/InvoiceTemplates";
 import FeaturesPage from "./pages/AdminPages/Content/Features";
 import ThoughtOfDayPage from "./pages/AdminPages/Content/ThoughtOfDay";
 import ThoughtOfDayNewPage from "./pages/AdminPages/Content/ThoughtOfDayNew";
-import ComingSoon from "./components/admin/ComingSoon";
 import Reports from "./pages/AdminPages/Reports/Reports";
+import LeadsPage from "./pages/AdminPages/Leads/Leads";
+import AccountsPage from "./pages/AdminPages/Accounts/Accounts";
 
 
 export default function App() {
@@ -106,12 +109,12 @@ export default function App() {
               } />
               <Route path="/admin/leads" element={
                 <ProtectedRoute module="dashboard" action="view">
-                  <ComingSoon title="Leads" />
+                  <LeadsPage />
                 </ProtectedRoute>
               } />
               <Route path="/admin/accounts" element={
                 <ProtectedRoute module="dashboard" action="view">
-                  <ComingSoon title="Accounts" />
+                  <AccountsPage />
                 </ProtectedRoute>
               } />
               <Route path="/admin/messages" element={
@@ -223,18 +226,14 @@ export default function App() {
                 </ProtectedRoute>
               } />
               <Route path="/admin/associates" element={
-                <div className="flex min-h-[40vh] flex-1 items-center justify-center bg-white px-6">
-                  <div className="rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light px-12 py-10 text-center shadow-sm">
-                    <p className="text-xl font-bold text-ad-green-dark">Associates — Coming Soon</p>
-                  </div>
-                </div>
+                <ProtectedRoute module="users" action="view">
+                  <Associates />
+                </ProtectedRoute>
               } />
               <Route path="/admin/dealers" element={
-                <div className="flex min-h-[40vh] flex-1 items-center justify-center bg-white px-6">
-                  <div className="rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light px-12 py-10 text-center shadow-sm">
-                    <p className="text-xl font-bold text-ad-green-dark">Dealers — Coming Soon</p>
-                  </div>
-                </div>
+                <ProtectedRoute module="users" action="view">
+                  <Dealers />
+                </ProtectedRoute>
               } />
 
               <Route path="/admin/unauthorized" element={<Unauthorized />} />

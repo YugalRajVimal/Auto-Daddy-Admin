@@ -420,8 +420,8 @@ const navItems: NavItem[] = [
   {
     icon: <FaRegCreditCard />, name: "Categories / Services",
     subItems: [
-      { name: "Categories",    path: "/admin/categories",    permissionModule: "services" },
-      { name: "Services",  path: "/admin/services",  permissionModule: "categories" },
+      { name: "Services",    path: "/admin/categories",    permissionModule: "services" },
+      { name: "Sub Services",  path: "/admin/services",  permissionModule: "categories" },
     ],
   },
   { icon: <HiTemplate />,    name: "Web - Temp", path: "/admin/website-templates", permissionModule: "websiteTemplates" },

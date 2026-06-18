@@ -54,7 +54,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     "inline-block border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-300 sm:px-3 sm:text-xs";
 
   const subNavLinkClass =
-    "block px-2 py-1.5 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1.5 lg:py-1.5 lg:text-xs lg:leading-snug lg:whitespace-normal";
+    "relative block px-2 py-1.5 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1.5 lg:py-1.5 lg:text-xs lg:leading-snug lg:whitespace-normal";
 
   const loginRole = isAdmin ? "Admin" : "Sub Admin";
 
@@ -169,27 +169,25 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         {subItems.length > 0 && activePrimary && (
           <div className="relative z-10 mt-[3px] bg-white lg:mt-[5px]">
             <div className="px-3 sm:px-4">
-              <ul className="hidden w-full items-stretch overflow-visible lg:flex lg:gap-px lg:pb-1">
+              <ul className="hidden w-full items-stretch overflow-visible lg:flex lg:gap-px lg:pb-[7px]">
                 {visibleNav.map((item, colIndex) => {
                   const sub = colIndex < subItems.length ? subItems[colIndex] : null;
                   const active = sub ? isPathActive(location.pathname, sub.path) : false;
                   return (
                     <li key={item.name} className="relative min-w-0 flex-1 overflow-visible">
                       {sub && (
-                        <>
+                        <Link
+                          to={sub.path}
+                          className={`${subNavLinkClass} ${active ? "bg-gray-200 font-medium" : ""}`}
+                        >
+                          {sub.name}
                           {active && (
                             <span
-                              className="pointer-events-none absolute bottom-0 left-1/2 z-10 h-0 w-0 -translate-x-1/2 translate-y-full border-x-[7px] border-b-[7px] border-x-transparent border-b-ad-purple"
+                              className="pointer-events-none absolute left-1/2 top-full z-10 h-0 w-0 -translate-x-1/2 border-x-[7px] border-b-[7px] border-x-transparent border-b-ad-purple"
                               aria-hidden
                             />
                           )}
-                          <Link
-                            to={sub.path}
-                            className={`${subNavLinkClass} ${active ? "bg-gray-200 font-medium" : ""}`}
-                          >
-                            {sub.name}
-                          </Link>
-                        </>
+                        </Link>
                       )}
                     </li>
                   );

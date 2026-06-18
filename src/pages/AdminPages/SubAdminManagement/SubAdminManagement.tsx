@@ -8,7 +8,7 @@ const MODULES = [
   { key: "dashboard",        label: "Dashboard" },
   { key: "users",            label: "Users" },
   { key: "services",         label: "Services" },
-  { key: "categories",       label: "Categories" },
+  { key: "categories",       label: "Sub Services" },
   { key: "websiteTemplates", label: "Web - Temp" },
   { key: "dashboardData",    label: "Dashboard Data" },
   { key: "carCompanies",     label: "Car Companies" },
@@ -560,7 +560,7 @@ const SubAdminManagement: React.FC = () => {
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 400, color: "#444" }}>Sub Admin List</h3>
           <button onClick={openCreate} type="button"
             style={{ padding: "6px 16px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            + Add Sub Admin
+            Add Sub Admin
           </button>
         </div>
 

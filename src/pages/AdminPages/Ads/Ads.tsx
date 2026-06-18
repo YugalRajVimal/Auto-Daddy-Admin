@@ -1,20 +1,36 @@
-
-
-
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import axios from "axios";
-import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
+import AdminPage from "../../../components/admin/AdminPage";
 
-// ---- Types ----
 interface BusinessProfile {
-  _id: string; businessName?: string; businessAddress?: string; city?: string; pincode?: string; businessPhone?: string;
+  _id: string;
+  businessName?: string;
+  businessAddress?: string;
+  city?: string;
+  pincode?: string;
+  businessPhone?: string;
 }
+
 interface AutoShopOwner {
-  _id: string; name?: string; email?: string; phone?: string; countryCode?: string;
-  isDisabled?: boolean; isProfileComplete?: boolean; businessProfile?: BusinessProfile | null; createdAt?: string;
+  _id: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  countryCode?: string;
+  isDisabled?: boolean;
+  isProfileComplete?: boolean;
+  businessProfile?: BusinessProfile | null;
+  createdAt?: string;
 }
+
 interface Ad {
-  _id: string; category: string; websiteURL: string; imageUpload: string; createdAt: string; updatedAt: string;
+  _id: string;
+  category: string;
+  websiteURL: string;
+  imageUpload: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const CATEGORY_OPTIONS = [
@@ -32,7 +48,6 @@ function getOwnerStatus(owner: AutoShopOwner): { label: string; color: string } 
   return { label: "Active", color: "#28a745" };
 }
 
-// ---- Modal for Viewing & Managing Ads for each Shop Owner ----
 const OwnerAdsModal: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -43,66 +58,49 @@ const OwnerAdsModal: React.FC<{
   onAdd: () => void;
   onEdit: (ad: Ad) => void;
   onDelete: (adId: string) => void;
-}> = ({
-  open,
-  onClose,
-  owner,
-  ads,
-  adsLoading,
-  adsError,
-  onAdd,
-  onEdit,
-  onDelete,
-}) => {
+}> = ({ open, onClose, owner, ads, adsLoading, adsError, onAdd, onEdit, onDelete }) => {
   if (!open || !owner) return null;
 
   React.useEffect(() => {
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
         className="relative w-full max-w-3xl rounded border border-[#d2d6de] bg-white shadow-lg"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[#f4f4f4] px-6 py-4">
           <div>
-            <span className="font-bold text-[#007bff] text-lg">
+            <span className="text-lg font-bold text-[#007bff]">
               {owner.businessProfile?.businessName || owner.name}
             </span>
-            <span className="ml-3 text-[#777] text-sm">
+            <span className="ml-3 text-sm text-[#777]">
               {owner.name}
               {owner.businessProfile?.businessAddress ? ` · ${owner.businessProfile.businessAddress}` : ""}
             </span>
           </div>
-          <button
-            aria-label="Close"
-            onClick={onClose}
-            className="text-2xl text-[#999] hover:text-[#555]"
-          >
+          <button aria-label="Close" onClick={onClose} className="text-2xl text-[#999] hover:text-[#555]">
             ×
           </button>
         </div>
-        <div className="p-6 max-h-[60vh] overflow-auto">
-          <div className="flex justify-between mb-5">
+        <div className="max-h-[60vh] overflow-auto p-6">
+          <div className="mb-5 flex justify-between">
             <h3 className="text-[18px] font-bold text-[#333]">Ads List</h3>
             <button
               onClick={onAdd}
-              className="rounded bg-[#007bff] px-5 py-2 font-bold text-white hover:bg-[#0069d9] text-sm"
+              className="rounded bg-[#007bff] px-5 py-2 text-sm font-bold text-white hover:bg-[#0069d9]"
             >
-              + Add Ad
+              Add Ad
             </button>
           </div>
-          {adsLoading && (
-            <div className="text-center text-[#007bff] font-bold mb-5">Loading Ads…</div>
-          )}
+          {adsLoading && <div className="mb-5 text-center font-bold text-[#007bff]">Loading Ads…</div>}
           {adsError && (
-            <div className="rounded border border-[#f5c6cb] bg-[#f8d7da] px-4 py-2 text-[#721c24] mb-5">
+            <div className="mb-5 rounded border border-[#f5c6cb] bg-[#f8d7da] px-4 py-2 text-[#721c24]">
               {adsError}
             </div>
           )}
@@ -113,7 +111,7 @@ const OwnerAdsModal: React.FC<{
                   {["Image", "Category", "Website URL", "Created", "Actions"].map((h, i) => (
                     <th
                       key={h}
-                      className={`border border-[#d2d6de] bg-[#f9fafc] px-4 py-3 font-bold whitespace-nowrap ${i === 4 ? "text-center" : "text-left"}`}
+                      className={`whitespace-nowrap border border-[#d2d6de] bg-[#f9fafc] px-4 py-3 font-bold ${i === 4 ? "text-center" : "text-left"}`}
                     >
                       {h}
                     </th>
@@ -133,9 +131,13 @@ const OwnerAdsModal: React.FC<{
                     <td className="border border-[#d2d6de] px-4 py-4">
                       {ad.imageUpload ? (
                         <img
-                          src={ad.imageUpload.startsWith("http") ? ad.imageUpload : `${API_URL}/${ad.imageUpload.replace(/^\.?\/?/, "")}`}
+                          src={
+                            ad.imageUpload.startsWith("http")
+                              ? ad.imageUpload
+                              : `${API_URL}/${ad.imageUpload.replace(/^\.?\/?/, "")}`
+                          }
                           alt={ad.category}
-                          className="h-14 w-20 rounded object-cover border border-[#f1f5f9] bg-[#f3f4f6]"
+                          className="h-14 w-20 rounded border border-[#f1f5f9] bg-[#f3f4f6] object-cover"
                         />
                       ) : (
                         <span className="italic text-[#bbb]">No Image</span>
@@ -147,23 +149,34 @@ const OwnerAdsModal: React.FC<{
                       </span>
                     </td>
                     <td className="border border-[#d2d6de] px-4 py-4">
-                      <a href={ad.websiteURL} target="_blank" rel="noopener noreferrer" className="text-[#007bff] underline break-all">
+                      <a
+                        href={ad.websiteURL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="break-all text-[#007bff] underline"
+                      >
                         {ad.websiteURL}
                       </a>
                     </td>
                     <td className="border border-[#d2d6de] px-4 py-4 text-[#777]">
-                      {new Date(ad.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(ad.createdAt).toLocaleString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </td>
-                    <td className="border border-[#d2d6de] h-full px-4 py-4 text-center">
+                    <td className="h-full border border-[#d2d6de] px-4 py-4 text-center">
                       <button
                         onClick={() => onEdit(ad)}
-                        className="mr-2 my-2 rounded bg-[#17a2b8] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
+                        className="my-2 mr-2 rounded bg-[#17a2b8] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => onDelete(ad._id)}
-                        className="rounded bg-[#dc3545] my-2 px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
+                        className="my-2 rounded bg-[#dc3545] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
                       >
                         Delete
                       </button>
@@ -179,7 +192,6 @@ const OwnerAdsModal: React.FC<{
   );
 };
 
-// ---- Modal for Add/Edit Ad ----
 const AdFormModal: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -191,24 +203,34 @@ const AdFormModal: React.FC<{
   adsLoading: boolean;
   adsError: string | null;
   onCancel: () => void;
-}> = ({ open, onClose, onSubmit, form, handleFormChange, formMode, imageInputRef, adsLoading, adsError, onCancel }) => {
+}> = ({
+  open,
+  onClose,
+  onSubmit,
+  form,
+  handleFormChange,
+  formMode,
+  imageInputRef,
+  adsLoading,
+  adsError,
+  onCancel,
+}) => {
   if (!open) return null;
 
   React.useEffect(() => {
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/30"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/30" onClick={onClose}>
       <div
         className="relative w-full max-w-[450px] rounded border border-[#d2d6de] bg-white shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-[#f4f4f4] px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-[#f4f4f4] px-6 py-4">
           <h3 className="text-[18px] font-normal text-[#444]">
             {formMode === "CREATE" ? "Add New Ad" : "Edit Ad"}
           </h3>
@@ -228,7 +250,9 @@ const AdFormModal: React.FC<{
             >
               <option value="">Select Category</option>
               {CATEGORY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
               ))}
             </select>
           </div>
@@ -244,7 +268,6 @@ const AdFormModal: React.FC<{
               className="h-9 w-full rounded border border-[#d2d6de] px-3 outline-none"
             />
           </div>
-
           <div className="mb-5">
             <label className="mb-1 block text-[14px] font-bold text-[#333]">
               {formMode === "CREATE" ? "Ad Image" : "Change Ad Image (optional)"}
@@ -262,7 +285,6 @@ const AdFormModal: React.FC<{
               <span className="mt-1 block text-[13px] text-[#007bff]">{form.imageUpload.name}</span>
             )}
           </div>
-
           <div className="flex justify-center gap-3">
             <button
               type="submit"
@@ -280,7 +302,6 @@ const AdFormModal: React.FC<{
               Cancel
             </button>
           </div>
-
           {adsError && (
             <div className="mt-4 rounded border border-[#f5c6cb] bg-[#f8d7da] px-4 py-2 text-center text-[#721c24]">
               {adsError}
@@ -292,41 +313,36 @@ const AdFormModal: React.FC<{
   );
 };
 
-
-// ---- Main Component ----
 const Ads: React.FC = () => {
   const [owners, setOwners] = useState<AutoShopOwner[]>([]);
   const [ownersLoading, setOwnersLoading] = useState(false);
   const [ownersError, setOwnersError] = useState<string | null>(null);
 
-  // For modal handling:
   const [selectedOwnerForModal, setSelectedOwnerForModal] = useState<AutoShopOwner | null>(null);
-
-  // For showing/hiding modals:
   const [showOwnerAdsModal, setShowOwnerAdsModal] = useState(false);
   const [showAdFormModal, setShowAdFormModal] = useState(false);
 
-  // For ads list inside modal:
   const [ads, setAds] = useState<Ad[]>([]);
   const [adsLoading, setAdsLoading] = useState(false);
   const [adsError, setAdsError] = useState<string | null>(null);
 
-  // For add/edit form:
   const [form, setForm] = useState<{ category: string; websiteURL: string; imageUpload: File | null }>({
-    category: "", websiteURL: "", imageUpload: null,
+    category: "",
+    websiteURL: "",
+    imageUpload: null,
   });
   const [formMode, setFormMode] = useState<"CREATE" | "EDIT" | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Owner filtering:
-  const [ownerSearch, setOwnerSearch] = useState("");
-  const [pageSize, setPageSize] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [visibleCols, setVisibleCols] = useState(["ownerName", "shopName", "address", "phone", "status"]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  useEffect(() => { fetchOwners(); }, []);
+  useEffect(() => {
+    fetchOwners();
+  }, []);
 
   const fetchOwners = async () => {
     setOwnersLoading(true);
@@ -334,8 +350,12 @@ const Ads: React.FC = () => {
     try {
       const res = await axios.get(`${API_URL}/api/admin/autoshopowners`);
       setOwners(res.data.data || []);
-    } catch (err: any) {
-      setOwnersError(err?.response?.data?.message || "Failed to fetch shop owners");
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setOwnersError(message || "Failed to fetch shop owners");
     } finally {
       setOwnersLoading(false);
     }
@@ -354,15 +374,19 @@ const Ads: React.FC = () => {
       }
       const res = await axios.get(`${API_URL}/api/admin/business-profiles/${businessId}/ads`);
       setAds(res.data.data || []);
-    } catch (err: any) {
-      setAdsError(err?.response?.data?.message || "Failed to fetch ads");
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setAdsError(message || "Failed to fetch ads");
     } finally {
       setAdsLoading(false);
     }
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, files } = e.target as any;
+    const { name, value, files } = e.target as HTMLInputElement;
     if (name === "adsImage") {
       setForm((prev) => ({ ...prev, imageUpload: files?.[0] ?? null }));
     } else {
@@ -377,7 +401,6 @@ const Ads: React.FC = () => {
     if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
-  // Open owner ads modal and fetch ads for that owner
   const handleOpenOwnerAdsModal = async (owner: AutoShopOwner) => {
     setSelectedOwnerForModal(owner);
     setShowOwnerAdsModal(true);
@@ -388,7 +411,6 @@ const Ads: React.FC = () => {
     await fetchAds(owner);
   };
 
-  // Close owner ads modal and reset
   const handleCloseOwnerAdsModal = () => {
     setShowOwnerAdsModal(false);
     setSelectedOwnerForModal(null);
@@ -397,14 +419,12 @@ const Ads: React.FC = () => {
     resetForm();
   };
 
-  // Open form modal for add
   const handleOpenAddAd = () => {
     setFormMode("CREATE");
     resetForm();
     setShowAdFormModal(true);
   };
 
-  // Open form modal for edit
   const handleEdit = (ad: Ad) => {
     setFormMode("EDIT");
     setEditId(ad._id);
@@ -413,7 +433,6 @@ const Ads: React.FC = () => {
     if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
-  // Close ad form modal
   const handleCloseAdFormModal = () => {
     setFormMode(null);
     setShowAdFormModal(false);
@@ -425,10 +444,16 @@ const Ads: React.FC = () => {
     setAdsLoading(true);
     setAdsError(null);
     try {
-      await axios.delete(`${API_URL}/api/admin/business-profiles/${selectedOwnerForModal.businessProfile._id}/ads/${adId}`);
+      await axios.delete(
+        `${API_URL}/api/admin/business-profiles/${selectedOwnerForModal.businessProfile._id}/ads/${adId}`
+      );
       await fetchAds(selectedOwnerForModal);
-    } catch (err: any) {
-      setAdsError(err?.response?.data?.message || "Failed to delete ad");
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setAdsError(message || "Failed to delete ad");
     } finally {
       setAdsLoading(false);
     }
@@ -458,15 +483,19 @@ const Ads: React.FC = () => {
       }
       handleCloseAdFormModal();
       await fetchAds(selectedOwnerForModal);
-    } catch (err: any) {
-      setAdsError(err?.response?.data?.message || "Failed to save ad");
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setAdsError(message || "Failed to save ad");
     } finally {
       setAdsLoading(false);
     }
   };
 
   const filteredOwners = owners.filter((o) => {
-    const q = ownerSearch.toLowerCase();
+    const q = search.toLowerCase();
     return (
       o.name?.toLowerCase().includes(q) ||
       o.businessProfile?.businessName?.toLowerCase().includes(q) ||
@@ -475,156 +504,31 @@ const Ads: React.FC = () => {
     );
   });
 
-  const tableColumns = useMemo(
-    () => [
-      {
-        key: "ownerName",
-        label: "Owner Name",
-        render: (owner: AutoShopOwner) =>
-          tableCell(<span style={{ fontWeight: 500 }}>{owner.name || "—"}</span>),
-        exportValue: (owner: AutoShopOwner) => owner.name || "—",
-      },
-      {
-        key: "shopName",
-        label: "Shop Name",
-        render: (owner: AutoShopOwner) =>
-          tableCell(
-            owner.businessProfile?.businessName || (
-              <span style={{ fontStyle: "italic", color: "#bbb" }}>No business profile</span>
-            )
-          ),
-        exportValue: (owner: AutoShopOwner) => owner.businessProfile?.businessName || "—",
-      },
-      {
-        key: "address",
-        label: "Address / City",
-        render: (owner: AutoShopOwner) =>
-          tableCell(
-            [owner.businessProfile?.businessAddress, owner.businessProfile?.city].filter(Boolean).join(", ") || "—",
-            { maxWidth: 220 }
-          ),
-        exportValue: (owner: AutoShopOwner) =>
-          [owner.businessProfile?.businessAddress, owner.businessProfile?.city].filter(Boolean).join(", ") || "—",
-      },
-      {
-        key: "phone",
-        label: "Phone",
-        render: (owner: AutoShopOwner) =>
-          tableCell(`${owner.countryCode ? `${owner.countryCode} ` : ""}${owner.phone || "—"}`),
-        exportValue: (owner: AutoShopOwner) =>
-          `${owner.countryCode ? `${owner.countryCode} ` : ""}${owner.phone || "—"}`,
-      },
-      {
-        key: "status",
-        label: "Status",
-        render: (owner: AutoShopOwner) => {
-          const status = getOwnerStatus(owner);
-          return tableCell(
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                borderRadius: 999,
-                padding: "4px 12px",
-                fontSize: 12,
-                fontWeight: 700,
-                background: `${status.color}1a`,
-                color: status.color,
-              }}
-            >
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: status.color }} />
-              {status.label}
-            </span>
-          );
-        },
-        exportValue: (owner: AutoShopOwner) => getOwnerStatus(owner).label,
-      },
-    ],
-    []
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredOwners.length / entriesPerPage));
+  const paged = filteredOwners.slice((page - 1) * entriesPerPage, page * entriesPerPage);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === paged.length) setSelected(new Set());
+    else setSelected(new Set(paged.map((o) => o._id)));
+  };
+
+  const handleToolbarViewAds = () => {
+    if (selected.size !== 1) return;
+    const owner = owners.find((o) => o._id === Array.from(selected)[0]);
+    if (owner?.businessProfile?._id) handleOpenOwnerAdsModal(owner);
+  };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans">
-      {/* Heading */}
-      <h1 className="mb-6 text-xl md:text-2xl font-bold text-ad-green mb-4">Manage Ads</h1>
-
-      {/* ── SECTION 1: Owners ── */}
-      <div className="mb-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="inline text-[18px] font-normal text-[#444]">Auto Shop Owners</h3>
-            {!ownersLoading && (
-              <span className="ml-2 text-[13px] text-[#999]">
-                {filteredOwners.length} of {owners.length}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <AdminDataTable
-          items={filteredOwners}
-          columns={tableColumns}
-          getRowId={(o) => o._id}
-          loading={ownersLoading}
-          error={ownersError}
-          emptyMessage="No owners found."
-          search={ownerSearch}
-          onSearchChange={setOwnerSearch}
-          searchPlaceholder="Search by name, shop or phone…"
-          pageSize={pageSize}
-          onPageSizeChange={setPageSize}
-          currentPage={currentPage}
-          onCurrentPageChange={setCurrentPage}
-          visibleColumnKeys={visibleCols}
-          onVisibleColumnKeysChange={setVisibleCols}
-          selectedIds={selectedIds}
-          onSelectedIdsChange={setSelectedIds}
-          exportFilename="ads-owners"
-          totalBeforeFilter={owners.length}
-          extraToolbarActions={[
-            {
-              label: "View Ads",
-              color: "#10b981",
-              minSelected: 1,
-              maxSelected: 1,
-              onClick: (ids) => {
-                const owner = owners.find((o) => o._id === ids[0]);
-                if (owner?.businessProfile?._id) handleOpenOwnerAdsModal(owner);
-              },
-            },
-          ]}
-          renderActions={(owner) => {
-            const canSelect = !!owner.businessProfile?._id;
-            return (
-              <button
-                disabled={!canSelect}
-                title={
-                  !canSelect
-                    ? "This owner has no business profile — ads unavailable"
-                    : "Show Ads"
-                }
-                onClick={() => canSelect && handleOpenOwnerAdsModal(owner)}
-                type="button"
-                style={{
-                  borderRadius: 4,
-                  padding: "4px 16px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: "#fff",
-                  border: "none",
-                  cursor: canSelect ? "pointer" : "not-allowed",
-                  background: canSelect ? "#10b981" : "#ddd",
-                }}
-              >
-                View Ads
-              </button>
-            );
-          }}
-        />
-      </div>
-
-      {/* Owner Ads Modal */}
+    <>
       <OwnerAdsModal
         open={showOwnerAdsModal}
         onClose={handleCloseOwnerAdsModal}
@@ -637,7 +541,6 @@ const Ads: React.FC = () => {
         onDelete={handleDelete}
       />
 
-      {/* Ad Form Modal */}
       <AdFormModal
         open={showAdFormModal}
         onClose={handleCloseAdFormModal}
@@ -650,7 +553,197 @@ const Ads: React.FC = () => {
         adsError={adsError}
         onCancel={handleCloseAdFormModal}
       />
-    </div>
+
+      <AdminPage title="Manage Ads" noPanel>
+        {ownersError && (
+          <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
+            {ownersError}
+          </div>
+        )}
+
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              disabled={selected.size !== 1}
+              onClick={handleToolbarViewAds}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            >
+              View Ads
+            </button>
+            <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+              Shoot
+            </button>
+            <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+              Delete
+            </button>
+            <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+              Print
+            </button>
+          </div>
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Live Search here"
+              className="border border-gray-400 bg-white px-2 py-1 text-xs"
+            />
+            <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+              Search
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+          <span>Show</span>
+          <select
+            value={entriesPerPage}
+            onChange={(e) => {
+              setEntriesPerPage(Number(e.target.value));
+              setPage(1);
+            }}
+            className="border border-gray-400 px-1 py-0.5"
+          >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+          </select>
+          <span>entries</span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-ad-purple text-white">
+                <th className="border border-ad-purple-dark px-2 py-2 text-left">
+                  <input
+                    type="checkbox"
+                    checked={paged.length > 0 && selected.size === paged.length}
+                    onChange={toggleSelectAll}
+                    className="accent-white"
+                  />
+                </th>
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Owner Name</th>
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Name</th>
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Address / City</th>
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ownersLoading ? (
+                <tr>
+                  <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              ) : paged.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                    No owners found.
+                  </td>
+                </tr>
+              ) : (
+                paged.map((owner, idx) => {
+                  const status = getOwnerStatus(owner);
+                  const canSelect = !!owner.businessProfile?._id;
+                  const address =
+                    [owner.businessProfile?.businessAddress, owner.businessProfile?.city]
+                      .filter(Boolean)
+                      .join(", ") || "—";
+
+                  return (
+                    <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                      <td className="border border-gray-300 px-2 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(owner._id)}
+                          onChange={() => toggleSelect(owner._id)}
+                          className="accent-ad-purple"
+                        />
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2">{owner.name || "—"}</td>
+                      <td className="border border-gray-300 px-3 py-2">
+                        {canSelect ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenOwnerAdsModal(owner)}
+                            className="text-blue-700 hover:underline"
+                          >
+                            {owner.businessProfile?.businessName}
+                          </button>
+                        ) : (
+                          <span className="italic text-gray-400">No business profile</span>
+                        )}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2">{address}</td>
+                      <td className="border border-gray-300 px-3 py-2">
+                        {owner.countryCode ? `${owner.countryCode} ` : ""}
+                        {owner.phone || "—"}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2">
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs font-bold"
+                          style={{ background: `${status.color}1a`, color: status.color }}
+                        >
+                          <span
+                            className="inline-block h-1.5 w-1.5 rounded-full"
+                            style={{ background: status.color }}
+                          />
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2">
+                        <button
+                          type="button"
+                          disabled={!canSelect}
+                          title={
+                            !canSelect
+                              ? "This owner has no business profile — ads unavailable"
+                              : "Show Ads"
+                          }
+                          onClick={() => canSelect && handleOpenOwnerAdsModal(owner)}
+                          className="rounded bg-ad-green px-3 py-1 text-xs font-semibold text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:bg-gray-300"
+                        >
+                          View Ads
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPage(p)}
+                className={`h-7 w-7 border text-xs font-medium ${
+                  page === p
+                    ? "border-ad-green bg-ad-green text-white"
+                    : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+          <Link to="#" className="text-sm text-blue-700 hover:underline">
+            Deleted
+          </Link>
+        </div>
+      </AdminPage>
+    </>
   );
 };
 

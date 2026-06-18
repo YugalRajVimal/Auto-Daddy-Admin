@@ -242,7 +242,7 @@ const DashboardData: React.FC = () => {
               className="rounded bg-[#007bff] px-3 py-1 text-xs font-bold text-white hover:bg-[#0069d9]"
               onClick={handleAddSection}
             >
-              + Add Section
+              Add Section
             </button>
           </div>
           {(editData.sections ?? []).length === 0 && (

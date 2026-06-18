@@ -294,7 +294,7 @@ const CarCompany: React.FC = () => {
                     </div>
                   ))}
                   <button type="button" onClick={addModel}
-                    style={{ padding: "8px 18px", border: "1px solid #0073b7", borderRadius: 3, color: "#0073b7", fontSize: 16, fontWeight: 600, cursor: "pointer", background: "#fff" }}>+ Add Model</button>
+                    style={{ padding: "8px 18px", border: "1px solid #0073b7", borderRadius: 3, color: "#0073b7", fontSize: 16, fontWeight: 600, cursor: "pointer", background: "#fff" }}>Add Model</button>
                 </div>
 
                 {/* Footer Buttons */}
@@ -329,7 +329,7 @@ const CarCompany: React.FC = () => {
             <h3 style={{ margin: 0, fontSize: 23, fontWeight: 400, color: "#444" }}>Company List</h3>
             <button type="button" onClick={openAddModal}
               style={{ padding: "8px 20px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
-              + Add New
+              Add New
             </button>
           </div>
 

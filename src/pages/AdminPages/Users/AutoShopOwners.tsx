@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
+import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TeamMemberType = { _id: string; name: string; email?: string; phone?: string; designation?: string; photo?: string };
@@ -578,16 +579,16 @@ const BusinessProfileModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => 
       {Array.isArray(bp.myDeals) && bp.myDeals.length > 0 ? (
         <div style={{ overflowX: "auto", marginBottom: 16 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead><tr>{["Name", "Type", "Discount", "Ends On"].map(h => <th key={h} style={thS}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Name", "Type", "Discount", "Ends On"].map(h => <th key={h} className="border border-gray-300 bg-gray-100 px-3 py-2 text-left text-xs font-bold">{h}</th>)}</tr></thead>
             <tbody>
               {bp.myDeals.map((deal: any, i: number) => {
-                if (typeof deal === "string") return <tr key={i}><td style={tdS} colSpan={4}>{deal}</td></tr>;
+                if (typeof deal === "string") return <tr key={i}><td className={tdClass} colSpan={4}>{deal}</td></tr>;
                 return (
                   <tr key={deal._id ?? i}>
-                    <td style={tdS}>{deal.name || "-"}</td>
-                    <td style={tdS}>{deal.dealType || "-"}</td>
-                    <td style={tdS}>{deal.discountedPrice != null ? `$${deal.discountedPrice}` : deal.percentageDiscount != null ? `${deal.percentageDiscount}%` : "-"}</td>
-                    <td style={tdS}>{deal.offerEndsOnDate ? fmtDate(deal.offerEndsOnDate) : deal.endDate ? fmtDate(deal.endDate) : "-"}</td>
+                    <td className={tdClass}>{deal.name || "-"}</td>
+                    <td className={tdClass}>{deal.dealType || "-"}</td>
+                    <td className={tdClass}>{deal.discountedPrice != null ? `$${deal.discountedPrice}` : deal.percentageDiscount != null ? `${deal.percentageDiscount}%` : "-"}</td>
+                    <td className={tdClass}>{deal.offerEndsOnDate ? fmtDate(deal.offerEndsOnDate) : deal.endDate ? fmtDate(deal.endDate) : "-"}</td>
                   </tr>
                 );
               })}
@@ -740,10 +741,9 @@ function exportCsv(owners: AutoShopOwnerType[], visibleCols: string[]) {
 }
 
 // ─── STYLE CONSTANTS ──────────────────────────────────────────────────────────
-const thS: React.CSSProperties = { border: "1px solid #d2d6de", background: "#f9fafc", padding: "9px 12px", textAlign: "left", fontWeight: 700, fontSize: 13, color: "#333", whiteSpace: "nowrap" };
-const tdS: React.CSSProperties = { border: "1px solid #d2d6de", padding: "9px 12px", fontSize: 13, color: "#555", verticalAlign: "middle" };
-const linkBtn: React.CSSProperties = { background: "none", border: "none", color: "#0073b7", cursor: "pointer", padding: 0, fontSize: 12, textDecoration: "underline", fontWeight: 500 };
-const pageBtn = (active: boolean, disabled: boolean): React.CSSProperties => ({ border: "1px solid", borderColor: active ? "#0073b7" : "#ddd", background: active ? "#0073b7" : "#fff", color: active ? "#fff" : disabled ? "#bbb" : "#777", padding: "6px 13px", fontSize: 13, cursor: disabled ? "not-allowed" : "pointer", marginLeft: -1 });
+const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700";
+const thClass = "border border-ad-purple-dark px-3 py-2 text-left font-medium whitespace-nowrap";
+const linkClass = "text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-medium";
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 const AutoShopOwners: React.FC = () => {
@@ -839,49 +839,48 @@ const AutoShopOwners: React.FC = () => {
     switch (key) {
       case "name":
         return (
-          <td key={key} style={{ ...tdS, fontWeight: 500 }}>
-            <button type="button" onClick={() => setProfileFor(owner)} style={{ ...linkBtn, color: "#8a00d4", fontWeight: 600, fontSize: 13 }}>
+          <td key={key} className={`${tdClass} font-medium`}>
+            <button type="button" onClick={() => setProfileFor(owner)} className="text-ad-purple hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">
               {owner.name}
             </button>
           </td>
         );
       case "phone":
-        return <td key={key} style={tdS}>{owner.countryCode ? `${owner.countryCode} ` : ""}{owner.phone || "-"}</td>;
+        return <td key={key} className={tdClass}>{owner.countryCode ? `${owner.countryCode} ` : ""}{owner.phone || "-"}</td>;
       case "shopName":
-        return <td key={key} style={tdS}><button type="button" onClick={() => setBusinessFor(owner)} style={linkBtn}>{owner.businessProfile?.businessName || "-"}</button></td>;
+        return <td key={key} className={tdClass}><button type="button" onClick={() => setBusinessFor(owner)} className={linkClass}>{owner.businessProfile?.businessName || "-"}</button></td>;
       case "shopType":
         return (
-          <td key={key} style={tdS}>
+          <td key={key} className={tdClass}>
             {(owner.shopType && SHOP_TYPE_OPTIONS.find(x => x.value === owner.shopType)?.label) || "-"}
           </td>
         );
       case "city":
-        return <td key={key} style={tdS}>{owner.businessProfile?.city || "-"}</td>;
+        return <td key={key} className={tdClass}>{owner.businessProfile?.city || "-"}</td>;
       case "date":
-        return <td key={key} style={tdS}>{fmtDate(owner.createdAt)}</td>;
+        return <td key={key} className={tdClass}>{fmtDate(owner.createdAt)}</td>;
       case "customers":
-        return <td key={key} style={tdS}><button type="button" onClick={() => setCustomersFor(owner)} style={linkBtn}>{owner.myCustomers?.length ?? 0}</button></td>;
+        return <td key={key} className={tdClass}><button type="button" onClick={() => setCustomersFor(owner)} className={linkClass}>{owner.myCustomers?.length ?? 0}</button></td>;
       case "deals":
-        return <td key={key} style={tdS}><button type="button" onClick={() => setDealsFor(owner)} style={linkBtn}>{owner.deals?.length ?? 0}</button></td>;
+        return <td key={key} className={tdClass}><button type="button" onClick={() => setDealsFor(owner)} className={linkClass}>{owner.deals?.length ?? 0}</button></td>;
       case "jobCards":
-        return <td key={key} style={tdS}><button type="button" onClick={() => setJobCardsFor(owner)} style={linkBtn}>{owner.jobCards?.length ?? 0}</button></td>;
+        return <td key={key} className={tdClass}><button type="button" onClick={() => setJobCardsFor(owner)} className={linkClass}>{owner.jobCards?.length ?? 0}</button></td>;
       case "status":
-        return <td key={key} style={tdS}><span style={{ ...getStatusColors(getStatus(owner)), display: "inline-block", padding: "2px 10px", borderRadius: 3, fontSize: 12, fontWeight: 600 }}>{getStatus(owner)}</span></td>;
+        return <td key={key} className={tdClass}><span style={{ ...getStatusColors(getStatus(owner)), display: "inline-block", padding: "2px 10px", borderRadius: 3, fontSize: 12, fontWeight: 600 }}>{getStatus(owner)}</span></td>;
       default:
-        return <td key={key} style={tdS}>-</td>;
+        return <td key={key} className={tdClass}>-</td>;
     }
   }
 
-  const tbBtn = (label: string, bg: string, onClick: () => void, disabled = false) => (
-    <button type="button" onClick={onClick} disabled={disabled} style={{ padding: "6px 14px", borderRadius: 2, border: "1px solid rgba(0,0,0,0.2)", fontSize: 13, background: disabled ? "#bbb" : bg, color: "#fff", fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
-      {label}
-    </button>
+  const toolbarBtnClass = (disabled = false) =>
+    `px-3 py-1 text-xs font-medium text-white whitespace-nowrap ${disabled ? "bg-gray-400 cursor-not-allowed" : "bg-gray-600 hover:bg-gray-700"}`;
+
+  const visibleColumns = ALL_COLUMNS.filter((c) =>
+    viewMode === "active" ? visibleCols.includes(c.key) : DEFAULT_VISIBLE.includes(c.key)
   );
 
   return (
     <>
-      {/* ── MODALS ── */}
-      {/* unchanged, same as previous code for modals... */}
       {profileFor && (
         <ProfileModal
           owner={profileFor}
@@ -902,160 +901,220 @@ const AutoShopOwners: React.FC = () => {
         mode={addEdit.mode}
       />
 
-      {/* ── PAGE ── */}
-      <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans">
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#2c8c2c", margin: 0 }}>Auto Shop Owners</h1>
-          <button
-            onClick={() => setAddEdit({ open: true, mode: "add", owner: null })}
-            style={{ background: "#00a65a", color: "#fff", padding: "8px 18px", borderRadius: 4, border: "none", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
-          >
-            + Add New
-          </button>
-        </div>
+      <AdminPage
+        title={viewMode === "deleted" ? "Deleted Auto Shop Owners" : "Auto Shop Owners"}
+        headerAction={
+          viewMode === "active" ? (
+            <AddNewButton label="New Shop Owner" onClick={() => setAddEdit({ open: true, mode: "add", owner: null })} />
+          ) : undefined
+        }
+      >
+        {viewMode === "deleted" && (
+          <div className="mb-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+            Showing deleted auto shop owners ({deletedOwners.length}) — select one and use Restore
+          </div>
+        )}
 
-        <div className="mb-4" style={{ background: "#fff", border: "1px solid #d2d6de", borderRadius: 3, boxShadow: "0 1px 1px rgba(0,0,0,.1)" }}>
-          {/* ── Toolbar ── */}
-          <div style={{ padding: "8px 14px", background: "#d2d6de", borderBottom: "1px solid #bbb", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            {viewMode === "active" ? (
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+          <div className="flex flex-wrap gap-1">
+            {viewMode === "active" && (
               <>
-                {tbBtn("✉ Send Notification", "#555", () => { if (!selCount) { alert("Select at least one."); return; } setNotifOpen(true); })}
-                {tbBtn("WhatsApp", "#25d366", () => {})}
-                {tbBtn("↓ Export XL", "#555", () => { if (!selCount) { alert("Select at least one."); return; } exportCsv(allOwners.filter(o => selectedRows.has(o._id)), visibleCols); })}
-                {selCount === 1 && tbBtn("✏️ Update", "#0073b7", () => { const o = allOwners.find(x => x._id === selected[0]); if (o) setAddEdit({ open: true, mode: "edit", owner: o }); })}
-                {selCount === 1 && tbBtn("🗑 Delete", "#e74c3c", () => deleteOwner(selected[0]))}
-                {selCount === 1 && tbBtn("🖨 Print", "#00c0ef", () => { const o = allOwners.find(x => x._id === selected[0]); if (o) printOwner(o); })}
-              </>
-            ) : (
-              <>
-                {selCount === 1 && tbBtn("♻️ Restore Active", "#27ae60", () => reviveOwner(selected[0]))}
+                <button type="button" onClick={() => { if (!selCount) { alert("Select at least one."); return; } setNotifOpen(true); }} className={toolbarBtnClass()}>
+                  Send Notification
+                </button>
+                <button type="button" className="bg-[#25d366] px-3 py-1 text-xs font-medium text-white hover:opacity-90">
+                  WhatsApp
+                </button>
+                <button type="button" onClick={() => { if (!selCount) { alert("Select at least one."); return; } exportCsv(allOwners.filter(o => selectedRows.has(o._id)), visibleCols); }} className={toolbarBtnClass()}>
+                  Export
+                </button>
+                <button
+                  type="button"
+                  disabled={selCount !== 1}
+                  onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) setAddEdit({ open: true, mode: "edit", owner: o }); }}
+                  className={toolbarBtnClass(selCount !== 1)}
+                >
+                  Update
+                </button>
+                <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+                  Shoot
+                </button>
+                {selCount === 1 && (
+                  <button type="button" onClick={() => deleteOwner(selected[0])} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+                    Delete
+                  </button>
+                )}
+                {selCount === 1 && (
+                  <button type="button" onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) printOwner(o); }} className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+                    Print
+                  </button>
+                )}
               </>
             )}
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-              <input value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} style={{ height: 30, width: 170, border: "1px solid #bbb", borderRadius: 2, padding: "0 10px", fontSize: 13, outline: "none", backgroundColor: "#fff" }} placeholder="Live Search here" />
-              {selCount > 0 && <span style={{ fontSize: 12, color: "#555", fontWeight: 600, whiteSpace: "nowrap" }}>{selCount} selected</span>}
-              {viewMode === "active" && <ColSelector visible={visibleCols} onChange={setVisibleCols} />}
-            </div>
+            {viewMode === "deleted" && selCount === 1 && (
+              <button type="button" onClick={() => reviveOwner(selected[0])} className={toolbarBtnClass()}>
+                Restore
+              </button>
+            )}
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+              placeholder="Live Search here"
+              className="border border-gray-400 bg-white px-2 py-1 text-xs"
+            />
+            {selCount > 0 && <span className="text-xs font-semibold text-gray-600">{selCount} selected</span>}
+            {viewMode === "active" && <ColSelector visible={visibleCols} onChange={setVisibleCols} />}
+            <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+              Search
+            </button>
+          </div>
+        </div>
 
-          {/* ── View Mode Banner ── */}
-          {viewMode === "deleted" && (
-            <div style={{ background: "#fdf3f2", borderBottom: "1px solid #f5c6cb", padding: "8px 20px", display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 13, color: "#a94442", fontWeight: 600 }}>🗑️ Showing Deleted Auto Shop Owners ({deletedOwners.length})</span>
-              <span style={{ fontSize: 12, color: "#888" }}>— Select a deleted owner and click restore to set active</span>
-            </div>
-          )}
+        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+          <span>Show</span>
+          <select
+            value={pageSize}
+            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+            className="border border-gray-400 px-1 py-0.5"
+          >
+            {[10, 25, 50, 100].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <span>entries</span>
+        </div>
 
-          {/* Card Body */}
-          <div style={{ padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "#333", marginBottom: 14 }}>
-              <span>Show</span>
-              <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} style={{ height: 32, border: "1px solid #d2d6de", borderRadius: 3, padding: "0 8px", fontSize: 14, outline: "none" }}>
-                {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-              <span>entries</span>
-            </div>
+        {loading && <div className="py-10 text-center text-sm text-gray-500">Loading shop owners…</div>}
+        {error && <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">Error: {error}</div>}
 
-            {loading && <div style={{ textAlign: "center", padding: "40px 0", color: "#888" }}>Loading shop owners…</div>}
-            {error && <div style={{ textAlign: "center", padding: "30px 0", color: "#c0392b" }}>Error: {error}</div>}
-
-            {!loading && !error && (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                  <thead>
-                    <tr>
-                      <th style={thS}>
-                        <input type="checkbox" checked={allPageSel} onChange={e => {
-                          setSelectedRows(prev => { const c = new Set(prev); paginated.forEach(o => e.target.checked ? c.add(o._id) : c.delete(o._id)); return c; });
-                        }} />
-                      </th>
-                      {ALL_COLUMNS.filter(c => viewMode === "active" ? visibleCols.includes(c.key) : DEFAULT_VISIBLE.includes(c.key)).map(c => <th key={c.key} style={thS}>{c.label}</th>)}
-                      {viewMode === "active" && <th style={thS}>Action</th>}
-                      {viewMode === "deleted" && <th style={thS}>Restore Active</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginated.length === 0 && (
-                      <tr><td colSpan={visibleCols.length + 2} style={{ ...tdS, textAlign: "center", color: "#aaa", padding: "36px 0" }}>
-                        {viewMode === "deleted" ? "No deleted auto shop owners." : "No auto shop owners found."}
-                      </td></tr>
-                    )}
-                    {paginated.map(owner => {
-                      const isSuspended = !!owner.isDisabled;
-                      const busy = !!actionBusy[owner._id];
-                      const cols = ALL_COLUMNS.filter(c => viewMode === "active" ? visibleCols.includes(c.key) : DEFAULT_VISIBLE.includes(c.key));
-                      return (
-                        <tr key={owner._id} style={{ background: selectedRows.has(owner._id) ? (viewMode === "deleted" ? "#fdf3f2" : "#f0f7ff") : undefined }}>
-                          <td style={tdS}><input type="checkbox" checked={selectedRows.has(owner._id)} onChange={() => toggleRow(owner._id)} /></td>
-                          {cols.map(c => renderCell(owner, c.key))}
-                          {viewMode === "active" && (
-                            <td style={{ ...tdS, whiteSpace: "nowrap" }}>
-                              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                <button type="button" disabled={busy} onClick={() => toggleSuspend(owner._id, !isSuspended)} style={{ padding: "4px 10px", borderRadius: 3, border: "none", fontSize: 12, fontWeight: 600, cursor: busy ? "not-allowed" : "pointer", background: isSuspended ? "#dff0d8" : "#fcf8e3", color: isSuspended ? "#3c763d" : "#8a6d3b", opacity: busy ? 0.6 : 1 }}>
-                                  {busy ? "…" : isSuspended ? "Enable" : "Suspend"}
-                                </button>
-                                <button type="button" disabled={busy} onClick={() => deleteOwner(owner._id)} style={{ padding: "4px 10px", borderRadius: 3, border: "none", fontSize: 12, fontWeight: 600, cursor: busy ? "not-allowed" : "pointer", background: "#f2dede", color: "#a94442", opacity: busy ? 0.6 : 1 }}>
-                                  {busy ? "…" : "Delete"}
-                                </button>
-                              </div>
-                            </td>
-                          )}
-                          {viewMode === "deleted" && (
-                            <td style={tdS}>
-                              <button type="button" disabled={busy} onClick={() => reviveOwner(owner._id)} style={{ padding: "4px 12px", borderRadius: 3, border: "none", background: busy ? "#aaa" : "#27ae60", color: "#fff", fontSize: 12, fontWeight: 600, cursor: busy ? "not-allowed" : "pointer" }}>
-                                {busy ? "…" : "♻️ Restore Active"}
+        {!loading && !error && (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-ad-purple text-white">
+                  <th className="border border-ad-purple-dark px-2 py-2 text-left">
+                    <input
+                      type="checkbox"
+                      checked={allPageSel}
+                      onChange={(e) => {
+                        setSelectedRows((prev) => {
+                          const c = new Set(prev);
+                          paginated.forEach((o) => (e.target.checked ? c.add(o._id) : c.delete(o._id)));
+                          return c;
+                        });
+                      }}
+                      className="accent-white"
+                    />
+                  </th>
+                  {visibleColumns.map((c) => (
+                    <th key={c.key} className={thClass}>{c.label}</th>
+                  ))}
+                  {viewMode === "active" && <th className={thClass}>Action</th>}
+                  {viewMode === "deleted" && <th className={thClass}>Restore</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.length === 0 ? (
+                  <tr>
+                    <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                      {viewMode === "deleted" ? "No deleted auto shop owners." : "No auto shop owners found."}
+                    </td>
+                  </tr>
+                ) : (
+                  paginated.map((owner, idx) => {
+                    const isSuspended = !!owner.isDisabled;
+                    const busy = !!actionBusy[owner._id];
+                    return (
+                      <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                        <td className="border border-gray-300 px-2 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.has(owner._id)}
+                            onChange={() => toggleRow(owner._id)}
+                            className="accent-ad-purple"
+                          />
+                        </td>
+                        {visibleColumns.map((c) => renderCell(owner, c.key))}
+                        {viewMode === "active" && (
+                          <td className={`${tdClass} whitespace-nowrap`}>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => toggleSuspend(owner._id, !isSuspended)}
+                                className="rounded px-2 py-0.5 text-xs font-semibold disabled:opacity-60"
+                                style={{ background: isSuspended ? "#dff0d8" : "#fcf8e3", color: isSuspended ? "#3c763d" : "#8a6d3b" }}
+                              >
+                                {busy ? "…" : isSuspended ? "Enable" : "Suspend"}
                               </button>
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {!loading && !error && (
-              <div style={{ marginTop: 14, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                <p style={{ margin: 0, fontSize: 14, color: "#333" }}>
-                  {filtered.length === 0 ? "No entries" : `Showing ${(currentPage - 1) * pageSize + 1} to ${Math.min(currentPage * pageSize, filtered.length)} of ${filtered.length} entries${search ? ` (filtered from ${displayOwners.length} total)` : ""}`}
-                </p>
-                <div style={{ display: "flex" }}>
-                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={pageBtn(false, currentPage === 1)}>Previous</button>
-                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map(pg => <button key={pg} onClick={() => setCurrentPage(pg)} style={pageBtn(pg === currentPage, false)}>{pg}</button>)}
-                  {totalPages > 7 && <span style={{ padding: "6px 8px", fontSize: 13 }}>…</span>}
-                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={pageBtn(false, currentPage === totalPages)}>Next</button>
-                </div>
-              </div>
-            )}
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => deleteOwner(owner._id)}
+                                className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 disabled:opacity-60"
+                              >
+                                {busy ? "…" : "Delete"}
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                        {viewMode === "deleted" && (
+                          <td className={tdClass}>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => reviveOwner(owner._id)}
+                              className="rounded bg-ad-green px-2 py-0.5 text-xs font-semibold text-white disabled:opacity-60"
+                            >
+                              {busy ? "…" : "Restore"}
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
-        </div>
+        )}
 
-        {/* ── Bottom Right Toggle Button ── */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8, marginBottom: 40 }}>
-          <button
-            type="button"
-            onClick={() => {
-              setViewMode(v => v === "active" ? "deleted" : "active");
-              setSelectedRows(new Set());
-              setSearch("");
-              setCurrentPage(1);
-            }}
-            style={{
-              padding: "9px 22px", borderRadius: 4, border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer",
-              background: viewMode === "active" ? "#e74c3c" : "#27ae60",
-              color: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
-              display: "flex", alignItems: "center", gap: 8,
-            }}
-          >
-            {viewMode === "active"
-              ? <>🗑️ Deleted <span style={{ background: "rgba(255,255,255,0.25)", borderRadius: 10, padding: "1px 8px", fontSize: 12 }}>{deletedOwners.length}</span></>
-              : <>✅ Active Owners</>
-            }
-          </button>
-        </div>
-      </div>
+        {!loading && !error && (
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setCurrentPage(p)}
+                  className={`h-7 w-7 border text-xs font-medium ${
+                    currentPage === p
+                      ? "border-ad-green bg-ad-green text-white"
+                      : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode((v) => (v === "active" ? "deleted" : "active"));
+                setSelectedRows(new Set());
+                setSearch("");
+                setCurrentPage(1);
+              }}
+              className="text-sm text-blue-700 hover:underline"
+            >
+              {viewMode === "active" ? "Deleted" : "Active Owners"}
+            </button>
+          </div>
+        )}
+      </AdminPage>
     </>
   );
 };

@@ -4,7 +4,7 @@ import { ContentPanel } from "./ContentPanel";
 type AdminPageProps = {
   title: string;
   children: ReactNode;
-  /** Action control beside the page title (e.g. green "+ Add New" button) */
+  /** Action control beside the page title (e.g. green "Add New" button) */
   headerAction?: ReactNode;
   /** Panel rendered between the title row and main content (e.g. inline add form) */
   between?: ReactNode;
@@ -62,7 +62,7 @@ export function AddNewButton({ label, onClick }: { label: string; onClick: () =>
       onClick={onClick}
       className="shrink-0 rounded bg-ad-green px-4 py-2 text-sm font-bold text-white hover:bg-ad-green-dark"
     >
-      + {label}
+      Add {label}
     </button>
   );
 }

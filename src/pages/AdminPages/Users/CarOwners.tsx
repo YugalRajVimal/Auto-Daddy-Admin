@@ -1,7 +1,7 @@
 
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
+import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type BusinessProfileType = {
@@ -659,7 +659,7 @@ const AddEditModal: React.FC<{ isOpen: boolean; onClose: () => void; onSaved: ()
           </div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#9b308d", borderBottom: "2px solid #9b308d", paddingBottom: 6, marginBottom: 14, textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span>Vehicles</span>
-            {vehicles.length < 5 && <button type="button" onClick={() => setVehicles(v => [...v, emptyVehicle()])} style={{ fontSize: 12, background: "#9b308d", color: "#fff", border: "none", borderRadius: 3, padding: "4px 12px", cursor: "pointer", fontWeight: 600 }}>+ Add Vehicle</button>}
+            {vehicles.length < 5 && <button type="button" onClick={() => setVehicles(v => [...v, emptyVehicle()])} style={{ fontSize: 12, background: "#9b308d", color: "#fff", border: "none", borderRadius: 3, padding: "4px 12px", cursor: "pointer", fontWeight: 600 }}>Add Vehicle</button>}
           </div>
           {vehicles.map((v, i) => (
             <VehicleRowForm key={i} v={v} i={i} attempted={attempted} onChange={patch => setVehicles(prev => { const n = [...prev]; n[i] = { ...n[i], ...patch }; return n; })} onRemove={() => setVehicles(prev => prev.filter((_, idx) => idx !== i))} canRemove={vehicles.length > 1} />
@@ -758,10 +758,9 @@ function exportCsv(owners: CarOwnerType[], visibleCols: string[]) {
 }
 
 // ─── STYLE CONSTANTS ──────────────────────────────────────────────────────────
-const thS: React.CSSProperties = { border: "1px solid #d2d6de", background: "#f9fafc", padding: "9px 12px", textAlign: "left", fontWeight: 700, fontSize: 13, color: "#333", whiteSpace: "nowrap" };
-const tdS: React.CSSProperties = { border: "1px solid #d2d6de", padding: "9px 12px", fontSize: 13, color: "#555", verticalAlign: "middle" };
-const linkBtn: React.CSSProperties = { background: "none", border: "none", color: "#0073b7", cursor: "pointer", padding: 0, fontSize: 12, textDecoration: "underline", fontWeight: 500 };
-const pageBtn = (active: boolean, disabled: boolean): React.CSSProperties => ({ border: "1px solid", borderColor: active ? "#0073b7" : "#ddd", background: active ? "#0073b7" : "#fff", color: active ? "#fff" : disabled ? "#bbb" : "#777", padding: "6px 13px", fontSize: 13, cursor: disabled ? "not-allowed" : "pointer", marginLeft: -1 });
+const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700";
+const thClass = "border border-ad-purple-dark px-3 py-2 text-left font-medium whitespace-nowrap";
+const linkClass = "text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-medium";
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 const CarOwners: React.FC = () => {
@@ -833,14 +832,14 @@ const CarOwners: React.FC = () => {
   function renderCell(owner: CarOwnerType, key: string) {
     const shops = owner.autoshopsReceivedServiceFrom ?? [];
     switch (key) {
-      case "name": return <td key={key} style={{ ...tdS, fontWeight: 500 }}><button type="button" onClick={() => setProfileFor(owner)} style={{ ...linkBtn, color: "#8a00d4", fontWeight: 600, fontSize: 13 }}>{owner.name || "-"}</button></td>;
-      case "phone": return <td key={key} style={tdS}>{owner.phone || "-"}</td>;
-      case "city": return <td key={key} style={tdS}>{owner.city || "-"}</td>;
-      case "date": return <td key={key} style={tdS}>{fmtDate(owner.createdAt)}</td>;
-      case "vehicle": return <td key={key} style={tdS}>{owner.myVehicles && owner.myVehicles.length > 0 ? <button type="button" onClick={() => setVehiclesFor(owner)} style={linkBtn}>{owner.myVehicles.length}</button> : "-"}</td>;
-      case "autoShops": return <td key={key} style={tdS}>{shops.length > 0 ? <button type="button" onClick={() => setShopsFor(owner)} style={linkBtn}>{shops.length}</button> : "-"}</td>;
-      case "jobCard": return <td key={key} style={tdS}>{owner.jobCards && owner.jobCards.length > 0 ? <button type="button" onClick={() => setJobCardsFor(owner)} style={linkBtn}>{owner.jobCards.length}</button> : "-"}</td>;
-      case "invoice": return <td key={key} style={tdS}>{owner.jobCards && owner.jobCards.length > 0 ? <button type="button" style={linkBtn}>{owner.jobCards.length}</button> : "0"}</td>;
+      case "name": return <td key={key} className={`${tdClass} font-medium`}><button type="button" onClick={() => setProfileFor(owner)} className="text-ad-purple hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">{owner.name || "-"}</button></td>;
+      case "phone": return <td key={key} className={tdClass}>{owner.phone || "-"}</td>;
+      case "city": return <td key={key} className={tdClass}>{owner.city || "-"}</td>;
+      case "date": return <td key={key} className={tdClass}>{fmtDate(owner.createdAt)}</td>;
+      case "vehicle": return <td key={key} className={tdClass}>{owner.myVehicles && owner.myVehicles.length > 0 ? <button type="button" onClick={() => setVehiclesFor(owner)} className={linkClass}>{owner.myVehicles.length}</button> : "-"}</td>;
+      case "autoShops": return <td key={key} className={tdClass}>{shops.length > 0 ? <button type="button" onClick={() => setShopsFor(owner)} className={linkClass}>{shops.length}</button> : "-"}</td>;
+      case "jobCard": return <td key={key} className={tdClass}>{owner.jobCards && owner.jobCards.length > 0 ? <button type="button" onClick={() => setJobCardsFor(owner)} className={linkClass}>{owner.jobCards.length}</button> : "-"}</td>;
+      case "invoice": return <td key={key} className={tdClass}>{owner.jobCards && owner.jobCards.length > 0 ? <button type="button" className={linkClass}>{owner.jobCards.length}</button> : "0"}</td>;
       case "status": {
         let status = (owner.status ?? "active").toLowerCase();
         let bg = "#dff0d8", color = "#3c763d", border = "1px solid #d6e9c6", label = "Active";
@@ -850,22 +849,19 @@ const CarOwners: React.FC = () => {
           bg = "#f2dede"; color = "#a94442"; border = "1px solid #ebcccc"; label = "Deleted";
         }
         return (
-          <td key={key} style={tdS}>
+          <td key={key} className={tdClass}>
             <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 3, fontSize: 12, fontWeight: 600, background: bg, color, border }}>
               {label}
             </span>
           </td>
         );
       }
-      default: return <td key={key} style={tdS}>-</td>;
+      default: return <td key={key} className={tdClass}>-</td>;
     }
   }
 
-  const toolbarBtn = (label: string, bg: string, onClick: () => void, disabled = false) => (
-    <button type="button" onClick={onClick} disabled={disabled} style={{ padding: "6px 14px", borderRadius: 2, border: "1px solid rgba(0,0,0,0.2)", fontSize: 13, background: disabled ? "#bbb" : bg, color: "#fff", fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
-      {label}
-    </button>
-  );
+  const toolbarBtnClass = (disabled = false) =>
+    `px-3 py-1 text-xs font-medium text-white whitespace-nowrap ${disabled ? "bg-gray-400 cursor-not-allowed" : "bg-gray-600 hover:bg-gray-700"}`;
 
   return (
     <>
@@ -884,236 +880,219 @@ const CarOwners: React.FC = () => {
         />
       )}
 
-
       <AddEditModal isOpen={addEdit.open} onClose={() => setAddEdit(s => ({ ...s, open: false }))} onSaved={() => { setAddEdit(s => ({ ...s, open: false })); fetchOwners(); }} owner={addEdit.owner} mode={addEdit.mode} />
       <SendNotifModal isOpen={notifOpen} onClose={() => setNotifOpen(false)} ids={selected} onDone={() => {}} />
 
-      {/* ── PAGE ── */}
-      <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans">
-
-        {/* Header row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#2c8c2c", margin: 0 }}>
-            {showDeleted ? "Deleted Car Owners" : "Car Owners"}
-          </h1>
-          {/* Only show Add New button when not in deleted view */}
-          {!showDeleted && (
-            <button
-              onClick={() => setAddEdit({ open: true, mode: "add", owner: null })}
-              style={{ background: "#00a65a", color: "#fff", padding: "8px 18px", borderRadius: 4, border: "none", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
-            >
-              + Add New
+      <AdminPage
+        title={showDeleted ? "Deleted Car Owners" : "Car Owners"}
+        headerAction={
+          !showDeleted ? (
+            <AddNewButton label="New Car Owner" onClick={() => setAddEdit({ open: true, mode: "add", owner: null })} />
+          ) : undefined
+        }
+      >
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+          <div className="flex flex-wrap gap-1">
+            <button type="button" onClick={() => { if (!selCount) { alert("Select at least one."); return; } setNotifOpen(true); }} className={toolbarBtnClass()}>
+              Send Notification
             </button>
-          )}
-        </div>
-
-        <div className="mb-4" style={{ background: "#fff", border: "1px solid #d2d6de", borderRadius: 3, boxShadow: "0 1px 1px rgba(0,0,0,.1)" }}>
-          {/* ── Toolbar ── */}
-          <div style={{ padding: "8px 14px", background: "#d2d6de", borderBottom: "1px solid #bbb", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            {/* Always visible */}
-            {toolbarBtn("✉ Send Notification", "#555", () => { if (!selCount) { alert("Select at least one."); return; } setNotifOpen(true); }, false)}
-            {toolbarBtn("WhatsApp", "#25d366", () => {}, false)}
-            {toolbarBtn("↓ Export XL", "#555", () => { if (!selCount) { alert("Select at least one."); return; } exportCsv(allOwners.filter(o => selectedRows.has(o._id)), visibleCols); }, false)}
-
-            {/* Active/Inactive view actions — hidden in deleted view */}
-            {!showDeleted && selCount === 1 && toolbarBtn("Update", "#555", () => { const o = allOwners.find(x => x._id === selected[0]); if (o) setAddEdit({ open: true, mode: "edit", owner: o }); })}
-            {!showDeleted && selCount === 1 && toolbarBtn("🗑 Delete", "#e74c3c", async () => {
-              const owner = allOwners.find(o => o._id === selected[0]);
-              if (!owner) return;
-              if (window.confirm(`Delete ${owner.name}?`)) {
-                await toggleStatus(selected[0], "deleted");
-                setSelectedRows(new Set());
-              }
-            })}
+            <button type="button" className="bg-[#25d366] px-3 py-1 text-xs font-medium text-white hover:opacity-90">
+              WhatsApp
+            </button>
+            <button type="button" onClick={() => { if (!selCount) { alert("Select at least one."); return; } exportCsv(allOwners.filter(o => selectedRows.has(o._id)), visibleCols); }} className={toolbarBtnClass()}>
+              Export
+            </button>
+            {!showDeleted && (
+              <button
+                type="button"
+                disabled={selCount !== 1}
+                onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) setAddEdit({ open: true, mode: "edit", owner: o }); }}
+                className={toolbarBtnClass(selCount !== 1)}
+              >
+                Update
+              </button>
+            )}
+            <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+              Shoot
+            </button>
+            {!showDeleted && selCount === 1 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const owner = allOwners.find(o => o._id === selected[0]);
+                  if (!owner) return;
+                  if (window.confirm(`Delete ${owner.name}?`)) {
+                    await toggleStatus(selected[0], "deleted");
+                    setSelectedRows(new Set());
+                  }
+                }}
+                className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+              >
+                Delete
+              </button>
+            )}
             {!showDeleted && selCount === 1 && (() => {
               const owner = allOwners.find(o => o._id === selected[0]);
               if (!owner) return null;
-              if (owner.status === "suspended") {
-                return toolbarBtn("▶ Set Active", "#27ae60", async () => {
-                  if (window.confirm(`Set ${owner.name} as Active?`)) {
+              const isSuspended = owner.status === "suspended";
+              return (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm(`Set ${owner.name} as ${isSuspended ? "Active" : "Inactive"}?`)) {
+                      await toggleStatus(selected[0], isSuspended ? "active" : "suspended");
+                      setSelectedRows(new Set());
+                    }
+                  }}
+                  className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+                >
+                  {isSuspended ? "Set Active" : "Set Inactive"}
+                </button>
+              );
+            })()}
+            {showDeleted && selCount === 1 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const owner = allOwners.find(o => o._id === selected[0]);
+                  if (!owner) return;
+                  if (window.confirm(`Restore ${owner.name} as Active?`)) {
                     await toggleStatus(selected[0], "active");
                     setSelectedRows(new Set());
                   }
-                });
-              } else {
-                return toolbarBtn("⏸ Set Inactive", "#b97b16", async () => {
-                  if (window.confirm(`Set ${owner.name} as Inactive?`)) {
-                    await toggleStatus(selected[0], "suspended");
-                    setSelectedRows(new Set());
-                  }
-                });
-              }
-            })()}
-       
-            {!showDeleted && selCount === 1 && toolbarBtn("🖨 Print", "#00c0ef", () => { const o = allOwners.find(x => x._id === selected[0]); if (o) printOwner(o); })}
-
-            {/* Deleted view action — restore */}
-            {showDeleted && selCount === 1 && toolbarBtn("♻️ Restore Active", "#27ae60", async () => {
-              const owner = allOwners.find(o => o._id === selected[0]);
-              if (!owner) return;
-              if (window.confirm(`Restore ${owner.name} as Active?`)) {
-                await toggleStatus(selected[0], "active");
-                setSelectedRows(new Set());
-              }
-            })}
-
-            {/* Live search */}
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-              <input
-                value={search}
-                onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-                style={{ height: 30, width: 170, border: "1px solid #bbb", borderRadius: 2, padding: "0 10px", fontSize: 13, outline: "none", backgroundColor: "#fff" }}
-                placeholder="Live Search here"
-              />
-              {selCount > 0 && <span style={{ fontSize: 12, color: "#555", fontWeight: 600, whiteSpace: "nowrap" }}>{selCount} selected</span>}
-              <ColSelector visible={visibleCols} onChange={setVisibleCols} />
-            </div>
+                }}
+                className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+              >
+                Restore
+              </button>
+            )}
+            {!showDeleted && selCount === 1 && (
+              <button
+                type="button"
+                onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) printOwner(o); }}
+                className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark"
+              >
+                Print
+              </button>
+            )}
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+              placeholder="Live Search here"
+              className="border border-gray-400 bg-white px-2 py-1 text-xs"
+            />
+            {selCount > 0 && <span className="text-xs font-semibold text-gray-600">{selCount} selected</span>}
+            <ColSelector visible={visibleCols} onChange={setVisibleCols} />
+            <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+              Search
+            </button>
+          </div>
+        </div>
 
-          {/* Card Body */}
-          <div style={{ padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "#333", marginBottom: 14 }}>
-              <span>Show</span>
-              <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} style={{ height: 32, border: "1px solid #d2d6de", borderRadius: 3, padding: "0 8px", fontSize: 14, outline: "none" }}>
-                {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-              <span>entries</span>
-            </div>
+        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+          <span>Show</span>
+          <select
+            value={pageSize}
+            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+            className="border border-gray-400 px-1 py-0.5"
+          >
+            {[10, 25, 50, 100].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <span>entries</span>
+        </div>
 
-            {loading && <div style={{ textAlign: "center", padding: "40px 0", color: "#888" }}>Loading car owners…</div>}
-            {error && <div style={{ textAlign: "center", padding: "30px 0", color: "#c0392b" }}>Error: {error}</div>}
+        {loading && <div className="py-10 text-center text-sm text-gray-500">Loading car owners…</div>}
+        {error && <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">Error: {error}</div>}
 
-            {!loading && !error && (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                  <thead>
-                    <tr>
-                      <th style={thS}>
+        {!loading && !error && (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-ad-purple text-white">
+                  <th className="border border-ad-purple-dark px-2 py-2 text-left">
+                    <input
+                      type="checkbox"
+                      checked={allPageSel}
+                      onChange={(e) => {
+                        setSelectedRows((prev) => {
+                          const c = new Set(prev);
+                          paginated.forEach((o) => (e.target.checked ? c.add(o._id) : c.delete(o._id)));
+                          return c;
+                        });
+                      }}
+                      className="accent-white"
+                    />
+                  </th>
+                  {ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => (
+                    <th key={c.key} className={thClass}>{c.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.length === 0 ? (
+                  <tr>
+                    <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                      {showDeleted ? "No deleted car owners found." : "No car owners found."}
+                    </td>
+                  </tr>
+                ) : (
+                  paginated.map((owner, idx) => (
+                    <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                      <td className="border border-gray-300 px-2 py-2">
                         <input
                           type="checkbox"
-                          checked={allPageSel}
-                          onChange={e => {
-                            setSelectedRows(prev => {
-                              const c = new Set(prev);
-                              paginated.forEach(o => e.target.checked ? c.add(o._id) : c.delete(o._id));
-                              return c;
-                            });
-                          }}
+                          checked={selectedRows.has(owner._id)}
+                          onChange={() => toggleRow(owner._id)}
+                          className="accent-ad-purple"
                         />
-                      </th>
-                      {ALL_COLUMNS.filter(c => visibleCols.includes(c.key)).map(c => <th key={c.key} style={thS}>{c.label}</th>)}
+                      </td>
+                      {ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => renderCell(owner, c.key))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {paginated.length === 0 && (
-                      <tr>
-                        <td colSpan={visibleCols.length + 1} style={{ ...tdS, textAlign: "center", color: "#aaa", padding: "36px 0" }}>
-                          {showDeleted ? "No deleted car owners found." : "No car owners found."}
-                        </td>
-                      </tr>
-                    )}
-                    {paginated.map(owner => (
-                      <tr key={owner._id} style={{ background: selectedRows.has(owner._id) ? "#f0f7ff" : undefined }}>
-                        <td style={tdS}><input type="checkbox" checked={selectedRows.has(owner._id)} onChange={() => toggleRow(owner._id)} /></td>
-                        {ALL_COLUMNS.filter(c => visibleCols.includes(c.key)).map(c => renderCell(owner, c.key))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {!loading && !error && (
-              <div style={{ marginTop: 14, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                <p style={{ margin: 0, fontSize: 14, color: "#333" }}>
-                  {filtered.length === 0
-                    ? "No entries"
-                    : `Showing ${(currentPage - 1) * pageSize + 1} to ${Math.min(currentPage * pageSize, filtered.length)} of ${filtered.length} entries${search ? ` (filtered from ${displayOwners.length} total)` : ""}`}
-                </p>
-                <div style={{ display: "flex" }}>
-                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={pageBtn(false, currentPage === 1)}>Previous</button>
-                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map(pg => (
-                    <button key={pg} onClick={() => setCurrentPage(pg)} style={pageBtn(pg === currentPage, false)}>{pg}</button>
-                  ))}
-                  {totalPages > 7 && <span style={{ padding: "6px 8px", fontSize: 13 }}>…</span>}
-                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={pageBtn(false, currentPage === totalPages)}>Next</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Toggle View Button (bottom right) ── */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8, marginBottom: 20 }}>
-          <button
-            type="button"
-            onClick={() => {
-              setShowDeleted(prev => !prev);
-              setCurrentPage(1);
-              setSelectedRows(new Set());
-              setSearch("");
-            }}
-            style={{
-              padding: "10px 24px",
-              borderRadius: 4,
-              border: "none",
-              background: showDeleted ? "#00a65a" : "#e74c3c",
-              color: "#fff",
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: "pointer",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              transition: "background 0.2s",
-            }}
-          >
-            {showDeleted ? (
-              <>
-                👥 Active / Inactive Users
-                <span style={{
-                  background: "#fff",
-                  color: "#00a65a",
-                  borderRadius: "50%",
-                  width: 24,
-                  height: 24,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  flexShrink: 0,
-                }}>
-                  {activeOwners.length}
-                </span>
-              </>
-            ) : (
-              <>
-                🗑️ Deleted Car Owners
-                {deletedOwners.length > 0 && (
-                  <span style={{
-                    background: "#fff",
-                    color: "#e74c3c",
-                    borderRadius: "50%",
-                    width: 24,
-                    height: 24,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 12,
-                    fontWeight: 800,
-                    flexShrink: 0,
-                  }}>
-                    {deletedOwners.length}
-                  </span>
+                  ))
                 )}
-              </>
-            )}
-          </button>
-        </div>
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      </div>
+        {!loading && !error && (
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setCurrentPage(p)}
+                  className={`h-7 w-7 border text-xs font-medium ${
+                    currentPage === p
+                      ? "border-ad-green bg-ad-green text-white"
+                      : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeleted((prev) => !prev);
+                setCurrentPage(1);
+                setSelectedRows(new Set());
+                setSearch("");
+              }}
+              className="text-sm text-blue-700 hover:underline"
+            >
+              {showDeleted ? "Active / Inactive Users" : "Deleted"}
+            </button>
+          </div>
+        )}
+      </AdminPage>
     </>
   );
 };

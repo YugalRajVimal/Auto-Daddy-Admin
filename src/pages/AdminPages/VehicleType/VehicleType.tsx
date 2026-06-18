@@ -328,7 +328,7 @@ const VehicleType: React.FC = () => {
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-md shadow transition-colors duration-150"
           onClick={openAddModal}
         >
-          + Add Car Company
+          Add Car Company
         </button>
       </div>
       {error && (
@@ -505,7 +505,7 @@ const VehicleType: React.FC = () => {
                     className="text-blue-700 hover:bg-blue-50 rounded px-3 py-1 mt-2 transition text-sm font-semibold border border-blue-100"
                     onClick={addModelRow}
                   >
-                    + Add more model
+                    Add more model
                   </button>
                 </div>
               </div>

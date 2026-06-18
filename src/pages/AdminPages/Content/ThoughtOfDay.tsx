@@ -8,7 +8,6 @@ import {
   CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
-  compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 
@@ -114,7 +113,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
             }
           >
             <CompactFormRow className="items-start">
-              <CompactField label="Date" required className={compactFixedFieldWidth}>
+              <CompactField label="Date" required>
                 <input
                   type="date"
                   value={date}
@@ -122,7 +121,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Country" required className={compactFixedFieldWidth}>
+              <CompactField label="Country" required>
                 <select
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
@@ -132,7 +131,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   <option value="USA">USA</option>
                 </select>
               </CompactField>
-              <CompactField label="Title" required className="w-[200px] shrink-0 flex-none sm:w-[260px]">
+              <CompactField label="Title" required>
                 <input
                   type="text"
                   value={title}
@@ -140,7 +139,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Note" required className="min-w-[200px] flex-1">
+              <CompactField label="Note" required>
                 <CompactAutoGrowTextarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}

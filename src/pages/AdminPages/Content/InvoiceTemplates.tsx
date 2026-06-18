@@ -11,22 +11,28 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 
-const CATEGORIES = ["Mechanics", "Washing", "Tire Master", "Tow Truck"];
+const USER_TYPE_OPTIONS = [
+  { value: "mechanic-shop", label: "Mechanic Shop" },
+  { value: "car-washing", label: "Car Washing" },
+  { value: "tire-master", label: "Tire Master" },
+  { value: "tow-truck", label: "Tow Truck" },
+];
 
 type TemplateRow = {
   id: number;
   date: string;
-  subject: string;
+  userType: string;
   notes: string;
   country: string;
   hasClip: boolean;
 };
 
 const DUMMY_TEMPLATES: TemplateRow[] = [
-  { id: 1, date: "2026-06-16", subject: "Mechanics", notes: "Invoice Template - 1", country: "Canada", hasClip: true },
-  { id: 2, date: "2026-06-15", subject: "Mechanics", notes: "Invoice Template - 2", country: "Canada", hasClip: false },
-  { id: 3, date: "2026-06-14", subject: "Washing", notes: "Invoice Template - 3", country: "Canada", hasClip: true },
-  { id: 4, date: "2026-06-13", subject: "Tire Master", notes: "Invoice Template - 4", country: "USA", hasClip: false },
+  { id: 1, date: "2026-06-16", userType: "mechanic-shop", notes: "Invoice Template - 1", country: "Canada", hasClip: true },
+  { id: 2, date: "2026-06-15", userType: "mechanic-shop", notes: "Invoice Template - 2", country: "Canada", hasClip: false },
+  { id: 3, date: "2026-06-14", userType: "car-washing", notes: "Invoice Template - 3", country: "Canada", hasClip: true },
+  { id: 4, date: "2026-06-13", userType: "tire-master", notes: "Invoice Template - 4", country: "USA", hasClip: false },
+  { id: 5, date: "2026-06-12", userType: "tow-truck", notes: "Invoice Template - 5", country: "Canada", hasClip: true },
 ];
 
 type InvoiceTemplatesPageProps = {
@@ -42,21 +48,23 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   const [showForm, setShowForm] = useState(initialShowForm);
   const [date, setDate] = useState("2026-06-16");
   const [country, setCountry] = useState("Canada");
-  const [category, setCategory] = useState("Mechanics");
+  const [userType, setUserType] = useState("mechanic-shop");
   const [label, setLabel] = useState("");
-  const [categories, setCategories] = useState<Record<string, boolean>>({
-    Mechanics: true,
-    Washing: false,
-    "Tire Master": false,
-    "Tow Truck": false,
+  const [userTypeFilters, setUserTypeFilters] = useState<Record<string, boolean>>({
+    "mechanic-shop": true,
+    "car-washing": false,
+    "tire-master": false,
+    "tow-truck": false,
   });
   const [attachImage, setAttachImage] = useState(false);
 
   const filtered = templates.filter(
     (t) =>
-      (categories[t.subject] ?? true) &&
+      (userTypeFilters[t.userType] ?? true) &&
       (t.date.includes(search) ||
-        t.subject.toLowerCase().includes(search.toLowerCase()) ||
+        (USER_TYPE_OPTIONS.find((o) => o.value === t.userType)?.label ?? t.userType)
+          .toLowerCase()
+          .includes(search.toLowerCase()) ||
         t.notes.toLowerCase().includes(search.toLowerCase()) ||
         t.country.toLowerCase().includes(search.toLowerCase()))
   );
@@ -78,15 +86,15 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
     else setSelected(new Set(paged.map((t) => t.id)));
   };
 
-  const toggleCategory = (cat: string) => {
-    setCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
+  const toggleUserType = (type: string) => {
+    setUserTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }));
     setPage(1);
   };
 
   const resetForm = () => {
     setDate("2026-06-16");
     setCountry("Canada");
-    setCategory("Mechanics");
+    setUserType("mechanic-shop");
     setLabel("");
     setAttachImage(false);
   };
@@ -136,15 +144,15 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                   <option value="USA">USA</option>
                 </select>
               </CompactField>
-              <CompactField label="Category" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
+              <CompactField label="User Type" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
                 <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  value={userType}
+                  onChange={(e) => setUserType(e.target.value)}
                   className={compactInputClass}
                 >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
+                  {USER_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -183,15 +191,15 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
       }
     >
       <div className="mb-2 flex flex-wrap items-center gap-4 border-b border-gray-300 bg-gray-100 px-3 py-2">
-        {CATEGORIES.map((cat) => (
-          <label key={cat} className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
+        {USER_TYPE_OPTIONS.map((option) => (
+          <label key={option.value} className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
             <input
               type="checkbox"
-              checked={categories[cat]}
-              onChange={() => toggleCategory(cat)}
+              checked={userTypeFilters[option.value]}
+              onChange={() => toggleUserType(option.value)}
               className="h-3.5 w-3.5 accent-ad-green"
             />
-            {cat}
+            {option.label}
           </label>
         ))}
       </div>
@@ -257,10 +265,10 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                   className="accent-white"
                 />
               </th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Template</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Country</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Category</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Template</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User Type</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
             </tr>
           </thead>
@@ -281,15 +289,13 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                     onClick={() => setShowForm(true)}
                     className="text-blue-700 hover:underline"
                   >
-                    {row.date}
-                  </button>
-                </td>
-                <td className="border border-gray-300 px-3 py-2">{row.country}</td>
-                <td className="border border-gray-300 px-3 py-2">{row.subject}</td>
-                <td className="border border-gray-300 px-3 py-2">
-                  <button type="button" className="text-blue-700 hover:underline">
                     {row.notes}
                   </button>
+                </td>
+                <td className="border border-gray-300 px-3 py-2">{row.date}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.country}</td>
+                <td className="border border-gray-300 px-3 py-2">
+                  {USER_TYPE_OPTIONS.find((o) => o.value === row.userType)?.label ?? row.userType}
                 </td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {row.hasClip ? (

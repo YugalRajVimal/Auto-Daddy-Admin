@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { FiRefreshCw } from "react-icons/fi";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
+  CompactAutoGrowTextarea,
   CompactField,
   CompactFormFooter,
   CompactFormPanel,
@@ -11,36 +12,54 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 
-const USER_TYPE_OPTIONS = [
-  { value: "mechanic-shop", label: "Mechanic Shop" },
-  { value: "car-washing", label: "Car Washing" },
-  { value: "tire-master", label: "Tire Master" },
-  { value: "tow-truck", label: "Tow Truck" },
+const TYPE_OPTIONS = [
+  { value: "car-owner", label: "Car Owner" },
+  { value: "auto-shop", label: "Auto Shop" },
+  { value: "dealer", label: "Dealer" },
+  { value: "associate", label: "Associate" },
 ];
 
-type TemplateRow = {
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "pending", label: "Pending" },
+  { value: "suspended", label: "Suspended" },
+  { value: "closed", label: "Closed" },
+];
+
+type AccountRow = {
   id: number;
   date: string;
-  userType: string;
-  notes: string;
+  accountName: string;
+  type: string;
+  contact: string;
+  balance: string;
+  status: string;
   country: string;
+  notes: string;
   hasClip: boolean;
 };
 
-const DUMMY_SITES: TemplateRow[] = [
-  { id: 1, date: "2026-06-16", userType: "mechanic-shop", notes: "Mechanic1.autodaddy.ca", country: "Canada", hasClip: true },
-  { id: 2, date: "2026-06-15", userType: "mechanic-shop", notes: "Mechanic2.autodaddy.ca", country: "Canada", hasClip: false },
-  { id: 3, date: "2026-06-14", userType: "car-washing", notes: "Wash1.autodaddy.ca", country: "Canada", hasClip: true },
-  { id: 4, date: "2026-06-13", userType: "tire-master", notes: "Tire1.autodaddy.ca", country: "USA", hasClip: false },
-  { id: 5, date: "2026-06-12", userType: "tow-truck", notes: "Tow1.autodaddy.ca", country: "Canada", hasClip: true },
+const DUMMY_ACCOUNTS: AccountRow[] = [
+  { id: 1, date: "2026-06-16", accountName: "Maple Auto Care", type: "auto-shop", contact: "705 991 3785", balance: "$2,450.00", status: "active", country: "Canada", notes: "Premium shop account", hasClip: true },
+  { id: 2, date: "2026-06-15", accountName: "John Smith", type: "car-owner", contact: "416 555 0192", balance: "$125.50", status: "active", country: "Canada", notes: "Wallet balance — 3 job cards", hasClip: false },
+  { id: 3, date: "2026-06-14", accountName: "Northern Dealers Inc.", type: "dealer", contact: "647 555 8821", balance: "$18,200.00", status: "active", country: "Canada", notes: "Fleet dealer — monthly billing", hasClip: true },
+  { id: 4, date: "2026-06-13", accountName: "Quick Lube Express", type: "auto-shop", contact: "905 555 4410", balance: "$890.00", status: "pending", country: "Canada", notes: "Onboarding in progress", hasClip: false },
+  { id: 5, date: "2026-06-12", accountName: "Sarah Johnson", type: "car-owner", contact: "519 555 7733", balance: "$0.00", status: "active", country: "Canada", notes: "New account — no transactions yet", hasClip: true },
+  { id: 6, date: "2026-06-11", accountName: "Toronto Tire Masters", type: "auto-shop", contact: "613 555 2299", balance: "$5,670.00", status: "active", country: "Canada", notes: "Ads campaign active", hasClip: false },
+  { id: 7, date: "2026-06-10", accountName: "Mike's Towing", type: "associate", contact: "312 555 8844", balance: "$340.00", status: "suspended", country: "USA", notes: "Payment overdue — follow up", hasClip: true },
+  { id: 8, date: "2026-06-09", accountName: "Emily Wilson", type: "car-owner", contact: "416 555 6611", balance: "$78.25", status: "active", country: "Canada", notes: "Referral credit applied", hasClip: false },
+  { id: 9, date: "2026-06-08", accountName: "West End Motors", type: "dealer", contact: "705 555 3399", balance: "$12,100.00", status: "active", country: "Canada", notes: "12 active leads this month", hasClip: true },
+  { id: 10, date: "2026-06-07", accountName: "Anna Martinez", type: "car-owner", contact: "647 555 1122", balance: "$0.00", status: "closed", country: "Canada", notes: "Account closed — moved out of region", hasClip: false },
 ];
 
-type WebsiteTemplatesProps = {
+const DEFAULT_NOTES = "Account notes and billing details.";
+
+type AccountsPageProps = {
   initialShowForm?: boolean;
 };
 
-export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTemplatesProps) {
-  const [sites] = useState(DUMMY_SITES);
+export default function AccountsPage({ initialShowForm = false }: AccountsPageProps) {
+  const [accounts] = useState(DUMMY_ACCOUNTS);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -48,25 +67,28 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const [showForm, setShowForm] = useState(initialShowForm);
   const [date, setDate] = useState("2026-06-16");
   const [country, setCountry] = useState("Canada");
-  const [userType, setUserType] = useState("mechanic-shop");
-  const [url, setUrl] = useState("");
-  const [userTypeFilters, setUserTypeFilters] = useState<Record<string, boolean>>({
-    "mechanic-shop": true,
-    "car-washing": false,
-    "tire-master": false,
-    "tow-truck": false,
-  });
+  const [accountName, setAccountName] = useState("");
+  const [type, setType] = useState("car-owner");
+  const [contact, setContact] = useState("");
+  const [balance, setBalance] = useState("");
+  const [status, setStatus] = useState("active");
+  const [notes, setNotes] = useState(DEFAULT_NOTES);
   const [attachImage, setAttachImage] = useState(false);
 
-  const filtered = sites.filter(
-    (s) =>
-      (userTypeFilters[s.userType] ?? true) &&
-      (s.date.includes(search) ||
-        (USER_TYPE_OPTIONS.find((o) => o.value === s.userType)?.label ?? s.userType)
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        s.notes.toLowerCase().includes(search.toLowerCase()) ||
-        s.country.toLowerCase().includes(search.toLowerCase()))
+  const filtered = accounts.filter(
+    (a) =>
+      a.date.includes(search) ||
+      a.accountName.toLowerCase().includes(search.toLowerCase()) ||
+      a.contact.includes(search) ||
+      a.balance.includes(search) ||
+      a.notes.toLowerCase().includes(search.toLowerCase()) ||
+      a.country.toLowerCase().includes(search.toLowerCase()) ||
+      (TYPE_OPTIONS.find((o) => o.value === a.type)?.label ?? a.type)
+        .toLowerCase()
+        .includes(search.toLowerCase()) ||
+      (STATUS_OPTIONS.find((o) => o.value === a.status)?.label ?? a.status)
+        .toLowerCase()
+        .includes(search.toLowerCase())
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
@@ -83,19 +105,18 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
 
   const toggleSelectAll = () => {
     if (selected.size === paged.length) setSelected(new Set());
-    else setSelected(new Set(paged.map((s) => s.id)));
-  };
-
-  const toggleUserType = (type: string) => {
-    setUserTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }));
-    setPage(1);
+    else setSelected(new Set(paged.map((a) => a.id)));
   };
 
   const resetForm = () => {
     setDate("2026-06-16");
     setCountry("Canada");
-    setUserType("mechanic-shop");
-    setUrl("");
+    setAccountName("");
+    setType("car-owner");
+    setContact("");
+    setBalance("");
+    setStatus("active");
+    setNotes(DEFAULT_NOTES);
     setAttachImage(false);
   };
 
@@ -111,14 +132,14 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
 
   return (
     <AdminPage
-      title="Web - Temp"
-      headerAction={!showForm ? <AddNewButton label="New Template" onClick={() => setShowForm(true)} /> : undefined}
+      title="Accounts"
+      headerAction={!showForm ? <AddNewButton label="New Account" onClick={() => setShowForm(true)} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
-                message="You are creating a 'Website Template'"
+                message="You are creating an 'Account'"
                 messageCenter
                 onSave={handleSave}
                 onCancel={handleCancel}
@@ -144,27 +165,59 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   <option value="USA">USA</option>
                 </select>
               </CompactField>
-              <CompactField label="User Type" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
+              <CompactField label="Account Name" required className={compactFixedFieldWidth}>
+                <input
+                  type="text"
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
+                  className={compactInputClass}
+                />
+              </CompactField>
+              <CompactField label="Type" required className={compactFixedFieldWidth}>
                 <select
-                  value={userType}
-                  onChange={(e) => setUserType(e.target.value)}
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
                   className={compactInputClass}
                 >
-                  {USER_TYPE_OPTIONS.map((option) => (
+                  {TYPE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
                 </select>
               </CompactField>
-              <CompactField label="URL" required className="min-w-[200px] flex-1">
+              <CompactField label="Contact" required className={compactFixedFieldWidth}>
                 <input
                   type="text"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="example.autodaddy.ca"
+                  value={contact}
+                  onChange={(e) => setContact(e.target.value)}
                   className={compactInputClass}
                 />
+              </CompactField>
+              <CompactField label="Balance" required className={compactFixedFieldWidth}>
+                <input
+                  type="text"
+                  value={balance}
+                  onChange={(e) => setBalance(e.target.value)}
+                  placeholder="$0.00"
+                  className={compactInputClass}
+                />
+              </CompactField>
+              <CompactField label="Status" required className={compactFixedFieldWidth}>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className={compactInputClass}
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </CompactField>
+              <CompactField label="Notes" required className="min-w-[200px] flex-1">
+                <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
               </CompactField>
             </CompactFormRow>
             <CompactFormRow className="justify-start">
@@ -190,20 +243,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
         ) : undefined
       }
     >
-      <div className="mb-2 flex flex-wrap items-center gap-4 border-b border-gray-300 bg-gray-100 px-3 py-2">
-        {USER_TYPE_OPTIONS.map((option) => (
-          <label key={option.value} className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
-            <input
-              type="checkbox"
-              checked={userTypeFilters[option.value]}
-              onChange={() => toggleUserType(option.value)}
-              className="h-3.5 w-3.5 accent-ad-green"
-            />
-            {option.label}
-          </label>
-        ))}
-      </div>
-
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
           <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
@@ -265,10 +304,14 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">URL</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Account Name</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Type</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Contact</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Balance</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Country</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User Type</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
             </tr>
           </thead>
@@ -284,20 +327,25 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   />
                 </td>
                 <td className="border border-gray-300 px-3 py-2">
-                  <a
-                    href={`https://${row.notes}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(true)}
                     className="text-blue-700 hover:underline"
                   >
-                    {row.notes}
-                  </a>
+                    {row.date}
+                  </button>
                 </td>
-                <td className="border border-gray-300 px-3 py-2">{row.date}</td>
-                <td className="border border-gray-300 px-3 py-2">{row.country}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.accountName}</td>
                 <td className="border border-gray-300 px-3 py-2">
-                  {USER_TYPE_OPTIONS.find((o) => o.value === row.userType)?.label ?? row.userType}
+                  {TYPE_OPTIONS.find((o) => o.value === row.type)?.label ?? row.type}
                 </td>
+                <td className="border border-gray-300 px-3 py-2">{row.contact}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.balance}</td>
+                <td className="border border-gray-300 px-3 py-2 capitalize">
+                  {STATUS_OPTIONS.find((o) => o.value === row.status)?.label ?? row.status}
+                </td>
+                <td className="border border-gray-300 px-3 py-2">{row.country}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.notes}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {row.hasClip ? (
                     <FiRefreshCw className="inline text-ad-green" size={16} />
@@ -318,10 +366,11 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${page === p
-                ? "border-ad-green bg-ad-green text-white"
-                : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-                }`}
+              className={`h-7 w-7 border text-xs font-medium ${
+                page === p
+                  ? "border-ad-green bg-ad-green text-white"
+                  : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+              }`}
             >
               {p}
             </button>
