@@ -27,7 +27,7 @@ export function ContentPanel({ children, title, action, footer, className = "" }
 }
 
 export const compactInputClass =
-  "w-full min-h-[36px] border border-gray-400 bg-white px-2.5 py-2 text-sm leading-normal focus:border-blue-500 focus:outline-none";
+  "w-full min-h-[30px] border border-gray-400 bg-white px-2 py-1.5 text-sm leading-snug focus:border-blue-500 focus:outline-none";
 
 export const compactFixedFieldWidth = "w-[140px] shrink-0 flex-none sm:w-[180px]";
 
@@ -93,7 +93,7 @@ export function CompactFormPanel({
     <div
       className={`relative mb-10 rounded border border-ad-form-border bg-ad-form-bg shadow-sm ${className}`}
     >
-      <div className="min-h-[108px] space-y-5 px-4 py-5">{children}</div>
+      <div className="min-h-[96px] space-y-4 px-4 py-4">{children}</div>
       {footer}
       <PanelBottomBorder />
     </div>
@@ -127,7 +127,7 @@ export function CompactField({
 }) {
   return (
     <div className={`min-w-0 flex-1 ${className}`}>
-      <label className="mb-1.5 block text-xs font-bold text-ad-green-dark">
+      <label className="mb-1 block text-xs font-bold text-ad-green-dark">
         {label}
         {required ? <span className="text-red-600"> *</span> : null}
       </label>
