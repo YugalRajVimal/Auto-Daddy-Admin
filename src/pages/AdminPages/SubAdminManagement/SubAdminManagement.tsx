@@ -9,7 +9,7 @@ const MODULES = [
   { key: "users",            label: "Users" },
   { key: "services",         label: "Services" },
   { key: "categories",       label: "Categories" },
-  { key: "websiteTemplates", label: "Website Templates" },
+  { key: "websiteTemplates", label: "Web - Temp" },
   { key: "dashboardData",    label: "Dashboard Data" },
   { key: "carCompanies",     label: "Car Companies" },
   { key: "provinces",        label: "Provinces" },

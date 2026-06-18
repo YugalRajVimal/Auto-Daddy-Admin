@@ -25,8 +25,8 @@ export const primaryNav: NavItem[] = [
       { name: "Features", path: "/admin/features", permissionModule: "dashboardData" },
       { name: "FAQs", path: "/admin/faqs", permissionModule: "dashboardData" },
       { name: "Privacy", path: "/admin/privacy", permissionModule: "dashboardData" },
-      { name: "Website Templates", path: "/admin/website-templates", permissionModule: "websiteTemplates" },
-      { name: "Invoice Templates", path: "/admin/invoice-templates", permissionModule: "websiteTemplates" },
+      { name: "Web - Temp", path: "/admin/website-templates", permissionModule: "websiteTemplates" },
+      { name: "Inv - Temp", path: "/admin/invoice-templates", permissionModule: "websiteTemplates" },
     ],
     matchPaths: [
       "/admin",
@@ -103,8 +103,8 @@ export const legacyPrimaryNav: NavItem[] = [
       { name: "Dashboard Data", path: "/admin/dashboard-data", permissionModule: "dashboardData" },
       { name: "FAQs", path: "/admin/faqs", permissionModule: "dashboardData" },
       { name: "Privacy", path: "/admin/privacy", permissionModule: "dashboardData" },
-      { name: "Website Templates", path: "/admin/website-templates", permissionModule: "websiteTemplates" },
-      { name: "Invoice Templates", path: "/admin/invoice-templates", permissionModule: "websiteTemplates" },
+      { name: "Web - Temp", path: "/admin/website-templates", permissionModule: "websiteTemplates" },
+      { name: "Inv - Temp", path: "/admin/invoice-templates", permissionModule: "websiteTemplates" },
     ],
     matchPaths: [
       "/admin",

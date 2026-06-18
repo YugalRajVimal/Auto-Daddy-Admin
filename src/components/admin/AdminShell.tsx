@@ -54,7 +54,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     "inline-block border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-300 sm:px-3 sm:text-xs";
 
   const subNavLinkClass =
-    "block px-1.5 py-2 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1 lg:py-2 lg:text-xs lg:leading-tight lg:whitespace-normal";
+    "block px-2 py-1.5 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1.5 lg:py-1.5 lg:text-xs lg:leading-snug lg:whitespace-normal";
 
   const loginRole = isAdmin ? "Admin" : "Sub Admin";
 
@@ -93,7 +93,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </div>
 
             <div className="col-span-2 flex flex-col items-end gap-2 md:col-span-1 md:col-start-3 md:row-start-1">
-              <nav className="flex items-center gap-px" aria-label="Account actions">
+              <nav className="flex items-center gap-0 [&>a+a]:-ml-px" aria-label="Account actions">
                 <Link to="/admin/profile" className={utilityLinkClass}>
                   Admin
                 </Link>
@@ -129,15 +129,15 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
         {/* Primary nav — separated tabs: flat top, rounded bottom */}
         <nav
-          className={`px-3 sm:px-4 ${mobileOpen ? "block" : "hidden lg:block"}`}
+          className={`relative z-20 overflow-visible px-3 pb-0 sm:px-4 ${mobileOpen ? "block" : "hidden lg:block"}`}
         >
-          <ul className="flex flex-col lg:flex-row lg:w-full lg:gap-px">
+          <ul className="flex flex-col gap-px lg:flex-row lg:w-full lg:gap-px">
             {visibleNav.map((item) => {
               const isActive = activePrimary?.name === item.name;
               const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
-              const itemClass = `w-full px-4 py-2 text-center text-sm font-medium transition-colors lg:rounded-t-none lg:rounded-b-lg lg:px-6 lg:py-2 ${isActive
-                ? "relative z-10 border border-ad-purple border-b-white bg-white text-ad-purple lg:border-b-white"
-                : "border-0 border-b border-white/20 bg-ad-purple text-white hover:bg-ad-purple-dark lg:border lg:border-ad-purple"
+              const itemClass = `w-full px-3 py-1.5 text-center text-sm font-semibold transition-colors lg:rounded-b-lg lg:px-4 lg:py-2 lg:text-sm ${isActive
+                ? "relative z-20 border border-ad-purple bg-white text-ad-purple shadow-md"
+                : "border border-ad-purple/80 bg-ad-purple text-white shadow-sm hover:bg-ad-purple-dark"
                 }`;
               return (
                 <li key={item.name} className="min-w-0 flex-1">
@@ -166,9 +166,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
         {/* Sub nav — columns align with primary nav tabs on desktop */}
         {subItems.length > 0 && activePrimary && (
-          <div className="relative z-10 -mt-px bg-white">
+          <div className="relative z-10 mt-0.5 bg-white lg:mt-1">
             <div className="px-3 sm:px-4">
-              <ul className="hidden w-full items-stretch overflow-visible pb-[7px] lg:flex lg:gap-px">
+              <ul className="hidden w-full items-stretch overflow-visible lg:flex lg:gap-px lg:pb-1">
                 {visibleNav.map((item, colIndex) => {
                   const sub = colIndex < subItems.length ? subItems[colIndex] : null;
                   const active = sub ? isPathActive(location.pathname, sub.path) : false;

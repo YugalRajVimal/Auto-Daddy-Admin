@@ -424,7 +424,7 @@ const navItems: NavItem[] = [
       { name: "Services",  path: "/admin/services",  permissionModule: "categories" },
     ],
   },
-  { icon: <HiTemplate />,    name: "Website Templates", path: "/admin/website-templates", permissionModule: "websiteTemplates" },
+  { icon: <HiTemplate />,    name: "Web - Temp", path: "/admin/website-templates", permissionModule: "websiteTemplates" },
   { icon: <FaFileAlt />,     name: "Dashboard Data",    path: "/admin/dashboard-data",    permissionModule: "dashboardData" },
   { icon: <FaCarSide />,     name: "Car Companies",     path: "/admin/car-companies",     permissionModule: "carCompanies" },
   {
