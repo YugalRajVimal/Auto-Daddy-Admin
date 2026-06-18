@@ -546,7 +546,7 @@ const SubAdminManagement: React.FC = () => {
       </Modal>
 
       {/* ── Page ─────────────────────────────────────────────────────────────── */}
-      <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5 font-sans">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans">
         <h1 className="mb-4 text-xl font-bold text-ad-green md:text-2xl">Sub Admin Management</h1>
 
         {error && (

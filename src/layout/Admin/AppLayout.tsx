@@ -86,7 +86,7 @@ const SubAdminAppLayout: React.FC = () => {
 
   if (isAdminAuthenticated === null || !isAdminAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white">
+      <div className="flex min-h-screen items-center justify-center bg-ad-app-bg">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
       </div>
     );

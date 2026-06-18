@@ -57,7 +57,7 @@ export default function ThoughtOfDayPage() {
   };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-serif text-2xl font-bold text-gray-500 md:text-3xl">Today&apos;s Tip</h1>
         <Link

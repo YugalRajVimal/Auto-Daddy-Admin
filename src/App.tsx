@@ -62,7 +62,7 @@ import Reports from "./pages/AdminPages/Reports/Reports";
 export default function App() {
   return (
     <>
-      <ToastContainer 
+      <ToastContainer
         position="top-right"
         autoClose={3000}
         hideProgressBar={false}
@@ -74,186 +74,187 @@ export default function App() {
         pauseOnHover
         theme="light"
       />
-      <Router >
-        <ScrollToTop />
-        
-        <Routes>
-          {/* Login is the first page — no public homepage */}
-          <Route index path="/" element={<AdminSignInPage />} />
-          {/* <Route index path="/" element={<HomePage />} /> */}
+      <div className="min-h-screen bg-ad-app-bg px-4 md:px-[160px]">
+        <Router >
+          <ScrollToTop />
 
-          <Route element={<AdminAppLayout />}>
-            <Route index path="/admin" element={
-              <ProtectedRoute module="dashboard" action="view">
-                <AdminHome />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/thought-of-day" element={
-              <ProtectedRoute module="dashboardData" action="view">
-                <ThoughtOfDayPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/thought-of-day/new" element={
-              <ProtectedRoute module="dashboardData" action="view">
-                <ThoughtOfDayNewPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/features" element={
-              <ProtectedRoute module="dashboardData" action="view">
-                <FeaturesPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/leads" element={
-              <ProtectedRoute module="dashboard" action="view">
-                <ComingSoon title="Leads" />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/accounts" element={
-              <ProtectedRoute module="dashboard" action="view">
-                <ComingSoon title="Accounts" />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/messages" element={
-              <ProtectedRoute module="inviteHelp" action="view">
-                <Invitehelp />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/reports" element={
-              <ProtectedRoute module="dashboard" action="view">
-                <Reports />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/car-owners" element={
-              <ProtectedRoute module="users" action="view">
-                <CarOwners />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/auto-shop-owners" element={
-              <ProtectedRoute module="users" action="view">
-                <AutoShopOwners />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/categories" element={
-              <ProtectedRoute module="services" action="view">
-                <Services />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/services" element={
-              <ProtectedRoute module="categories" action="view">
-                <SubServicesPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/provinces" element={
-              <ProtectedRoute module="provinces" action="view">
-                <Provinces />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/cities" element={
-              <ProtectedRoute module="cities" action="view">
-                <Cities />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/invite-help" element={<Navigate to="/admin/messages" replace />} />
-            <Route path="/admin/ads" element={
-              <ProtectedRoute module="ads" action="view">
-                <Ads />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/running-deals" element={
-              <ProtectedRoute module="runningDeals" action="view">
-                <RunningDeals />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/wallet" element={
-              <ProtectedRoute module="wallet" action="view">
-                <Wallet />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/manage-task" element={
-              <ProtectedRoute module="tasks" action="view">
-                <Tasks />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/profile" element={
-              <ProtectedRoute module="dashboard" action="view">
-                <AdminProfile />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/logout" element={
+          <Routes>
+            {/* Login is the first page — no public homepage */}
+            <Route index path="/" element={<AdminSignInPage />} />
+            {/* <Route index path="/" element={<HomePage />} /> */}
+
+            <Route element={<AdminAppLayout />}>
+              <Route index path="/admin" element={
+                <ProtectedRoute module="dashboard" action="view">
+                  <AdminHome />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/thought-of-day" element={
+                <ProtectedRoute module="dashboardData" action="view">
+                  <ThoughtOfDayPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/thought-of-day/new" element={
+                <ProtectedRoute module="dashboardData" action="view">
+                  <ThoughtOfDayNewPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/features" element={
+                <ProtectedRoute module="dashboardData" action="view">
+                  <FeaturesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/leads" element={
+                <ProtectedRoute module="dashboard" action="view">
+                  <ComingSoon title="Leads" />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/accounts" element={
+                <ProtectedRoute module="dashboard" action="view">
+                  <ComingSoon title="Accounts" />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/messages" element={
+                <ProtectedRoute module="inviteHelp" action="view">
+                  <Invitehelp />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/reports" element={
+                <ProtectedRoute module="dashboard" action="view">
+                  <Reports />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/car-owners" element={
+                <ProtectedRoute module="users" action="view">
+                  <CarOwners />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/auto-shop-owners" element={
+                <ProtectedRoute module="users" action="view">
+                  <AutoShopOwners />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/categories" element={
+                <ProtectedRoute module="services" action="view">
+                  <Services />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/services" element={
+                <ProtectedRoute module="categories" action="view">
+                  <SubServicesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/provinces" element={
+                <ProtectedRoute module="provinces" action="view">
+                  <Provinces />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/cities" element={
+                <ProtectedRoute module="cities" action="view">
+                  <Cities />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/invite-help" element={<Navigate to="/admin/messages" replace />} />
+              <Route path="/admin/ads" element={
+                <ProtectedRoute module="ads" action="view">
+                  <Ads />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/running-deals" element={
+                <ProtectedRoute module="runningDeals" action="view">
+                  <RunningDeals />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/wallet" element={
+                <ProtectedRoute module="wallet" action="view">
+                  <Wallet />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/manage-task" element={
+                <ProtectedRoute module="tasks" action="view">
+                  <Tasks />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/profile" element={
+                <ProtectedRoute module="dashboard" action="view">
+                  <AdminProfile />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/logout" element={
 
                 <LogOutAdmin />
 
-            } />
-            <Route path="/admin/website-templates" element={
-              <ProtectedRoute module="websiteTemplates" action="view">
-                <WebsiteTemplates />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/invoice-templates" element={
-              <ProtectedRoute module="websiteTemplates" action="view">
-                <InvoiceTemplatesPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/faqs" element={
-              <ProtectedRoute module="dashboardData" action="view">
-                <FAQsPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/privacy" element={
-              <ProtectedRoute module="dashboardData" action="view">
-                <PrivacyPage />
-              </ProtectedRoute>
-            } />
-            {/* Dashboard Data route commented out — functionality split into Thought of Day + Features
+              } />
+              <Route path="/admin/website-templates" element={
+                <ProtectedRoute module="websiteTemplates" action="view">
+                  <WebsiteTemplates />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/invoice-templates" element={
+                <ProtectedRoute module="websiteTemplates" action="view">
+                  <InvoiceTemplatesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/faqs" element={
+                <ProtectedRoute module="dashboardData" action="view">
+                  <FAQsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/privacy" element={
+                <ProtectedRoute module="dashboardData" action="view">
+                  <PrivacyPage />
+                </ProtectedRoute>
+              } />
+              {/* Dashboard Data route commented out — functionality split into Thought of Day + Features
             <Route path="/admin/dashboard-data" element={
               <ProtectedRoute module="dashboardData" action="view">
                 <DashboardData />
               </ProtectedRoute>
             } />
             */}
-            <Route path="/admin/car-companies" element={
-              <ProtectedRoute module="carCompanies" action="view">
-                <CarCompany />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/subadmins" element={
-              <ProtectedRoute module="subAdminManagement" action="view">
-                <SubAdminManagement />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/associates" element={
-              <div className="flex min-h-[40vh] flex-1 items-center justify-center bg-white px-6">
-                <div className="rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light px-12 py-10 text-center shadow-sm">
-                  <p className="text-xl font-bold text-ad-green-dark">Associates — Coming Soon</p>
+              <Route path="/admin/car-companies" element={
+                <ProtectedRoute module="carCompanies" action="view">
+                  <CarCompany />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/subadmins" element={
+                <ProtectedRoute module="subAdminManagement" action="view">
+                  <SubAdminManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/associates" element={
+                <div className="flex min-h-[40vh] flex-1 items-center justify-center bg-white px-6">
+                  <div className="rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light px-12 py-10 text-center shadow-sm">
+                    <p className="text-xl font-bold text-ad-green-dark">Associates — Coming Soon</p>
+                  </div>
                 </div>
-              </div>
-            } />
-            <Route path="/admin/dealers" element={
-              <div className="flex min-h-[40vh] flex-1 items-center justify-center bg-white px-6">
-                <div className="rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light px-12 py-10 text-center shadow-sm">
-                  <p className="text-xl font-bold text-ad-green-dark">Dealers — Coming Soon</p>
+              } />
+              <Route path="/admin/dealers" element={
+                <div className="flex min-h-[40vh] flex-1 items-center justify-center bg-white px-6">
+                  <div className="rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light px-12 py-10 text-center shadow-sm">
+                    <p className="text-xl font-bold text-ad-green-dark">Dealers — Coming Soon</p>
+                  </div>
                 </div>
-              </div>
-            } />
-       
-            <Route path="/admin/unauthorized" element={<Unauthorized />} />
-          </Route>
-     
+              } />
+
+              <Route path="/admin/unauthorized" element={<Unauthorized />} />
+            </Route>
 
 
-          <Route path="/admin/signin" element={<AdminSignInPage />} />
 
-          {/* Sub-admin login flow not needed for now
+            <Route path="/admin/signin" element={<AdminSignInPage />} />
+
+            {/* Sub-admin login flow not needed for now
           <Route path="/subadmin/signin" element={<SubAdminSignInPage />} />
           */}
-     
-
-
-          <Route path="/auto-shop-owner/onboarding" element={<AutoShopOwnerOnboarding />} />
 
 
 
-          <Route path="/calendar" element={<Calendar />} />
+            <Route path="/auto-shop-owner/onboarding" element={<AutoShopOwnerOnboarding />} />
+
+
+
+            <Route path="/calendar" element={<Calendar />} />
             <Route path="/blank" element={<Blank />} />
             <Route path="/form-elements" element={<FormElements />} />
             <Route path="/basic-tables" element={<BasicTables />} />
@@ -265,10 +266,11 @@ export default function App() {
             <Route path="/videos" element={<Videos />} />
             <Route path="/line-chart" element={<LineChart />} />
             <Route path="/bar-chart" element={<BarChart />} />
-          {/* Fallback Route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Router>
+            {/* Fallback Route */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Router>
+      </div>
     </>
   );
 }

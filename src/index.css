@@ -29,6 +29,7 @@ layer(base);
   --color-ad-pink-dark: #c06090;
   --color-ad-blue-light: #a8d4f0;
   --color-ad-blue-dark: #2060a0;
+  --color-ad-app-bg: #eef4fe;
 
   --breakpoint-*: initial;
   --breakpoint-2xsm: 375px;
@@ -207,7 +208,7 @@ layer(base);
     cursor: pointer;
   }
   body {
-    @apply relative font-normal font-outfit z-1 bg-gray-50;
+    @apply relative font-normal font-outfit z-1 bg-ad-app-bg;
   }
 }
 

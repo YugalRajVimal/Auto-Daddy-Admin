@@ -183,7 +183,7 @@ const Invitehelp: React.FC = () => {
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5 font-sans">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans">
       <div className="flex items-start justify-between mb-4">
         <h1 className="text-2xl font-semibold text-gray-800">Messages</h1>
         <div className="text-sm text-right">

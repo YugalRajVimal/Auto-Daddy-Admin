@@ -889,7 +889,7 @@ const CarOwners: React.FC = () => {
       <SendNotifModal isOpen={notifOpen} onClose={() => setNotifOpen(false)} ids={selected} onDone={() => {}} />
 
       {/* ── PAGE ── */}
-      <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5 font-sans">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans">
 
         {/* Header row */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>

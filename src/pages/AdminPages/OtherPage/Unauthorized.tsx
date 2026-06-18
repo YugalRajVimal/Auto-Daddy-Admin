@@ -3,7 +3,7 @@ import { Link } from "react-router";
 
 export default function Unauthorized() {
   return (
-    <div className="flex min-h-[50vh] flex-1 items-center justify-center bg-white">
+    <div className="flex min-h-[50vh] flex-1 items-center justify-center bg-ad-app-bg">
       <div className="text-center max-w-md px-6">
         <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-6">
           <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

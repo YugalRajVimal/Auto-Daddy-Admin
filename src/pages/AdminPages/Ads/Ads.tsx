@@ -545,7 +545,7 @@ const Ads: React.FC = () => {
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5 font-sans">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans">
       {/* Heading */}
       <h1 className="mb-6 text-xl md:text-2xl font-bold text-ad-green mb-4">Manage Ads</h1>
 

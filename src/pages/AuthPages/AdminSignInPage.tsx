@@ -1,11 +1,18 @@
-import { useState } from "react";
-import { FiLock } from "react-icons/fi";
+import { useEffect, useState } from "react";
+import OtpInput from "../../components/form/input/OtpInput";
 
 const ADMIN_ROLE = "admin";
 const ADMIN_TOKEN_KEY = "admin-token";
 const ADMIN_HOME = "/admin";
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
 const LOGO = "/logo.png";
+const RESEND_COOLDOWN_SEC = 5 * 60;
+
+function formatCooldown(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
+}
 
 export default function AdminSignInPage() {
   const [email, setEmail] = useState("");
@@ -13,6 +20,15 @@ export default function AdminSignInPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (!otpSent || resendCooldown <= 0) return;
+    const timer = window.setTimeout(() => {
+      setResendCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [otpSent, resendCooldown]);
 
   async function handleSendOtp() {
     setStatus(null);
@@ -25,7 +41,10 @@ export default function AdminSignInPage() {
       });
       const data = await res.json();
       if (res.ok) {
+        const isResend = otpSent;
         setOtpSent(true);
+        setResendCooldown(RESEND_COOLDOWN_SEC);
+        if (isResend) setOtp("");
         setStatus("OTP sent! Please check your email.");
       } else {
         setOtpSent(false);
@@ -37,6 +56,11 @@ export default function AdminSignInPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleResendOtp() {
+    if (resendCooldown > 0) return;
+    await handleSendOtp();
   }
 
   async function handleVerifyOtp() {
@@ -70,7 +94,7 @@ export default function AdminSignInPage() {
   }
 
   return (
-    <div style={{ backgroundColor: "#eef4fe" }} className="flex min-h-screen flex-col items-center justify-center bg-white px-4 py-8 md:px-6">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-ad-app-bg py-8">
       <div className="w-full max-w-3xl">
         <div className="relative">
           <p className="mb-2 text-right text-sm font-medium text-ad-green-dark md:absolute md:-top-7 md:right-0 md:mb-0">
@@ -143,29 +167,43 @@ export default function AdminSignInPage() {
               ) : (
                 <div className="mx-auto w-full max-w-xs space-y-4">
                   <label className="block text-sm text-ad-green-dark">OTP</label>
-                  <div className="relative">
-                    <FiLock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
-                    <input
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      placeholder="Enter OTP from email"
-                      disabled={loading}
-                      className="w-full rounded-md border border-gray-400 bg-white py-2 pl-9 pr-3 text-sm focus:border-ad-green focus:outline-none"
-                    />
-                  </div>
+                  <OtpInput
+                    value={otp}
+                    onChange={setOtp}
+                    disabled={loading}
+                    autoFocus
+                  />
                   <button
                     type="button"
                     onClick={handleVerifyOtp}
-                    disabled={loading || !otp.trim()}
+                    disabled={loading || otp.length !== 6}
                     className="w-full rounded-md bg-ad-green py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-ad-green-dark disabled:opacity-60"
                   >
                     {loading ? "Verifying..." : "Verify & Login"}
                   </button>
+                  <p className="text-center text-sm text-gray-500">
+                    Didn&apos;t receive the code?{" "}
+                    {resendCooldown > 0 ? (
+                      <span className="font-medium text-ad-green-dark">
+                        Resend in {formatCooldown(resendCooldown)}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        disabled={loading}
+                        className="font-semibold text-ad-green-dark hover:underline disabled:opacity-60"
+                      >
+                        {loading ? "Sending..." : "Resend OTP"}
+                      </button>
+                    )}
+                  </p>
                   <button
                     type="button"
                     onClick={() => {
                       setOtp("");
                       setOtpSent(false);
+                      setResendCooldown(0);
                       setStatus(null);
                     }}
                     disabled={loading}
