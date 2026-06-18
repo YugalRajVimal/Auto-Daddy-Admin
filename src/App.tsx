@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -56,6 +56,7 @@ import FeaturesPage from "./pages/AdminPages/Content/Features";
 import ThoughtOfDayPage from "./pages/AdminPages/Content/ThoughtOfDay";
 import ThoughtOfDayNewPage from "./pages/AdminPages/Content/ThoughtOfDayNew";
 import ComingSoon from "./components/admin/ComingSoon";
+import Reports from "./pages/AdminPages/Reports/Reports";
 
 
 export default function App() {
@@ -113,13 +114,13 @@ export default function App() {
               </ProtectedRoute>
             } />
             <Route path="/admin/messages" element={
-              <ProtectedRoute module="dashboard" action="view">
-                <ComingSoon title="Messages" />
+              <ProtectedRoute module="inviteHelp" action="view">
+                <Invitehelp />
               </ProtectedRoute>
             } />
             <Route path="/admin/reports" element={
               <ProtectedRoute module="dashboard" action="view">
-                <ComingSoon title="Reports" />
+                <Reports />
               </ProtectedRoute>
             } />
             <Route path="/admin/car-owners" element={
@@ -152,11 +153,7 @@ export default function App() {
                 <Cities />
               </ProtectedRoute>
             } />
-            <Route path="/admin/invite-help" element={
-              <ProtectedRoute module="inviteHelp" action="view">
-                <Invitehelp />
-              </ProtectedRoute>
-            } />
+            <Route path="/admin/invite-help" element={<Navigate to="/admin/messages" replace />} />
             <Route path="/admin/ads" element={
               <ProtectedRoute module="ads" action="view">
                 <Ads />

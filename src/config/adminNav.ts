@@ -78,7 +78,7 @@ export const primaryNav: NavItem[] = [
   {
     name: "Messages",
     path: "/admin/messages",
-    permissionModule: "dashboard",
+    permissionModule: "inviteHelp",
   },
   {
     name: "Reports",

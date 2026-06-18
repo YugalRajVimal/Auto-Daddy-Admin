@@ -437,7 +437,7 @@ const navItems: NavItem[] = [
   { icon: <FaBullhorn />,        name: "Ads",           path: "/admin/ads",           permissionModule: "ads" },
   { icon: <FaTags />,            name: "Running Deals", path: "/admin/running-deals", permissionModule: "runningDeals" },
   { icon: <FaMoneyBillWave />,   name: "Wallet",        path: "/admin/wallet",        permissionModule: "wallet" },
-  { icon: <TbHelpCircle />,      name: "Invite Help",   path: "/admin/invite-help",   permissionModule: "inviteHelp" },
+  { icon: <TbHelpCircle />,      name: "Messages",      path: "/admin/messages",      permissionModule: "inviteHelp" },
 ];
 
 // Administration section — main admin only

@@ -38,6 +38,7 @@ const Invitehelp: React.FC = () => {
     "userEmail",
     "businessName",
     "businessEmail",
+    "message",
     "audio",
     "createdAt",
   ]);
@@ -126,6 +127,21 @@ const Invitehelp: React.FC = () => {
         exportValue: (inv: InviteHelp) => inv.userId?.businessProfile?.businessEmail || "N/A",
       },
       {
+        key: "message",
+        label: "Message",
+        render: (inv: InviteHelp) =>
+          tableCell(
+            inv.message ? (
+              <span className="line-clamp-2 block max-w-[200px]" title={inv.message}>
+                {inv.message}
+              </span>
+            ) : (
+              <span style={{ color: "#aaa", fontStyle: "italic" }}>N/A</span>
+            )
+          ),
+        exportValue: (inv: InviteHelp) => inv.message || "N/A",
+      },
+      {
         key: "audio",
         label: "Audio",
         render: (inv: InviteHelp) => {
@@ -169,10 +185,10 @@ const Invitehelp: React.FC = () => {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5 font-sans">
       <div className="flex items-start justify-between mb-4">
-        <h1 className="text-2xl font-semibold text-gray-800">Invite Help Requests</h1>
+        <h1 className="text-2xl font-semibold text-gray-800">Messages</h1>
         <div className="text-sm text-right">
           <span className="text-blue-600 hover:underline cursor-pointer">Dashboard</span>
-          <span className="text-gray-500"> / Invite Help</span>
+          <span className="text-gray-500"> / Messages</span>
         </div>
       </div>
 
@@ -183,7 +199,7 @@ const Invitehelp: React.FC = () => {
       )}
 
       <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
-        <span className="text-base font-medium text-gray-700">Request List</span>
+        <span className="text-base font-medium text-gray-700">Invite Help Requests</span>
         <span className="text-sm text-gray-400">
           {!loading && `${inviteHelps.length} total request${inviteHelps.length !== 1 ? "s" : ""}`}
         </span>
@@ -206,7 +222,7 @@ const Invitehelp: React.FC = () => {
           onVisibleColumnKeysChange={setVisibleCols}
           selectedIds={selectedIds}
           onSelectedIdsChange={setSelectedIds}
-          exportFilename="invite-help"
+          exportFilename="messages"
           totalBeforeFilter={inviteHelps.length}
         />
       </div>
