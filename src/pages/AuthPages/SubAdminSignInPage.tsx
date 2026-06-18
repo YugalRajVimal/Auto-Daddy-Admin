@@ -41,7 +41,7 @@ export default function SubAdminSignInPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-ad-app-bg py-10">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-ad-login-bg py-10 -mx-4 px-4 md:-mx-[160px] md:px-[160px]">
       <p className="absolute right-6 top-6 text-sm font-medium text-ad-green-dark md:text-base">
         Sub Admin Sign In
       </p>

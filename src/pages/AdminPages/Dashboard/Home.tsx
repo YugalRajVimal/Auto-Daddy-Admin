@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import PageMeta from "../../../components/common/PageMeta";
+import DashboardPanelCard from "../../../components/COMP";
 
 interface AdminDashboardAPI {
   carOwnersCount: number;
@@ -27,16 +28,18 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 function StatCardView({ card }: { card: StatCard }) {
   return (
-    <div className="flex flex-1 min-w-[140px] items-center gap-3 rounded border border-gray-200 bg-white px-3 py-3 shadow-md">
-      <div
-        className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded text-lg font-bold ${card.bg} ${card.text}`}
-      >
-        {card.value}
+    <DashboardPanelCard className="mb-3 min-w-[110px] flex-1">
+      <div className="flex items-center gap-2">
+        <div
+          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded text-sm font-bold ${card.bg} ${card.text}`}
+        >
+          {card.value}
+        </div>
+        <span className={`font-serif text-xs font-bold leading-tight ${card.labelColor}`}>
+          {card.label}
+        </span>
       </div>
-      <span className={`font-serif text-sm font-bold leading-tight ${card.labelColor}`}>
-        {card.label}
-      </span>
-    </div>
+    </DashboardPanelCard>
   );
 }
 
@@ -100,7 +103,7 @@ export default function AdminDashboardHome() {
   ];
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg px-6 py-4 sm:px-8 md:px-12 md:py-5 lg:px-16">
       <PageMeta title="Dashboard | AutoDaddy Admin" description="Admin dashboard" />
 
       {loading ? (
@@ -108,13 +111,13 @@ export default function AdminDashboardHome() {
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
         </div>
       ) : error ? (
-        <div className="rounded border border-red-300 bg-red-100 p-4 text-red-700">{error}</div>
+        <div className="rounded-[10px] border border-red-300 bg-red-100 p-4 text-red-700">{error}</div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {rows.map((row) => (
             <section key={row.title}>
-              <h2 className="mb-3 font-serif text-lg font-bold text-ad-green-dark">{row.title}</h2>
-              <div className="flex flex-wrap gap-3">
+              <h2 className="mb-2 font-serif text-base font-bold text-ad-green-dark">{row.title}</h2>
+              <div className="flex flex-wrap gap-2 overflow-visible pb-2">
                 {row.cards.map((card) => (
                   <StatCardView key={card.label} card={card} />
                 ))}
