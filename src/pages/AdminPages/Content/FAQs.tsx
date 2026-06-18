@@ -1,6 +1,13 @@
 import { useState } from "react";
-import AdminPage from "../../../components/admin/AdminPage";
-import { PanelCard, PanelFooter } from "../../../components/admin/ContentPanel";
+import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import {
+  CompactField,
+  CompactFormFooter,
+  CompactFormPanel,
+  CompactFormRow,
+  PanelCard,
+  compactInputClass,
+} from "../../../components/admin/ContentPanel";
 
 const ROLE_OPTIONS = ["Car Owner", "Mechanics", "Washing", "Sub-Admin", "Tow Truck"];
 
@@ -45,67 +52,46 @@ export default function FAQsPage() {
     <AdminPage
       narrowPanel
       title="FAQ Management"
-      panelTitle="FAQ Management"
-      action={
-        !showForm ? (
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="text-sm font-medium text-blue-700 hover:underline"
-          >
-            + Add New
-          </button>
-        ) : undefined
-      }
-      footer={
+      headerAction={!showForm ? <AddNewButton label="Add New" onClick={() => setShowForm(true)} /> : undefined}
+      between={
         showForm ? (
-          <PanelFooter
-            message="You are creating FAQs"
-            actionLabel="Save"
-            onAction={handleSave}
-            cancelLabel="Cancel"
-            onCancel={handleCancel}
-          />
+          <CompactFormPanel
+            footer={<CompactFormFooter onSave={handleSave} onCancel={handleCancel} />}
+          >
+            <CompactFormRow>
+              <CompactField label="Question ?" required className="min-w-[140px] flex-1">
+                <input
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  className={compactInputClass}
+                />
+              </CompactField>
+              <CompactField label="Answer" required className="min-w-[140px] flex-[2]">
+                <input
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  className={compactInputClass}
+                />
+              </CompactField>
+            </CompactFormRow>
+            <CompactFormRow className="items-center pt-0.5">
+              {ROLE_OPTIONS.map((role) => (
+                <label key={role} className="flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                  <input
+                    type="checkbox"
+                    checked={roles[role]}
+                    onChange={() => toggleRole(role)}
+                    className="h-3.5 w-3.5 accent-ad-green"
+                  />
+                  {role}
+                </label>
+              ))}
+            </CompactFormRow>
+          </CompactFormPanel>
         ) : undefined
       }
     >
-      {showForm && (
-        <div className="mb-5 space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-bold text-ad-green-dark">Question ?</label>
-            <input
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              className="w-full rounded border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-ad-purple focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-bold text-ad-green-dark">Answer</label>
-            <textarea
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              rows={4}
-              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-ad-green-dark shadow-sm focus:border-ad-purple focus:outline-none"
-            />
-          </div>
-          <div className="flex flex-wrap gap-4">
-            {ROLE_OPTIONS.map((role) => (
-              <label key={role} className="flex items-center gap-2 text-sm font-bold text-ad-green-dark">
-                <input
-                  type="checkbox"
-                  checked={roles[role]}
-                  onChange={() => toggleRole(role)}
-                  className="h-4 w-4 accent-ad-green"
-                />
-                {role}
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!showForm &&
-        faqs.map((faq) => (
+      {faqs.map((faq) => (
           <div key={faq.id} className="mb-0">
             <PanelCard className="mb-0 rounded-b-none">
               <button

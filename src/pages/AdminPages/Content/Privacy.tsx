@@ -1,6 +1,12 @@
 import { useState } from "react";
-import AdminPage from "../../../components/admin/AdminPage";
-import { PanelFooter } from "../../../components/admin/ContentPanel";
+import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import {
+  CompactField,
+  CompactFormFooter,
+  CompactFormPanel,
+  CompactFormRow,
+  compactInputClass,
+} from "../../../components/admin/ContentPanel";
 
 const TYPE_OPTIONS = ["Privacy", "Disclaimer", "Terms of Service"];
 
@@ -23,77 +29,60 @@ export default function PrivacyPage() {
     <AdminPage
       narrowPanel
       title="Privacy and Disclaimer"
-      panelTitle="Privacy and Disclaimer"
-      action={
-        !showForm ? (
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="text-sm font-medium text-blue-700 hover:underline"
-          >
-            + Add New
-          </button>
-        ) : undefined
-      }
-      footer={
+      headerAction={!showForm ? <AddNewButton label="Add New" onClick={() => setShowForm(true)} /> : undefined}
+      between={
         showForm ? (
-          <PanelFooter
-            message="You are creating Privacy and Disclaimer"
-            actionLabel="Save"
-            onAction={() => setShowForm(false)}
-            cancelLabel="Cancel"
-            onCancel={handleCancel}
-          />
+          <CompactFormPanel
+            footer={<CompactFormFooter onSave={() => setShowForm(false)} onCancel={handleCancel} />}
+          >
+            <CompactFormRow>
+              <CompactField label="Type" required className="w-[150px] shrink-0 flex-none">
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  className={compactInputClass}
+                >
+                  {TYPE_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </CompactField>
+              <CompactField label="Description" required className="min-w-[160px] flex-1">
+                <input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Description"
+                  className={compactInputClass}
+                />
+              </CompactField>
+            </CompactFormRow>
+            <CompactFormRow className="items-center pt-0.5">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                <input
+                  type="checkbox"
+                  checked={web}
+                  onChange={(e) => setWeb(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-ad-green"
+                />
+                Web
+              </label>
+              <label className="flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                <input
+                  type="checkbox"
+                  checked={mobile}
+                  onChange={(e) => setMobile(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-ad-green"
+                />
+                Mobile App
+              </label>
+            </CompactFormRow>
+          </CompactFormPanel>
         ) : undefined
       }
     >
-      {showForm && (
-      <div className="space-y-4">
-        <div>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="w-full max-w-xs appearance-none rounded border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-ad-purple focus:outline-none"
-          >
-            {TYPE_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-bold text-ad-green-dark">Description</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Answer"
-            rows={8}
-            className="w-full rounded border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-ad-purple focus:outline-none"
-          />
-        </div>
-        <div className="flex gap-6">
-          <label className="flex items-center gap-2 text-sm font-bold text-ad-green-dark">
-            <input
-              type="checkbox"
-              checked={web}
-              onChange={(e) => setWeb(e.target.checked)}
-              className="h-4 w-4 accent-ad-green"
-            />
-            Web
-          </label>
-          <label className="flex items-center gap-2 text-sm font-bold text-ad-green-dark">
-            <input
-              type="checkbox"
-              checked={mobile}
-              onChange={(e) => setMobile(e.target.checked)}
-              className="h-4 w-4 accent-ad-green"
-            />
-            Mobile App
-          </label>
-        </div>
-      </div>
-      )}
+      <p className="text-sm text-gray-500">No entries yet. Click &quot;+ Add New&quot; to create one.</p>
     </AdminPage>
   );
 }

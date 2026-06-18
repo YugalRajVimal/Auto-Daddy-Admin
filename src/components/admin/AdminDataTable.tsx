@@ -437,6 +437,7 @@ export function AdminDataTable<T>({
                 padding: "0 10px",
                 fontSize: 13,
                 outline: "none",
+                backgroundColor: "#fff",
               }}
               placeholder={searchPlaceholder}
             />

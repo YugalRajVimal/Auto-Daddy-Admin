@@ -962,7 +962,7 @@ const CarOwners: React.FC = () => {
               <input
                 value={search}
                 onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-                style={{ height: 30, width: 170, border: "1px solid #bbb", borderRadius: 2, padding: "0 10px", fontSize: 13, outline: "none" }}
+                style={{ height: 30, width: 170, border: "1px solid #bbb", borderRadius: 2, padding: "0 10px", fontSize: 13, outline: "none", backgroundColor: "#fff" }}
                 placeholder="Live Search here"
               />
               {selCount > 0 && <span style={{ fontSize: 12, color: "#555", fontWeight: 600, whiteSpace: "nowrap" }}>{selCount} selected</span>}

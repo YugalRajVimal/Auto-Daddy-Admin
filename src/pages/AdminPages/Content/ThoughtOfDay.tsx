@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { FiRefreshCw } from "react-icons/fi";
+import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import {
+  CompactAutoGrowTextarea,
+  CompactField,
+  CompactFormFooter,
+  CompactFormPanel,
+  CompactFormRow,
+  compactFixedFieldWidth,
+  compactInputClass,
+} from "../../../components/admin/ContentPanel";
 
 type NoteRow = {
   id: number;
@@ -24,12 +34,25 @@ const DUMMY_NOTES: NoteRow[] = [
   { id: 10, date: "2026-06-07", subject: "Super Admin", notes: "705 991 3785", country: "Canada", hasClip: false },
 ];
 
-export default function ThoughtOfDayPage() {
+const DEFAULT_NOTE =
+  "A goodman is always a best friend and, soonest to be choosen, longer to be retained it in-deed and, never to be parted with.";
+
+type ThoughtOfDayPageProps = {
+  initialShowForm?: boolean;
+};
+
+export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfDayPageProps) {
   const [notes] = useState(DUMMY_NOTES);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [showForm, setShowForm] = useState(initialShowForm);
+  const [date, setDate] = useState("2026-06-16");
+  const [country, setCountry] = useState("Canada");
+  const [title, setTitle] = useState("");
+  const [note, setNote] = useState(DEFAULT_NOTE);
+  const [attachImage, setAttachImage] = useState(false);
 
   const filtered = notes.filter(
     (n) =>
@@ -56,18 +79,90 @@ export default function ThoughtOfDayPage() {
     else setSelected(new Set(paged.map((n) => n.id)));
   };
 
-  return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="font-serif text-2xl font-bold text-gray-500 md:text-3xl">Today&apos;s Tip</h1>
-        <Link
-          to="/admin/thought-of-day/new"
-          className="rounded bg-ad-green px-4 py-2 text-sm font-bold text-white hover:bg-ad-green-dark"
-        >
-          New Note
-        </Link>
-      </div>
+  const resetForm = () => {
+    setDate("2026-06-16");
+    setCountry("Canada");
+    setTitle("");
+    setNote(DEFAULT_NOTE);
+    setAttachImage(false);
+  };
 
+  const handleCancel = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  const handleSave = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  return (
+    <AdminPage
+      title="Today's Tip"
+      headerAction={!showForm ? <AddNewButton label="New Note" onClick={() => setShowForm(true)} /> : undefined}
+      between={
+        showForm ? (
+          <CompactFormPanel
+            footer={<CompactFormFooter onSave={handleSave} onCancel={handleCancel} />}
+          >
+            <CompactFormRow className="items-start">
+              <CompactField label="Date" required className="w-[110px] shrink-0 flex-none sm:w-[130px]">
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className={compactInputClass}
+                />
+              </CompactField>
+              <CompactField label="Country" required className={compactFixedFieldWidth}>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className={compactInputClass}
+                >
+                  <option value="Canada">Canada</option>
+                  <option value="USA">USA</option>
+                </select>
+              </CompactField>
+              <CompactField label="Title" required className="w-[200px] shrink-0 flex-none sm:w-[260px]">
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className={compactInputClass}
+                />
+              </CompactField>
+              <CompactField label="Note" required className="min-w-[200px] flex-1">
+                <CompactAutoGrowTextarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </CompactField>
+            </CompactFormRow>
+            <CompactFormRow className="justify-end">
+              <div className="flex flex-col items-end gap-1.5">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                  <input
+                    type="checkbox"
+                    checked={attachImage}
+                    onChange={(e) => setAttachImage(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-ad-green"
+                  />
+                  Attach Image of Receipt
+                </label>
+                {attachImage ? (
+                  <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
+                    Upload File
+                    <input type="file" accept="image/*" className="hidden" />
+                  </label>
+                ) : null}
+              </div>
+            </CompactFormRow>
+          </CompactFormPanel>
+        ) : undefined
+      }
+    >
       {/* Toolbar */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
@@ -93,7 +188,7 @@ export default function ThoughtOfDayPage() {
               setPage(1);
             }}
             placeholder="Live Search here"
-            className="border border-gray-400 px-2 py-1 text-xs"
+            className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
           <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
             Search
@@ -139,26 +234,30 @@ export default function ThoughtOfDayPage() {
             </tr>
           </thead>
           <tbody>
-            {paged.map((note, idx) => (
-              <tr key={note.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+            {paged.map((row, idx) => (
+              <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
                 <td className="border border-gray-300 px-2 py-2">
                   <input
                     type="checkbox"
-                    checked={selected.has(note.id)}
-                    onChange={() => toggleSelect(note.id)}
+                    checked={selected.has(row.id)}
+                    onChange={() => toggleSelect(row.id)}
                     className="accent-ad-purple"
                   />
                 </td>
                 <td className="border border-gray-300 px-3 py-2">
-                  <Link to={`/admin/thought-of-day/new`} className="text-blue-700 hover:underline">
-                    {note.date}
-                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(true)}
+                    className="text-blue-700 hover:underline"
+                  >
+                    {row.date}
+                  </button>
                 </td>
-                <td className="border border-gray-300 px-3 py-2">{note.subject}</td>
-                <td className="border border-gray-300 px-3 py-2">{note.notes}</td>
-                <td className="border border-gray-300 px-3 py-2">{note.country}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.subject}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.notes}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.country}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
-                  {note.hasClip ? (
+                  {row.hasClip ? (
                     <FiRefreshCw className="inline text-ad-green" size={16} />
                   ) : (
                     <span className="text-gray-500">--</span>
@@ -178,11 +277,10 @@ export default function ThoughtOfDayPage() {
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
-                page === p
+              className={`h-7 w-7 border text-xs font-medium ${page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-              }`}
+                }`}
             >
               {p}
             </button>
@@ -192,6 +290,6 @@ export default function ThoughtOfDayPage() {
           Deleted
         </Link>
       </div>
-    </div>
+    </AdminPage>
   );
 }

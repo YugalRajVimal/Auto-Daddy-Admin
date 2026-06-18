@@ -88,7 +88,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
             <div className="col-span-2 flex items-center justify-center md:col-span-1 md:self-center">
               <p className="font-serif text-base text-gray-700 md:text-lg lg:text-xl">
-                Login as : <span className="font-bold text-ad-green">{loginRole}</span>
+                Login as :{" "}
+                <span className="text-lg font-bold text-ad-green md:text-xl lg:text-2xl">{loginRole}</span>
               </p>
             </div>
 
@@ -104,13 +105,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                   Log out
                 </Link>
               </nav>
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-4">
                 <button
                   type="button"
                   className="relative text-blue-600 hover:text-blue-700"
                   aria-label="Notifications"
                 >
-                  <FiBell size={22} strokeWidth={1.75} />
+                  <FiBell size={26} strokeWidth={1.75} />
                   <span className="absolute -right-1.5 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold leading-none text-white">
                     1
                   </span>
@@ -166,7 +167,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
         {/* Sub nav — columns align with primary nav tabs on desktop */}
         {subItems.length > 0 && activePrimary && (
-          <div className="relative z-10 mt-0.5 bg-white lg:mt-1">
+          <div className="relative z-10 mt-[3px] bg-white lg:mt-[5px]">
             <div className="px-3 sm:px-4">
               <ul className="hidden w-full items-stretch overflow-visible lg:flex lg:gap-px lg:pb-1">
                 {visibleNav.map((item, colIndex) => {

@@ -933,7 +933,7 @@ const AutoShopOwners: React.FC = () => {
               </>
             )}
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-              <input value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} style={{ height: 30, width: 170, border: "1px solid #bbb", borderRadius: 2, padding: "0 10px", fontSize: 13, outline: "none" }} placeholder="Live Search here" />
+              <input value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} style={{ height: 30, width: 170, border: "1px solid #bbb", borderRadius: 2, padding: "0 10px", fontSize: 13, outline: "none", backgroundColor: "#fff" }} placeholder="Live Search here" />
               {selCount > 0 && <span style={{ fontSize: 12, color: "#555", fontWeight: 600, whiteSpace: "nowrap" }}>{selCount} selected</span>}
               {viewMode === "active" && <ColSelector visible={visibleCols} onChange={setVisibleCols} />}
             </div>
