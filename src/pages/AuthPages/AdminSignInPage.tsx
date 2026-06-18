@@ -70,7 +70,7 @@ export default function AdminSignInPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#eefbee] px-4 py-8 md:px-6">
+    <div style={{ backgroundColor: "#acfa70" }} className="flex min-h-screen flex-col items-center justify-center bg-white px-4 py-8 md:px-6">
       <div className="w-full max-w-3xl">
         <div className="relative">
           <p className="mb-2 text-right text-sm font-medium text-ad-green-dark md:absolute md:-top-7 md:right-0 md:mb-0">
@@ -105,11 +105,10 @@ export default function AdminSignInPage() {
 
               {status && (
                 <div
-                  className={`mb-4 rounded-lg border px-3 py-1.5 text-sm ${
-                    status.includes("successful") || status.includes("sent")
-                      ? "border-green-300 bg-green-50 text-green-800"
-                      : "border-red-300 bg-red-50 text-red-700"
-                  }`}
+                  className={`mb-4 rounded-lg border px-3 py-1.5 text-sm ${status.includes("successful") || status.includes("sent")
+                    ? "border-green-300 bg-green-50 text-green-800"
+                    : "border-red-300 bg-red-50 text-red-700"
+                    }`}
                 >
                   {status}
                 </div>
