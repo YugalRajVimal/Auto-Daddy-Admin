@@ -74,7 +74,7 @@ export default function App() {
         pauseOnHover
         theme="light"
       />
-      <div className="min-h-screen bg-ad-app-bg px-4 md:px-[160px]">
+      <div className="min-h-screen bg-ad-app-bg px-4 md:px-10 lg:px-14">
         <Router >
           <ScrollToTop />
 

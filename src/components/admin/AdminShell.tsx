@@ -51,7 +51,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   };
 
   const utilityLinkClass =
-    "inline-block border border-gray-300 bg-gray-50 px-2.5 py-0.5 text-[11px] text-gray-600 hover:bg-gray-100 sm:px-3 sm:text-xs";
+    "inline-block border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-300 sm:px-3 sm:text-xs";
 
   const subNavLinkClass =
     "block px-1.5 py-2 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1 lg:py-2 lg:text-xs lg:leading-tight lg:whitespace-normal";
@@ -60,7 +60,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
-      <div className="mx-auto flex w-full min-h-0 flex-1 flex-col lg:max-w-[1350px]">
+      <div className="flex w-full min-h-0 flex-1 flex-col">
         {/* Header: logo, login status, utilities */}
         <header className="px-3 pt-4 pb-2 sm:px-4 md:pt-5">
           <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-3 md:grid-cols-[auto_1fr_auto] md:gap-x-4">
@@ -87,7 +87,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </div>
 
             <div className="col-span-2 flex items-center justify-center md:col-span-1 md:self-center">
-              <p className="font-serif text-sm text-gray-700 md:text-base">
+              <p className="font-serif text-base text-gray-700 md:text-lg lg:text-xl">
                 Login as : <span className="font-bold text-ad-green">{loginRole}</span>
               </p>
             </div>
@@ -117,10 +117,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 </button>
                 <button
                   type="button"
-                  className="flex h-8 w-8 items-center justify-center border border-gray-300 bg-white text-gray-400 shadow-sm"
+                  className="flex h-11 w-11 items-center justify-center border border-gray-300 bg-white text-gray-400 shadow-sm sm:h-12 sm:w-12"
                   aria-label="Profile"
                 >
-                  <FiUser size={22} strokeWidth={1.75} />
+                  <FiUser size={28} strokeWidth={1.75} />
                 </button>
               </div>
             </div>
@@ -135,9 +135,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             {visibleNav.map((item) => {
               const isActive = activePrimary?.name === item.name;
               const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
-              const itemClass = `w-full border-0 border-b border-white/20 px-4 py-2 text-center text-sm font-medium transition-colors lg:rounded-t-none lg:rounded-b-lg lg:border-b lg:px-6 lg:py-2 ${isActive
-                ? "relative z-10 bg-white text-ad-purple lg:border-ad-purple lg:border-b-white"
-                : "bg-ad-purple text-white hover:bg-ad-purple-dark lg:border-ad-purple"
+              const itemClass = `w-full px-4 py-2 text-center text-sm font-medium transition-colors lg:rounded-t-none lg:rounded-b-lg lg:px-6 lg:py-2 ${isActive
+                ? "relative z-10 border border-ad-purple border-b-white bg-white text-ad-purple lg:border-b-white"
+                : "border-0 border-b border-white/20 bg-ad-purple text-white hover:bg-ad-purple-dark lg:border lg:border-ad-purple"
                 }`;
               return (
                 <li key={item.name} className="min-w-0 flex-1">

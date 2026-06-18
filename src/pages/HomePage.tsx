@@ -4,7 +4,7 @@ const LOGO = "/logo.png";
 
 const HomePage = () => {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-ad-login-bg px-4 py-10 -mx-4 md:-mx-[160px] md:px-[160px]">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-ad-login-bg px-4 py-10 -mx-4 md:-mx-10 md:px-10 lg:-mx-14 lg:px-14">
       <p className="absolute right-6 top-6 text-sm font-medium text-ad-green-dark md:text-base">
         Welcome to AutoDaddy
       </p>

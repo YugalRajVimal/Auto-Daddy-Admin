@@ -103,7 +103,7 @@ export default function AdminDashboardHome() {
   ];
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg px-6 py-4 sm:px-8 md:px-12 md:py-5 lg:px-16">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg px-4 py-4 sm:px-6 md:px-8 md:py-5 lg:px-10">
       <PageMeta title="Dashboard | AutoDaddy Admin" description="Admin dashboard" />
 
       {loading ? (

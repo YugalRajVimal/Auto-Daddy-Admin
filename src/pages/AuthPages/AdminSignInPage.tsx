@@ -96,7 +96,7 @@ export default function AdminSignInPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-ad-login-bg py-8 -mx-4 px-4 md:-mx-[160px] md:px-[160px]">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-ad-login-bg py-8 -mx-4 px-4 md:-mx-10 md:px-10 lg:-mx-14 lg:px-14">
       <div className="w-full max-w-3xl">
         <div className="relative">
           <p className="mb-2 text-right text-sm font-medium text-ad-green-dark md:absolute md:-top-7 md:right-0 md:mb-0">
