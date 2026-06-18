@@ -104,10 +104,17 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
       between={
         showForm ? (
           <CompactFormPanel
-            footer={<CompactFormFooter onSave={handleSave} onCancel={handleCancel} />}
+            footer={
+              <CompactFormFooter
+                message="You are creating a 'Thought of the Day'"
+                messageCenter
+                onSave={handleSave}
+                onCancel={handleCancel}
+              />
+            }
           >
             <CompactFormRow className="items-start">
-              <CompactField label="Date" required className="w-[110px] shrink-0 flex-none sm:w-[130px]">
+              <CompactField label="Date" required className={compactFixedFieldWidth}>
                 <input
                   type="date"
                   value={date}
@@ -140,8 +147,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 />
               </CompactField>
             </CompactFormRow>
-            <CompactFormRow className="justify-end">
-              <div className="flex flex-col items-end gap-1.5">
+            <CompactFormRow className="justify-start">
+              <div className="flex flex-col items-start gap-1.5">
                 <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
                   <input
                     type="checkbox"
@@ -227,9 +234,9 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 />
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Subject</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
             </tr>
           </thead>
@@ -253,9 +260,9 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                     {row.date}
                   </button>
                 </td>
+                <td className="border border-gray-300 px-3 py-2">{row.country}</td>
                 <td className="border border-gray-300 px-3 py-2">{row.subject}</td>
                 <td className="border border-gray-300 px-3 py-2">{row.notes}</td>
-                <td className="border border-gray-300 px-3 py-2">{row.country}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {row.hasClip ? (
                     <FiRefreshCw className="inline text-ad-green" size={16} />
@@ -278,8 +285,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
               type="button"
               onClick={() => setPage(p)}
               className={`h-7 w-7 border text-xs font-medium ${page === p
-                  ? "border-ad-green bg-ad-green text-white"
-                  : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                ? "border-ad-green bg-ad-green text-white"
+                : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
                 }`}
             >
               {p}

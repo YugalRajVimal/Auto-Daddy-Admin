@@ -27,7 +27,7 @@ export function ContentPanel({ children, title, action, footer, className = "" }
 }
 
 export const compactInputClass =
-  "w-full border border-gray-400 bg-white px-1.5 py-0.5 text-sm leading-tight focus:border-blue-500 focus:outline-none";
+  "w-full min-h-[36px] border border-gray-400 bg-white px-2.5 py-2 text-sm leading-normal focus:border-blue-500 focus:outline-none";
 
 export const compactFixedFieldWidth = "w-[140px] shrink-0 flex-none sm:w-[180px]";
 
@@ -93,7 +93,7 @@ export function CompactFormPanel({
     <div
       className={`relative mb-10 rounded border border-ad-form-border bg-ad-form-bg shadow-sm ${className}`}
     >
-      <div className="space-y-1.5 px-2.5 py-2">{children}</div>
+      <div className="min-h-[108px] space-y-5 px-4 py-5">{children}</div>
       {footer}
       <PanelBottomBorder />
     </div>
@@ -108,7 +108,7 @@ export function CompactFormRow({
   className?: string;
 }) {
   return (
-    <div className={`flex flex-wrap items-end gap-x-2 gap-y-1.5 ${className}`}>
+    <div className={`flex flex-wrap items-end gap-x-4 gap-y-4 ${className}`}>
       {children}
     </div>
   );
@@ -127,7 +127,7 @@ export function CompactField({
 }) {
   return (
     <div className={`min-w-0 flex-1 ${className}`}>
-      <label className="mb-0.5 block text-xs font-bold text-ad-green-dark">
+      <label className="mb-1.5 block text-xs font-bold text-ad-green-dark">
         {label}
         {required ? <span className="text-red-600"> *</span> : null}
       </label>
@@ -141,41 +141,66 @@ export function CompactFormFooter({
   onCancel,
   actionLabel = "Save",
   actionType = "button",
+  message,
+  messageCenter = false,
 }: {
   onSave?: () => void;
   onCancel?: () => void;
   actionLabel?: string;
   actionType?: "button" | "submit";
+  message?: ReactNode;
+  messageCenter?: boolean;
 }) {
+  const defaultMessage = (
+    <>
+      Marks (<span className="text-red-600">*</span>) are required.
+    </>
+  );
+  const footerMessage = message ?? defaultMessage;
+
+  const actions = (
+    <div className="flex items-center gap-2">
+      <button
+        type={actionType}
+        onClick={onSave}
+        className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95"
+      >
+        {actionLabel}
+        <span aria-hidden className="text-base leading-none">
+          →
+        </span>
+      </button>
+      {onCancel ? (
+        <span className="text-xs text-gray-700">
+          or{" "}
+          <button
+            type="button"
+            onClick={onCancel}
+            className="font-medium text-blue-600 underline hover:text-blue-700"
+          >
+            Cancel
+          </button>
+        </span>
+      ) : null}
+    </div>
+  );
+
+  if (messageCenter) {
+    return (
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+        <div />
+        <span className="text-center text-xs font-serif italic text-gray-800">{footerMessage}</span>
+        <div className="flex justify-end">{actions}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-stretch justify-between gap-2 border-t border-ad-form-border bg-ad-form-bg">
-      <div className="flex min-w-[180px] flex-1 items-center bg-ad-form-required-bg px-2.5 py-1.5 text-xs text-gray-800">
-        Marks (<span className="text-red-600">*</span>) are required.
+      <div className="flex min-w-[180px] flex-1 items-center bg-ad-form-required-bg px-3 py-2.5 text-xs text-gray-800">
+        {footerMessage}
       </div>
-      <div className="flex items-center gap-2 px-2.5 py-1.5">
-        <button
-          type={actionType}
-          onClick={onSave}
-          className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95"
-        >
-          {actionLabel}
-          <span aria-hidden className="text-base leading-none">
-            →
-          </span>
-        </button>
-        {onCancel ? (
-          <span className="text-xs text-gray-700">
-            or{" "}
-            <button
-              type="button"
-              onClick={onCancel}
-              className="font-medium text-blue-600 underline hover:text-blue-700"
-            >
-              Cancel
-            </button>
-          </span>
-        ) : null}
-      </div>
+      <div className="flex items-center gap-2 px-3 py-2.5">{actions}</div>
     </div>
   );
 }
