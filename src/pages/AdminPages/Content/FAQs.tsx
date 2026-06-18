@@ -43,16 +43,19 @@ export default function FAQsPage() {
 
   return (
     <AdminPage
+      narrowPanel
       title="FAQ Management"
       panelTitle="FAQ Management"
       action={
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="text-sm font-medium text-blue-700 hover:underline"
-        >
-          + Add New
-        </button>
+        !showForm ? (
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="text-sm font-medium text-blue-700 hover:underline"
+          >
+            + Add New
+          </button>
+        ) : undefined
       }
       footer={
         showForm ? (
@@ -63,8 +66,6 @@ export default function FAQsPage() {
             cancelLabel="Cancel"
             onCancel={handleCancel}
           />
-        ) : !showForm && faqs.length > 0 ? (
-          <PanelFooter message="You are creating FAQs" actionLabel="✕" onAction={() => {}} />
         ) : undefined
       }
     >

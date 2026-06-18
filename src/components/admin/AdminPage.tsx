@@ -8,6 +8,8 @@ type AdminPageProps = {
   action?: ReactNode;
   footer?: ReactNode;
   noPanel?: boolean;
+  /** Constrain the green content panel to ~55% width, centered */
+  narrowPanel?: boolean;
 };
 
 export default function AdminPage({
@@ -17,17 +19,26 @@ export default function AdminPage({
   action,
   footer,
   noPanel = false,
+  narrowPanel = false,
 }: AdminPageProps) {
+  const panel = noPanel ? (
+    children
+  ) : (
+    <ContentPanel title={panelTitle} action={action} footer={footer}>
+      {children}
+    </ContentPanel>
+  );
+
+  const showPageTitle = noPanel || !panelTitle;
+
   return (
     <div className="min-h-0 flex-1 overflow-y-auto bg-white px-6 py-4 md:px-12 md:py-5 lg:px-16">
-      <h1 className="mb-4 text-xl font-bold text-ad-green md:text-2xl">{title}</h1>
-      {noPanel ? (
-        children
-      ) : (
-        <ContentPanel title={panelTitle} action={action} footer={footer}>
-          {children}
-        </ContentPanel>
-      )}
+      <div className={narrowPanel ? "mx-auto w-full sm:w-[55%] sm:min-w-[320px]" : undefined}>
+        {showPageTitle && (
+          <h1 className="mb-4 text-xl font-bold text-ad-green md:text-2xl">{title}</h1>
+        )}
+        {panel}
+      </div>
     </div>
   );
 }

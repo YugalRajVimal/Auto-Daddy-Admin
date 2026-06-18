@@ -26,7 +26,7 @@ const WebsiteTemplates: React.FC = () => {
   };
 
   return (
-    <AdminPage title="Website Templates">
+    <AdminPage narrowPanel noPanel title="Website Templates">
       <div className="rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light p-4 md:p-5">
         <div className="mb-4 flex flex-wrap gap-4 border-b border-ad-green-dark/40 pb-4">
           {CATEGORIES.map((cat) => (

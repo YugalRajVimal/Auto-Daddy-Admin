@@ -9,6 +9,11 @@ export default function FeaturesPage() {
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
 
+  const handleCancel = () => {
+    setNewName("");
+    setShowForm(false);
+  };
+
   const handleSave = () => {
     if (!newName.trim()) return;
     setFeatures((prev) => [...prev, { id: prev.length + 1, name: newName.trim() }]);
@@ -18,23 +23,30 @@ export default function FeaturesPage() {
 
   return (
     <AdminPage
+      narrowPanel
       title="Product Features"
       panelTitle="Product Features"
       action={
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="text-sm font-medium text-blue-700 hover:underline"
-        >
-          + Add New
-        </button>
+        !showForm ? (
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="text-sm font-medium text-blue-700 hover:underline"
+          >
+            + Add New
+          </button>
+        ) : undefined
       }
       footer={
-        <PanelFooter
-          message="You are creating a Product Features for Display"
-          actionLabel="Save"
-          onAction={handleSave}
-        />
+        showForm ? (
+          <PanelFooter
+            message="You are creating a Product Features for Display"
+            actionLabel="Save"
+            onAction={handleSave}
+            cancelLabel="Cancel"
+            onCancel={handleCancel}
+          />
+        ) : undefined
       }
     >
       {showForm && (

@@ -22,6 +22,7 @@ export default function ThoughtOfDayNewPage() {
 
   return (
     <AdminPage
+      narrowPanel
       title="New Note"
       panelTitle="New Note"
       footer={

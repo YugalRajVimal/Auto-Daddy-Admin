@@ -5,24 +5,49 @@ import { PanelFooter } from "../../../components/admin/ContentPanel";
 const TYPE_OPTIONS = ["Privacy", "Disclaimer", "Terms of Service"];
 
 export default function PrivacyPage() {
+  const [showForm, setShowForm] = useState(false);
   const [type, setType] = useState("Privacy");
   const [description, setDescription] = useState("");
   const [web, setWeb] = useState(true);
   const [mobile, setMobile] = useState(false);
 
+  const handleCancel = () => {
+    setType("Privacy");
+    setDescription("");
+    setWeb(true);
+    setMobile(false);
+    setShowForm(false);
+  };
+
   return (
     <AdminPage
+      narrowPanel
       title="Privacy and Disclaimer"
       panelTitle="Privacy and Disclaimer"
       action={
-        <button type="button" className="text-sm font-medium text-blue-700 hover:underline">
-          + Add New
-        </button>
+        !showForm ? (
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="text-sm font-medium text-blue-700 hover:underline"
+          >
+            + Add New
+          </button>
+        ) : undefined
       }
       footer={
-        <PanelFooter message="You are creating Privacy and Disclaimer" actionLabel="Save" onAction={() => {}} />
+        showForm ? (
+          <PanelFooter
+            message="You are creating Privacy and Disclaimer"
+            actionLabel="Save"
+            onAction={() => setShowForm(false)}
+            cancelLabel="Cancel"
+            onCancel={handleCancel}
+          />
+        ) : undefined
       }
     >
+      {showForm && (
       <div className="space-y-4">
         <div>
           <select
@@ -68,6 +93,7 @@ export default function PrivacyPage() {
           </label>
         </div>
       </div>
+      )}
     </AdminPage>
   );
 }
