@@ -28,13 +28,19 @@ const LayoutContent: React.FC<{
   );
 };
 
+const BYPASS_AUTH = import.meta.env.DEV;
+
 const SubAdminAppLayout: React.FC = () => {
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean | null>(null);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean | null>(
+    BYPASS_AUTH ? true : null
+  );
   const [superAdminName, setSuperAdminName] = useState<string | undefined>();
   const [superAdminEmail, setSuperAdminEmail] = useState<string | undefined>();
   const [isLoggedInViaSuperAdmin, setIsLoggedInViaSuperAdmin] = useState<boolean>(false);
 
   useEffect(() => {
+    if (BYPASS_AUTH) return;
+
     const checkAdminAuth = async () => {
       try {
         const token = localStorage.getItem("admin-token");

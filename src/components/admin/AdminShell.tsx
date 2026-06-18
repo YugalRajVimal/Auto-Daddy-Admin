@@ -51,7 +51,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   };
 
   const utilityLinkClass =
-    "inline-block border border-gray-300 bg-gray-50 px-2.5 py-1 text-[11px] text-gray-600 hover:bg-gray-100 sm:px-3 sm:text-xs";
+    "inline-block border border-gray-300 bg-gray-50 px-2.5 py-0.5 text-[11px] text-gray-600 hover:bg-gray-100 sm:px-3 sm:text-xs";
 
   const subNavLinkClass =
     "block px-1.5 py-2 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1 lg:py-2 lg:text-xs lg:leading-tight lg:whitespace-normal";
@@ -93,7 +93,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </div>
 
             <div className="col-span-2 flex flex-col items-end gap-2 md:col-span-1 md:col-start-3 md:row-start-1">
-              <nav className="flex items-center gap-1 sm:gap-1.5" aria-label="Account actions">
+              <nav className="flex items-center gap-px" aria-label="Account actions">
                 <Link to="/admin/profile" className={utilityLinkClass}>
                   Admin
                 </Link>
@@ -117,7 +117,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 </button>
                 <button
                   type="button"
-                  className="flex h-10 w-10 items-center justify-center border border-gray-300 bg-white text-gray-400 shadow-sm"
+                  className="flex h-8 w-8 items-center justify-center border border-gray-300 bg-white text-gray-400 shadow-sm"
                   aria-label="Profile"
                 >
                   <FiUser size={22} strokeWidth={1.75} />
@@ -135,7 +135,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             {visibleNav.map((item) => {
               const isActive = activePrimary?.name === item.name;
               const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
-              const itemClass = `w-full border-0 border-b border-white/20 px-4 py-2.5 text-center text-sm font-medium transition-colors lg:rounded-t-none lg:rounded-b-lg lg:border-b lg:px-6 lg:py-3 ${isActive
+              const itemClass = `w-full border-0 border-b border-white/20 px-4 py-2 text-center text-sm font-medium transition-colors lg:rounded-t-none lg:rounded-b-lg lg:border-b lg:px-6 lg:py-2 ${isActive
                 ? "relative z-10 bg-white text-ad-purple lg:border-ad-purple lg:border-b-white"
                 : "bg-ad-purple text-white hover:bg-ad-purple-dark lg:border-ad-purple"
                 }`;
