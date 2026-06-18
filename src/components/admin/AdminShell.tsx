@@ -51,8 +51,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="flex min-h-screen flex-col bg-white font-sans">
+      <div className="mx-auto flex w-full min-h-0 flex-1 flex-col px-2 sm:px-3 lg:w-[92.5%] lg:max-w-[1350px] lg:px-0">
       {/* Top bar */}
-      <div className="relative flex items-center justify-between px-4 py-3 md:px-6">
+      <div className="relative flex items-center justify-between py-3">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -79,21 +80,21 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           Canada
         </span>
 
-        <div className="flex items-center gap-1 md:gap-2">
-          <span className="bg-ad-grey-light px-3 py-1.5 text-xs font-medium text-black md:px-4 md:text-sm">
+        <div className="grid w-[210px] grid-cols-3 gap-1 sm:w-[270px] md:gap-2 lg:w-[330px]">
+          <span className="flex items-center justify-center bg-ad-grey-light px-2 py-2 text-center text-xs font-medium text-black md:px-4 md:py-2.5 md:text-sm">
             Admin
           </span>
           <a
             href="https://autodaddy.ca"
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-ad-grey px-3 py-1.5 text-xs font-medium text-black hover:bg-gray-400 md:px-4 md:text-sm"
+            className="flex items-center justify-center bg-ad-grey px-2 py-2 text-center text-xs font-medium text-black hover:bg-gray-400 md:px-4 md:py-2.5 md:text-sm"
           >
             Help
           </a>
           <Link
             to="/admin/logout"
-            className="bg-ad-grey-dark px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 md:px-4 md:text-sm"
+            className="flex items-center justify-center bg-ad-grey-dark px-2 py-2 text-center text-xs font-medium text-white hover:opacity-90 md:px-4 md:py-2.5 md:text-sm"
           >
             Log out
           </Link>
@@ -104,21 +105,21 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <nav
         className={`bg-ad-purple ${mobileOpen ? "block" : "hidden lg:block"}`}
       >
-        <ul className="flex flex-col lg:flex-row lg:overflow-x-auto">
+        <ul className="flex flex-col lg:flex-row lg:w-full">
           {visibleNav.map((item) => {
             const isActive = activePrimary?.name === item.name;
             const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
+            const itemClass = `w-full border-0 border-b border-white/20 px-4 py-2.5 text-center text-sm font-medium transition-colors lg:border-b-0 lg:px-6 lg:py-3 ${isActive
+              ? "relative z-10 bg-white text-ad-purple"
+              : "text-white hover:bg-white/10"
+              }`;
             return (
-              <li key={item.name} className="flex-shrink-0">
+              <li key={item.name} className="min-w-0 flex-1">
                 {item.subItems ? (
                   <button
                     type="button"
                     onClick={() => handlePrimaryClick(item)}
-                    className={`w-full border-b border-white/20 px-4 py-2.5 text-sm font-medium transition-colors lg:border-b-0 lg:border-r lg:px-5 lg:py-3 ${
-                      isActive
-                        ? "relative z-10 bg-white text-ad-purple"
-                        : "text-white hover:bg-white/10"
-                    }`}
+                    className={itemClass}
                   >
                     {item.name}
                   </button>
@@ -126,11 +127,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                   <Link
                     to={firstPath}
                     onClick={() => setMobileOpen(false)}
-                    className={`block border-b border-white/20 px-4 py-2.5 text-sm font-medium transition-colors lg:border-b-0 lg:border-r lg:px-5 lg:py-3 ${
-                      isActive
-                        ? "relative z-10 bg-white text-ad-purple"
-                        : "text-white hover:bg-white/10"
-                    }`}
+                    className={`block ${itemClass}`}
                   >
                     {item.name}
                   </Link>
@@ -144,7 +141,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       {/* Sub nav */}
       {subItems.length > 0 && (
         <div className="relative z-10 -mt-px border-b-2 border-ad-purple bg-white">
-          <ul className="flex flex-wrap items-stretch gap-1 px-3 py-2 md:gap-0 md:px-4">
+          <ul className="flex flex-wrap items-stretch gap-2 py-2.5 md:gap-4">
             {subItems.map((sub) => {
               const active = isPathActive(location.pathname, sub.path);
               return (
@@ -157,9 +154,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                   )}
                   <Link
                     to={sub.path}
-                    className={`block px-3 py-1.5 text-sm text-blue-700 underline-offset-2 hover:underline ${
-                      active ? "bg-gray-200 font-medium" : ""
-                    }`}
+                    className={`block px-3 py-1.5 text-sm text-blue-700 underline-offset-2 hover:underline ${active ? "bg-gray-200 font-medium" : ""
+                      }`}
                   >
                     {sub.name}
                   </Link>
@@ -171,6 +167,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       )}
 
       <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+      </div>
     </div>
   );
 }

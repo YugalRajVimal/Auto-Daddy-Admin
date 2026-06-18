@@ -239,7 +239,7 @@ const Wallet: React.FC = () => {
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5 font-sans">
       <h1 className="mb-6 text-xl md:text-2xl font-bold text-ad-green mb-4">
         Wallet <span className="text-[28px] text-[#999]">(Job Card Payments)</span>
       </h1>

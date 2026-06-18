@@ -315,7 +315,7 @@ const CarCompany: React.FC = () => {
       {/* ── Page ──────────────────────────────────────────────────────────── */}
       <div
         // You may use Tailwind class if setup, or fallback to CSS below.
-        className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans"
+        className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5 font-sans"
       >
 
         {/* Heading */}

@@ -249,7 +249,7 @@ const Tasks: React.FC = () => {
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5">
       <h1 className="mb-4 text-xl font-bold text-ad-green md:text-2xl">Manage Tasks</h1>
 
       <div className="mb-5 flex flex-col md:flex-row gap-2 items-start md:items-center">

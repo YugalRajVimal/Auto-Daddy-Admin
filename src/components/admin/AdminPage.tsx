@@ -32,7 +32,7 @@ export default function AdminPage({
   const showPageTitle = noPanel || !panelTitle;
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-6 py-4 md:px-12 md:py-5 lg:px-16">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5">
       <div className={narrowPanel ? "mx-auto w-full sm:w-[55%] sm:min-w-[320px]" : undefined}>
         {showPageTitle && (
           <h1 className="mb-4 text-xl font-bold text-ad-green md:text-2xl">{title}</h1>

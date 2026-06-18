@@ -903,7 +903,7 @@ const AutoShopOwners: React.FC = () => {
       />
 
       {/* ── PAGE ── */}
-      <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5 font-sans">
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: "#2c8c2c", margin: 0 }}>Auto Shop Owners</h1>

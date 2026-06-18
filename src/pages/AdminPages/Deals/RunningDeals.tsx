@@ -227,7 +227,7 @@ const RunningDeals: React.FC = () => {
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-5 font-sans">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white py-4 md:py-5 font-sans">
       <h1 className="mb-1 text-xl md:text-2xl font-bold text-ad-green mb-4">Running Deals</h1>
       <p className="mb-6 text-[15px] text-[#777]">
         All currently active offers and deals for Auto Shop Owners
