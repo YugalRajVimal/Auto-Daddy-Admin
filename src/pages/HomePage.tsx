@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 
-const LOGO = "/autodaddy-logo.png";
+const LOGO = "/logo.png";
 
 const HomePage = () => {
   return (

@@ -215,21 +215,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
       <div className="max-w-lg w-full mx-auto bg-white rounded-3xl shadow-2xl border border-gray-200 p-0 overflow-hidden">
         {/* Header with logo and title */}
         <div className="bg-primary-700 py-7 px-8 flex flex-col items-center">
-          {/* Logo or Icon */}
-          <svg
-            className="w-12 h-12 mb-3 text-white"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 40 40"
-          >
-            <rect x="5" y="14" width="30" height="14" rx="4" fill="white" stroke="none"/>
-            <rect x="5" y="14" width="30" height="14" rx="4" stroke="currentColor" strokeWidth="2"/>
-            <rect x="11" y="8" width="18" height="8" rx="2" fill="white" stroke="none"/>
-            <rect x="11" y="8" width="18" height="8" rx="2" stroke="currentColor" strokeWidth="2"/>
-            <circle cx="13.5" cy="30" r="3" fill="white" stroke="currentColor" strokeWidth="2" />
-            <circle cx="26.5" cy="30" r="3" fill="white" stroke="currentColor" strokeWidth="2" />
-          </svg>
+          <img src="/logo.png" alt="AutoDaddy" className="mb-3 h-12 w-auto object-contain" />
           <h1 className="text-3xl font-bold text-gray-900 text-center">
             AutoShop Owner Onboarding
           </h1>

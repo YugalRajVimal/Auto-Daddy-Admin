@@ -5,7 +5,7 @@ const ADMIN_ROLE = "admin";
 const ADMIN_TOKEN_KEY = "admin-token";
 const ADMIN_HOME = "/admin";
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
-const LOGO = "/autodaddy-logo.png";
+const LOGO = "/logo.png";
 
 export default function AdminSignInPage() {
   const [email, setEmail] = useState("");
@@ -70,7 +70,7 @@ export default function AdminSignInPage() {
   }
 
   return (
-    <div style={{ backgroundColor: "#acfa70" }} className="flex min-h-screen flex-col items-center justify-center bg-white px-4 py-8 md:px-6">
+    <div style={{ backgroundColor: "#eef4fe" }} className="flex min-h-screen flex-col items-center justify-center bg-white px-4 py-8 md:px-6">
       <div className="w-full max-w-3xl">
         <div className="relative">
           <p className="mb-2 text-right text-sm font-medium text-ad-green-dark md:absolute md:-top-7 md:right-0 md:mb-0">
@@ -88,7 +88,7 @@ export default function AdminSignInPage() {
               <p className="max-w-[220px] text-center font-serif text-sm italic leading-relaxed text-ad-green-dark">
                 A Digital Bridge - that connects with
               </p>
-              <p className="mt-2 max-w-[220px] text-center text-base font-bold leading-snug text-black">
+              <p className="mt-2 whitespace-nowrap text-center text-base font-bold leading-snug text-black">
                 Voice of your &lsquo;Happy Customers&rsquo;
               </p>
             </div>

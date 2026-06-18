@@ -6,7 +6,7 @@ const SUBADMIN_TOKEN_KEY = "admin-token";
 const SUBADMIN_ROLE_KEY = "admin-role";
 const ADMIN_HOME = "/admin";
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
-const LOGO = "/autodaddy-logo.png";
+const LOGO = "/logo.png";
 
 export default function SubAdminSignInPage() {
   const [email, setEmail] = useState("");
@@ -64,11 +64,10 @@ export default function SubAdminSignInPage() {
 
           {status && (
             <div
-              className={`mb-4 rounded-lg border px-3 py-2 text-sm ${
-                status.includes("successful")
+              className={`mb-4 rounded-lg border px-3 py-2 text-sm ${status.includes("successful")
                   ? "border-green-300 bg-green-50 text-green-800"
                   : "border-red-300 bg-red-50 text-red-700"
-              }`}
+                }`}
             >
               {status}
             </div>

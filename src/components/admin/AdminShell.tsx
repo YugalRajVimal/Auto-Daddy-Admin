@@ -9,7 +9,7 @@ import {
   type NavSubItem,
 } from "../../config/adminNav";
 
-const LOGO = "/autodaddy-logo.png";
+const LOGO = "/logo.png";
 
 function filterNavItem(item: NavItem, canView: (m: string) => boolean, isAdmin: boolean): NavItem | null {
   if (item.adminOnly && !isAdmin) return null;
