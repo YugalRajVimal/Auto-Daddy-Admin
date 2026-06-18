@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import OtpInput from "../../components/form/input/OtpInput";
 
 const ADMIN_ROLE = "admin";
@@ -15,6 +16,7 @@ function formatCooldown(seconds: number) {
 }
 
 export default function AdminSignInPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -81,7 +83,7 @@ export default function AdminSignInPage() {
         localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
         setStatus("Login successful!");
         setTimeout(() => {
-          window.location.href = ADMIN_HOME;
+          navigate(ADMIN_HOME, { replace: true });
         }, 800);
       } else {
         setStatus(data?.message || "OTP verification failed");
