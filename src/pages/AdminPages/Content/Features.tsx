@@ -12,24 +12,32 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 
+const USER_OPTIONS = [
+  { value: "car-owner", label: "Car Owner" },
+  { value: "mechanic", label: "Mechanic" },
+  { value: "shop-owner", label: "Shop Owner" },
+  { value: "associate", label: "Associate" },
+  { value: "dealer", label: "Dealer" },
+];
+
 type FeatureRow = {
   id: number;
   date: string;
-  subject: string;
-  notes: string;
+  user: string;
+  feature: string;
   country: string;
   hasClip: boolean;
 };
 
 const DUMMY_FEATURES: FeatureRow[] = [
-  { id: 1, date: "2026-06-16", subject: "Car Brands Speciality", notes: "Premium service coverage", country: "Canada", hasClip: true },
-  { id: 2, date: "2026-06-15", subject: "Roadside Assistance", notes: "24/7 emergency support", country: "Canada", hasClip: false },
-  { id: 3, date: "2026-06-14", subject: "Fleet Management", notes: "Multi-vehicle tracking", country: "USA", hasClip: true },
-  { id: 4, date: "2026-06-13", subject: "Oil Change Reminders", notes: "Automated scheduling", country: "Canada", hasClip: false },
-  { id: 5, date: "2026-06-12", subject: "Tire Rotation", notes: "Seasonal tire swaps", country: "Canada", hasClip: true },
+  { id: 1, date: "2026-06-16", user: "car-owner", feature: "Premium service coverage", country: "Canada", hasClip: true },
+  { id: 2, date: "2026-06-15", user: "car-owner", feature: "24/7 emergency support", country: "Canada", hasClip: false },
+  { id: 3, date: "2026-06-14", user: "shop-owner", feature: "Multi-vehicle tracking", country: "USA", hasClip: true },
+  { id: 4, date: "2026-06-13", user: "mechanic", feature: "Automated scheduling", country: "Canada", hasClip: false },
+  { id: 5, date: "2026-06-12", user: "car-owner", feature: "Seasonal tire swaps", country: "Canada", hasClip: true },
 ];
 
-const DEFAULT_NOTES = "Describe the product feature and its benefits.";
+const DEFAULT_FEATURE = "Describe the product feature and its benefits.";
 
 type FeaturesPageProps = {
   initialShowForm?: boolean;
@@ -44,15 +52,15 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   const [showForm, setShowForm] = useState(initialShowForm);
   const [date, setDate] = useState("2026-06-16");
   const [country, setCountry] = useState("Canada");
-  const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState(DEFAULT_NOTES);
+  const [user, setUser] = useState("car-owner");
+  const [feature, setFeature] = useState(DEFAULT_FEATURE);
   const [attachImage, setAttachImage] = useState(false);
 
   const filtered = features.filter(
     (f) =>
       f.date.includes(search) ||
-      f.subject.toLowerCase().includes(search.toLowerCase()) ||
-      f.notes.toLowerCase().includes(search.toLowerCase()) ||
+      f.user.toLowerCase().includes(search.toLowerCase()) ||
+      f.feature.toLowerCase().includes(search.toLowerCase()) ||
       f.country.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -76,8 +84,8 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   const resetForm = () => {
     setDate("2026-06-16");
     setCountry("Canada");
-    setTitle("");
-    setNotes(DEFAULT_NOTES);
+    setUser("car-owner");
+    setFeature(DEFAULT_FEATURE);
     setAttachImage(false);
   };
 
@@ -126,18 +134,23 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                   <option value="USA">USA</option>
                 </select>
               </CompactField>
-              <CompactField label="Feature" required className="w-[200px] shrink-0 flex-none sm:w-[260px]">
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+              <CompactField label="User" required className={compactFixedFieldWidth}>
+                <select
+                  value={user}
+                  onChange={(e) => setUser(e.target.value)}
                   className={compactInputClass}
-                />
+                >
+                  {USER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </CompactField>
-              <CompactField label="Notes" required className="min-w-[200px] flex-1">
+              <CompactField label="Feature" required className="min-w-[200px] flex-1">
                 <CompactAutoGrowTextarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  value={feature}
+                  onChange={(e) => setFeature(e.target.value)}
                 />
               </CompactField>
             </CompactFormRow>
@@ -227,8 +240,8 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Country</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Feature</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
             </tr>
           </thead>
@@ -253,8 +266,10 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                   </button>
                 </td>
                 <td className="border border-gray-300 px-3 py-2">{row.country}</td>
-                <td className="border border-gray-300 px-3 py-2">{row.subject}</td>
-                <td className="border border-gray-300 px-3 py-2">{row.notes}</td>
+                <td className="border border-gray-300 px-3 py-2">
+                  {USER_OPTIONS.find((o) => o.value === row.user)?.label ?? row.user}
+                </td>
+                <td className="border border-gray-300 px-3 py-2">{row.feature}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {row.hasClip ? (
                     <FiRefreshCw className="inline text-ad-green" size={16} />

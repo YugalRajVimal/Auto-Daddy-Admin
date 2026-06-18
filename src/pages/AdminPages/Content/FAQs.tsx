@@ -12,22 +12,28 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 
-const ROLE_OPTIONS = ["Car Owner", "Mechanics", "Washing", "Sub-Admin", "Tow Truck"];
+const USER_OPTIONS = [
+  { value: "car-owner", label: "Car Owner" },
+  { value: "mechanic", label: "Mechanic" },
+  { value: "shop-owner", label: "Shop Owner" },
+  { value: "associate", label: "Associate" },
+  { value: "dealer", label: "Dealer" },
+];
 
 type FaqRow = {
   id: number;
   date: string;
   subject: string;
   notes: string;
-  country: string;
+  user: string;
   hasClip: boolean;
 };
 
 const DUMMY_FAQS: FaqRow[] = [
-  { id: 1, date: "2026-06-16", subject: "How do I book a service?", notes: "Use the app to select a shop and time.", country: "Canada", hasClip: false },
-  { id: 2, date: "2026-06-15", subject: "What payment methods are accepted?", notes: "Credit card, debit, and wallet.", country: "Canada", hasClip: true },
-  { id: 3, date: "2026-06-14", subject: "Can I cancel an appointment?", notes: "Yes, up to 24 hours before.", country: "USA", hasClip: false },
-  { id: 4, date: "2026-06-13", subject: "How do mechanics join?", notes: "Complete the vendor onboarding form.", country: "Canada", hasClip: true },
+  { id: 1, date: "2026-06-16", subject: "How do I book a service?", notes: "Use the app to select a shop and time.", user: "car-owner", hasClip: false },
+  { id: 2, date: "2026-06-15", subject: "What payment methods are accepted?", notes: "Credit card, debit, and wallet.", user: "car-owner", hasClip: true },
+  { id: 3, date: "2026-06-14", subject: "Can I cancel an appointment?", notes: "Yes, up to 24 hours before.", user: "shop-owner", hasClip: false },
+  { id: 4, date: "2026-06-13", subject: "How do mechanics join?", notes: "Complete the vendor onboarding form.", user: "mechanic", hasClip: true },
 ];
 
 const DEFAULT_ANSWER = "Answer";
@@ -44,24 +50,18 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [date, setDate] = useState("2026-06-16");
-  const [country, setCountry] = useState("Canada");
+  const [user, setUser] = useState("car-owner");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(DEFAULT_ANSWER);
-  const [roles, setRoles] = useState<Record<string, boolean>>({
-    "Car Owner": false,
-    Mechanics: true,
-    Washing: false,
-    "Sub-Admin": false,
-    "Tow Truck": false,
-  });
-  const [attachImage, setAttachImage] = useState(false);
 
   const filtered = faqs.filter(
     (f) =>
       f.date.includes(search) ||
       f.subject.toLowerCase().includes(search.toLowerCase()) ||
       f.notes.toLowerCase().includes(search.toLowerCase()) ||
-      f.country.toLowerCase().includes(search.toLowerCase())
+      (USER_OPTIONS.find((o) => o.value === f.user)?.label ?? f.user)
+        .toLowerCase()
+        .includes(search.toLowerCase())
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
@@ -81,23 +81,11 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     else setSelected(new Set(paged.map((f) => f.id)));
   };
 
-  const toggleRole = (role: string) => {
-    setRoles((prev) => ({ ...prev, [role]: !prev[role] }));
-  };
-
   const resetForm = () => {
     setDate("2026-06-16");
-    setCountry("Canada");
+    setUser("car-owner");
     setQuestion("");
     setAnswer(DEFAULT_ANSWER);
-    setRoles({
-      "Car Owner": false,
-      Mechanics: true,
-      Washing: false,
-      "Sub-Admin": false,
-      "Tow Truck": false,
-    });
-    setAttachImage(false);
   };
 
   const handleCancel = () => {
@@ -127,6 +115,19 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
             }
           >
             <CompactFormRow className="items-start">
+              <CompactField label="User" required className={compactFixedFieldWidth}>
+                <select
+                  value={user}
+                  onChange={(e) => setUser(e.target.value)}
+                  className={compactInputClass}
+                >
+                  {USER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </CompactField>
               <CompactField label="Date" required className={compactFixedFieldWidth}>
                 <input
                   type="date"
@@ -135,23 +136,11 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Country" required className={compactFixedFieldWidth}>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className={compactInputClass}
-                >
-                  <option value="Canada">Canada</option>
-                  <option value="USA">USA</option>
-                </select>
-              </CompactField>
-              <CompactField label="Question" required className="w-[200px] shrink-0 flex-none sm:w-[260px]">
-                <input
-                  type="text"
+              <CompactField label="Question" required className="min-w-[200px] flex-1">
+                <CompactAutoGrowTextarea
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   placeholder="Question ?"
-                  className={compactInputClass}
                 />
               </CompactField>
               <CompactField label="Answer" required className="min-w-[200px] flex-1">
@@ -160,38 +149,6 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                   onChange={(e) => setAnswer(e.target.value)}
                 />
               </CompactField>
-            </CompactFormRow>
-            <CompactFormRow className="items-center">
-              {ROLE_OPTIONS.map((role) => (
-                <label key={role} className="flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                  <input
-                    type="checkbox"
-                    checked={roles[role]}
-                    onChange={() => toggleRole(role)}
-                    className="h-3.5 w-3.5 accent-ad-green"
-                  />
-                  {role}
-                </label>
-              ))}
-            </CompactFormRow>
-            <CompactFormRow className="justify-start">
-              <div className="flex flex-col items-start gap-1.5">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                  <input
-                    type="checkbox"
-                    checked={attachImage}
-                    onChange={(e) => setAttachImage(e.target.checked)}
-                    className="h-3.5 w-3.5 accent-ad-green"
-                  />
-                  Attach Image
-                </label>
-                {attachImage ? (
-                  <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
-                    Upload File
-                    <input type="file" accept="image/*" className="hidden" />
-                  </label>
-                ) : null}
-              </div>
             </CompactFormRow>
           </CompactFormPanel>
         ) : undefined
@@ -258,8 +215,8 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                   className="accent-white"
                 />
               </th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Question</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Answer</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
@@ -282,10 +239,10 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                     onClick={() => setShowForm(true)}
                     className="text-blue-700 hover:underline"
                   >
-                    {row.date}
+                    {USER_OPTIONS.find((o) => o.value === row.user)?.label ?? row.user}
                   </button>
                 </td>
-                <td className="border border-gray-300 px-3 py-2">{row.country}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.date}</td>
                 <td className="border border-gray-300 px-3 py-2">{row.subject}</td>
                 <td className="border border-gray-300 px-3 py-2">{row.notes}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">

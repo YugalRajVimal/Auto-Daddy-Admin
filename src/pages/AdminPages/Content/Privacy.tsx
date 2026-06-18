@@ -12,7 +12,11 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 
-const TYPE_OPTIONS = ["Privacy", "Disclaimer", "Terms of Service"];
+const TYPE_BASE_OPTIONS = ["Privacy", "Disclaimer", "Terms of Service"];
+const TYPE_OPTIONS = TYPE_BASE_OPTIONS.flatMap((base) => [
+  `${base} - Web`,
+  `${base} - App`,
+]);
 
 type PrivacyRow = {
   id: number;
@@ -24,9 +28,9 @@ type PrivacyRow = {
 };
 
 const DUMMY_ENTRIES: PrivacyRow[] = [
-  { id: 1, date: "2026-06-16", subject: "Privacy", notes: "User data collection and usage policy", country: "Canada", hasClip: false },
-  { id: 2, date: "2026-06-15", subject: "Disclaimer", notes: "Service liability limitations", country: "Canada", hasClip: true },
-  { id: 3, date: "2026-06-14", subject: "Terms of Service", notes: "Platform usage agreement", country: "USA", hasClip: false },
+  { id: 1, date: "2026-06-16", subject: "Privacy - Web", notes: "User data collection and usage policy", country: "Canada", hasClip: false },
+  { id: 2, date: "2026-06-15", subject: "Disclaimer - App", notes: "Service liability limitations", country: "Canada", hasClip: true },
+  { id: 3, date: "2026-06-14", subject: "Terms of Service - Web", notes: "Platform usage agreement", country: "USA", hasClip: false },
 ];
 
 type PrivacyPageProps = {
@@ -42,11 +46,9 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   const [showForm, setShowForm] = useState(initialShowForm);
   const [date, setDate] = useState("2026-06-16");
   const [country, setCountry] = useState("Canada");
-  const [type, setType] = useState("Privacy");
+  const [type, setType] = useState("Privacy - Web");
   const [description, setDescription] = useState("");
-  const [web, setWeb] = useState(true);
-  const [mobile, setMobile] = useState(false);
-  const [attachImage, setAttachImage] = useState(false);
+  const [attachFile, setAttachFile] = useState(false);
 
   const filtered = entries.filter(
     (e) =>
@@ -76,11 +78,9 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   const resetForm = () => {
     setDate("2026-06-16");
     setCountry("Canada");
-    setType("Privacy");
+    setType("Privacy - Web");
     setDescription("");
-    setWeb(true);
-    setMobile(false);
-    setAttachImage(false);
+    setAttachFile(false);
   };
 
   const handleCancel = () => {
@@ -128,7 +128,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                   <option value="USA">USA</option>
                 </select>
               </CompactField>
-              <CompactField label="Type" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
+              <CompactField label="Type" required className="w-[180px] shrink-0 flex-none sm:w-[220px]">
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
@@ -149,41 +149,21 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                 />
               </CompactField>
             </CompactFormRow>
-            <CompactFormRow className="items-center">
-              <label className="flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                <input
-                  type="checkbox"
-                  checked={web}
-                  onChange={(e) => setWeb(e.target.checked)}
-                  className="h-3.5 w-3.5 accent-ad-green"
-                />
-                Web
-              </label>
-              <label className="flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                <input
-                  type="checkbox"
-                  checked={mobile}
-                  onChange={(e) => setMobile(e.target.checked)}
-                  className="h-3.5 w-3.5 accent-ad-green"
-                />
-                Mobile App
-              </label>
-            </CompactFormRow>
             <CompactFormRow className="justify-start">
               <div className="flex flex-col items-start gap-1.5">
                 <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
                   <input
                     type="checkbox"
-                    checked={attachImage}
-                    onChange={(e) => setAttachImage(e.target.checked)}
+                    checked={attachFile}
+                    onChange={(e) => setAttachFile(e.target.checked)}
                     className="h-3.5 w-3.5 accent-ad-green"
                   />
-                  Attach Image
+                  Attach File
                 </label>
-                {attachImage ? (
+                {attachFile ? (
                   <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
                     Upload File
-                    <input type="file" accept="image/*" className="hidden" />
+                    <input type="file" className="hidden" />
                   </label>
                 ) : null}
               </div>
