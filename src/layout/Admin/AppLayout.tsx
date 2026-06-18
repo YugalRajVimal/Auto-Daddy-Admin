@@ -2,6 +2,9 @@ import { Outlet } from "react-router";
 import { useEffect, useState } from "react";
 import AdminShell from "../../components/admin/AdminShell";
 
+// TODO: set to false when re-enabling auth
+const BYPASS_AUTH = true;
+
 const LayoutContent: React.FC<{
   superAdminName?: string;
   superAdminEmail?: string;
@@ -27,8 +30,6 @@ const LayoutContent: React.FC<{
     </AdminShell>
   );
 };
-
-const BYPASS_AUTH = import.meta.env.DEV;
 
 const SubAdminAppLayout: React.FC = () => {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean | null>(
