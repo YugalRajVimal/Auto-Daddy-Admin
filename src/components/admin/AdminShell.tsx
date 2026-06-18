@@ -116,7 +116,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                     onClick={() => handlePrimaryClick(item)}
                     className={`w-full border-b border-white/20 px-4 py-2.5 text-sm font-medium transition-colors lg:border-b-0 lg:border-r lg:px-5 lg:py-3 ${
                       isActive
-                        ? "rounded-t-lg bg-white text-ad-purple"
+                        ? "relative z-10 bg-white text-ad-purple"
                         : "text-white hover:bg-white/10"
                     }`}
                   >
@@ -128,7 +128,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                     onClick={() => setMobileOpen(false)}
                     className={`block border-b border-white/20 px-4 py-2.5 text-sm font-medium transition-colors lg:border-b-0 lg:border-r lg:px-5 lg:py-3 ${
                       isActive
-                        ? "rounded-t-lg bg-white text-ad-purple"
+                        ? "relative z-10 bg-white text-ad-purple"
                         : "text-white hover:bg-white/10"
                     }`}
                   >
@@ -143,14 +143,17 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
       {/* Sub nav */}
       {subItems.length > 0 && (
-        <div className="relative border-b-2 border-ad-purple bg-white">
-          <ul className="flex flex-wrap items-center gap-1 px-3 py-2 md:gap-0 md:px-4">
+        <div className="relative z-10 -mt-px border-b-2 border-ad-purple bg-white">
+          <ul className="flex flex-wrap items-stretch gap-1 px-3 py-2 md:gap-0 md:px-4">
             {subItems.map((sub) => {
               const active = isPathActive(location.pathname, sub.path);
               return (
-                <li key={sub.path} className="relative">
+                <li key={sub.path} className="relative flex items-center">
                   {active && (
-                    <span className="absolute -top-[9px] left-1/2 hidden h-0 w-0 -translate-x-1/2 border-x-[7px] border-b-[7px] border-x-transparent border-b-ad-purple md:block" />
+                    <span
+                      className="pointer-events-none absolute bottom-0 left-1/2 z-10 hidden h-0 w-0 -translate-x-1/2 translate-y-full border-x-[7px] border-b-[7px] border-x-transparent border-b-ad-purple md:block"
+                      aria-hidden
+                    />
                   )}
                   <Link
                     to={sub.path}
