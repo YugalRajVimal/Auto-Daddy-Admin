@@ -79,7 +79,8 @@ export default function App() {
           <ScrollToTop />
 
           <Routes>
-            <Route index path="/" element={<Navigate to="/admin" replace />} />
+            {/* Login is the first page — no public homepage */}
+            <Route index path="/" element={<AdminSignInPage />} />
             {/* <Route index path="/" element={<HomePage />} /> */}
 
             <Route element={<AdminAppLayout />}>

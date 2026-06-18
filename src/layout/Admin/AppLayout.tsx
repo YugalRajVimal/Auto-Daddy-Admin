@@ -2,9 +2,6 @@ import { Outlet } from "react-router";
 import { useEffect, useState } from "react";
 import AdminShell from "../../components/admin/AdminShell";
 
-// TODO: set to false when re-enabling auth
-const BYPASS_AUTH = true;
-
 const LayoutContent: React.FC<{
   superAdminName?: string;
   superAdminEmail?: string;
@@ -32,16 +29,12 @@ const LayoutContent: React.FC<{
 };
 
 const SubAdminAppLayout: React.FC = () => {
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean | null>(
-    BYPASS_AUTH ? true : null
-  );
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean | null>(null);
   const [superAdminName, setSuperAdminName] = useState<string | undefined>();
   const [superAdminEmail, setSuperAdminEmail] = useState<string | undefined>();
   const [isLoggedInViaSuperAdmin, setIsLoggedInViaSuperAdmin] = useState<boolean>(false);
 
   useEffect(() => {
-    if (BYPASS_AUTH) return;
-
     const checkAdminAuth = async () => {
       try {
         const token = localStorage.getItem("admin-token");
