@@ -193,7 +193,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
   return (
     <AdminPage
       title="Services"
-      headerAction={!showForm ? <AddNewButton label="New Service" onClick={openAdd} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

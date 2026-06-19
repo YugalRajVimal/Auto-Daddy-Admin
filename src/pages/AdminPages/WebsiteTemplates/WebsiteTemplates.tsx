@@ -112,7 +112,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   return (
     <AdminPage
       title="Web - Temp"
-      headerAction={!showForm ? <AddNewButton label="New Template" onClick={() => setShowForm(true)} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

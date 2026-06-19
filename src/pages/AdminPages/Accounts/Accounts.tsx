@@ -133,7 +133,7 @@ export default function AccountsPage({ initialShowForm = false }: AccountsPagePr
   return (
     <AdminPage
       title="Accounts"
-      headerAction={!showForm ? <AddNewButton label="New Account" onClick={() => setShowForm(true)} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

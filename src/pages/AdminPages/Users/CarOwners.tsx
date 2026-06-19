@@ -2,6 +2,15 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import {
+  CompactAutoGrowTextarea,
+  CompactField,
+  CompactFormFooter,
+  CompactFormPanel,
+  CompactFormRow,
+  compactFixedFieldWidth,
+  compactInputClass,
+} from "../../../components/admin/ContentPanel";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type BusinessProfileType = {
@@ -14,15 +23,15 @@ type BusinessProfileType = {
 };
 type VehicleType = {
   _id: string; make?: { name?: string; model?: string }; year?: number; vinNo?: string;
-  licensePlateNo?: string; odometerReading?: number; carImages?: string[];
+  licensePlateNo?: string; odometerReading?: number; dueOdometerReading?: number; carImages?: string[];
   licensePlateFrontImagePath?: string; licensePlateBackImagePath?: string;
-  createdAt?: string; updatedAt?: string; status?: string; [key: string]: any;
+  createdAt?: string; updatedAt?: string; status?: string;[key: string]: any;
 };
 type JobCardType = {
   _id: string; business: BusinessProfileType; jobNo?: string | number;
   paymentStatus?: string; totalPayableAmount?: number; services?: any[];
   vehicleId?: { licensePlateNo?: string }; customerId?: any;
-  vehiclePhotos?: string[]; createdAt?: string; updatedAt?: string; [key: string]: any;
+  vehiclePhotos?: string[]; createdAt?: string; updatedAt?: string;[key: string]: any;
 };
 type CarOwnerType = {
   _id: string; name: string; email?: string; countryCode?: string; phone?: string;
@@ -362,16 +371,16 @@ const ProfileModal: React.FC<{
           />
           <GCRow label="Joining Date" value={fmtDate(owner.createdAt)} />
           <GCRow label="URL" value={
-            <a 
-              href={`https://autodaddy.ca/user`} 
-              target="_blank" 
+            <a
+              href={`https://autodaddy.ca/user`}
+              target="_blank"
               rel="noopener noreferrer"
               style={{ color: "#0073b7", textDecoration: "underline" }}
             >
               https://autodaddy.ca/user
             </a>
           } />
-     
+
           <div style={{ marginTop: 14 }}>
             <span style={GC_LABEL}>Image</span>
             <div style={{ display: "inline-flex", marginLeft: 18, border: "1px solid #bbb", background: "#fff", width: 120, height: 120, borderRadius: 6, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
@@ -483,199 +492,604 @@ function exportXL() {
   if (w) { w.document.write(html); w.document.close(); }
 }
 
+type CarCatalogModel = { modelName: string; years: (number | string)[] };
+type CarCatalogItem = { _id: string; companyName: string; models: CarCatalogModel[] };
+
+function normalizeYearOptions(years: (number | string)[]): string[] {
+  const out: string[] = [];
+  for (const y of years) {
+    if (typeof y === "number") out.push(String(y));
+    else if (typeof y === "string") {
+      y.split(",").forEach((part) => {
+        const t = part.trim();
+        if (t) out.push(t);
+      });
+    }
+  }
+  return [...new Set(out)].sort((a, b) => Number(b) - Number(a));
+}
+
 // ─── ADD/EDIT MODAL ───────────────────────────────────────────────────────────
 type VehicleFormRow = {
-  _id?: string; licensePlateNo: string; vinNo: string; vehicleName: string;
-  model: string; year: string; odometerReading: string;
-  vehicleImageFile: File | null; vehicleImagePreview: string;
+  _id?: string;
+  licensePlateNo: string;
+  vinNo: string;
+  vehicleName: string;
+  model: string;
+  year: string;
+  odometerReading: string;
+  nextDueService: string;
+  attachNextDueService: boolean;
+  attachVehiclePhoto: boolean;
+  vehicleImageFile: File | null;
+  vehicleImagePreview: string;
 };
 function emptyVehicle(): VehicleFormRow {
-  return { licensePlateNo: "", vinNo: "", vehicleName: "", model: "", year: "", odometerReading: "", vehicleImageFile: null, vehicleImagePreview: "" };
+  return {
+    licensePlateNo: "",
+    vinNo: "",
+    vehicleName: "",
+    model: "",
+    year: "",
+    odometerReading: "",
+    nextDueService: "",
+    attachNextDueService: false,
+    attachVehiclePhoto: false,
+    vehicleImageFile: null,
+    vehicleImagePreview: "",
+  };
 }
-const CALLING_CODES = [
-  { id: "CA", flag: "🇨🇦", code: "+1" }, { id: "US", flag: "🇺🇸", code: "+1" },
-  { id: "GB", flag: "🇬🇧", code: "+44" }, { id: "IN", flag: "🇮🇳", code: "+91" }, { id: "AU", flag: "🇦🇺", code: "+61" },
-];
 function isValidEmail(e: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()); }
-const iStyle: React.CSSProperties = { width: "100%", border: "1px solid #d2d6de", borderRadius: 3, padding: "7px 10px", fontSize: 13, outline: "none", boxSizing: "border-box", color: "#333", background: "#fff" };
-const lStyle: React.CSSProperties = { display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4, color: "#555", textTransform: "uppercase", letterSpacing: "0.04em" };
+const fieldErrorClass = "mt-0.5 text-[11px] font-semibold text-red-700";
+const uploadBtnClass =
+  "rounded border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300";
+const carOwnerRowFieldWidth = compactFixedFieldWidth;
+const carOwnerAddressFieldWidth = "min-w-[220px] flex-1 sm:min-w-[300px]";
+const vehicleGridClass = "grid w-full grid-cols-6 gap-x-4 gap-y-3 items-start";
+const vehicleFieldClass = "!flex-none min-w-0 w-full";
 
-function VehicleRowForm({ v, i, attempted, onChange, onRemove, canRemove }: {
-  v: VehicleFormRow; i: number; attempted: boolean;
+type ProvinceCityOption = { name: string; status?: string };
+type ProvinceWithCities = { cities?: ProvinceCityOption[] };
+
+function VehicleRowForm({ v, i, attempted, carCatalog, onChange, onRemove, canRemove }: {
+  v: VehicleFormRow; i: number; attempted: boolean; carCatalog: CarCatalogItem[];
   onChange: (p: Partial<VehicleFormRow>) => void; onRemove: () => void; canRemove: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+
+  const makeOptions = React.useMemo(
+    () => [...new Set(carCatalog.map((c) => c.companyName))].sort((a, b) => a.localeCompare(b)),
+    [carCatalog],
+  );
+  const modelOptions = React.useMemo(() => {
+    if (!v.vehicleName) return [];
+    const company = carCatalog.find((c) => c.companyName === v.vehicleName);
+    return (company?.models ?? []).map((m) => m.modelName).sort((a, b) => a.localeCompare(b));
+  }, [carCatalog, v.vehicleName]);
+  const yearOptions = React.useMemo(() => {
+    if (!v.vehicleName || !v.model) return [];
+    const company = carCatalog.find((c) => c.companyName === v.vehicleName);
+    const model = company?.models.find((m) => m.modelName === v.model);
+    return model ? normalizeYearOptions(model.years) : [];
+  }, [carCatalog, v.vehicleName, v.model]);
+
   return (
-    <div style={{ border: "1px solid #d2d6de", borderRadius: 4, padding: "12px 14px", background: "#f9fafc", marginBottom: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: "#9b308d" }}>Vehicle #{i + 1}</span>
-        {canRemove && <button type="button" onClick={onRemove} style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✕ Remove</button>}
+    <div className="mb-2 w-full rounded border border-gray-300 bg-white px-6 py-3 shadow-sm last:mb-0">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-bold text-ad-green-dark">Vehicle #{i + 1}</span>
+        {canRemove && (
+          <button type="button" onClick={onRemove} className="text-xs font-semibold text-red-600 hover:underline">
+            Remove
+          </button>
+        )}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 14px" }}>
-        <div>
-          <label style={lStyle}>License Plate *</label>
-          <input style={iStyle} value={v.licensePlateNo} onChange={e => onChange({ licensePlateNo: e.target.value.slice(0, 14) })} placeholder="e.g. ABC 1234" />
-          {attempted && !v.licensePlateNo.trim() && <p style={{ color: "#c0392b", fontSize: 11, margin: "2px 0 0", fontWeight: 600 }}>Required</p>}
-        </div>
-        <div>
-          <label style={lStyle}>VIN (17 chars)</label>
-          <input style={iStyle} value={v.vinNo} onChange={e => onChange({ vinNo: e.target.value.slice(0, 17).toUpperCase() })} placeholder="17-char VIN" maxLength={17} />
-          {attempted && v.vinNo && v.vinNo.length !== 17 && <p style={{ color: "#c0392b", fontSize: 11, margin: "2px 0 0", fontWeight: 600 }}>Must be 17 chars</p>}
-        </div>
-        <div>
-          <label style={lStyle}>Make *</label>
-          <input style={iStyle} value={v.vehicleName} onChange={e => onChange({ vehicleName: e.target.value })} placeholder="e.g. Toyota" />
-        </div>
-        <div>
-          <label style={lStyle}>Model *</label>
-          <input style={iStyle} value={v.model} onChange={e => onChange({ model: e.target.value })} placeholder="e.g. Camry" />
-        </div>
-        <div>
-          <label style={lStyle}>Year *</label>
-          <input style={iStyle} value={v.year} onChange={e => onChange({ year: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="e.g. 2020" maxLength={4} />
-        </div>
-        <div>
-          <label style={lStyle}>Odometer (km)</label>
-          <input style={iStyle} value={v.odometerReading} onChange={e => onChange({ odometerReading: e.target.value.replace(/\D/g, "") })} placeholder="e.g. 45000" />
-        </div>
-        <div style={{ gridColumn: "1/-1" }}>
-          <label style={lStyle}>Vehicle Image</label>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {v.vehicleImagePreview && <img src={v.vehicleImagePreview} alt="" style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 3, border: "1px solid #d2d6de" }} />}
-            <input ref={ref} type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
-              const file = e.target.files?.[0]; if (!file) return;
-              if (v.vehicleImagePreview?.startsWith("blob:")) URL.revokeObjectURL(v.vehicleImagePreview);
-              onChange({ vehicleImageFile: file, vehicleImagePreview: URL.createObjectURL(file) });
-            }} />
-            <button type="button" onClick={() => ref.current?.click()} style={{ padding: "6px 14px", border: "1px solid #d2d6de", borderRadius: 3, background: "#fff", color: "#555", fontSize: 12, cursor: "pointer" }}>
-              {v.vehicleImagePreview ? "Change" : "Upload"}
-            </button>
-            {v.vehicleImagePreview && (
-              <button type="button" onClick={() => { if (v.vehicleImagePreview?.startsWith("blob:")) URL.revokeObjectURL(v.vehicleImagePreview); onChange({ vehicleImageFile: null, vehicleImagePreview: "" }); if (ref.current) ref.current.value = ""; }} style={{ padding: "6px 10px", border: "1px solid #d2d6de", borderRadius: 3, background: "#fff", color: "#e74c3c", fontSize: 12, cursor: "pointer" }}>Remove</button>
+      <div className={vehicleGridClass}>
+        <CompactField label="Make" required className={vehicleFieldClass}>
+          <select
+            value={v.vehicleName}
+            onChange={(e) => onChange({ vehicleName: e.target.value, model: "", year: "" })}
+            className={compactInputClass}
+          >
+            <option value="">Select make</option>
+            {makeOptions.map((make) => (
+              <option key={make} value={make}>{make}</option>
+            ))}
+            {v.vehicleName && !makeOptions.includes(v.vehicleName) && (
+              <option value={v.vehicleName}>{v.vehicleName}</option>
             )}
-          </div>
+          </select>
+        </CompactField>
+        <CompactField label="Model" required className={vehicleFieldClass}>
+          <select
+            value={v.model}
+            onChange={(e) => onChange({ model: e.target.value, year: "" })}
+            disabled={!v.vehicleName}
+            className={`${compactInputClass} disabled:cursor-not-allowed disabled:bg-gray-100`}
+          >
+            <option value="">Select model</option>
+            {modelOptions.map((modelName) => (
+              <option key={modelName} value={modelName}>{modelName}</option>
+            ))}
+            {v.model && !modelOptions.includes(v.model) && (
+              <option value={v.model}>{v.model}</option>
+            )}
+          </select>
+        </CompactField>
+        <CompactField label="Year" required className={vehicleFieldClass}>
+          <select
+            value={v.year}
+            onChange={(e) => onChange({ year: e.target.value })}
+            disabled={!v.vehicleName || !v.model}
+            className={`${compactInputClass} disabled:cursor-not-allowed disabled:bg-gray-100`}
+          >
+            <option value="">Select year</option>
+            {yearOptions.map((year) => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+            {v.year && !yearOptions.includes(v.year) && (
+              <option value={v.year}>{v.year}</option>
+            )}
+          </select>
+        </CompactField>
+        <CompactField label="License Plate" required className={vehicleFieldClass}>
+          <input
+            type="text"
+            value={v.licensePlateNo}
+            onChange={(e) => onChange({ licensePlateNo: e.target.value.slice(0, 14) })}
+            placeholder="ABC 1234"
+            className={compactInputClass}
+          />
+          {attempted && !v.licensePlateNo.trim() && <p className={fieldErrorClass}>Required</p>}
+        </CompactField>
+        <CompactField label="VIN" className={vehicleFieldClass}>
+          <input
+            type="text"
+            value={v.vinNo}
+            onChange={(e) => onChange({ vinNo: e.target.value.slice(0, 17).toUpperCase() })}
+            placeholder="17-char VIN"
+            maxLength={17}
+            className={compactInputClass}
+          />
+          {attempted && v.vinNo && v.vinNo.length !== 17 && <p className={fieldErrorClass}>Must be 17 chars</p>}
+        </CompactField>
+        <div className="min-w-0 w-full">
+          <label className="mb-1 block text-xs font-bold text-ad-green-dark">Odometer</label>
+          <input
+            type="text"
+            value={v.odometerReading}
+            onChange={(e) => onChange({ odometerReading: e.target.value.replace(/\D/g, "") })}
+            placeholder="km"
+            className={compactInputClass}
+          />
+        </div>
+        <div className="col-start-1 min-w-0 w-full">
+          <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+            <input
+              type="checkbox"
+              checked={v.attachVehiclePhoto}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                if (!checked) {
+                  if (v.vehicleImagePreview?.startsWith("blob:")) URL.revokeObjectURL(v.vehicleImagePreview);
+                  onChange({
+                    attachVehiclePhoto: false,
+                    vehicleImageFile: null,
+                    vehicleImagePreview: "",
+                  });
+                  if (ref.current) ref.current.value = "";
+                } else {
+                  onChange({ attachVehiclePhoto: true });
+                }
+              }}
+              className="h-3.5 w-3.5 accent-ad-green"
+            />
+            Photo
+          </label>
+          {v.attachVehiclePhoto ? (
+            <div className="flex w-full min-w-0 items-center gap-1.5">
+              {v.vehicleImagePreview ? (
+                <img src={v.vehicleImagePreview} alt="" className="h-[30px] w-[30px] shrink-0 rounded border border-gray-300 object-cover" />
+              ) : null}
+              <input
+                readOnly
+                value={v.vehicleImageFile?.name ?? ""}
+                placeholder="No file chosen"
+                tabIndex={-1}
+                className={`${compactInputClass} min-w-0 flex-1 cursor-default`}
+              />
+              <button type="button" onClick={() => ref.current?.click()} className={`${uploadBtnClass} shrink-0`}>
+                Upload
+              </button>
+              <input
+                ref={ref}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (v.vehicleImagePreview?.startsWith("blob:")) URL.revokeObjectURL(v.vehicleImagePreview);
+                  onChange({ vehicleImageFile: file, vehicleImagePreview: URL.createObjectURL(file) });
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
+        <div className="col-start-6 min-w-0 w-full">
+          <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+            <input
+              type="checkbox"
+              checked={v.attachNextDueService}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                onChange({
+                  attachNextDueService: checked,
+                  ...(!checked ? { nextDueService: "" } : {}),
+                });
+              }}
+              className="h-3.5 w-3.5 accent-ad-green"
+            />
+            Next Due Service
+          </label>
+          {v.attachNextDueService ? (
+            <input
+              type="text"
+              value={v.nextDueService}
+              onChange={(e) => onChange({ nextDueService: e.target.value.replace(/\D/g, "") })}
+              placeholder="km"
+              className={compactInputClass}
+            />
+          ) : null}
         </div>
       </div>
     </div>
   );
 }
 
-const AddEditModal: React.FC<{ isOpen: boolean; onClose: () => void; onSaved: () => void; owner?: CarOwnerType | null; mode: "add" | "edit" }> = ({ isOpen, onClose, onSaved, owner, mode }) => {
-  const isEdit = mode === "edit";
+const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () => void; onSaved: () => void }> = ({ owner, onCancel, onSaved }) => {
+  const isEdit = !!owner;
   const [name, setName] = useState(""); const [email, setEmail] = useState("");
-  const [dialCode, setDialCode] = useState("+1"); const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("");
   const [pincode, setPincode] = useState(""); const [address, setAddress] = useState("");
-  const [city, setCity] = useState(""); const [vehicles, setVehicles] = useState<VehicleFormRow[]>([emptyVehicle()]);
+  const [city, setCity] = useState(""); const [joiningDate, setJoiningDate] = useState("");
+  const [vehicles, setVehicles] = useState<VehicleFormRow[]>([emptyVehicle()]);
+  const [attachEmail, setAttachEmail] = useState(false);
+  const [attachProfilePhoto, setAttachProfilePhoto] = useState(false);
   const [profileFile, setProfileFile] = useState<File | null>(null); const [profilePreview, setProfilePreview] = useState("");
   const [submitting, setSubmitting] = useState(false); const [attempted, setAttempted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [carCatalog, setCarCatalog] = useState<CarCatalogItem[]>([]);
   const pRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axios.get(`${API()}/api/admin/provinces`, { headers: getToken() });
+        if (cancelled) return;
+        const provinces: ProvinceWithCities[] = res.data?.data || [];
+        const names = new Set<string>();
+        for (const province of provinces) {
+          for (const c of province.cities || []) {
+            if (!c.status || c.status === "Active") names.add(c.name);
+          }
+        }
+        setCityOptions([...names].sort((a, b) => a.localeCompare(b)));
+      } catch {
+        if (!cancelled) setCityOptions([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axios.get(`${API()}/api/auto-shop-owner/car-details`, { headers: getToken() });
+        if (cancelled) return;
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          setCarCatalog(res.data.data);
+        } else {
+          setCarCatalog([]);
+        }
+      } catch {
+        if (!cancelled) setCarCatalog([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const citySelectOptions = React.useMemo(() => {
+    const names = new Set(cityOptions);
+    if (city.trim()) names.add(city.trim());
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [cityOptions, city]);
+
+  useEffect(() => {
     setAttempted(false); setApiError(null);
     if (isEdit && owner) {
-      setName(owner.name || ""); setEmail(owner.email || ""); setDialCode(owner.countryCode || "+1");
+      setName(owner.name || ""); setEmail(owner.email || "");
       setPhone(owner.phone || ""); setPincode(owner.pincode || ""); setAddress(owner.address || "");
-      setCity(owner.city || ""); setProfileFile(null); setProfilePreview(ownerProfileImg(owner));
+      setCity(owner.city || ""); setJoiningDate(fmtDate(owner.createdAt) !== "-" ? fmtDate(owner.createdAt) : "");
+      setAttachEmail(false); setAttachProfilePhoto(false); setProfileFile(null); setProfilePreview(ownerProfileImg(owner));
       setVehicles((owner.myVehicles ?? []).map(v => ({
         _id: v._id, licensePlateNo: v.licensePlateNo || "", vinNo: v.vinNo || "",
         vehicleName: getMakeName(v) === "-" ? "" : getMakeName(v),
         model: getMakeModel(v) === "-" ? "" : getMakeModel(v),
-        year: v.year ? String(v.year) : "", odometerReading: v.odometerReading != null ? String(v.odometerReading) : "",
-        vehicleImageFile: null, vehicleImagePreview: Array.isArray(v.carImages) && v.carImages[0] ? mediaUrl(v.carImages[0]) : "",
+        year: v.year ? String(v.year) : "",
+        odometerReading: v.odometerReading != null ? String(v.odometerReading) : "",
+        nextDueService: v.dueOdometerReading != null ? String(v.dueOdometerReading) : "",
+        attachNextDueService: false,
+        attachVehiclePhoto: false,
+        vehicleImageFile: null,
+        vehicleImagePreview: Array.isArray(v.carImages) && v.carImages[0] ? mediaUrl(v.carImages[0]) : "",
       })) || [emptyVehicle()]);
     } else {
-      setName(""); setEmail(""); setDialCode("+1"); setPhone(""); setPincode(""); setAddress(""); setCity("");
-      setProfileFile(null); setProfilePreview(""); setVehicles([emptyVehicle()]);
+      setName(""); setEmail(""); setPhone(""); setPincode(""); setAddress(""); setCity("");
+      setJoiningDate(new Date().toISOString().slice(0, 10));
+      setAttachEmail(false); setAttachProfilePhoto(false); setProfileFile(null); setProfilePreview(""); setVehicles([emptyVehicle()]);
     }
-  }, [isOpen, isEdit, owner]);
+  }, [isEdit, owner]);
 
   function validate(): string | null {
     if (!name.trim()) return "Name is required.";
-    if (!email.trim() || !isValidEmail(email)) return "Valid email required.";
+    if (attachEmail && (!email.trim() || !isValidEmail(email))) return "Valid email required.";
     if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
     if (!pincode.trim()) return "Zip code required.";
     return null;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setAttempted(true);
+  async function handleSave() {
+    setAttempted(true);
     const err = validate(); if (err) { setApiError(err); return; }
     setApiError(null);
     const filled = vehicles.filter(v => v.licensePlateNo.trim() || v.vehicleName.trim());
     const fd = new FormData();
     if (isEdit && owner) fd.append("carOwnerId", owner._id);
-    fd.append("name", name.trim()); fd.append("email", email.trim());
-    fd.append("countryCode", dialCode); fd.append("phone", phone.replace(/\D/g, ""));
+    fd.append("name", name.trim());
+    if (attachEmail && email.trim()) fd.append("email", email.trim());
+    fd.append("phone", phone.replace(/\D/g, ""));
     fd.append("pincode", pincode.trim().replace(/\s/g, "").toUpperCase());
     fd.append("address", address.trim().slice(0, 50));
     if (city.trim()) fd.append("city", city.trim());
+    if (joiningDate.trim()) fd.append("createdAt", joiningDate.trim());
     if (!isEdit) fd.append("role", "carowner");
-    fd.append("vehicles", JSON.stringify(filled.map(v => ({ ...(v._id ? { _id: v._id } : {}), licensePlateNo: v.licensePlateNo.trim(), vinNo: v.vinNo.trim(), vehicleName: v.vehicleName.trim(), model: v.model.trim(), year: v.year.trim(), odometerReading: v.odometerReading.trim() }))));
+    fd.append("vehicles", JSON.stringify(filled.map(v => ({
+      ...(v._id ? { _id: v._id } : {}),
+      licensePlateNo: v.licensePlateNo.trim(),
+      vinNo: v.vinNo.trim(),
+      vehicleName: v.vehicleName.trim(),
+      model: v.model.trim(),
+      year: v.year.trim(),
+      odometerReading: v.odometerReading.trim(),
+      ...(v.attachNextDueService && v.nextDueService.trim() ? { dueOdometerReading: v.nextDueService.trim() } : {}),
+    }))));
     if (profileFile) fd.append("profilePhoto", profileFile, profileFile.name);
-    filled.forEach((v, idx) => { if (v.vehicleImageFile) fd.append(`carImage_${idx}`, v.vehicleImageFile, v.vehicleImageFile.name); });
+    filled.forEach((v, idx) => {
+      if (v.attachVehiclePhoto && v.vehicleImageFile) {
+        fd.append(`carImage_${idx}`, v.vehicleImageFile, v.vehicleImageFile.name);
+      }
+    });
     setSubmitting(true);
     try {
       if (isEdit) await axios.put(`${API()}/api/admin/my-customers`, fd, { headers: getToken() });
       else await axios.post(`${API()}/api/admin/onboard-carowner`, fd, { headers: getToken() });
-      onSaved(); onClose();
+      onSaved();
     } catch (err: any) {
       setApiError(err?.response?.data?.message || (isEdit ? "Could not update." : "Could not add."));
     } finally { setSubmitting(false); }
   }
 
-  if (!isOpen) return null;
+  const formMessage = isEdit
+    ? "You are updating a 'Car Owner'"
+    : "You are creating a 'Car Owner'";
+
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", background: "rgba(0,0,0,0.48)", overflowY: "auto", padding: "30px 12px" }}>
-      <div style={{ background: "#fff", borderRadius: 4, width: "min(960px,96vw)", boxShadow: "0 8px 32px rgba(0,0,0,0.22)" }}>
-        <div style={{ background: "#9b308d", color: "#fff", padding: "13px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "4px 4px 0 0" }}>
-          <span style={{ fontWeight: 700, fontSize: 16 }}>{isEdit ? "✏️ Edit Car Owner" : "➕ Add New Car Owner"}</span>
-          <button onClick={onClose} disabled={submitting} type="button" style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer" }}>×</button>
+    <CompactFormPanel
+      footer={
+        <CompactFormFooter
+          message={formMessage}
+          messageCenter
+          actionLabel={submitting ? "Saving..." : "Save"}
+          onSave={handleSave}
+          onCancel={onCancel}
+        />
+      }
+    >
+      {apiError && (
+        <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
+          {apiError}
         </div>
-        <form onSubmit={handleSubmit} style={{ padding: "22px 24px" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#9b308d", borderBottom: "2px solid #9b308d", paddingBottom: 6, marginBottom: 16, textTransform: "uppercase" }}>Personal Information</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", border: "2px solid #d2d6de", background: "#e3f2fd", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              {profilePreview ? <img src={profilePreview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 20, color: "#90caf9", fontWeight: 700 }}>?</span>}
+      )}
+      <CompactFormRow className="items-start">
+        <CompactField label="Date" className={carOwnerRowFieldWidth}>
+          <input
+            type="date"
+            value={joiningDate}
+            onChange={(e) => setJoiningDate(e.target.value)}
+            className={compactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Phone" required className={carOwnerRowFieldWidth}>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            className={compactInputClass}
+          />
+          {attempted && phone.replace(/\D/g, "").length !== 10 && (
+            <p className={fieldErrorClass}>Must be 10 digits</p>
+          )}
+        </CompactField>
+        <CompactField label="Full Name" required className={carOwnerRowFieldWidth}>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value.slice(0, 20))}
+            className={compactInputClass}
+          />
+          {attempted && !name.trim() && <p className={fieldErrorClass}>Required</p>}
+        </CompactField>
+        <CompactField label="City" className={carOwnerRowFieldWidth}>
+          <select
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            className={compactInputClass}
+          >
+            <option value="">Select city</option>
+            {citySelectOptions.map((cityName) => (
+              <option key={cityName} value={cityName}>
+                {cityName}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+        <CompactField label="Zip / Postal Code" required className={carOwnerRowFieldWidth}>
+          <input
+            type="text"
+            value={pincode}
+            onChange={(e) => setPincode(e.target.value.slice(0, 10))}
+            placeholder="A1A 1A1"
+            className={compactInputClass}
+          />
+          {attempted && !pincode.trim() && <p className={fieldErrorClass}>Required</p>}
+        </CompactField>
+        <div className={`min-w-0 flex-1 ${carOwnerAddressFieldWidth}`}>
+          <label className="mb-1 block text-xs font-bold text-ad-green-dark">Address</label>
+          <CompactAutoGrowTextarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value.slice(0, 50))}
+            placeholder="Max 50 chars"
+          />
+        </div>
+      </CompactFormRow>
+      <CompactFormRow className="items-start justify-start gap-6">
+        <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+          <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+            <input
+              type="checkbox"
+              checked={attachProfilePhoto}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setAttachProfilePhoto(checked);
+                if (!checked) {
+                  if (profilePreview?.startsWith("blob:")) URL.revokeObjectURL(profilePreview);
+                  setProfileFile(null);
+                  setProfilePreview(isEdit && owner ? ownerProfileImg(owner) : "");
+                  if (pRef.current) pRef.current.value = "";
+                }
+              }}
+              className="h-3.5 w-3.5 accent-ad-green"
+            />
+            Profile Photo
+          </label>
+          {attachProfilePhoto ? (
+            <div className="flex items-center gap-1.5">
+              {profilePreview ? (
+                <img src={profilePreview} alt="" className="h-[30px] w-[30px] shrink-0 rounded border border-gray-300 object-cover" />
+              ) : null}
+              <input
+                readOnly
+                value={profileFile?.name ?? ""}
+                placeholder="No file chosen"
+                tabIndex={-1}
+                className={`${compactInputClass} min-w-0 flex-1 cursor-default`}
+              />
+              <button
+                type="button"
+                onClick={() => pRef.current?.click()}
+                className={`${uploadBtnClass} shrink-0`}
+              >
+                Upload
+              </button>
+              <input
+                ref={pRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  if (profilePreview?.startsWith("blob:")) URL.revokeObjectURL(profilePreview);
+                  setProfileFile(f);
+                  setProfilePreview(URL.createObjectURL(f));
+                }}
+              />
             </div>
-            <div>
-              <label style={lStyle}>Profile Photo</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input ref={pRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (!f) return; if (profilePreview?.startsWith("blob:")) URL.revokeObjectURL(profilePreview); setProfileFile(f); setProfilePreview(URL.createObjectURL(f)); }} />
-                <button type="button" onClick={() => pRef.current?.click()} style={{ padding: "6px 14px", border: "1px solid #d2d6de", borderRadius: 3, background: "#fff", color: "#555", fontSize: 12, cursor: "pointer" }}>{profilePreview ? "Change" : "Upload"}</button>
-                {profilePreview && <button type="button" onClick={() => { if (profilePreview?.startsWith("blob:")) URL.revokeObjectURL(profilePreview); setProfileFile(null); setProfilePreview(""); if (pRef.current) pRef.current.value = ""; }} style={{ padding: "6px 10px", border: "1px solid #d2d6de", borderRadius: 3, background: "#fff", color: "#e74c3c", fontSize: 12, cursor: "pointer" }}>Remove</button>}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px", marginBottom: 20 }}>
-            <div><label style={lStyle}>Full Name *</label><input style={iStyle} value={name} onChange={e => setName(e.target.value.slice(0, 20))} placeholder="Enter full name" />{attempted && !name.trim() && <p style={{ color: "#c0392b", fontSize: 11, margin: "2px 0 0", fontWeight: 600 }}>Required</p>}</div>
-            <div><label style={lStyle}>Email *</label><input style={iStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter email" />{attempted && !isValidEmail(email) && <p style={{ color: "#c0392b", fontSize: 11, margin: "2px 0 0", fontWeight: 600 }}>Valid email required</p>}</div>
-            <div><label style={lStyle}>Phone *</label><div style={{ display: "flex", gap: 6 }}><select value={dialCode} onChange={e => setDialCode(e.target.value)} style={{ ...iStyle, width: 100, flexShrink: 0 }}>{CALLING_CODES.map(c => <option key={c.id + c.code} value={c.code}>{c.flag} {c.code}</option>)}</select><input style={{ ...iStyle, flex: 1 }} type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="10-digit number" /></div>{attempted && phone.replace(/\D/g, "").length !== 10 && <p style={{ color: "#c0392b", fontSize: 11, margin: "2px 0 0", fontWeight: 600 }}>Must be 10 digits</p>}</div>
-            <div><label style={lStyle}>Zip / Postal Code *</label><input style={iStyle} value={pincode} onChange={e => setPincode(e.target.value.slice(0, 10))} placeholder="e.g. A1A 1A1" />{attempted && !pincode.trim() && <p style={{ color: "#c0392b", fontSize: 11, margin: "2px 0 0", fontWeight: 600 }}>Required</p>}</div>
-            <div><label style={lStyle}>City</label><input style={iStyle} value={city} onChange={e => setCity(e.target.value)} placeholder="Enter city" /></div>
-            <div><label style={lStyle}>Role</label><div style={{ ...iStyle, background: "#f5f6f8", color: "#888", fontWeight: 600, cursor: "default" }}>carowner</div></div>
-            <div style={{ gridColumn: "1/-1" }}><label style={lStyle}>Address</label><textarea style={{ ...iStyle, minHeight: 60, resize: "vertical", fontFamily: "inherit" }} value={address} onChange={e => setAddress(e.target.value.slice(0, 50))} placeholder="Max 50 chars" rows={2} /></div>
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#9b308d", borderBottom: "2px solid #9b308d", paddingBottom: 6, marginBottom: 14, textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span>Vehicles</span>
-            {vehicles.length < 5 && <button type="button" onClick={() => setVehicles(v => [...v, emptyVehicle()])} style={{ fontSize: 12, background: "#9b308d", color: "#fff", border: "none", borderRadius: 3, padding: "4px 12px", cursor: "pointer", fontWeight: 600 }}>Add Vehicle</button>}
-          </div>
-          {vehicles.map((v, i) => (
-            <VehicleRowForm key={i} v={v} i={i} attempted={attempted} onChange={patch => setVehicles(prev => { const n = [...prev]; n[i] = { ...n[i], ...patch }; return n; })} onRemove={() => setVehicles(prev => prev.filter((_, idx) => idx !== i))} canRemove={vehicles.length > 1} />
-          ))}
-          {apiError && <div style={{ marginTop: 10, padding: "9px 14px", background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, color: "#c0392b", fontSize: 13 }}>{apiError}</div>}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, paddingTop: 16, borderTop: "1px solid #f4f4f4" }}>
-            <button type="button" onClick={onClose} disabled={submitting} style={{ padding: "8px 22px", borderRadius: 3, border: "1px solid #d2d6de", background: "#fff", color: "#555", fontSize: 14, cursor: "pointer" }}>Cancel</button>
-            <button type="submit" disabled={submitting} style={{ padding: "8px 26px", borderRadius: 3, border: "none", background: submitting ? "#aaa" : "#00a65a", color: "#fff", fontSize: 14, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer" }}>{submitting ? "Saving…" : isEdit ? "Save Changes" : "Add Car Owner"}</button>
-          </div>
-        </form>
+          ) : null}
+        </div>
+        <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+          <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+            <input
+              type="checkbox"
+              checked={attachEmail}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setAttachEmail(checked);
+                if (!checked) {
+                  setEmail(isEdit && owner ? (owner.email || "") : "");
+                }
+              }}
+              className="h-3.5 w-3.5 accent-ad-green"
+            />
+            Email
+          </label>
+          {attachEmail ? (
+            <>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                className={compactInputClass}
+              />
+              {attempted && !isValidEmail(email) && (
+                <p className={fieldErrorClass}>Valid email required</p>
+              )}
+            </>
+          ) : null}
+        </div>
+      </CompactFormRow>
+      <div className="flex items-center justify-between border-t border-gray-300 pt-3">
+        <span className="text-xs font-bold text-ad-green-dark">Vehicles</span>
+        {vehicles.length < 5 && (
+          <button
+            type="button"
+            onClick={() => setVehicles((v) => [...v, emptyVehicle()])}
+            className="rounded bg-ad-green px-2.5 py-0.5 text-xs font-semibold text-white hover:brightness-95"
+          >
+            + Add Vehicle
+          </button>
+        )}
       </div>
-    </div>
+      <div className="mt-2 w-full space-y-0 px-2 sm:px-3">
+        {vehicles.map((v, i) => (
+          <VehicleRowForm
+            key={i}
+            v={v}
+            i={i}
+            attempted={attempted}
+            carCatalog={carCatalog}
+            onChange={(patch) =>
+              setVehicles((prev) => {
+                const n = [...prev];
+                n[i] = { ...n[i], ...patch };
+                return n;
+              })
+            }
+            onRemove={() => setVehicles((prev) => prev.filter((_, idx) => idx !== i))}
+            canRemove={vehicles.length > 1}
+          />
+        ))}
+      </div>
+    </CompactFormPanel>
   );
 };
 
 // ─── SEND NOTIFICATION ────────────────────────────────────────────────────────
+const notifLabelClass = "mb-1 block text-xs font-bold text-gray-600";
 const SendNotifModal: React.FC<{ isOpen: boolean; onClose: () => void; ids: string[]; onDone: () => void }> = ({ isOpen, onClose, ids, onDone }) => {
   const [title, setTitle] = useState(""); const [body, setBody] = useState("");
   const [sending, setSending] = useState(false); const [err, setErr] = useState<string | null>(null); const [ok, setOk] = useState<string | null>(null);
@@ -692,8 +1106,14 @@ const SendNotifModal: React.FC<{ isOpen: boolean; onClose: () => void; ids: stri
           else setErr(res.data?.message || "Failed.");
         } catch (e: any) { setErr(e?.response?.data?.message || "Error."); } finally { setSending(false); }
       }}>
-        <div style={{ marginBottom: 12 }}><label style={lStyle}>Title *</label><input style={iStyle} value={title} onChange={e => setTitle(e.target.value)} maxLength={100} disabled={sending} /></div>
-        <div style={{ marginBottom: 12 }}><label style={lStyle}>Body *</label><textarea style={{ ...iStyle, minHeight: 80, resize: "vertical", fontFamily: "inherit" }} value={body} onChange={e => setBody(e.target.value)} rows={3} disabled={sending} /></div>
+        <div className="mb-3">
+          <label className={notifLabelClass}>Title *</label>
+          <input className={compactInputClass} value={title} onChange={e => setTitle(e.target.value)} maxLength={100} disabled={sending} />
+        </div>
+        <div className="mb-3">
+          <label className={notifLabelClass}>Body *</label>
+          <textarea className={`${compactInputClass} min-h-[80px] resize-y`} value={body} onChange={e => setBody(e.target.value)} rows={3} disabled={sending} />
+        </div>
         <p style={{ fontSize: 13, color: "#2575c4", marginBottom: 10 }}>To: <strong>{ids.length} owner{ids.length !== 1 ? "s" : ""}</strong></p>
         {err && <div style={{ color: "#c0392b", fontSize: 13, marginBottom: 8, background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, padding: "7px 10px" }}>{err}</div>}
         {ok && <div style={{ color: "#27ae60", fontSize: 13, marginBottom: 8, background: "#f0fff4", border: "1px solid #c3e6cb", borderRadius: 3, padding: "7px 10px" }}>{ok}</div>}
@@ -781,8 +1201,30 @@ const CarOwners: React.FC = () => {
   const [shopsFor, setShopsFor] = useState<CarOwnerType | null>(null);
   const [jobCardsFor, setJobCardsFor] = useState<CarOwnerType | null>(null);
   const [profileFor, setProfileFor] = useState<CarOwnerType | null>(null);
-  const [addEdit, setAddEdit] = useState<{ open: boolean; mode: "add" | "edit"; owner: CarOwnerType | null }>({ open: false, mode: "add", owner: null });
+  const [showForm, setShowForm] = useState(false);
+  const [editingOwner, setEditingOwner] = useState<CarOwnerType | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
+
+  const openAdd = () => {
+    setEditingOwner(null);
+    setShowForm(true);
+  };
+
+  const openEdit = (owner: CarOwnerType) => {
+    setEditingOwner(owner);
+    setShowForm(true);
+  };
+
+  const handleFormCancel = () => {
+    setEditingOwner(null);
+    setShowForm(false);
+  };
+
+  const handleFormSaved = () => {
+    setEditingOwner(null);
+    setShowForm(false);
+    fetchOwners();
+  };
 
   const fetchOwners = useCallback(async () => {
     setLoading(true); setError("");
@@ -873,21 +1315,29 @@ const CarOwners: React.FC = () => {
         <ProfileModal
           owner={profileFor}
           onClose={() => setProfileFor(null)}
-          onEdit={() => { setAddEdit({ open: true, mode: "edit", owner: profileFor }); setProfileFor(null); }}
+          onEdit={() => { openEdit(profileFor); setProfileFor(null); }}
           toggleStatus={(id, newStatus) =>
             toggleStatus(id, newStatus as "active" | "suspended" | "deleted")
           }
         />
       )}
 
-      <AddEditModal isOpen={addEdit.open} onClose={() => setAddEdit(s => ({ ...s, open: false }))} onSaved={() => { setAddEdit(s => ({ ...s, open: false })); fetchOwners(); }} owner={addEdit.owner} mode={addEdit.mode} />
-      <SendNotifModal isOpen={notifOpen} onClose={() => setNotifOpen(false)} ids={selected} onDone={() => {}} />
+      <SendNotifModal isOpen={notifOpen} onClose={() => setNotifOpen(false)} ids={selected} onDone={() => { }} />
 
       <AdminPage
         title={showDeleted ? "Deleted Car Owners" : "Car Owners"}
         headerAction={
-          !showDeleted ? (
-            <AddNewButton label="New Car Owner" onClick={() => setAddEdit({ open: true, mode: "add", owner: null })} />
+          !showDeleted && !showForm ? (
+            <AddNewButton onClick={openAdd} />
+          ) : undefined
+        }
+        between={
+          showForm ? (
+            <CarOwnerAddEditForm
+              owner={editingOwner}
+              onCancel={handleFormCancel}
+              onSaved={handleFormSaved}
+            />
           ) : undefined
         }
       >
@@ -906,7 +1356,7 @@ const CarOwners: React.FC = () => {
               <button
                 type="button"
                 disabled={selCount !== 1}
-                onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) setAddEdit({ open: true, mode: "edit", owner: o }); }}
+                onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) openEdit(o); }}
                 className={toolbarBtnClass(selCount !== 1)}
               >
                 Update
@@ -1068,11 +1518,10 @@ const CarOwners: React.FC = () => {
                   key={p}
                   type="button"
                   onClick={() => setCurrentPage(p)}
-                  className={`h-7 w-7 border text-xs font-medium ${
-                    currentPage === p
+                  className={`h-7 w-7 border text-xs font-medium ${currentPage === p
                       ? "border-ad-green bg-ad-green text-white"
                       : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   {p}
                 </button>

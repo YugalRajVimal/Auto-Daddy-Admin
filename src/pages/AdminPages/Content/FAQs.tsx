@@ -101,7 +101,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   return (
     <AdminPage
       title="FAQ Management"
-      headerAction={!showForm ? <AddNewButton label="New FAQ" onClick={() => setShowForm(true)} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

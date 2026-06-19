@@ -238,7 +238,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   return (
     <AdminPage
       title="Sub Services"
-      headerAction={!showForm ? <AddNewButton label="New Sub Service" onClick={openAdd} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

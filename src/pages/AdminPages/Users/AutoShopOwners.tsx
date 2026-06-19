@@ -1,19 +1,26 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import {
+  CompactField,
+  CompactFormFooter,
+  CompactFormPanel,
+  CompactFormRow,
+  compactInputClass,
+} from "../../../components/admin/ContentPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TeamMemberType = { _id: string; name: string; email?: string; phone?: string; designation?: string; photo?: string };
 type IndividualService = { name: string; desc?: string; price?: number; _id: string };
-type Service = { _id: string; name?: string; desc?: string; services?: IndividualService[]; [k: string]: any };
-type MyService = { service: Service; subServices?: { subService: string }[]; serviceName?: string; serviceId?: string; [k: string]: any };
+type Service = { _id: string; name?: string; desc?: string; services?: IndividualService[];[k: string]: any };
+type MyService = { service: Service; subServices?: { subService: string }[]; serviceName?: string; serviceId?: string;[k: string]: any };
 type BusinessProfileType = {
   _id: string; businessName?: string; businessAddress?: string; pincode?: string; city?: string;
   businessPhone?: string; businessEmail?: string; businessHSTNumber?: string; openHours?: string;
   openDays?: string[]; perDayOpenHours?: any[]; businessLogo?: string; myServices?: MyService[];
   myDeals?: any[]; teamMembers?: TeamMemberType[]; businessMapLocation?: any; isOpen?: boolean;
   rating?: number; reviewCount?: number; reviewDate?: string; websiteUrl?: string;
-  createdAt?: string; updatedAt?: string; ads?: any[]; [k: string]: any;
+  createdAt?: string; updatedAt?: string; ads?: any[];[k: string]: any;
 };
 type CustomerType = { _id: string; name?: string; email?: string; phone?: string };
 type DealType = {
@@ -27,7 +34,7 @@ type JobCardType = {
   services?: any[]; additionalNotes?: string; vehiclePhotos?: string[];
   dealApplied?: { name?: string; percentageDiscount?: number; dealCode?: string };
   totalPayableAmount?: number; paymentStatus?: string; technicalRemarks?: string;
-  createdAt?: string; updatedAt?: string; status?: string; [k: string]: any;
+  createdAt?: string; updatedAt?: string; status?: string;[k: string]: any;
 };
 type ShopType = "autoShop" | "tyreShop" | "carWash" | "towTruck";
 type AutoShopOwnerType = {
@@ -118,23 +125,24 @@ function GCRow({ label, value }: { label: string; value?: any }) {
   );
 }
 
-// ─── Shared input styles ──────────────────────────────────────────────────────
-const iStyle: React.CSSProperties = {
-  width: "100%", border: "1px solid #d2d6de", borderRadius: 3,
-  padding: "7px 10px", fontSize: 13, outline: "none", boxSizing: "border-box", color: "#333", background: "#fff",
-};
-const lStyle: React.CSSProperties = {
-  display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4,
-  color: "#555", textTransform: "uppercase", letterSpacing: "0.04em",
-};
-
-// Shop Type Options
+// Shop Type Options (labels match Web-Temp screen)
 const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
-  { value: "autoShop", label: "Auto Shop" },
-  { value: "tyreShop", label: "Tyre Shop" },
-  { value: "carWash", label: "Car Wash" },
+  { value: "autoShop", label: "Mechanic Shop" },
+  { value: "carWash", label: "Car Washing" },
+  { value: "tyreShop", label: "Tire Master" },
   { value: "towTruck", label: "Tow Truck" },
 ];
+
+const DEFAULT_SHOP_TYPE_FILTERS: Record<ShopType, boolean> = {
+  autoShop: true,
+  carWash: false,
+  tyreShop: false,
+  towTruck: false,
+};
+
+function ownerShopType(owner: AutoShopOwnerType): ShopType {
+  return (owner.shopType as ShopType) || "autoShop";
+}
 
 // ─── BASE MODAL ───────────────────────────────────────────────────────────────
 const BaseModal: React.FC<{
@@ -165,153 +173,7 @@ function parseOpenDays(openDays?: string[]): string {
 }
 
 // ─── ADD / EDIT MODAL ────────────────────────────────────────────────────────
-const CALLING_CODES = [
-  { id: "CA", flag: "🇨🇦", code: "+1" }, { id: "US", flag: "🇺🇸", code: "+1" },
-  { id: "GB", flag: "🇬🇧", code: "+44" }, { id: "IN", flag: "🇮🇳", code: "+91" },
-  { id: "AU", flag: "🇦🇺", code: "+61" },
-];
 function isEmail(e: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()); }
-
-const AddEditModal: React.FC<{
-  isOpen: boolean; onClose: () => void; onSaved: () => void;
-  owner?: AutoShopOwnerType | null; mode: "add" | "edit";
-}> = ({ isOpen, onClose, onSaved, owner, mode }) => {
-  const isEdit = mode === "edit";
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [dialCode, setDialCode] = useState("+1");
-  const [phone, setPhone] = useState("");
-  const [pincode, setPincode] = useState("");
-  const [address, setAddress] = useState("");
-  // SHOP TYPE handling
-  const [shopType, setShopType] = useState<ShopType>("autoShop");
-  const [submitting, setSubmitting] = useState(false);
-  const [attempted, setAttempted] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setAttempted(false); setApiError(null);
-    if (isEdit && owner) {
-      setName(owner.name || ""); setEmail(owner.email || "");
-      setDialCode(owner.countryCode || "+1"); setPhone(owner.phone || "");
-      setPincode(owner.pincode || ""); setAddress(owner.address || "");
-      setShopType((owner.shopType as ShopType) || "autoShop");
-    } else {
-      setName(""); setEmail(""); setDialCode("+1"); setPhone(""); setPincode(""); setAddress("");
-      setShopType("autoShop");
-    }
-  }, [isOpen, isEdit, owner]);
-
-  function validate(): string | null {
-    if (!name.trim()) return "Name is required.";
-    if (!email.trim() || !isEmail(email)) return "Valid email required.";
-    if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
-    if (!pincode.trim()) return "Zip / Postal code is required.";
-    if (!shopType) return "Shop type required.";
-    return null;
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setAttempted(true);
-    const err = validate(); if (err) { setApiError(err); return; }
-    setApiError(null);
-    const payload = {
-      name: name.trim(), email: email.trim(), countryCode: dialCode,
-      phone: phone.replace(/\D/g, ""), pincode: pincode.trim(),
-      address: address.trim(), role: "autoshopowner",
-      shopType,
-    };
-    setSubmitting(true);
-    try {
-      if (isEdit && owner) {
-        await axios.put(`${API()}/api/admin/autoshopowners/${owner._id}`, payload, { headers: getToken() });
-      } else {
-        await axios.post(`${API()}/api/admin/autoshopowners`, payload, { headers: getToken() });
-      }
-      onSaved(); onClose();
-    } catch (err: any) {
-      setApiError(err?.response?.data?.message || (isEdit ? "Could not update." : "Could not add."));
-    } finally { setSubmitting(false); }
-  }
-
-  if (!isOpen) return null;
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", background: "rgba(0,0,0,0.48)", overflowY: "auto", padding: "30px 12px" }}>
-      <div style={{ background: "#fff", borderRadius: 4, width: "min(680px,96vw)", boxShadow: "0 8px 32px rgba(0,0,0,0.22)" }}>
-        <div style={{ background: "#9b308d", color: "#fff", padding: "13px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "4px 4px 0 0" }}>
-          <span style={{ fontWeight: 700, fontSize: 16 }}>{isEdit ? "✏️ Edit Auto Shop Owner" : "➕ Add Auto Shop Owner"}</span>
-          <button onClick={onClose} disabled={submitting} type="button" style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer" }}>×</button>
-        </div>
-        <form onSubmit={handleSubmit} style={{ padding: "22px 24px" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#9b308d", borderBottom: "2px solid #9b308d", paddingBottom: 6, marginBottom: 18, textTransform: "uppercase" }}>Owner Information</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px" }}>
-            <div>
-              <label style={lStyle}>Full Name <span style={{ color: "#e73d3d" }}>*</span></label>
-              <input style={iStyle} value={name} onChange={e => setName(e.target.value.slice(0, 40))} placeholder="Enter full name" maxLength={40} />
-              {attempted && !name.trim() && <p style={{ color: "#c0392b", fontSize: 11, margin: "3px 0 0", fontWeight: 600 }}>Required</p>}
-            </div>
-            <div>
-              <label style={lStyle}>Email Address <span style={{ color: "#e73d3d" }}>*</span></label>
-              <input style={iStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter email" />
-              {attempted && !isEmail(email) && <p style={{ color: "#c0392b", fontSize: 11, margin: "3px 0 0", fontWeight: 600 }}>Valid email required</p>}
-            </div>
-            <div>
-              <label style={lStyle}>Phone Number <span style={{ color: "#e73d3d" }}>*</span></label>
-              <div style={{ display: "flex", gap: 6 }}>
-                <select value={dialCode} onChange={e => setDialCode(e.target.value)} style={{ ...iStyle, width: 100, flexShrink: 0 }}>
-                  {CALLING_CODES.map(c => <option key={c.id + c.code} value={c.code}>{c.flag} {c.code}</option>)}
-                </select>
-                <input style={{ ...iStyle, flex: 1 }} type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="10-digit number" />
-              </div>
-              {attempted && phone.replace(/\D/g, "").length !== 10 && <p style={{ color: "#c0392b", fontSize: 11, margin: "3px 0 0", fontWeight: 600 }}>Must be 10 digits</p>}
-            </div>
-            <div>
-              <label style={lStyle}>Zip / Postal Code <span style={{ color: "#e73d3d" }}>*</span></label>
-              <input style={iStyle} value={pincode} onChange={e => setPincode(e.target.value.slice(0, 10))} placeholder="e.g. A1A 1A1" />
-              {attempted && !pincode.trim() && <p style={{ color: "#c0392b", fontSize: 11, margin: "3px 0 0", fontWeight: 600 }}>Required</p>}
-            </div>
-            <div>
-              <label style={lStyle}>Role</label>
-              <div style={{ ...iStyle, background: "#f5f6f8", color: "#888", fontWeight: 600, cursor: "default" }}>autoshopowner</div>
-            </div>
-            {/* ADD SHOP TYPE */}
-            <div>
-              <label style={lStyle}>Shop Type <span style={{ color: "#e73d3d" }}>*</span></label>
-              <select
-                style={iStyle}
-                value={shopType}
-                onChange={e => setShopType(e.target.value as ShopType)}
-              >
-                {SHOP_TYPE_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              {attempted && !shopType && (
-                <p style={{ color: "#c0392b", fontSize: 11, margin: "3px 0 0", fontWeight: 600 }}>Required</p>
-              )}
-            </div>
-            <div style={{ gridColumn: "1/-1" }}>
-              <label style={lStyle}>Address</label>
-              <textarea style={{ ...iStyle, minHeight: 60, resize: "vertical", fontFamily: "inherit" }} value={address} onChange={e => setAddress(e.target.value.slice(0, 100))} placeholder="Enter address (max 100 chars)" rows={2} maxLength={100} />
-            </div>
-          </div>
-          {apiError && (
-            <div style={{ marginTop: 12, padding: "9px 14px", background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, color: "#c0392b", fontSize: 13 }}>{apiError}</div>
-          )}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, paddingTop: 16, borderTop: "1px solid #f4f4f4" }}>
-            <button type="button" onClick={onClose} disabled={submitting} style={{ padding: "8px 22px", borderRadius: 3, border: "1px solid #d2d6de", background: "#fff", color: "#555", fontSize: 14, cursor: "pointer" }}>Cancel</button>
-            <button type="submit" disabled={submitting} style={{ padding: "8px 26px", borderRadius: 3, border: "none", background: submitting ? "#aaa" : "#00a65a", color: "#fff", fontSize: 14, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer" }}>
-              {submitting ? "Saving…" : isEdit ? "Save Changes" : "Add Owner"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
 
 // ─── SHOP OVERVIEW CARD ───────────────────────────────────────────────────────
 const ShopOverviewCard: React.FC<{ bp: BusinessProfileType }> = ({ bp }) => {
@@ -648,10 +510,10 @@ table{border-collapse:collapse;font-size:14px}
 </div>
 <script>
 function exportXL(){
-  const d=${JSON.stringify({ Name:owner.name,Email:owner.email,Phone:`${owner.countryCode??""} ${owner.phone??""}`.trim(),ShopName:bp?.businessName,City:bp?.city,Address:bp?.businessAddress,Pincode:bp?.pincode,Status:getStatus(owner),Customers:customers.length,Deals:deals.length,JobCards:cards.length })};
+  const d=${JSON.stringify({ Name: owner.name, Email: owner.email, Phone: `${owner.countryCode ?? ""} ${owner.phone ?? ""}`.trim(), ShopName: bp?.businessName, City: bp?.city, Address: bp?.businessAddress, Pincode: bp?.pincode, Status: getStatus(owner), Customers: customers.length, Deals: deals.length, JobCards: cards.length })};
   const rows=[Object.keys(d),Object.values(d)];
   const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\\n");
-  const a=document.createElement("a");a.href="data:text/csv,"+encodeURIComponent(csv);a.download="autoshop-${owner.name.replace(/\s+/g,"-")}.csv";a.click();
+  const a=document.createElement("a");a.href="data:text/csv,"+encodeURIComponent(csv);a.download="autoshop-${owner.name.replace(/\s+/g, "-")}.csv";a.click();
 }
 </script></body></html>`;
   const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); }
@@ -722,7 +584,7 @@ function exportCsv(owners: AutoShopOwnerType[], visibleCols: string[]) {
     name: o => o.name || "-",
     phone: o => `${o.countryCode ?? ""} ${o.phone ?? ""}`.trim() || "-",
     shopName: o => o.businessProfile?.businessName || "-",
-    shopType: o => o.shopType ? SHOP_TYPE_OPTIONS.find(x => x.value === o.shopType)?.label || o.shopType : "-",
+    shopType: o => SHOP_TYPE_OPTIONS.find(x => x.value === ownerShopType(o))?.label || "-",
     city: o => o.businessProfile?.city || "-",
     date: o => fmtDate(o.createdAt),
     customers: o => String(o.myCustomers?.length ?? 0),
@@ -756,6 +618,7 @@ const AutoShopOwners: React.FC = () => {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [visibleCols, setVisibleCols] = useState<string[]>(DEFAULT_VISIBLE);
   const [actionBusy, setActionBusy] = useState<Record<string, boolean>>({});
+  const [shopTypeFilters, setShopTypeFilters] = useState<Record<ShopType, boolean>>(DEFAULT_SHOP_TYPE_FILTERS);
 
   // ── View toggle: "active" shows active/suspended, "deleted" shows deleted ──
   const [viewMode, setViewMode] = useState<"active" | "deleted">("active");
@@ -767,7 +630,19 @@ const AutoShopOwners: React.FC = () => {
   const [dealsFor, setDealsFor] = useState<AutoShopOwnerType | null>(null);
   const [jobCardsFor, setJobCardsFor] = useState<AutoShopOwnerType | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [addEdit, setAddEdit] = useState<{ open: boolean; mode: "add" | "edit"; owner: AutoShopOwnerType | null }>({ open: false, mode: "add", owner: null });
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingOwner, setEditingOwner] = useState<AutoShopOwnerType | null>(null);
+  const [formName, setFormName] = useState("");
+  const [formEmail, setFormEmail] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formCity, setFormCity] = useState("");
+  const [formPincode, setFormPincode] = useState("");
+  const [formAddress, setFormAddress] = useState("");
+  const [formShopType, setFormShopType] = useState<ShopType>("autoShop");
+  const [formAttempted, setFormAttempted] = useState(false);
+  const [formApiError, setFormApiError] = useState<string | null>(null);
+  const [formSubmitting, setFormSubmitting] = useState(false);
 
   const fetchOwners = useCallback(async () => {
     setLoading(true); setError("");
@@ -786,14 +661,111 @@ const AutoShopOwners: React.FC = () => {
   const deletedOwners = allOwners.filter(o => o.status === "deleted");
   const displayOwners = viewMode === "deleted" ? deletedOwners : activeOwners;
 
+  function toggleShopType(type: ShopType) {
+    setShopTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }));
+    setCurrentPage(1);
+  }
+
+  const resetForm = () => {
+    setFormName("");
+    setFormEmail("");
+    setFormPhone("");
+    setFormCity("");
+    setFormPincode("");
+    setFormAddress("");
+    setFormShopType("autoShop");
+    setFormAttempted(false);
+    setFormApiError(null);
+    setEditingOwner(null);
+  };
+
+  const openAdd = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
+  const openEdit = (owner: AutoShopOwnerType) => {
+    setFormName(owner.name || "");
+    setFormEmail(owner.email || "");
+    setFormPhone(owner.phone || "");
+    setFormCity(owner.businessProfile?.city || "");
+    setFormPincode(owner.pincode || "");
+    setFormAddress(owner.address || "");
+    setFormShopType(ownerShopType(owner));
+    setFormAttempted(false);
+    setFormApiError(null);
+    setEditingOwner(owner);
+    setShowForm(true);
+  };
+
+  const handleFormCancel = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  function validateOwnerForm(): string | null {
+    if (!formName.trim()) return "Name is required.";
+    if (!formEmail.trim() || !isEmail(formEmail)) return "Valid email required.";
+    if (formPhone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
+    if (!formPincode.trim()) return "Zip / Postal code is required.";
+    if (!formShopType) return "Shop type required.";
+    return null;
+  }
+
+  async function handleFormSave() {
+    setFormAttempted(true);
+    const err = validateOwnerForm();
+    if (err) {
+      setFormApiError(err);
+      return;
+    }
+    setFormApiError(null);
+    const payload = {
+      name: formName.trim(),
+      email: formEmail.trim(),
+      phone: formPhone.replace(/\D/g, ""),
+      city: formCity.trim(),
+      pincode: formPincode.trim(),
+      address: formAddress.trim(),
+      role: "autoshopowner",
+      shopType: formShopType,
+    };
+    setFormSubmitting(true);
+    try {
+      if (editingOwner) {
+        await axios.put(`${API()}/api/admin/autoshopowners/${editingOwner._id}`, payload, { headers: getToken() });
+      } else {
+        await axios.post(`${API()}/api/admin/autoshopowners`, payload, { headers: getToken() });
+      }
+      resetForm();
+      setShowForm(false);
+      await fetchOwners();
+    } catch (saveErr: unknown) {
+      const axErr = saveErr as { response?: { data?: { message?: string } } };
+      setFormApiError(
+        axErr?.response?.data?.message || (editingOwner ? "Could not update." : "Could not add.")
+      );
+    } finally {
+      setFormSubmitting(false);
+    }
+  }
+
+  const formMessage = editingOwner
+    ? "You are updating an 'Auto Shop Owner'"
+    : "You are creating an 'Auto Shop Owner'";
+
   const filtered = displayOwners.filter(o => {
+    const st = ownerShopType(o);
+    if (!(shopTypeFilters[st] ?? true)) return false;
     const q = search.toLowerCase();
+    const shopTypeLabel = SHOP_TYPE_OPTIONS.find(x => x.value === st)?.label ?? "";
     return (o.name || "").toLowerCase().includes(q)
       || (o.email || "").toLowerCase().includes(q)
       || (o.phone || "").toLowerCase().includes(q)
       || (o.businessProfile?.businessName || "").toLowerCase().includes(q)
       || (o.businessProfile?.city || "").toLowerCase().includes(q)
-      || (o.shopType || "").toLowerCase().includes(q); // search on shopType as well
+      || st.toLowerCase().includes(q)
+      || shopTypeLabel.toLowerCase().includes(q);
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -852,7 +824,7 @@ const AutoShopOwners: React.FC = () => {
       case "shopType":
         return (
           <td key={key} className={tdClass}>
-            {(owner.shopType && SHOP_TYPE_OPTIONS.find(x => x.value === owner.shopType)?.label) || "-"}
+            {SHOP_TYPE_OPTIONS.find(x => x.value === ownerShopType(owner))?.label || "-"}
           </td>
         );
       case "city":
@@ -885,27 +857,110 @@ const AutoShopOwners: React.FC = () => {
         <ProfileModal
           owner={profileFor}
           onClose={() => setProfileFor(null)}
-          onEdit={() => { setAddEdit({ open: true, mode: "edit", owner: profileFor }); setProfileFor(null); }}
+          onEdit={() => { openEdit(profileFor); setProfileFor(null); }}
         />
       )}
       {businessFor && <BusinessProfileModal owner={businessFor} onClose={() => setBusinessFor(null)} />}
       {customersFor && <CustomersModal owner={customersFor} onClose={() => setCustomersFor(null)} />}
       {dealsFor && <DealsModal owner={dealsFor} onClose={() => setDealsFor(null)} />}
       {jobCardsFor && <JobCardsModal owner={jobCardsFor} onClose={() => setJobCardsFor(null)} />}
-      <SendNotifModal isOpen={notifOpen} onClose={() => setNotifOpen(false)} ids={selected} onDone={() => {}} />
-      <AddEditModal
-        isOpen={addEdit.open}
-        onClose={() => setAddEdit(s => ({ ...s, open: false }))}
-        onSaved={() => { setAddEdit(s => ({ ...s, open: false })); fetchOwners(); }}
-        owner={addEdit.owner}
-        mode={addEdit.mode}
-      />
+      <SendNotifModal isOpen={notifOpen} onClose={() => setNotifOpen(false)} ids={selected} onDone={() => { }} />
 
       <AdminPage
         title={viewMode === "deleted" ? "Deleted Auto Shop Owners" : "Auto Shop Owners"}
         headerAction={
-          viewMode === "active" ? (
-            <AddNewButton label="New Shop Owner" onClick={() => setAddEdit({ open: true, mode: "add", owner: null })} />
+          viewMode === "active" && !showForm ? (
+            <AddNewButton onClick={openAdd} />
+          ) : undefined
+        }
+        between={
+          showForm ? (
+            <CompactFormPanel
+              footer={
+                <CompactFormFooter
+                  message={formMessage}
+                  messageCenter
+                  actionLabel={formSubmitting ? "Saving..." : "Save"}
+                  onSave={handleFormSave}
+                  onCancel={handleFormCancel}
+                />
+              }
+            >
+              {formApiError && (
+                <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
+                  {formApiError}
+                </div>
+              )}
+              <CompactFormRow className="!grid w-full grid-cols-2 items-start gap-x-4 gap-y-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
+                <CompactField label="Full Name" required className="min-w-0 w-full">
+                  <input
+                    type="text"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value.slice(0, 40))}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+                <CompactField label="Email" required className="min-w-0 w-full">
+                  <input
+                    type="email"
+                    value={formEmail}
+                    onChange={(e) => setFormEmail(e.target.value)}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+                <CompactField label="Phone" required className="min-w-0 w-full">
+                  <input
+                    type="tel"
+                    value={formPhone}
+                    onChange={(e) => setFormPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+                <CompactField label="City" className="min-w-0 w-full">
+                  <input
+                    type="text"
+                    value={formCity}
+                    onChange={(e) => setFormCity(e.target.value)}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+                <CompactField label="Zip / Postal Code" required className="min-w-0 w-full">
+                  <input
+                    type="text"
+                    value={formPincode}
+                    onChange={(e) => setFormPincode(e.target.value.slice(0, 10))}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+                <CompactField label="Shop Type" required className="min-w-0 w-full">
+                  <select
+                    value={formShopType}
+                    onChange={(e) => setFormShopType(e.target.value as ShopType)}
+                    className={compactInputClass}
+                  >
+                    {SHOP_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </CompactField>
+                <CompactField label="Address" className="min-w-0 w-full">
+                  <textarea
+                    value={formAddress}
+                    onChange={(e) => setFormAddress(e.target.value.slice(0, 100))}
+                    rows={2}
+                    className={`${compactInputClass} resize-y`}
+                  />
+                </CompactField>
+              </CompactFormRow>
+              {formAttempted && (() => {
+                const validationError = validateOwnerForm();
+                return validationError ? (
+                  <p className="text-xs font-semibold text-red-700">{validationError}</p>
+                ) : null;
+              })()}
+            </CompactFormPanel>
           ) : undefined
         }
       >
@@ -914,6 +969,20 @@ const AutoShopOwners: React.FC = () => {
             Showing deleted auto shop owners ({deletedOwners.length}) — select one and use Restore
           </div>
         )}
+
+        <div className="mb-2 flex flex-wrap items-center gap-4 border-b border-gray-300 bg-gray-100 px-3 py-2">
+          {SHOP_TYPE_OPTIONS.map((option) => (
+            <label key={option.value} className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
+              <input
+                type="checkbox"
+                checked={shopTypeFilters[option.value]}
+                onChange={() => toggleShopType(option.value)}
+                className="h-3.5 w-3.5 accent-ad-green"
+              />
+              {option.label}
+            </label>
+          ))}
+        </div>
 
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
           <div className="flex flex-wrap gap-1">
@@ -931,7 +1000,7 @@ const AutoShopOwners: React.FC = () => {
                 <button
                   type="button"
                   disabled={selCount !== 1}
-                  onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) setAddEdit({ open: true, mode: "edit", owner: o }); }}
+                  onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) openEdit(o); }}
                   className={toolbarBtnClass(selCount !== 1)}
                 >
                   Update
@@ -1090,11 +1159,10 @@ const AutoShopOwners: React.FC = () => {
                   key={p}
                   type="button"
                   onClick={() => setCurrentPage(p)}
-                  className={`h-7 w-7 border text-xs font-medium ${
-                    currentPage === p
+                  className={`h-7 w-7 border text-xs font-medium ${currentPage === p
                       ? "border-ad-green bg-ad-green text-white"
                       : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   {p}
                 </button>

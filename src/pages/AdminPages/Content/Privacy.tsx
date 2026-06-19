@@ -96,7 +96,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   return (
     <AdminPage
       title="Privacy and Disclaimer"
-      headerAction={!showForm ? <AddNewButton label="New Entry" onClick={() => setShowForm(true)} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

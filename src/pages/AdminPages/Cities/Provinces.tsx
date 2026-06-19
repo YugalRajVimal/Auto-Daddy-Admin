@@ -198,7 +198,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
   return (
     <AdminPage
       title="Provinces"
-      headerAction={!showForm ? <AddNewButton label="New Province" onClick={openAdd} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

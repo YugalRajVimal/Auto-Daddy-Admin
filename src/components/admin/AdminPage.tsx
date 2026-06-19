@@ -55,14 +55,14 @@ export default function AdminPage({
   );
 }
 
-export function AddNewButton({ label, onClick }: { label: string; onClick: () => void }) {
+export function AddNewButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="shrink-0 rounded bg-ad-green px-4 py-2 text-sm font-bold text-white hover:bg-ad-green-dark"
     >
-      Add {label}
+      Add New
     </button>
   );
 }

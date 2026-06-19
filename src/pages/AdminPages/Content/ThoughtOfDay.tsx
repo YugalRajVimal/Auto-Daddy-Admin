@@ -99,7 +99,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   return (
     <AdminPage
       title="Today's Tip"
-      headerAction={!showForm ? <AddNewButton label="New Note" onClick={() => setShowForm(true)} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

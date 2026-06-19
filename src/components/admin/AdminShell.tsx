@@ -5,6 +5,7 @@ import usePermissions from "../../hooks/usePermission";
 import {
   primaryNav,
   adminOnlyNav,
+  adminUtilityNav,
   getActivePrimaryItem,
   type NavItem,
   type NavSubItem,
@@ -42,7 +43,14 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   ];
 
   const activePrimary = getActivePrimaryItem(location.pathname, visibleNav);
-  const subItems: NavSubItem[] = activePrimary?.subItems ?? [];
+  const visibleUtilityNav = adminUtilityNav.filter(
+    (s) => !s.permissionModule || canView(s.permissionModule)
+  );
+  const onAdminUtility = visibleUtilityNav.some((s) => isPathActive(location.pathname, s.path));
+  const utilitySubItems = onAdminUtility ? visibleUtilityNav : [];
+  const primarySubItems: NavSubItem[] = activePrimary?.subItems ?? [];
+  const displaySubItems = utilitySubItems.length > 0 ? utilitySubItems : primarySubItems;
+  const adminUtilityPath = visibleUtilityNav[0]?.path ?? "/admin/associates";
 
   const handlePrimaryClick = (item: NavItem) => {
     const target = item.path ?? item.subItems?.[0]?.path;
@@ -61,6 +69,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const utilityLinkClass =
     "inline-block rounded-b-lg border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-300 sm:px-3 sm:text-xs";
+  const utilityLinkActiveClass =
+    "inline-block rounded-b-lg border border-ad-purple bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ad-purple shadow-sm sm:px-3 sm:text-xs";
 
   const subNavLinkClass =
     "relative block px-2 py-1.5 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1.5 lg:py-1.5 lg:text-xs lg:leading-snug lg:whitespace-normal";
@@ -104,7 +114,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
             <div className="col-span-2 flex flex-col items-end gap-2 md:col-span-1 md:col-start-3 md:row-start-1">
               <nav className="flex items-center gap-0 [&>a+a]:-ml-px" aria-label="Account actions">
-                <Link to="/admin/profile" className={utilityLinkClass}>
+                <Link
+                  to={adminUtilityPath}
+                  className={onAdminUtility ? utilityLinkActiveClass : utilityLinkClass}
+                >
                   Admin
                 </Link>
                 <Link to="#" className={utilityLinkClass}>
@@ -125,13 +138,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                     1
                   </span>
                 </button>
-                <button
-                  type="button"
+                <Link
+                  to="/admin/profile"
                   className="flex h-11 w-11 items-center justify-center border border-gray-300 bg-white text-gray-400 shadow-sm sm:h-12 sm:w-12"
                   aria-label="Profile"
                 >
                   <FiUser size={28} strokeWidth={1.75} />
-                </button>
+                </Link>
               </div>
             </div>
           </div>
@@ -175,12 +188,12 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </nav>
 
         {/* Sub nav — columns align with primary nav tabs on desktop */}
-        {subItems.length > 0 && activePrimary && (
+        {displaySubItems.length > 0 && (activePrimary || onAdminUtility) && (
           <div className="relative z-10 mt-[3px] bg-white lg:mt-[5px]">
             <div className="px-3 sm:px-4">
               <ul className="hidden w-full items-stretch overflow-visible lg:flex lg:gap-px lg:pb-[7px]">
                 {visibleNav.map((item, colIndex) => {
-                  const sub = colIndex < subItems.length ? subItems[colIndex] : null;
+                  const sub = colIndex < displaySubItems.length ? displaySubItems[colIndex] : null;
                   const active = sub ? isPathActive(location.pathname, sub.path) : false;
                   return (
                     <li key={item.name} className="relative min-w-0 flex-1 overflow-visible">
@@ -205,7 +218,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </div>
             <div className="hidden border-b-2 border-ad-purple lg:block" aria-hidden />
             <ul className="flex flex-col border-b-2 border-ad-purple lg:hidden">
-              {subItems.map((sub) => {
+              {displaySubItems.map((sub) => {
                 const active = isPathActive(location.pathname, sub.path);
                 return (
                   <li key={sub.path}>

@@ -45,6 +45,8 @@ import Ads from "./pages/AdminPages/Ads/Ads";
 import RunningDeals from "./pages/AdminPages/Deals/RunningDeals";
 import Wallet from "./pages/AdminPages/Wallet/Wallet";
 import SubServicesPage from "./pages/AdminPages/Services/Categories";
+import CarBrandsPage from "./pages/AdminPages/Services/CarBrands";
+import CarBrandsNewPage from "./pages/AdminPages/Services/CarBrandsNew";
 import Provinces from "./pages/AdminPages/Cities/Provinces";
 import Invitehelp from "./pages/AdminPages/InviteHelpSection/Invitehelp";
 import SubAdminManagement from "./pages/AdminPages/SubAdminManagement/SubAdminManagement";
@@ -145,6 +147,16 @@ export default function App() {
               <Route path="/admin/services" element={
                 <ProtectedRoute module="categories" action="view">
                   <SubServicesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/car-brands" element={
+                <ProtectedRoute module="carCompanies" action="view">
+                  <CarBrandsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/car-brands/new" element={
+                <ProtectedRoute module="carCompanies" action="view">
+                  <CarBrandsNewPage />
                 </ProtectedRoute>
               } />
               <Route path="/admin/provinces" element={

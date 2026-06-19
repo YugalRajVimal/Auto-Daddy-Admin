@@ -51,8 +51,9 @@ export const primaryNav: NavItem[] = [
     subItems: [
       { name: "Services", path: "/admin/categories", permissionModule: "services" },
       { name: "Sub Services", path: "/admin/services", permissionModule: "categories" },
+      { name: "Car Brands", path: "/admin/car-brands", permissionModule: "carCompanies" },
     ],
-    matchPaths: ["/admin/categories", "/admin/services"],
+    matchPaths: ["/admin/categories", "/admin/services", "/admin/car-brands"],
   },
   {
     name: "Users",
@@ -60,10 +61,9 @@ export const primaryNav: NavItem[] = [
     subItems: [
       { name: "Car Owners", path: "/admin/car-owners", permissionModule: "users" },
       { name: "Auto Shop Owners", path: "/admin/auto-shop-owners", permissionModule: "users" },
-      { name: "Associates", path: "/admin/associates", permissionModule: "users" },
       { name: "Dealers", path: "/admin/dealers", permissionModule: "users" },
     ],
-    matchPaths: ["/admin/car-owners", "/admin/auto-shop-owners", "/admin/associates", "/admin/dealers"],
+    matchPaths: ["/admin/car-owners", "/admin/auto-shop-owners", "/admin/dealers"],
   },
   {
     name: "Leads",
@@ -90,6 +90,11 @@ export const primaryNav: NavItem[] = [
     path: "/admin/ads",
     permissionModule: "ads",
   },
+];
+
+/** Routes accessed via the top Admin utility button (not primary nav). */
+export const adminUtilityNav: NavSubItem[] = [
+  { name: "Associates", path: "/admin/associates", permissionModule: "users" },
 ];
 
 /* ── Legacy nav items (commented out — routes still reachable by URL) ──

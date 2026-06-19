@@ -102,7 +102,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   return (
     <AdminPage
       title="Product Features"
-      headerAction={!showForm ? <AddNewButton label="New Feature" onClick={() => setShowForm(true)} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

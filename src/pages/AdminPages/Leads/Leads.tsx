@@ -133,7 +133,7 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
   return (
     <AdminPage
       title="Leads"
-      headerAction={!showForm ? <AddNewButton label="New Lead" onClick={() => setShowForm(true)} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

@@ -242,7 +242,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
   return (
     <AdminPage
       title="Cities"
-      headerAction={!showForm ? <AddNewButton label="New City" onClick={openAdd} /> : undefined}
+      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
