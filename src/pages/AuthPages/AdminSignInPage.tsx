@@ -9,15 +9,30 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
 const LOGO = "/logo.png";
 const RESEND_COOLDOWN_SEC = 5 * 60;
 
+const CALLING_CODES = [
+  { id: "CA", flag: "🇨🇦", label: "Canada", code: "+1" },
+  { id: "US", flag: "🇺🇸", label: "United States", code: "+1" },
+  { id: "IN", flag: "🇮🇳", label: "India", code: "+91" },
+  { id: "GB", flag: "🇬🇧", label: "United Kingdom", code: "+44" },
+  { id: "AU", flag: "🇦🇺", label: "Australia", code: "+61" },
+];
+
 function formatCooldown(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 export default function AdminSignInPage() {
   const navigate = useNavigate();
+  const [countryId, setCountryId] = useState("CA");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [loginWithEmail, setLoginWithEmail] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,6 +47,22 @@ export default function AdminSignInPage() {
     return () => clearTimeout(timer);
   }, [otpSent, resendCooldown]);
 
+  const countryCode =
+    CALLING_CODES.find((c) => c.id === countryId)?.code ?? "+1";
+  const phoneDigits = phone.replace(/\D/g, "");
+
+  function getAuthPayload() {
+    if (loginWithEmail) {
+      return { email: email.trim().toLowerCase(), role: ADMIN_ROLE };
+    }
+    return { countryCode, phone: phoneDigits, role: ADMIN_ROLE };
+  }
+
+  function canRequestOtp() {
+    if (loginWithEmail) return isValidEmail(email);
+    return phoneDigits.length === 10;
+  }
+
   async function handleSendOtp() {
     setStatus(null);
     setLoading(true);
@@ -39,7 +70,7 @@ export default function AdminSignInPage() {
       const res = await fetch(`${API_BASE}/admin/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), role: ADMIN_ROLE }),
+        body: JSON.stringify(getAuthPayload()),
       });
       const data = await res.json();
       if (res.ok) {
@@ -47,7 +78,11 @@ export default function AdminSignInPage() {
         setOtpSent(true);
         setResendCooldown(RESEND_COOLDOWN_SEC);
         if (isResend) setOtp("");
-        setStatus("OTP sent! Please check your email.");
+        setStatus(
+          loginWithEmail
+            ? "OTP sent! Please check your email."
+            : "OTP sent! Please check your phone."
+        );
       } else {
         setOtpSent(false);
         setStatus(data?.message || "Failed to send OTP");
@@ -72,11 +107,7 @@ export default function AdminSignInPage() {
       const res = await fetch(`${API_BASE}/admin/verify-account`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          role: ADMIN_ROLE,
-          otp,
-        }),
+        body: JSON.stringify({ ...getAuthPayload(), otp }),
       });
       const data = await res.json();
       if (res.ok && data.token) {
@@ -142,25 +173,74 @@ export default function AdminSignInPage() {
 
               {!otpSent ? (
                 <div className="mx-auto w-full max-w-xs space-y-4">
-                  <label className="block text-sm text-gray-500">Mobile Number</label>
-                  <div className="flex">
-                    <div className="flex items-center rounded-l-md border border-r-0 border-gray-400 bg-gray-300 px-3 py-2 text-sm text-gray-700">
-                      <span>+1</span>
-                      <span className="ml-1.5 text-[10px]">v</span>
-                    </div>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
                     <input
-                      type="text"
-                      value={email}
-                      autoComplete="username"
-                      onChange={(e) => setEmail(e.target.value)}
+                      type="checkbox"
+                      checked={loginWithEmail}
+                      onChange={(e) => {
+                        setLoginWithEmail(e.target.checked);
+                        setStatus(null);
+                      }}
                       disabled={loading}
-                      className="w-full rounded-r-md border border-gray-400 bg-white py-2 px-3 text-sm focus:border-ad-green focus:outline-none"
+                      className="h-4 w-4 rounded border-gray-400 text-ad-green focus:ring-ad-green"
                     />
-                  </div>
+                    Login using email
+                  </label>
+
+                  {loginWithEmail ? (
+                    <div>
+                      <label className="mb-1 block text-sm text-gray-500">Email Address</label>
+                      <input
+                        type="email"
+                        value={email}
+                        autoComplete="email"
+                        placeholder="Enter your email"
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={loading}
+                        className="w-full rounded-md border border-gray-400 bg-white py-2 px-3 text-sm focus:border-ad-green focus:outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="mb-1 block text-sm text-gray-500">Mobile Number</label>
+                      <div className="flex">
+                        <div className="relative shrink-0">
+                          <select
+                            value={countryId}
+                            onChange={(e) => setCountryId(e.target.value)}
+                            disabled={loading}
+                            aria-label="Country code"
+                            className="appearance-none rounded-l-md border border-r-0 border-gray-400 bg-gray-300 py-2 pl-2 pr-7 text-sm text-gray-700 focus:border-ad-green focus:outline-none"
+                          >
+                            {CALLING_CODES.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.flag} {c.code}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-600">
+                            ▼
+                          </span>
+                        </div>
+                        <input
+                          type="tel"
+                          value={phone}
+                          autoComplete="tel-national"
+                          placeholder="10-digit number"
+                          onChange={(e) =>
+                            setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+                          }
+                          disabled={loading}
+                          className="w-full rounded-r-md border border-gray-400 bg-white py-2 px-3 text-sm focus:border-ad-green focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     onClick={handleSendOtp}
-                    disabled={loading || !email.trim()}
+                    disabled={loading || !canRequestOtp()}
                     className="w-full rounded-md bg-ad-green py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-ad-green-dark disabled:opacity-60"
                   >
                     {loading ? "Sending..." : "Get OTP"}
@@ -211,7 +291,7 @@ export default function AdminSignInPage() {
                     disabled={loading}
                     className="w-full text-sm text-ad-green-dark hover:underline"
                   >
-                    ← Back to Mobile Number
+                    ← Back to {loginWithEmail ? "Email" : "Mobile Number"}
                   </button>
                 </div>
               )}

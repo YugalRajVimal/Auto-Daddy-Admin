@@ -5,14 +5,15 @@ const LogOutAdmin: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Remove the admin token from local storage
+    if (!window.confirm("Are you sure you want to log out?")) {
+      navigate("/admin", { replace: true });
+      return;
+    }
+
     localStorage.removeItem("admin-token");
     localStorage.removeItem("admin-role");
     localStorage.removeItem("subadmin-permissions");
-    // Optionally, clear all local storage if more cleanup is needed
-    // localStorage.clear();
 
-    // Redirect to sign-in page after logout
     navigate("/", { replace: true });
   }, [navigate]);
 

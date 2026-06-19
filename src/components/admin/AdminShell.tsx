@@ -50,8 +50,17 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     setMobileOpen(false);
   };
 
+  const handleLogout = () => {
+    if (!window.confirm("Are you sure you want to log out?")) return;
+
+    localStorage.removeItem("admin-token");
+    localStorage.removeItem("admin-role");
+    localStorage.removeItem("subadmin-permissions");
+    navigate("/", { replace: true });
+  };
+
   const utilityLinkClass =
-    "inline-block border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-300 sm:px-3 sm:text-xs";
+    "inline-block rounded-b-lg border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-300 sm:px-3 sm:text-xs";
 
   const subNavLinkClass =
     "relative block px-2 py-1.5 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1.5 lg:py-1.5 lg:text-xs lg:leading-snug lg:whitespace-normal";
@@ -101,9 +110,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 <Link to="#" className={utilityLinkClass}>
                   Help
                 </Link>
-                <Link to="/admin/logout" className={utilityLinkClass}>
+                <button type="button" onClick={handleLogout} className={utilityLinkClass}>
                   Log out
-                </Link>
+                </button>
               </nav>
               <div className="flex items-center gap-4">
                 <button
