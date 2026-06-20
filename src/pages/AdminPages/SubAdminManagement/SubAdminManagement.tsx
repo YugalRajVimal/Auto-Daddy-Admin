@@ -50,10 +50,9 @@ const CITY_OPTIONS = [
 
 const ROLE_OPTIONS = [
   "Super Admin",
-  "Support Admin",
-  "Content Editor",
-  "Regional Manager",
-  "Operations Admin",
+  "Admin",
+  "Sub Admin",
+  "Business Associate",
 ];
 
 const uploadBtnClass =
