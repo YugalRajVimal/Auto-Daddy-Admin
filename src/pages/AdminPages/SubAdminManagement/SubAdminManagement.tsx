@@ -9,7 +9,6 @@ import {
   CompactField,
   CompactFormFooter,
   CompactFormPanel,
-  CompactFormRow,
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
@@ -54,6 +53,10 @@ const ROLE_OPTIONS = [
   "Sub Admin",
   "Business Associate",
 ];
+
+const subAdminFormGridClass =
+  "grid w-full grid-cols-[140px_140px_minmax(0,1fr)_140px_minmax(0,1fr)] items-start gap-x-4 gap-y-4 sm:grid-cols-[180px_180px_minmax(0,1fr)_180px_minmax(0,1fr)]";
+const subAdminFormGridField = "min-w-0 w-full !flex-none";
 
 const uploadBtnClass =
   "rounded border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300";
@@ -320,7 +323,6 @@ const SubAdminManagement: React.FC = () => {
   const [showPermModal, setShowPermModal] = useState<SubAdmin | null>(null);
   const [showActivityModal, setShowActivityModal] = useState<SubAdmin | null>(null);
   const [showViewModal, setShowViewModal] = useState<SubAdmin | null>(null);
-  const [showResetModal, setShowResetModal] = useState<SubAdmin | null>(null);
   const [editingSubAdmin, setEditingSubAdmin] = useState<SubAdmin | null>(null);
 
   // Form state
@@ -329,6 +331,7 @@ const SubAdminManagement: React.FC = () => {
   const [role, setRole] = useState("");
   const [city, setCity] = useState("");
   const [permissionKeys, setPermissionKeys] = useState<string[]>([]);
+  const [isActive, setIsActive] = useState(true);
   const [attachImage, setAttachImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -343,10 +346,6 @@ const SubAdminManagement: React.FC = () => {
   // Permission edit
   const [editPerms, setEditPerms] = useState<Permissions>(DEFAULT_PERMS());
   const [permLoading, setPermLoading] = useState(false);
-
-  // Reset password
-  const [newPassword, setNewPassword] = useState("");
-  const [resetLoading, setResetLoading] = useState(false);
 
   const token = localStorage.getItem("admin-token");
   const headers = { Authorization: token || "" };
@@ -371,6 +370,7 @@ const SubAdminManagement: React.FC = () => {
     setRole("");
     setCity("");
     setPermissionKeys([]);
+    setIsActive(true);
     setAttachImage(false);
     if (imagePreview.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
     setImageFile(null);
@@ -425,6 +425,7 @@ const SubAdminManagement: React.FC = () => {
     setRole(sa.role || "");
     setCity(sa.city || "");
     setPermissionKeys(permissionKeysFromPerms(sa.permissions));
+    setIsActive(sa.isActive);
     const existingImage = adminImageUrl(sa);
     setAttachImage(!!existingImage);
     setImageFile(null);
@@ -456,6 +457,7 @@ const SubAdminManagement: React.FC = () => {
       phone: form.phone,
       role,
       city,
+      isActive,
     };
 
     setFormLoading(true);
@@ -536,17 +538,6 @@ const SubAdminManagement: React.FC = () => {
     if (sa) openEdit(sa);
   };
 
-  const handleDelete = async (sa: SubAdmin) => {
-    if (!window.confirm(`Delete SubAdmin "${sa.name}"? This cannot be undone.`)) return;
-    try {
-      await axios.delete(`${API}/api/admin/subadmins/${sa._id}`, { headers });
-      showMsg("SubAdmin deleted.");
-      fetchSubAdmins();
-    } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to delete.");
-    }
-  };
-
   // Permission modal
   const openPermModal = (sa: SubAdmin) => {
     setEditPerms({ ...DEFAULT_PERMS(), ...sa.permissions });
@@ -575,23 +566,6 @@ const SubAdminManagement: React.FC = () => {
       setActivityLogs(res.data.data || []);
     } catch { setActivityLogs([]); }
     finally { setActivityLoading(false); }
-  };
-
-  // Reset password
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!showResetModal) return;
-    if (newPassword.length < 6) return setError("Password must be at least 6 characters.");
-    setResetLoading(true);
-    try {
-      await axios.patch(`${API}/api/admin/subadmins/${showResetModal._id}/reset-password`,
-        { newPassword }, { headers });
-      showMsg("Password reset successfully.");
-      setShowResetModal(null);
-      setNewPassword("");
-    } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to reset password.");
-    } finally { setResetLoading(false); }
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -675,27 +649,6 @@ const SubAdminManagement: React.FC = () => {
         )}
       </Modal>
 
-      {/* ── Reset Password Modal ─────────────────────────────────────────────── */}
-      <Modal isOpen={!!showResetModal} onClose={() => { setShowResetModal(null); setNewPassword(""); }}
-        title={`Reset Password — ${showResetModal?.name}`}>
-        <form onSubmit={handleResetPassword}>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: 13, marginBottom: 4 }}>New Password</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-              required minLength={6} placeholder="Min. 6 characters"
-              style={{ width: "100%", border: "1px solid #d2d6de", borderRadius: 3, padding: "7px 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-          </div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button type="button" onClick={() => { setShowResetModal(null); setNewPassword(""); }}
-              style={{ padding: "7px 18px", borderRadius: 3, border: "1px solid #d2d6de", background: "#fff", color: "#444", fontSize: 13, cursor: "pointer" }}>Cancel</button>
-            <button type="submit" disabled={resetLoading}
-              style={{ padding: "7px 22px", borderRadius: 3, border: "none", background: resetLoading ? "#aaa" : "#f39c12", color: "#fff", fontSize: 13, fontWeight: 600, cursor: resetLoading ? "not-allowed" : "pointer" }}>
-              {resetLoading ? "Resetting..." : "Reset Password"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
       <AdminPage
         title="Manage Admin"
         headerAction={!showForm ? <AddNewButton onClick={openCreate} /> : undefined}
@@ -722,8 +675,8 @@ const SubAdminManagement: React.FC = () => {
                 </div>
               )}
               <form onSubmit={handleSubmit} autoComplete="off" className="flex flex-col gap-4">
-                <CompactFormRow className="w-full items-start gap-x-4 gap-y-4">
-                  <CompactField label="Date" required className={compactFixedFieldWidth}>
+                <div className={subAdminFormGridClass}>
+                  <CompactField label="Date" required className={`${compactFixedFieldWidth} ${subAdminFormGridField}`}>
                     <input
                       type="date"
                       value={date}
@@ -731,7 +684,7 @@ const SubAdminManagement: React.FC = () => {
                       className={compactInputClass}
                     />
                   </CompactField>
-                  <CompactField label="Role" required className={compactFixedFieldWidth}>
+                  <CompactField label="Role" required className={`${compactFixedFieldWidth} ${subAdminFormGridField}`}>
                     <select
                       value={role}
                       onChange={(e) => setRole(e.target.value)}
@@ -745,7 +698,7 @@ const SubAdminManagement: React.FC = () => {
                       ))}
                     </select>
                   </CompactField>
-                  <CompactField label="Name" required className="min-w-0 flex-1">
+                  <CompactField label="Name" required className={subAdminFormGridField}>
                     <input
                       type="text"
                       required
@@ -755,7 +708,7 @@ const SubAdminManagement: React.FC = () => {
                       className={compactInputClass}
                     />
                   </CompactField>
-                  <CompactField label="Phone" className={compactFixedFieldWidth}>
+                  <CompactField label="Phone" className={`${compactFixedFieldWidth} ${subAdminFormGridField}`}>
                     <input
                       type="tel"
                       value={form.phone}
@@ -764,7 +717,7 @@ const SubAdminManagement: React.FC = () => {
                       className={compactInputClass}
                     />
                   </CompactField>
-                  <CompactField label="Email" required className="min-w-0 flex-1">
+                  <CompactField label="Email" required className={subAdminFormGridField}>
                     <input
                       type="email"
                       required
@@ -774,26 +727,9 @@ const SubAdminManagement: React.FC = () => {
                       className={compactInputClass}
                     />
                   </CompactField>
-                </CompactFormRow>
-                <CompactFormRow className="w-full items-start gap-x-4 gap-y-4">
-                  <CompactField label="City" required className={compactFixedFieldWidth}>
-                    <select
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      className={compactInputClass}
-                    >
-                      <option value="">Select city</option>
-                      {CITY_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </CompactField>
-                  <CompactField label="Permissions" required className="min-w-0 flex-1">
-                    <PermissionsDropdown selected={permissionKeys} onChange={setPermissionKeys} />
-                  </CompactField>
-                  <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+                </div>
+                <div className={subAdminFormGridClass}>
+                  <div className={`${compactFixedFieldWidth} ${subAdminFormGridField}`}>
                     <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
                       <input
                         type="checkbox"
@@ -853,7 +789,48 @@ const SubAdminManagement: React.FC = () => {
                       </div>
                     ) : null}
                   </div>
-                </CompactFormRow>
+                  <CompactField label="City" required className={`${compactFixedFieldWidth} ${subAdminFormGridField}`}>
+                    <select
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className={compactInputClass}
+                    >
+                      <option value="">Select city</option>
+                      {CITY_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </CompactField>
+                  <CompactField label="Permissions" required className={subAdminFormGridField}>
+                    <PermissionsDropdown selected={permissionKeys} onChange={setPermissionKeys} />
+                  </CompactField>
+                  <CompactField label="Status" className={`${compactFixedFieldWidth} ${subAdminFormGridField}`}>
+                    <div className="flex h-[30px] items-center gap-4">
+                      <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-gray-800">
+                        <input
+                          type="radio"
+                          name="subAdminStatus"
+                          checked={isActive}
+                          onChange={() => setIsActive(true)}
+                          className="h-3.5 w-3.5 accent-ad-green"
+                        />
+                        Active
+                      </label>
+                      <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-gray-800">
+                        <input
+                          type="radio"
+                          name="subAdminStatus"
+                          checked={!isActive}
+                          onChange={() => setIsActive(false)}
+                          className="h-3.5 w-3.5 accent-ad-green"
+                        />
+                        Inactive
+                      </label>
+                    </div>
+                  </CompactField>
+                </div>
               </form>
             </CompactFormPanel>
           ) : undefined
@@ -1015,16 +992,6 @@ const SubAdminManagement: React.FC = () => {
                               label: "Activity Logs",
                               onClick: () => openActivityModal(sa),
                               className: "text-cyan-800",
-                            },
-                            {
-                              label: "Reset Password",
-                              onClick: () => setShowResetModal(sa),
-                              className: "text-gray-700",
-                            },
-                            {
-                              label: "Delete",
-                              onClick: () => handleDelete(sa),
-                              className: "text-red-700",
                             },
                           ]}
                         />
