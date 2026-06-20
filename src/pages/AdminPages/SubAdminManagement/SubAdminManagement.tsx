@@ -465,7 +465,7 @@ const SubAdminManagement: React.FC = () => {
       if (editingSubAdmin) {
         if (imageFile) {
           const fd = new FormData();
-          Object.entries(basePayload).forEach(([key, value]) => fd.append(key, value));
+          Object.entries(basePayload).forEach(([key, value]) => fd.append(key, String(value)));
           fd.append("profilePhoto", imageFile, imageFile.name);
           await axios.put(`${API}/api/admin/subadmins/${editingSubAdmin._id}`, fd, {
             headers: { ...headers, "Content-Type": "multipart/form-data" },
@@ -479,7 +479,7 @@ const SubAdminManagement: React.FC = () => {
       } else {
         if (imageFile) {
           const fd = new FormData();
-          Object.entries(basePayload).forEach(([key, value]) => fd.append(key, value));
+          Object.entries(basePayload).forEach(([key, value]) => fd.append(key, String(value)));
           fd.append("permissions", JSON.stringify(formPerms));
           fd.append("profilePhoto", imageFile, imageFile.name);
           await axios.post(`${API}/api/admin/subadmins`, fd, {
