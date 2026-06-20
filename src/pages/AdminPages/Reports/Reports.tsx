@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { FiPrinter } from "react-icons/fi";
 import AdminPage from "../../../components/admin/AdminPage";
 import {
@@ -14,10 +14,12 @@ import {
   DUMMY_BANKS,
   DUMMY_EXPENSES,
   DUMMY_INCOME,
+  estimateGstAmount,
   formatDisplayDate,
   todayIso,
   type AccountReportTitle,
   type BankRow,
+  type GstLedgerRow,
   type LedgerRow,
 } from "../Accounts/accountData";
 import {
@@ -29,6 +31,8 @@ import {
 } from "../Accounts/ledgerCategories";
 import {
   filterLedgerRows,
+  filterGstRows,
+  buildGstRows,
   formatLongDate,
   formatReportAmount,
   groupLedgerByCategory,
@@ -38,6 +42,8 @@ import {
   sumAmounts,
   type GroupBy,
 } from "./reportGrouping";
+
+const VALID_REPORT_TYPES: AccountReportTitle[] = ["expenses", "income", "bank", "gst"];
 
 const REPORT_OPTIONS: { value: AccountReportTitle; label: string; description: string }[] = [
   {
@@ -54,6 +60,11 @@ const REPORT_OPTIONS: { value: AccountReportTitle; label: string; description: s
     value: "bank",
     label: "Bank Report",
     description: "View bank and wallet account balances.",
+  },
+  {
+    value: "gst",
+    label: "GST Report",
+    description: "View GST/HST on income and expenses for the selected period.",
   },
 ];
 
@@ -273,9 +284,129 @@ function GroupedLedgerReport({
   );
 }
 
+function GstReportView({
+  rows,
+  fromDate,
+  toDate,
+  expenseCategories,
+  incomeCategories,
+}: {
+  rows: GstLedgerRow[];
+  fromDate: string;
+  toDate: string;
+  expenseCategories: CategoryOption[];
+  incomeCategories: CategoryOption[];
+}) {
+  const incomeRows = rows.filter((row) => row.ledgerType === "income");
+  const expenseRows = rows.filter((row) => row.ledgerType === "expenses");
+  const incomeGstTotal = incomeRows.reduce((sum, row) => sum + estimateGstAmount(row.amount), 0);
+  const expenseGstTotal = expenseRows.reduce((sum, row) => sum + estimateGstAmount(row.amount), 0);
+  const netGst = incomeGstTotal - expenseGstTotal;
+
+  return (
+    <div id="report-print-area" className="rounded border border-gray-300 bg-white p-4">
+      <div className="mb-4 flex items-start justify-between gap-3 print:hidden">
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-1.5 rounded border border-gray-400 bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-300"
+        >
+          <FiPrinter size={14} aria-hidden />
+          Print Report
+        </button>
+      </div>
+
+      <div className="mb-4 text-center">
+        <h3 className="text-xl font-bold text-gray-900">GST Report</h3>
+        <p className="mt-1 text-sm font-semibold text-gray-800">{REPORT_COMPANY_NAME}</p>
+        <p className="mt-1 text-sm text-gray-700">
+          Between {formatLongDate(fromDate)} and {formatLongDate(toDate)}
+        </p>
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded border border-gray-300 bg-gray-50 px-4 py-3 text-center">
+          <p className="text-xs font-semibold uppercase text-gray-600">GST Collected</p>
+          <p className="mt-1 text-lg font-bold text-ad-green-dark">{formatReportAmount(incomeGstTotal)}</p>
+        </div>
+        <div className="rounded border border-gray-300 bg-gray-50 px-4 py-3 text-center">
+          <p className="text-xs font-semibold uppercase text-gray-600">GST Paid</p>
+          <p className="mt-1 text-lg font-bold text-gray-900">{formatReportAmount(expenseGstTotal)}</p>
+        </div>
+        <div className="rounded border border-gray-300 bg-gray-50 px-4 py-3 text-center">
+          <p className="text-xs font-semibold uppercase text-gray-600">Net GST</p>
+          <p className="mt-1 text-lg font-bold text-gray-900">{formatReportAmount(netGst)}</p>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="px-4 py-6 text-center text-sm text-gray-600">
+          No GST records found for the selected date range.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-ad-purple text-white">
+                {["Date", "Type", "Vendor / Source", "Category", "Amount", "GST", "Notes"].map((header) => (
+                  <th
+                    key={header}
+                    className={`border border-ad-purple-dark px-3 py-2 font-medium ${
+                      header === "Amount" || header === "GST" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const categories = row.ledgerType === "expenses" ? expenseCategories : incomeCategories;
+                const labels = categoryLabel(categories, row.category, row.subcategory);
+                const gstAmount = estimateGstAmount(row.amount);
+                return (
+                  <tr key={`${row.ledgerType}-${row.id}`}>
+                    <td className="border border-gray-300 px-3 py-2">{formatDisplayDate(row.date)}</td>
+                    <td className="border border-gray-300 px-3 py-2 capitalize">
+                      {row.ledgerType === "expenses" ? "Expense" : "Income"}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2 uppercase">{row.vendor}</td>
+                    <td className="border border-gray-300 px-3 py-2">
+                      <div className="font-bold leading-tight">{labels.category}</div>
+                      <div className="text-xs text-gray-600">{labels.subcategory}</div>
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2 text-right">
+                      {formatReportAmount(row.amount)}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2 text-right">
+                      {formatReportAmount(gstAmount)}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2">{row.notes || ""}</td>
+                  </tr>
+                );
+              })}
+              <tr className="bg-gray-100">
+                <td colSpan={5} className="border border-gray-300 px-3 py-2 text-right font-bold">
+                  Net GST
+                </td>
+                <td className="border border-gray-300 px-3 py-2 text-right font-bold">
+                  {formatReportAmount(netGst)}
+                </td>
+                <td className="border border-gray-300 px-3 py-2" />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReportTypePicker({ onSelect }: { onSelect: (report: AccountReportTitle) => void }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {REPORT_OPTIONS.map((option) => (
         <button
           key={option.value}
@@ -292,13 +423,18 @@ function ReportTypePicker({ onSelect }: { onSelect: (report: AccountReportTitle)
 }
 
 export default function Reports() {
+  const navigate = useNavigate();
   const location = useLocation();
+  const { reportType: reportTypeParam } = useParams<{ reportType?: string }>();
   const navResetToken = (location.state as { navReset?: number } | null)?.navReset;
+
+  const selectedReport = VALID_REPORT_TYPES.includes(reportTypeParam as AccountReportTitle)
+    ? (reportTypeParam as AccountReportTitle)
+    : null;
 
   const defaultToDate = todayIso();
   const defaultFromDate = `${defaultToDate.slice(0, 4)}-01-01`;
 
-  const [selectedReport, setSelectedReport] = useState<AccountReportTitle | null>(null);
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
   const [category, setCategory] = useState("");
@@ -314,30 +450,31 @@ export default function Reports() {
   const activeCategories =
     selectedReport === "expenses" ? expenseCategories : selectedReport === "income" ? incomeCategories : [];
 
-  const handleSelectReport = (report: AccountReportTitle) => {
-    setSelectedReport(report);
-    setCategory("");
-    setGroupBy("category");
-    setApplied(null);
-    setPage(1);
-  };
-
-  const handleBackToReportTypes = () => {
-    setSelectedReport(null);
-    setCategory("");
-    setGroupBy("category");
-    setApplied(null);
-    setPage(1);
-  };
+  useEffect(() => {
+    if (reportTypeParam && !selectedReport) {
+      navigate("/admin/reports", { replace: true });
+    }
+  }, [reportTypeParam, selectedReport, navigate]);
 
   useEffect(() => {
     if (!navResetToken) return;
-    setSelectedReport(null);
+    navigate("/admin/reports", { replace: true });
+  }, [navResetToken, navigate]);
+
+  useEffect(() => {
     setCategory("");
     setGroupBy("category");
     setApplied(null);
     setPage(1);
-  }, [navResetToken]);
+  }, [selectedReport]);
+
+  const handleSelectReport = (report: AccountReportTitle) => {
+    navigate(`/admin/reports/${report}`);
+  };
+
+  const handleBackToReportTypes = () => {
+    navigate("/admin/reports");
+  };
 
   const handleSearch = () => {
     if (!fromDate || !toDate || !selectedReport) return;
@@ -362,9 +499,14 @@ export default function Reports() {
   };
 
   const ledgerRows = useMemo(() => {
-    if (!applied || applied.title === "bank") return [];
+    if (!applied || applied.title === "bank" || applied.title === "gst") return [];
     const source = applied.title === "expenses" ? DUMMY_EXPENSES : DUMMY_INCOME;
     return filterLedgerRows(source, applied.fromDate, applied.toDate, applied.category);
+  }, [applied]);
+
+  const gstRows = useMemo(() => {
+    if (applied?.title !== "gst") return [];
+    return filterGstRows(buildGstRows(DUMMY_EXPENSES, DUMMY_INCOME), applied.fromDate, applied.toDate);
   }, [applied]);
 
   const bankRows = useMemo(() => {
@@ -418,35 +560,35 @@ export default function Reports() {
           </div>
         </CompactField>
         {isLedgerReport && (
-          <CompactField label="Category" className={compactFixedFieldWidth}>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className={compactInputClass}
-            >
-              <option value="">All Categories</option>
-              {activeCategories.map((cat) => (
-                <option key={cat.value} value={cat.value}>
-                  {cat.label}
-                </option>
-              ))}
-            </select>
-          </CompactField>
-        )}
-        {isLedgerReport && (
-          <CompactField label="Group By" className={`${compactFixedFieldWidth} ml-auto shrink-0`}>
-            <select
-              value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-              className={compactInputClass}
-            >
-              {GROUP_BY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </CompactField>
+          <div className="ml-auto flex shrink-0 items-end gap-x-4">
+            <CompactField label="Category" className={compactFixedFieldWidth}>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className={compactInputClass}
+              >
+                <option value="">All Categories</option>
+                {activeCategories.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </CompactField>
+            <CompactField label="Group By" className={compactFixedFieldWidth}>
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+                className={compactInputClass}
+              >
+                {GROUP_BY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </CompactField>
+          </div>
         )}
       </CompactFormRow>
     </CompactFormPanel>
@@ -458,7 +600,7 @@ export default function Reports() {
     <AdminPage
       title="Reports"
       noPanel
-      onTitleClick={handleBackToReportTypes}
+      onTitleClick={selectedReport ? handleBackToReportTypes : undefined}
       between={
         <>
           {showReportTypePicker && <ReportTypePicker onSelect={handleSelectReport} />}
@@ -562,6 +704,14 @@ export default function Reports() {
               reportType={applied.title}
               fromDate={applied.fromDate}
               toDate={applied.toDate}
+            />
+          ) : applied.title === "gst" ? (
+            <GstReportView
+              rows={gstRows}
+              fromDate={applied.fromDate}
+              toDate={applied.toDate}
+              expenseCategories={expenseCategories}
+              incomeCategories={incomeCategories}
             />
           ) : null}
         </>

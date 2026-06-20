@@ -23,7 +23,14 @@ export type LedgerRow = {
   hasReceipt: boolean;
 };
 
-export type AccountReportTitle = "income" | "expenses" | "bank";
+export type AccountReportTitle = "income" | "expenses" | "bank" | "gst";
+
+export type GstLedgerRow = LedgerRow & { ledgerType: "income" | "expenses" };
+
+/** Estimate GST/HST portion when the amount includes 13% tax. */
+export function estimateGstAmount(amount: number) {
+  return Math.round((amount - amount / 1.13) * 100) / 100;
+}
 
 export const DUMMY_BANKS: BankRow[] = [
   {

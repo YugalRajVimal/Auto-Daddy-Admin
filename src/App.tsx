@@ -157,6 +157,11 @@ export default function App() {
                   <Reports />
                 </ProtectedRoute>
               } />
+              <Route path="/admin/reports/:reportType" element={
+                <ProtectedRoute module="dashboard" action="view">
+                  <Reports />
+                </ProtectedRoute>
+              } />
               <Route path="/admin/car-owners" element={
                 <ProtectedRoute module="users" action="view">
                   <CarOwners />

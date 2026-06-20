@@ -98,6 +98,7 @@ export const primaryNav: NavItem[] = [
     name: "Reports",
     path: "/admin/reports",
     permissionModule: "dashboard",
+    matchPaths: ["/admin/reports"],
   },
   {
     name: "Domain",

@@ -1,7 +1,25 @@
-import { formatDisplayDate, type LedgerRow } from "../Accounts/accountData";
+import { formatDisplayDate, type LedgerRow, type GstLedgerRow } from "../Accounts/accountData";
 import { categoryLabel, type CategoryOption } from "../Accounts/ledgerCategories";
 
 export type GroupBy = "category" | "vendor" | "project";
+
+export function filterGstRows(rows: GstLedgerRow[], fromDate: string, toDate: string) {
+  return rows.filter((row) => {
+    if (fromDate && row.date < fromDate) return false;
+    if (toDate && row.date > toDate) return false;
+    return true;
+  });
+}
+
+export function buildGstRows(
+  expenses: LedgerRow[],
+  income: LedgerRow[]
+): GstLedgerRow[] {
+  return [
+    ...expenses.filter((row) => row.gst).map((row) => ({ ...row, ledgerType: "expenses" as const })),
+    ...income.filter((row) => row.gst).map((row) => ({ ...row, ledgerType: "income" as const })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.vendor.localeCompare(b.vendor));
+}
 
 export function filterLedgerRows(
   rows: LedgerRow[],
