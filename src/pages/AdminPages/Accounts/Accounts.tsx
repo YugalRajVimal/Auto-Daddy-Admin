@@ -287,7 +287,6 @@ function LedgerPage({
   const baseCategories = isExpense ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
   const vendorLabel = isExpense ? "Vendor" : "Source";
   const billLabel = isExpense ? "Bill Number" : "Invoice Number";
-  const recordLabel = isExpense ? "Expense" : "Income";
   const initialData = isExpense ? DUMMY_EXPENSES : DUMMY_INCOME;
 
   const [categories, setCategories] = useState<CategoryOption[]>(() => cloneCategories(baseCategories));
