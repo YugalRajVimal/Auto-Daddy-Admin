@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { FiBell, FiUser } from "react-icons/fi";
 import usePermissions from "../../hooks/usePermission";
@@ -31,6 +31,19 @@ function isPathActive(pathname: string, path: string) {
   return pathname === path || pathname.startsWith(path + "/");
 }
 
+function getActiveSubItemPath(pathname: string, subItems: NavSubItem[]): string | null {
+  const exact = subItems.find((s) => {
+    if (s.path === "/admin") return pathname === "/admin";
+    return pathname === s.path;
+  });
+  if (exact) return exact.path;
+
+  const prefixMatch = subItems
+    .filter((s) => s.path !== "/admin" && pathname.startsWith(`${s.path}/`))
+    .sort((a, b) => b.path.length - a.path.length)[0];
+  return prefixMatch?.path ?? null;
+}
+
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -50,6 +63,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const utilitySubItems = onAdminUtility ? visibleUtilityNav : [];
   const primarySubItems: NavSubItem[] = activePrimary?.subItems ?? [];
   const displaySubItems = utilitySubItems.length > 0 ? utilitySubItems : primarySubItems;
+  const activeSubItemPath = getActiveSubItemPath(location.pathname, displaySubItems);
   const adminUtilityPath = visibleUtilityNav[0]?.path ?? "/admin/associates";
 
   const handlePrimaryClick = (item: NavItem) => {
@@ -77,9 +91,14 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const loginRole = isAdmin ? "Admin" : "Sub Admin";
 
+  useEffect(() => {
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+  }, [location.pathname]);
+
   return (
     <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
-      <div className="flex w-full min-h-0 flex-1 flex-col">
+      <div className="flex w-full flex-col">
         {/* Header: logo, login status, utilities */}
         <header className="px-3 pt-4 pb-2 sm:px-4 md:pt-5">
           <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-3 md:grid-cols-[auto_1fr_auto] md:gap-x-4">
@@ -194,7 +213,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               <ul className="hidden w-full items-stretch overflow-visible lg:flex lg:gap-px lg:pb-[7px]">
                 {visibleNav.map((item, colIndex) => {
                   const sub = colIndex < displaySubItems.length ? displaySubItems[colIndex] : null;
-                  const active = sub ? isPathActive(location.pathname, sub.path) : false;
+                  const active = sub ? sub.path === activeSubItemPath : false;
                   return (
                     <li key={item.name} className="relative min-w-0 flex-1 overflow-visible">
                       {sub && (
@@ -219,7 +238,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <div className="hidden border-b-2 border-ad-purple lg:block" aria-hidden />
             <ul className="flex flex-col border-b-2 border-ad-purple lg:hidden">
               {displaySubItems.map((sub) => {
-                const active = isPathActive(location.pathname, sub.path);
+                const active = sub.path === activeSubItemPath;
                 return (
                   <li key={sub.path}>
                     <Link
@@ -235,7 +254,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </div>
         )}
 
-        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+        <main>{children}</main>
       </div>
     </div>
   );

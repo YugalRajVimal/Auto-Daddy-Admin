@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { FiRefreshCw } from "react-icons/fi";
+import { EyeIcon } from "../../../icons";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
   CompactAutoGrowTextarea,
@@ -12,19 +12,21 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 
-const SOURCE_OPTIONS = [
-  { value: "website", label: "Website" },
-  { value: "referral", label: "Referral" },
-  { value: "walk-in", label: "Walk-in" },
-  { value: "phone", label: "Phone" },
+// Date + gap-x-4 + Sent To (matches compactFixedFieldWidth × 2 + 16px)
+const leadWebsiteFieldWidth = "w-[296px] shrink-0 flex-none sm:w-[376px]";
+
+const ASSOCIATE_OPTIONS = [
+  "Sarah Mitchell",
+  "James Chen",
+  "Priya Sharma",
+  "Marcus Dubois",
+  "Emily Watson",
+  "David Okonkwo",
+  "Lisa Tremblay",
+  "Robert Singh",
 ];
 
-const STATUS_OPTIONS = [
-  { value: "new", label: "New" },
-  { value: "contacted", label: "Contacted" },
-  { value: "qualified", label: "Qualified" },
-  { value: "closed", label: "Closed" },
-];
+type LeadStatus = "visited" | "completed";
 
 type LeadRow = {
   id: number;
@@ -32,63 +34,98 @@ type LeadRow = {
   name: string;
   phone: string;
   email: string;
-  source: string;
-  status: string;
-  country: string;
+  website: string;
+  sentTo: string | null;
+  personContacted?: string | null;
   notes: string;
-  hasClip: boolean;
+  status?: LeadStatus;
+  imageUrl?: string | null;
 };
 
+const leadImageUrl = (id: number) => `https://picsum.photos/seed/lead-${id}/480/320`;
+
 const DUMMY_LEADS: LeadRow[] = [
-  { id: 1, date: "2026-06-16", name: "John Smith", phone: "705 991 3785", email: "john.s@email.com", source: "website", status: "new", country: "Canada", notes: "Interested in oil change package", hasClip: true },
-  { id: 2, date: "2026-06-15", name: "Maria Garcia", phone: "416 555 0192", email: "maria.g@email.com", source: "referral", status: "contacted", country: "Canada", notes: "Referred by Auto Shop #12", hasClip: false },
-  { id: 3, date: "2026-06-14", name: "David Chen", phone: "647 555 8821", email: "d.chen@email.com", source: "walk-in", status: "qualified", country: "Canada", notes: "Fleet account inquiry — 5 vehicles", hasClip: true },
-  { id: 4, date: "2026-06-13", name: "Sarah Johnson", phone: "905 555 4410", email: "sarah.j@email.com", source: "phone", status: "new", country: "Canada", notes: "Brake inspection request", hasClip: false },
-  { id: 5, date: "2026-06-12", name: "Michael Brown", phone: "519 555 7733", email: "m.brown@email.com", source: "website", status: "closed", country: "Canada", notes: "Signed up for premium plan", hasClip: true },
-  { id: 6, date: "2026-06-11", name: "Emily Wilson", phone: "613 555 2299", email: "emily.w@email.com", source: "referral", status: "contacted", country: "Canada", notes: "Follow up scheduled for Friday", hasClip: false },
-  { id: 7, date: "2026-06-10", name: "James Taylor", phone: "312 555 8844", email: "j.taylor@email.com", source: "website", status: "new", country: "USA", notes: "Tire rotation quote needed", hasClip: true },
-  { id: 8, date: "2026-06-09", name: "Lisa Anderson", phone: "416 555 6611", email: "l.anderson@email.com", source: "walk-in", status: "qualified", country: "Canada", notes: "Dealer partnership interest", hasClip: false },
-  { id: 9, date: "2026-06-08", name: "Robert Lee", phone: "705 555 3399", email: "r.lee@email.com", source: "phone", status: "contacted", country: "Canada", notes: "Callback requested after 5 PM", hasClip: true },
-  { id: 10, date: "2026-06-07", name: "Anna Martinez", phone: "647 555 1122", email: "a.martinez@email.com", source: "website", status: "new", country: "Canada", notes: "New car owner onboarding", hasClip: false },
+  { id: 1, date: "2026-06-16", name: "John Smith", phone: "705 991 3785", email: "john.s@email.com", website: "autodaddy.ca", sentTo: "Sarah Mitchell", notes: "Interested in oil change package", status: "visited", imageUrl: leadImageUrl(1) },
+  { id: 2, date: "2026-06-15", name: "Maria Garcia", phone: "416 555 0192", email: "maria.g@email.com", website: "autoshop12.ca", sentTo: "James Chen", notes: "Referred by Auto Shop #12", status: "visited", imageUrl: leadImageUrl(2) },
+  { id: 3, date: "2026-06-14", name: "David Chen", phone: "647 555 8821", email: "d.chen@email.com", website: "fleetcare.com", sentTo: "Marcus Dubois", notes: "Fleet account inquiry — 5 vehicles", status: "visited", imageUrl: leadImageUrl(3) },
+  { id: 4, date: "2026-06-13", name: "Sarah Johnson", phone: "905 555 4410", email: "sarah.j@email.com", website: "autodaddy.ca", sentTo: "Emily Watson", personContacted: "Sarah Johnson", notes: "Brake inspection request", status: "completed", imageUrl: leadImageUrl(4) },
+  { id: 5, date: "2026-06-12", name: "Michael Brown", phone: "519 555 7733", email: "m.brown@email.com", website: "premium.autodaddy.ca", sentTo: "Robert Singh", personContacted: "Michael Brown", notes: "Signed up for premium plan", status: "completed", imageUrl: leadImageUrl(5) },
+  { id: 6, date: "2026-06-11", name: "Emily Wilson", phone: "613 555 2299", email: "emily.w@email.com", website: "autodaddy.ca", sentTo: "Lisa Tremblay", notes: "Follow up scheduled for Friday" },
+  { id: 7, date: "2026-06-10", name: "James Taylor", phone: "312 555 8844", email: "j.taylor@email.com", website: "autodaddy.com", sentTo: "David Okonkwo", notes: "Tire rotation quote needed" },
+  { id: 8, date: "2026-06-09", name: "Lisa Anderson", phone: "416 555 6611", email: "l.anderson@email.com", website: "dealerpartners.ca", sentTo: "Sarah Mitchell", notes: "Dealer partnership interest" },
+  { id: 9, date: "2026-06-08", name: "Robert Lee", phone: "705 555 3399", email: "r.lee@email.com", website: "autodaddy.ca", sentTo: "James Chen", notes: "Callback requested after 5 PM" },
+  { id: 10, date: "2026-06-07", name: "Anna Martinez", phone: "647 555 1122", email: "a.martinez@email.com", website: "autodaddy.ca", sentTo: null, notes: "New car owner onboarding" },
+  { id: 11, date: "2026-06-06", name: "Kevin Nguyen", phone: "905 555 9021", email: "k.nguyen@email.com", website: "northside.auto", sentTo: "Priya Sharma", notes: "Site visit completed — requested winter tire quote", status: "visited", imageUrl: leadImageUrl(11) },
+  { id: 12, date: "2026-06-05", name: "Olivia Park", phone: "416 555 7788", email: "olivia.p@email.com", website: "autodaddy.ca", sentTo: "Emily Watson", notes: "Walk-in visit for AC service estimate", status: "visited", imageUrl: leadImageUrl(12) },
+  { id: 13, date: "2026-06-04", name: "Daniel Wright", phone: "519 555 4419", email: "d.wright@email.com", website: "wrightfleet.ca", sentTo: "David Okonkwo", notes: "Visited showroom — comparing maintenance plans", status: "visited", imageUrl: leadImageUrl(13) },
+  { id: 14, date: "2026-06-03", name: "Sophie Tremblay", phone: "613 555 3300", email: "s.tremblay@email.com", website: "autodaddy.ca", sentTo: "Lisa Tremblay", personContacted: "Sophie Tremblay", notes: "Positive feedback after test drive booking", status: "completed", imageUrl: leadImageUrl(14) },
+  { id: 15, date: "2026-06-02", name: "Marcus Allen", phone: "705 555 8820", email: "m.allen@email.com", website: "allenmotors.ca", sentTo: "Marcus Dubois", personContacted: "Marcus Allen", notes: "Marked positive — ready to sign service contract", status: "completed", imageUrl: leadImageUrl(15) },
+  { id: 16, date: "2026-06-01", name: "Hannah Brooks", phone: "647 555 1190", email: "h.brooks@email.com", website: "premium.autodaddy.ca", sentTo: "Robert Singh", personContacted: "Hannah Brooks", notes: "Positive lead from referral campaign", status: "completed", imageUrl: leadImageUrl(16) },
+  { id: 17, date: "2026-05-31", name: "Tyler Singh", phone: "905 555 6677", email: "t.singh@email.com", website: "autodaddy.ca", sentTo: "James Chen", notes: "Second visit — confirmed interest in detailing package", status: "visited", imageUrl: leadImageUrl(17) },
+  { id: 18, date: "2026-05-30", name: "Rachel Kim", phone: "416 555 9033", email: "r.kim@email.com", website: "kimautos.ca", sentTo: "Sarah Mitchell", personContacted: "Rachel Kim", notes: "Strong positive response to follow-up call", status: "completed", imageUrl: leadImageUrl(18) },
 ];
 
 const DEFAULT_NOTES = "Lead notes and follow-up details.";
 
+type LeadSection = "all" | "visited" | "completed";
+
 type LeadsPageProps = {
   initialShowForm?: boolean;
+  title?: string;
+  showAddNew?: boolean;
+  readOnly?: boolean;
+  section?: LeadSection;
 };
 
-export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
-  const [leads] = useState(DUMMY_LEADS);
+export default function LeadsPage({
+  initialShowForm = false,
+  title = "Leads",
+  showAddNew = true,
+  readOnly = false,
+  section = "all",
+}: LeadsPageProps) {
+  const [leads, setLeads] = useState(DUMMY_LEADS);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [date, setDate] = useState("2026-06-16");
-  const [country, setCountry] = useState("Canada");
+  const [sentTo, setSentTo] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [source, setSource] = useState("website");
-  const [status, setStatus] = useState("new");
+  const [website, setWebsite] = useState("");
   const [notes, setNotes] = useState(DEFAULT_NOTES);
-  const [attachImage, setAttachImage] = useState(false);
+  const [viewingLead, setViewingLead] = useState<LeadRow | null>(null);
+  const [imagePreview, setImagePreview] = useState<{ url: string; title: string } | null>(null);
 
-  const filtered = leads.filter(
+  useEffect(() => {
+    if (!imagePreview) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setImagePreview(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [imagePreview]);
+
+  const sectionLeads = leads.filter((l) => {
+    if (section === "visited") return l.status === "visited";
+    if (section === "completed") return l.status === "completed";
+    return l.status !== "visited" && l.status !== "completed";
+  });
+
+  const filtered = sectionLeads.filter(
     (l) =>
       l.date.includes(search) ||
       l.name.toLowerCase().includes(search.toLowerCase()) ||
       l.phone.includes(search) ||
       l.email.toLowerCase().includes(search.toLowerCase()) ||
       l.notes.toLowerCase().includes(search.toLowerCase()) ||
-      l.country.toLowerCase().includes(search.toLowerCase()) ||
-      (SOURCE_OPTIONS.find((o) => o.value === l.source)?.label ?? l.source)
-        .toLowerCase()
-        .includes(search.toLowerCase()) ||
-      (STATUS_OPTIONS.find((o) => o.value === l.status)?.label ?? l.status)
-        .toLowerCase()
-        .includes(search.toLowerCase())
+      (l.sentTo?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+      (l.personContacted?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+      l.website.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
@@ -109,15 +146,30 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
   };
 
   const resetForm = () => {
+    setEditingId(null);
     setDate("2026-06-16");
-    setCountry("Canada");
+    setSentTo("");
     setName("");
     setPhone("");
     setEmail("");
-    setSource("website");
-    setStatus("new");
+    setWebsite("");
     setNotes(DEFAULT_NOTES);
-    setAttachImage(false);
+  };
+
+  const openAdd = () => {
+    resetForm();
+    setViewingLead(null);
+    setShowForm(true);
+  };
+
+  const openView = (row: LeadRow) => {
+    setViewingLead(row);
+    setShowForm(false);
+    resetForm();
+  };
+
+  const closeView = () => {
+    setViewingLead(null);
   };
 
   const handleCancel = () => {
@@ -126,27 +178,112 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
   };
 
   const handleSave = () => {
+    const payload = {
+      date,
+      name,
+      phone,
+      email,
+      website,
+      sentTo: sentTo || null,
+      notes,
+    };
+
+    if (editingId != null) {
+      setLeads((prev) =>
+        prev.map((lead) => (lead.id === editingId ? { ...lead, ...payload } : lead))
+      );
+    } else {
+      setLeads((prev) => [
+        ...prev,
+        {
+          id: Math.max(0, ...prev.map((lead) => lead.id)) + 1,
+          ...payload,
+        },
+      ]);
+    }
+
     resetForm();
     setShowForm(false);
   };
 
+  const sentToLabel =
+    section === "visited" ? "Visited By" : section === "completed" ? "Completed By" : "Sent To";
+  const isCompletedSection = section === "completed";
+
+  const readOnlyValueClass = `${compactInputClass} bg-gray-50 text-gray-800`;
+
+  const viewDetailPanel = viewingLead ? (
+    <CompactFormPanel
+      footer={
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+          <div />
+          <span className="text-center text-xs font-serif italic text-gray-800">
+            You are viewing a &apos;Lead&apos;
+          </span>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={closeView}
+              className="rounded border border-gray-400 bg-white px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <CompactFormRow className="w-full items-start">
+        <CompactField label="Date" className={compactFixedFieldWidth}>
+          <div className={readOnlyValueClass}>{viewingLead.date}</div>
+        </CompactField>
+        <CompactField label={sentToLabel} className={compactFixedFieldWidth}>
+          <div className={readOnlyValueClass}>{viewingLead.sentTo || "-"}</div>
+        </CompactField>
+        <CompactField label="Name" className="min-w-0 flex-1">
+          <div className={readOnlyValueClass}>{viewingLead.name}</div>
+        </CompactField>
+        <CompactField label="Phone" className={compactFixedFieldWidth}>
+          <div className={readOnlyValueClass}>{viewingLead.phone}</div>
+        </CompactField>
+        <CompactField label="Email" className="min-w-0 flex-1">
+          <div className={readOnlyValueClass}>{viewingLead.email}</div>
+        </CompactField>
+      </CompactFormRow>
+      <CompactFormRow className="w-full items-start">
+        <CompactField label="Website" className={leadWebsiteFieldWidth}>
+          <div className={readOnlyValueClass}>{viewingLead.website}</div>
+        </CompactField>
+        {isCompletedSection && (
+          <CompactField label="Person Contacted" className={compactFixedFieldWidth}>
+            <div className={readOnlyValueClass}>{viewingLead.personContacted || "-"}</div>
+          </CompactField>
+        )}
+        <CompactField label="Notes" className="min-w-0 flex-1">
+          <div className={`${readOnlyValueClass} whitespace-pre-wrap`}>{viewingLead.notes}</div>
+        </CompactField>
+      </CompactFormRow>
+    </CompactFormPanel>
+  ) : undefined;
+
   return (
     <AdminPage
-      title="Leads"
-      headerAction={!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
+      title={title}
+      noPanel={!showAddNew}
+      headerAction={showAddNew && !showForm && !viewingLead ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        viewDetailPanel ??
+        (!readOnly && showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
-                message="You are creating a 'Lead'"
+                message={editingId != null ? "You are editing a 'Lead'" : "You are creating a 'Lead'"}
                 messageCenter
                 onSave={handleSave}
                 onCancel={handleCancel}
               />
             }
           >
-            <CompactFormRow className="items-start">
+            <CompactFormRow className="w-full items-start">
               <CompactField label="Date" required className={compactFixedFieldWidth}>
                 <input
                   type="date"
@@ -155,17 +292,21 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Country" required className={compactFixedFieldWidth}>
+              <CompactField label="Sent To" className={compactFixedFieldWidth}>
                 <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
+                  value={sentTo}
+                  onChange={(e) => setSentTo(e.target.value)}
                   className={compactInputClass}
                 >
-                  <option value="Canada">Canada</option>
-                  <option value="USA">USA</option>
+                  <option value="">-</option>
+                  {ASSOCIATE_OPTIONS.map((associate) => (
+                    <option key={associate} value={associate}>
+                      {associate}
+                    </option>
+                  ))}
                 </select>
               </CompactField>
-              <CompactField label="Name" required className={compactFixedFieldWidth}>
+              <CompactField label="Name" required className="min-w-0 flex-1">
                 <input
                   type="text"
                   value={name}
@@ -181,7 +322,7 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Email" required className={compactFixedFieldWidth}>
+              <CompactField label="Email" required className="min-w-0 flex-1">
                 <input
                   type="email"
                   value={email}
@@ -189,70 +330,39 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Source" required className={compactFixedFieldWidth}>
-                <select
-                  value={source}
-                  onChange={(e) => setSource(e.target.value)}
+            </CompactFormRow>
+            <CompactFormRow className="w-full items-start">
+              <CompactField label="Website" required className={leadWebsiteFieldWidth}>
+                <input
+                  type="text"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
                   className={compactInputClass}
-                >
-                  {SOURCE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </CompactField>
-              <CompactField label="Status" required className={compactFixedFieldWidth}>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className={compactInputClass}
-                >
-                  {STATUS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </CompactField>
-              <CompactField label="Notes" required className="min-w-[200px] flex-1">
+              <CompactField label="Notes" required className="min-w-0 flex-1">
                 <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
               </CompactField>
             </CompactFormRow>
-            <CompactFormRow className="justify-start">
-              <div className="flex flex-col items-start gap-1.5">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                  <input
-                    type="checkbox"
-                    checked={attachImage}
-                    onChange={(e) => setAttachImage(e.target.checked)}
-                    className="h-3.5 w-3.5 accent-ad-green"
-                  />
-                  Attach Image
-                </label>
-                {attachImage ? (
-                  <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
-                    Upload File
-                    <input type="file" accept="image/*" className="hidden" />
-                  </label>
-                ) : null}
-              </div>
-            </CompactFormRow>
           </CompactFormPanel>
-        ) : undefined
+        ) : undefined)
       }
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Update
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Shoot
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Delete
-          </button>
+          {!readOnly && (
+            <>
+              <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+                Update
+              </button>
+              <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+                Shoot
+              </button>
+              <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+                Delete
+              </button>
+            </>
+          )}
           <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
             Print
           </button>
@@ -307,11 +417,13 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Name</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Email</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Source</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Country</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Website</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">{sentToLabel}</th>
+              {isCompletedSection && (
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Person Contacted</th>
+              )}
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">View Image</th>
             </tr>
           </thead>
           <tbody>
@@ -328,7 +440,7 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
                 <td className="border border-gray-300 px-3 py-2">
                   <button
                     type="button"
-                    onClick={() => setShowForm(true)}
+                    onClick={() => openView(row)}
                     className="text-blue-700 hover:underline"
                   >
                     {row.date}
@@ -337,17 +449,28 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
                 <td className="border border-gray-300 px-3 py-2">{row.name}</td>
                 <td className="border border-gray-300 px-3 py-2">{row.phone}</td>
                 <td className="border border-gray-300 px-3 py-2">{row.email}</td>
-                <td className="border border-gray-300 px-3 py-2">
-                  {SOURCE_OPTIONS.find((o) => o.value === row.source)?.label ?? row.source}
-                </td>
-                <td className="border border-gray-300 px-3 py-2 capitalize">
-                  {STATUS_OPTIONS.find((o) => o.value === row.status)?.label ?? row.status}
-                </td>
-                <td className="border border-gray-300 px-3 py-2">{row.country}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.website}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.sentTo || "-"}</td>
+                {isCompletedSection && (
+                  <td className="border border-gray-300 px-3 py-2">{row.personContacted || "-"}</td>
+                )}
                 <td className="border border-gray-300 px-3 py-2">{row.notes}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
-                  {row.hasClip ? (
-                    <FiRefreshCw className="inline text-ad-green" size={16} />
+                  {row.imageUrl ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setImagePreview({
+                          url: row.imageUrl!,
+                          title: `${row.name} — lead image`,
+                        })
+                      }
+                      className="inline-flex items-center justify-center rounded p-1 text-ad-purple hover:bg-ad-purple/10 hover:text-ad-purple-dark"
+                      aria-label={`View image for ${row.name}`}
+                      title="View image"
+                    >
+                      <EyeIcon className="size-5 fill-current" />
+                    </button>
                   ) : (
                     <span className="text-gray-500">--</span>
                   )}
@@ -365,11 +488,10 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
-                page === p
-                  ? "border-ad-green bg-ad-green text-white"
-                  : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-              }`}
+              className={`h-7 w-7 border text-xs font-medium ${page === p
+                ? "border-ad-green bg-ad-green text-white"
+                : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                }`}
             >
               {p}
             </button>
@@ -379,6 +501,33 @@ export default function LeadsPage({ initialShowForm = false }: LeadsPageProps) {
           Deleted
         </Link>
       </div>
+
+      {imagePreview && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setImagePreview(null)}
+        >
+          <div
+            className="relative max-h-[90vh] max-w-[min(90vw,480px)] rounded border border-gray-300 bg-white p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setImagePreview(null)}
+              className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-sm text-white hover:bg-gray-900"
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <p className="mb-3 text-center text-sm font-semibold text-ad-green-dark">{imagePreview.title}</p>
+            <img
+              src={imagePreview.url}
+              alt={imagePreview.title}
+              className="mx-auto max-h-[70vh] max-w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
     </AdminPage>
   );
 }

@@ -111,17 +111,44 @@ export default function App() {
               } />
               <Route path="/admin/leads" element={
                 <ProtectedRoute module="dashboard" action="view">
-                  <LeadsPage />
+                  <LeadsPage section="all" />
                 </ProtectedRoute>
               } />
-              <Route path="/admin/accounts" element={
+              <Route path="/admin/leads/visited" element={
                 <ProtectedRoute module="dashboard" action="view">
-                  <AccountsPage />
+                  <LeadsPage title="Visited" section="visited" showAddNew={false} readOnly />
                 </ProtectedRoute>
               } />
-              <Route path="/admin/messages" element={
+              <Route path="/admin/leads/completed" element={
+                <ProtectedRoute module="dashboard" action="view">
+                  <LeadsPage title="Completed" section="completed" showAddNew={false} />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/accounts" element={<Navigate to="/admin/accounts/expenses" replace />} />
+              <Route path="/admin/accounts/expenses" element={
+                <ProtectedRoute module="dashboard" action="view">
+                  <AccountsPage title="Expenses" variant="expenses" />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/accounts/income" element={
+                <ProtectedRoute module="dashboard" action="view">
+                  <AccountsPage title="Income" variant="income" />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/accounts/bank" element={
+                <ProtectedRoute module="dashboard" action="view">
+                  <AccountsPage title="Manage Banks" />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/messages" element={<Navigate to="/admin/messages/sent" replace />} />
+              <Route path="/admin/messages/sent" element={
                 <ProtectedRoute module="inviteHelp" action="view">
-                  <Invitehelp />
+                  <Invitehelp title="Notifications Sent" section="sent" />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/messages/received" element={
+                <ProtectedRoute module="inviteHelp" action="view">
+                  <Invitehelp title="Notifications Received" section="received" />
                 </ProtectedRoute>
               } />
               <Route path="/admin/reports" element={
@@ -169,10 +196,26 @@ export default function App() {
                   <Cities />
                 </ProtectedRoute>
               } />
-              <Route path="/admin/invite-help" element={<Navigate to="/admin/messages" replace />} />
-              <Route path="/admin/ads" element={
+              <Route path="/admin/invite-help" element={<Navigate to="/admin/messages/received" replace />} />
+              <Route path="/admin/ads" element={<Navigate to="/admin/ads/dealer" replace />} />
+              <Route path="/admin/ads/dealer" element={
                 <ProtectedRoute module="ads" action="view">
-                  <Ads />
+                  <Ads section="dealer" />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/ads/adds" element={
+                <ProtectedRoute module="ads" action="view">
+                  <Ads section="adds" />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/ads/invoices" element={
+                <ProtectedRoute module="ads" action="view">
+                  <Ads section="invoices" />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/ads/payment" element={
+                <ProtectedRoute module="ads" action="view">
+                  <Ads section="payment" />
                 </ProtectedRoute>
               } />
               <Route path="/admin/running-deals" element={

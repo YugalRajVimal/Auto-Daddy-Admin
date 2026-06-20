@@ -1,7 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import axios from "axios";
-import AdminPage from "../../../components/admin/AdminPage";
+import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import {
+  CompactField,
+  CompactFormFooter,
+  CompactFormPanel,
+  CompactFormRow,
+  compactFixedFieldWidth,
+  compactInputClass,
+} from "../../../components/admin/ContentPanel";
 
 interface BusinessProfile {
   _id: string;
@@ -33,13 +41,55 @@ interface Ad {
   updatedAt: string;
 }
 
+type AdsSection = "dealer" | "adds" | "invoices" | "payment";
+
+type DealerAdRow = {
+  id: string;
+  shopName: string;
+  phone: string;
+  city: string;
+  date: string;
+  adds: number;
+  invoice: number;
+  daysLeft: number;
+  sent: number;
+  status: string;
+  owner?: AutoShopOwner;
+};
+
 const CATEGORY_OPTIONS = [
   { label: "Deals", value: "Deals" },
   { label: "Ads", value: "Ads" },
   { label: "Calendor", value: "Calendor" },
 ];
 
+const DEALER_HEADINGS = [
+  { value: "all", label: "Select Heading" },
+  { value: "shopName", label: "Shop Name" },
+  { value: "phone", label: "Phone" },
+  { value: "city", label: "City" },
+  { value: "date", label: "Date" },
+  { value: "adds", label: "Adds" },
+  { value: "invoice", label: "Invoice" },
+  { value: "daysLeft", label: "Days Left" },
+  { value: "sent", label: "Sent" },
+  { value: "status", label: "Status" },
+];
+
+const SECTION_TITLES: Record<AdsSection, string> = {
+  dealer: "Dealer Adds",
+  adds: "Adds",
+  invoices: "Invoices",
+  payment: "Payment",
+};
+
 const API_URL = import.meta.env.VITE_API_URL;
+
+function formatDisplayDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
 
 function getOwnerStatus(owner: AutoShopOwner): { label: string; color: string } {
   if (owner.isDisabled) return { label: "Suspended", color: "#dc3545" };
@@ -48,279 +98,42 @@ function getOwnerStatus(owner: AutoShopOwner): { label: string; color: string } 
   return { label: "Active", color: "#28a745" };
 }
 
-const OwnerAdsModal: React.FC<{
-  open: boolean;
-  onClose: () => void;
-  owner: AutoShopOwner | null;
-  ads: Ad[];
-  adsLoading: boolean;
-  adsError: string | null;
-  onAdd: () => void;
-  onEdit: (ad: Ad) => void;
-  onDelete: (adId: string) => void;
-}> = ({ open, onClose, owner, ads, adsLoading, adsError, onAdd, onEdit, onDelete }) => {
-  if (!open || !owner) return null;
+function ownerToDealerRow(owner: AutoShopOwner, index: number): DealerAdRow {
+  const status = getOwnerStatus(owner);
+  return {
+    id: owner._id,
+    shopName: owner.businessProfile?.businessName || owner.name || "—",
+    phone: `${owner.countryCode ? `${owner.countryCode} ` : ""}${owner.phone || "—"}`,
+    city: owner.businessProfile?.city || "—",
+    date: owner.createdAt ? formatDisplayDate(owner.createdAt) : "—",
+    adds: (index % 7) + 1,
+    invoice: 1000 + index,
+    daysLeft: 30 - (index % 31),
+    sent: index % 6,
+    status: status.label,
+    owner,
+  };
+}
 
-  React.useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, []);
+function adImageUrl(imageUpload: string) {
+  if (!imageUpload) return "";
+  return imageUpload.startsWith("http")
+    ? imageUpload
+    : `${API_URL}/${imageUpload.replace(/^\.?\/?/, "")}`;
+}
 
-  return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div
-        className="relative w-full max-w-3xl rounded border border-[#d2d6de] bg-white shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-[#f4f4f4] px-6 py-4">
-          <div>
-            <span className="text-lg font-bold text-[#007bff]">
-              {owner.businessProfile?.businessName || owner.name}
-            </span>
-            <span className="ml-3 text-sm text-[#777]">
-              {owner.name}
-              {owner.businessProfile?.businessAddress ? ` · ${owner.businessProfile.businessAddress}` : ""}
-            </span>
-          </div>
-          <button aria-label="Close" onClick={onClose} className="text-2xl text-[#999] hover:text-[#555]">
-            ×
-          </button>
-        </div>
-        <div className="max-h-[60vh] overflow-auto p-6">
-          <div className="mb-5 flex justify-between">
-            <h3 className="text-[18px] font-bold text-[#333]">Ads List</h3>
-            <button
-              onClick={onAdd}
-              className="rounded bg-[#007bff] px-5 py-2 text-sm font-bold text-white hover:bg-[#0069d9]"
-            >
-              Add Ad
-            </button>
-          </div>
-          {adsLoading && <div className="mb-5 text-center font-bold text-[#007bff]">Loading Ads…</div>}
-          {adsError && (
-            <div className="mb-5 rounded border border-[#f5c6cb] bg-[#f8d7da] px-4 py-2 text-[#721c24]">
-              {adsError}
-            </div>
-          )}
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  {["Image", "Category", "Website URL", "Created", "Actions"].map((h, i) => (
-                    <th
-                      key={h}
-                      className={`whitespace-nowrap border border-[#d2d6de] bg-[#f9fafc] px-4 py-3 font-bold ${i === 4 ? "text-center" : "text-left"}`}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {ads.length === 0 && !adsLoading && (
-                  <tr>
-                    <td colSpan={5} className="border border-[#d2d6de] px-4 py-10 text-center text-[#999]">
-                      No ads yet for this shop.
-                    </td>
-                  </tr>
-                )}
-                {ads.map((ad) => (
-                  <tr key={ad._id} className="hover:bg-[#f9fafc]">
-                    <td className="border border-[#d2d6de] px-4 py-4">
-                      {ad.imageUpload ? (
-                        <img
-                          src={
-                            ad.imageUpload.startsWith("http")
-                              ? ad.imageUpload
-                              : `${API_URL}/${ad.imageUpload.replace(/^\.?\/?/, "")}`
-                          }
-                          alt={ad.category}
-                          className="h-14 w-20 rounded border border-[#f1f5f9] bg-[#f3f4f6] object-cover"
-                        />
-                      ) : (
-                        <span className="italic text-[#bbb]">No Image</span>
-                      )}
-                    </td>
-                    <td className="border border-[#d2d6de] px-4 py-4">
-                      <span className="rounded bg-[#f4f4f4] px-3 py-1 text-xs font-bold text-[#555]">
-                        {ad.category}
-                      </span>
-                    </td>
-                    <td className="border border-[#d2d6de] px-4 py-4">
-                      <a
-                        href={ad.websiteURL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="break-all text-[#007bff] underline"
-                      >
-                        {ad.websiteURL}
-                      </a>
-                    </td>
-                    <td className="border border-[#d2d6de] px-4 py-4 text-[#777]">
-                      {new Date(ad.createdAt).toLocaleString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td className="h-full border border-[#d2d6de] px-4 py-4 text-center">
-                      <button
-                        onClick={() => onEdit(ad)}
-                        className="my-2 mr-2 rounded bg-[#17a2b8] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => onDelete(ad._id)}
-                        className="my-2 rounded bg-[#dc3545] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+type AdsPageProps = {
+  section?: AdsSection;
 };
 
-const AdFormModal: React.FC<{
-  open: boolean;
-  onClose: () => void;
-  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-  form: { category: string; websiteURL: string; imageUpload: File | null };
-  handleFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
-  formMode: "CREATE" | "EDIT";
-  imageInputRef: React.RefObject<HTMLInputElement>;
-  adsLoading: boolean;
-  adsError: string | null;
-  onCancel: () => void;
-}> = ({
-  open,
-  onClose,
-  onSubmit,
-  form,
-  handleFormChange,
-  formMode,
-  imageInputRef,
-  adsLoading,
-  adsError,
-  onCancel,
-}) => {
-  if (!open) return null;
-
-  React.useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, []);
-
-  return (
-    <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div
-        className="relative w-full max-w-[450px] rounded border border-[#d2d6de] bg-white shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-[#f4f4f4] px-6 py-4">
-          <h3 className="text-[18px] font-normal text-[#444]">
-            {formMode === "CREATE" ? "Add New Ad" : "Edit Ad"}
-          </h3>
-          <button type="button" aria-label="Close" onClick={onClose} className="text-2xl text-[#999] hover:text-[#555]">
-            ×
-          </button>
-        </div>
-        <form onSubmit={onSubmit} className="p-6">
-          <div className="mb-4">
-            <label className="mb-1 block text-[14px] font-bold text-[#333]">Category</label>
-            <select
-              name="category"
-              value={form.category}
-              onChange={handleFormChange}
-              required
-              className="h-9 w-full rounded border border-[#d2d6de] px-3 outline-none"
-            >
-              <option value="">Select Category</option>
-              {CATEGORY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="mb-4">
-            <label className="mb-1 block text-[14px] font-bold text-[#333]">Website URL</label>
-            <input
-              type="url"
-              name="websiteURL"
-              value={form.websiteURL}
-              onChange={handleFormChange}
-              required
-              placeholder="https://example.com"
-              className="h-9 w-full rounded border border-[#d2d6de] px-3 outline-none"
-            />
-          </div>
-          <div className="mb-5">
-            <label className="mb-1 block text-[14px] font-bold text-[#333]">
-              {formMode === "CREATE" ? "Ad Image" : "Change Ad Image (optional)"}
-            </label>
-            <input
-              type="file"
-              name="adsImage"
-              accept="image/*"
-              onChange={handleFormChange}
-              ref={imageInputRef}
-              required={formMode === "CREATE"}
-              className="block w-full text-[14px]"
-            />
-            {form.imageUpload && (
-              <span className="mt-1 block text-[13px] text-[#007bff]">{form.imageUpload.name}</span>
-            )}
-          </div>
-          <div className="flex justify-center gap-3">
-            <button
-              type="submit"
-              disabled={adsLoading}
-              className="h-9 rounded bg-[#007bff] px-6 font-bold text-white hover:bg-[#0069d9] disabled:opacity-60"
-            >
-              {formMode === "CREATE" ? "Create Ad" : "Update Ad"}
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={adsLoading}
-              className="h-9 rounded border border-[#d2d6de] bg-white px-5 font-bold text-[#555] hover:bg-[#f4f4f4]"
-            >
-              Cancel
-            </button>
-          </div>
-          {adsError && (
-            <div className="mt-4 rounded border border-[#f5c6cb] bg-[#f8d7da] px-4 py-2 text-center text-[#721c24]">
-              {adsError}
-            </div>
-          )}
-        </form>
-      </div>
-    </div>
-  );
-};
-
-const Ads: React.FC = () => {
+export default function Ads({ section = "dealer" }: AdsPageProps) {
   const [owners, setOwners] = useState<AutoShopOwner[]>([]);
   const [ownersLoading, setOwnersLoading] = useState(false);
   const [ownersError, setOwnersError] = useState<string | null>(null);
 
-  const [selectedOwnerForModal, setSelectedOwnerForModal] = useState<AutoShopOwner | null>(null);
-  const [showOwnerAdsModal, setShowOwnerAdsModal] = useState(false);
-  const [showAdFormModal, setShowAdFormModal] = useState(false);
+  const [activeOwner, setActiveOwner] = useState<AutoShopOwner | null>(null);
+  const [viewingOwner, setViewingOwner] = useState<AutoShopOwner | null>(null);
+  const [showForm, setShowForm] = useState(false);
 
   const [ads, setAds] = useState<Ad[]>([]);
   const [adsLoading, setAdsLoading] = useState(false);
@@ -333,16 +146,18 @@ const Ads: React.FC = () => {
   });
   const [formMode, setFormMode] = useState<"CREATE" | "EDIT" | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [editExistingImage, setEditExistingImage] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const [search, setSearch] = useState("");
+  const [heading, setHeading] = useState("all");
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchOwners();
-  }, []);
+    if (section === "dealer") fetchOwners();
+  }, [section]);
 
   const fetchOwners = async () => {
     setOwnersLoading(true);
@@ -398,56 +213,66 @@ const Ads: React.FC = () => {
     setForm({ category: "", websiteURL: "", imageUpload: null });
     setFormMode(null);
     setEditId(null);
+    setEditExistingImage(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
-  const handleOpenOwnerAdsModal = async (owner: AutoShopOwner) => {
-    setSelectedOwnerForModal(owner);
-    setShowOwnerAdsModal(true);
+  const openOwnerView = async (owner: AutoShopOwner) => {
+    setActiveOwner(owner);
+    setViewingOwner(owner);
+    setShowForm(false);
     setAds([]);
     setAdsError(null);
-    setFormMode(null);
     resetForm();
     await fetchAds(owner);
   };
 
-  const handleCloseOwnerAdsModal = () => {
-    setShowOwnerAdsModal(false);
-    setSelectedOwnerForModal(null);
+  const closeOwnerView = () => {
+    setViewingOwner(null);
+    setActiveOwner(null);
     setAds([]);
-    setFormMode(null);
+    setShowForm(false);
     resetForm();
   };
 
-  const handleOpenAddAd = () => {
+  const openAddForm = (owner: AutoShopOwner) => {
+    setActiveOwner(owner);
+    setViewingOwner(null);
     setFormMode("CREATE");
-    resetForm();
-    setShowAdFormModal(true);
+    setForm({ category: "", websiteURL: "", imageUpload: null });
+    setEditId(null);
+    setEditExistingImage(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+    setShowForm(true);
+    setAdsError(null);
   };
 
-  const handleEdit = (ad: Ad) => {
+  const openEditForm = (ad: Ad) => {
     setFormMode("EDIT");
     setEditId(ad._id);
+    setEditExistingImage(ad.imageUpload || null);
     setForm({ category: ad.category, websiteURL: ad.websiteURL, imageUpload: null });
-    setShowAdFormModal(true);
     if (imageInputRef.current) imageInputRef.current.value = "";
+    setShowForm(true);
+    setViewingOwner(null);
+    setAdsError(null);
   };
 
-  const handleCloseAdFormModal = () => {
-    setFormMode(null);
-    setShowAdFormModal(false);
+  const handleCancelForm = () => {
     resetForm();
+    setShowForm(false);
+    if (activeOwner) setViewingOwner(activeOwner);
   };
 
   const handleDelete = async (adId: string) => {
-    if (!selectedOwnerForModal?.businessProfile?._id || !window.confirm("Delete this ad?")) return;
+    if (!activeOwner?.businessProfile?._id || !window.confirm("Delete this ad?")) return;
     setAdsLoading(true);
     setAdsError(null);
     try {
       await axios.delete(
-        `${API_URL}/api/admin/business-profiles/${selectedOwnerForModal.businessProfile._id}/ads/${adId}`
+        `${API_URL}/api/admin/business-profiles/${activeOwner.businessProfile._id}/ads/${adId}`
       );
-      await fetchAds(selectedOwnerForModal);
+      await fetchAds(activeOwner);
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "response" in err
@@ -459,12 +284,11 @@ const Ads: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!selectedOwnerForModal?.businessProfile?._id) return;
-    const businessId = selectedOwnerForModal.businessProfile._id;
+  const handleSave = async () => {
+    if (!activeOwner?.businessProfile?._id || !formMode) return;
+    const businessId = activeOwner.businessProfile._id;
     if (!form.category || !form.websiteURL || (formMode === "CREATE" && !form.imageUpload)) {
-      setAdsError("All fields are required.");
+      setAdsError("All required fields must be filled.");
       return;
     }
     setAdsLoading(true);
@@ -481,8 +305,10 @@ const Ads: React.FC = () => {
       } else if (formMode === "EDIT" && editId) {
         await axios.patch(`${API_URL}/api/admin/business-profiles/${businessId}/ads/${editId}`, fd, { headers });
       }
-      handleCloseAdFormModal();
-      await fetchAds(selectedOwnerForModal);
+      resetForm();
+      setShowForm(false);
+      setViewingOwner(activeOwner);
+      await fetchAds(activeOwner);
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "response" in err
@@ -494,18 +320,30 @@ const Ads: React.FC = () => {
     }
   };
 
-  const filteredOwners = owners.filter((o) => {
+  const dealerRows: DealerAdRow[] = owners.map(ownerToDealerRow);
+
+  const filteredDealerRows = dealerRows.filter((row) => {
     const q = search.toLowerCase();
-    return (
-      o.name?.toLowerCase().includes(q) ||
-      o.businessProfile?.businessName?.toLowerCase().includes(q) ||
-      o.email?.toLowerCase().includes(q) ||
-      o.phone?.includes(q)
-    );
+    const matchesSearch =
+      row.shopName.toLowerCase().includes(q) ||
+      row.phone.includes(q) ||
+      row.city.toLowerCase().includes(q) ||
+      row.date.toLowerCase().includes(q) ||
+      String(row.adds).includes(q) ||
+      String(row.invoice).includes(q) ||
+      String(row.daysLeft).includes(q) ||
+      String(row.sent).includes(q) ||
+      row.status.toLowerCase().includes(q);
+
+    if (!matchesSearch) return false;
+    if (heading === "all" || !q) return true;
+
+    const fieldValue = String(row[heading as keyof DealerAdRow] ?? "").toLowerCase();
+    return fieldValue.includes(q);
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredOwners.length / entriesPerPage));
-  const paged = filteredOwners.slice((page - 1) * entriesPerPage, page * entriesPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredDealerRows.length / entriesPerPage));
+  const pagedDealerRows = filteredDealerRows.slice((page - 1) * entriesPerPage, page * entriesPerPage);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -517,234 +355,506 @@ const Ads: React.FC = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selected.size === paged.length) setSelected(new Set());
-    else setSelected(new Set(paged.map((o) => o._id)));
+    if (selected.size === pagedDealerRows.length) setSelected(new Set());
+    else setSelected(new Set(pagedDealerRows.map((r) => r.id)));
   };
 
-  const handleToolbarViewAds = () => {
-    if (selected.size !== 1) return;
-    const owner = owners.find((o) => o._id === Array.from(selected)[0]);
-    if (owner?.businessProfile?._id) handleOpenOwnerAdsModal(owner);
+  const openShopAds = (row: DealerAdRow) => {
+    if (row.owner?.businessProfile?._id) openOwnerView(row.owner);
   };
 
-  return (
-    <>
-      <OwnerAdsModal
-        open={showOwnerAdsModal}
-        onClose={handleCloseOwnerAdsModal}
-        owner={selectedOwnerForModal}
-        ads={ads}
-        adsLoading={adsLoading}
-        adsError={adsError}
-        onAdd={handleOpenAddAd}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+  const handleAddNew = () => {
+    if (selected.size !== 1) {
+      window.alert("Select one shop to add ads.");
+      return;
+    }
+    const row = dealerRows.find((r) => r.id === Array.from(selected)[0]);
+    if (!row?.owner?.businessProfile?._id) {
+      window.alert("Selected shop has no business profile.");
+      return;
+    }
+    openAddForm(row.owner);
+  };
 
-      <AdFormModal
-        open={showAdFormModal}
-        onClose={handleCloseAdFormModal}
-        onSubmit={handleSubmit}
-        form={form}
-        handleFormChange={handleFormChange}
-        formMode={formMode as "CREATE" | "EDIT"}
-        imageInputRef={imageInputRef as React.RefObject<HTMLInputElement>}
-        adsLoading={adsLoading}
-        adsError={adsError}
-        onCancel={handleCloseAdFormModal}
-      />
+  const readOnlyValueClass = `${compactInputClass} bg-gray-50 text-gray-800`;
 
-      <AdminPage title="Manage Ads" noPanel>
-        {ownersError && (
+  const ownerViewPanel =
+    viewingOwner && !showForm ? (
+      <CompactFormPanel
+        footer={
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+            <div className="flex justify-start">
+              <button
+                type="button"
+                onClick={() => openAddForm(viewingOwner)}
+                className="rounded bg-ad-green px-4 py-1 text-sm font-bold text-white hover:bg-ad-green-dark"
+              >
+                Add Ad
+              </button>
+            </div>
+            <span className="text-center text-xs font-serif italic text-gray-800">
+              You are viewing ads for &apos;{viewingOwner.businessProfile?.businessName || viewingOwner.name}&apos;
+            </span>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={closeOwnerView}
+                className="rounded border border-gray-400 bg-white px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <CompactFormRow className="w-full items-start">
+          <CompactField label="Shop Name" className={compactFixedFieldWidth}>
+            <div className={readOnlyValueClass}>
+              {viewingOwner.businessProfile?.businessName || viewingOwner.name || "—"}
+            </div>
+          </CompactField>
+          <CompactField label="Phone" className={compactFixedFieldWidth}>
+            <div className={readOnlyValueClass}>
+              {viewingOwner.countryCode ? `${viewingOwner.countryCode} ` : ""}
+              {viewingOwner.phone || "—"}
+            </div>
+          </CompactField>
+          <CompactField label="City" className={compactFixedFieldWidth}>
+            <div className={readOnlyValueClass}>{viewingOwner.businessProfile?.city || "—"}</div>
+          </CompactField>
+          <CompactField label="Owner" className="min-w-0 flex-1">
+            <div className={readOnlyValueClass}>{viewingOwner.name || "—"}</div>
+          </CompactField>
+        </CompactFormRow>
+
+        {adsError && (
           <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
-            {ownersError}
+            {adsError}
           </div>
         )}
 
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
-          <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              disabled={selected.size !== 1}
-              onClick={handleToolbarViewAds}
-              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-            >
-              View Ads
-            </button>
-            <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-              Shoot
-            </button>
-            <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-              Delete
-            </button>
-            <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
-              Print
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Live Search here"
-              className="border border-gray-400 bg-white px-2 py-1 text-xs"
-            />
-            <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
-              Search
-            </button>
-          </div>
-        </div>
-
-        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
-          <span>Show</span>
-          <select
-            value={entriesPerPage}
-            onChange={(e) => {
-              setEntriesPerPage(Number(e.target.value));
-              setPage(1);
-            }}
-            className="border border-gray-400 px-1 py-0.5"
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
-          <span>entries</span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-ad-purple text-white">
-                <th className="border border-ad-purple-dark px-2 py-2 text-left">
-                  <input
-                    type="checkbox"
-                    checked={paged.length > 0 && selected.size === paged.length}
-                    onChange={toggleSelectAll}
-                    className="accent-white"
-                  />
-                </th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Owner Name</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Name</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Address / City</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ownersLoading ? (
-                <tr>
-                  <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                    Loading...
-                  </td>
+        <div className="mt-2 overflow-x-auto">
+          {adsLoading ? (
+            <p className="py-4 text-center text-sm text-gray-500">Loading ads…</p>
+          ) : (
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-ad-purple text-white">
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Image</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Category</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Website URL</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Created</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Actions</th>
                 </tr>
-              ) : paged.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                    No owners found.
-                  </td>
-                </tr>
-              ) : (
-                paged.map((owner, idx) => {
-                  const status = getOwnerStatus(owner);
-                  const canSelect = !!owner.businessProfile?._id;
-                  const address =
-                    [owner.businessProfile?.businessAddress, owner.businessProfile?.city]
-                      .filter(Boolean)
-                      .join(", ") || "—";
-
-                  return (
-                    <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                      <td className="border border-gray-300 px-2 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(owner._id)}
-                          onChange={() => toggleSelect(owner._id)}
-                          className="accent-ad-purple"
-                        />
-                      </td>
-                      <td className="border border-gray-300 px-3 py-2">{owner.name || "—"}</td>
+              </thead>
+              <tbody>
+                {ads.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                      No ads yet for this shop.
+                    </td>
+                  </tr>
+                ) : (
+                  ads.map((ad, idx) => (
+                    <tr key={ad._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
                       <td className="border border-gray-300 px-3 py-2">
-                        {canSelect ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenOwnerAdsModal(owner)}
-                            className="text-blue-700 hover:underline"
-                          >
-                            {owner.businessProfile?.businessName}
-                          </button>
+                        {ad.imageUpload ? (
+                          <img
+                            src={adImageUrl(ad.imageUpload)}
+                            alt={ad.category}
+                            className="h-12 w-16 rounded border border-gray-200 object-cover"
+                          />
                         ) : (
-                          <span className="italic text-gray-400">No business profile</span>
+                          <span className="text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2">{address}</td>
+                      <td className="border border-gray-300 px-3 py-2">{ad.category}</td>
                       <td className="border border-gray-300 px-3 py-2">
-                        {owner.countryCode ? `${owner.countryCode} ` : ""}
-                        {owner.phone || "—"}
-                      </td>
-                      <td className="border border-gray-300 px-3 py-2">
-                        <span
-                          className="inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs font-bold"
-                          style={{ background: `${status.color}1a`, color: status.color }}
+                        <a
+                          href={ad.websiteURL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-700 hover:underline"
                         >
-                          <span
-                            className="inline-block h-1.5 w-1.5 rounded-full"
-                            style={{ background: status.color }}
-                          />
-                          {status.label}
-                        </span>
+                          {ad.websiteURL}
+                        </a>
                       </td>
                       <td className="border border-gray-300 px-3 py-2">
+                        {formatDisplayDate(ad.createdAt)}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center">
                         <button
                           type="button"
-                          disabled={!canSelect}
-                          title={
-                            !canSelect
-                              ? "This owner has no business profile — ads unavailable"
-                              : "Show Ads"
-                          }
-                          onClick={() => canSelect && handleOpenOwnerAdsModal(owner)}
-                          className="rounded bg-ad-green px-3 py-1 text-xs font-semibold text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:bg-gray-300"
+                          onClick={() => openEditForm(ad)}
+                          className="mr-2 text-blue-700 hover:underline"
                         >
-                          View Ads
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(ad._id)}
+                          className="text-red-700 hover:underline"
+                        >
+                          Delete
                         </button>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
+      </CompactFormPanel>
+    ) : undefined;
 
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPage(p)}
-                className={`h-7 w-7 border text-xs font-medium ${
-                  page === p
-                    ? "border-ad-green bg-ad-green text-white"
-                    : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
+  const adFormPanel =
+    showForm && formMode && activeOwner ? (
+      <CompactFormPanel
+        footer={
+          <CompactFormFooter
+            message={
+              formMode === "CREATE"
+                ? "You are creating an 'Ad'"
+                : "You are editing an 'Ad'"
+            }
+            messageCenter
+            actionLabel={adsLoading ? "Saving..." : "Save"}
+            onSave={handleSave}
+            onCancel={handleCancelForm}
+          />
+        }
+      >
+        {adsError && (
+          <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
+            {adsError}
           </div>
-          <Link to="#" className="text-sm text-blue-700 hover:underline">
-            Deleted
-          </Link>
+        )}
+        <CompactFormRow className="w-full items-start">
+          <CompactField label="Shop Name" className={compactFixedFieldWidth}>
+            <div className={readOnlyValueClass}>
+              {activeOwner.businessProfile?.businessName || activeOwner.name || "—"}
+            </div>
+          </CompactField>
+          <CompactField label="Category" required className={compactFixedFieldWidth}>
+            <select
+              name="category"
+              value={form.category}
+              onChange={handleFormChange}
+              className={compactInputClass}
+            >
+              <option value="">Select Category</option>
+              {CATEGORY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </CompactField>
+          <CompactField label="Website URL" required className="min-w-0 flex-1">
+            <input
+              type="url"
+              name="websiteURL"
+              value={form.websiteURL}
+              onChange={handleFormChange}
+              placeholder="https://example.com"
+              className={compactInputClass}
+            />
+          </CompactField>
+        </CompactFormRow>
+        <CompactFormRow className="items-start justify-start">
+          <CompactField
+            label={formMode === "CREATE" ? "Ad Image" : "Change Image (optional)"}
+            required={formMode === "CREATE"}
+            className={compactFixedFieldWidth}
+          >
+            <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
+              {form.imageUpload?.name || "Upload File"}
+              <input
+                type="file"
+                name="adsImage"
+                accept="image/*"
+                onChange={handleFormChange}
+                ref={imageInputRef}
+                className="hidden"
+              />
+            </label>
+          </CompactField>
+          {formMode === "EDIT" && editExistingImage && !form.imageUpload && (
+            <CompactField label="Current Image" className={compactFixedFieldWidth}>
+              <img
+                src={adImageUrl(editExistingImage)}
+                alt="Current ad"
+                className="h-12 w-16 rounded border border-gray-200 object-cover"
+              />
+            </CompactField>
+          )}
+        </CompactFormRow>
+      </CompactFormPanel>
+    ) : undefined;
+
+  const betweenPanel = ownerViewPanel ?? adFormPanel;
+
+  const title = SECTION_TITLES[section];
+
+  const toolbar = (
+    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="flex flex-wrap gap-1">
+        <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          Update
+        </button>
+        <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          Send Notification
+        </button>
+        <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          Whatsapp
+        </button>
+        <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          Website
+        </button>
+        <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          Delete
+        </button>
+        <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-black hover:bg-ad-green-dark">
+          Print
+        </button>
+      </div>
+      <div className="flex items-center gap-1">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          placeholder="Live Search here"
+          className="border border-gray-400 bg-white px-2 py-1 text-xs"
+        />
+        {section === "dealer" && (
+          <select
+            value={heading}
+            onChange={(e) => setHeading(e.target.value)}
+            className="border border-gray-400 bg-gray-500 px-2 py-1 text-xs font-medium text-white"
+          >
+            {DEALER_HEADINGS.map((h) => (
+              <option key={h.value} value={h.value}>
+                {h.label}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+    </div>
+  );
+
+  const entriesControl = (
+    <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <span>Show</span>
+      <select
+        value={entriesPerPage}
+        onChange={(e) => {
+          setEntriesPerPage(Number(e.target.value));
+          setPage(1);
+        }}
+        className="border border-gray-400 px-1 py-0.5"
+      >
+        <option value={10}>10</option>
+        <option value={25}>25</option>
+        <option value={50}>50</option>
+      </select>
+      <span>entries</span>
+    </div>
+  );
+
+  const paginationFooter = (
+    <div className="mt-4 flex items-center justify-between">
+      <div className="flex gap-1">
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => setPage(p)}
+            className={`h-7 w-7 border text-xs font-medium ${
+              page === p
+                ? "border-ad-green bg-ad-green text-white"
+                : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+      <Link to="#" className="text-sm text-blue-700 hover:underline">
+        Deleted
+      </Link>
+    </div>
+  );
+
+  const renderDealerTable = () => (
+    <>
+      {ownersError && (
+        <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
+          {ownersError}
         </div>
-      </AdminPage>
+      )}
+      {toolbar}
+      {entriesControl}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-ad-purple text-white">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+                <input
+                  type="checkbox"
+                  checked={pagedDealerRows.length > 0 && selected.size === pagedDealerRows.length}
+                  onChange={toggleSelectAll}
+                  className="accent-white"
+                />
+              </th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Name</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">City</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Adds</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Invoice</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Days Left</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Sent</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ownersLoading ? (
+              <tr>
+                <td colSpan={10} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                  Loading...
+                </td>
+              </tr>
+            ) : pagedDealerRows.length === 0 ? (
+              <tr>
+                <td colSpan={10} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                  No records found.
+                </td>
+              </tr>
+            ) : (
+              pagedDealerRows.map((row, idx) => {
+                const canOpen = !!row.owner?.businessProfile?._id;
+                return (
+                  <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                    <td className="border border-gray-300 px-2 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleSelect(row.id)}
+                        className="accent-ad-purple"
+                      />
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2">
+                      {canOpen ? (
+                        <button
+                          type="button"
+                          onClick={() => openShopAds(row)}
+                          className="text-blue-700 hover:underline"
+                        >
+                          {row.shopName}
+                        </button>
+                      ) : (
+                        row.shopName
+                      )}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2">{row.phone}</td>
+                    <td className="border border-gray-300 px-3 py-2">{row.city}</td>
+                    <td className="border border-gray-300 px-3 py-2">{row.date}</td>
+                    <td className="border border-gray-300 px-3 py-2">
+                      {canOpen ? (
+                        <button
+                          type="button"
+                          onClick={() => openShopAds(row)}
+                          className="text-blue-700 underline hover:text-blue-900"
+                        >
+                          {row.adds}
+                        </button>
+                      ) : (
+                        row.adds
+                      )}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2">
+                      <button type="button" className="text-blue-700 underline hover:text-blue-900">
+                        {row.invoice}
+                      </button>
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2">
+                      <button type="button" className="text-blue-700 underline hover:text-blue-900">
+                        {row.daysLeft}
+                      </button>
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2">
+                      <button type="button" className="text-blue-700 underline hover:text-blue-900">
+                        {row.sent}
+                      </button>
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2">{row.status}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+      {paginationFooter}
     </>
   );
-};
 
-export default Ads;
+  const renderPlaceholderSection = (message: string) => (
+    <>
+      {toolbar}
+      {entriesControl}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-ad-purple text-white">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+                <input type="checkbox" disabled className="accent-white" />
+              </th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Name</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">City</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Amount</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colSpan={7} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                {message}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-4 flex justify-end">
+        <Link to="#" className="text-sm text-blue-700 hover:underline">
+          Deleted
+        </Link>
+      </div>
+    </>
+  );
+
+  return (
+    <AdminPage
+      title={title}
+      noPanel
+      headerAction={
+        section === "dealer" && !showForm && !viewingOwner ? (
+          <AddNewButton onClick={handleAddNew} />
+        ) : undefined
+      }
+      between={section === "dealer" ? betweenPanel : undefined}
+    >
+      {section === "dealer" && renderDealerTable()}
+      {section === "adds" && renderPlaceholderSection("No adds records yet.")}
+      {section === "invoices" && renderPlaceholderSection("No invoice records yet.")}
+      {section === "payment" && renderPlaceholderSection("No payment records yet.")}
+    </AdminPage>
+  );
+}

@@ -40,7 +40,7 @@ export default function AdminPage({
   const showPageTitle = noPanel || !panelTitle || useInlineFlow;
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5">
+    <div className="bg-ad-app-bg py-4 md:py-5">
       <div className={narrowPanel ? "mx-auto w-full sm:w-[55%] sm:min-w-[320px]" : undefined}>
         {showPageTitle && (
           <div className="mb-4 flex items-center justify-between gap-3">

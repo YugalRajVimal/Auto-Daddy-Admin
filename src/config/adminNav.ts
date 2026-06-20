@@ -67,18 +67,32 @@ export const primaryNav: NavItem[] = [
   },
   {
     name: "Leads",
-    path: "/admin/leads",
     permissionModule: "dashboard",
+    subItems: [
+      { name: "All Leads", path: "/admin/leads", permissionModule: "dashboard" },
+      { name: "Visited", path: "/admin/leads/visited", permissionModule: "dashboard" },
+      { name: "Completed", path: "/admin/leads/completed", permissionModule: "dashboard" },
+    ],
+    matchPaths: ["/admin/leads", "/admin/leads/visited", "/admin/leads/completed"],
   },
   {
     name: "Accounts",
-    path: "/admin/accounts",
     permissionModule: "dashboard",
+    subItems: [
+      { name: "Expenses", path: "/admin/accounts/expenses", permissionModule: "dashboard" },
+      { name: "Income", path: "/admin/accounts/income", permissionModule: "dashboard" },
+      { name: "Bank", path: "/admin/accounts/bank", permissionModule: "dashboard" },
+    ],
+    matchPaths: ["/admin/accounts/expenses", "/admin/accounts/income", "/admin/accounts/bank"],
   },
   {
     name: "Messages",
-    path: "/admin/messages",
     permissionModule: "inviteHelp",
+    subItems: [
+      { name: "Notifications Sent", path: "/admin/messages/sent", permissionModule: "inviteHelp" },
+      { name: "Notifications Received", path: "/admin/messages/received", permissionModule: "inviteHelp" },
+    ],
+    matchPaths: ["/admin/messages/sent", "/admin/messages/received"],
   },
   {
     name: "Reports",
@@ -87,8 +101,14 @@ export const primaryNav: NavItem[] = [
   },
   {
     name: "Ads",
-    path: "/admin/ads",
     permissionModule: "ads",
+    subItems: [
+      { name: "Dealer", path: "/admin/ads/dealer", permissionModule: "ads" },
+      { name: "Adds", path: "/admin/ads/adds", permissionModule: "ads" },
+      { name: "Invoices", path: "/admin/ads/invoices", permissionModule: "ads" },
+      { name: "Payment", path: "/admin/ads/payment", permissionModule: "ads" },
+    ],
+    matchPaths: ["/admin/ads/dealer", "/admin/ads/adds", "/admin/ads/invoices", "/admin/ads/payment"],
   },
 ];
 

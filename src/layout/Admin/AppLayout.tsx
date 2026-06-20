@@ -10,7 +10,7 @@ const LayoutContent: React.FC<{
   return (
     <AdminShell>
       {isLoggedInViaSuperAdmin && (
-        <div className="flex items-center gap-2 border-b border-yellow-200 bg-yellow-100 px-4 py-2 text-xs text-yellow-900">
+        <div className="flex shrink-0 items-center gap-2 border-b border-yellow-200 bg-yellow-100 px-4 py-2 text-xs text-yellow-900">
           <span className="font-semibold">You are logged in as Admin</span>
           {superAdminName && (
             <span>
