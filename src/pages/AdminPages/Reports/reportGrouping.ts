@@ -3,10 +3,16 @@ import { categoryLabel, type CategoryOption } from "../Accounts/ledgerCategories
 
 export type GroupBy = "category" | "vendor" | "project";
 
-export function filterGstRows(rows: GstLedgerRow[], fromDate: string, toDate: string) {
+export function filterGstRows(
+  rows: GstLedgerRow[],
+  fromDate: string,
+  toDate: string,
+  categoryFilter = ""
+) {
   return rows.filter((row) => {
     if (fromDate && row.date < fromDate) return false;
     if (toDate && row.date > toDate) return false;
+    if (categoryFilter && row.category !== categoryFilter) return false;
     return true;
   });
 }

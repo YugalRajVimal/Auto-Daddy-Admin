@@ -53,6 +53,36 @@ export const DUMMY_BANKS: BankRow[] = [
     accountNumber: "",
     interac: "",
   },
+  {
+    id: 3,
+    label: "CHECKING ACCOUNT",
+    assignToInvoice: false,
+    status: "active",
+    totalBalance: 5420,
+    accountName: "Operating Chequing",
+    accountNumber: "****4521",
+    interac: "",
+  },
+  {
+    id: 4,
+    label: "CASH",
+    assignToInvoice: false,
+    status: "active",
+    totalBalance: 850,
+    accountName: "",
+    accountNumber: "",
+    interac: "",
+  },
+  {
+    id: 5,
+    label: "CREDIT CARD",
+    assignToInvoice: false,
+    status: "active",
+    totalBalance: -1240,
+    accountName: "Visa Business",
+    accountNumber: "****8891",
+    interac: "",
+  },
 ];
 
 export const DUMMY_EXPENSES: LedgerRow[] = [

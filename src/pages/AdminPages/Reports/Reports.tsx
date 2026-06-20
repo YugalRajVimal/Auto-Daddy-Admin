@@ -445,10 +445,28 @@ export default function Reports() {
 
   const expenseCategories = useMemo(() => cloneCategories(EXPENSE_CATEGORIES), []);
   const incomeCategories = useMemo(() => cloneCategories(INCOME_CATEGORIES), []);
+  const allCategories = useMemo(() => {
+    const seen = new Set<string>();
+    return [...expenseCategories, ...incomeCategories].filter((cat) => {
+      if (seen.has(cat.value)) return false;
+      seen.add(cat.value);
+      return true;
+    });
+  }, [expenseCategories, incomeCategories]);
 
-  const isLedgerReport = selectedReport === "income" || selectedReport === "expenses";
+  const bankAccountOptions = useMemo(
+    () => DUMMY_BANKS.map((bank) => ({ value: String(bank.id), label: bank.label })),
+    []
+  );
+
   const activeCategories =
-    selectedReport === "expenses" ? expenseCategories : selectedReport === "income" ? incomeCategories : [];
+    selectedReport === "expenses"
+      ? expenseCategories
+      : selectedReport === "income"
+        ? incomeCategories
+        : selectedReport === "gst"
+          ? allCategories
+          : [];
 
   useEffect(() => {
     if (reportTypeParam && !selectedReport) {
@@ -506,12 +524,18 @@ export default function Reports() {
 
   const gstRows = useMemo(() => {
     if (applied?.title !== "gst") return [];
-    return filterGstRows(buildGstRows(DUMMY_EXPENSES, DUMMY_INCOME), applied.fromDate, applied.toDate);
+    return filterGstRows(
+      buildGstRows(DUMMY_EXPENSES, DUMMY_INCOME),
+      applied.fromDate,
+      applied.toDate,
+      applied.category
+    );
   }, [applied]);
 
   const bankRows = useMemo(() => {
     if (applied?.title !== "bank") return [];
-    return DUMMY_BANKS;
+    if (!applied.category) return DUMMY_BANKS;
+    return DUMMY_BANKS.filter((bank) => String(bank.id) === applied.category);
   }, [applied]);
 
   const activeRows = applied?.title === "bank" ? bankRows : ledgerRows;
@@ -559,37 +583,51 @@ export default function Reports() {
             />
           </div>
         </CompactField>
-        {isLedgerReport && (
-          <div className="ml-auto flex shrink-0 items-end gap-x-4">
-            <CompactField label="Category" className={compactFixedFieldWidth}>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className={compactInputClass}
-              >
-                <option value="">All Categories</option>
-                {activeCategories.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
-            </CompactField>
-            <CompactField label="Group By" className={compactFixedFieldWidth}>
-              <select
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-                className={compactInputClass}
-              >
-                {GROUP_BY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </CompactField>
-          </div>
-        )}
+        <div className="ml-auto flex shrink-0 items-end gap-x-4">
+          <CompactField
+            label={selectedReport === "bank" ? "Account" : "Category"}
+            className={compactFixedFieldWidth}
+          >
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className={compactInputClass}
+            >
+              {selectedReport === "bank" ? (
+                <>
+                  <option value="">All Accounts</option>
+                  {bankAccountOptions.map((bank) => (
+                    <option key={bank.value} value={bank.value}>
+                      {bank.label}
+                    </option>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <option value="">All Categories</option>
+                  {activeCategories.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
+          </CompactField>
+          <CompactField label="Group By" className={compactFixedFieldWidth}>
+            <select
+              value={groupBy}
+              onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+              className={compactInputClass}
+            >
+              {GROUP_BY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </CompactField>
+        </div>
       </CompactFormRow>
     </CompactFormPanel>
   ) : null;
