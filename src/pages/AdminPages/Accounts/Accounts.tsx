@@ -285,7 +285,7 @@ function LedgerPage({
 }) {
   const isExpense = variant === "expenses";
   const baseCategories = isExpense ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
-  const vendorLabel = isExpense ? "Vendor" : "Source";
+  const vendorLabel = "Vendor";
   const billLabel = isExpense ? "Bill Number" : "Invoice Number";
   const initialData = isExpense ? DUMMY_EXPENSES : DUMMY_INCOME;
 
@@ -571,7 +571,7 @@ function LedgerPage({
               />
             }
           >
-            <CompactFormRow className="items-start">
+            <CompactFormRow className="items-start gap-y-6">
               <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
                 <CompactField label="Amount" required className="w-full flex-none">
                   <input
@@ -582,7 +582,7 @@ function LedgerPage({
                     className={compactInputClass}
                   />
                 </CompactField>
-                <div className="mt-1">
+                <div className="mt-3">
                   <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
                     <input
                       type="checkbox"
@@ -625,7 +625,7 @@ function LedgerPage({
                     className={compactInputClass}
                   />
                 </CompactField>
-                <div className="mt-1">
+                <div className="mt-3">
                   <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
                     <input
                       type="checkbox"
@@ -660,7 +660,7 @@ function LedgerPage({
                   onEditAddNew={openCategoriesPopup}
                   className="w-full"
                 />
-                <div className="mt-1">
+                <div className="mt-3">
                   <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
                     <input
                       type="checkbox"
@@ -700,7 +700,7 @@ function LedgerPage({
                 <CompactField label="Notes" className="w-full flex-none">
                   <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </CompactField>
-                <div className="mt-1">
+                <div className="mt-3">
                   <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
                     <input
                       type="checkbox"
@@ -867,8 +867,8 @@ function LedgerPage({
               type="button"
               onClick={() => setPage(p)}
               className={`h-7 w-7 border text-xs font-medium ${page === p
-                  ? "border-ad-green bg-ad-green text-white"
-                  : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                ? "border-ad-green bg-ad-green text-white"
+                : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
                 }`}
             >
               {p}
