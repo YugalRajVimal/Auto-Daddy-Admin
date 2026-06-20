@@ -1,8 +1,10 @@
 // pages/AdminPages/SubAdmins/SubAdminManagement.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router";
 import axios from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { MoreDotIcon } from "../../../icons";
 import {
   CompactField,
   CompactFormFooter,
@@ -12,7 +14,9 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 import {
+  ACTIONS,
   DEFAULT_PERMS,
+  MODULES,
   PermissionMatrix,
   type Permissions,
 } from "../../../components/admin/PermissionMatrix";
@@ -22,11 +26,247 @@ interface SubAdmin {
   name: string;
   email: string;
   phone?: string;
+  role?: string;
+  city?: string;
+  profilePhoto?: string;
+  profileImage?: string;
   isActive: boolean;
   lastLogin?: string;
   createdAt: string;
   permissions: Permissions;
   createdBy?: { name?: string; email?: string };
+}
+
+const CITY_OPTIONS = [
+  "Toronto",
+  "Vancouver",
+  "Montreal",
+  "Calgary",
+  "Ottawa",
+  "Edmonton",
+  "Winnipeg",
+  "Halifax",
+];
+
+const ROLE_OPTIONS = [
+  "Super Admin",
+  "Support Admin",
+  "Content Editor",
+  "Regional Manager",
+  "Operations Admin",
+];
+
+const uploadBtnClass =
+  "rounded border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300";
+
+const API = import.meta.env.VITE_API_URL;
+
+function adminImageUrl(sa: SubAdmin) {
+  const path = sa.profilePhoto || sa.profileImage;
+  if (!path) return "";
+  return path.startsWith("http") ? path : `${API}/${path.replace(/^\.?\/?/, "")}`;
+}
+
+function formatAdminDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  return d.toISOString().slice(0, 10);
+}
+
+function permissionLabels(keys: string[]) {
+  return keys
+    .map((key) => MODULES.find((m) => m.key === key)?.label ?? key)
+    .join(", ");
+}
+
+function permissionKeysFromPerms(perms: Permissions) {
+  return MODULES.filter((m) => ACTIONS.some((a) => perms[m.key]?.[a])).map((m) => m.key);
+}
+
+function permsFromPermissionKeys(keys: string[]): Permissions {
+  const perms = DEFAULT_PERMS();
+  for (const key of keys) {
+    if (perms[key]) {
+      perms[key] = { view: true, add: true, edit: true, delete: true };
+    }
+  }
+  return perms;
+}
+
+function PermissionsDropdown({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (keys: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const toggle = (key: string) => {
+    onChange(
+      selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]
+    );
+  };
+
+  const summary =
+    selected.length === 0
+      ? "Select permissions"
+      : selected.length === MODULES.length
+        ? "All permissions"
+        : `${selected.length} selected`;
+
+  return (
+    <div ref={ref} className="relative w-full min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className={`${compactInputClass} flex w-full items-center justify-between gap-2 text-left`}
+      >
+        <span className={`truncate ${selected.length === 0 ? "text-gray-500" : ""}`}>{summary}</span>
+        <span className="shrink-0 text-[10px] text-gray-600">▼</span>
+      </button>
+      {open ? (
+        <div className="absolute left-0 top-full z-50 mt-0.5 max-h-52 w-full min-w-[240px] overflow-y-auto border border-gray-400 bg-white shadow-md">
+          {MODULES.map((mod) => (
+            <label
+              key={mod.key}
+              className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-gray-800 hover:bg-gray-100"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(mod.key)}
+                onChange={() => toggle(mod.key)}
+                className="h-3.5 w-3.5 accent-ad-purple"
+              />
+              {mod.label}
+            </label>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TableRowMenu({
+  open,
+  onToggle,
+  onClose,
+  items,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  items: { label: string; onClick: () => void; className?: string }[];
+}) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<{ top: number; left: number } | null>(null);
+
+  const updatePosition = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const menuWidth = 160;
+    const menuHeight = menuRef.current?.offsetHeight ?? items.length * 30 + 8;
+    const gap = 4;
+
+    let top = rect.bottom + gap;
+    let left = rect.right - menuWidth;
+
+    if (top + menuHeight > window.innerHeight - gap) {
+      top = Math.max(gap, rect.top - menuHeight - gap);
+    }
+    left = Math.max(gap, Math.min(left, window.innerWidth - menuWidth - gap));
+
+    setMenuStyle({ top, left });
+  }, [items.length]);
+
+  useEffect(() => {
+    if (!open) {
+      setMenuStyle(null);
+      return;
+    }
+    updatePosition();
+    const raf = requestAnimationFrame(() => updatePosition());
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open, updatePosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      onClose();
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open, onClose]);
+
+  const menu =
+    open && menuStyle
+      ? createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{
+              position: "fixed",
+              top: menuStyle.top,
+              left: menuStyle.left,
+              zIndex: 9999,
+            }}
+            className="min-w-[160px] rounded border border-gray-400 bg-white py-1 shadow-lg"
+          >
+            {items.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  item.onClick();
+                  onClose();
+                }}
+                className={`block w-full px-3 py-1.5 text-left text-xs hover:bg-gray-100 ${item.className ?? "text-gray-800"}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )
+      : null;
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={onToggle}
+        className="dropdown-toggle inline-flex h-8 w-8 items-center justify-center rounded hover:bg-gray-200"
+        aria-label="Row actions"
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
+        <MoreDotIcon className="size-5 text-gray-600" />
+      </button>
+      {menu}
+    </>
+  );
 }
 
 interface ActivityLog {
@@ -38,8 +278,6 @@ interface ActivityLog {
   ipAddress?: string;
   createdAt: string;
 }
-
-const API = import.meta.env.VITE_API_URL;
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 const thStyle: React.CSSProperties = {
@@ -76,6 +314,7 @@ const SubAdminManagement: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Inline form
   const [showForm, setShowForm] = useState(false);
@@ -86,8 +325,15 @@ const SubAdminManagement: React.FC = () => {
   const [editingSubAdmin, setEditingSubAdmin] = useState<SubAdmin | null>(null);
 
   // Form state
-  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirmPassword: "" });
-  const [formPerms, setFormPerms] = useState<Permissions>(DEFAULT_PERMS());
+  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [role, setRole] = useState("");
+  const [city, setCity] = useState("");
+  const [permissionKeys, setPermissionKeys] = useState<string[]>([]);
+  const [attachImage, setAttachImage] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const imageRef = useRef<HTMLInputElement>(null);
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
 
@@ -120,10 +366,32 @@ const SubAdminManagement: React.FC = () => {
 
   const showMsg = (msg: string) => { setSuccess(msg); setTimeout(() => setSuccess(""), 3500); };
 
+  const resetFormFields = () => {
+    setForm({ name: "", email: "", phone: "" });
+    setDate(new Date().toISOString().slice(0, 10));
+    setRole("");
+    setCity("");
+    setPermissionKeys([]);
+    setAttachImage(false);
+    if (imagePreview.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview("");
+    if (imageRef.current) imageRef.current.value = "";
+  };
+
   // Filter + paginate
   const filtered = subAdmins.filter((s) => {
     const q = search.toLowerCase();
-    return s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q) || (s.phone || "").includes(q);
+    const keys = permissionKeysFromPerms(s.permissions);
+    return (
+      s.name.toLowerCase().includes(q) ||
+      s.email.toLowerCase().includes(q) ||
+      (s.phone || "").includes(q) ||
+      (s.role || "").toLowerCase().includes(q) ||
+      (s.city || "").toLowerCase().includes(q) ||
+      formatAdminDate(s.createdAt).includes(search) ||
+      permissionLabels(keys).toLowerCase().includes(q)
+    );
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -143,59 +411,88 @@ const SubAdminManagement: React.FC = () => {
     else setSelectedIds(new Set(paged.map((s) => s._id)));
   };
 
-  const actionLink = (label: string, onClick: () => void, className = "text-blue-700 hover:underline") => (
-    <button type="button" onClick={onClick} className={`mr-2 ${className}`}>
-      {label}
-    </button>
-  );
-
   // Create / Edit
   const openCreate = () => {
     setEditingSubAdmin(null);
-    setForm({ name: "", email: "", phone: "", password: "", confirmPassword: "" });
-    setFormPerms(DEFAULT_PERMS());
+    resetFormFields();
     setFormError("");
     setShowForm(true);
   };
 
   const openEdit = (sa: SubAdmin) => {
     setEditingSubAdmin(sa);
-    setForm({ name: sa.name, email: sa.email, phone: sa.phone || "", password: "", confirmPassword: "" });
-    setFormPerms({ ...DEFAULT_PERMS(), ...sa.permissions });
+    setForm({ name: sa.name, email: sa.email, phone: sa.phone || "" });
+    setDate(formatAdminDate(sa.createdAt));
+    setRole(sa.role || "");
+    setCity(sa.city || "");
+    setPermissionKeys(permissionKeysFromPerms(sa.permissions));
+    const existingImage = adminImageUrl(sa);
+    setAttachImage(!!existingImage);
+    setImageFile(null);
+    setImagePreview(existingImage);
+    if (imageRef.current) imageRef.current.value = "";
     setFormError("");
     setShowForm(true);
   };
 
   const handleCancelForm = () => {
     setEditingSubAdmin(null);
-    setForm({ name: "", email: "", phone: "", password: "", confirmPassword: "" });
-    setFormPerms(DEFAULT_PERMS());
+    resetFormFields();
     setFormError("");
     setShowForm(false);
   };
 
   const saveForm = async () => {
     setFormError("");
-    if (!editingSubAdmin && form.password !== form.confirmPassword)
-      return setFormError("Passwords do not match.");
-    if (!editingSubAdmin && form.password.length < 6)
-      return setFormError("Password must be at least 6 characters.");
+    if (!form.name.trim()) return setFormError("Name is required.");
+    if (!form.email.trim()) return setFormError("Email is required.");
+    if (!role) return setFormError("Role is required.");
+    if (!city) return setFormError("City is required.");
+    if (permissionKeys.length === 0) return setFormError("Select at least one permission.");
+
+    const formPerms = permsFromPermissionKeys(permissionKeys);
+    const basePayload = {
+      name: form.name.trim(),
+      email: form.email.trim(),
+      phone: form.phone,
+      role,
+      city,
+    };
 
     setFormLoading(true);
     try {
       if (editingSubAdmin) {
-        await axios.put(`${API}/api/admin/subadmins/${editingSubAdmin._id}`,
-          { name: form.name, email: form.email, phone: form.phone }, { headers });
+        if (imageFile) {
+          const fd = new FormData();
+          Object.entries(basePayload).forEach(([key, value]) => fd.append(key, value));
+          fd.append("profilePhoto", imageFile, imageFile.name);
+          await axios.put(`${API}/api/admin/subadmins/${editingSubAdmin._id}`, fd, {
+            headers: { ...headers, "Content-Type": "multipart/form-data" },
+          });
+        } else {
+          await axios.put(`${API}/api/admin/subadmins/${editingSubAdmin._id}`, basePayload, { headers });
+        }
         await axios.patch(`${API}/api/admin/subadmins/${editingSubAdmin._id}/permissions`,
           { permissions: formPerms }, { headers });
         showMsg("SubAdmin updated successfully.");
       } else {
-        await axios.post(`${API}/api/admin/subadmins`,
-          { name: form.name, email: form.email, phone: form.phone, password: form.password, permissions: formPerms },
-          { headers });
+        if (imageFile) {
+          const fd = new FormData();
+          Object.entries(basePayload).forEach(([key, value]) => fd.append(key, value));
+          fd.append("permissions", JSON.stringify(formPerms));
+          fd.append("profilePhoto", imageFile, imageFile.name);
+          await axios.post(`${API}/api/admin/subadmins`, fd, {
+            headers: { ...headers, "Content-Type": "multipart/form-data" },
+          });
+        } else {
+          await axios.post(`${API}/api/admin/subadmins`,
+            { ...basePayload, permissions: formPerms },
+            { headers });
+        }
         showMsg("SubAdmin created successfully.");
       }
       setShowForm(false);
+      resetFormFields();
       fetchSubAdmins();
     } catch (e: any) {
       setFormError(e?.response?.data?.message || "An error occurred.");
@@ -360,12 +657,14 @@ const SubAdminManagement: React.FC = () => {
           <>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px 20px", fontSize: 13, marginBottom: 18, padding: "12px 16px", background: "#f8f9fa", border: "1px solid #d2d6de", borderRadius: 3 }}>
               {[
+                ["Date", formatAdminDate(showViewModal.createdAt)],
+                ["Role", showViewModal.role || "—"],
                 ["Name", showViewModal.name],
-                ["Email", showViewModal.email],
                 ["Phone", showViewModal.phone || "—"],
+                ["Email", showViewModal.email],
+                ["City", showViewModal.city || "—"],
                 ["Status", showViewModal.isActive ? "Active" : "Inactive"],
                 ["Last Login", showViewModal.lastLogin ? new Date(showViewModal.lastLogin).toLocaleString() : "Never"],
-                ["Created At", new Date(showViewModal.createdAt).toLocaleString()],
                 ["Created By", showViewModal.createdBy?.name || "Admin"],
               ].map(([label, value]) => (
                 <div key={label as string}><span style={{ fontWeight: 600 }}>{label}:</span> {value as string}</div>
@@ -423,25 +722,37 @@ const SubAdminManagement: React.FC = () => {
                   {formError}
                 </div>
               )}
-              <form onSubmit={handleSubmit} autoComplete="off">
-                <CompactFormRow className="w-full items-start">
-                  <CompactField label="Full Name" required className={compactFixedFieldWidth}>
+              <form onSubmit={handleSubmit} autoComplete="off" className="flex flex-col gap-4">
+                <CompactFormRow className="w-full items-start gap-x-4 gap-y-4">
+                  <CompactField label="Date" required className={compactFixedFieldWidth}>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className={compactInputClass}
+                    />
+                  </CompactField>
+                  <CompactField label="Role" required className={compactFixedFieldWidth}>
+                    <select
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className={compactInputClass}
+                    >
+                      <option value="">Select role</option>
+                      {ROLE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </CompactField>
+                  <CompactField label="Name" required className="min-w-0 flex-1">
                     <input
                       type="text"
                       required
                       value={form.name}
                       onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
                       placeholder="John Doe"
-                      className={compactInputClass}
-                    />
-                  </CompactField>
-                  <CompactField label="Email" required className={compactFixedFieldWidth}>
-                    <input
-                      type="email"
-                      required
-                      value={form.email}
-                      onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                      placeholder="john@example.com"
                       className={compactInputClass}
                     />
                   </CompactField>
@@ -454,33 +765,96 @@ const SubAdminManagement: React.FC = () => {
                       className={compactInputClass}
                     />
                   </CompactField>
-                  {!editingSubAdmin && (
-                    <>
-                      <CompactField label="Password" required className={compactFixedFieldWidth}>
-                        <input
-                          type="password"
-                          required
-                          value={form.password}
-                          onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                          className={compactInputClass}
-                        />
-                      </CompactField>
-                      <CompactField label="Confirm Password" required className={compactFixedFieldWidth}>
-                        <input
-                          type="password"
-                          required
-                          value={form.confirmPassword}
-                          onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))}
-                          className={compactInputClass}
-                        />
-                      </CompactField>
-                    </>
-                  )}
+                  <CompactField label="Email" required className="min-w-0 flex-1">
+                    <input
+                      type="email"
+                      required
+                      value={form.email}
+                      onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                      placeholder="john@example.com"
+                      className={compactInputClass}
+                    />
+                  </CompactField>
                 </CompactFormRow>
-                <div className="mt-3 border-t border-gray-300 pt-3">
-                  <p className="mb-2 text-sm font-bold text-ad-green-dark">Permission Matrix</p>
-                  <PermissionMatrix permissions={formPerms} onChange={setFormPerms} />
-                </div>
+                <CompactFormRow className="w-full items-start gap-x-4 gap-y-4">
+                  <CompactField label="City" required className={compactFixedFieldWidth}>
+                    <select
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className={compactInputClass}
+                    >
+                      <option value="">Select city</option>
+                      {CITY_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </CompactField>
+                  <CompactField label="Permissions" required className="min-w-0 flex-1">
+                    <PermissionsDropdown selected={permissionKeys} onChange={setPermissionKeys} />
+                  </CompactField>
+                  <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+                    <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                      <input
+                        type="checkbox"
+                        checked={attachImage}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setAttachImage(checked);
+                          if (!checked) {
+                            if (imagePreview.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+                            setImageFile(null);
+                            setImagePreview(
+                              editingSubAdmin ? adminImageUrl(editingSubAdmin) : ""
+                            );
+                            if (imageRef.current) imageRef.current.value = "";
+                          }
+                        }}
+                        className="h-3.5 w-3.5 accent-ad-green"
+                      />
+                      Add Image
+                    </label>
+                    {attachImage ? (
+                      <div className="flex items-center gap-1.5">
+                        {imagePreview ? (
+                          <img
+                            src={imagePreview}
+                            alt=""
+                            className="h-[30px] w-[30px] shrink-0 rounded border border-gray-300 object-cover"
+                          />
+                        ) : null}
+                        <input
+                          readOnly
+                          value={imageFile?.name ?? ""}
+                          placeholder="No file chosen"
+                          tabIndex={-1}
+                          className={`${compactInputClass} min-w-0 flex-1 cursor-default`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => imageRef.current?.click()}
+                          className={`${uploadBtnClass} shrink-0`}
+                        >
+                          Upload
+                        </button>
+                        <input
+                          ref={imageRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (imagePreview.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+                            setImageFile(file);
+                            setImagePreview(URL.createObjectURL(file));
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </CompactFormRow>
               </form>
             </CompactFormPanel>
           ) : undefined
@@ -569,24 +943,27 @@ const SubAdminManagement: React.FC = () => {
                       className="accent-white"
                     />
                   </th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Role</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Name</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Email</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Created Date</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Last Login</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Actions</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Email</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">City</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Permissions</th>
+                  <th className="border border-ad-purple-dark px-2 py-2 text-center font-medium w-12" aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
                 {paged.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                    <td colSpan={9} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
                       No sub admins found.
                     </td>
                   </tr>
                 ) : (
-                  paged.map((sa, idx) => (
+                  paged.map((sa, idx) => {
+                    const permKeys = permissionKeysFromPerms(sa.permissions);
+                    return (
                     <tr key={sa._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
                       <td className="border border-gray-300 px-2 py-2">
                         <input
@@ -597,6 +974,10 @@ const SubAdminManagement: React.FC = () => {
                         />
                       </td>
                       <td className="border border-gray-300 px-3 py-2">
+                        {formatAdminDate(sa.createdAt)}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2">{sa.role || "—"}</td>
+                      <td className="border border-gray-300 px-3 py-2">
                         <button
                           type="button"
                           onClick={() => openEdit(sa)}
@@ -605,38 +986,53 @@ const SubAdminManagement: React.FC = () => {
                           {sa.name}
                         </button>
                       </td>
-                      <td className="border border-gray-300 px-3 py-2">{sa.email}</td>
                       <td className="border border-gray-300 px-3 py-2">{sa.phone || "—"}</td>
+                      <td className="border border-gray-300 px-3 py-2">{sa.email}</td>
+                      <td className="border border-gray-300 px-3 py-2">{sa.city || "—"}</td>
                       <td className="border border-gray-300 px-3 py-2">
-                        <span
-                          className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${
-                            sa.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {sa.isActive ? "Active" : "Inactive"}
-                        </span>
+                        {permissionLabels(permKeys) || "—"}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2">
-                        {new Date(sa.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="border border-gray-300 px-3 py-2">
-                        {sa.lastLogin ? new Date(sa.lastLogin).toLocaleString() : "Never"}
-                      </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center whitespace-nowrap">
-                        {actionLink("View", () => setShowViewModal(sa))}
-                        {actionLink("Edit", () => openEdit(sa))}
-                        {actionLink("Perms", () => openPermModal(sa), "text-amber-700 hover:underline")}
-                        {actionLink(
-                          sa.isActive ? "Disable" : "Enable",
-                          () => handleToggleStatus(sa),
-                          sa.isActive ? "text-red-700 hover:underline" : "text-green-700 hover:underline"
-                        )}
-                        {actionLink("Logs", () => openActivityModal(sa), "text-cyan-700 hover:underline")}
-                        {actionLink("Reset", () => setShowResetModal(sa), "text-gray-700 hover:underline")}
-                        {actionLink("Delete", () => handleDelete(sa), "text-red-700 hover:underline")}
+                      <td className="border border-gray-300 px-3 py-2 text-center">
+                        <TableRowMenu
+                          open={openMenuId === sa._id}
+                          onToggle={() =>
+                            setOpenMenuId((current) => (current === sa._id ? null : sa._id))
+                          }
+                          onClose={() => setOpenMenuId(null)}
+                          items={[
+                            { label: "View", onClick: () => setShowViewModal(sa) },
+                            { label: "Edit", onClick: () => openEdit(sa) },
+                            {
+                              label: "Permissions",
+                              onClick: () => openPermModal(sa),
+                              className: "text-amber-800",
+                            },
+                            {
+                              label: sa.isActive ? "Disable" : "Enable",
+                              onClick: () => handleToggleStatus(sa),
+                              className: sa.isActive ? "text-red-700" : "text-green-700",
+                            },
+                            {
+                              label: "Activity Logs",
+                              onClick: () => openActivityModal(sa),
+                              className: "text-cyan-800",
+                            },
+                            {
+                              label: "Reset Password",
+                              onClick: () => setShowResetModal(sa),
+                              className: "text-gray-700",
+                            },
+                            {
+                              label: "Delete",
+                              onClick: () => handleDelete(sa),
+                              className: "text-red-700",
+                            },
+                          ]}
+                        />
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

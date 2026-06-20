@@ -1,90 +1,132 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
-  CompactAutoGrowTextarea,
   CompactField,
   CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
-  compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
-import {
-  DEFAULT_PERMS,
-  MODULES,
-  PermissionMatrix,
-  type Permissions,
-} from "../../../components/admin/PermissionMatrix";
+import { MODULES } from "../../../components/admin/PermissionMatrix";
 
 type RoleRow = {
   id: number;
-  name: string;
-  description: string;
-  modules: number;
-  status: "Active" | "Inactive";
+  role: string;
+  city: string;
+  permissionKeys: string[];
   createdDate: string;
-  permissions: Permissions;
 };
+
+const CITY_OPTIONS = [
+  "Toronto",
+  "Vancouver",
+  "Montreal",
+  "Calgary",
+  "Ottawa",
+  "Edmonton",
+  "Winnipeg",
+  "Halifax",
+];
 
 const DUMMY_ROLES: RoleRow[] = [
   {
     id: 1,
-    name: "Super Admin",
-    description: "Full access to all modules",
-    modules: MODULES.length,
-    status: "Active",
+    role: "Super Admin",
+    city: "Toronto",
+    permissionKeys: MODULES.map((m) => m.key),
     createdDate: "2026-01-15",
-    permissions: Object.fromEntries(
-      MODULES.map((m) => [m.key, { view: true, add: true, edit: true, delete: true }])
-    ),
   },
   {
     id: 2,
-    name: "Support Admin",
-    description: "Users, messages, and dashboard access",
-    modules: 4,
-    status: "Active",
+    role: "Support Admin",
+    city: "Vancouver",
+    permissionKeys: ["dashboard", "users", "inviteHelp", "tasks"],
     createdDate: "2026-02-20",
-    permissions: {
-      ...DEFAULT_PERMS(),
-      dashboard: { view: true, add: false, edit: false, delete: false },
-      users: { view: true, add: true, edit: true, delete: false },
-      inviteHelp: { view: true, add: true, edit: false, delete: false },
-      tasks: { view: true, add: false, edit: false, delete: false },
-    },
   },
   {
     id: 3,
-    name: "Content Editor",
-    description: "Dashboard data and website templates",
-    modules: 3,
-    status: "Active",
+    role: "Content Editor",
+    city: "Montreal",
+    permissionKeys: ["dashboard", "dashboardData", "websiteTemplates"],
     createdDate: "2026-03-08",
-    permissions: {
-      ...DEFAULT_PERMS(),
-      dashboardData: { view: true, add: true, edit: true, delete: false },
-      websiteTemplates: { view: true, add: true, edit: true, delete: false },
-      dashboard: { view: true, add: false, edit: false, delete: false },
-    },
   },
   {
     id: 4,
-    name: "Read Only",
-    description: "View-only access across modules",
-    modules: MODULES.length,
-    status: "Inactive",
+    role: "Regional Manager",
+    city: "Calgary",
+    permissionKeys: ["dashboard", "provinces", "cities", "users"],
     createdDate: "2026-04-02",
-    permissions: Object.fromEntries(
-      MODULES.map((m) => [m.key, { view: true, add: false, edit: false, delete: false }])
-    ),
   },
 ];
 
-function countEnabledModules(permissions: Permissions) {
-  return MODULES.filter((m) =>
-    (["view", "add", "edit", "delete"] as const).some((a) => permissions[m.key]?.[a])
-  ).length;
+function permissionLabels(keys: string[]) {
+  return keys
+    .map((key) => MODULES.find((m) => m.key === key)?.label ?? key)
+    .join(", ");
+}
+
+function PermissionsDropdown({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (keys: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const toggle = (key: string) => {
+    onChange(
+      selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]
+    );
+  };
+
+  const summary =
+    selected.length === 0
+      ? "Select permissions"
+      : selected.length === MODULES.length
+        ? "All permissions"
+        : `${selected.length} selected`;
+
+  return (
+    <div ref={ref} className="relative w-full min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className={`${compactInputClass} flex w-full items-center justify-between gap-2 text-left`}
+      >
+        <span className={`truncate ${selected.length === 0 ? "text-gray-500" : ""}`}>{summary}</span>
+        <span className="shrink-0 text-[10px] text-gray-600">▼</span>
+      </button>
+      {open ? (
+        <div className="absolute left-0 top-full z-50 mt-0.5 max-h-52 w-full min-w-[240px] overflow-y-auto border border-gray-400 bg-white shadow-md">
+          {MODULES.map((mod) => (
+            <label
+              key={mod.key}
+              className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-gray-800 hover:bg-gray-100"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(mod.key)}
+                onChange={() => toggle(mod.key)}
+                className="h-3.5 w-3.5 accent-ad-purple"
+              />
+              {mod.label}
+            </label>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export default function RoleManager() {
@@ -95,18 +137,19 @@ export default function RoleManager() {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
-  const [permissions, setPermissions] = useState<Permissions>(DEFAULT_PERMS());
+  const [role, setRole] = useState("");
+  const [city, setCity] = useState("");
+  const [permissionKeys, setPermissionKeys] = useState<string[]>([]);
 
-  const filtered = roles.filter(
-    (r) =>
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.description.toLowerCase().includes(search.toLowerCase()) ||
-      r.status.toLowerCase().includes(search.toLowerCase()) ||
-      r.createdDate.includes(search)
-  );
+  const filtered = roles.filter((row) => {
+    const q = search.toLowerCase();
+    return (
+      row.role.toLowerCase().includes(q) ||
+      row.city.toLowerCase().includes(q) ||
+      permissionLabels(row.permissionKeys).toLowerCase().includes(q) ||
+      row.createdDate.includes(search)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -126,10 +169,9 @@ export default function RoleManager() {
   };
 
   const resetForm = () => {
-    setName("");
-    setDescription("");
-    setStatus("Active");
-    setPermissions(DEFAULT_PERMS());
+    setRole("");
+    setCity("");
+    setPermissionKeys([]);
     setEditingId(null);
   };
 
@@ -140,10 +182,9 @@ export default function RoleManager() {
 
   const openEdit = (row: RoleRow) => {
     setEditingId(row.id);
-    setName(row.name);
-    setDescription(row.description);
-    setStatus(row.status);
-    setPermissions({ ...DEFAULT_PERMS(), ...row.permissions });
+    setRole(row.role);
+    setCity(row.city);
+    setPermissionKeys([...row.permissionKeys]);
     setShowForm(true);
   };
 
@@ -153,12 +194,14 @@ export default function RoleManager() {
   };
 
   const handleSave = () => {
+    if (!role.trim()) return;
+    if (!city) return;
+    if (permissionKeys.length === 0) return;
+
     const payload = {
-      name,
-      description,
-      status,
-      permissions,
-      modules: countEnabledModules(permissions),
+      role: role.trim(),
+      city,
+      permissionKeys: [...permissionKeys],
       createdDate: new Date().toISOString().slice(0, 10),
     };
 
@@ -167,7 +210,10 @@ export default function RoleManager() {
         prev.map((r) => (r.id === editingId ? { ...r, ...payload } : r))
       );
     } else {
-      setRoles((prev) => [...prev, { id: Math.max(0, ...prev.map((r) => r.id)) + 1, ...payload }]);
+      setRoles((prev) => [
+        ...prev,
+        { id: Math.max(0, ...prev.map((r) => r.id)) + 1, ...payload },
+      ]);
     }
 
     resetForm();
@@ -205,36 +251,33 @@ export default function RoleManager() {
               />
             }
           >
-            <CompactFormRow className="w-full items-start">
-              <CompactField label="Role Name" required className={compactFixedFieldWidth}>
+            <CompactFormRow className="grid w-full grid-cols-3 items-start gap-4">
+              <CompactField label="Role" required className="min-w-0">
                 <input
                   type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Status" required className={compactFixedFieldWidth}>
+              <CompactField label="City" required className="min-w-0">
                 <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as "Active" | "Inactive")}
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
                   className={compactInputClass}
                 >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
+                  <option value="">Select city</option>
+                  {CITY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
                 </select>
               </CompactField>
-              <CompactField label="Description" required className="min-w-0 flex-1">
-                <CompactAutoGrowTextarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
+              <CompactField label="Permissions" required className="min-w-0">
+                <PermissionsDropdown selected={permissionKeys} onChange={setPermissionKeys} />
               </CompactField>
             </CompactFormRow>
-            <div className="mt-3 border-t border-gray-300 pt-3">
-              <p className="mb-2 text-sm font-bold text-ad-green-dark">Permission Matrix</p>
-              <PermissionMatrix permissions={permissions} onChange={setPermissions} />
-            </div>
           </CompactFormPanel>
         ) : undefined
       }
@@ -308,17 +351,16 @@ export default function RoleManager() {
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Role Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Description</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Modules</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Role</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">City</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Permissions</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Created Date</th>
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                <td colSpan={5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
                   No roles found.
                 </td>
               </tr>
@@ -339,21 +381,12 @@ export default function RoleManager() {
                       onClick={() => openEdit(row)}
                       className="text-blue-700 hover:underline"
                     >
-                      {row.name}
+                      {row.role}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2">{row.description}</td>
-                  <td className="border border-gray-300 px-3 py-2">{row.modules}</td>
+                  <td className="border border-gray-300 px-3 py-2">{row.city}</td>
                   <td className="border border-gray-300 px-3 py-2">
-                    <span
-                      className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${
-                        row.status === "Active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {row.status}
-                    </span>
+                    {permissionLabels(row.permissionKeys)}
                   </td>
                   <td className="border border-gray-300 px-3 py-2">{row.createdDate}</td>
                 </tr>
