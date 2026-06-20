@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import axios from "axios";
+import { EyeIcon } from "../../../icons";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
   CompactAutoGrowTextarea,
@@ -27,13 +28,18 @@ interface InviteHelp {
   };
 }
 
+type UserType = "carOwner" | "shopOwner";
+type UserScope = "all" | "particular";
+
 interface SentNotification {
   _id: string;
-  title?: string;
-  message?: string;
-  userType?: string;
-  recipientCount?: number;
-  createdAt?: string;
+  date: string;
+  title: string;
+  note: string;
+  imageUrl?: string | null;
+  userType: UserType;
+  userScope: UserScope;
+  particularUser?: string | null;
 }
 
 type MessagesSection = "sent" | "received";
@@ -44,11 +50,67 @@ type InvitehelpProps = {
   showAddNew?: boolean;
 };
 
-const USER_TYPE_OPTIONS = [
+const USER_TYPE_OPTIONS: { value: UserType; label: string }[] = [
   { value: "carOwner", label: "Car Owner" },
-  { value: "autoshopowner", label: "Auto Shop Owner" },
-  { value: "dealer", label: "Dealer" },
+  { value: "shopOwner", label: "Shop Owner" },
 ];
+
+const USER_SCOPE_OPTIONS: { value: UserScope; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "particular", label: "Particular" },
+];
+
+const CAR_OWNER_USERS = [
+  "John Smith",
+  "Maria Garcia",
+  "David Chen",
+  "Sarah Johnson",
+  "Michael Brown",
+  "Emily Wilson",
+  "James Taylor",
+  "Lisa Anderson",
+];
+
+const SHOP_OWNER_USERS = [
+  "Northside Auto",
+  "Premium Auto Care",
+  "Wright Fleet Services",
+  "Kim Auto Shop",
+  "Allen Motors Garage",
+  "City Tire & Brake",
+  "Lakeview Auto Repair",
+  "Eastside Detailing",
+];
+
+const notifImageUrl = (id: number) => `https://picsum.photos/seed/notif-${id}/480/320`;
+
+const DUMMY_SENT_NOTIFICATIONS: SentNotification[] = [
+  { _id: "sent-1", date: "2026-06-18", title: "Summer Service Reminder", note: "Book your seasonal oil change and tire rotation before July.", imageUrl: notifImageUrl(1), userType: "carOwner", userScope: "all" },
+  { _id: "sent-2", date: "2026-06-17", title: "New Dealer Partner Alert", note: "A new dealer partner is now available in your area.", imageUrl: notifImageUrl(2), userType: "carOwner", userScope: "particular", particularUser: "John Smith" },
+  { _id: "sent-3", date: "2026-06-16", title: "Platform Maintenance", note: "Scheduled maintenance tonight from 11 PM to 1 AM EST.", imageUrl: null, userType: "shopOwner", userScope: "all" },
+  { _id: "sent-4", date: "2026-06-15", title: "Invoice Upload Reminder", note: "Please upload pending invoices for May billing cycle.", imageUrl: notifImageUrl(4), userType: "shopOwner", userScope: "particular", particularUser: "Northside Auto" },
+  { _id: "sent-5", date: "2026-06-14", title: "Winter Tire Promo", note: "Early-bird discount on winter tire packages — limited slots.", imageUrl: notifImageUrl(5), userType: "carOwner", userScope: "all" },
+  { _id: "sent-6", date: "2026-06-13", title: "Profile Completion", note: "Complete your shop profile to appear in local search results.", imageUrl: notifImageUrl(6), userType: "shopOwner", userScope: "particular", particularUser: "Premium Auto Care" },
+  { _id: "sent-7", date: "2026-06-12", title: "Referral Bonus Live", note: "Earn credits when you refer a friend to AutoDaddy.", imageUrl: notifImageUrl(7), userType: "carOwner", userScope: "particular", particularUser: "Maria Garcia" },
+  { _id: "sent-8", date: "2026-06-11", title: "Lead Assignment Update", note: "New leads are now routed based on your service categories.", imageUrl: null, userType: "shopOwner", userScope: "all" },
+  { _id: "sent-9", date: "2026-06-10", title: "Payment Received", note: "Your wallet payment for job card #4821 has been processed.", imageUrl: notifImageUrl(9), userType: "carOwner", userScope: "particular", particularUser: "David Chen" },
+  { _id: "sent-10", date: "2026-06-09", title: "Ad Campaign Tips", note: "Boost visibility with these best practices for dealer ads.", imageUrl: notifImageUrl(10), userType: "shopOwner", userScope: "particular", particularUser: "Kim Auto Shop" },
+  { _id: "sent-11", date: "2026-06-08", title: "App Update Available", note: "Version 2.4 includes faster booking and push notification fixes.", imageUrl: notifImageUrl(11), userType: "carOwner", userScope: "all" },
+  { _id: "sent-12", date: "2026-06-07", title: "Holiday Hours", note: "Support hours will be reduced on the upcoming public holiday.", imageUrl: null, userType: "shopOwner", userScope: "particular", particularUser: "City Tire & Brake" },
+];
+
+function userTypeLabel(userType: UserType) {
+  return USER_TYPE_OPTIONS.find((o) => o.value === userType)?.label ?? userType;
+}
+
+function userScopeLabel(notification: SentNotification) {
+  if (notification.userScope === "all") return "All";
+  return notification.particularUser || "Particular";
+}
+
+function particularUsersForType(userType: UserType) {
+  return userType === "carOwner" ? CAR_OWNER_USERS : SHOP_OWNER_USERS;
+}
 
 function arrayBufferToBlobUrl(buffer: number[], mimeType = "audio/webm") {
   const arr = new Uint8Array(buffer);
@@ -62,19 +124,26 @@ export default function Invitehelp({
   showAddNew = true,
 }: InvitehelpProps) {
   const [inviteHelps, setInviteHelps] = useState<InviteHelp[]>([]);
-  const [sentNotifications, setSentNotifications] = useState<SentNotification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [sentNotifications, setSentNotifications] = useState<SentNotification[]>(DUMMY_SENT_NOTIFICATIONS);
+  const [loading, setLoading] = useState(section !== "sent");
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ url: string; title: string } | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
 
+  const [notifDate, setNotifDate] = useState("2026-06-18");
   const [notifTitle, setNotifTitle] = useState("");
-  const [notifMessage, setNotifMessage] = useState("");
-  const [userType, setUserType] = useState(USER_TYPE_OPTIONS[0].value);
+  const [notifNote, setNotifNote] = useState("");
+  const [attachImage, setAttachImage] = useState(false);
+  const [notifImage, setNotifImage] = useState<File | null>(null);
+  const [userType, setUserType] = useState<UserType>("carOwner");
+  const [userScope, setUserScope] = useState<UserScope>("all");
+  const [particularUser, setParticularUser] = useState("");
 
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
@@ -83,31 +152,30 @@ export default function Invitehelp({
   const [receivedMessage, setReceivedMessage] = useState("");
 
   useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setImagePreview(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
     const fetchData = async () => {
+      if (section === "sent") {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError("");
       try {
-        if (section === "received") {
-          const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/invite-help`);
-          if (res.data?.success) {
-            setInviteHelps(res.data.data || []);
-          } else {
-            setError("Failed to fetch invite help requests.");
-          }
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/invite-help`);
+        if (res.data?.success) {
+          setInviteHelps(res.data.data || []);
         } else {
-          const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/notification/sent`);
-          if (res.data?.success) {
-            setSentNotifications(res.data.data || []);
-          } else {
-            setSentNotifications([]);
-          }
+          setError("Failed to fetch invite help requests.");
         }
       } catch {
-        if (section === "received") {
-          setError("Failed to fetch invite help requests.");
-        } else {
-          setSentNotifications([]);
-        }
+        setError("Failed to fetch invite help requests.");
       }
       setLoading(false);
     };
@@ -128,9 +196,11 @@ export default function Invitehelp({
   const filteredSent = sentNotifications.filter((n) => {
     const q = search.toLowerCase();
     return (
-      (n.title || "").toLowerCase().includes(q) ||
-      (n.message || "").toLowerCase().includes(q) ||
-      (n.userType || "").toLowerCase().includes(q)
+      n.date.toLowerCase().includes(q) ||
+      n.title.toLowerCase().includes(q) ||
+      n.note.toLowerCase().includes(q) ||
+      userTypeLabel(n.userType).toLowerCase().includes(q) ||
+      userScopeLabel(n).toLowerCase().includes(q)
     );
   });
 
@@ -154,9 +224,15 @@ export default function Invitehelp({
   };
 
   const resetForm = () => {
+    setNotifDate("2026-06-18");
     setNotifTitle("");
-    setNotifMessage("");
-    setUserType(USER_TYPE_OPTIONS[0].value);
+    setNotifNote("");
+    setAttachImage(false);
+    setNotifImage(null);
+    setUserType("carOwner");
+    setUserScope("all");
+    setParticularUser("");
+    if (imageInputRef.current) imageInputRef.current.value = "";
     setUserName("");
     setUserEmail("");
     setBusinessName("");
@@ -171,18 +247,24 @@ export default function Invitehelp({
 
   const handleSave = () => {
     if (section === "sent") {
-      if (!notifTitle.trim() || !notifMessage.trim()) {
-        setError("Title and message are required.");
+      if (!notifDate.trim() || !notifTitle.trim() || !notifNote.trim()) {
+        setError("Date, title, and note are required.");
+        return;
+      }
+      if (userScope === "particular" && !particularUser.trim()) {
+        setError("Please select a user when sending to a particular user.");
         return;
       }
       setError("");
       const entry: SentNotification = {
         _id: `sent-${Date.now()}`,
+        date: notifDate.trim(),
         title: notifTitle.trim(),
-        message: notifMessage.trim(),
-        userType: USER_TYPE_OPTIONS.find((o) => o.value === userType)?.label ?? userType,
-        recipientCount: 0,
-        createdAt: new Date().toISOString(),
+        note: notifNote.trim(),
+        imageUrl: attachImage && notifImage ? URL.createObjectURL(notifImage) : null,
+        userType,
+        userScope,
+        particularUser: userScope === "particular" ? particularUser.trim() : null,
       };
       setSentNotifications((prev) => [entry, ...prev]);
     } else {
@@ -228,10 +310,22 @@ export default function Invitehelp({
       {section === "sent" ? (
         <>
           <CompactFormRow className="w-full items-start">
+            <CompactField label="Date" required className={compactFixedFieldWidth}>
+              <input
+                type="date"
+                value={notifDate}
+                onChange={(e) => setNotifDate(e.target.value)}
+                className={compactInputClass}
+              />
+            </CompactField>
             <CompactField label="User Type" required className={compactFixedFieldWidth}>
               <select
                 value={userType}
-                onChange={(e) => setUserType(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value as UserType;
+                  setUserType(next);
+                  setParticularUser("");
+                }}
                 className={compactInputClass}
               >
                 {USER_TYPE_OPTIONS.map((option) => (
@@ -241,6 +335,39 @@ export default function Invitehelp({
                 ))}
               </select>
             </CompactField>
+            <CompactField label="User" required className={compactFixedFieldWidth}>
+              <select
+                value={userScope}
+                onChange={(e) => {
+                  const next = e.target.value as UserScope;
+                  setUserScope(next);
+                  if (next === "all") setParticularUser("");
+                }}
+                className={compactInputClass}
+              >
+                {USER_SCOPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </CompactField>
+            {userScope === "particular" && (
+              <CompactField label="Select User" required className={compactFixedFieldWidth}>
+                <select
+                  value={particularUser}
+                  onChange={(e) => setParticularUser(e.target.value)}
+                  className={compactInputClass}
+                >
+                  <option value="">-</option>
+                  {particularUsersForType(userType).map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </CompactField>
+            )}
             <CompactField label="Title" required className="min-w-0 flex-1">
               <input
                 type="text"
@@ -251,12 +378,44 @@ export default function Invitehelp({
             </CompactField>
           </CompactFormRow>
           <CompactFormRow className="w-full items-start">
-            <CompactField label="Message" required className="min-w-0 flex-1">
+            <CompactField label="Note" required className="min-w-0 flex-1">
               <CompactAutoGrowTextarea
-                value={notifMessage}
-                onChange={(e) => setNotifMessage(e.target.value)}
+                value={notifNote}
+                onChange={(e) => setNotifNote(e.target.value)}
               />
             </CompactField>
+          </CompactFormRow>
+          <CompactFormRow className="items-start justify-start">
+            <div className="flex flex-col items-start gap-1.5">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                <input
+                  type="checkbox"
+                  checked={attachImage}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setAttachImage(checked);
+                    if (!checked) {
+                      setNotifImage(null);
+                      if (imageInputRef.current) imageInputRef.current.value = "";
+                    }
+                  }}
+                  className="h-3.5 w-3.5 accent-ad-green"
+                />
+                Attach Image
+              </label>
+              {attachImage ? (
+                <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
+                  {notifImage?.name || "Upload File"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setNotifImage(e.target.files?.[0] ?? null)}
+                    ref={imageInputRef}
+                    className="hidden"
+                  />
+                </label>
+              ) : null}
+            </div>
           </CompactFormRow>
         </>
       ) : (
@@ -384,11 +543,12 @@ export default function Invitehelp({
               </th>
               {section === "sent" ? (
                 <>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Title</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Message</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Note</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">View Image</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User Type</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Recipients</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Sent At</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User</th>
                 </>
               ) : (
                 <>
@@ -406,13 +566,13 @@ export default function Invitehelp({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={section === "sent" ? 6 : 8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={section === "sent" ? 7 : 8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={section === "sent" ? 6 : 8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={section === "sent" ? 7 : 8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   {section === "sent" ? "No sent notifications found." : "No invite help requests found."}
                 </td>
               </tr>
@@ -429,21 +589,35 @@ export default function Invitehelp({
                         className="accent-ad-purple"
                       />
                     </td>
-                    <td className="border border-gray-300 px-3 py-2">{notification.title || "N/A"}</td>
+                    <td className="border border-gray-300 px-3 py-2">{notification.date}</td>
+                    <td className="border border-gray-300 px-3 py-2">{notification.title}</td>
                     <td className="border border-gray-300 px-3 py-2">
-                      {notification.message ? (
-                        <span className="line-clamp-2 block max-w-[200px]" title={notification.message}>
-                          {notification.message}
-                        </span>
+                      <span className="line-clamp-2 block max-w-[200px]" title={notification.note}>
+                        {notification.note}
+                      </span>
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">
+                      {notification.imageUrl ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setImagePreview({
+                              url: notification.imageUrl!,
+                              title: `${notification.title} — notification image`,
+                            })
+                          }
+                          className="inline-flex items-center justify-center rounded p-1 text-ad-purple hover:bg-ad-purple/10 hover:text-ad-purple-dark"
+                          aria-label={`View image for ${notification.title}`}
+                          title="View image"
+                        >
+                          <EyeIcon className="size-5 fill-current" />
+                        </button>
                       ) : (
-                        "N/A"
+                        <span className="text-gray-500">--</span>
                       )}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2">{notification.userType || "N/A"}</td>
-                    <td className="border border-gray-300 px-3 py-2">{notification.recipientCount ?? "N/A"}</td>
-                    <td className="border border-gray-300 px-3 py-2">
-                      {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : "N/A"}
-                    </td>
+                    <td className="border border-gray-300 px-3 py-2">{userTypeLabel(notification.userType)}</td>
+                    <td className="border border-gray-300 px-3 py-2">{userScopeLabel(notification)}</td>
                   </tr>
                 );
               })
@@ -527,6 +701,33 @@ export default function Invitehelp({
           Deleted
         </Link>
       </div>
+
+      {imagePreview && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setImagePreview(null)}
+        >
+          <div
+            className="relative max-h-[90vh] max-w-[min(90vw,480px)] rounded border border-gray-300 bg-white p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setImagePreview(null)}
+              className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-sm text-white hover:bg-gray-900"
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <p className="mb-3 text-center text-sm font-semibold text-ad-green-dark">{imagePreview.title}</p>
+            <img
+              src={imagePreview.url}
+              alt={imagePreview.title}
+              className="mx-auto max-h-[70vh] max-w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
     </AdminPage>
   );
 }
