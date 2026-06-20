@@ -584,7 +584,7 @@ export default function Domain() {
             {adsError}
           </div>
         )}
-        <CompactFormRow className="w-full items-start">
+        <CompactFormRow className="w-full items-start flex-nowrap overflow-x-auto">
           <CompactField label="User Type" required className={compactFixedFieldWidth}>
             <select
               name="userType"
@@ -626,7 +626,7 @@ export default function Domain() {
               ))}
             </select>
           </CompactField>
-          <CompactField label="Domain" required className="min-w-0 flex-1">
+          <CompactField label="Domain" required className={compactFixedFieldWidth}>
             <input
               type="text"
               name="domain"
@@ -636,8 +636,6 @@ export default function Domain() {
               className={compactInputClass}
             />
           </CompactField>
-        </CompactFormRow>
-        <CompactFormRow className="w-full items-start">
           <CompactField label="Expiry (Date)" required className={compactFixedFieldWidth}>
             <input
               type="date"

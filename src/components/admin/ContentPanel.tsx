@@ -140,6 +140,7 @@ export function CompactFormFooter({
   onSave,
   onCancel,
   actionLabel = "Save",
+  cancelLabel = "Cancel",
   actionType = "button",
   message,
   messageCenter = false,
@@ -147,6 +148,7 @@ export function CompactFormFooter({
   onSave?: () => void;
   onCancel?: () => void;
   actionLabel?: string;
+  cancelLabel?: string;
   actionType?: "button" | "submit";
   message?: ReactNode;
   messageCenter?: boolean;
@@ -178,7 +180,7 @@ export function CompactFormFooter({
             onClick={onCancel}
             className="font-medium text-blue-600 underline hover:text-blue-700"
           >
-            Cancel
+            {cancelLabel}
           </button>
         </span>
       ) : null}
