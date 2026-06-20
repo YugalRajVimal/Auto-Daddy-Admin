@@ -313,7 +313,7 @@ export default function Invitehelp({
   const navResetToken = (location.state as NavResetLocationState | null)?.navReset;
   const [inviteHelps, setInviteHelps] = useState<InviteHelp[]>(DUMMY_RECEIVED_NOTIFICATIONS);
   const [sentNotifications, setSentNotifications] = useState<SentNotification[]>(DUMMY_SENT_NOTIFICATIONS);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [imagePreview, setImagePreview] = useState<{ url: string; title: string } | null>(null);
