@@ -56,20 +56,28 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   ];
 
   const activePrimary = getActivePrimaryItem(location.pathname, visibleNav);
-  const visibleUtilityNav = adminUtilityNav.filter(
-    (s) => !s.permissionModule || canView(s.permissionModule)
-  );
+  const visibleUtilityNav = isAdmin
+    ? adminUtilityNav.filter((s) => !s.permissionModule || canView(s.permissionModule))
+    : [];
   const onAdminUtility = visibleUtilityNav.some((s) => isPathActive(location.pathname, s.path));
   const utilitySubItems = onAdminUtility ? visibleUtilityNav : [];
   const primarySubItems: NavSubItem[] = activePrimary?.subItems ?? [];
   const displaySubItems = utilitySubItems.length > 0 ? utilitySubItems : primarySubItems;
   const activeSubItemPath = getActiveSubItemPath(location.pathname, displaySubItems);
-  const adminUtilityPath = visibleUtilityNav[0]?.path ?? "/admin/associates";
+  const adminUtilityPath = visibleUtilityNav[0]?.path ?? "/admin/roles";
 
   const handlePrimaryClick = (item: NavItem) => {
     const target = item.path ?? item.subItems?.[0]?.path;
     if (target) navigate(target);
     setMobileOpen(false);
+  };
+
+  const handleSubNavClick = (path: string, e: React.MouseEvent<HTMLAnchorElement>) => {
+    setMobileOpen(false);
+    if (location.pathname === path) {
+      e.preventDefault();
+      navigate(path, { replace: true, state: { navReset: Date.now() } });
+    }
   };
 
   const handleLogout = () => {
@@ -133,12 +141,14 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
             <div className="col-span-2 flex flex-col items-end gap-2 md:col-span-1 md:col-start-3 md:row-start-1">
               <nav className="flex items-center gap-0 [&>a+a]:-ml-px" aria-label="Account actions">
-                <Link
-                  to={adminUtilityPath}
-                  className={onAdminUtility ? utilityLinkActiveClass : utilityLinkClass}
-                >
-                  Admin
-                </Link>
+                {isAdmin && visibleUtilityNav.length > 0 && (
+                  <Link
+                    to={adminUtilityPath}
+                    className={onAdminUtility ? utilityLinkActiveClass : utilityLinkClass}
+                  >
+                    Admin
+                  </Link>
+                )}
                 <Link to="#" className={utilityLinkClass}>
                   Help
                 </Link>
@@ -219,6 +229,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                       {sub && (
                         <Link
                           to={sub.path}
+                          onClick={(e) => handleSubNavClick(sub.path, e)}
                           className={`${subNavLinkClass} ${active ? "bg-gray-200 font-medium" : ""}`}
                         >
                           {sub.name}
@@ -243,6 +254,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                   <li key={sub.path}>
                     <Link
                       to={sub.path}
+                      onClick={(e) => handleSubNavClick(sub.path, e)}
                       className={`${subNavLinkClass} text-left ${active ? "bg-gray-200 font-medium" : ""}`}
                     >
                       {sub.name}

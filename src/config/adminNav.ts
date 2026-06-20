@@ -100,21 +100,19 @@ export const primaryNav: NavItem[] = [
     permissionModule: "dashboard",
   },
   {
-    name: "Ads",
-    permissionModule: "ads",
+    name: "Domain",
+    permissionModule: "domain",
     subItems: [
-      { name: "Dealer", path: "/admin/ads/dealer", permissionModule: "ads" },
-      { name: "Adds", path: "/admin/ads/adds", permissionModule: "ads" },
-      { name: "Invoices", path: "/admin/ads/invoices", permissionModule: "ads" },
-      { name: "Payment", path: "/admin/ads/payment", permissionModule: "ads" },
+      { name: "Domain Manager", path: "/admin/domain/manager", permissionModule: "domain" },
     ],
-    matchPaths: ["/admin/ads/dealer", "/admin/ads/adds", "/admin/ads/invoices", "/admin/ads/payment"],
+    matchPaths: ["/admin/domain/manager"],
   },
 ];
 
 /** Routes accessed via the top Admin utility button (not primary nav). */
 export const adminUtilityNav: NavSubItem[] = [
-  { name: "Associates", path: "/admin/associates", permissionModule: "users" },
+  { name: "Role Manager", path: "/admin/roles", permissionModule: "subAdminManagement" },
+  { name: "Manage Admin", path: "/admin/subadmins", permissionModule: "subAdminManagement" },
 ];
 
 /* ── Legacy nav items (commented out — routes still reachable by URL) ──

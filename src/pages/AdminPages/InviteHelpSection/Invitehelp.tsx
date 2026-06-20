@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
-import axios from "axios";
+import { Link, useLocation } from "react-router";
+import { FiPaperclip } from "react-icons/fi";
 import { EyeIcon } from "../../../icons";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
@@ -15,12 +15,20 @@ import {
 
 interface InviteHelp {
   _id: string;
+  date?: string;
+  ticketNo?: string;
+  title?: string;
   message?: string;
+  imageUrl?: string | null;
+  userType?: UserType;
+  status?: "resolved" | "unresolved";
   audioBlob?: { data: number[]; type: string };
+  audioUrl?: string;
   createdAt?: string;
   userId?: {
     name?: string;
     email?: string;
+    role?: string;
     businessProfile?: {
       businessName?: string;
       businessEmail?: string;
@@ -39,10 +47,14 @@ interface SentNotification {
   imageUrl?: string | null;
   userType: UserType;
   userScope: UserScope;
-  particularUser?: string | null;
+  particularUsers?: string[] | null;
 }
 
 type MessagesSection = "sent" | "received";
+
+type NavResetLocationState = {
+  navReset?: number;
+};
 
 type InvitehelpProps = {
   title?: string;
@@ -53,11 +65,6 @@ type InvitehelpProps = {
 const USER_TYPE_OPTIONS: { value: UserType; label: string }[] = [
   { value: "carOwner", label: "Car Owner" },
   { value: "shopOwner", label: "Shop Owner" },
-];
-
-const USER_SCOPE_OPTIONS: { value: UserScope; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "particular", label: "Particular" },
 ];
 
 const CAR_OWNER_USERS = [
@@ -86,17 +93,151 @@ const notifImageUrl = (id: number) => `https://picsum.photos/seed/notif-${id}/48
 
 const DUMMY_SENT_NOTIFICATIONS: SentNotification[] = [
   { _id: "sent-1", date: "2026-06-18", title: "Summer Service Reminder", note: "Book your seasonal oil change and tire rotation before July.", imageUrl: notifImageUrl(1), userType: "carOwner", userScope: "all" },
-  { _id: "sent-2", date: "2026-06-17", title: "New Dealer Partner Alert", note: "A new dealer partner is now available in your area.", imageUrl: notifImageUrl(2), userType: "carOwner", userScope: "particular", particularUser: "John Smith" },
+  { _id: "sent-2", date: "2026-06-17", title: "New Dealer Partner Alert", note: "A new dealer partner is now available in your area.", imageUrl: notifImageUrl(2), userType: "carOwner", userScope: "particular", particularUsers: ["John Smith"] },
   { _id: "sent-3", date: "2026-06-16", title: "Platform Maintenance", note: "Scheduled maintenance tonight from 11 PM to 1 AM EST.", imageUrl: null, userType: "shopOwner", userScope: "all" },
-  { _id: "sent-4", date: "2026-06-15", title: "Invoice Upload Reminder", note: "Please upload pending invoices for May billing cycle.", imageUrl: notifImageUrl(4), userType: "shopOwner", userScope: "particular", particularUser: "Northside Auto" },
+  { _id: "sent-4", date: "2026-06-15", title: "Invoice Upload Reminder", note: "Please upload pending invoices for May billing cycle.", imageUrl: notifImageUrl(4), userType: "shopOwner", userScope: "particular", particularUsers: ["Northside Auto"] },
   { _id: "sent-5", date: "2026-06-14", title: "Winter Tire Promo", note: "Early-bird discount on winter tire packages — limited slots.", imageUrl: notifImageUrl(5), userType: "carOwner", userScope: "all" },
-  { _id: "sent-6", date: "2026-06-13", title: "Profile Completion", note: "Complete your shop profile to appear in local search results.", imageUrl: notifImageUrl(6), userType: "shopOwner", userScope: "particular", particularUser: "Premium Auto Care" },
-  { _id: "sent-7", date: "2026-06-12", title: "Referral Bonus Live", note: "Earn credits when you refer a friend to AutoDaddy.", imageUrl: notifImageUrl(7), userType: "carOwner", userScope: "particular", particularUser: "Maria Garcia" },
+  { _id: "sent-6", date: "2026-06-13", title: "Profile Completion", note: "Complete your shop profile to appear in local search results.", imageUrl: notifImageUrl(6), userType: "shopOwner", userScope: "particular", particularUsers: ["Premium Auto Care"] },
+  { _id: "sent-7", date: "2026-06-12", title: "Referral Bonus Live", note: "Earn credits when you refer a friend to AutoDaddy.", imageUrl: notifImageUrl(7), userType: "carOwner", userScope: "particular", particularUsers: ["Maria Garcia"] },
   { _id: "sent-8", date: "2026-06-11", title: "Lead Assignment Update", note: "New leads are now routed based on your service categories.", imageUrl: null, userType: "shopOwner", userScope: "all" },
-  { _id: "sent-9", date: "2026-06-10", title: "Payment Received", note: "Your wallet payment for job card #4821 has been processed.", imageUrl: notifImageUrl(9), userType: "carOwner", userScope: "particular", particularUser: "David Chen" },
-  { _id: "sent-10", date: "2026-06-09", title: "Ad Campaign Tips", note: "Boost visibility with these best practices for dealer ads.", imageUrl: notifImageUrl(10), userType: "shopOwner", userScope: "particular", particularUser: "Kim Auto Shop" },
+  { _id: "sent-9", date: "2026-06-10", title: "Payment Received", note: "Your wallet payment for job card #4821 has been processed.", imageUrl: notifImageUrl(9), userType: "carOwner", userScope: "particular", particularUsers: ["David Chen"] },
+  { _id: "sent-10", date: "2026-06-09", title: "Ad Campaign Tips", note: "Boost visibility with these best practices for dealer ads.", imageUrl: notifImageUrl(10), userType: "shopOwner", userScope: "particular", particularUsers: ["Kim Auto Shop"] },
   { _id: "sent-11", date: "2026-06-08", title: "App Update Available", note: "Version 2.4 includes faster booking and push notification fixes.", imageUrl: notifImageUrl(11), userType: "carOwner", userScope: "all" },
-  { _id: "sent-12", date: "2026-06-07", title: "Holiday Hours", note: "Support hours will be reduced on the upcoming public holiday.", imageUrl: null, userType: "shopOwner", userScope: "particular", particularUser: "City Tire & Brake" },
+  { _id: "sent-12", date: "2026-06-07", title: "Holiday Hours", note: "Support hours will be reduced on the upcoming public holiday.", imageUrl: null, userType: "shopOwner", userScope: "particular", particularUsers: ["City Tire & Brake"] },
+];
+
+const DUMMY_AUDIO_URL = "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3";
+
+const DUMMY_RECEIVED_NOTIFICATIONS: InviteHelp[] = [
+  {
+    _id: "recv-1",
+    date: "2026-06-18",
+    ticketNo: "TK-240618",
+    title: "Brake Noise Complaint",
+    message: "Hearing a grinding sound when braking at low speeds. Can someone advise?",
+    imageUrl: notifImageUrl(101),
+    userType: "carOwner",
+    status: "unresolved",
+    audioUrl: DUMMY_AUDIO_URL,
+    userId: { name: "John Smith", email: "john.smith@email.com" },
+  },
+  {
+    _id: "recv-2",
+    date: "2026-06-17",
+    ticketNo: "TK-240617",
+    title: "Invoice Dispute",
+    message: "The last job card total does not match the invoice uploaded to wallet.",
+    imageUrl: notifImageUrl(102),
+    userType: "shopOwner",
+    userId: { businessProfile: { businessName: "Northside Auto", businessEmail: "billing@northsideauto.com" } },
+  },
+  {
+    _id: "recv-3",
+    date: "2026-06-16",
+    ticketNo: "TK-240616",
+    title: "App Login Issue",
+    message: "Unable to sign in after password reset — getting session expired error.",
+    imageUrl: null,
+    userType: "carOwner",
+    status: "unresolved",
+    audioUrl: DUMMY_AUDIO_URL,
+    userId: { name: "Maria Garcia", email: "maria.g@email.com" },
+  },
+  {
+    _id: "recv-4",
+    date: "2026-06-15",
+    ticketNo: "TK-240615",
+    title: "Lead Not Received",
+    message: "We did not receive the oil change lead assigned yesterday afternoon.",
+    imageUrl: null,
+    userType: "shopOwner",
+    userId: { businessProfile: { businessName: "Premium Auto Care" } },
+  },
+  {
+    _id: "recv-5",
+    date: "2026-06-14",
+    ticketNo: "TK-240614",
+    title: "Referral Credit Missing",
+    message: "Referred a friend last week but referral bonus has not appeared in wallet.",
+    imageUrl: notifImageUrl(105),
+    userType: "carOwner",
+    userId: { name: "David Chen", email: "david.chen@email.com" },
+  },
+  {
+    _id: "recv-6",
+    date: "2026-06-13",
+    ticketNo: "TK-240613",
+    title: "Shop Profile Photo",
+    message: "Uploaded new shop photos but they are still not showing on our listing.",
+    imageUrl: notifImageUrl(106),
+    userType: "shopOwner",
+    audioUrl: DUMMY_AUDIO_URL,
+    userId: { businessProfile: { businessName: "Kim Auto Shop" } },
+  },
+  {
+    _id: "recv-7",
+    date: "2026-06-12",
+    ticketNo: "TK-240612",
+    title: "Booking Cancellation",
+    message: "Need to cancel tomorrow's appointment and rebook for next Monday.",
+    imageUrl: null,
+    userType: "carOwner",
+    userId: { name: "Sarah Johnson", email: "sarah.j@email.com" },
+  },
+  {
+    _id: "recv-8",
+    date: "2026-06-11",
+    ticketNo: "TK-240611",
+    title: "Ad Performance Query",
+    message: "Dealer ad impressions dropped sharply this week — please review campaign settings.",
+    imageUrl: notifImageUrl(108),
+    userType: "shopOwner",
+    userId: { businessProfile: { businessName: "City Tire & Brake" } },
+  },
+  {
+    _id: "recv-9",
+    date: "2026-06-10",
+    ticketNo: "TK-240610",
+    title: "Payment Not Reflected",
+    message: "Customer payment for job #4821 was processed but wallet balance unchanged.",
+    imageUrl: notifImageUrl(109),
+    userType: "carOwner",
+    status: "unresolved",
+    audioUrl: DUMMY_AUDIO_URL,
+    userId: { name: "Michael Brown", email: "m.brown@email.com" },
+  },
+  {
+    _id: "recv-10",
+    date: "2026-06-09",
+    ticketNo: "TK-240609",
+    title: "Service Category Update",
+    message: "Please add EV battery diagnostics to our shop service categories.",
+    imageUrl: null,
+    userType: "shopOwner",
+    userId: { businessProfile: { businessName: "Lakeview Auto Repair" } },
+  },
+  {
+    _id: "recv-11",
+    date: "2026-06-08",
+    ticketNo: "TK-240608",
+    title: "Voice Message Follow-up",
+    message: "Following up on my earlier voice note about the transmission slipping issue.",
+    imageUrl: notifImageUrl(111),
+    userType: "carOwner",
+    status: "unresolved",
+    audioUrl: DUMMY_AUDIO_URL,
+    userId: { name: "Emily Wilson", email: "emily.w@email.com" },
+  },
+  {
+    _id: "recv-12",
+    date: "2026-06-07",
+    ticketNo: "TK-240607",
+    title: "Detailing Package Inquiry",
+    message: "Looking for pricing on full interior and exterior detailing for fleet vehicles.",
+    imageUrl: notifImageUrl(112),
+    userType: "shopOwner",
+    userId: { businessProfile: { businessName: "Eastside Detailing" } },
+  },
 ];
 
 function userTypeLabel(userType: UserType) {
@@ -105,7 +246,8 @@ function userTypeLabel(userType: UserType) {
 
 function userScopeLabel(notification: SentNotification) {
   if (notification.userScope === "all") return "All";
-  return notification.particularUser || "Particular";
+  if (notification.particularUsers?.length) return notification.particularUsers.join(", ");
+  return "All";
 }
 
 function particularUsersForType(userType: UserType) {
@@ -118,14 +260,60 @@ function arrayBufferToBlobUrl(buffer: number[], mimeType = "audio/webm") {
   return URL.createObjectURL(blob);
 }
 
+function receivedDate(inv: InviteHelp) {
+  if (inv.date) return inv.date;
+  if (inv.createdAt) return new Date(inv.createdAt).toLocaleDateString();
+  return "—";
+}
+
+function receivedTicketNo(inv: InviteHelp) {
+  if (inv.ticketNo) return inv.ticketNo;
+  return inv._id.slice(-8).toUpperCase();
+}
+
+function receivedUserType(inv: InviteHelp): UserType {
+  if (inv.userType) return inv.userType;
+  if (inv.userId?.role?.toLowerCase().includes("shop")) return "shopOwner";
+  if (inv.userId?.businessProfile?.businessName) return "shopOwner";
+  return "carOwner";
+}
+
+function receivedUserName(inv: InviteHelp) {
+  const userType = receivedUserType(inv);
+  if (userType === "shopOwner") {
+    return inv.userId?.businessProfile?.businessName || inv.userId?.name || "—";
+  }
+  return inv.userId?.name || inv.userId?.businessProfile?.businessName || "—";
+}
+
+function receivedImageUrl(inv: InviteHelp) {
+  return inv.imageUrl ?? null;
+}
+
+function receivedAudioUrl(inv: InviteHelp) {
+  if (inv.audioUrl) return inv.audioUrl;
+  if (
+    inv.audioBlob?.data &&
+    Array.isArray(inv.audioBlob.data) &&
+    inv.audioBlob.type === "Buffer"
+  ) {
+    return arrayBufferToBlobUrl(inv.audioBlob.data);
+  }
+  return null;
+}
+
+const readOnlyValueClass = `${compactInputClass} bg-gray-50 text-gray-800`;
+
 export default function Invitehelp({
   title = "Messages",
   section = "received",
   showAddNew = true,
 }: InvitehelpProps) {
-  const [inviteHelps, setInviteHelps] = useState<InviteHelp[]>([]);
+  const location = useLocation();
+  const navResetToken = (location.state as NavResetLocationState | null)?.navReset;
+  const [inviteHelps, setInviteHelps] = useState<InviteHelp[]>(DUMMY_RECEIVED_NOTIFICATIONS);
   const [sentNotifications, setSentNotifications] = useState<SentNotification[]>(DUMMY_SENT_NOTIFICATIONS);
-  const [loading, setLoading] = useState(section !== "sent");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [imagePreview, setImagePreview] = useState<{ url: string; title: string } | null>(null);
@@ -142,53 +330,56 @@ export default function Invitehelp({
   const [attachImage, setAttachImage] = useState(false);
   const [notifImage, setNotifImage] = useState<File | null>(null);
   const [userType, setUserType] = useState<UserType>("carOwner");
-  const [userScope, setUserScope] = useState<UserScope>("all");
-  const [particularUser, setParticularUser] = useState("");
+  const [selectedUser, setSelectedUser] = useState("");
 
-  const [userName, setUserName] = useState("");
-  const [userEmail, setUserEmail] = useState("");
-  const [businessName, setBusinessName] = useState("");
-  const [businessEmail, setBusinessEmail] = useState("");
-  const [receivedMessage, setReceivedMessage] = useState("");
+  const [viewingReceived, setViewingReceived] = useState<InviteHelp | null>(null);
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  const actionMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const closeReceivedView = () => {
+    setViewingReceived(null);
+  };
+
+  useEffect(() => {
+    if (!showActionMenu) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(e.target as Node)) {
+        setShowActionMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [showActionMenu]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setImagePreview(null);
+      if (e.key === "Escape") {
+        setImagePreview(null);
+        closeReceivedView();
+        setShowActionMenu(false);
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (section === "sent") {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      setError("");
-      try {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/invite-help`);
-        if (res.data?.success) {
-          setInviteHelps(res.data.data || []);
-        } else {
-          setError("Failed to fetch invite help requests.");
-        }
-      } catch {
-        setError("Failed to fetch invite help requests.");
-      }
-      setLoading(false);
-    };
-    fetchData();
-  }, [section]);
+    if (section !== "received") return;
+    closeReceivedView();
+    setShowForm(false);
+    setImagePreview(null);
+    setShowActionMenu(false);
+    setError("");
+  }, [location.pathname, navResetToken, section]);
 
   const filteredReceived = inviteHelps.filter((inv) => {
     const q = search.toLowerCase();
     return (
-      (inv.userId?.name || "").toLowerCase().includes(q) ||
-      (inv.userId?.email || "").toLowerCase().includes(q) ||
-      (inv.userId?.businessProfile?.businessName || "").toLowerCase().includes(q) ||
-      (inv.userId?.businessProfile?.businessEmail || "").toLowerCase().includes(q) ||
+      receivedDate(inv).toLowerCase().includes(q) ||
+      receivedTicketNo(inv).toLowerCase().includes(q) ||
+      userTypeLabel(receivedUserType(inv)).toLowerCase().includes(q) ||
+      receivedUserName(inv).toLowerCase().includes(q) ||
+      (inv.title || "").toLowerCase().includes(q) ||
       (inv.message || "").toLowerCase().includes(q)
     );
   });
@@ -223,6 +414,30 @@ export default function Invitehelp({
     else setSelected(new Set(paged.map((n) => n._id)));
   };
 
+  const openReceivedView = (inv: InviteHelp) => {
+    setShowForm(false);
+    resetForm();
+    setViewingReceived(inv);
+    setShowActionMenu(false);
+    setError("");
+  };
+
+  const applyReceivedStatus = (status: "resolved" | "unresolved") => {
+    if (selected.size === 0) {
+      setError("Select at least one notification.");
+      setShowActionMenu(false);
+      return;
+    }
+    setInviteHelps((prev) =>
+      prev.map((inv) => (selected.has(inv._id) ? { ...inv, status } : inv))
+    );
+    if (viewingReceived && selected.has(viewingReceived._id)) {
+      setViewingReceived((prev) => (prev ? { ...prev, status } : null));
+    }
+    setError("");
+    setShowActionMenu(false);
+  };
+
   const resetForm = () => {
     setNotifDate("2026-06-18");
     setNotifTitle("");
@@ -230,14 +445,8 @@ export default function Invitehelp({
     setAttachImage(false);
     setNotifImage(null);
     setUserType("carOwner");
-    setUserScope("all");
-    setParticularUser("");
+    setSelectedUser("");
     if (imageInputRef.current) imageInputRef.current.value = "";
-    setUserName("");
-    setUserEmail("");
-    setBusinessName("");
-    setBusinessEmail("");
-    setReceivedMessage("");
   };
 
   const handleCancel = () => {
@@ -251,11 +460,8 @@ export default function Invitehelp({
         setError("Date, title, and note are required.");
         return;
       }
-      if (userScope === "particular" && !particularUser.trim()) {
-        setError("Please select a user when sending to a particular user.");
-        return;
-      }
       setError("");
+      const userScope: UserScope = selectedUser ? "particular" : "all";
       const entry: SentNotification = {
         _id: `sent-${Date.now()}`,
         date: notifDate.trim(),
@@ -264,52 +470,27 @@ export default function Invitehelp({
         imageUrl: attachImage && notifImage ? URL.createObjectURL(notifImage) : null,
         userType,
         userScope,
-        particularUser: userScope === "particular" ? particularUser.trim() : null,
+        particularUsers: selectedUser ? [selectedUser] : null,
       };
       setSentNotifications((prev) => [entry, ...prev]);
-    } else {
-      if (!userName.trim() || !receivedMessage.trim()) {
-        setError("User name and message are required.");
-        return;
-      }
-      setError("");
-      const entry: InviteHelp = {
-        _id: `received-${Date.now()}`,
-        message: receivedMessage.trim(),
-        createdAt: new Date().toISOString(),
-        userId: {
-          name: userName.trim(),
-          email: userEmail.trim() || undefined,
-          businessProfile: {
-            businessName: businessName.trim() || undefined,
-            businessEmail: businessEmail.trim() || undefined,
-          },
-        },
-      };
-      setInviteHelps((prev) => [entry, ...prev]);
     }
     resetForm();
     setShowForm(false);
   };
 
-  const addFormPanel = showForm ? (
+  const addFormPanel = showForm && section === "sent" ? (
     <CompactFormPanel
       footer={
         <CompactFormFooter
-          message={
-            section === "sent"
-              ? "You are creating a 'Notification'"
-              : "You are creating a 'Received Notification'"
-          }
+          message="You are creating a 'Notification'"
           messageCenter
           onSave={handleSave}
           onCancel={handleCancel}
         />
       }
     >
-      {section === "sent" ? (
-        <>
-          <CompactFormRow className="w-full items-start">
+      <>
+        <CompactFormRow className="w-full items-start">
             <CompactField label="Date" required className={compactFixedFieldWidth}>
               <input
                 type="date"
@@ -324,7 +505,7 @@ export default function Invitehelp({
                 onChange={(e) => {
                   const next = e.target.value as UserType;
                   setUserType(next);
-                  setParticularUser("");
+                  setSelectedUser("");
                 }}
                 className={compactInputClass}
               >
@@ -335,40 +516,21 @@ export default function Invitehelp({
                 ))}
               </select>
             </CompactField>
-            <CompactField label="User" required className={compactFixedFieldWidth}>
+            <CompactField label="User" className={compactFixedFieldWidth}>
               <select
-                value={userScope}
-                onChange={(e) => {
-                  const next = e.target.value as UserScope;
-                  setUserScope(next);
-                  if (next === "all") setParticularUser("");
-                }}
+                value={selectedUser}
+                onChange={(e) => setSelectedUser(e.target.value)}
                 className={compactInputClass}
               >
-                {USER_SCOPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                <option value="">All</option>
+                {particularUsersForType(userType).map((name) => (
+                  <option key={name} value={name}>
+                    {name}
                   </option>
                 ))}
               </select>
             </CompactField>
-            {userScope === "particular" && (
-              <CompactField label="Select User" required className={compactFixedFieldWidth}>
-                <select
-                  value={particularUser}
-                  onChange={(e) => setParticularUser(e.target.value)}
-                  className={compactInputClass}
-                >
-                  <option value="">-</option>
-                  {particularUsersForType(userType).map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </CompactField>
-            )}
-            <CompactField label="Title" required className="min-w-0 flex-1">
+            <CompactField label="Title" required className={compactFixedFieldWidth}>
               <input
                 type="text"
                 value={notifTitle}
@@ -376,8 +538,6 @@ export default function Invitehelp({
                 className={compactInputClass}
               />
             </CompactField>
-          </CompactFormRow>
-          <CompactFormRow className="w-full items-start">
             <CompactField label="Note" required className="min-w-0 flex-1">
               <CompactAutoGrowTextarea
                 value={notifNote}
@@ -418,52 +578,90 @@ export default function Invitehelp({
             </div>
           </CompactFormRow>
         </>
-      ) : (
-        <>
-          <CompactFormRow className="w-full items-start">
-            <CompactField label="User Name" required className={compactFixedFieldWidth}>
-              <input
-                type="text"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                className={compactInputClass}
-              />
-            </CompactField>
-            <CompactField label="User Email" className={compactFixedFieldWidth}>
-              <input
-                type="email"
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-                className={compactInputClass}
-              />
-            </CompactField>
-            <CompactField label="Business Name" className={compactFixedFieldWidth}>
-              <input
-                type="text"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                className={compactInputClass}
-              />
-            </CompactField>
-            <CompactField label="Business Email" className={compactFixedFieldWidth}>
-              <input
-                type="email"
-                value={businessEmail}
-                onChange={(e) => setBusinessEmail(e.target.value)}
-                className={compactInputClass}
-              />
-            </CompactField>
-          </CompactFormRow>
-          <CompactFormRow className="w-full items-start">
-            <CompactField label="Message" required className="min-w-0 flex-1">
-              <CompactAutoGrowTextarea
-                value={receivedMessage}
-                onChange={(e) => setReceivedMessage(e.target.value)}
-              />
-            </CompactField>
-          </CompactFormRow>
-        </>
-      )}
+    </CompactFormPanel>
+  ) : undefined;
+
+  const receivedViewPanel =
+    section === "received" && viewingReceived ? (
+    <CompactFormPanel
+      footer={
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+          <div />
+          <span className="text-center text-xs font-serif italic text-gray-800">
+            You are viewing a &apos;Received Notification&apos;
+          </span>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={closeReceivedView}
+              className="rounded border border-gray-400 bg-white px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <CompactFormRow className="w-full flex-nowrap items-start">
+        <CompactField label="Date">
+          <div className={readOnlyValueClass}>{receivedDate(viewingReceived)}</div>
+        </CompactField>
+        <CompactField label="Ticket No.">
+          <div className={readOnlyValueClass}>{receivedTicketNo(viewingReceived)}</div>
+        </CompactField>
+        <CompactField label="User Type">
+          <div className={readOnlyValueClass}>{userTypeLabel(receivedUserType(viewingReceived))}</div>
+        </CompactField>
+        <CompactField label="User Name">
+          <div className={readOnlyValueClass}>{receivedUserName(viewingReceived)}</div>
+        </CompactField>
+        <CompactField label="Title">
+          <div className={readOnlyValueClass}>{viewingReceived.title || "—"}</div>
+        </CompactField>
+        <CompactField label="Audio">
+          {receivedAudioUrl(viewingReceived) ? (
+            <audio controls src={receivedAudioUrl(viewingReceived)!} className="h-[30px] w-full accent-blue-600" />
+          ) : (
+            <div className={`${readOnlyValueClass} text-gray-500`}>No audio</div>
+          )}
+        </CompactField>
+      </CompactFormRow>
+      <CompactFormRow className="w-full items-start">
+        <CompactField label="Message" className="min-w-0 basis-full">
+          <div className={`${readOnlyValueClass} whitespace-pre-wrap`}>
+            {viewingReceived.message || "—"}
+          </div>
+        </CompactField>
+      </CompactFormRow>
+      <CompactFormRow className="w-full items-start">
+        <div className="flex min-w-0 basis-full flex-col items-start gap-1.5">
+          <label className="inline-flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+            <input
+              type="checkbox"
+              checked={Boolean(receivedImageUrl(viewingReceived))}
+              readOnly
+              disabled
+              className="h-3.5 w-3.5 accent-ad-green"
+            />
+            Attached Image
+          </label>
+          {receivedImageUrl(viewingReceived) ? (
+            <button
+              type="button"
+              onClick={() =>
+                setImagePreview({
+                  url: receivedImageUrl(viewingReceived)!,
+                  title: `${viewingReceived.title || receivedTicketNo(viewingReceived)} — attached image`,
+                })
+              }
+              className="inline-flex items-center gap-1.5 rounded border border-gray-400 bg-white px-3 py-0.5 text-xs font-medium text-ad-purple hover:bg-ad-purple/10"
+            >
+              <EyeIcon className="size-4 fill-current" />
+              View Image
+            </button>
+          ) : null}
+        </div>
+      </CompactFormRow>
     </CompactFormPanel>
   ) : undefined;
 
@@ -471,8 +669,8 @@ export default function Invitehelp({
     <AdminPage
       title={title}
       noPanel
-      headerAction={showAddNew && !showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
-      between={addFormPanel}
+      headerAction={showAddNew && !showForm && !viewingReceived ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
+      between={receivedViewPanel ?? addFormPanel}
     >
       {error && (
         <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
@@ -485,9 +683,35 @@ export default function Invitehelp({
           <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
             Update
           </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Shoot
-          </button>
+          <div className="relative" ref={actionMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                if (section === "received") setShowActionMenu((open) => !open);
+              }}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+            >
+              Action
+            </button>
+            {section === "received" && showActionMenu ? (
+              <div className="absolute left-0 top-full z-50 mt-1 min-w-[130px] border border-gray-400 bg-white py-1 shadow-md">
+                <button
+                  type="button"
+                  onClick={() => applyReceivedStatus("resolved")}
+                  className="block w-full px-3 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-100"
+                >
+                  Resolve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyReceivedStatus("unresolved")}
+                  className="block w-full px-3 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-100"
+                >
+                  Unresolved
+                </button>
+              </div>
+            ) : null}
+          </div>
           <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
             Delete
           </button>
@@ -546,19 +770,20 @@ export default function Invitehelp({
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Title</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Note</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">View Image</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User Type</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" aria-label="Attachment"></th>
                 </>
               ) : (
                 <>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Ticket No.</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User Type</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User Name</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User Email</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Business Name</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Business Email</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Message</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Title</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Audio</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Created At</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Message</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" aria-label="Attachment"></th>
                 </>
               )}
             </tr>
@@ -566,14 +791,14 @@ export default function Invitehelp({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={section === "sent" ? 7 : 8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={section === "sent" ? 7 : 9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={section === "sent" ? 7 : 8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                  {section === "sent" ? "No sent notifications found." : "No invite help requests found."}
+                <td colSpan={section === "sent" ? 7 : 9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                  {section === "sent" ? "No sent notifications found." : "No received notifications found."}
                 </td>
               </tr>
             ) : section === "sent" ? (
@@ -596,6 +821,8 @@ export default function Invitehelp({
                         {notification.note}
                       </span>
                     </td>
+                    <td className="border border-gray-300 px-3 py-2">{userTypeLabel(notification.userType)}</td>
+                    <td className="border border-gray-300 px-3 py-2">{userScopeLabel(notification)}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center">
                       {notification.imageUrl ? (
                         <button
@@ -606,32 +833,24 @@ export default function Invitehelp({
                               title: `${notification.title} — notification image`,
                             })
                           }
-                          className="inline-flex items-center justify-center rounded p-1 text-ad-purple hover:bg-ad-purple/10 hover:text-ad-purple-dark"
-                          aria-label={`View image for ${notification.title}`}
-                          title="View image"
+                          className="inline-flex items-center justify-center rounded p-1 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                          aria-label={`View attached image for ${notification.title}`}
+                          title="View attached image"
                         >
-                          <EyeIcon className="size-5 fill-current" />
+                          <FiPaperclip size={16} aria-hidden />
                         </button>
                       ) : (
                         <span className="text-gray-500">--</span>
                       )}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2">{userTypeLabel(notification.userType)}</td>
-                    <td className="border border-gray-300 px-3 py-2">{userScopeLabel(notification)}</td>
                   </tr>
                 );
               })
             ) : (
               paged.map((row, idx) => {
                 const invite = row as InviteHelp;
-                let audioUrl: string | null = null;
-                if (
-                  invite.audioBlob?.data &&
-                  Array.isArray(invite.audioBlob.data) &&
-                  invite.audioBlob.type === "Buffer"
-                ) {
-                  audioUrl = arrayBufferToBlobUrl(invite.audioBlob.data);
-                }
+                const imageUrl = receivedImageUrl(invite);
+                const audioUrl = receivedAudioUrl(invite);
 
                 return (
                   <tr key={invite._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
@@ -644,24 +863,22 @@ export default function Invitehelp({
                       />
                     </td>
                     <td className="border border-gray-300 px-3 py-2">
-                      <span className="text-blue-700">{invite.userId?.name || "N/A"}</span>
+                      <button
+                        type="button"
+                        onClick={() => openReceivedView(invite)}
+                        className="text-blue-700 hover:underline"
+                      >
+                        {receivedDate(invite)}
+                      </button>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2">{invite.userId?.email || "N/A"}</td>
+                    <td className="border border-gray-300 px-3 py-2">{receivedTicketNo(invite)}</td>
                     <td className="border border-gray-300 px-3 py-2">
-                      {invite.userId?.businessProfile?.businessName || "N/A"}
+                      {userTypeLabel(receivedUserType(invite))}
                     </td>
                     <td className="border border-gray-300 px-3 py-2">
-                      {invite.userId?.businessProfile?.businessEmail || "N/A"}
+                      <span className="text-blue-700">{receivedUserName(invite)}</span>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2">
-                      {invite.message ? (
-                        <span className="line-clamp-2 block max-w-[200px]" title={invite.message}>
-                          {invite.message}
-                        </span>
-                      ) : (
-                        "N/A"
-                      )}
-                    </td>
+                    <td className="border border-gray-300 px-3 py-2">{invite.title || "—"}</td>
                     <td className="border border-gray-300 px-3 py-2">
                       {audioUrl ? (
                         <audio controls src={audioUrl} className="h-8 w-44 accent-blue-600" />
@@ -670,7 +887,33 @@ export default function Invitehelp({
                       )}
                     </td>
                     <td className="border border-gray-300 px-3 py-2">
-                      {invite.createdAt ? new Date(invite.createdAt).toLocaleString() : "N/A"}
+                      {invite.message ? (
+                        <span className="line-clamp-2 block max-w-[200px]" title={invite.message}>
+                          {invite.message}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">
+                      {imageUrl ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setImagePreview({
+                              url: imageUrl,
+                              title: `${invite.title || receivedTicketNo(invite)} — attached image`,
+                            })
+                          }
+                          className="inline-flex items-center justify-center rounded p-1 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                          aria-label={`View attached image for ${receivedTicketNo(invite)}`}
+                          title="View attached image"
+                        >
+                          <FiPaperclip size={16} aria-hidden />
+                        </button>
+                      ) : (
+                        <span className="text-gray-500">--</span>
+                      )}
                     </td>
                   </tr>
                 );

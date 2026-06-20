@@ -1,34 +1,21 @@
 // pages/AdminPages/SubAdmins/SubAdminManagement.tsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router";
 import axios from "axios";
-import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-const MODULES = [
-  { key: "dashboard",        label: "Dashboard" },
-  { key: "users",            label: "Users" },
-  { key: "services",         label: "Services" },
-  { key: "categories",       label: "Sub Services" },
-  { key: "websiteTemplates", label: "Web - Temp" },
-  { key: "dashboardData",    label: "Dashboard Data" },
-  { key: "carCompanies",     label: "Car Companies" },
-  { key: "provinces",        label: "Provinces" },
-  { key: "cities",           label: "Cities" },
-  { key: "ads",              label: "Ads" },
-  { key: "runningDeals",     label: "Running Deals" },
-  { key: "wallet",           label: "Wallet" },
-  { key: "inviteHelp",       label: "Invite Help" },
-  { key: "tasks",            label: "Tasks" },
-];
-
-const ACTIONS = ["view", "add", "edit", "delete"] as const;
-type Action = typeof ACTIONS[number];
-
-type ModulePermissions = Record<Action, boolean>;
-type Permissions = Record<string, ModulePermissions>;
-
-const DEFAULT_PERMS = (): Permissions =>
-  Object.fromEntries(MODULES.map((m) => [m.key, { view: false, add: false, edit: false, delete: false }]));
+import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import {
+  CompactField,
+  CompactFormFooter,
+  CompactFormPanel,
+  CompactFormRow,
+  compactFixedFieldWidth,
+  compactInputClass,
+} from "../../../components/admin/ContentPanel";
+import {
+  DEFAULT_PERMS,
+  PermissionMatrix,
+  type Permissions,
+} from "../../../components/admin/PermissionMatrix";
 
 interface SubAdmin {
   _id: string;
@@ -79,79 +66,6 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     );
   };
 
-// ─── Permission Matrix ────────────────────────────────────────────────────────
-const PermissionMatrix: React.FC<{
-  permissions: Permissions;
-  onChange: (perms: Permissions) => void;
-  readOnly?: boolean;
-}> = ({ permissions, onChange, readOnly }) => {
-  const toggle = (mod: string, action: Action) => {
-    onChange({ ...permissions, [mod]: { ...permissions[mod], [action]: !permissions[mod][action] } });
-  };
-  const toggleModule = (mod: string) => {
-    const allOn = ACTIONS.every((a) => permissions[mod][a]);
-    onChange({ ...permissions, [mod]: Object.fromEntries(ACTIONS.map((a) => [a, !allOn])) as ModulePermissions });
-  };
-  const toggleAll = () => {
-    const totalOn = MODULES.every((m) => ACTIONS.every((a) => permissions[m.key]?.[a]));
-    onChange(Object.fromEntries(MODULES.map((m) => [m.key, Object.fromEntries(ACTIONS.map((a) => [a, !totalOn]))])) as Permissions);
-  };
-  const allOn = MODULES.every((m) => ACTIONS.every((a) => permissions[m.key]?.[a]));
-
-  return (
-    <div style={{ overflowX: "auto" }}>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-        {!readOnly && (
-          <button type="button" onClick={toggleAll}
-            style={{ fontSize: 12, color: "#0073b7", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}>
-            {allOn ? "Deselect All" : "Select All"}
-          </button>
-        )}
-      </div>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead>
-          <tr style={{ background: "#f4f4f4" }}>
-            <th style={{ ...thStyle, width: 160 }}>Module</th>
-            {ACTIONS.map((a) => (
-              <th key={a} style={{ ...thStyle, textAlign: "center", textTransform: "capitalize" }}>{a}</th>
-            ))}
-            {!readOnly && <th style={{ ...thStyle, textAlign: "center" }}>All</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {MODULES.map((mod, idx) => {
-            const p = permissions[mod.key] || { view: false, add: false, edit: false, delete: false };
-            const modAllOn = ACTIONS.every((a) => p[a]);
-            return (
-              <tr key={mod.key} style={{ background: idx % 2 === 0 ? "#fafafa" : "#fff" }}>
-                <td style={{ ...tdStyle, fontWeight: 600 }}>{mod.label}</td>
-                {ACTIONS.map((a) => (
-                  <td key={a} style={{ ...tdStyle, textAlign: "center" }}>
-                    {readOnly ? (
-                      <span style={{ color: p[a] ? "#27ae60" : "#e74c3c", fontWeight: 700 }}>{p[a] ? "✓" : "✗"}</span>
-                    ) : (
-                      <input type="checkbox" checked={!!p[a]} onChange={() => toggle(mod.key, a)}
-                        style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#0073b7" }} />
-                    )}
-                  </td>
-                ))}
-                {!readOnly && (
-                  <td style={{ ...tdStyle, textAlign: "center" }}>
-                    <button type="button" onClick={() => toggleModule(mod.key)}
-                      style={{ fontSize: 11, padding: "2px 8px", border: "1px solid #0073b7", borderRadius: 3, background: modAllOn ? "#0073b7" : "#fff", color: modAllOn ? "#fff" : "#0073b7", cursor: "pointer" }}>
-                      {modAllOn ? "Clear" : "All"}
-                    </button>
-                  </td>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 const SubAdminManagement: React.FC = () => {
   const [subAdmins, setSubAdmins] = useState<SubAdmin[]>([]);
@@ -161,11 +75,10 @@ const SubAdminManagement: React.FC = () => {
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const [visibleCols, setVisibleCols] = useState(["name", "email", "phone", "status", "createdDate", "lastLogin"]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Modals
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  // Inline form
+  const [showForm, setShowForm] = useState(false);
   const [showPermModal, setShowPermModal] = useState<SubAdmin | null>(null);
   const [showActivityModal, setShowActivityModal] = useState<SubAdmin | null>(null);
   const [showViewModal, setShowViewModal] = useState<SubAdmin | null>(null);
@@ -213,55 +126,25 @@ const SubAdminManagement: React.FC = () => {
     return s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q) || (s.phone || "").includes(q);
   });
 
-  const tableColumns = useMemo(
-    () => [
-      {
-        key: "name",
-        label: "Name",
-        render: (sa: SubAdmin) => tableCell(<span style={{ fontWeight: 500 }}>{sa.name}</span>),
-        exportValue: (sa: SubAdmin) => sa.name,
-      },
-      {
-        key: "email",
-        label: "Email",
-        render: (sa: SubAdmin) => tableCell(sa.email),
-        exportValue: (sa: SubAdmin) => sa.email,
-      },
-      {
-        key: "phone",
-        label: "Phone",
-        render: (sa: SubAdmin) => tableCell(sa.phone || "—"),
-        exportValue: (sa: SubAdmin) => sa.phone || "—",
-      },
-      {
-        key: "status",
-        label: "Status",
-        render: (sa: SubAdmin) =>
-          tableCell(
-            <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 3, fontSize: 12, fontWeight: 600, background: sa.isActive ? "#dff0d8" : "#f2dede", color: sa.isActive ? "#3c763d" : "#a94442", border: `1px solid ${sa.isActive ? "#d6e9c6" : "#ebccd1"}` }}>
-              {sa.isActive ? "Active" : "Inactive"}
-            </span>
-          ),
-        exportValue: (sa: SubAdmin) => (sa.isActive ? "Active" : "Inactive"),
-      },
-      {
-        key: "createdDate",
-        label: "Created Date",
-        render: (sa: SubAdmin) => tableCell(new Date(sa.createdAt).toLocaleDateString()),
-        exportValue: (sa: SubAdmin) => new Date(sa.createdAt).toLocaleDateString(),
-      },
-      {
-        key: "lastLogin",
-        label: "Last Login",
-        render: (sa: SubAdmin) => tableCell(sa.lastLogin ? new Date(sa.lastLogin).toLocaleString() : "Never"),
-        exportValue: (sa: SubAdmin) => (sa.lastLogin ? new Date(sa.lastLogin).toLocaleString() : "Never"),
-      },
-    ],
-    []
-  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const actionBtn = (label: string, onClick: () => void, style: React.CSSProperties) => (
-    <button onClick={onClick} type="button" style={{ padding: "3px 10px", borderRadius: 3, fontSize: 12, cursor: "pointer", ...style }}>
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paged.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(paged.map((s) => s._id)));
+  };
+
+  const actionLink = (label: string, onClick: () => void, className = "text-blue-700 hover:underline") => (
+    <button type="button" onClick={onClick} className={`mr-2 ${className}`}>
       {label}
     </button>
   );
@@ -272,7 +155,7 @@ const SubAdminManagement: React.FC = () => {
     setForm({ name: "", email: "", phone: "", password: "", confirmPassword: "" });
     setFormPerms(DEFAULT_PERMS());
     setFormError("");
-    setShowCreateModal(true);
+    setShowForm(true);
   };
 
   const openEdit = (sa: SubAdmin) => {
@@ -280,11 +163,18 @@ const SubAdminManagement: React.FC = () => {
     setForm({ name: sa.name, email: sa.email, phone: sa.phone || "", password: "", confirmPassword: "" });
     setFormPerms({ ...DEFAULT_PERMS(), ...sa.permissions });
     setFormError("");
-    setShowCreateModal(true);
+    setShowForm(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCancelForm = () => {
+    setEditingSubAdmin(null);
+    setForm({ name: "", email: "", phone: "", password: "", confirmPassword: "" });
+    setFormPerms(DEFAULT_PERMS());
+    setFormError("");
+    setShowForm(false);
+  };
+
+  const saveForm = async () => {
     setFormError("");
     if (!editingSubAdmin && form.password !== form.confirmPassword)
       return setFormError("Passwords do not match.");
@@ -296,7 +186,6 @@ const SubAdminManagement: React.FC = () => {
       if (editingSubAdmin) {
         await axios.put(`${API}/api/admin/subadmins/${editingSubAdmin._id}`,
           { name: form.name, email: form.email, phone: form.phone }, { headers });
-        // Also update permissions
         await axios.patch(`${API}/api/admin/subadmins/${editingSubAdmin._id}/permissions`,
           { permissions: formPerms }, { headers });
         showMsg("SubAdmin updated successfully.");
@@ -306,11 +195,16 @@ const SubAdminManagement: React.FC = () => {
           { headers });
         showMsg("SubAdmin created successfully.");
       }
-      setShowCreateModal(false);
+      setShowForm(false);
       fetchSubAdmins();
     } catch (e: any) {
       setFormError(e?.response?.data?.message || "An error occurred.");
     } finally { setFormLoading(false); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await saveForm();
   };
 
   // Toggle Status
@@ -325,7 +219,27 @@ const SubAdminManagement: React.FC = () => {
     }
   };
 
-  // Delete
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} selected sub-admin(s)?`)) return;
+    try {
+      await Promise.all(
+        [...selectedIds].map((id) => axios.delete(`${API}/api/admin/subadmins/${id}`, { headers }))
+      );
+      showMsg("Selected sub-admins deleted.");
+      setSelectedIds(new Set());
+      fetchSubAdmins();
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "Failed to delete.");
+    }
+  };
+
+  const handleUpdateSelected = () => {
+    if (selectedIds.size !== 1) return;
+    const sa = subAdmins.find((s) => s._id === [...selectedIds][0]);
+    if (sa) openEdit(sa);
+  };
+
   const handleDelete = async (sa: SubAdmin) => {
     if (!window.confirm(`Delete SubAdmin "${sa.name}"? This cannot be undone.`)) return;
     try {
@@ -387,67 +301,6 @@ const SubAdminManagement: React.FC = () => {
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <>
-      {/* ── Create / Edit Modal ─────────────────────────────────────────────── */}
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)}
-        title={editingSubAdmin ? `Edit SubAdmin — ${editingSubAdmin.name}` : "Create Sub Admin"} wide>
-        <form onSubmit={handleSubmit} autoComplete="off">
-          {formError && (
-            <div style={{ marginBottom: 12, padding: "8px 12px", background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, color: "#c0392b", fontSize: 13 }}>{formError}</div>
-          )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-            {[
-              { label: "Full Name", name: "name", type: "text", required: true, placeholder: "John Doe" },
-              { label: "Email Address", name: "email", type: "email", required: true, placeholder: "john@example.com" },
-              { label: "Phone", name: "phone", type: "tel", placeholder: "+1 800 000 0000" },
-            ].map((field) => (
-              <div key={field.name}>
-                <label style={{ display: "block", fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
-                  {field.label} {field.required && <span style={{ color: "#e73d3d" }}>*</span>}
-                </label>
-                <input type={field.type} required={field.required} placeholder={field.placeholder}
-                  value={(form as any)[field.name]}
-                  onChange={(e) => setForm((p) => ({ ...p, [field.name]: e.target.value }))}
-                  style={{ width: "100%", border: "1px solid #d2d6de", borderRadius: 3, padding: "7px 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-              </div>
-            ))}
-            {!editingSubAdmin && (
-              <>
-                <div>
-                  <label style={{ display: "block", fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Password <span style={{ color: "#e73d3d" }}>*</span></label>
-                  <input type="password" required value={form.password}
-                    onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                    style={{ width: "100%", border: "1px solid #d2d6de", borderRadius: 3, padding: "7px 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Confirm Password <span style={{ color: "#e73d3d" }}>*</span></label>
-                  <input type="password" required value={form.confirmPassword}
-                    onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))}
-                    style={{ width: "100%", border: "1px solid #d2d6de", borderRadius: 3, padding: "7px 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                </div>
-              </>
-            )}
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #9b308d", paddingBottom: 6, color: "#9b308d" }}>
-              Permission Matrix
-            </div>
-            <PermissionMatrix permissions={formPerms} onChange={setFormPerms} />
-          </div>
-
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-            <button type="button" onClick={() => setShowCreateModal(false)}
-              style={{ padding: "7px 18px", borderRadius: 3, border: "1px solid #d2d6de", background: "#fff", color: "#444", fontSize: 13, cursor: "pointer" }}>
-              Cancel
-            </button>
-            <button type="submit" disabled={formLoading}
-              style={{ padding: "7px 22px", borderRadius: 3, border: "none", background: formLoading ? "#aaa" : "#0073b7", color: "#fff", fontSize: 13, fontWeight: 600, cursor: formLoading ? "not-allowed" : "pointer" }}>
-              {formLoading ? "Saving..." : editingSubAdmin ? "Save Changes" : "Create SubAdmin"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
       {/* ── Permission Edit Modal ────────────────────────────────────────────── */}
       <Modal isOpen={!!showPermModal} onClose={() => setShowPermModal(null)}
         title={`Permissions — ${showPermModal?.name}`} wide>
@@ -545,71 +398,273 @@ const SubAdminManagement: React.FC = () => {
         </form>
       </Modal>
 
-      {/* ── Page ─────────────────────────────────────────────────────────────── */}
-      <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans">
-        <h1 className="mb-4 text-xl font-bold text-ad-green md:text-2xl">Sub Admin Management</h1>
-
+      <AdminPage
+        title="Manage Admin"
+        headerAction={!showForm ? <AddNewButton onClick={openCreate} /> : undefined}
+        between={
+          showForm ? (
+            <CompactFormPanel
+              footer={
+                <CompactFormFooter
+                  message={
+                    editingSubAdmin
+                      ? `You are editing '${editingSubAdmin.name}'`
+                      : "You are creating a 'Sub Admin'"
+                  }
+                  messageCenter
+                  actionLabel={formLoading ? "Saving..." : "Save"}
+                  onSave={saveForm}
+                  onCancel={handleCancelForm}
+                />
+              }
+            >
+              {formError && (
+                <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
+                  {formError}
+                </div>
+              )}
+              <form onSubmit={handleSubmit} autoComplete="off">
+                <CompactFormRow className="w-full items-start">
+                  <CompactField label="Full Name" required className={compactFixedFieldWidth}>
+                    <input
+                      type="text"
+                      required
+                      value={form.name}
+                      onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="John Doe"
+                      className={compactInputClass}
+                    />
+                  </CompactField>
+                  <CompactField label="Email" required className={compactFixedFieldWidth}>
+                    <input
+                      type="email"
+                      required
+                      value={form.email}
+                      onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                      placeholder="john@example.com"
+                      className={compactInputClass}
+                    />
+                  </CompactField>
+                  <CompactField label="Phone" className={compactFixedFieldWidth}>
+                    <input
+                      type="tel"
+                      value={form.phone}
+                      onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                      placeholder="+1 800 000 0000"
+                      className={compactInputClass}
+                    />
+                  </CompactField>
+                  {!editingSubAdmin && (
+                    <>
+                      <CompactField label="Password" required className={compactFixedFieldWidth}>
+                        <input
+                          type="password"
+                          required
+                          value={form.password}
+                          onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                          className={compactInputClass}
+                        />
+                      </CompactField>
+                      <CompactField label="Confirm Password" required className={compactFixedFieldWidth}>
+                        <input
+                          type="password"
+                          required
+                          value={form.confirmPassword}
+                          onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))}
+                          className={compactInputClass}
+                        />
+                      </CompactField>
+                    </>
+                  )}
+                </CompactFormRow>
+                <div className="mt-3 border-t border-gray-300 pt-3">
+                  <p className="mb-2 text-sm font-bold text-ad-green-dark">Permission Matrix</p>
+                  <PermissionMatrix permissions={formPerms} onChange={setFormPerms} />
+                </div>
+              </form>
+            </CompactFormPanel>
+          ) : undefined
+        }
+      >
         {error && (
-          <div style={{ marginBottom: 12, padding: "10px 14px", background: "#fdf3f2", border: "1px solid #f5c6cb", borderRadius: 3, color: "#c0392b", fontSize: 13 }}>{error}</div>
+          <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
+            {error}
+          </div>
         )}
         {success && (
-          <div style={{ marginBottom: 12, padding: "10px 14px", background: "#f0fff4", border: "1px solid #c3e6cb", borderRadius: 3, color: "#27ae60", fontSize: 13 }}>{success}</div>
+          <div className="mb-2 rounded border border-green-200 bg-green-100 px-3 py-2 text-xs text-green-800">
+            {success}
+          </div>
         )}
 
-        <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 400, color: "#444" }}>Sub Admin List</h3>
-          <button onClick={openCreate} type="button"
-            style={{ padding: "6px 16px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            Add Sub Admin
-          </button>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={handleUpdateSelected}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+            >
+              Update
+            </button>
+            <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+              Shoot
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteSelected}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+            >
+              Delete
+            </button>
+            <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+              Print
+            </button>
+          </div>
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Live Search here"
+              className="border border-gray-400 bg-white px-2 py-1 text-xs"
+            />
+            <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+              Search
+            </button>
+          </div>
         </div>
 
-        <div className="mb-10">
-          <AdminDataTable
-            items={filtered}
-            columns={tableColumns}
-            getRowId={(sa) => sa._id}
-            loading={loading}
-            error={error || null}
-            emptyMessage="No sub admins found."
-            search={search}
-            onSearchChange={setSearch}
-            pageSize={pageSize}
-            onPageSizeChange={setPageSize}
-            currentPage={currentPage}
-            onCurrentPageChange={setCurrentPage}
-            visibleColumnKeys={visibleCols}
-            onVisibleColumnKeysChange={setVisibleCols}
-            selectedIds={selectedIds}
-            onSelectedIdsChange={setSelectedIds}
-            exportFilename="sub-admins"
-            totalBeforeFilter={subAdmins.length}
-            extraToolbarActions={[
-              {
-                label: "✏️ Update",
-                color: "#0073b7",
-                minSelected: 1,
-                maxSelected: 1,
-                onClick: (ids) => {
-                  const sa = subAdmins.find((s) => s._id === ids[0]);
-                  if (sa) openEdit(sa);
-                },
-              },
-            ]}
-            renderActions={(sa) => (
-              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                {actionBtn("View", () => setShowViewModal(sa), { border: "1px solid #0073b7", background: "#fff", color: "#0073b7" })}
-                {actionBtn("Edit", () => openEdit(sa), { border: "1px solid #0073b7", background: "#0073b7", color: "#fff" })}
-                {actionBtn("Perms", () => openPermModal(sa), { border: "1px solid #f39c12", background: "#f39c12", color: "#fff" })}
-                {actionBtn(sa.isActive ? "Disable" : "Enable", () => handleToggleStatus(sa), { border: "1px solid #d2d6de", background: sa.isActive ? "#f2dede" : "#dff0d8", color: sa.isActive ? "#a94442" : "#3c763d" })}
-                {actionBtn("Logs", () => openActivityModal(sa), { border: "1px solid #17a2b8", background: "#17a2b8", color: "#fff" })}
-                {actionBtn("Reset PW", () => setShowResetModal(sa), { border: "1px solid #777", background: "#777", color: "#fff" })}
-                {actionBtn("Delete", () => handleDelete(sa), { border: "1px solid #d2d6de", background: "#f2dede", color: "#a94442" })}
-              </div>
-            )}
-          />
+        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+          <span>Show</span>
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="border border-gray-400 px-1 py-0.5"
+          >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+          </select>
+          <span>entries</span>
         </div>
-      </div>
+
+        <div className="overflow-x-auto">
+          {loading ? (
+            <p className="py-6 text-center text-sm text-gray-500">Loading sub-admins…</p>
+          ) : (
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-ad-purple text-white">
+                  <th className="border border-ad-purple-dark px-2 py-2 text-left">
+                    <input
+                      type="checkbox"
+                      checked={paged.length > 0 && selectedIds.size === paged.length}
+                      onChange={toggleSelectAll}
+                      className="accent-white"
+                    />
+                  </th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Name</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Email</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Created Date</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Last Login</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paged.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                      No sub admins found.
+                    </td>
+                  </tr>
+                ) : (
+                  paged.map((sa, idx) => (
+                    <tr key={sa._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                      <td className="border border-gray-300 px-2 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(sa._id)}
+                          onChange={() => toggleSelect(sa._id)}
+                          className="accent-ad-purple"
+                        />
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(sa)}
+                          className="font-medium text-blue-700 hover:underline"
+                        >
+                          {sa.name}
+                        </button>
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2">{sa.email}</td>
+                      <td className="border border-gray-300 px-3 py-2">{sa.phone || "—"}</td>
+                      <td className="border border-gray-300 px-3 py-2">
+                        <span
+                          className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${
+                            sa.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {sa.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2">
+                        {new Date(sa.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2">
+                        {sa.lastLogin ? new Date(sa.lastLogin).toLocaleString() : "Never"}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center whitespace-nowrap">
+                        {actionLink("View", () => setShowViewModal(sa))}
+                        {actionLink("Edit", () => openEdit(sa))}
+                        {actionLink("Perms", () => openPermModal(sa), "text-amber-700 hover:underline")}
+                        {actionLink(
+                          sa.isActive ? "Disable" : "Enable",
+                          () => handleToggleStatus(sa),
+                          sa.isActive ? "text-red-700 hover:underline" : "text-green-700 hover:underline"
+                        )}
+                        {actionLink("Logs", () => openActivityModal(sa), "text-cyan-700 hover:underline")}
+                        {actionLink("Reset", () => setShowResetModal(sa), "text-gray-700 hover:underline")}
+                        {actionLink("Delete", () => handleDelete(sa), "text-red-700 hover:underline")}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setCurrentPage(p)}
+                className={`h-7 w-7 border text-xs font-medium ${
+                  currentPage === p
+                    ? "border-ad-green bg-ad-green text-white"
+                    : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+          <Link to="#" className="text-sm text-blue-700 hover:underline">
+            Deleted
+          </Link>
+        </div>
+      </AdminPage>
     </>
   );
 };

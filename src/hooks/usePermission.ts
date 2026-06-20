@@ -6,7 +6,7 @@ import { useMemo } from "react";
 export type Action = "view" | "add" | "edit" | "delete";
 export type ModuleKey =
   | "dashboard" | "users" | "services" | "categories" | "websiteTemplates"
-  | "dashboardData" | "carCompanies" | "provinces" | "cities" | "ads"
+  | "dashboardData" | "carCompanies" | "provinces" | "cities" | "domain"
   | "runningDeals" | "wallet" | "inviteHelp" | "tasks";
 
 export interface Permissions {

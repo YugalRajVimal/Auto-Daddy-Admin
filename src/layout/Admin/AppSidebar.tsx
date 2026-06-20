@@ -75,8 +75,8 @@
 //   },
 //   {
 //     icon: <FaBullhorn />,
-//     name: "Ads",
-//     path: "/admin/ads",
+//     name: "Domain",
+//     path: "/admin/domain",
 //   },
 //   {
 //     icon: <FaTags />,
@@ -434,7 +434,7 @@ const navItems: NavItem[] = [
       { name: "Cities",    path: "/admin/cities",    permissionModule: "cities" },
     ],
   },
-  { icon: <FaBullhorn />,        name: "Ads",           path: "/admin/ads/dealer",    permissionModule: "ads" },
+  { icon: <FaBullhorn />,        name: "Domain",        path: "/admin/domain/manager", permissionModule: "domain" },
   { icon: <FaTags />,            name: "Running Deals", path: "/admin/running-deals", permissionModule: "runningDeals" },
   { icon: <FaMoneyBillWave />,   name: "Wallet",        path: "/admin/wallet",        permissionModule: "wallet" },
   { icon: <TbHelpCircle />,      name: "Messages",      path: "/admin/messages",      permissionModule: "inviteHelp" },

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import axios from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
+  CompactAutoGrowTextarea,
   CompactField,
   CompactFormFooter,
   CompactFormPanel,
@@ -32,6 +33,30 @@ interface AutoShopOwner {
   createdAt?: string;
 }
 
+interface CarOwner {
+  _id: string;
+  name?: string;
+  email?: string;
+}
+
+type DomainForm = {
+  userName: string;
+  userType: string;
+  domain: string;
+  expiry: string;
+  provider: string;
+  dns: string;
+};
+
+const EMPTY_DOMAIN_FORM: DomainForm = {
+  userName: "",
+  userType: "shopOwner",
+  domain: "",
+  expiry: "",
+  provider: "",
+  dns: "",
+};
+
 interface Ad {
   _id: string;
   category: string;
@@ -40,8 +65,6 @@ interface Ad {
   createdAt: string;
   updatedAt: string;
 }
-
-type AdsSection = "dealer" | "adds" | "invoices" | "payment";
 
 type DealerAdRow = {
   id: string;
@@ -57,10 +80,19 @@ type DealerAdRow = {
   owner?: AutoShopOwner;
 };
 
-const CATEGORY_OPTIONS = [
-  { label: "Deals", value: "Deals" },
-  { label: "Ads", value: "Ads" },
-  { label: "Calendor", value: "Calendor" },
+const PAGE_TITLE = "Domain Manager";
+
+const USER_TYPE_OPTIONS = [
+  { value: "carOwner", label: "Car Owner" },
+  { value: "shopOwner", label: "Shop Owner" },
+];
+
+const PROVIDER_OPTIONS = [
+  { value: "godaddy", label: "GoDaddy" },
+  { value: "namecheap", label: "Namecheap" },
+  { value: "cloudflare", label: "Cloudflare" },
+  { value: "google", label: "Google Domains" },
+  { value: "other", label: "Other" },
 ];
 
 const DEALER_HEADINGS = [
@@ -75,13 +107,6 @@ const DEALER_HEADINGS = [
   { value: "sent", label: "Sent" },
   { value: "status", label: "Status" },
 ];
-
-const SECTION_TITLES: Record<AdsSection, string> = {
-  dealer: "Dealer Adds",
-  adds: "Adds",
-  invoices: "Invoices",
-  payment: "Payment",
-};
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -122,12 +147,13 @@ function adImageUrl(imageUpload: string) {
     : `${API_URL}/${imageUpload.replace(/^\.?\/?/, "")}`;
 }
 
-type AdsPageProps = {
-  section?: AdsSection;
-};
+function ownerDisplayName(owner: AutoShopOwner) {
+  return owner.businessProfile?.businessName || owner.name || "—";
+}
 
-export default function Ads({ section = "dealer" }: AdsPageProps) {
+export default function Domain() {
   const [owners, setOwners] = useState<AutoShopOwner[]>([]);
+  const [carOwners, setCarOwners] = useState<CarOwner[]>([]);
   const [ownersLoading, setOwnersLoading] = useState(false);
   const [ownersError, setOwnersError] = useState<string | null>(null);
 
@@ -139,15 +165,9 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
   const [adsLoading, setAdsLoading] = useState(false);
   const [adsError, setAdsError] = useState<string | null>(null);
 
-  const [form, setForm] = useState<{ category: string; websiteURL: string; imageUpload: File | null }>({
-    category: "",
-    websiteURL: "",
-    imageUpload: null,
-  });
+  const [form, setForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
   const [formMode, setFormMode] = useState<"CREATE" | "EDIT" | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editExistingImage, setEditExistingImage] = useState<string | null>(null);
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const [search, setSearch] = useState("");
   const [heading, setHeading] = useState("all");
@@ -156,8 +176,18 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (section === "dealer") fetchOwners();
-  }, [section]);
+    fetchOwners();
+    fetchCarOwners();
+  }, []);
+
+  const fetchCarOwners = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/admin/carowners`);
+      setCarOwners(res.data.data || []);
+    } catch {
+      setCarOwners([]);
+    }
+  };
 
   const fetchOwners = async () => {
     setOwnersLoading(true);
@@ -194,27 +224,23 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      setAdsError(message || "Failed to fetch ads");
+      setAdsError(message || "Failed to fetch domains");
     } finally {
       setAdsLoading(false);
     }
   };
 
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, files } = e.target as HTMLInputElement;
-    if (name === "adsImage") {
-      setForm((prev) => ({ ...prev, imageUpload: files?.[0] ?? null }));
-    } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
-    }
+  const handleFormChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const resetForm = () => {
-    setForm({ category: "", websiteURL: "", imageUpload: null });
+    setForm(EMPTY_DOMAIN_FORM);
     setFormMode(null);
     setEditId(null);
-    setEditExistingImage(null);
-    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
   const openOwnerView = async (owner: AutoShopOwner) => {
@@ -235,14 +261,16 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
     resetForm();
   };
 
-  const openAddForm = (owner: AutoShopOwner) => {
-    setActiveOwner(owner);
+  const openAddForm = (owner?: AutoShopOwner) => {
+    setActiveOwner(owner ?? null);
     setViewingOwner(null);
     setFormMode("CREATE");
-    setForm({ category: "", websiteURL: "", imageUpload: null });
+    setForm({
+      ...EMPTY_DOMAIN_FORM,
+      userType: "shopOwner",
+      userName: owner ? ownerDisplayName(owner) : "",
+    });
     setEditId(null);
-    setEditExistingImage(null);
-    if (imageInputRef.current) imageInputRef.current.value = "";
     setShowForm(true);
     setAdsError(null);
   };
@@ -250,9 +278,14 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
   const openEditForm = (ad: Ad) => {
     setFormMode("EDIT");
     setEditId(ad._id);
-    setEditExistingImage(ad.imageUpload || null);
-    setForm({ category: ad.category, websiteURL: ad.websiteURL, imageUpload: null });
-    if (imageInputRef.current) imageInputRef.current.value = "";
+    setForm({
+      userName: activeOwner ? ownerDisplayName(activeOwner) : "",
+      userType: "shopOwner",
+      domain: ad.websiteURL,
+      expiry: ad.createdAt ? ad.createdAt.slice(0, 10) : "",
+      provider: ad.category,
+      dns: "",
+    });
     setShowForm(true);
     setViewingOwner(null);
     setAdsError(null);
@@ -265,7 +298,7 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
   };
 
   const handleDelete = async (adId: string) => {
-    if (!activeOwner?.businessProfile?._id || !window.confirm("Delete this ad?")) return;
+    if (!activeOwner?.businessProfile?._id || !window.confirm("Delete this domain entry?")) return;
     setAdsLoading(true);
     setAdsError(null);
     try {
@@ -278,16 +311,37 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      setAdsError(message || "Failed to delete ad");
+      setAdsError(message || "Failed to delete domain entry");
     } finally {
       setAdsLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!activeOwner?.businessProfile?._id || !formMode) return;
-    const businessId = activeOwner.businessProfile._id;
-    if (!form.category || !form.websiteURL || (formMode === "CREATE" && !form.imageUpload)) {
+    const owner =
+      activeOwner ??
+      (form.userType === "shopOwner"
+        ? owners.find((o) => ownerDisplayName(o) === form.userName)
+        : null);
+    if (!owner?.businessProfile?._id || !formMode) {
+      if (form.userType === "carOwner") {
+        setAdsError("Domain entries for car owners are not yet supported.");
+      } else if (!form.userName) {
+        setAdsError("Please select a user.");
+      } else {
+        setAdsError("Selected shop owner has no business profile.");
+      }
+      return;
+    }
+    const businessId = owner.businessProfile._id;
+    if (
+      !form.userName ||
+      !form.userType ||
+      !form.domain ||
+      !form.expiry ||
+      !form.provider ||
+      !form.dns
+    ) {
       setAdsError("All required fields must be filled.");
       return;
     }
@@ -295,9 +349,12 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
     setAdsError(null);
     try {
       const fd = new FormData();
-      fd.append("category", form.category);
-      fd.append("websiteURL", form.websiteURL);
-      if (form.imageUpload) fd.append("adsImage", form.imageUpload);
+      fd.append("userName", form.userName);
+      fd.append("userType", form.userType);
+      fd.append("domain", form.domain);
+      fd.append("expiry", form.expiry);
+      fd.append("provider", form.provider);
+      fd.append("dns", form.dns);
 
       const headers = { "Content-Type": "multipart/form-data" };
       if (formMode === "CREATE") {
@@ -305,16 +362,17 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
       } else if (formMode === "EDIT" && editId) {
         await axios.patch(`${API_URL}/api/admin/business-profiles/${businessId}/ads/${editId}`, fd, { headers });
       }
+      setActiveOwner(owner);
       resetForm();
       setShowForm(false);
-      setViewingOwner(activeOwner);
-      await fetchAds(activeOwner);
+      setViewingOwner(owner);
+      await fetchAds(owner);
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      setAdsError(message || "Failed to save ad");
+      setAdsError(message || "Failed to save domain entry");
     } finally {
       setAdsLoading(false);
     }
@@ -359,22 +417,18 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
     else setSelected(new Set(pagedDealerRows.map((r) => r.id)));
   };
 
-  const openShopAds = (row: DealerAdRow) => {
+  const openShopDomains = (row: DealerAdRow) => {
     if (row.owner?.businessProfile?._id) openOwnerView(row.owner);
   };
 
   const handleAddNew = () => {
-    if (selected.size !== 1) {
-      window.alert("Select one shop to add ads.");
-      return;
-    }
-    const row = dealerRows.find((r) => r.id === Array.from(selected)[0]);
-    if (!row?.owner?.businessProfile?._id) {
-      window.alert("Selected shop has no business profile.");
-      return;
-    }
-    openAddForm(row.owner);
+    openAddForm();
   };
+
+  const userNameOptions =
+    form.userType === "carOwner"
+      ? carOwners.map((owner) => owner.name || "—").filter((name) => name !== "—")
+      : owners.filter((o) => o.businessProfile?._id).map(ownerDisplayName);
 
   const readOnlyValueClass = `${compactInputClass} bg-gray-50 text-gray-800`;
 
@@ -389,11 +443,11 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
                 onClick={() => openAddForm(viewingOwner)}
                 className="rounded bg-ad-green px-4 py-1 text-sm font-bold text-white hover:bg-ad-green-dark"
               >
-                Add Ad
+                Add Domain
               </button>
             </div>
             <span className="text-center text-xs font-serif italic text-gray-800">
-              You are viewing ads for &apos;{viewingOwner.businessProfile?.businessName || viewingOwner.name}&apos;
+              You are viewing domains for &apos;{viewingOwner.businessProfile?.businessName || viewingOwner.name}&apos;
             </span>
             <div className="flex justify-end">
               <button
@@ -435,7 +489,7 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
 
         <div className="mt-2 overflow-x-auto">
           {adsLoading ? (
-            <p className="py-4 text-center text-sm text-gray-500">Loading ads…</p>
+            <p className="py-4 text-center text-sm text-gray-500">Loading domains…</p>
           ) : (
             <table className="w-full border-collapse text-sm">
               <thead>
@@ -451,7 +505,7 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
                 {ads.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
-                      No ads yet for this shop.
+                      No domains yet for this shop.
                     </td>
                   </tr>
                 ) : (
@@ -509,14 +563,14 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
     ) : undefined;
 
   const adFormPanel =
-    showForm && formMode && activeOwner ? (
+    showForm && formMode && (formMode === "EDIT" ? activeOwner : true) ? (
       <CompactFormPanel
         footer={
           <CompactFormFooter
             message={
               formMode === "CREATE"
-                ? "You are creating an 'Ad'"
-                : "You are editing an 'Ad'"
+                ? "You are creating a 'Domain' entry"
+                : "You are editing a 'Domain' entry"
             }
             messageCenter
             actionLabel={adsLoading ? "Saving..." : "Save"}
@@ -531,71 +585,96 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
           </div>
         )}
         <CompactFormRow className="w-full items-start">
-          <CompactField label="Shop Name" className={compactFixedFieldWidth}>
-            <div className={readOnlyValueClass}>
-              {activeOwner.businessProfile?.businessName || activeOwner.name || "—"}
-            </div>
-          </CompactField>
-          <CompactField label="Category" required className={compactFixedFieldWidth}>
+          <CompactField label="User Type" required className={compactFixedFieldWidth}>
             <select
-              name="category"
-              value={form.category}
-              onChange={handleFormChange}
+              name="userType"
+              value={form.userType}
+              onChange={(e) => {
+                const userType = e.target.value;
+                setForm((prev) => ({ ...prev, userType, userName: "" }));
+                setActiveOwner(null);
+              }}
               className={compactInputClass}
             >
-              <option value="">Select Category</option>
-              {CATEGORY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
+              {USER_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
           </CompactField>
-          <CompactField label="Website URL" required className="min-w-0 flex-1">
+          <CompactField label="User Name" required className={compactFixedFieldWidth}>
+            <select
+              name="userName"
+              value={form.userName}
+              onChange={(e) => {
+                const userName = e.target.value;
+                setForm((prev) => ({ ...prev, userName }));
+                if (form.userType === "shopOwner") {
+                  setActiveOwner(
+                    owners.find((o) => ownerDisplayName(o) === userName) ?? null
+                  );
+                }
+              }}
+              className={compactInputClass}
+            >
+              <option value="">Select User</option>
+              {userNameOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </CompactField>
+          <CompactField label="Domain" required className="min-w-0 flex-1">
             <input
-              type="url"
-              name="websiteURL"
-              value={form.websiteURL}
+              type="text"
+              name="domain"
+              value={form.domain}
               onChange={handleFormChange}
-              placeholder="https://example.com"
+              placeholder="example.com"
               className={compactInputClass}
             />
           </CompactField>
         </CompactFormRow>
-        <CompactFormRow className="items-start justify-start">
-          <CompactField
-            label={formMode === "CREATE" ? "Ad Image" : "Change Image (optional)"}
-            required={formMode === "CREATE"}
-            className={compactFixedFieldWidth}
-          >
-            <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
-              {form.imageUpload?.name || "Upload File"}
-              <input
-                type="file"
-                name="adsImage"
-                accept="image/*"
-                onChange={handleFormChange}
-                ref={imageInputRef}
-                className="hidden"
-              />
-            </label>
+        <CompactFormRow className="w-full items-start">
+          <CompactField label="Expiry (Date)" required className={compactFixedFieldWidth}>
+            <input
+              type="date"
+              name="expiry"
+              value={form.expiry}
+              onChange={handleFormChange}
+              className={compactInputClass}
+            />
           </CompactField>
-          {formMode === "EDIT" && editExistingImage && !form.imageUpload && (
-            <CompactField label="Current Image" className={compactFixedFieldWidth}>
-              <img
-                src={adImageUrl(editExistingImage)}
-                alt="Current ad"
-                className="h-12 w-16 rounded border border-gray-200 object-cover"
-              />
-            </CompactField>
-          )}
+          <CompactField label="Provider" required className={compactFixedFieldWidth}>
+            <select
+              name="provider"
+              value={form.provider}
+              onChange={handleFormChange}
+              className={compactInputClass}
+            >
+              <option value="">Select Provider</option>
+              {PROVIDER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </CompactField>
+          <CompactField label="DNS" required className="min-w-0 flex-1">
+            <CompactAutoGrowTextarea
+              name="dns"
+              value={form.dns}
+              onChange={handleFormChange}
+              placeholder="A record, CNAME, nameservers, etc."
+            />
+          </CompactField>
         </CompactFormRow>
       </CompactFormPanel>
     ) : undefined;
 
   const betweenPanel = ownerViewPanel ?? adFormPanel;
-
-  const title = SECTION_TITLES[section];
 
   const toolbar = (
     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
@@ -630,19 +709,17 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
           placeholder="Live Search here"
           className="border border-gray-400 bg-white px-2 py-1 text-xs"
         />
-        {section === "dealer" && (
-          <select
-            value={heading}
-            onChange={(e) => setHeading(e.target.value)}
-            className="border border-gray-400 bg-gray-500 px-2 py-1 text-xs font-medium text-white"
-          >
-            {DEALER_HEADINGS.map((h) => (
-              <option key={h.value} value={h.value}>
-                {h.label}
-              </option>
-            ))}
-          </select>
-        )}
+        <select
+          value={heading}
+          onChange={(e) => setHeading(e.target.value)}
+          className="border border-gray-400 bg-gray-500 px-2 py-1 text-xs font-medium text-white"
+        >
+          {DEALER_HEADINGS.map((h) => (
+            <option key={h.value} value={h.value}>
+              {h.label}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
@@ -752,7 +829,7 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
                       {canOpen ? (
                         <button
                           type="button"
-                          onClick={() => openShopAds(row)}
+                          onClick={() => openShopDomains(row)}
                           className="text-blue-700 hover:underline"
                         >
                           {row.shopName}
@@ -768,7 +845,7 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
                       {canOpen ? (
                         <button
                           type="button"
-                          onClick={() => openShopAds(row)}
+                          onClick={() => openShopDomains(row)}
                           className="text-blue-700 underline hover:text-blue-900"
                         >
                           {row.adds}
@@ -804,57 +881,18 @@ export default function Ads({ section = "dealer" }: AdsPageProps) {
     </>
   );
 
-  const renderPlaceholderSection = (message: string) => (
-    <>
-      {toolbar}
-      {entriesControl}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
-                <input type="checkbox" disabled className="accent-white" />
-              </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">City</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Amount</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colSpan={7} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
-                {message}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-4 flex justify-end">
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
-      </div>
-    </>
-  );
-
   return (
     <AdminPage
-      title={title}
+      title={PAGE_TITLE}
       noPanel
       headerAction={
-        section === "dealer" && !showForm && !viewingOwner ? (
+        !showForm && !viewingOwner ? (
           <AddNewButton onClick={handleAddNew} />
         ) : undefined
       }
-      between={section === "dealer" ? betweenPanel : undefined}
+      between={betweenPanel}
     >
-      {section === "dealer" && renderDealerTable()}
-      {section === "adds" && renderPlaceholderSection("No adds records yet.")}
-      {section === "invoices" && renderPlaceholderSection("No invoice records yet.")}
-      {section === "payment" && renderPlaceholderSection("No payment records yet.")}
+      {renderDealerTable()}
     </AdminPage>
   );
 }

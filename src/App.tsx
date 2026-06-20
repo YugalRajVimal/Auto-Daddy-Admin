@@ -41,7 +41,7 @@ import WebsiteTemplates from "./pages/AdminPages/WebsiteTemplates/WebsiteTemplat
 // import DashboardData from "./pages/AdminPages/Dashboarddata/DashboardData";
 import CarCompany from "./pages/AdminPages/CarCompany/CarCompany";
 import Cities from "./pages/AdminPages/Cities/Cities";
-import Ads from "./pages/AdminPages/Ads/Ads";
+import Domain from "./pages/AdminPages/Domain/Domain";
 import RunningDeals from "./pages/AdminPages/Deals/RunningDeals";
 import Wallet from "./pages/AdminPages/Wallet/Wallet";
 import SubServicesPage from "./pages/AdminPages/Services/Categories";
@@ -50,6 +50,7 @@ import CarBrandsNewPage from "./pages/AdminPages/Services/CarBrandsNew";
 import Provinces from "./pages/AdminPages/Cities/Provinces";
 import Invitehelp from "./pages/AdminPages/InviteHelpSection/Invitehelp";
 import SubAdminManagement from "./pages/AdminPages/SubAdminManagement/SubAdminManagement";
+import RoleManager from "./pages/AdminPages/RoleManager/RoleManager";
 // import SubAdminSignInPage from "./pages/AuthPages/SubAdminSignInPage";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import Unauthorized from "./pages/AdminPages/OtherPage/Unauthorized";
@@ -148,7 +149,7 @@ export default function App() {
               } />
               <Route path="/admin/messages/received" element={
                 <ProtectedRoute module="inviteHelp" action="view">
-                  <Invitehelp title="Notifications Received" section="received" />
+                  <Invitehelp title="Notifications Received" section="received" showAddNew={false} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/reports" element={
@@ -197,25 +198,19 @@ export default function App() {
                 </ProtectedRoute>
               } />
               <Route path="/admin/invite-help" element={<Navigate to="/admin/messages/received" replace />} />
-              <Route path="/admin/ads" element={<Navigate to="/admin/ads/dealer" replace />} />
-              <Route path="/admin/ads/dealer" element={
-                <ProtectedRoute module="ads" action="view">
-                  <Ads section="dealer" />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/ads/adds" element={
-                <ProtectedRoute module="ads" action="view">
-                  <Ads section="adds" />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/ads/invoices" element={
-                <ProtectedRoute module="ads" action="view">
-                  <Ads section="invoices" />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/ads/payment" element={
-                <ProtectedRoute module="ads" action="view">
-                  <Ads section="payment" />
+              <Route path="/admin/ads" element={<Navigate to="/admin/domain/manager" replace />} />
+              <Route path="/admin/ads/dealer" element={<Navigate to="/admin/domain/manager" replace />} />
+              <Route path="/admin/ads/adds" element={<Navigate to="/admin/domain/manager" replace />} />
+              <Route path="/admin/ads/invoices" element={<Navigate to="/admin/domain/manager" replace />} />
+              <Route path="/admin/ads/payment" element={<Navigate to="/admin/domain/manager" replace />} />
+              <Route path="/admin/domain" element={<Navigate to="/admin/domain/manager" replace />} />
+              <Route path="/admin/domain/dealer" element={<Navigate to="/admin/domain/manager" replace />} />
+              <Route path="/admin/domain/adds" element={<Navigate to="/admin/domain/manager" replace />} />
+              <Route path="/admin/domain/invoices" element={<Navigate to="/admin/domain/manager" replace />} />
+              <Route path="/admin/domain/payment" element={<Navigate to="/admin/domain/manager" replace />} />
+              <Route path="/admin/domain/manager" element={
+                <ProtectedRoute module="domain" action="view">
+                  <Domain />
                 </ProtectedRoute>
               } />
               <Route path="/admin/running-deals" element={
@@ -273,6 +268,11 @@ export default function App() {
               <Route path="/admin/car-companies" element={
                 <ProtectedRoute module="carCompanies" action="view">
                   <CarCompany />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/roles" element={
+                <ProtectedRoute module="subAdminManagement" action="view">
+                  <RoleManager />
                 </ProtectedRoute>
               } />
               <Route path="/admin/subadmins" element={
