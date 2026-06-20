@@ -113,37 +113,6 @@ const BaseModal: React.FC<{
   );
 };
 
-const ProfileModal: React.FC<{
-  row: DummyUserRow;
-  config: DummyUserListConfig;
-  onClose: () => void;
-  onEdit: () => void;
-}> = ({ row, config, onClose, onEdit }) => (
-  <BaseModal isOpen wide onClose={onClose} title={`Profile — ${row.name}`}>
-    <div style={GREEN_CARD}>
-      <GCRow label="Name" value={row.name} />
-      <GCRow label="E-mail" value={row.email} />
-      <GCRow label="Phone" value={row.phone} />
-      <GCRow label={config.primaryFieldLabel} value={row.primaryLabel} />
-      <GCRow label="City" value={row.city} />
-      <GCRow label={config.regionFieldLabel} value={row.region} />
-      <GCRow label="Address" value={row.address} />
-      <GCRow label="Zip Code" value={row.pincode} />
-      <GCRow label={config.countALabel} value={row.countA} />
-      <GCRow label={config.countBLabel} value={row.countB} />
-      <GCRow label="Status" value={getStatus(row)} />
-      <GCRow label="Joining Date" value={fmtDate(row.createdAt)} />
-    </div>
-    <button
-      type="button"
-      onClick={onEdit}
-      className="mt-2 cursor-pointer rounded border-0 bg-[#1a6e1a] px-7 py-2 text-sm font-bold text-white"
-    >
-      Update
-    </button>
-  </BaseModal>
-);
-
 const CountModal: React.FC<{
   row: DummyUserRow;
   label: string;
@@ -167,6 +136,164 @@ const CountModal: React.FC<{
 function isEmail(e: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 }
+
+const DummyUserAddEditForm: React.FC<{
+  row?: DummyUserRow | null;
+  config: DummyUserListConfig;
+  onCancel: () => void;
+  onSaved: (row: DummyUserRow) => void;
+}> = ({ row, config, onCancel, onSaved }) => {
+  const isEdit = !!row;
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [primaryLabel, setPrimaryLabel] = useState("");
+  const [region, setRegion] = useState("");
+  const [attempted, setAttempted] = useState(false);
+
+  useEffect(() => {
+    setAttempted(false);
+    if (isEdit && row) {
+      setName(row.name);
+      setEmail(row.email);
+      setPhone(row.phone);
+      setPincode(row.pincode);
+      setAddress(row.address);
+      setCity(row.city);
+      setPrimaryLabel(row.primaryLabel);
+      setRegion(row.region);
+    } else {
+      setName("");
+      setEmail("");
+      setPhone("");
+      setPincode("");
+      setAddress("");
+      setCity("");
+      setPrimaryLabel("");
+      setRegion("");
+    }
+  }, [isEdit, row]);
+
+  const isValid =
+    name.trim() &&
+    isEmail(email) &&
+    phone.replace(/\D/g, "").length === 10 &&
+    pincode.trim() &&
+    primaryLabel.trim() &&
+    region.trim();
+
+  const handleSave = () => {
+    setAttempted(true);
+    if (!isValid) return;
+    onSaved({
+      _id: row ? row._id : `dummy-${Date.now()}`,
+      name: name.trim(),
+      email: email.trim(),
+      countryCode: "",
+      phone: phone.replace(/\D/g, ""),
+      pincode: pincode.trim(),
+      address: address.trim(),
+      city: city.trim() || "Toronto",
+      createdAt: row ? row.createdAt : new Date().toISOString(),
+      isDisabled: row ? row.isDisabled : false,
+      status: row ? row.status : undefined,
+      primaryLabel: primaryLabel.trim(),
+      region: region.trim(),
+      countA: row ? row.countA : 0,
+      countB: row ? row.countB : 0,
+    });
+  };
+
+  const formMessage = isEdit
+    ? `You are updating a '${config.title}'`
+    : `You are creating a '${config.title}'`;
+
+  return (
+    <CompactFormPanel
+      footer={
+        <CompactFormFooter
+          message={formMessage}
+          messageCenter
+          onSave={handleSave}
+          onCancel={onCancel}
+        />
+      }
+    >
+      <CompactFormRow className="items-start">
+        <CompactField label="Full Name" required className={compactFixedFieldWidth}>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value.slice(0, 40))}
+            className={compactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Email" required className={compactFixedFieldWidth}>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={compactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Phone" required className={compactFixedFieldWidth}>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            className={compactInputClass}
+          />
+        </CompactField>
+        <CompactField label="City" className={compactFixedFieldWidth}>
+          <input
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            className={compactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Zip / Postal Code" required className={compactFixedFieldWidth}>
+          <input
+            type="text"
+            value={pincode}
+            onChange={(e) => setPincode(e.target.value.slice(0, 10))}
+            className={compactInputClass}
+          />
+        </CompactField>
+        <CompactField label={config.primaryFieldLabel} required className={compactFixedFieldWidth}>
+          <input
+            type="text"
+            value={primaryLabel}
+            onChange={(e) => setPrimaryLabel(e.target.value)}
+            className={compactInputClass}
+          />
+        </CompactField>
+        <CompactField label={config.regionFieldLabel} required className={compactFixedFieldWidth}>
+          <input
+            type="text"
+            value={region}
+            onChange={(e) => setRegion(e.target.value)}
+            className={compactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Address" className="min-w-[200px] flex-1">
+          <textarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value.slice(0, 100))}
+            rows={2}
+            className={`${compactInputClass} resize-y`}
+          />
+        </CompactField>
+      </CompactFormRow>
+      {attempted && !isValid && (
+        <p className="text-xs font-semibold text-red-700">Please fill all required fields correctly.</p>
+      )}
+    </CompactFormPanel>
+  );
+};
 
 const ColSelector: React.FC<{ columns: ColumnDef[]; visible: string[]; onChange: (v: string[]) => void }> = ({
   columns,
@@ -249,20 +376,10 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
   const [visibleCols, setVisibleCols] = useState<string[]>(config.defaultVisible);
   const [viewMode, setViewMode] = useState<"active" | "deleted">("active");
 
-  const [profileFor, setProfileFor] = useState<DummyUserRow | null>(null);
   const [countAFor, setCountAFor] = useState<DummyUserRow | null>(null);
   const [countBFor, setCountBFor] = useState<DummyUserRow | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingRow, setEditingRow] = useState<DummyUserRow | null>(null);
-  const [formName, setFormName] = useState("");
-  const [formEmail, setFormEmail] = useState("");
-  const [formPhone, setFormPhone] = useState("");
-  const [formPincode, setFormPincode] = useState("");
-  const [formAddress, setFormAddress] = useState("");
-  const [formCity, setFormCity] = useState("");
-  const [formPrimaryLabel, setFormPrimaryLabel] = useState("");
-  const [formRegion, setFormRegion] = useState("");
-  const [formAttempted, setFormAttempted] = useState(false);
 
   const activeRows = allRows.filter((r) => r.status !== "deleted");
   const deletedRows = allRows.filter((r) => r.status === "deleted");
@@ -320,86 +437,33 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
     setAllRows((prev) => prev.map((r) => (r._id === id ? { ...r, status: undefined, isDisabled: false } : r)));
   }
 
-  const resetForm = () => {
-    setFormName("");
-    setFormEmail("");
-    setFormPhone("");
-    setFormPincode("");
-    setFormAddress("");
-    setFormCity("");
-    setFormPrimaryLabel("");
-    setFormRegion("");
-    setFormAttempted(false);
-    setEditingRow(null);
-  };
-
   const openAdd = () => {
-    resetForm();
+    setEditingRow(null);
     setShowForm(true);
   };
 
   const openEdit = (row: DummyUserRow) => {
-    setFormName(row.name);
-    setFormEmail(row.email);
-    setFormPhone(row.phone);
-    setFormPincode(row.pincode);
-    setFormAddress(row.address);
-    setFormCity(row.city);
-    setFormPrimaryLabel(row.primaryLabel);
-    setFormRegion(row.region);
-    setFormAttempted(false);
     setEditingRow(row);
     setShowForm(true);
   };
 
   const handleFormCancel = () => {
-    resetForm();
+    setEditingRow(null);
     setShowForm(false);
   };
 
-  const isFormValid =
-    formName.trim() &&
-    isEmail(formEmail) &&
-    formPhone.replace(/\D/g, "").length === 10 &&
-    formPincode.trim() &&
-    formPrimaryLabel.trim() &&
-    formRegion.trim();
-
-  const handleFormSave = () => {
-    setFormAttempted(true);
-    if (!isFormValid) return;
-    const saved: DummyUserRow = {
-      _id: editingRow ? editingRow._id : `dummy-${Date.now()}`,
-      name: formName.trim(),
-      email: formEmail.trim(),
-      countryCode: "",
-      phone: formPhone.replace(/\D/g, ""),
-      pincode: formPincode.trim(),
-      address: formAddress.trim(),
-      city: formCity.trim() || "Toronto",
-      createdAt: editingRow ? editingRow.createdAt : new Date().toISOString(),
-      isDisabled: editingRow ? editingRow.isDisabled : false,
-      status: editingRow ? editingRow.status : undefined,
-      primaryLabel: formPrimaryLabel.trim(),
-      region: formRegion.trim(),
-      countA: editingRow ? editingRow.countA : 0,
-      countB: editingRow ? editingRow.countB : 0,
-    };
+  const handleFormSaved = (saved: DummyUserRow) => {
     handleSaved(saved);
-    resetForm();
+    setEditingRow(null);
     setShowForm(false);
   };
-
-  const formMessage = editingRow
-    ? `You are updating a '${config.title}'`
-    : `You are creating a '${config.title}'`;
 
   function renderCell(row: DummyUserRow, key: string) {
     switch (key) {
       case "name":
         return (
           <td key={key} className={`${tdClass} font-medium`}>
-            <button type="button" onClick={() => setProfileFor(row)} className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-ad-purple hover:underline">
+            <button type="button" onClick={() => openEdit(row)} className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-ad-purple hover:underline">
               {row.name}
             </button>
           </td>
@@ -469,17 +533,6 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
 
   return (
     <>
-      {profileFor && (
-        <ProfileModal
-          row={profileFor}
-          config={config}
-          onClose={() => setProfileFor(null)}
-          onEdit={() => {
-            openEdit(profileFor);
-            setProfileFor(null);
-          }}
-        />
-      )}
       {countAFor && (
         <CountModal row={countAFor} label={config.countALabel} count={countAFor.countA} onClose={() => setCountAFor(null)} />
       )}
@@ -495,86 +548,13 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
         }
         between={
           showForm ? (
-            <CompactFormPanel
-              footer={
-                <CompactFormFooter
-                  message={formMessage}
-                  messageCenter
-                  onSave={handleFormSave}
-                  onCancel={handleFormCancel}
-                />
-              }
-            >
-              <CompactFormRow className="items-start">
-                <CompactField label="Full Name" required className={compactFixedFieldWidth}>
-                  <input
-                    type="text"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value.slice(0, 40))}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="Email" required className={compactFixedFieldWidth}>
-                  <input
-                    type="email"
-                    value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="Phone" required className={compactFixedFieldWidth}>
-                  <input
-                    type="tel"
-                    value={formPhone}
-                    onChange={(e) => setFormPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="City" className={compactFixedFieldWidth}>
-                  <input
-                    type="text"
-                    value={formCity}
-                    onChange={(e) => setFormCity(e.target.value)}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="Zip / Postal Code" required className={compactFixedFieldWidth}>
-                  <input
-                    type="text"
-                    value={formPincode}
-                    onChange={(e) => setFormPincode(e.target.value.slice(0, 10))}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label={config.primaryFieldLabel} required className={compactFixedFieldWidth}>
-                  <input
-                    type="text"
-                    value={formPrimaryLabel}
-                    onChange={(e) => setFormPrimaryLabel(e.target.value)}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label={config.regionFieldLabel} required className={compactFixedFieldWidth}>
-                  <input
-                    type="text"
-                    value={formRegion}
-                    onChange={(e) => setFormRegion(e.target.value)}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="Address" className="min-w-[200px] flex-1">
-                  <textarea
-                    value={formAddress}
-                    onChange={(e) => setFormAddress(e.target.value.slice(0, 100))}
-                    rows={2}
-                    className={`${compactInputClass} resize-y`}
-                  />
-                </CompactField>
-              </CompactFormRow>
-              {formAttempted && !isFormValid && (
-                <p className="text-xs font-semibold text-red-700">Please fill all required fields correctly.</p>
-              )}
-            </CompactFormPanel>
+            <DummyUserAddEditForm
+              key={editingRow?._id ?? "new"}
+              row={editingRow}
+              config={config}
+              onCancel={handleFormCancel}
+              onSaved={handleFormSaved}
+            />
           ) : undefined
         }
       >

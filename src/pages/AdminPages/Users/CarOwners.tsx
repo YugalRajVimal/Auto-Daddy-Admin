@@ -265,152 +265,6 @@ const JobCardsModal: React.FC<{ owner: CarOwnerType; onClose: () => void }> = ({
   );
 };
 
-// ─── PROFILE MODAL ─────────────────────────────────────────────────────────────
-const ProfileModal: React.FC<{
-  owner: CarOwnerType;
-  onClose: () => void;
-  onEdit: () => void;
-  toggleStatus: (id: string, newStatus: string) => Promise<void>;
-}> = ({ owner, onClose, onEdit, toggleStatus }) => {
-  const vehicles = owner.myVehicles ?? [];
-  const shops = owner.autoshopsReceivedServiceFrom ?? [];
-  const cards = owner.jobCards ?? [];
-  const favIds = new Set((owner.favoriteAutoShops ?? []).map(f => f._id));
-  const imgSrc = ownerProfileImg(owner);
-
-  function getStatusDisplay(status: string | undefined): string {
-    if (!status || status === "active") return "Active";
-    if (status === "suspended" || status === "inactive") return "Inactive";
-    if (status === "deleted") return "Deleted";
-    return status.charAt(0).toUpperCase() + status.slice(1);
-  }
-
-  const [statusLoading, setStatusLoading] = React.useState(false);
-  const [currentStatus, setCurrentStatus] = React.useState(owner.status ?? "active");
-
-  React.useEffect(() => {
-    setCurrentStatus(owner.status ?? "active");
-  }, [owner.status]);
-
-  async function handleToggleStatus() {
-    if (!owner._id) return;
-    setStatusLoading(true);
-    try {
-      if (currentStatus === "deleted") { setStatusLoading(false); return; }
-      const newStatus = currentStatus === "suspended" || currentStatus === "inactive" ? "active" : "suspended";
-      await toggleStatus(owner._id, newStatus);
-      setCurrentStatus(newStatus);
-      setStatusLoading(false);
-    } catch (e) {
-      setStatusLoading(false);
-      alert("Failed to update status.");
-    }
-  }
-
-  const isDeleted = currentStatus === "deleted";
-
-  return (
-    <BaseModal isOpen wide onClose={onClose} title={`Profile — ${owner.name}`} maxW="min(820px,96vw)">
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, border: "1px solid #c8e6b0", borderRadius: 14, overflow: "hidden" }}>
-        {/* Left */}
-        <div style={{ background: "#d4f5c4", padding: "24px 28px", borderRight: "1px solid #c8e6b0" }}>
-          <GCRow label="Name" value={owner.name} />
-          <GCRow label="E-mail" value={<a href={`mailto:${owner.email}`} style={{ color: "#0073b7" }}>{owner.email}</a>} />
-          <GCRow label="Phone" value={`${owner.countryCode ?? ""} ${owner.phone ?? ""}`.trim() || undefined} />
-          <GCRow label="City" value={owner.city} />
-          <GCRow label="Address" value={owner.address} />
-          <GCRow label="Zip Code" value={owner.pincode} />
-          <div style={{ margin: "10px 0 4px", display: "flex", gap: 8 }}>
-            <span style={GC_LABEL}>Vehicles</span>
-            <span style={{ color: "#888", marginRight: 4 }}>:</span>
-            <div>
-              {vehicles.map((v) => (
-                <div key={v._id} style={GC_VAL}>{getMakeName(v)}- {getMakeModel(v)}  - {v.year}</div>
-              ))}
-              {vehicles.length === 0 && <span style={GC_VAL}>—</span>}
-            </div>
-          </div>
-          <div style={{ margin: "10px 0 4px", display: "flex", gap: 8 }}>
-            <span style={GC_LABEL}>Auto Shop</span>
-            <span style={{ color: "#888", marginRight: 4 }}>:</span>
-            <div>
-              {shops.map((s) => (
-                <div key={s._id} style={{ ...GC_VAL, display: "flex", gap: 6, alignItems: "center" }}>
-                  {s.businessName} - {s.city}
-                  {favIds.has(s._id) && <span>❤️</span>}
-                </div>
-              ))}
-              {shops.length === 0 && <span style={GC_VAL}>—</span>}
-            </div>
-          </div>
-          <div style={{ margin: "10px 0 4px", display: "flex", gap: 8 }}>
-            <span style={GC_LABEL}>Job Cards</span>
-            <span style={{ color: "#888", marginRight: 4 }}>:</span>
-            <div>
-              {cards.map((c) => (
-                <div key={c._id} style={GC_VAL}># {c.jobNo ?? c._id.slice(-5)}</div>
-              ))}
-              {cards.length === 0 && <span style={GC_VAL}>—</span>}
-            </div>
-          </div>
-        </div>
-        {/* Right */}
-        <div style={{ background: "#d4f5c4", padding: "24px 28px" }}>
-          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>User account Login with</div>
-          <GCRow label="Mobile" value={owner.phone} />
-          <GCRow
-            label="Status"
-            value={
-              <span style={{
-                color: currentStatus === "active" ? "#1A6E1A" : currentStatus === "suspended" || currentStatus === "inactive" ? "#c77f0d" : currentStatus === "deleted" ? "#b71818" : "#222",
-                fontWeight: 600, textTransform: "capitalize",
-              }}>
-                {getStatusDisplay(currentStatus)}
-              </span>
-            }
-          />
-          <GCRow label="Joining Date" value={fmtDate(owner.createdAt)} />
-          <GCRow label="URL" value={
-            <a
-              href={`https://autodaddy.ca/user`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "#0073b7", textDecoration: "underline" }}
-            >
-              https://autodaddy.ca/user
-            </a>
-          } />
-
-          <div style={{ marginTop: 14 }}>
-            <span style={GC_LABEL}>Image</span>
-            <div style={{ display: "inline-flex", marginLeft: 18, border: "1px solid #bbb", background: "#fff", width: 120, height: 120, borderRadius: 6, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
-              {imgSrc ? <img src={imgSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
-            </div>
-          </div>
-          <div style={{ marginTop: 24, display: "flex", gap: 10, alignItems: "center" }}>
-            <button type="button" onClick={onEdit} style={{ background: "#1a6e1a", color: "#fff", border: "none", borderRadius: 4, padding: "8px 28px", fontWeight: 700, fontSize: 14, cursor: "pointer", marginRight: 10 }} disabled={statusLoading}>
-              Update
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleStatus}
-              style={{
-                background: isDeleted ? "#888" : currentStatus === "suspended" || currentStatus === "inactive" ? "#1a6e1a" : "#d32f2f",
-                color: "#fff", border: "none", borderRadius: 4, padding: "8px 24px", fontWeight: 700, fontSize: 14,
-                cursor: isDeleted ? "not-allowed" : statusLoading ? "not-allowed" : "pointer",
-                opacity: statusLoading || isDeleted ? 0.7 : 1,
-              }}
-              disabled={statusLoading || isDeleted}
-            >
-              {isDeleted ? "Deleted" : statusLoading ? "Updating..." : currentStatus === "suspended" || currentStatus === "inactive" ? "Set Active" : "Set Inactive"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </BaseModal>
-  );
-};
-
 // ─── PRINT PAGE ───────────────────────────────────────────────────────────────
 function printOwner(owner: CarOwnerType) {
   const vehicles = owner.myVehicles ?? [];
@@ -813,7 +667,11 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
       setName(owner.name || ""); setEmail(owner.email || "");
       setPhone(owner.phone || ""); setPincode(owner.pincode || ""); setAddress(owner.address || "");
       setCity(owner.city || ""); setJoiningDate(fmtDate(owner.createdAt) !== "-" ? fmtDate(owner.createdAt) : "");
-      setAttachEmail(false); setAttachProfilePhoto(false); setProfileFile(null); setProfilePreview(ownerProfileImg(owner));
+      const existingProfileImg = ownerProfileImg(owner);
+      setAttachEmail(!!owner.email?.trim());
+      setAttachProfilePhoto(!!existingProfileImg);
+      setProfileFile(null);
+      setProfilePreview(existingProfileImg);
       setVehicles((owner.myVehicles ?? []).map(v => ({
         _id: v._id, licensePlateNo: v.licensePlateNo || "", vinNo: v.vinNo || "",
         vehicleName: getMakeName(v) === "-" ? "" : getMakeName(v),
@@ -1200,7 +1058,6 @@ const CarOwners: React.FC = () => {
   const [vehiclesFor, setVehiclesFor] = useState<CarOwnerType | null>(null);
   const [shopsFor, setShopsFor] = useState<CarOwnerType | null>(null);
   const [jobCardsFor, setJobCardsFor] = useState<CarOwnerType | null>(null);
-  const [profileFor, setProfileFor] = useState<CarOwnerType | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingOwner, setEditingOwner] = useState<CarOwnerType | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -1274,7 +1131,7 @@ const CarOwners: React.FC = () => {
   function renderCell(owner: CarOwnerType, key: string) {
     const shops = owner.autoshopsReceivedServiceFrom ?? [];
     switch (key) {
-      case "name": return <td key={key} className={`${tdClass} font-medium`}><button type="button" onClick={() => setProfileFor(owner)} className="text-ad-purple hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">{owner.name || "-"}</button></td>;
+      case "name": return <td key={key} className={`${tdClass} font-medium`}><button type="button" onClick={() => openEdit(owner)} className="text-ad-purple hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">{owner.name || "-"}</button></td>;
       case "phone": return <td key={key} className={tdClass}>{owner.phone || "-"}</td>;
       case "city": return <td key={key} className={tdClass}>{owner.city || "-"}</td>;
       case "date": return <td key={key} className={tdClass}>{fmtDate(owner.createdAt)}</td>;
@@ -1311,16 +1168,6 @@ const CarOwners: React.FC = () => {
       {vehiclesFor && <VehiclesModal owner={vehiclesFor} onClose={() => setVehiclesFor(null)} />}
       {shopsFor && <AutoShopsModal owner={shopsFor} onClose={() => setShopsFor(null)} />}
       {jobCardsFor && <JobCardsModal owner={jobCardsFor} onClose={() => setJobCardsFor(null)} />}
-      {profileFor && (
-        <ProfileModal
-          owner={profileFor}
-          onClose={() => setProfileFor(null)}
-          onEdit={() => { openEdit(profileFor); setProfileFor(null); }}
-          toggleStatus={(id, newStatus) =>
-            toggleStatus(id, newStatus as "active" | "suspended" | "deleted")
-          }
-        />
-      )}
 
       <SendNotifModal isOpen={notifOpen} onClose={() => setNotifOpen(false)} ids={selected} onDone={() => { }} />
 
@@ -1334,6 +1181,7 @@ const CarOwners: React.FC = () => {
         between={
           showForm ? (
             <CarOwnerAddEditForm
+              key={editingOwner?._id ?? "new"}
               owner={editingOwner}
               onCancel={handleFormCancel}
               onSaved={handleFormSaved}

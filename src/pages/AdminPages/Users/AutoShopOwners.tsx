@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
+  CompactAutoGrowTextarea,
   CompactField,
   CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
+  compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 
@@ -238,60 +240,6 @@ const ShopOverviewCard: React.FC<{ bp: BusinessProfileType }> = ({ bp }) => {
         <span className="truncate text-right text-slate-200">{openDays} | {bp.openHours || "-"}</span>
       </div>
     </div>
-  );
-};
-
-// ─── PROFILE MODAL ────────────────────────────────────────────────────────────
-const ProfileModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => void; onEdit: () => void }> = ({ owner, onClose, onEdit }) => {
-  const bp = owner.businessProfile;
-  const customers = owner.myCustomers ?? [];
-  const deals = owner.deals ?? [];
-  const cards = owner.jobCards ?? [];
-  const logoSrc = bp?.businessLogo ? imgUrl(bp.businessLogo) : "";
-  return (
-    <BaseModal isOpen wide onClose={onClose} title={`Profile — ${owner.name}`} maxW="min(860px,96vw)">
-      {bp && <ShopOverviewCard bp={bp} />}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, border: "1px solid #c8e6b0", borderRadius: 14, overflow: "hidden", marginTop: 8 }}>
-        <div style={{ background: "#d4f5c4", padding: "22px 26px", borderRight: "1px solid #c8e6b0" }}>
-          <GCRow label="Name" value={owner.name} />
-          <GCRow label="E-mail" value={<a href={`mailto:${owner.email}`} style={{ color: "#0073b7" }}>{owner.email}</a>} />
-          <GCRow label="Phone" value={`${owner.countryCode ?? ""} ${owner.phone ?? ""}`.trim() || undefined} />
-          <GCRow label="Shop Name" value={bp?.businessName} />
-          <GCRow label="City" value={bp?.city} />
-          <GCRow label="Address" value={bp?.businessAddress} />
-          <GCRow label="Zip Code" value={bp?.pincode} />
-          <div style={{ margin: "10px 0 4px", display: "flex", gap: 8 }}>
-            <span style={GC_LABEL}>Customers</span><span style={{ color: "#888", marginRight: 4 }}>:</span>
-            <div>{customers.length > 0 ? customers.map(c => <div key={c._id} style={GC_VAL}>{c.name || c.email || "-"}</div>) : <span style={GC_VAL}>—</span>}</div>
-          </div>
-          <div style={{ margin: "10px 0 4px", display: "flex", gap: 8 }}>
-            <span style={GC_LABEL}>Deals</span><span style={{ color: "#888", marginRight: 4 }}>:</span>
-            <div>{deals.length > 0 ? deals.map(d => <div key={d._id} style={GC_VAL}>{d.name || d.dealType || "-"}</div>) : <span style={GC_VAL}>—</span>}</div>
-          </div>
-          <div style={{ margin: "10px 0 4px", display: "flex", gap: 8 }}>
-            <span style={GC_LABEL}>Job Cards</span><span style={{ color: "#888", marginRight: 4 }}>:</span>
-            <div>{cards.length > 0 ? cards.map(c => <div key={c._id} style={GC_VAL}># {c.jobNo || c._id.slice(-5)}</div>) : <span style={GC_VAL}>—</span>}</div>
-          </div>
-        </div>
-        <div style={{ background: "#d4f5c4", padding: "22px 26px" }}>
-          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Shop Account Info</div>
-          <GCRow label="Mobile" value={owner.phone} />
-          <GCRow label="Status" value={getStatus(owner)} />
-          <GCRow label="Joining Date" value={fmtDate(owner.createdAt)} />
-          <GCRow label="HST Number" value={bp?.businessHSTNumber} />
-          <GCRow label="Email" value={bp?.businessEmail} />
-          <div style={{ marginTop: 14 }}>
-            <span style={GC_LABEL}>Shop Logo</span>
-            <div style={{ display: "inline-flex", marginLeft: 18, border: "1px solid #bbb", background: "#fff", width: 120, height: 120, borderRadius: 6, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
-              {logoSrc ? <img src={logoSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
-            </div>
-          </div>
-          <div style={{ marginTop: 24 }}>
-            <button type="button" onClick={onEdit} style={{ background: "#1a6e1a", color: "#fff", border: "none", borderRadius: 4, padding: "8px 28px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Update</button>
-          </div>
-        </div>
-      </div>
-    </BaseModal>
   );
 };
 
@@ -603,9 +551,242 @@ function exportCsv(owners: AutoShopOwnerType[], visibleCols: string[]) {
 }
 
 // ─── STYLE CONSTANTS ──────────────────────────────────────────────────────────
+const fieldErrorClass = "mt-0.5 text-[11px] font-semibold text-red-700";
+const autoShopRowFieldWidth = compactFixedFieldWidth;
+const autoShopAddressFieldWidth = "min-w-[220px] flex-1 sm:min-w-[300px]";
+type ProvinceCityOption = { name: string; status?: string };
+type ProvinceWithCities = { cities?: ProvinceCityOption[] };
 const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700";
 const thClass = "border border-ad-purple-dark px-3 py-2 text-left font-medium whitespace-nowrap";
 const linkClass = "text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-medium";
+
+const AutoShopAddEditForm: React.FC<{
+  owner?: AutoShopOwnerType | null;
+  onCancel: () => void;
+  onSaved: () => void;
+}> = ({ owner, onCancel, onSaved }) => {
+  const isEdit = !!owner;
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [address, setAddress] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [shopType, setShopType] = useState<ShopType>("autoShop");
+  const [attempted, setAttempted] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axios.get(`${API()}/api/admin/provinces`, { headers: getToken() });
+        if (cancelled) return;
+        const provinces: ProvinceWithCities[] = res.data?.data || [];
+        const names = new Set<string>();
+        for (const province of provinces) {
+          for (const c of province.cities || []) {
+            if (!c.status || c.status === "Active") names.add(c.name);
+          }
+        }
+        setCityOptions([...names].sort((a, b) => a.localeCompare(b)));
+      } catch {
+        if (!cancelled) setCityOptions([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const citySelectOptions = React.useMemo(() => {
+    const names = new Set(cityOptions);
+    if (city.trim()) names.add(city.trim());
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [cityOptions, city]);
+
+  useEffect(() => {
+    setAttempted(false);
+    setApiError(null);
+    if (isEdit && owner) {
+      setName(owner.name || "");
+      setEmail(owner.email || "");
+      setPhone(owner.phone || "");
+      setCity(owner.businessProfile?.city || "");
+      setPincode(owner.pincode || "");
+      setAddress(owner.address || "");
+      setJoiningDate(fmtDate(owner.createdAt) !== "-" ? fmtDate(owner.createdAt) : "");
+      setShopType(ownerShopType(owner));
+    } else {
+      setName("");
+      setEmail("");
+      setPhone("");
+      setCity("");
+      setPincode("");
+      setAddress("");
+      setJoiningDate(new Date().toISOString().slice(0, 10));
+      setShopType("autoShop");
+    }
+  }, [isEdit, owner]);
+
+  function validate(): string | null {
+    if (!name.trim()) return "Name is required.";
+    if (!email.trim() || !isEmail(email)) return "Valid email required.";
+    if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
+    if (!pincode.trim()) return "Zip / Postal code is required.";
+    if (!shopType) return "Shop type required.";
+    return null;
+  }
+
+  async function handleSave() {
+    setAttempted(true);
+    const err = validate();
+    if (err) {
+      setApiError(err);
+      return;
+    }
+    setApiError(null);
+    const payload: Record<string, string> = {
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.replace(/\D/g, ""),
+      city: city.trim(),
+      pincode: pincode.trim(),
+      address: address.trim(),
+      role: "autoshopowner",
+      shopType,
+    };
+    if (joiningDate.trim()) payload.createdAt = joiningDate.trim();
+    setSubmitting(true);
+    try {
+      if (isEdit && owner) {
+        await axios.put(`${API()}/api/admin/autoshopowners/${owner._id}`, payload, { headers: getToken() });
+      } else {
+        await axios.post(`${API()}/api/admin/autoshopowners`, payload, { headers: getToken() });
+      }
+      onSaved();
+    } catch (saveErr: unknown) {
+      const axErr = saveErr as { response?: { data?: { message?: string } } };
+      setApiError(axErr?.response?.data?.message || (isEdit ? "Could not update." : "Could not add."));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const formMessage = isEdit
+    ? "You are updating an 'Auto Shop Owner'"
+    : "You are creating an 'Auto Shop Owner'";
+
+  return (
+    <CompactFormPanel
+      footer={
+        <CompactFormFooter
+          message={formMessage}
+          messageCenter
+          actionLabel={submitting ? "Saving..." : "Save"}
+          onSave={handleSave}
+          onCancel={onCancel}
+        />
+      }
+    >
+      {apiError && (
+        <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
+          {apiError}
+        </div>
+      )}
+      <CompactFormRow className="items-start">
+        <CompactField label="Date" className={autoShopRowFieldWidth}>
+          <input
+            type="date"
+            value={joiningDate}
+            onChange={(e) => setJoiningDate(e.target.value)}
+            className={compactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Phone" required className={autoShopRowFieldWidth}>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            className={compactInputClass}
+          />
+          {attempted && phone.replace(/\D/g, "").length !== 10 && (
+            <p className={fieldErrorClass}>Must be 10 digits</p>
+          )}
+        </CompactField>
+        <CompactField label="Full Name" required className={autoShopRowFieldWidth}>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value.slice(0, 40))}
+            className={compactInputClass}
+          />
+          {attempted && !name.trim() && <p className={fieldErrorClass}>Required</p>}
+        </CompactField>
+        <CompactField label="City" className={autoShopRowFieldWidth}>
+          <select
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            className={compactInputClass}
+          >
+            <option value="">Select city</option>
+            {citySelectOptions.map((cityName) => (
+              <option key={cityName} value={cityName}>
+                {cityName}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+        <CompactField label="Zip / Postal Code" required className={autoShopRowFieldWidth}>
+          <input
+            type="text"
+            value={pincode}
+            onChange={(e) => setPincode(e.target.value.slice(0, 10))}
+            placeholder="A1A 1A1"
+            className={compactInputClass}
+          />
+          {attempted && !pincode.trim() && <p className={fieldErrorClass}>Required</p>}
+        </CompactField>
+        <div className={`min-w-0 flex-1 ${autoShopAddressFieldWidth}`}>
+          <label className="mb-1 block text-xs font-bold text-ad-green-dark">Address</label>
+          <CompactAutoGrowTextarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value.slice(0, 100))}
+            placeholder="Max 100 chars"
+          />
+        </div>
+      </CompactFormRow>
+      <CompactFormRow className="items-start justify-start gap-6">
+        <CompactField label="Shop Type" required className={autoShopRowFieldWidth}>
+          <select
+            value={shopType}
+            onChange={(e) => setShopType(e.target.value as ShopType)}
+            className={compactInputClass}
+          >
+            {SHOP_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+        <CompactField label="Email" required className={autoShopRowFieldWidth}>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="name@example.com"
+            className={compactInputClass}
+          />
+          {attempted && (!email.trim() || !isEmail(email)) && (
+            <p className={fieldErrorClass}>Valid email required</p>
+          )}
+        </CompactField>
+      </CompactFormRow>
+    </CompactFormPanel>
+  );
+};
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 const AutoShopOwners: React.FC = () => {
@@ -624,7 +805,6 @@ const AutoShopOwners: React.FC = () => {
   const [viewMode, setViewMode] = useState<"active" | "deleted">("active");
 
   // Modals
-  const [profileFor, setProfileFor] = useState<AutoShopOwnerType | null>(null);
   const [businessFor, setBusinessFor] = useState<AutoShopOwnerType | null>(null);
   const [customersFor, setCustomersFor] = useState<AutoShopOwnerType | null>(null);
   const [dealsFor, setDealsFor] = useState<AutoShopOwnerType | null>(null);
@@ -633,16 +813,6 @@ const AutoShopOwners: React.FC = () => {
 
   const [showForm, setShowForm] = useState(false);
   const [editingOwner, setEditingOwner] = useState<AutoShopOwnerType | null>(null);
-  const [formName, setFormName] = useState("");
-  const [formEmail, setFormEmail] = useState("");
-  const [formPhone, setFormPhone] = useState("");
-  const [formCity, setFormCity] = useState("");
-  const [formPincode, setFormPincode] = useState("");
-  const [formAddress, setFormAddress] = useState("");
-  const [formShopType, setFormShopType] = useState<ShopType>("autoShop");
-  const [formAttempted, setFormAttempted] = useState(false);
-  const [formApiError, setFormApiError] = useState<string | null>(null);
-  const [formSubmitting, setFormSubmitting] = useState(false);
 
   const fetchOwners = useCallback(async () => {
     setLoading(true); setError("");
@@ -666,93 +836,26 @@ const AutoShopOwners: React.FC = () => {
     setCurrentPage(1);
   }
 
-  const resetForm = () => {
-    setFormName("");
-    setFormEmail("");
-    setFormPhone("");
-    setFormCity("");
-    setFormPincode("");
-    setFormAddress("");
-    setFormShopType("autoShop");
-    setFormAttempted(false);
-    setFormApiError(null);
-    setEditingOwner(null);
-  };
-
   const openAdd = () => {
-    resetForm();
+    setEditingOwner(null);
     setShowForm(true);
   };
 
   const openEdit = (owner: AutoShopOwnerType) => {
-    setFormName(owner.name || "");
-    setFormEmail(owner.email || "");
-    setFormPhone(owner.phone || "");
-    setFormCity(owner.businessProfile?.city || "");
-    setFormPincode(owner.pincode || "");
-    setFormAddress(owner.address || "");
-    setFormShopType(ownerShopType(owner));
-    setFormAttempted(false);
-    setFormApiError(null);
     setEditingOwner(owner);
     setShowForm(true);
   };
 
   const handleFormCancel = () => {
-    resetForm();
+    setEditingOwner(null);
     setShowForm(false);
   };
 
-  function validateOwnerForm(): string | null {
-    if (!formName.trim()) return "Name is required.";
-    if (!formEmail.trim() || !isEmail(formEmail)) return "Valid email required.";
-    if (formPhone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
-    if (!formPincode.trim()) return "Zip / Postal code is required.";
-    if (!formShopType) return "Shop type required.";
-    return null;
-  }
-
-  async function handleFormSave() {
-    setFormAttempted(true);
-    const err = validateOwnerForm();
-    if (err) {
-      setFormApiError(err);
-      return;
-    }
-    setFormApiError(null);
-    const payload = {
-      name: formName.trim(),
-      email: formEmail.trim(),
-      phone: formPhone.replace(/\D/g, ""),
-      city: formCity.trim(),
-      pincode: formPincode.trim(),
-      address: formAddress.trim(),
-      role: "autoshopowner",
-      shopType: formShopType,
-    };
-    setFormSubmitting(true);
-    try {
-      if (editingOwner) {
-        await axios.put(`${API()}/api/admin/autoshopowners/${editingOwner._id}`, payload, { headers: getToken() });
-      } else {
-        await axios.post(`${API()}/api/admin/autoshopowners`, payload, { headers: getToken() });
-      }
-      resetForm();
-      setShowForm(false);
-      await fetchOwners();
-    } catch (saveErr: unknown) {
-      const axErr = saveErr as { response?: { data?: { message?: string } } };
-      setFormApiError(
-        axErr?.response?.data?.message || (editingOwner ? "Could not update." : "Could not add.")
-      );
-    } finally {
-      setFormSubmitting(false);
-    }
-  }
-
-  const formMessage = editingOwner
-    ? "You are updating an 'Auto Shop Owner'"
-    : "You are creating an 'Auto Shop Owner'";
+  const handleFormSaved = () => {
+    setEditingOwner(null);
+    setShowForm(false);
+    fetchOwners();
+  };
 
   const filtered = displayOwners.filter(o => {
     const st = ownerShopType(o);
@@ -812,7 +915,7 @@ const AutoShopOwners: React.FC = () => {
       case "name":
         return (
           <td key={key} className={`${tdClass} font-medium`}>
-            <button type="button" onClick={() => setProfileFor(owner)} className="text-ad-purple hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">
+            <button type="button" onClick={() => openEdit(owner)} className="text-ad-purple hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">
               {owner.name}
             </button>
           </td>
@@ -853,13 +956,6 @@ const AutoShopOwners: React.FC = () => {
 
   return (
     <>
-      {profileFor && (
-        <ProfileModal
-          owner={profileFor}
-          onClose={() => setProfileFor(null)}
-          onEdit={() => { openEdit(profileFor); setProfileFor(null); }}
-        />
-      )}
       {businessFor && <BusinessProfileModal owner={businessFor} onClose={() => setBusinessFor(null)} />}
       {customersFor && <CustomersModal owner={customersFor} onClose={() => setCustomersFor(null)} />}
       {dealsFor && <DealsModal owner={dealsFor} onClose={() => setDealsFor(null)} />}
@@ -875,92 +971,12 @@ const AutoShopOwners: React.FC = () => {
         }
         between={
           showForm ? (
-            <CompactFormPanel
-              footer={
-                <CompactFormFooter
-                  message={formMessage}
-                  messageCenter
-                  actionLabel={formSubmitting ? "Saving..." : "Save"}
-                  onSave={handleFormSave}
-                  onCancel={handleFormCancel}
-                />
-              }
-            >
-              {formApiError && (
-                <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
-                  {formApiError}
-                </div>
-              )}
-              <CompactFormRow className="!grid w-full grid-cols-2 items-start gap-x-4 gap-y-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
-                <CompactField label="Full Name" required className="min-w-0 w-full">
-                  <input
-                    type="text"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value.slice(0, 40))}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="Email" required className="min-w-0 w-full">
-                  <input
-                    type="email"
-                    value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="Phone" required className="min-w-0 w-full">
-                  <input
-                    type="tel"
-                    value={formPhone}
-                    onChange={(e) => setFormPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="City" className="min-w-0 w-full">
-                  <input
-                    type="text"
-                    value={formCity}
-                    onChange={(e) => setFormCity(e.target.value)}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="Zip / Postal Code" required className="min-w-0 w-full">
-                  <input
-                    type="text"
-                    value={formPincode}
-                    onChange={(e) => setFormPincode(e.target.value.slice(0, 10))}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="Shop Type" required className="min-w-0 w-full">
-                  <select
-                    value={formShopType}
-                    onChange={(e) => setFormShopType(e.target.value as ShopType)}
-                    className={compactInputClass}
-                  >
-                    {SHOP_TYPE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </CompactField>
-                <CompactField label="Address" className="min-w-0 w-full">
-                  <textarea
-                    value={formAddress}
-                    onChange={(e) => setFormAddress(e.target.value.slice(0, 100))}
-                    rows={2}
-                    className={`${compactInputClass} resize-y`}
-                  />
-                </CompactField>
-              </CompactFormRow>
-              {formAttempted && (() => {
-                const validationError = validateOwnerForm();
-                return validationError ? (
-                  <p className="text-xs font-semibold text-red-700">{validationError}</p>
-                ) : null;
-              })()}
-            </CompactFormPanel>
+            <AutoShopAddEditForm
+              key={editingOwner?._id ?? "new"}
+              owner={editingOwner}
+              onCancel={handleFormCancel}
+              onSaved={handleFormSaved}
+            />
           ) : undefined
         }
       >
