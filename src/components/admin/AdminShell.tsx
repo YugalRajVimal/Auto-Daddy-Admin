@@ -80,6 +80,14 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     }
   };
 
+  const handlePrimaryNavLinkClick = (path: string, e: React.MouseEvent<HTMLAnchorElement>) => {
+    setMobileOpen(false);
+    if (location.pathname === path) {
+      e.preventDefault();
+      navigate(path, { replace: true, state: { navReset: Date.now() } });
+    }
+  };
+
   const handleLogout = () => {
     if (!window.confirm("Are you sure you want to log out?")) return;
 
@@ -204,7 +212,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                   ) : (
                     <Link
                       to={firstPath}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={(e) => handlePrimaryNavLinkClick(firstPath, e)}
                       className={`block ${itemClass}`}
                     >
                       {item.name}

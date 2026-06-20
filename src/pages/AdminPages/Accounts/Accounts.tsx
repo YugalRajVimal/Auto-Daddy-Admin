@@ -305,9 +305,11 @@ function LedgerPage({
   const [subcategory, setSubcategory] = useState("");
   const [notes, setNotes] = useState("");
   const [gst, setGst] = useState(false);
+  const [gstAmount, setGstAmount] = useState("");
   const [hasBillNumber, setHasBillNumber] = useState(false);
   const [billNumber, setBillNumber] = useState("");
   const [byCheque, setByCheque] = useState(false);
+  const [chequeNumber, setChequeNumber] = useState("");
   const [attachReceipt, setAttachReceipt] = useState(false);
 
   const [categoriesPopupOpen, setCategoriesPopupOpen] = useState(false);
@@ -489,9 +491,11 @@ function LedgerPage({
     setSubcategory("");
     setNotes("");
     setGst(false);
+    setGstAmount("");
     setHasBillNumber(false);
     setBillNumber("");
     setByCheque(false);
+    setChequeNumber("");
     setAttachReceipt(false);
   };
 
@@ -568,15 +572,42 @@ function LedgerPage({
             }
           >
             <CompactFormRow className="items-start">
-              <CompactField label="Amount" required className={compactFixedFieldWidth}>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className={compactInputClass}
-                />
-              </CompactField>
+              <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+                <CompactField label="Amount" required className="w-full flex-none">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+                <div className="mt-1">
+                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                    <input
+                      type="checkbox"
+                      checked={gst}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setGst(checked);
+                        if (!checked) setGstAmount("");
+                      }}
+                      className="h-3.5 w-3.5 accent-ad-green"
+                    />
+                    GST
+                  </label>
+                  {gst ? (
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={gstAmount}
+                      onChange={(e) => setGstAmount(e.target.value)}
+                      placeholder="GST amount"
+                      className={compactInputClass}
+                    />
+                  ) : null}
+                </div>
+              </div>
               <CompactField label="Date" required className={compactFixedFieldWidth}>
                 <input
                   type="date"
@@ -585,24 +616,75 @@ function LedgerPage({
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label={vendorLabel} required className={compactFixedFieldWidth}>
-                <input
-                  type="text"
-                  value={vendor}
-                  onChange={(e) => setVendor(e.target.value)}
-                  className={compactInputClass}
+              <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+                <CompactField label={vendorLabel} required className="w-full flex-none">
+                  <input
+                    type="text"
+                    value={vendor}
+                    onChange={(e) => setVendor(e.target.value)}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+                <div className="mt-1">
+                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                    <input
+                      type="checkbox"
+                      checked={hasBillNumber}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setHasBillNumber(checked);
+                        if (!checked) setBillNumber("");
+                      }}
+                      className="h-3.5 w-3.5 accent-ad-green"
+                    />
+                    {billLabel}
+                  </label>
+                  {hasBillNumber ? (
+                    <input
+                      type="text"
+                      value={billNumber}
+                      onChange={(e) => setBillNumber(e.target.value)}
+                      className={compactInputClass}
+                    />
+                  ) : null}
+                </div>
+              </div>
+              <div className="min-w-[160px] flex-1">
+                <ComboSelectWithEditor
+                  label="Category"
+                  required
+                  value={selectedCategoryLabel}
+                  placeholder="Select category"
+                  options={categoryLabels}
+                  onChange={handleCategoryChange}
+                  onEditAddNew={openCategoriesPopup}
+                  className="w-full"
                 />
-              </CompactField>
-              <ComboSelectWithEditor
-                label="Category"
-                required
-                value={selectedCategoryLabel}
-                placeholder="Select category"
-                options={categoryLabels}
-                onChange={handleCategoryChange}
-                onEditAddNew={openCategoriesPopup}
-                className="min-w-[160px] flex-1"
-              />
+                <div className="mt-1">
+                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                    <input
+                      type="checkbox"
+                      checked={byCheque}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setByCheque(checked);
+                        if (!checked) setChequeNumber("");
+                      }}
+                      className="h-3.5 w-3.5 accent-ad-green"
+                    />
+                    By Cheque
+                  </label>
+                  {byCheque ? (
+                    <input
+                      type="text"
+                      value={chequeNumber}
+                      onChange={(e) => setChequeNumber(e.target.value)}
+                      placeholder="Cheque number"
+                      className={compactInputClass}
+                    />
+                  ) : null}
+                </div>
+              </div>
               <ComboSelectWithEditor
                 label="Subcategory"
                 required
@@ -614,64 +696,27 @@ function LedgerPage({
                 onEditAddNew={openSubcategoriesPopup}
                 className="min-w-[160px] flex-1"
               />
-              <CompactField label="Notes" className="min-w-[160px] flex-1">
-                <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-              </CompactField>
-            </CompactFormRow>
-            <CompactFormRow className="items-start justify-start gap-x-6 gap-y-3">
-              <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                <input
-                  type="checkbox"
-                  checked={gst}
-                  onChange={(e) => setGst(e.target.checked)}
-                  className="h-3.5 w-3.5 accent-ad-green"
-                />
-                GST
-              </label>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                  <input
-                    type="checkbox"
-                    checked={hasBillNumber}
-                    onChange={(e) => setHasBillNumber(e.target.checked)}
-                    className="h-3.5 w-3.5 accent-ad-green"
-                  />
-                  {billLabel}
-                </label>
-                {hasBillNumber ? (
-                  <input
-                    type="text"
-                    value={billNumber}
-                    onChange={(e) => setBillNumber(e.target.value)}
-                    className="w-[120px] border border-gray-400 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
-                  />
-                ) : null}
-              </div>
-              <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                <input
-                  type="checkbox"
-                  checked={byCheque}
-                  onChange={(e) => setByCheque(e.target.checked)}
-                  className="h-3.5 w-3.5 accent-ad-green"
-                />
-                By Cheque
-              </label>
-              <div className="flex flex-col items-start gap-1.5">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                  <input
-                    type="checkbox"
-                    checked={attachReceipt}
-                    onChange={(e) => setAttachReceipt(e.target.checked)}
-                    className="h-3.5 w-3.5 accent-ad-green"
-                  />
-                  Attach Image of Receipt
-                </label>
-                {attachReceipt ? (
-                  <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
-                    Upload File
-                    <input type="file" accept="image/*" className="hidden" />
+              <div className="min-w-[160px] flex-1">
+                <CompactField label="Notes" className="w-full flex-none">
+                  <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+                </CompactField>
+                <div className="mt-1">
+                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                    <input
+                      type="checkbox"
+                      checked={attachReceipt}
+                      onChange={(e) => setAttachReceipt(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-ad-green"
+                    />
+                    Attach Image of Receipt
                   </label>
-                ) : null}
+                  {attachReceipt ? (
+                    <label className="block w-full cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-1.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-300">
+                      Upload File
+                      <input type="file" accept="image/*" className="hidden" />
+                    </label>
+                  ) : null}
+                </div>
               </div>
             </CompactFormRow>
             {categoriesPopupOpen && (

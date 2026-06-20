@@ -6,6 +6,8 @@ type AdminPageProps = {
   children: ReactNode;
   /** Action control beside the page title (e.g. green "Add New" button) */
   headerAction?: ReactNode;
+  /** When set, the page title becomes clickable (e.g. navigate back to a parent view). */
+  onTitleClick?: () => void;
   /** Panel rendered between the title row and main content (e.g. inline add form) */
   between?: ReactNode;
   panelTitle?: string;
@@ -20,6 +22,7 @@ export default function AdminPage({
   title,
   children,
   headerAction,
+  onTitleClick,
   between,
   panelTitle,
   action,
@@ -44,7 +47,17 @@ export default function AdminPage({
       <div className={narrowPanel ? "mx-auto w-full sm:w-[55%] sm:min-w-[320px]" : undefined}>
         {showPageTitle && (
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h1 className="text-xl font-bold text-ad-green md:text-2xl">{title}</h1>
+            {onTitleClick ? (
+              <button
+                type="button"
+                onClick={onTitleClick}
+                className="text-left text-xl font-bold text-ad-green hover:underline md:text-2xl"
+              >
+                {title}
+              </button>
+            ) : (
+              <h1 className="text-xl font-bold text-ad-green md:text-2xl">{title}</h1>
+            )}
             {headerAction}
           </div>
         )}
