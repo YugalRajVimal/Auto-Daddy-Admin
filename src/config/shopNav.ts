@@ -4,7 +4,6 @@ export const shopPrimaryNav: NavItem[] = [
   {
     name: "Home",
     path: "/shop",
-    subItems: [{ name: "Dashboard", path: "/shop" }],
     matchPaths: ["/shop"],
   },
   {

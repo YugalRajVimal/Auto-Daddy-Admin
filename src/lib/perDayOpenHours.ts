@@ -191,3 +191,16 @@ export function enabledWeekdaysFromSchedule(schedule: PerDaySchedule): WeekDay[]
 export function closedWeekdaysFromSchedule(schedule: PerDaySchedule): WeekDay[] {
   return WEEK_DAYS.filter((day) => !schedule[day]?.enabled);
 }
+
+export function perDayOpenHoursFromSchedule(schedule: PerDaySchedule): PerDayOpenHourEntry[] {
+  return WEEK_DAYS.map((day) => ({
+    day,
+    open: schedule[day].start,
+    close: schedule[day].end,
+    isClosed: !schedule[day].enabled,
+  }));
+}
+
+export function serializePerDayOpenHoursForApi(schedule: PerDaySchedule): string {
+  return JSON.stringify(perDayOpenHoursFromSchedule(schedule));
+}

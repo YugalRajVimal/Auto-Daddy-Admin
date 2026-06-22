@@ -1,7 +1,6 @@
 import { Route } from "react-router";
 import OwnerPanelLayout from "../../layout/Owner/OwnerPanelLayout";
 import ShopPanelLayout from "../../layout/Shop/ShopPanelLayout";
-import PortalPlaceholder from "../../components/admin/PortalPlaceholder";
 import OwnerHomePage from "../../pages/OwnerPages/Home";
 import OwnerProfilePage from "../../pages/OwnerPages/Profile";
 import OwnerDealsPage from "../../pages/OwnerPages/Deals";
@@ -12,6 +11,20 @@ import OwnerDigiPursePage from "../../pages/OwnerPages/DigiPurse";
 import OwnerMessagesPage from "../../pages/OwnerPages/Messages";
 import OwnerVehiclesPage from "../../pages/OwnerPages/Vehicles";
 import ShopHomePage from "../../pages/ShopPages/Home";
+import ShopProfilePage from "../../pages/ShopPages/Profile";
+import ShopPeoplePage from "../../pages/ShopPages/People";
+import ShopServicesPage from "../../pages/ShopPages/Services";
+import ShopJobCardsPage from "../../pages/ShopPages/JobCards";
+import ShopWalletPage from "../../pages/ShopPages/Wallet";
+import ShopMessagesPage from "../../pages/ShopPages/Messages";
+import ShopReportsPage from "../../pages/ShopPages/Reports";
+import ShopDealsPage from "../../pages/ShopPages/Deals";
+import ShopCustomerAddPage, { ShopCustomerEditPage } from "../../pages/ShopPages/CustomerFormPage";
+import ShopJobCardAddPage, { ShopJobCardEditPage } from "../../pages/ShopPages/JobCardFormPage";
+import ShopCarCompaniesPage from "../../pages/ShopPages/CarCompanies";
+import ShopServicesSelectionPage from "../../pages/ShopPages/ServicesSelection";
+import ShopTeamPage from "../../pages/ShopPages/Team";
+import ShopTeamMemberFormPage from "../../pages/ShopPages/TeamMemberFormPage";
 
 export const ownerRoutes = (
   <Route element={<OwnerPanelLayout />}>
@@ -30,13 +43,22 @@ export const ownerRoutes = (
 export const shopRoutes = (
   <Route element={<ShopPanelLayout />}>
     <Route index path="/shop" element={<ShopHomePage />} />
-    <Route path="/shop/profile" element={<PortalPlaceholder title="Profile" />} />
-    <Route path="/shop/people" element={<PortalPlaceholder title="People" />} />
-    <Route path="/shop/services" element={<PortalPlaceholder title="Services" />} />
-    <Route path="/shop/job-cards" element={<PortalPlaceholder title="Job Cards" />} />
-    <Route path="/shop/wallet" element={<PortalPlaceholder title="Wallet" />} />
-    <Route path="/shop/messages" element={<PortalPlaceholder title="Messages" />} />
-    <Route path="/shop/reports" element={<PortalPlaceholder title="Reports" />} />
-    <Route path="/shop/deals" element={<PortalPlaceholder title="Deals" />} />
+    <Route path="/shop/profile" element={<ShopProfilePage />} />
+    <Route path="/shop/people" element={<ShopPeoplePage />} />
+    <Route path="/shop/people/new" element={<ShopCustomerAddPage />} />
+    <Route path="/shop/people/:id/edit" element={<ShopCustomerEditPage />} />
+    <Route path="/shop/services" element={<ShopServicesPage />} />
+    <Route path="/shop/job-cards" element={<ShopJobCardsPage />} />
+    <Route path="/shop/job-cards/new" element={<ShopJobCardAddPage />} />
+    <Route path="/shop/job-cards/:id/edit" element={<ShopJobCardEditPage />} />
+    <Route path="/shop/wallet" element={<ShopWalletPage />} />
+    <Route path="/shop/messages" element={<ShopMessagesPage />} />
+    <Route path="/shop/reports" element={<ShopReportsPage />} />
+    <Route path="/shop/deals" element={<ShopDealsPage />} />
+    <Route path="/shop/profile/car-companies" element={<ShopCarCompaniesPage />} />
+    <Route path="/shop/profile/services-selection" element={<ShopServicesSelectionPage />} />
+    <Route path="/shop/team" element={<ShopTeamPage />} />
+    <Route path="/shop/team/new" element={<ShopTeamMemberFormPage />} />
+    <Route path="/shop/team/:id/edit" element={<ShopTeamMemberFormPage />} />
   </Route>
 );

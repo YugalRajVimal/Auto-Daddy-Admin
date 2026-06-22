@@ -36,6 +36,8 @@ export type PortalShellProps = {
   loginAs?: string;
   /** Center header content (e.g. owner name and city). */
   headerCenter?: React.ReactNode;
+  /** When set, shows "{n} Days Left" in the utility row instead of "Login as". */
+  subscriptionDaysLeft?: number | null;
 };
 
 export default function PortalShell({
@@ -47,6 +49,7 @@ export default function PortalShell({
   utilityNavLabel = "Admin",
   loginAs,
   headerCenter,
+  subscriptionDaysLeft,
 }: PortalShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -141,7 +144,11 @@ export default function PortalShell({
 
             <div className="col-span-2 flex flex-col items-end gap-2 md:col-span-1 md:col-start-3 md:row-start-1">
               <nav className="flex items-center gap-0 [&>*+*]:-ml-px" aria-label="Account actions">
-                <span className={utilityLinkClass}>Login as : {loginAsDisplay}</span>
+                {subscriptionDaysLeft != null ? (
+                  <span className={utilityLinkClass}>{subscriptionDaysLeft} Days Left</span>
+                ) : (
+                  <span className={utilityLinkClass}>Login as : {loginAsDisplay}</span>
+                )}
                 {utilityNav.length > 0 && (
                   <Link
                     to={utilityNavPath}

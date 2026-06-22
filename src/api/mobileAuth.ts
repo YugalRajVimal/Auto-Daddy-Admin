@@ -77,6 +77,40 @@ export async function putJson<T>(
   return { ok: res.ok, status: res.status, data };
 }
 
+export async function patchJson<T>(
+  path: string,
+  body: Record<string, unknown>,
+  token: string
+) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => null)) as T | null;
+  return { ok: res.ok, status: res.status, data };
+}
+
+export async function deleteJson<T>(
+  path: string,
+  token: string,
+  body?: Record<string, unknown>
+) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = (await res.json().catch(() => null)) as T | null;
+  return { ok: res.ok, status: res.status, data };
+}
+
 export function normalizePhoneDigits(phone: string): string {
   return phone.replace(/\D/g, "");
 }

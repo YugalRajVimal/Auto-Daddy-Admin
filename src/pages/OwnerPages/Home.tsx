@@ -1,12 +1,10 @@
 import { useState } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
+import { PORTAL_HOME_HERO_IMAGE } from "../../lib/portalHeroImage";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
 import OwnerServiceSidebar from "../../components/owner/OwnerServiceSidebar";
 import { useCarOwnerDashboard, useCarOwnerServiceSidebar } from "../../hooks/useOwnerPortal";
-
-const HERO_IMAGE =
-  "https://cdn.prod.website-files.com/682bafcf9a7a236122010f96/684aaaa7513a914ea33079fb_67b4a931485b522bb83b2779_Brief%25207b%2520Cars%2520(1).gif";
 
 export default function OwnerHomePage() {
   const { thoughtOfTheDay, faqsHeading, faqsDescription, loading } = useCarOwnerDashboard();
@@ -33,7 +31,7 @@ export default function OwnerHomePage() {
           ) : (
             <>
               <img
-                src={HERO_IMAGE}
+                src={PORTAL_HOME_HERO_IMAGE}
                 alt="AutoDaddy hero"
                 className="absolute inset-0 h-full w-full object-cover"
               />
