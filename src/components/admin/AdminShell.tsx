@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { FiBell, FiUser } from "react-icons/fi";
-import usePermissions from "../../hooks/usePermission";
+import useAuth from "../../auth/useAuth";
+import { getRoleConfig } from "../../auth/roleRegistry";
 import {
   primaryNav,
   adminOnlyNav,
@@ -47,7 +48,7 @@ function getActiveSubItemPath(pathname: string, subItems: NavSubItem[]): string 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAdmin, canView } = usePermissions();
+  const { isAdmin, canView, role, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const visibleNav = [
@@ -90,11 +91,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const handleLogout = () => {
     if (!window.confirm("Are you sure you want to log out?")) return;
-
-    localStorage.removeItem("admin-token");
-    localStorage.removeItem("admin-role");
-    localStorage.removeItem("subadmin-permissions");
-    navigate("/", { replace: true });
+    logout();
   };
 
   const utilityLinkClass =
@@ -105,7 +102,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const subNavLinkClass =
     "relative block px-2 py-1.5 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1.5 lg:py-1.5 lg:text-xs lg:leading-snug lg:whitespace-normal";
 
-  const loginRole = isAdmin ? "Admin" : "Sub Admin";
+  const loginRole = role ? getRoleConfig(role).label : "Admin";
 
   useEffect(() => {
     document.body.style.overflow = "";

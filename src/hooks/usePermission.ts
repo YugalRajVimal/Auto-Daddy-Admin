@@ -1,7 +1,9 @@
-// hooks/usePermissions.ts
-// Reads subadmin permissions from the JWT / localStorage and returns helper functions.
+// hooks/usePermission.ts
+// Delegates to AuthProvider when available; falls back to localStorage for edge cases.
 
-import { useMemo } from "react";
+import { useContext, useMemo } from "react";
+import { AuthContext } from "../auth/AuthProvider";
+import { readSession } from "../auth/tokenStorage";
 
 export type Action = "view" | "add" | "edit" | "delete";
 export type ModuleKey =
@@ -13,20 +15,6 @@ export interface Permissions {
   [module: string]: { view?: boolean; add?: boolean; edit?: boolean; delete?: boolean };
 }
 
-function parsePermissions(): Permissions | null {
-  try {
-    const stored = localStorage.getItem("subadmin-permissions");
-    if (!stored) return null;
-    return JSON.parse(stored);
-  } catch {
-    return null;
-  }
-}
-
-function getRole(): string {
-  return localStorage.getItem("admin-role") || "admin";
-}
-
 /**
  * usePermissions()
  * Returns:
@@ -35,19 +23,39 @@ function getRole(): string {
  *   - canView(module): shortcut for can(module, "view")
  */
 export function usePermissions() {
-  const role = getRole();
-  const permissions = useMemo(() => parsePermissions(), []);
+  const auth = useContext(AuthContext);
 
-  const isAdmin = role === "admin";
+  const fallback = useMemo(() => {
+    const session = readSession();
+    const role = session?.role ?? "admin";
+    const permissions = session?.permissions ?? null;
+    const isAdmin = role === "admin";
 
-  const can = (module: string, action: Action): boolean => {
-    if (isAdmin) return true;
-    return !!(permissions?.[module]?.[action]);
-  };
+    const can = (module: string, action: Action): boolean => {
+      if (isAdmin) return true;
+      return !!(permissions?.[module]?.[action]);
+    };
 
-  const canView = (module: string): boolean => can(module, "view");
+    return {
+      isAdmin,
+      can,
+      canView: (module: string) => can(module, "view"),
+      permissions,
+      role,
+    };
+  }, []);
 
-  return { isAdmin, can, canView, permissions, role };
+  if (auth) {
+    return {
+      isAdmin: auth.isAdmin,
+      can: auth.can,
+      canView: auth.canView,
+      permissions: auth.permissions,
+      role: auth.role ?? "admin",
+    };
+  }
+
+  return fallback;
 }
 
 export default usePermissions;

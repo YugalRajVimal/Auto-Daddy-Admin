@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
+import { authHeaders } from "../../../api/client";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
 // Representation according to CarDetails.schema.js (companyName, models)
@@ -15,10 +16,7 @@ interface CarDetailsItem {
   updatedAt?: string;
 }
 
-// Utility to get token from localStorage (edit per your auth strategy)
-const getToken = () => {
-  return localStorage.getItem("admin-token") || "";
-};
+const getToken = () => authHeaders().Authorization || "";
 
 const VehicleType: React.FC = () => {
   const [carDetails, setCarDetails] = useState<CarDetailsItem[]>([]);

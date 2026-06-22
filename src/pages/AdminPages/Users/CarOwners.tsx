@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
+import { authHeaders } from "../../../api/client";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
   CompactAutoGrowTextarea,
@@ -84,8 +85,7 @@ function getMakeModel(v: VehicleType): string {
   return "-";
 }
 function getToken(): Record<string, string> {
-  const t = localStorage.getItem("admin-token");
-  return t ? { Authorization: t } : {};
+  return authHeaders();
 }
 
 // ─── Green Card Styles ───────────────────────────────────────────────────────

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import {
   Spin,
   Typography,
@@ -10,10 +9,9 @@ import {
   Card,
 } from "antd";
 import dayjs from "dayjs";
+import api from "../../../api/client";
 
 const { Title, Text } = Typography;
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 interface AdminDetails {
   _id: string;
@@ -43,13 +41,8 @@ const AdminProfile: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    const adminToken = localStorage.getItem("admin-token");
-    axios
-      .get(`${API_BASE_URL}/api/admin/profile`, {
-        headers: {
-          ...(adminToken ? { Authorization: `${adminToken}` } : {}),
-        },
-      })
+    api
+      .get("/api/admin/profile")
       .then((res) => {
         if (res.data && res.data.success && res.data.data) {
           setAdmin(res.data.data);

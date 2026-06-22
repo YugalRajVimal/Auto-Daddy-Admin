@@ -1,0 +1,132 @@
+{
+    "success": true,
+    "dashboard": {
+        "_id": "69f454c8d8906fa5b9e09bba",
+        "thoughtOfTheDay": "Push yourself, because no one else is going to do it for you. ",
+        "aboutUs": {
+            "heading": "About Our Auto Shop",
+            "desc": "We are committed to providing top-notch automobile services for all makes and models. Customer satisfaction is our priority."
+        },
+        "privacyPolicy": {
+            "heading": "Privacy Policy",
+            "desc": "Your privacy is important to us. All your data is handled securely and never shared with third parties without consent."
+        },
+        "FAQs": {
+            "heading": "Frequently Asked Questions",
+            "desc": "1. What services do you provide?\n2. What payment methods are accepted?\n3. How do I book a service?"
+        },
+        "documents": {
+            "heading": "Important Documents",
+            "desc": "Here you'll find warranty, registration, and insurance documents required for various services."
+        },
+        "disclaimer": {
+            "heading": "Disclaimer",
+            "desc": "All repairs are subject to part availability. Pricing may vary based on model and condition."
+        },
+        "createdAt": "2025-05-01T00:00:00.000Z",
+        "__v": 0
+    },
+    "userProfile": {
+        "_id": "69738231be99999b1eef5f26",
+        "phone": "9999999999",
+        "isProfileComplete": true,
+        "createdAt": "2026-01-23T14:14:09.114Z",
+        "email": "abc999@gmail.com",
+        "name": "Priyanshu",
+        "role": "carowner",
+        "myVehicles": [
+            {
+                "_id": "69739f37adf02d19c844287a",
+                "licensePlateNo": "UK12VD2323",
+                "make": {
+                    "name": "Toyota2",
+                    "model": "T12"
+                },
+                "year": 2016
+            },
+            {
+                "_id": "697c4ef558497e4e75afb7a4",
+                "licensePlateNo": "UK12VD2323",
+                "make": {
+                    "name": "zxcvbnm",
+                    "model": "ABC"
+                },
+                "year": 2002
+            },
+            {
+                "_id": "69fda5b60f47fa54411679b2",
+                "licensePlateNo": "UK12VD2323",
+                "make": {
+                    "name": "zxcvbnm",
+                    "model": "ABC"
+                },
+                "year": 2002
+            },
+            {
+                "_id": "69feb52925c97052ea204597",
+                "licensePlateNo": "iosjis7373gs7",
+                "make": {
+                    "name": "zxcvbnm",
+                    "model": "ABC"
+                },
+                "year": 2002
+            },
+            {
+                "_id": "69feb55625c97052ea20459e",
+                "licensePlateNo": "iosjis7373gs7",
+                "make": {
+                    "name": "zxcvbnm",
+                    "model": "ABC"
+                },
+                "year": 2002
+            },
+            {
+                "_id": "69feb59825c97052ea2045a5",
+                "licensePlateNo": "UP75AV5463",
+                "make": {
+                    "name": "Suzuki",
+                    "model": "Baleno"
+                },
+                "year": 2025
+            }
+        ],
+        "profilePhoto": "Uploads/UserProfiles/1778230893712-Screenshot_2026-02-12_at_12.07.26_AM.png"
+    },
+    "nextService": {
+        "jobCardId": "69f857d15d638b6397dcd0cb",
+        "vehicle": {
+            "_id": "69739f37adf02d19c844287a",
+            "licensePlateNo": "UK12VD2323",
+            "make": {
+                "name": "Toyota2",
+                "model": "T12"
+            },
+            "year": 2016
+        },
+        "customer": {
+            "_id": "69738231be99999b1eef5f26",
+            "phone": "9999999999",
+            "email": "abc999@gmail.com",
+            "name": "Priyanshu",
+            "profilePhoto": "Uploads/UserProfiles/1778230893712-Screenshot_2026-02-12_at_12.07.26_AM.png"
+        },
+        "dueOdometerReading": 0,
+        "createdAt": "2026-05-04T08:24:49.840Z",
+        "issueDescription": "",
+        "serviceType": "Repair",
+        "priorityLevel": "Normal",
+        "status": "Pending",
+        "services": [
+            {
+                "service": "69a01e990350740b4d61efbb",
+                "subServices": [
+                    {
+                        "name": "Basic Oil Change",
+                        "desc": "Engine oil + filter replacement",
+                        "price": 35629
+                    }
+                ]
+            }
+        ]
+    }
+}

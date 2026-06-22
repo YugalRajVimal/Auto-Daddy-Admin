@@ -1,0 +1,103 @@
+{
+  "expo": {
+    "name": "AutoDaddy",
+    "slug": "com.autodaddy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/app-icon-square.png",
+    "splash": {
+      "image": "./assets/images/logo-rectangle.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#DCFCE7"
+    },
+    "scheme": "comautodaddy",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "icon": "./assets/images/app-icon-square.png",
+      "bundleIdentifier": "com.autodaddy",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "amazonpay",
+          "upi",
+          "credpay",
+          "bhim",
+          "paytmmp",
+          "phonepe",
+          "tez",
+          "navipay",
+          "mobikwik",
+          "myairtel",
+          "popclubapp",
+          "super",
+          "kiwi",
+          "simplypayupi",
+          "whatsapp"
+        ]
+      }
+    },
+    "android": {
+      "softwareKeyboardLayoutMode": "pan",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/app-icon-adaptive-foreground.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.appeasing.com.autodaddy",
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo-rectangle.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#DCFCE7",
+          "dark": {
+            "backgroundColor": "#DCFCE7"
+          },
+          "android": {
+            "image": "./assets/images/splash-icon-android.png",
+            "imageWidth": 260,
+            "resizeMode": "contain",
+            "backgroundColor": "#DCFCE7"
+          }
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-secure-store",
+      "@react-native-firebase/messaging",
+      "@react-native-firebase/app",
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "AutoDaddy needs access to your photos to upload profile pictures, vehicle images, and documents."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "AutoDaddy uses your location to set your business on the map and improve nearby shop results."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

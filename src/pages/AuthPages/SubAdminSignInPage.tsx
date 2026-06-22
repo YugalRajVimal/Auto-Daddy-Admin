@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { FiMail, FiLock } from "react-icons/fi";
+import { useAuth, getPostLoginRedirect } from "../../auth";
 
-const SUBADMIN_TOKEN_KEY = "admin-token";
-const SUBADMIN_ROLE_KEY = "admin-role";
-const ADMIN_HOME = "/admin";
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
 const LOGO = "/logo.png";
 
 export default function SubAdminSignInPage() {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,11 +24,15 @@ export default function SubAdminSignInPage() {
       });
       const data = await res.json();
       if (res.ok && data.token) {
-        localStorage.setItem(SUBADMIN_TOKEN_KEY, data.token);
-        localStorage.setItem(SUBADMIN_ROLE_KEY, "subadmin");
-        localStorage.setItem("subadmin-permissions", JSON.stringify(data.user?.permissions || {}));
+        login({
+          token: data.token,
+          role: "subadmin",
+          permissions: data.user?.permissions || {},
+        });
         setStatus("Login successful!");
-        setTimeout(() => { window.location.href = ADMIN_HOME; }, 600);
+        setTimeout(() => {
+          window.location.href = getPostLoginRedirect("subadmin");
+        }, 600);
       } else {
         setStatus(data?.message || "Login failed");
       }

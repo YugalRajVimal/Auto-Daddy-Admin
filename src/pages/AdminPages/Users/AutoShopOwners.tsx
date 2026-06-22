@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
+import { authHeaders } from "../../../api/client";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
   CompactAutoGrowTextarea,
@@ -93,8 +94,7 @@ function fmtDate(d?: string): string {
   return new Date(d).toISOString().slice(0, 10);
 }
 function getToken(): Record<string, string> {
-  const t = localStorage.getItem("admin-token");
-  return t ? { Authorization: t } : {};
+  return authHeaders();
 }
 function getStatus(owner: AutoShopOwnerType): string {
   if (owner.status === "deleted") return "Deleted";

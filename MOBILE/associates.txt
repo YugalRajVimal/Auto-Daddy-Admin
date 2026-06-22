@@ -1,0 +1,30 @@
+Name
+    Business Associate
+
+    I am online/offline
+
+    Quick actions
+
+        My leads
+        my customers
+        wallet-> collections
+        My Visits (orders)
+
+    TOTD
+
+    Bottom Navigation
+        Home
+        Brochure-> email 
+        Profile
+        Website Templates
+
+    
+    My leads-> admin panel-> leads entered->
+        cold leads-> actions: 
+
+
+    domain expiry-> (whois)
+
+
+    wallet-> 
+        

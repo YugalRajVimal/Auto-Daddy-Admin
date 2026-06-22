@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import OtpInput from "../../components/form/input/OtpInput";
+import { useAuth, getPostLoginRedirect } from "../../auth";
 
-const ADMIN_ROLE = "admin";
-const ADMIN_TOKEN_KEY = "admin-token";
-const ADMIN_HOME = "/admin";
+const ADMIN_ROLE = "admin" as const;
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
 const LOGO = "/logo.png";
 const RESEND_COOLDOWN_SEC = 5 * 60;
@@ -29,6 +28,7 @@ function isValidEmail(value: string) {
 
 export default function AdminSignInPage() {
   const navigate = useNavigate();
+  const { login, isAuthenticated, isLoading, role } = useAuth();
   const [countryId, setCountryId] = useState("CA");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -38,6 +38,12 @@ export default function AdminSignInPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && role) {
+      navigate(getPostLoginRedirect(role), { replace: true });
+    }
+  }, [isLoading, isAuthenticated, role, navigate]);
 
   useEffect(() => {
     if (!otpSent || resendCooldown <= 0) return;
@@ -111,10 +117,10 @@ export default function AdminSignInPage() {
       });
       const data = await res.json();
       if (res.ok && data.token) {
-        localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
+        login({ token: data.token, role: ADMIN_ROLE });
         setStatus("Login successful!");
         setTimeout(() => {
-          navigate(ADMIN_HOME, { replace: true });
+          navigate(getPostLoginRedirect(ADMIN_ROLE), { replace: true });
         }, 800);
       } else {
         setStatus(data?.message || "OTP verification failed");
