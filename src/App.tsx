@@ -20,6 +20,7 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import AdminSignInPage from "./pages/AuthPages/AdminSignInPage";
 import AutoShopOwnerOnboarding from "./pages/AutoShopOwnerOnboarding";
 import { adminRoutes } from "./portals/admin/routes";
+import { ownerRoutes, shopRoutes } from "./portals/owner/routes";
 
 export default function App() {
   return (
@@ -42,9 +43,10 @@ export default function App() {
 
           <Routes>
             <Route index path="/" element={<AdminSignInPage />} />
-            <Route path="/admin/signin" element={<AdminSignInPage />} />
 
             {adminRoutes}
+            {ownerRoutes}
+            {shopRoutes}
 
             {/* Sub-admin login flow not needed for now
             <Route path="/subadmin/signin" element={<SubAdminSignInPage />} />

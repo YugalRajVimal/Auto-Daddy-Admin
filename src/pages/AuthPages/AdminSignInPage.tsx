@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import OtpInput from "../../components/form/input/OtpInput";
+import {
+  buildSessionMeta,
+  getJson,
+  mapBackendRoleToUserRole,
+  normalizePhoneDigits,
+  sendMobileOtp,
+  verifyMobileOtp,
+} from "../../api/mobileAuth";
 import { useAuth, getPostLoginRedirect } from "../../auth";
+import type { UserRole } from "../../auth/types";
 
 const ADMIN_ROLE = "admin" as const;
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
@@ -53,11 +62,10 @@ export default function AdminSignInPage() {
     return () => clearTimeout(timer);
   }, [otpSent, resendCooldown]);
 
-  const countryCode =
-    CALLING_CODES.find((c) => c.id === countryId)?.code ?? "+1";
-  const phoneDigits = phone.replace(/\D/g, "");
+  const countryCode = CALLING_CODES.find((c) => c.id === countryId)?.code ?? "+1";
+  const phoneDigits = normalizePhoneDigits(phone);
 
-  function getAuthPayload() {
+  function getAdminAuthPayload() {
     if (loginWithEmail) {
       return { email: email.trim().toLowerCase(), role: ADMIN_ROLE };
     }
@@ -73,25 +81,36 @@ export default function AdminSignInPage() {
     setStatus(null);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/signin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(getAuthPayload()),
-      });
-      const data = await res.json();
+      if (loginWithEmail) {
+        const res = await fetch(`${API_BASE}/admin/signin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(getAdminAuthPayload()),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const isResend = otpSent;
+          setOtpSent(true);
+          setResendCooldown(RESEND_COOLDOWN_SEC);
+          if (isResend) setOtp("");
+          setStatus("OTP sent! Please check your email.");
+        } else {
+          setOtpSent(false);
+          setStatus(data?.message || "Failed to send OTP");
+        }
+        return;
+      }
+
+      const res = await sendMobileOtp(phoneDigits, countryCode);
       if (res.ok) {
         const isResend = otpSent;
         setOtpSent(true);
         setResendCooldown(RESEND_COOLDOWN_SEC);
         if (isResend) setOtp("");
-        setStatus(
-          loginWithEmail
-            ? "OTP sent! Please check your email."
-            : "OTP sent! Please check your phone."
-        );
+        setStatus("OTP sent! Please check your phone.");
       } else {
         setOtpSent(false);
-        setStatus(data?.message || "Failed to send OTP");
+        setStatus(res.data?.message || "Failed to send OTP");
       }
     } catch {
       setStatus("An error occurred.");
@@ -106,25 +125,88 @@ export default function AdminSignInPage() {
     await handleSendOtp();
   }
 
+  async function enrichMobileProfile(
+    token: string,
+    userRole: UserRole,
+    verifyData: Parameters<typeof buildSessionMeta>[0],
+    phone: string,
+    code: string
+  ) {
+    const session = {
+      token,
+      role: userRole,
+      meta: buildSessionMeta(verifyData, phone, code),
+      profile: {
+        name: verifyData.name,
+        phone,
+        profilePhoto: verifyData.profilePhoto ?? null,
+      },
+    };
+    login(session);
+
+    try {
+      const profileRes = await getJson<{
+        success?: boolean;
+        data?: { name?: string; city?: string; phone?: string; profilePhoto?: string | null };
+      }>("/api/user/profile", token);
+      const p = profileRes.data?.data;
+      if (profileRes.ok && p) {
+        login({
+          ...session,
+          profile: {
+            name: p.name ?? verifyData.name,
+            phone: p.phone ?? phone,
+            city: p.city,
+            profilePhoto: p.profilePhoto ?? verifyData.profilePhoto ?? null,
+          },
+        });
+      }
+    } catch {
+      // optional enrichment
+    }
+  }
+
   async function handleVerifyOtp() {
     setStatus(null);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/verify-account`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...getAuthPayload(), otp }),
-      });
-      const data = await res.json();
-      if (res.ok && data.token) {
-        login({ token: data.token, role: ADMIN_ROLE });
-        setStatus("Login successful!");
-        setTimeout(() => {
-          navigate(getPostLoginRedirect(ADMIN_ROLE), { replace: true });
-        }, 800);
-      } else {
-        setStatus(data?.message || "OTP verification failed");
+      if (loginWithEmail) {
+        const res = await fetch(`${API_BASE}/admin/verify-account`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...getAdminAuthPayload(), otp }),
+        });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          login({ token: data.token, role: ADMIN_ROLE });
+          setStatus("Login successful!");
+          setTimeout(() => {
+            navigate(getPostLoginRedirect(ADMIN_ROLE), { replace: true });
+          }, 800);
+        } else {
+          setStatus(data?.message || "OTP verification failed");
+        }
+        return;
       }
+
+      const res = await verifyMobileOtp(phoneDigits, countryCode, otp);
+      const data = res.data;
+      if (!res.ok || !data?.token) {
+        setStatus(data?.message || "OTP verification failed");
+        return;
+      }
+
+      const userRole = mapBackendRoleToUserRole(data.role);
+      if (!userRole) {
+        setStatus("This account type is not supported on the web app.");
+        return;
+      }
+
+      await enrichMobileProfile(data.token, userRole, data, phoneDigits, countryCode);
+      setStatus("Login successful!");
+      setTimeout(() => {
+        navigate(getPostLoginRedirect(userRole), { replace: true });
+      }, 800);
     } catch {
       setStatus("An error occurred.");
     } finally {
@@ -141,7 +223,6 @@ export default function AdminSignInPage() {
           </p>
 
           <div className="flex min-h-[320px] overflow-hidden rounded-xl bg-ad-mint shadow-[6px_6px_20px_rgba(0,0,0,0.12)] md:min-h-[360px]">
-            {/* Left branding */}
             <div className="hidden w-1/2 flex-col items-center justify-center border-r border-ad-green-dark/50 px-6 py-8 md:flex lg:px-8">
               <img
                 src={LOGO}
@@ -156,7 +237,6 @@ export default function AdminSignInPage() {
               </p>
             </div>
 
-            {/* Right form */}
             <div className="flex w-full flex-col justify-center px-6 py-8 sm:px-8 md:w-1/2 md:px-8 md:py-10">
               <div className="mb-5 flex justify-center md:hidden">
                 <img
@@ -168,10 +248,11 @@ export default function AdminSignInPage() {
 
               {status && (
                 <div
-                  className={`mb-4 rounded-lg border px-3 py-1.5 text-sm ${status.includes("successful") || status.includes("sent")
-                    ? "border-green-300 bg-green-50 text-green-800"
-                    : "border-red-300 bg-red-50 text-red-700"
-                    }`}
+                  className={`mb-4 rounded-lg border px-3 py-1.5 text-sm ${
+                    status.includes("successful") || status.includes("sent")
+                      ? "border-green-300 bg-green-50 text-green-800"
+                      : "border-red-300 bg-red-50 text-red-700"
+                  }`}
                 >
                   {status}
                 </div>
@@ -255,12 +336,7 @@ export default function AdminSignInPage() {
               ) : (
                 <div className="mx-auto w-full max-w-xs space-y-4">
                   <label className="block text-sm text-ad-green-dark">OTP</label>
-                  <OtpInput
-                    value={otp}
-                    onChange={setOtp}
-                    disabled={loading}
-                    autoFocus
-                  />
+                  <OtpInput value={otp} onChange={setOtp} disabled={loading} autoFocus />
                   <button
                     type="button"
                     onClick={handleVerifyOtp}

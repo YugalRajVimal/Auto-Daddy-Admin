@@ -17,6 +17,18 @@ export interface UserProfile {
   id?: string;
   name?: string;
   email?: string;
+  phone?: string;
+  city?: string;
+  profilePhoto?: string | null;
+}
+
+/** Extra fields from MOBILE OTP login (`/api/auth/verify-otp`). */
+export interface SessionMeta {
+  phone?: string;
+  countryCode?: string;
+  backendRole?: string;
+  isProfileComplete?: boolean | null;
+  isAutoShopBusinessProfileComplete?: boolean | null;
 }
 
 export interface Session {
@@ -25,6 +37,7 @@ export interface Session {
   permissions?: Permissions | null;
   isLogInViaSuperAdmin?: boolean;
   profile?: UserProfile;
+  meta?: SessionMeta;
 }
 
 export type AuthGuardReason =

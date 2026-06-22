@@ -4,6 +4,7 @@ import { RequireAuth } from "./RequireAuth";
 interface RequirePortalProps {
   portal: Portal;
   children: React.ReactNode;
+  signInPath?: string;
   unauthorizedPath?: string;
 }
 
@@ -11,10 +12,11 @@ interface RequirePortalProps {
 export function RequirePortal({
   portal,
   children,
+  signInPath,
   unauthorizedPath = "/admin/unauthorized",
 }: RequirePortalProps) {
   return (
-    <RequireAuth portal={portal} unauthorizedPath={unauthorizedPath}>
+    <RequireAuth portal={portal} signInPath={signInPath} unauthorizedPath={unauthorizedPath}>
       {children}
     </RequireAuth>
   );

@@ -205,14 +205,18 @@ export const adminOnlyNav: NavItem[] = [
   */
 ];
 
-export function getActivePrimaryItem(pathname: string, items: NavItem[]): NavItem | null {
+export function getActivePrimaryItem(
+  pathname: string,
+  items: NavItem[],
+  homePath = "/admin"
+): NavItem | null {
   for (const item of items) {
     const paths = item.matchPaths ?? [
       ...(item.path ? [item.path] : []),
       ...(item.subItems?.map((s) => s.path) ?? []),
     ];
     const matched = paths.some((p) => {
-      if (p === "/admin") return pathname === "/admin";
+      if (p === homePath) return pathname === homePath;
       return pathname === p || pathname.startsWith(`${p}/`);
     });
     if (matched) return item;

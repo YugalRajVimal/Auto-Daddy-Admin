@@ -27,14 +27,14 @@ export const ROLE_REGISTRY: Record<UserRole, RoleConfig> = {
     role: "car_owner",
     portal: "owner",
     homePath: "/owner",
-    signInPath: "/owner/signin",
+    signInPath: "/",
     label: "Car Owner",
   },
   auto_shop_owner: {
     role: "auto_shop_owner",
     portal: "shop",
     homePath: "/shop",
-    signInPath: "/shop/signin",
+    signInPath: "/",
     label: "Auto Shop Owner",
   },
   supervisor: {
