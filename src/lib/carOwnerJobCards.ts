@@ -39,6 +39,10 @@ export function jobChipLabel(jc: CarOwnerJobCard): string {
   return jobNo.toLowerCase().startsWith("job") ? jobNo : `Job # ${jobNo}`;
 }
 
+export function jobCardLicensePlate(jc: CarOwnerJobCard): string {
+  return jc.vehicleId?.licensePlateNo?.trim().toUpperCase() || "—";
+}
+
 export function formatJobCardDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";

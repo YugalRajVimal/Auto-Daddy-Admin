@@ -6,13 +6,13 @@ import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
 import { AddNewButton } from "../../components/admin/AdminPage";
 import {
-  CompactField,
   CompactFormPanel,
-  CompactFormRow,
   compactInputClass,
 } from "../../components/admin/ContentPanel";
 import OwnerAddVehicleForm from "../../components/owner/OwnerAddVehicleForm";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
+import OwnerInvoiceRow from "../../components/owner/OwnerInvoiceRow";
+import OwnerJobCardRow from "../../components/owner/OwnerJobCardRow";
 import VehiclePickerPopup from "../../components/owner/OwnerVehiclePicker";
 import { putFormData, putJson } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
@@ -20,23 +20,15 @@ import { useCarOwnerDocuments } from "../../hooks/useCarOwnerDocuments";
 import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
-import { useCarOwnerInvoices } from "../../hooks/useCarOwnerInvoices";
-import { formatCurrencyAmount } from "../../lib/currency";
-import {
-  businessName,
-  formatBusinessPhone,
-  formatJobCardDate,
-  jobChipLabel,
-  serviceTypeLabel,
-} from "../../lib/carOwnerJobCards";
+import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "../../hooks/useCarOwnerInvoices";
+import { businessName } from "../../lib/carOwnerJobCards";
+import { DUMMY_OWNER_INVOICES } from "../../lib/dummyOwnerInvoices";
 import {
   VEHICLE_DOCUMENT_FIELDS,
   type VehicleDocumentFieldKey,
 } from "../../lib/carOwnerDocuments";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
-import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
-import type { CarOwnerJobCard } from "../../types/carOwnerJobCards";
-import type { CarOwnerInvoiceRow } from "../../hooks/useCarOwnerInvoices";
+import { vehicleSidebarLabel, vehicleBracketLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
 
 type VehiclePanelSection = "vehicle-details" | "job-cards" | "invoices" | "documents" | "update-odometer";
 
@@ -341,19 +333,34 @@ function DocumentFieldRow({
 
 function VehicleDocumentsPanel({
   vehicleId,
+  licensePlate,
+  vehicleSubtitle,
   busyField,
   mutating,
   onUpload,
   fields,
 }: {
   vehicleId: string;
+  licensePlate?: string;
+  vehicleSubtitle?: string;
   busyField: string | null;
   mutating: boolean;
   onUpload: (vehicleId: string, field: VehicleDocumentFieldKey, file: File) => void;
   fields: Array<{ key: VehicleDocumentFieldKey; label: string; uri: string | null }>;
 }) {
+  const plate = licensePlate?.trim().toUpperCase() ?? "";
+
   return (
-    <div className="overflow-hidden rounded-md border border-[#b2e0a0] bg-[#e8ffe8] shadow-sm">
+    <div className="flex flex-col gap-3">
+      {plate ? (
+        <div className="text-center">
+          <p className="text-lg font-bold tracking-wide text-gray-900 sm:text-xl">{plate}</p>
+          {vehicleSubtitle ? (
+            <p className="mt-0.5 text-sm font-medium text-gray-600">{vehicleSubtitle}</p>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="overflow-hidden rounded-md border border-[#b2e0a0] bg-[#e8ffe8] shadow-sm">
       {fields.map((field) => {
         const fieldBusy = busyField === `${vehicleId}:${field.key}`;
         return (
@@ -369,71 +376,8 @@ function VehicleDocumentsPanel({
           />
         );
       })}
+      </div>
     </div>
-  );
-}
-
-function JobCardRow({ jc }: { jc: CarOwnerJobCard }) {
-  const shop = businessName(jc.business);
-  const phone = formatBusinessPhone(jc.business);
-  const service = serviceTypeLabel(jc);
-  const date = formatJobCardDate(jc.createdAt);
-
-  return (
-    <article className="flex overflow-hidden rounded-md shadow-sm">
-      <div className="flex w-[28%] min-w-[100px] max-w-[160px] shrink-0 items-center justify-center bg-[#006600] px-3 py-4 text-center sm:min-w-[120px]">
-        <p className="text-sm font-bold leading-tight text-white">{jobChipLabel(jc)}</p>
-      </div>
-
-      <div className="flex min-w-0 flex-1 items-center justify-between gap-4 bg-[#CCFFCC] px-4 py-3 sm:px-6">
-        <div className="min-w-0 flex-1 text-center sm:text-left">
-          <p className="text-sm font-bold text-gray-900">{shop}</p>
-          {phone ? (
-            <a href={`tel:${phone.replace(/\s/g, "")}`} className="text-sm font-semibold text-blue-700 hover:underline">
-              {phone}
-            </a>
-          ) : (
-            <p className="text-sm text-gray-500">—</p>
-          )}
-        </div>
-
-        <div className="shrink-0 text-center sm:min-w-[100px]">
-          <p className="text-sm font-bold text-[#008000]">{service}</p>
-          <p className="text-sm font-semibold text-blue-700">{date}</p>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function formatInvoiceDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-}
-
-function InvoiceCard({ row, countryCode }: { row: CarOwnerInvoiceRow; countryCode?: string }) {
-  return (
-    <article className="rounded-md bg-[#CCFFCC] px-4 py-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-bold text-gray-900">{row.shopName}</p>
-          <p className="text-xs font-semibold text-gray-600">
-            Job {row.jobNo}
-            {row.plate ? ` · ${row.plate}` : ""}
-          </p>
-          {row.vehicle ? <p className="text-xs text-gray-600">{row.vehicle}</p> : null}
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-bold text-ad-purple">{formatCurrencyAmount(row.amount, countryCode)}</p>
-          <p className="text-xs text-gray-600">{formatInvoiceDate(row.createdAt)}</p>
-        </div>
-      </div>
-      <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-gray-700">
-        {row.paymentStatus || "Unpaid"}
-        {row.paymentMethod ? ` · ${row.paymentMethod}` : ""}
-      </p>
-    </article>
   );
 }
 
@@ -443,20 +387,20 @@ function odometerToNumber(value: string | number | null | undefined): number | n
   return Number.isFinite(n) ? n : null;
 }
 
-function remainingKmLabel(due: number | null, reading: number | null): string {
-  if (due == null || reading == null) return "—";
-  const remaining = due - reading;
-  if (remaining > 0) return `${remaining.toLocaleString()} km`;
-  if (remaining === 0) return "Due now";
-  return `${Math.abs(remaining).toLocaleString()} km overdue`;
+function remainingKmNumber(due: number | null, reading: number | null): number | null {
+  if (due == null || reading == null) return null;
+  return due - reading;
 }
 
-const odometerReadOnlyClass =
-  "flex min-h-[30px] w-full cursor-default select-none items-center rounded-sm border border-gray-200 bg-gray-100 px-2 py-1.5 text-sm font-medium text-gray-600";
-
-function OdometerReadOnlyValue({ value }: { value: string }) {
-  return <div className={odometerReadOnlyClass}>{value}</div>;
+function remainingKmStatusText(remaining: number | null): string {
+  if (remaining == null) return "Service Due after Kms";
+  if (remaining > 0) return "Service Due after Kms";
+  if (remaining === 0) return "Service due now";
+  return "Service overdue by Kms";
 }
+
+const odometerDisplayClass =
+  "flex min-h-[30px] w-full cursor-default select-none items-center border border-gray-400 bg-white px-2 py-1.5 text-sm text-gray-800";
 
 function OdometerUpdatePanel({
   vehicle,
@@ -474,8 +418,9 @@ function OdometerUpdatePanel({
       ? String(vehicle.odometerReading).trim()
       : "";
   const dueNum = odometerToNumber(vehicle.dueOdometerReading);
-  const dueDisplay = dueNum != null ? `${dueNum.toLocaleString()} km` : "—";
+  const dueDisplay = dueNum != null ? dueNum.toLocaleString() : "—";
   const plate = vehicle.licensePlateNo?.trim() ?? "";
+  const imageUri = vehicleImageUri(vehicle);
 
   const [value, setValue] = useState(current);
   const [saving, setSaving] = useState(false);
@@ -483,7 +428,13 @@ function OdometerUpdatePanel({
   const parsed = value.trim() ? Number(value.trim()) : null;
   const currentNum = current ? Number(current) : null;
   const readingForRemaining = parsed != null && Number.isFinite(parsed) ? parsed : currentNum;
-  const remainingKm = remainingKmLabel(dueNum, readingForRemaining);
+  const remainingNum = remainingKmNumber(dueNum, readingForRemaining);
+  const remainingDisplay =
+    remainingNum == null
+      ? "—"
+      : remainingNum <= 0
+        ? Math.abs(remainingNum).toLocaleString()
+        : remainingNum.toLocaleString();
   const serviceByDisplay = serviceBy?.trim() || "—";
   const canSave =
     !saving &&
@@ -524,60 +475,87 @@ function OdometerUpdatePanel({
   };
 
   return (
-    <CompactFormPanel
-      className="!mb-0"
-      footer={
-        <div className="flex flex-wrap items-stretch justify-between gap-2 border-t border-ad-form-border bg-ad-form-bg">
-          <div className="flex min-w-[180px] flex-1 items-center bg-ad-form-required-bg px-3 py-2.5 text-xs text-gray-800">
-            {error ? <span className="text-red-600">{error}</span> : "\u00a0"}
-          </div>
-          <div className="flex items-center gap-2 px-3 py-2.5">
+    <div className="w-full">
+      <h2 className="mb-3 text-xl font-bold text-ad-purple">Update Odometer</h2>
+
+      <CompactFormPanel
+        className="!mb-0"
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-4 py-2.5">
+            {error ? <p className="mr-auto text-xs text-red-600">{error}</p> : null}
             <button
               type="button"
               disabled={!canSave}
               onClick={() => void handleSave()}
-              className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving ? "Saving…" : "Save odometer"}
-              <span aria-hidden className="text-base leading-none">
-                →
-              </span>
+              {saving ? "Saving…" : "Save"}
             </button>
+            <span className="text-xs text-gray-700">
+              or{" "}
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setValue(current)}
+                className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-50"
+              >
+                Reset
+              </button>
+            </span>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="flex w-full shrink-0 flex-col sm:w-[132px]">
+            <div className="flex aspect-square w-full max-w-[132px] items-center justify-center overflow-hidden border border-gray-300 bg-white">
+              {imageUri ? (
+                <img src={imageUri} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-xs font-semibold text-gray-400">No image</span>
+              )}
+            </div>
+            <div className="w-full max-w-[132px] bg-ad-green-dark px-2 py-2 text-center text-sm font-bold tracking-wide text-white">
+              {plate || "—"}
+            </div>
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label htmlFor="odometer-input" className="mb-1 block text-sm font-medium text-gray-900">
+                  New Odometer
+                </label>
+                <input
+                  id="odometer-input"
+                  type="text"
+                  inputMode="numeric"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder=""
+                  disabled={saving}
+                  className={compactInputClass}
+                />
+              </div>
+
+              <div>
+                <p className="mb-1 text-sm font-medium text-gray-900">Due On</p>
+                <div className={odometerDisplayClass}>{dueDisplay}</div>
+              </div>
+
+              <div>
+                <p className="mb-1 text-sm font-medium text-gray-900">Auto shop</p>
+                <div className={odometerDisplayClass}>{serviceByDisplay}</div>
+              </div>
+            </div>
+
+            <p className="mt-5 text-center text-sm font-bold text-blue-600">
+              {remainingKmStatusText(remainingNum)}{" "}
+              <span className="text-4xl font-bold leading-none">{remainingDisplay}</span>
+            </p>
           </div>
         </div>
-      }
-    >
-      <CompactFormRow>
-        <CompactField label="License plate" className="min-w-[90px] flex-1">
-          <OdometerReadOnlyValue value={plate || "—"} />
-        </CompactField>
-
-        <CompactField label="CURRENT READING" className="min-w-[90px] flex-1">
-          <input
-            id="odometer-input"
-            type="text"
-            inputMode="numeric"
-            value={value}
-            onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, ""))}
-            placeholder="e.g. 45000"
-            disabled={saving}
-            className={compactInputClass}
-          />
-        </CompactField>
-
-        <CompactField label="SERVICE DUE ON" className="min-w-[90px] flex-1">
-          <OdometerReadOnlyValue value={dueDisplay} />
-        </CompactField>
-
-        <CompactField label="REMAINING Km" className="min-w-[90px] flex-1">
-          <OdometerReadOnlyValue value={remainingKm} />
-        </CompactField>
-
-        <CompactField label="SERVICE BY" className="min-w-[90px] flex-1">
-          <OdometerReadOnlyValue value={serviceByDisplay} />
-        </CompactField>
-      </CompactFormRow>
-    </CompactFormPanel>
+      </CompactFormPanel>
+    </div>
   );
 }
 
@@ -617,6 +595,12 @@ export default function OwnerVehiclesPage() {
   const openSection = (section: VehiclePanelSection) => {
     if (vehicles.length === 0) {
       toast.info("Add a vehicle first.");
+      return;
+    }
+
+    if (section === "invoices") {
+      setActiveSection("invoices");
+      setPopupSection(null);
       return;
     }
 
@@ -670,10 +654,19 @@ export default function OwnerVehiclesPage() {
     }
   };
 
-  const vehiclePlate = selectedVehicle?.licensePlateNo?.trim().toUpperCase() ?? "";
-  const vehicleInvoices = [...paidInvoices, ...unpaidInvoices].filter(
-    (row) => vehiclePlate && row.plate.toUpperCase() === vehiclePlate
+  const apiInvoices = [...paidInvoices, ...unpaidInvoices].filter(
+    (row, index, list) => list.findIndex((r) => r.id === row.id) === index
   );
+  const visibleInvoices = (() => {
+    const seen = new Set<string>();
+    const rows: CarOwnerInvoiceRow[] = [];
+    for (const row of [...DUMMY_OWNER_INVOICES, ...apiInvoices]) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      rows.push(row);
+    }
+    return rows;
+  })();
 
   const documentFields = VEHICLE_DOCUMENT_FIELDS.map((field) => {
     const match = documentSection?.fields.find((f) => f.key === field.key);
@@ -717,7 +710,34 @@ export default function OwnerVehiclesPage() {
       );
     }
 
-    if (!activeSection || !selectedVehicle) {
+    if (!activeSection) {
+      return <VehiclesPanelPlaceholder />;
+    }
+
+    if (activeSection === "invoices") {
+      if (invoicesLoading) {
+        return (
+          <div className="flex min-h-[320px] items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
+          </div>
+        );
+      }
+      if (invoicesError && visibleInvoices.length === 0) {
+        return <p className="text-sm text-gray-600">{invoicesError}</p>;
+      }
+      if (visibleInvoices.length === 0) {
+        return <p className="text-sm text-gray-600">No invoices yet.</p>;
+      }
+      return (
+        <div className="flex flex-col gap-3">
+          {visibleInvoices.map((row) => (
+            <OwnerInvoiceRow key={row.id} row={row} countryCode={countryCode} />
+          ))}
+        </div>
+      );
+    }
+
+    if (!selectedVehicle) {
       return <VehiclesPanelPlaceholder />;
     }
 
@@ -742,6 +762,8 @@ export default function OwnerVehiclesPage() {
         return (
           <VehicleDocumentsPanel
             vehicleId={selectedVehicle.id}
+            licensePlate={selectedVehicle.licensePlateNo ?? undefined}
+            vehicleSubtitle={vehicleBracketLabel(selectedVehicle)}
             fields={documentFields}
             busyField={busyField}
             mutating={mutating}
@@ -766,29 +788,7 @@ export default function OwnerVehiclesPage() {
         return (
           <div className="flex flex-col gap-3">
             {jobCards.map((jc) => (
-              <JobCardRow key={jc._id} jc={jc} />
-            ))}
-          </div>
-        );
-
-      case "invoices":
-        if (invoicesLoading) {
-          return (
-            <div className="flex min-h-[320px] items-center justify-center">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
-            </div>
-          );
-        }
-        if (invoicesError) {
-          return <p className="text-sm text-gray-600">{invoicesError}</p>;
-        }
-        if (vehicleInvoices.length === 0) {
-          return <p className="text-sm text-gray-600">No invoices for this vehicle yet.</p>;
-        }
-        return (
-          <div className="flex flex-col gap-3">
-            {vehicleInvoices.map((row) => (
-              <InvoiceCard key={row.id} row={row} countryCode={countryCode} />
+              <OwnerJobCardRow key={jc._id} jc={jc} countryCode={countryCode} />
             ))}
           </div>
         );
@@ -815,7 +815,9 @@ export default function OwnerVehiclesPage() {
 
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="font-serif text-2xl text-gray-600 md:text-3xl">Vehicles</h1>
-        {!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : null}
+        {!showForm && (activeSection === null || activeSection === "vehicle-details") ? (
+          <AddNewButton onClick={() => setShowForm(true)} />
+        ) : null}
       </div>
 
       {showForm ? (
@@ -851,7 +853,7 @@ export default function OwnerVehiclesPage() {
                 section="invoices"
                 label="Invoice Details"
                 active={activeSection === "invoices"}
-                popupOpen={popupSection === "invoices"}
+                popupOpen={false}
                 vehicles={vehicles}
                 onSectionClick={openSection}
                 onVehicleSelect={handleVehiclePicked}

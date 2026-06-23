@@ -75,7 +75,13 @@ export type CarOwnerInvoiceRow = {
   createdAt: string;
   paymentStatus: string;
   paymentMethod?: string;
+  phone?: string;
+  service?: string;
 };
+
+export function isPaidInvoiceRow(row: CarOwnerInvoiceRow): boolean {
+  return row.paymentStatus.trim().toLowerCase() === "paid";
+}
 
 function toInvoiceRow(jc: CarOwnerJobCard): CarOwnerInvoiceRow {
   return {

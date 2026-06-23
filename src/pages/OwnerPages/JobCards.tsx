@@ -2,53 +2,16 @@ import { useEffect, useState } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
+import OwnerJobCardRow from "../../components/owner/OwnerJobCardRow";
 import OwnerVehicleSidebar from "../../components/owner/OwnerVehicleSidebar";
+import { useAuth } from "../../auth";
 import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
-import {
-  businessName,
-  formatBusinessPhone,
-  formatJobCardDate,
-  jobChipLabel,
-  serviceTypeLabel,
-} from "../../lib/carOwnerJobCards";
-import type { CarOwnerJobCard } from "../../types/carOwnerJobCards";
-
-function JobCardRow({ jc }: { jc: CarOwnerJobCard }) {
-  const shop = businessName(jc.business);
-  const phone = formatBusinessPhone(jc.business);
-  const service = serviceTypeLabel(jc);
-  const date = formatJobCardDate(jc.createdAt);
-
-  return (
-    <article className="flex overflow-hidden rounded-md shadow-sm">
-      <div className="flex w-[28%] min-w-[100px] max-w-[160px] shrink-0 items-center justify-center bg-[#006600] px-3 py-4 text-center sm:min-w-[120px]">
-        <p className="text-sm font-bold leading-tight text-white">{jobChipLabel(jc)}</p>
-      </div>
-
-      <div className="flex min-w-0 flex-1 items-center justify-between gap-4 bg-[#CCFFCC] px-4 py-3 sm:px-6">
-        <div className="min-w-0 flex-1 text-center sm:text-left">
-          <p className="text-sm font-bold text-gray-900">{shop}</p>
-          {phone ? (
-            <a href={`tel:${phone.replace(/\s/g, "")}`} className="text-sm font-semibold text-blue-700 hover:underline">
-              {phone}
-            </a>
-          ) : (
-            <p className="text-sm text-gray-500">—</p>
-          )}
-        </div>
-
-        <div className="shrink-0 text-center sm:min-w-[100px]">
-          <p className="text-sm font-bold text-[#008000]">{service}</p>
-          <p className="text-sm font-semibold text-blue-700">{date}</p>
-        </div>
-      </div>
-    </article>
-  );
-}
 
 export default function OwnerJobCardsPage() {
+  const { session } = useAuth();
+  const countryCode = session?.meta?.countryCode;
   const { faqsHeading, faqsDescription } = useCarOwnerDashboard();
   const { vehicles, loading: vehiclesLoading, refresh: refreshVehicles } = useCarOwnerVehicles();
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
@@ -117,7 +80,7 @@ export default function OwnerJobCardsPage() {
           ) : (
             <div className="flex flex-col gap-3">
               {items.map((jc) => (
-                <JobCardRow key={jc._id} jc={jc} />
+                <OwnerJobCardRow key={jc._id} jc={jc} countryCode={countryCode} />
               ))}
             </div>
           )}

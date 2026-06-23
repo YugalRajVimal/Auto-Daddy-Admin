@@ -77,3 +77,11 @@ export function vehicleSidebarLabel(v: CarOwnerVehicle): string {
   if (makeName && model) return `${makeName}-${model}`;
   return vehicleTitle(v);
 }
+
+export function vehicleBracketLabel(v: CarOwnerVehicle): string {
+  const make = (v.make?.name ?? "").trim();
+  const model = (v.make?.model ?? "").trim();
+  const year = v.year != null && String(v.year).trim() ? String(v.year).trim() : "";
+  const parts = [make, model, year].filter(Boolean);
+  return parts.length ? `(${parts.join(" ")})` : "";
+}

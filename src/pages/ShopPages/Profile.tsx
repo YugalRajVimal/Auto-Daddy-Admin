@@ -64,8 +64,8 @@ export default function ShopProfilePage() {
           <ContentPanel title="Personal Profile" action={<ShopPersonalProfileEditor user={user} onSaved={() => void refresh()} />}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Name" value={user?.name} />
-              <Field label="Email" value={user?.email} />
               <Field label="Phone" value={user?.phone} />
+              <Field label="email" value={user?.email} />
               <Field label="Address" value={user?.address} />
               <Field label="Pincode" value={user?.pincode} />
             </div>
@@ -77,9 +77,9 @@ export default function ShopProfilePage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Business Name" value={business?.businessName} />
               <Field label="Phone" value={business?.businessPhone} />
+              <Field label="email" value={business?.email} />
               <Field label="City" value={business?.city} />
               <Field label="Address" value={business?.address} />
-              <Field label="Email" value={business?.email} />
               <Field label="HST Number" value={business?.hstNumber} />
             </div>
           </ContentPanel>
