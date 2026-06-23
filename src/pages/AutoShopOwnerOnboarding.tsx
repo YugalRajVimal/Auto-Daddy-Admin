@@ -211,7 +211,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
   const currentStepNum = step === "form" ? 1 : step === "otp" ? 2 : 3;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-gray-100">
+    <div className="flex min-h-screen items-center justify-center">
       <div className="max-w-lg w-full mx-auto bg-white rounded-3xl shadow-2xl border border-gray-200 p-0 overflow-hidden">
         {/* Header with logo and title */}
         <div className="bg-primary-700 py-7 px-8 flex flex-col items-center">

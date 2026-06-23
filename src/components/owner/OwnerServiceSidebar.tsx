@@ -1,40 +1,37 @@
-import { useState } from "react";
-import { FiChevronDown, FiChevronRight } from "react-icons/fi";
-import type { ServiceCategory } from "../../hooks/useOwnerPortal";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { FiChevronDown } from "react-icons/fi";
+import PortalSidebarButton from "../admin/PortalSidebarButton";
+import type { ServiceCategory, ServiceSubItem } from "../../hooks/useOwnerPortal";
 
 type OwnerServiceSidebarProps = {
   indoor: ServiceCategory[];
   outdoor: ServiceCategory[];
   loading?: boolean;
   onFaqsClick?: () => void;
+  onNextDueServiceClick?: () => void;
+  nextDueServiceActive?: boolean;
   selectedServiceId?: string | null;
   onServiceSelect?: (service: ServiceCategory) => void;
+  onSubServiceSelect?: (service: ServiceCategory, subService: ServiceSubItem) => void;
 };
 
 function SectionHeader({
   label,
-  variant,
   expanded,
   onToggle,
 }: {
   label: string;
-  variant: "indoor" | "outdoor";
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const styles =
-    variant === "indoor"
-      ? "bg-[#008000] hover:bg-[#006600]"
-      : "bg-[#2563eb] hover:bg-[#1d4ed8]";
-
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-expanded={expanded}
-      className={`flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm font-bold text-white transition-colors ${styles}`}
+      className="flex w-full items-center justify-between rounded-full border border-blue-600 bg-blue-100 px-4 py-2.5 text-left text-sm font-bold uppercase tracking-wide text-blue-700 transition-colors hover:bg-blue-200/80"
     >
-      <span>{label}</span>
+      <span className="min-w-0 flex-1">{label}</span>
       <FiChevronDown
         className={`shrink-0 text-base transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
         aria-hidden
@@ -43,105 +40,203 @@ function SectionHeader({
   );
 }
 
-function ServiceButton({
-  name,
-  active,
-  onClick,
+function SubServicePopup({
+  subServices,
+  onSelect,
 }: {
-  name: string;
-  active?: boolean;
-  onClick?: () => void;
+  subServices: ServiceSubItem[];
+  onSelect: (sub: ServiceSubItem) => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center justify-between rounded-md border px-3 py-2.5 text-left text-sm font-bold transition-colors ${
-        active
-          ? "border-ad-purple bg-white text-ad-purple ring-2 ring-ad-purple"
-          : "border-ad-purple bg-[#FDE4D0] text-ad-purple hover:bg-[#f5c9a8]"
-      }`}
+    <div
+      className="absolute left-0 top-full z-50 mt-1.5 w-full min-w-[220px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl lg:left-[calc(100%+8px)] lg:top-0 lg:mt-0 lg:w-max lg:min-w-[260px] lg:max-w-[320px]"
+      role="menu"
     >
-      <span>{name}</span>
-      <FiChevronRight className="shrink-0 text-base" aria-hidden />
-    </button>
+      {subServices.map((sub) => (
+        <button
+          key={sub.id ?? sub.name}
+          type="button"
+          role="menuitem"
+          onClick={() => onSelect(sub)}
+          className="block w-full px-4 py-2.5 text-left text-sm leading-snug text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+        >
+          {sub.name}
+        </button>
+      ))}
+    </div>
   );
 }
+
+function ServiceItem({
+  item,
+  active,
+  popupOpen,
+  onClick,
+  onSubSelect,
+}: {
+  item: ServiceCategory;
+  active: boolean;
+  popupOpen: boolean;
+  onClick: () => void;
+  onSubSelect: (sub: ServiceSubItem) => void;
+}) {
+  const hasSubs = item.subServices.length > 0;
+
+  return (
+    <div className="relative">
+      <PortalSidebarButton label={item.name} active={active} onClick={onClick} />
+      {hasSubs && popupOpen ? (
+        <SubServicePopup subServices={item.subServices} onSelect={onSubSelect} />
+      ) : null}
+    </div>
+  );
+}
+
+function ServiceList({
+  items,
+  loading,
+  selectedServiceId,
+  popupServiceKey,
+  onServiceSelect,
+  onSubServiceSelect,
+  setPopupServiceKey,
+}: {
+  items: ServiceCategory[];
+  loading?: boolean;
+  selectedServiceId?: string | null;
+  popupServiceKey: string | null;
+  onServiceSelect?: (service: ServiceCategory) => void;
+  onSubServiceSelect?: (service: ServiceCategory, sub: ServiceSubItem) => void;
+  setPopupServiceKey: Dispatch<SetStateAction<string | null>>;
+}) {
+  if (loading) {
+    return <p className="px-1 text-xs text-gray-500">Loading…</p>;
+  }
+  if (items.length === 0) {
+    return <p className="px-1 text-xs text-gray-500">No services available</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {items.map((item) => {
+        const key = item.id ?? item.name;
+        const popupOpen = popupServiceKey === key;
+        const active = Boolean(item.id && selectedServiceId === item.id);
+
+        return (
+          <ServiceItem
+            key={key}
+            item={item}
+            active={active}
+            popupOpen={popupOpen}
+            onClick={() => {
+              onServiceSelect?.(item);
+              if (item.subServices.length > 0) {
+                setPopupServiceKey(popupOpen ? null : key);
+              } else {
+                setPopupServiceKey(null);
+              }
+            }}
+            onSubSelect={(sub) => {
+              onSubServiceSelect?.(item, sub);
+              onServiceSelect?.(item);
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+type ServiceSection = "indoor" | "outdoor" | null;
 
 export default function OwnerServiceSidebar({
   indoor,
   outdoor,
   loading,
   onFaqsClick,
+  onNextDueServiceClick,
+  nextDueServiceActive = false,
   selectedServiceId,
   onServiceSelect,
+  onSubServiceSelect,
 }: OwnerServiceSidebarProps) {
-  const [indoorOpen, setIndoorOpen] = useState(false);
-  const [outdoorOpen, setOutdoorOpen] = useState(true);
+  const [openSection, setOpenSection] = useState<ServiceSection>(null);
+  const [popupServiceKey, setPopupServiceKey] = useState<string | null>(null);
+  const asideRef = useRef<HTMLElement>(null);
+
+  const toggleSection = (section: Exclude<ServiceSection, null>) => {
+    setOpenSection((current) => (current === section ? null : section));
+    setPopupServiceKey(null);
+  };
+
+  const indoorOpen = openSection === "indoor";
+  const outdoorOpen = openSection === "outdoor";
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!asideRef.current?.contains(event.target as Node)) {
+        setPopupServiceKey(null);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  const listProps = {
+    loading,
+    selectedServiceId,
+    popupServiceKey,
+    onServiceSelect,
+    onSubServiceSelect,
+    setPopupServiceKey,
+  };
 
   return (
-    <aside className="flex w-full shrink-0 flex-col gap-2 lg:w-[220px] xl:w-[240px] lg:min-h-[calc(100vh-220px)]">
-      <div className="flex flex-col gap-2">
+    <aside
+      ref={asideRef}
+      className="relative flex w-full shrink-0 flex-col gap-3 overflow-visible lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]"
+    >
+      <div className="flex flex-col gap-3">
         <SectionHeader
           label="Indoor Services"
-          variant="indoor"
           expanded={indoorOpen}
-          onToggle={() => setIndoorOpen((open) => !open)}
+          onToggle={() => toggleSection("indoor")}
         />
-        {indoorOpen ? (
-          <div className="flex flex-col gap-2">
-            {loading ? (
-              <p className="px-1 text-xs text-gray-500">Loading…</p>
-            ) : indoor.length === 0 ? (
-              <p className="px-1 text-xs text-gray-500">No services available</p>
-            ) : (
-              indoor.map((item) => (
-                <ServiceButton
-                  key={item.id ?? item.name}
-                  name={item.name}
-                  active={Boolean(item.id && selectedServiceId === item.id)}
-                  onClick={() => onServiceSelect?.(item)}
-                />
-              ))
-            )}
-          </div>
-        ) : null}
+        {indoorOpen ? <ServiceList items={indoor} {...listProps} /> : null}
 
         <SectionHeader
           label="Out Door Services"
-          variant="outdoor"
           expanded={outdoorOpen}
-          onToggle={() => setOutdoorOpen((open) => !open)}
+          onToggle={() => toggleSection("outdoor")}
         />
-        {outdoorOpen ? (
-          <div className="flex flex-col gap-2">
-            {loading ? (
-              <p className="px-1 text-xs text-gray-500">Loading…</p>
-            ) : outdoor.length === 0 ? (
-              <p className="px-1 text-xs text-gray-500">No services available</p>
-            ) : (
-              outdoor.map((item) => (
-                <ServiceButton
-                  key={item.id ?? item.name}
-                  name={item.name}
-                  active={Boolean(item.id && selectedServiceId === item.id)}
-                  onClick={() => onServiceSelect?.(item)}
-                />
-              ))
-            )}
-          </div>
+        {outdoorOpen ? <ServiceList items={outdoor} {...listProps} /> : null}
+      </div>
+
+      <div className="mt-auto flex flex-col gap-3 pt-6">
+        {onNextDueServiceClick ? (
+          <button
+            type="button"
+            onClick={onNextDueServiceClick}
+            className={`w-full rounded-full border px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide transition-colors ${nextDueServiceActive
+                ? "border-blue-700 bg-blue-600 text-white shadow-md"
+                : "border-blue-600 bg-white/70 text-blue-600 hover:bg-white"
+              }`}
+          >
+            Next Due Service
+          </button>
+        ) : null}
+        {onFaqsClick ? (
+          <button
+            type="button"
+            onClick={onFaqsClick}
+            className="w-full rounded-full border border-blue-600 bg-white/70 px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-blue-600 transition-colors hover:bg-white"
+          >
+            FAQs
+          </button>
         ) : null}
       </div>
 
-      <div className="mt-auto pt-6">
-        <button
-          type="button"
-          onClick={onFaqsClick}
-          className="w-full rounded-md bg-ad-purple px-3 py-2.5 text-center text-sm font-bold text-white transition-colors hover:bg-ad-purple-dark"
-        >
-          FAQs
-        </button>
-      </div>
     </aside>
   );
 }

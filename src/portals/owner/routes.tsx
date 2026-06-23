@@ -33,6 +33,7 @@ export const ownerRoutes = (
     <Route path="/owner/vehicles" element={<OwnerVehiclesPage />} />
     <Route path="/owner/auto-shops" element={<OwnerAutoShopsPage />} />
     <Route path="/owner/job-cards" element={<OwnerJobCardsPage />} />
+    <Route path="/owner/reports" element={<OwnerInvoicesPage />} />
     <Route path="/owner/invoices" element={<OwnerInvoicesPage />} />
     <Route path="/owner/messages" element={<OwnerMessagesPage />} />
     <Route path="/owner/digi-purse" element={<OwnerDigiPursePage />} />

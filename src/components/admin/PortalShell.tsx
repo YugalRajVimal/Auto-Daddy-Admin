@@ -94,7 +94,7 @@ export default function PortalShell({
   const utilityLinkClass =
     "inline-block rounded-b-lg border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-300 sm:px-3 sm:text-xs";
   const utilityLinkActiveClass =
-    "inline-block rounded-b-lg border border-ad-purple bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ad-purple shadow-sm sm:px-3 sm:text-xs";
+    "inline-block rounded-b-lg border border-ad-purple bg-ad-glass px-2.5 py-0.5 text-[11px] font-semibold text-ad-purple shadow-sm sm:px-3 sm:text-xs";
 
   const subNavLinkClass =
     "relative block px-2 py-1.5 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1.5 lg:py-1.5 lg:text-xs lg:leading-snug lg:whitespace-normal";
@@ -139,16 +139,24 @@ export default function PortalShell({
             </div>
 
             <div className="col-span-2 flex items-center justify-center md:col-span-1 md:self-center">
-              {headerCenter ?? null}
+              {headerCenter ?? (
+                <p className="text-center font-serif text-base text-gray-700 md:text-lg lg:text-xl">
+                  Login as :{" "}
+                  <span className="text-lg font-bold text-ad-green md:text-xl lg:text-2xl">
+                    {loginAsDisplay}
+                  </span>
+                </p>
+              )}
             </div>
 
             <div className="col-span-2 flex flex-col items-end gap-2 md:col-span-1 md:col-start-3 md:row-start-1">
               <nav className="flex items-center gap-0 [&>*+*]:-ml-px" aria-label="Account actions">
-                {subscriptionDaysLeft != null ? (
-                  <span className={utilityLinkClass}>{subscriptionDaysLeft} Days Left</span>
-                ) : (
-                  <span className={utilityLinkClass}>Login as : {loginAsDisplay}</span>
-                )}
+                {headerCenter != null &&
+                  (subscriptionDaysLeft != null ? (
+                    <span className={utilityLinkClass}>{subscriptionDaysLeft} Days Left</span>
+                  ) : (
+                    <span className={utilityLinkClass}>Login as : {loginAsDisplay}</span>
+                  ))}
                 {utilityNav.length > 0 && (
                   <Link
                     to={utilityNavPath}
@@ -195,7 +203,7 @@ export default function PortalShell({
               const isActive = activePrimary?.name === item.name;
               const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
               const itemClass = `w-full px-3 py-1.5 text-center text-sm font-semibold transition-colors lg:rounded-b-lg lg:px-4 lg:py-2 lg:text-sm ${isActive
-                  ? "relative z-20 border border-ad-purple bg-white text-ad-purple shadow-md"
+                  ? "relative z-20 border border-ad-purple bg-ad-glass text-ad-purple shadow-md"
                   : "border border-ad-purple/80 bg-ad-purple text-white shadow-sm hover:bg-ad-purple-dark"
                 }`;
               return (
@@ -220,7 +228,7 @@ export default function PortalShell({
         </nav>
 
         {displaySubItems.length > 0 && (activePrimary || onUtilityNav) && (
-          <div className="relative z-10 mt-[3px] bg-white lg:mt-[5px]">
+          <div className="relative z-10 mt-[3px] bg-white/35 backdrop-blur-xl lg:mt-[5px]">
             <div className="px-3 sm:px-4">
               <ul className="hidden w-full items-stretch overflow-visible lg:flex lg:gap-px lg:pb-[7px]">
                 {primaryNav.map((item, colIndex) => {

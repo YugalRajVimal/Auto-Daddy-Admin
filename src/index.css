@@ -31,8 +31,11 @@
   --color-ad-pink-dark: #c06090;
   --color-ad-blue-light: #a8d4f0;
   --color-ad-blue-dark: #2060a0;
-  --color-ad-app-bg: #ffffff;
-  --color-ad-login-bg: #eef4fe;
+  --color-ad-bg-pink: #fae8f4;
+  --color-ad-bg-purple: #efe4f4;
+  --color-ad-bg-green: #e8f8e6;
+  --color-ad-bg-blue: #e6f2fb;
+  --color-ad-bg-white: #ffffff;
 
   --breakpoint-*: initial;
   --breakpoint-2xsm: 375px;
@@ -213,12 +216,74 @@
     cursor: pointer;
   }
 
+  html {
+    min-height: 100%;
+  }
+
   body {
     @apply relative font-normal font-outfit z-1 bg-ad-app-bg;
   }
+
+  #root {
+    min-height: 100vh;
+    isolation: isolate;
+  }
+}
+
+:root {
+  --ad-app-gradient:
+    radial-gradient(ellipse 72% 58% at 6% 10%, rgba(232, 160, 200, 0.48) 0%, transparent 52%),
+    radial-gradient(ellipse 68% 52% at 94% 14%, rgba(155, 48, 141, 0.26) 0%, transparent 50%),
+    radial-gradient(ellipse 74% 56% at 12% 92%, rgba(44, 140, 44, 0.3) 0%, transparent 52%),
+    radial-gradient(ellipse 70% 54% at 88% 88%, rgba(168, 212, 240, 0.52) 0%, transparent 50%),
+    radial-gradient(ellipse 85% 65% at 50% 48%, rgba(255, 255, 255, 0.92) 0%, transparent 58%),
+    linear-gradient(
+      135deg,
+      var(--color-ad-bg-pink) 0%,
+      var(--color-ad-bg-green) 28%,
+      var(--color-ad-bg-white) 50%,
+      var(--color-ad-bg-blue) 72%,
+      var(--color-ad-bg-purple) 100%
+    );
+}
+
+@utility bg-ad-app-bg {
+  background: var(--ad-app-gradient);
+  background-attachment: fixed;
+}
+
+@utility bg-ad-login-bg {
+  background: var(--ad-app-gradient);
+  background-attachment: fixed;
+}
+
+@utility bg-ad-glass {
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(20px) saturate(1.18);
+  -webkit-backdrop-filter: blur(20px) saturate(1.18);
+  box-shadow:
+    0 4px 24px rgba(100, 130, 170, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+@utility border-ad-glass {
+  border-color: rgba(255, 255, 255, 0.72);
 }
 
 @layer components {
+  .rounded-md.border.border-gray-200.bg-white,
+  .rounded-lg.border.border-gray-200.bg-white,
+  .rounded-xl.border.border-gray-200.bg-white,
+  .rounded-2xl.border.border-gray-200.bg-white {
+    background: rgba(255, 255, 255, 0.42);
+    backdrop-filter: blur(20px) saturate(1.18);
+    -webkit-backdrop-filter: blur(20px) saturate(1.18);
+    border-color: rgba(255, 255, 255, 0.72);
+    box-shadow:
+      0 4px 24px rgba(100, 130, 170, 0.07),
+      inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  }
+
   .dashboard-panel-card-wrap {
     position: relative;
     z-index: 0;

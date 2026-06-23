@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 export function ShopLoadingPanel({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`flex min-h-[420px] flex-1 items-center justify-center rounded-md border border-gray-200 bg-white lg:min-h-[calc(100vh-220px)] ${className}`}
+      className={`flex min-h-[420px] flex-1 items-center justify-center rounded-md border border-white/70 bg-ad-glass lg:min-h-[calc(100vh-220px)] ${className}`}
     >
       <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
     </div>
@@ -13,7 +13,7 @@ export function ShopLoadingPanel({ className = "" }: { className?: string }) {
 export function ShopEmptyPanel({ message, className = "" }: { message: string; className?: string }) {
   return (
     <div
-      className={`flex min-h-[420px] flex-1 items-center justify-center rounded-md border border-gray-200 bg-white p-6 text-center text-sm text-gray-600 lg:min-h-[calc(100vh-220px)] ${className}`}
+      className={`flex min-h-[420px] flex-1 items-center justify-center rounded-md border border-white/70 bg-ad-glass p-6 text-center text-sm text-gray-600 lg:min-h-[calc(100vh-220px)] ${className}`}
     >
       {message}
     </div>
@@ -31,7 +31,7 @@ export function ShopErrorPanel({
 }) {
   return (
     <div
-      className={`flex min-h-[420px] flex-1 flex-col items-center justify-center gap-3 rounded-md border border-gray-200 bg-white p-6 text-center lg:min-h-[calc(100vh-220px)] ${className}`}
+      className={`flex min-h-[420px] flex-1 flex-col items-center justify-center gap-3 rounded-md border border-white/70 bg-ad-glass p-6 text-center lg:min-h-[calc(100vh-220px)] ${className}`}
     >
       <p className="text-sm font-semibold text-gray-800">{message}</p>
       {onRetry ? (

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { getJson } from "../api/mobileAuth";
 import { useAuth } from "../auth";
+import {
+  isOutdoorServiceCategory,
+  parseServiceCatalogResponse,
+  type ServiceCategory,
+  type ServiceSubItem,
+} from "../lib/serviceCatalog";
+
+export type { ServiceCategory, ServiceSubItem };
 
 export type CarOwnerDashboardData = {
   success?: boolean;
@@ -70,35 +78,6 @@ export function useCarOwnerDashboard() {
   };
 }
 
-export type ServiceCategory = { id?: string; name: string };
-
-function parseServiceCatalog(data: unknown): ServiceCategory[] {
-  if (!data || typeof data !== "object") return [];
-  const root = data as Record<string, unknown>;
-  const list = Array.isArray(root.data)
-    ? root.data
-    : Array.isArray(root.services)
-      ? root.services
-      : Array.isArray(data)
-        ? data
-        : [];
-  const out: ServiceCategory[] = [];
-  for (const item of list) {
-    if (!item || typeof item !== "object") continue;
-    const o = item as Record<string, unknown>;
-    const name = typeof o.name === "string" ? o.name.trim() : typeof o.title === "string" ? o.title.trim() : "";
-    if (!name) continue;
-    const id = typeof o._id === "string" ? o._id : typeof o.id === "string" ? o.id : undefined;
-    out.push({ id, name });
-  }
-  return out;
-}
-
-function isOutdoorService(name: string): boolean {
-  const n = name.toLowerCase();
-  return n.includes("wash") || n.includes("tow") || n.includes("detailing");
-}
-
 export function useCarOwnerServiceSidebar() {
   const { token } = useAuth();
   const [indoor, setIndoor] = useState<ServiceCategory[]>([]);
@@ -118,9 +97,9 @@ export function useCarOwnerServiceSidebar() {
       try {
         const res = await getJson<unknown>("/api/auto-shop-owner/services", token);
         if (cancelled) return;
-        const categories = parseServiceCatalog(res.data);
-        setIndoor(categories.filter((c) => !isOutdoorService(c.name)));
-        setOutdoor(categories.filter((c) => isOutdoorService(c.name)));
+        const categories = parseServiceCatalogResponse(res.data);
+        setIndoor(categories.filter((c) => !isOutdoorServiceCategory(c)));
+        setOutdoor(categories.filter((c) => isOutdoorServiceCategory(c)));
       } finally {
         if (!cancelled) setLoading(false);
       }

@@ -3,6 +3,7 @@ import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { toast } from "react-toastify";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
+import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
 import { useCarOwnerDocuments } from "../../hooks/useCarOwnerDocuments";
 import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
@@ -24,17 +25,7 @@ function CategoryButton({
   active: boolean;
   onClick: () => void;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full rounded-l-md px-4 py-3 text-left text-sm font-bold transition-colors ${
-        active ? "bg-[#006600] text-white shadow-sm" : "bg-[#008000] text-white hover:bg-[#006600]"
-      }`}
-    >
-      {label}
-    </button>
-  );
+  return <PortalSidebarButton label={label} active={active} onClick={onClick} />;
 }
 
 function DocumentFieldPanel({
@@ -201,7 +192,7 @@ export default function OwnerDigiPursePage() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
-        <aside className="flex w-full shrink-0 flex-col gap-2 lg:w-[220px] xl:w-[240px]">
+        <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[260px]">
           {DIGI_PURSE_CATEGORIES.map((item) => (
             <CategoryButton
               key={item.id}
@@ -213,7 +204,7 @@ export default function OwnerDigiPursePage() {
           <button
             type="button"
             onClick={() => setFaqsOpen(true)}
-            className="mt-auto rounded-md bg-ad-purple px-4 py-3 text-sm font-bold text-white hover:bg-ad-purple-dark"
+            className="mt-auto rounded-full border border-blue-600 bg-white/70 px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-blue-600 transition-colors hover:bg-white"
           >
             FAQs
           </button>
