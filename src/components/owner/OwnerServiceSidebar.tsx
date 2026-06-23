@@ -11,6 +11,7 @@ type OwnerServiceSidebarProps = {
   onNextDueServiceClick?: () => void;
   nextDueServiceActive?: boolean;
   selectedServiceId?: string | null;
+  selectedSubServiceId?: string | null;
   onServiceSelect?: (service: ServiceCategory) => void;
   onSubServiceSelect?: (service: ServiceCategory, subService: ServiceSubItem) => void;
 };
@@ -42,9 +43,11 @@ function SectionHeader({
 
 function SubServicePopup({
   subServices,
+  selectedSubServiceId,
   onSelect,
 }: {
   subServices: ServiceSubItem[];
+  selectedSubServiceId?: string | null;
   onSelect: (sub: ServiceSubItem) => void;
 }) {
   return (
@@ -52,17 +55,26 @@ function SubServicePopup({
       className="absolute left-0 top-full z-50 mt-1.5 w-full min-w-[220px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl lg:left-[calc(100%+8px)] lg:top-0 lg:mt-0 lg:w-max lg:min-w-[260px] lg:max-w-[320px]"
       role="menu"
     >
-      {subServices.map((sub) => (
-        <button
-          key={sub.id ?? sub.name}
-          type="button"
-          role="menuitem"
-          onClick={() => onSelect(sub)}
-          className="block w-full px-4 py-2.5 text-left text-sm leading-snug text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
-        >
-          {sub.name}
-        </button>
-      ))}
+      {subServices.map((sub) => {
+        const subKey = sub.id ?? sub.name;
+        const selected = Boolean(selectedSubServiceId && subKey === selectedSubServiceId);
+
+        return (
+          <button
+            key={subKey}
+            type="button"
+            role="menuitem"
+            onClick={() => onSelect(sub)}
+            className={`block w-full px-4 py-2.5 text-left text-sm leading-snug transition-colors ${
+              selected
+                ? "bg-blue-600 font-semibold text-white"
+                : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
+            }`}
+          >
+            {sub.name}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -71,12 +83,14 @@ function ServiceItem({
   item,
   active,
   popupOpen,
+  selectedSubServiceId,
   onClick,
   onSubSelect,
 }: {
   item: ServiceCategory;
   active: boolean;
   popupOpen: boolean;
+  selectedSubServiceId?: string | null;
   onClick: () => void;
   onSubSelect: (sub: ServiceSubItem) => void;
 }) {
@@ -86,7 +100,11 @@ function ServiceItem({
     <div className="relative">
       <PortalSidebarButton label={item.name} active={active} onClick={onClick} />
       {hasSubs && popupOpen ? (
-        <SubServicePopup subServices={item.subServices} onSelect={onSubSelect} />
+        <SubServicePopup
+          subServices={item.subServices}
+          selectedSubServiceId={selectedSubServiceId}
+          onSelect={onSubSelect}
+        />
       ) : null}
     </div>
   );
@@ -96,6 +114,7 @@ function ServiceList({
   items,
   loading,
   selectedServiceId,
+  selectedSubServiceId,
   popupServiceKey,
   onServiceSelect,
   onSubServiceSelect,
@@ -104,6 +123,7 @@ function ServiceList({
   items: ServiceCategory[];
   loading?: boolean;
   selectedServiceId?: string | null;
+  selectedSubServiceId?: string | null;
   popupServiceKey: string | null;
   onServiceSelect?: (service: ServiceCategory) => void;
   onSubServiceSelect?: (service: ServiceCategory, sub: ServiceSubItem) => void;
@@ -129,17 +149,26 @@ function ServiceList({
             item={item}
             active={active}
             popupOpen={popupOpen}
+            selectedSubServiceId={active ? selectedSubServiceId : null}
             onClick={() => {
-              onServiceSelect?.(item);
-              if (item.subServices.length > 0) {
-                setPopupServiceKey(popupOpen ? null : key);
-              } else {
-                setPopupServiceKey(null);
+              const hasSubs = item.subServices.length > 0;
+
+              if (hasSubs) {
+                if (active) {
+                  setPopupServiceKey(popupOpen ? null : key);
+                  return;
+                }
+                onServiceSelect?.(item);
+                setPopupServiceKey(key);
+                return;
               }
+
+              onServiceSelect?.(item);
+              setPopupServiceKey(null);
             }}
             onSubSelect={(sub) => {
               onSubServiceSelect?.(item, sub);
-              onServiceSelect?.(item);
+              setPopupServiceKey(null);
             }}
           />
         );
@@ -158,6 +187,7 @@ export default function OwnerServiceSidebar({
   onNextDueServiceClick,
   nextDueServiceActive = false,
   selectedServiceId,
+  selectedSubServiceId,
   onServiceSelect,
   onSubServiceSelect,
 }: OwnerServiceSidebarProps) {
@@ -186,6 +216,7 @@ export default function OwnerServiceSidebar({
   const listProps = {
     loading,
     selectedServiceId,
+    selectedSubServiceId,
     popupServiceKey,
     onServiceSelect,
     onSubServiceSelect,

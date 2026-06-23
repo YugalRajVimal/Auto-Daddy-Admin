@@ -12,6 +12,8 @@ export type CarOwnerAutoShopListItem = {
   mainServices: string[];
   mainServiceItems: { id: string; name: string }[];
   subServices: string[];
+  /** Car company / brand names the shop specializes in. */
+  carCompanies: string[];
   address: string;
   phone: string;
   website: string;

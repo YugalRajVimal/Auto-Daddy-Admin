@@ -28,7 +28,7 @@ import {
   type VehicleDocumentFieldKey,
 } from "../../lib/carOwnerDocuments";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
-import { vehicleSidebarLabel, vehicleBracketLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
+import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
 
 type VehiclePanelSection = "vehicle-details" | "job-cards" | "invoices" | "documents" | "update-odometer";
 
@@ -270,11 +270,21 @@ function VehicleDetails({
   );
 }
 
+function vehicleDetailsBracket(vehicle: CarOwnerVehicle): string {
+  const makeName = (vehicle.make?.name ?? "").trim();
+  const model = (vehicle.make?.model ?? "").trim();
+  const year = vehicle.year != null && String(vehicle.year).trim() ? String(vehicle.year).trim() : "";
+  const parts = [makeName, model, year].filter(Boolean);
+  return parts.length ? `(${parts.join(" ")})` : "";
+}
+
 function DocumentFieldRow({
   vehicleId,
   fieldKey,
   label,
   uri,
+  licensePlate,
+  vehicleDetails,
   busy,
   disabled,
   onUpload,
@@ -283,11 +293,14 @@ function DocumentFieldRow({
   fieldKey: VehicleDocumentFieldKey;
   label: string;
   uri: string | null;
+  licensePlate?: string;
+  vehicleDetails?: string;
   busy: boolean;
   disabled: boolean;
   onUpload: (vehicleId: string, field: VehicleDocumentFieldKey, file: File) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const plate = licensePlate?.trim().toUpperCase() ?? "";
 
   return (
     <div className="flex flex-wrap items-center gap-4 border-t border-[#b2e0a0] bg-white/60 px-4 py-3 first:border-t-0">
@@ -304,6 +317,11 @@ function DocumentFieldRow({
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold text-[#006600]">{label}</p>
         <p className="text-xs text-gray-600">{uri ? "Tap image to view full size" : "Not uploaded yet"}</p>
+      </div>
+
+      <div className="shrink-0 text-center sm:min-w-[120px]">
+        {plate ? <p className="text-base font-bold tracking-wide text-gray-900">{plate}</p> : null}
+        {vehicleDetails ? <p className="text-xs font-semibold text-gray-600">{vehicleDetails}</p> : null}
       </div>
 
       <div>
@@ -334,7 +352,7 @@ function DocumentFieldRow({
 function VehicleDocumentsPanel({
   vehicleId,
   licensePlate,
-  vehicleSubtitle,
+  vehicleDetails,
   busyField,
   mutating,
   onUpload,
@@ -342,25 +360,14 @@ function VehicleDocumentsPanel({
 }: {
   vehicleId: string;
   licensePlate?: string;
-  vehicleSubtitle?: string;
+  vehicleDetails?: string;
   busyField: string | null;
   mutating: boolean;
   onUpload: (vehicleId: string, field: VehicleDocumentFieldKey, file: File) => void;
   fields: Array<{ key: VehicleDocumentFieldKey; label: string; uri: string | null }>;
 }) {
-  const plate = licensePlate?.trim().toUpperCase() ?? "";
-
   return (
-    <div className="flex flex-col gap-3">
-      {plate ? (
-        <div className="text-center">
-          <p className="text-lg font-bold tracking-wide text-gray-900 sm:text-xl">{plate}</p>
-          {vehicleSubtitle ? (
-            <p className="mt-0.5 text-sm font-medium text-gray-600">{vehicleSubtitle}</p>
-          ) : null}
-        </div>
-      ) : null}
-      <div className="overflow-hidden rounded-md border border-[#b2e0a0] bg-[#e8ffe8] shadow-sm">
+    <div className="overflow-hidden rounded-md border border-[#b2e0a0] bg-[#e8ffe8] shadow-sm">
       {fields.map((field) => {
         const fieldBusy = busyField === `${vehicleId}:${field.key}`;
         return (
@@ -370,13 +377,14 @@ function VehicleDocumentsPanel({
             fieldKey={field.key}
             label={field.label}
             uri={field.uri}
+            licensePlate={licensePlate}
+            vehicleDetails={vehicleDetails}
             busy={fieldBusy}
             disabled={mutating && !fieldBusy}
             onUpload={onUpload}
           />
         );
       })}
-      </div>
     </div>
   );
 }
@@ -763,7 +771,7 @@ export default function OwnerVehiclesPage() {
           <VehicleDocumentsPanel
             vehicleId={selectedVehicle.id}
             licensePlate={selectedVehicle.licensePlateNo ?? undefined}
-            vehicleSubtitle={vehicleBracketLabel(selectedVehicle)}
+            vehicleDetails={vehicleDetailsBracket(selectedVehicle)}
             fields={documentFields}
             busyField={busyField}
             mutating={mutating}
@@ -882,11 +890,10 @@ export default function OwnerVehiclesPage() {
                 <button
                   type="button"
                   onClick={() => openSection("update-odometer")}
-                  className={`w-full rounded-full border px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide transition-colors ${
-                    activeSection === "update-odometer"
+                  className={`w-full rounded-full border px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide transition-colors ${activeSection === "update-odometer"
                       ? "border-blue-700 bg-blue-600 text-white shadow-md"
                       : "border-blue-600 bg-white/70 text-blue-600 hover:bg-white"
-                  }`}
+                    }`}
                 >
                   Update Odometer
                 </button>

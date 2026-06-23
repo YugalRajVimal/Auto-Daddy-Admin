@@ -44,71 +44,118 @@ function extractServices(raw: Record<string, unknown>): {
   subServices: string[];
 } {
   const serviceRoots =
-    (Array.isArray(raw.myServices) ? raw.myServices : null) ??
-    (Array.isArray(raw.services) ? raw.services : null) ??
-    (Array.isArray(raw.service) ? raw.service : null) ??
-    (Array.isArray(raw.businessServices) ? raw.businessServices : null) ??
-    null;
+    (Array.isArray(raw.myServices) && raw.myServices.length > 0 ? raw.myServices : null) ??
+    (Array.isArray(raw.businessServices) && raw.businessServices.length > 0 ? raw.businessServices : null);
 
   const mainServices: string[] = [];
   const mainServiceItems: { id: string; name: string }[] = [];
   const subServices: string[] = [];
+  const seenItems = new Set<string>();
 
   if (!serviceRoots) {
     return { mainServices, mainServiceItems, subServices };
   }
 
   for (const s of serviceRoots) {
-    if (typeof s === "string") {
-      const t = s.trim();
-      if (t) mainServices.push(t);
-      continue;
-    }
+    if (typeof s === "string") continue;
     if (!isShopRecord(s)) continue;
 
     const nestedService =
       s.service && isShopRecord(s.service) ? (s.service as Record<string, unknown>) : null;
     const serviceObj = nestedService ?? s;
     const mainId = pickString(
-      s._id,
-      s.id,
-      s.serviceId,
-      typeof s.service === "string" ? s.service : undefined,
       nestedService?._id,
-      nestedService?.id
+      nestedService?.id,
+      s.serviceId,
+      typeof s.service === "string" ? s.service : undefined
     );
-    const mainName = pickString(serviceObj.name, serviceObj.title, (s as { serviceName?: unknown }).serviceName);
-    if (mainName) mainServices.push(mainName);
-    if (mainId && mainName) mainServiceItems.push({ id: mainId, name: mainName });
+    if (!mainId) continue;
 
-    const nested = (serviceObj.subServices ?? s.subServices ?? s.selectedSubServices) as unknown;
-    if (Array.isArray(nested)) {
-      for (const sub of nested) {
+    const mainName = pickString(
+      serviceObj.name,
+      serviceObj.title,
+      (s as { serviceName?: unknown }).serviceName
+    );
+
+    const catalogSubs = Array.isArray((serviceObj as { services?: unknown }).services)
+      ? ((serviceObj as { services: unknown[] }).services ?? [])
+      : [];
+    const selectedSubIds = new Set<string>();
+    const selectedSubsRaw = (s.subServices ?? s.selectedSubServices) as unknown;
+    if (Array.isArray(selectedSubsRaw)) {
+      for (const sub of selectedSubsRaw) {
         if (typeof sub === "string") {
           const t = sub.trim();
-          if (t) subServices.push(t);
+          if (t) selectedSubIds.add(t);
           continue;
         }
         if (!isShopRecord(sub)) continue;
-        const nm = pickString(sub.name, sub.title);
-        if (nm) subServices.push(nm);
+        const subId = pickString(sub.subService, sub._id, sub.id);
+        if (subId) selectedSubIds.add(subId);
+        const subName = pickString(sub.name, sub.title);
+        if (subName) subServices.push(subName);
+      }
+    }
+
+    let addedOffered = false;
+    if (selectedSubIds.size > 0 && catalogSubs.length > 0) {
+      for (const catSub of catalogSubs) {
+        if (!isShopRecord(catSub)) continue;
+        const subId = pickString(catSub._id, catSub.id);
+        if (!subId || !selectedSubIds.has(subId)) continue;
+        const subName = pickString(catSub.name, catSub.title);
+        if (!subName) continue;
+        const key = `${mainId}:${subId}`;
+        if (seenItems.has(key)) continue;
+        seenItems.add(key);
+        mainServiceItems.push({ id: mainId, name: subName });
+        mainServices.push(subName);
+        addedOffered = true;
+      }
+    }
+
+    if (!addedOffered && mainName) {
+      const key = `main:${mainId}`;
+      if (!seenItems.has(key)) {
+        seenItems.add(key);
+        mainServiceItems.push({ id: mainId, name: mainName });
+        mainServices.push(mainName);
       }
     }
   }
 
-  const dedupedItems: { id: string; name: string }[] = [];
-  const seenIds = new Set<string>();
-  for (const item of mainServiceItems) {
-    if (seenIds.has(item.id)) continue;
-    seenIds.add(item.id);
-    dedupedItems.push(item);
-  }
-
   return {
     mainServices: [...new Set(mainServices)],
-    mainServiceItems: dedupedItems,
+    mainServiceItems,
     subServices: [...new Set(subServices)],
   };
+}
+
+function extractCarCompanies(raw: Record<string, unknown>): string[] {
+  const roots = [
+    raw.carCompanies,
+    raw.myCarCompanies,
+    raw.carBrands,
+    raw.specialistCarBrands,
+    raw.car_companies,
+  ];
+  const names: string[] = [];
+
+  for (const root of roots) {
+    if (!Array.isArray(root)) continue;
+    for (const item of root) {
+      if (typeof item === "string") {
+        const t = item.trim();
+        if (t) names.push(t);
+        continue;
+      }
+      if (!isShopRecord(item)) continue;
+      const nm = pickString(item.companyName, item.name, item.brandName, item.title);
+      if (nm) names.push(nm);
+    }
+  }
+
+  return [...new Set(names)];
 }
 
 /** Recursively JSON-parse strings / flatten arrays until we have leaf strings (handles double-encoded openDays). */
@@ -388,6 +435,7 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
   const logoUrl = typeof logoRaw === "string" ? normalizeMediaUrl(logoRaw) : null;
 
   const services = extractServices(raw);
+  const carCompanies = extractCarCompanies(raw);
   const coords = parseWgs84MapLocation(raw);
   const shopType = pickString(raw.shopType, raw.shop_type, raw.type);
 
@@ -404,6 +452,7 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
     mainServices: services.mainServices,
     mainServiceItems: services.mainServiceItems,
     subServices: services.subServices,
+    carCompanies,
     address,
     phone,
     website,
