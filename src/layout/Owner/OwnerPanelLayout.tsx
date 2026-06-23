@@ -35,6 +35,7 @@ function OwnerLayoutContent() {
       loginAs={loginAs}
       headerCenter={headerCenter}
       headerAvatarSrc={headerAvatarSrc}
+      helpPath="/owner/help"
     >
       <Outlet />
     </PortalShell>

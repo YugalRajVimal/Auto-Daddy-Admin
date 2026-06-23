@@ -35,6 +35,7 @@ function ShopLayoutContent() {
       loginAs={loginAs}
       headerCenter={headerCenter}
       subscriptionDaysLeft={daysLeft ?? null}
+      helpPath="/shop/help"
     >
       <Outlet />
     </PortalShell>

@@ -6,10 +6,12 @@ import OwnerProfilePage from "../../pages/OwnerPages/Profile";
 import OwnerDealsPage from "../../pages/OwnerPages/Deals";
 import OwnerAutoShopsPage from "../../pages/OwnerPages/AutoShops";
 import OwnerInvoicesPage from "../../pages/OwnerPages/Invoices";
+import OwnerReportsPage from "../../pages/OwnerPages/Reports";
 import OwnerJobCardsPage from "../../pages/OwnerPages/JobCards";
 import OwnerDigiPursePage from "../../pages/OwnerPages/DigiPurse";
 import OwnerMessagesPage from "../../pages/OwnerPages/Messages";
 import OwnerVehiclesPage from "../../pages/OwnerPages/Vehicles";
+import OwnerHelpPage from "../../pages/OwnerPages/Help";
 import ShopHomePage from "../../pages/ShopPages/Home";
 import ShopProfilePage from "../../pages/ShopPages/Profile";
 import ShopPeoplePage from "../../pages/ShopPages/People";
@@ -25,6 +27,7 @@ import ShopCarCompaniesPage from "../../pages/ShopPages/CarCompanies";
 import ShopServicesSelectionPage from "../../pages/ShopPages/ServicesSelection";
 import ShopTeamPage from "../../pages/ShopPages/Team";
 import ShopTeamMemberFormPage from "../../pages/ShopPages/TeamMemberFormPage";
+import ShopHelpPage from "../../pages/ShopPages/Help";
 
 export const ownerRoutes = (
   <Route element={<OwnerPanelLayout />}>
@@ -33,11 +36,12 @@ export const ownerRoutes = (
     <Route path="/owner/vehicles" element={<OwnerVehiclesPage />} />
     <Route path="/owner/auto-shops" element={<OwnerAutoShopsPage />} />
     <Route path="/owner/job-cards" element={<OwnerJobCardsPage />} />
-    <Route path="/owner/reports" element={<OwnerInvoicesPage />} />
+    <Route path="/owner/reports" element={<OwnerReportsPage />} />
     <Route path="/owner/invoices" element={<OwnerInvoicesPage />} />
     <Route path="/owner/messages" element={<OwnerMessagesPage />} />
     <Route path="/owner/digi-purse" element={<OwnerDigiPursePage />} />
     <Route path="/owner/deals" element={<OwnerDealsPage />} />
+    <Route path="/owner/help" element={<OwnerHelpPage />} />
   </Route>
 );
 
@@ -61,5 +65,6 @@ export const shopRoutes = (
     <Route path="/shop/team" element={<ShopTeamPage />} />
     <Route path="/shop/team/new" element={<ShopTeamMemberFormPage />} />
     <Route path="/shop/team/:id/edit" element={<ShopTeamMemberFormPage />} />
+    <Route path="/shop/help" element={<ShopHelpPage />} />
   </Route>
 );

@@ -1,6 +1,7 @@
 import { FiCheck } from "react-icons/fi";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
+import { OwnerSidebarFaqsSlot } from "./OwnerFaqsButton";
 
 type OwnerVehicleSidebarProps = {
   vehicles: CarOwnerVehicle[];
@@ -61,7 +62,7 @@ export default function OwnerVehicleSidebar({
   onFaqsClick,
 }: OwnerVehicleSidebarProps) {
   return (
-    <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[240px]">
+    <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[240px] lg:min-h-[calc(100vh-220px)]">
       <div className="flex flex-col gap-4">
         {loading ? (
           <p className="px-1 text-xs text-gray-500">Loading vehicles…</p>
@@ -79,13 +80,7 @@ export default function OwnerVehicleSidebar({
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onFaqsClick}
-        className="mt-auto rounded-md bg-ad-purple px-4 py-3 text-sm font-bold text-white hover:bg-ad-purple-dark"
-      >
-        FAQs
-      </button>
+      {onFaqsClick ? <OwnerSidebarFaqsSlot onClick={onFaqsClick} /> : null}
     </aside>
   );
 }

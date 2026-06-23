@@ -3,6 +3,7 @@ import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
+import { OwnerSidebarFaqsSlot } from "../../components/owner/OwnerFaqsButton";
 import { useAuth } from "../../auth";
 import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 import { useCarOwnerInvoices, type CarOwnerInvoiceRow, type InvoiceTab } from "../../hooks/useCarOwnerInvoices";
@@ -74,7 +75,7 @@ export default function OwnerInvoicesPage() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
-        <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[260px]">
+        <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]">
           <PortalSidebarButton
             label="Paid Invoices"
             active={tab === "paid"}
@@ -85,13 +86,7 @@ export default function OwnerInvoicesPage() {
             active={tab === "unpaid"}
             onClick={() => setTab("unpaid")}
           />
-          <button
-            type="button"
-            onClick={() => setFaqsOpen(true)}
-            className="mt-auto rounded-full border border-blue-600 bg-white/70 px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-blue-600 transition-colors hover:bg-white"
-          >
-            FAQs
-          </button>
+          <OwnerSidebarFaqsSlot onClick={() => setFaqsOpen(true)} />
         </aside>
 
         <div className="flex min-h-[420px] flex-1 flex-col">

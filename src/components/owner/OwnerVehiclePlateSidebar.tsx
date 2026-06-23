@@ -1,4 +1,5 @@
 import PortalSidebarButton from "../admin/PortalSidebarButton";
+import { OwnerFaqsButton } from "./OwnerFaqsButton";
 import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
 
 type OwnerVehiclePlateSidebarProps = {
@@ -39,15 +40,7 @@ export default function OwnerVehiclePlateSidebar({
         ))
       )}
 
-      {onFaqsClick ? (
-        <button
-          type="button"
-          onClick={onFaqsClick}
-          className="rounded-full border border-red-700 bg-red-600 px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-red-700"
-        >
-          FAQs
-        </button>
-      ) : null}
+      {onFaqsClick ? <OwnerFaqsButton onClick={onFaqsClick} /> : null}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
+import { OwnerSidebarFaqsSlot } from "../../components/owner/OwnerFaqsButton";
 import OwnerVehiclePlateSidebar from "../../components/owner/OwnerVehiclePlateSidebar";
 import { postJson } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
@@ -494,13 +495,7 @@ export default function OwnerAutoShopsPage() {
             onSelect={handleVehicleSelect}
           />
 
-          <button
-            type="button"
-            onClick={() => setFaqsOpen(true)}
-            className="mt-auto rounded-full border border-red-700 bg-red-600 px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-red-700"
-          >
-            FAQs
-          </button>
+          <OwnerSidebarFaqsSlot onClick={() => setFaqsOpen(true)} />
         </aside>
 
         <div className="flex min-h-[420px] flex-1 flex-col">

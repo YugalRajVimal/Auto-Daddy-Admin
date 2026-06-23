@@ -11,6 +11,7 @@ import {
 } from "../../components/admin/ContentPanel";
 import OwnerAddVehicleForm from "../../components/owner/OwnerAddVehicleForm";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
+import { OwnerFaqsButton } from "../../components/owner/OwnerFaqsButton";
 import OwnerInvoiceRow from "../../components/owner/OwnerInvoiceRow";
 import OwnerJobCardRow from "../../components/owner/OwnerJobCardRow";
 import VehiclePickerPopup from "../../components/owner/OwnerVehiclePicker";
@@ -898,13 +899,7 @@ export default function OwnerVehiclesPage() {
                   Update Odometer
                 </button>
               </SidebarSectionItem>
-              <button
-                type="button"
-                onClick={() => setFaqsOpen(true)}
-                className="w-full rounded-full border border-red-700 bg-red-600 px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-red-700"
-              >
-                FAQs
-              </button>
+              <OwnerFaqsButton onClick={() => setFaqsOpen(true)} />
             </div>
           </aside>
 

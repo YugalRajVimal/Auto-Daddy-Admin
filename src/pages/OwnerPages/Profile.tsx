@@ -12,6 +12,7 @@ import {
 } from "../../components/admin/ContentPanel";
 import OwnerCityPicker from "../../components/owner/OwnerCityPicker";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
+import { OwnerFaqsButton } from "../../components/owner/OwnerFaqsButton";
 import { useAuth } from "../../auth";
 import { useCarOwnerProfile } from "../../hooks/useCarOwnerProfile";
 import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
@@ -86,13 +87,7 @@ export default function OwnerProfilePage() {
             <aside className="relative flex w-full shrink-0 flex-col gap-3 overflow-visible lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]">
               <PortalSidebarButton label="Personal Profile" active />
               <div className="mt-auto mb-10 flex flex-col gap-3 pt-6 lg:mb-14">
-                <button
-                  type="button"
-                  onClick={() => setFaqsOpen(true)}
-                  className="w-full rounded-full border border-red-700 bg-red-600 px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-red-700"
-                >
-                  FAQs
-                </button>
+                <OwnerFaqsButton onClick={() => setFaqsOpen(true)} />
               </div>
             </aside>
 

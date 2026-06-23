@@ -40,6 +40,8 @@ export type PortalShellProps = {
   headerAvatarSrc?: string | null;
   /** When set, shows "{n} Days Left" in the utility row instead of "Login as". */
   subscriptionDaysLeft?: number | null;
+  /** Help page path; when set, the Help utility link navigates here. */
+  helpPath?: string;
 };
 
 export default function PortalShell({
@@ -53,6 +55,7 @@ export default function PortalShell({
   headerCenter,
   headerAvatarSrc,
   subscriptionDaysLeft,
+  helpPath,
 }: PortalShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -61,6 +64,7 @@ export default function PortalShell({
 
   const activePrimary = getActivePrimaryItem(location.pathname, primaryNav, homePath);
   const onUtilityNav = utilityNav.some((s) => isPathActive(location.pathname, s.path, homePath));
+  const onHelpNav = helpPath != null && isPathActive(location.pathname, helpPath, homePath);
   const utilitySubItems = onUtilityNav ? utilityNav : [];
   const primarySubItems: NavSubItem[] = activePrimary?.subItems ?? [];
   const displaySubItems = utilitySubItems.length > 0 ? utilitySubItems : primarySubItems;
@@ -98,6 +102,8 @@ export default function PortalShell({
     "inline-block rounded-b-lg border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-300 sm:px-3 sm:text-xs";
   const utilityLinkActiveClass =
     "inline-block rounded-b-lg border border-ad-purple bg-ad-glass px-2.5 py-0.5 text-[11px] font-semibold text-ad-purple shadow-sm sm:px-3 sm:text-xs";
+  const helpLinkActiveClass =
+    "inline-block rounded-b-lg border border-ad-green bg-ad-green-light px-2.5 py-0.5 text-[11px] font-semibold text-ad-green-dark shadow-sm sm:px-3 sm:text-xs";
 
   const subNavLinkClass =
     "relative block px-2 py-1.5 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1.5 lg:py-1.5 lg:text-xs lg:leading-snug lg:whitespace-normal";
@@ -168,7 +174,10 @@ export default function PortalShell({
                     {utilityNavLabel}
                   </Link>
                 )}
-                <Link to="#" className={utilityLinkClass}>
+                <Link
+                  to={helpPath ?? "#"}
+                  className={helpPath && onHelpNav ? helpLinkActiveClass : utilityLinkClass}
+                >
                   Help
                 </Link>
                 <button type="button" onClick={handleLogout} className={utilityLinkClass}>

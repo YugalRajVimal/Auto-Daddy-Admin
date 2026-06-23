@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { FiChevronDown } from "react-icons/fi";
 import PortalSidebarButton from "../admin/PortalSidebarButton";
+import { OwnerFaqsButton } from "./OwnerFaqsButton";
 import type { ServiceCategory, ServiceSubItem } from "../../hooks/useOwnerPortal";
 
 type OwnerServiceSidebarProps = {
@@ -257,15 +258,7 @@ export default function OwnerServiceSidebar({
             Next Due Service
           </button>
         ) : null}
-        {onFaqsClick ? (
-          <button
-            type="button"
-            onClick={onFaqsClick}
-            className="w-full rounded-full border border-red-700 bg-red-600 px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-red-700"
-          >
-            FAQs
-          </button>
-        ) : null}
+        {onFaqsClick ? <OwnerFaqsButton onClick={onFaqsClick} /> : null}
       </div>
 
     </aside>
