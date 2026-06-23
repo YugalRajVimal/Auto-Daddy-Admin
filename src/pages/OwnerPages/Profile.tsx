@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
-import { FiUser } from "react-icons/fi";
+import { useEffect, useRef, useState } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
+import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
 import {
   CompactAutoGrowTextarea,
   CompactField,
@@ -11,16 +11,23 @@ import {
   compactInputClass,
 } from "../../components/admin/ContentPanel";
 import OwnerCityPicker from "../../components/owner/OwnerCityPicker";
+import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
 import { useAuth } from "../../auth";
 import { useCarOwnerProfile } from "../../hooks/useCarOwnerProfile";
-import { formatPincodeDisplay } from "../../lib/carOwnerProfile";
+import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 
 const fieldErrorClass = "mt-0.5 text-[11px] text-red-600";
+const checkboxBoxClass =
+  "inline-block border border-gray-300 bg-gray-100 px-2 py-0.5 text-xs text-gray-800";
 
 export default function OwnerProfilePage() {
   const { token } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [faqsOpen, setFaqsOpen] = useState(false);
+  const [showUploadImage, setShowUploadImage] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
+  const { faqsHeading, faqsDescription } = useCarOwnerDashboard();
 
   const {
     loading,
@@ -32,14 +39,12 @@ export default function OwnerProfilePage() {
     editEmail,
     editPhone,
     editAddress,
-    editPincode,
     editCityId,
     editCityName,
     setEditName,
     setEditEmail,
     setEditPhone,
     setEditAddress,
-    setEditPincode,
     setEditCityId,
     setEditCityName,
     clearFieldError,
@@ -49,8 +54,11 @@ export default function OwnerProfilePage() {
     uploadProfilePhoto,
     profileNameMaxLength,
     profileAddressMaxLength,
-    pincodeDisplayMaxLength,
   } = useCarOwnerProfile();
+
+  useEffect(() => {
+    if (display.email?.trim()) setShowEmail(true);
+  }, [display.email]);
 
   const onPhotoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -58,11 +66,15 @@ export default function OwnerProfilePage() {
     if (file) void uploadProfilePhoto(file);
   };
 
+  const openPhotoPicker = () => {
+    if (!saving) fileInputRef.current?.click();
+  };
+
   return (
-    <PortalPageContent>
+    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
       <PageMeta title="Profile | AutoDaddy" description="Car owner profile" />
 
-      <h1 className="mb-4 text-base font-bold text-blue-700">Profile Photo</h1>
+      <h1 className="mb-4 font-serif text-2xl text-gray-600 md:text-3xl">My Profile</h1>
 
       {loading ? (
         <div className="flex min-h-[320px] items-center justify-center">
@@ -70,37 +82,21 @@ export default function OwnerProfilePage() {
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-5 md:flex-row md:items-start">
-            <div className="shrink-0">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={saving}
-                className="relative flex h-44 w-44 items-center justify-center overflow-hidden border-2 border-ad-green bg-white shadow-sm disabled:opacity-60 md:h-48 md:w-48"
-                aria-label="Upload profile photo"
-              >
-                {display.photoUri ? (
-                  <img src={display.photoUri} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <FiUser size={64} className="text-gray-300" />
-                )}
-                {saving ? (
-                  <span className="absolute inset-0 flex items-center justify-center bg-white/70 text-xs font-semibold text-ad-purple">
-                    Saving…
-                  </span>
-                ) : null}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={onPhotoSelected}
-              />
-              <p className="mt-2 max-w-[12rem] text-center text-xs text-gray-500">Click photo to upload</p>
-            </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
+            <aside className="relative flex w-full shrink-0 flex-col gap-3 overflow-visible lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]">
+              <PortalSidebarButton label="Personal Profile" active />
+              <div className="mt-auto mb-10 flex flex-col gap-3 pt-6 lg:mb-14">
+                <button
+                  type="button"
+                  onClick={() => setFaqsOpen(true)}
+                  className="w-full rounded-full border border-red-700 bg-red-600 px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-red-700"
+                >
+                  FAQs
+                </button>
+              </div>
+            </aside>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 lg:min-h-[calc(100vh-220px)]">
               <CompactFormPanel
                 footer={
                   <CompactFormFooter
@@ -119,12 +115,12 @@ export default function OwnerProfilePage() {
                         : startEditing
                     }
                     onCancel={isEditing ? cancelEditing : undefined}
-                    cancelLabel={isEditing ? "Cancel" : undefined}
+                    cancelLabel={isEditing ? "Reset" : undefined}
                   />
                 }
               >
                 <CompactFormRow>
-                  <CompactField label="Full name" required className="min-w-[180px] flex-1">
+                  <CompactField label="Name" required className="min-w-[120px] flex-1">
                     <input
                       type="text"
                       value={isEditing ? editName : display.name}
@@ -142,26 +138,7 @@ export default function OwnerProfilePage() {
                     ) : null}
                   </CompactField>
 
-                  <CompactField label="Email" className="min-w-[180px] flex-1">
-                    <input
-                      type="email"
-                      value={isEditing ? editEmail : display.email}
-                      onChange={(e) => {
-                        setEditEmail(e.target.value);
-                        clearFieldError("email");
-                      }}
-                      placeholder="you@example.com"
-                      disabled={!isEditing || saving}
-                      className={compactInputClass}
-                    />
-                    {isEditing && fieldErrors.email ? (
-                      <p className={fieldErrorClass}>{fieldErrors.email}</p>
-                    ) : null}
-                  </CompactField>
-                </CompactFormRow>
-
-                <CompactFormRow>
-                  <CompactField label="Phone" className="min-w-[180px] flex-1">
+                  <CompactField label="Phone" className="min-w-[120px] flex-1">
                     <input
                       type="tel"
                       value={isEditing ? editPhone : display.phoneReadOnly || "—"}
@@ -179,7 +156,7 @@ export default function OwnerProfilePage() {
                     ) : null}
                   </CompactField>
 
-                  <CompactField label="City" className="min-w-[180px] flex-1">
+                  <CompactField label="City" className="min-w-[120px] flex-1">
                     {isEditing ? (
                       <button
                         type="button"
@@ -198,11 +175,8 @@ export default function OwnerProfilePage() {
                       />
                     )}
                   </CompactField>
-                </CompactFormRow>
 
-                <CompactFormRow className="items-start">
-                  <div className="min-w-0 flex-1">
-                    <label className="mb-1 block text-xs font-bold text-ad-green-dark">Address</label>
+                  <CompactField label="Address" className="min-w-[120px] flex-1">
                     {isEditing ? (
                       <CompactAutoGrowTextarea
                         value={editAddress}
@@ -215,43 +189,95 @@ export default function OwnerProfilePage() {
                         disabled={saving}
                       />
                     ) : (
-                      <textarea
+                      <input
+                        type="text"
                         value={display.address || "—"}
                         disabled
-                        rows={2}
-                        className={`${compactInputClass} resize-none`}
+                        className={compactInputClass}
                       />
                     )}
                     {isEditing && fieldErrors.address ? (
                       <p className={fieldErrorClass}>{fieldErrors.address}</p>
                     ) : null}
-                  </div>
-
-                  <CompactField label="Zip Code" className="min-w-[140px] shrink-0 sm:w-[180px]">
-                    <input
-                      type="text"
-                      value={isEditing ? editPincode : formatPincodeDisplay(display.pincode)}
-                      onChange={(e) => {
-                        setEditPincode(e.target.value);
-                        clearFieldError("pincode");
-                      }}
-                      placeholder="A1A 1A1"
-                      maxLength={pincodeDisplayMaxLength}
-                      disabled={!isEditing || saving}
-                      className={compactInputClass}
-                    />
-                    {isEditing && fieldErrors.pincode ? (
-                      <p className={fieldErrorClass}>{fieldErrors.pincode}</p>
-                    ) : null}
                   </CompactField>
                 </CompactFormRow>
+
+                <CompactFormRow className="items-center">
+                  <div className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="profile-upload-image"
+                      checked={showUploadImage}
+                      onChange={(e) => setShowUploadImage(e.target.checked)}
+                      disabled={saving}
+                      className="h-3.5 w-3.5 accent-ad-green"
+                    />
+                    <label htmlFor="profile-upload-image" className="text-xs font-bold text-ad-green-dark">
+                      Upload Image
+                    </label>
+                  </div>
+                  {showUploadImage ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={openPhotoPicker}
+                        disabled={saving}
+                        className={`${checkboxBoxClass} hover:bg-gray-200 disabled:opacity-60`}
+                      >
+                        Choose image
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={onPhotoSelected}
+                      />
+                    </>
+                  ) : null}
+
+                  <div className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="profile-show-email"
+                      checked={showEmail}
+                      onChange={(e) => setShowEmail(e.target.checked)}
+                      disabled={saving}
+                      className="h-3.5 w-3.5 accent-ad-green"
+                    />
+                    <label htmlFor="profile-show-email" className="sr-only">
+                      Email
+                    </label>
+                  </div>
+                  {showEmail ? (
+                    isEditing ? (
+                      <input
+                        type="email"
+                        value={editEmail}
+                        onChange={(e) => {
+                          setEditEmail(e.target.value);
+                          clearFieldError("email");
+                        }}
+                        placeholder="you@example.com"
+                        disabled={saving}
+                        className={`${compactInputClass} max-w-[240px]`}
+                      />
+                    ) : (
+                      <span className={checkboxBoxClass}>{display.email?.trim() || "—"}</span>
+                    )
+                  ) : null}
+                  {showEmail && isEditing && fieldErrors.email ? (
+                    <p className={fieldErrorClass}>{fieldErrors.email}</p>
+                  ) : null}
+                </CompactFormRow>
               </CompactFormPanel>
+
+              <footer className="mt-4 text-center font-serif text-lg italic leading-snug text-gray-600 md:text-xl lg:text-2xl">
+                <p>With Autodaddy, you are not just choosing a system,</p>
+                <p>You are choosing a standard of excellence</p>
+              </footer>
             </div>
           </div>
-
-          <footer className="mt-10 pb-4 text-center font-serif text-sm italic text-gray-600">
-            With Autodaddy, you are not just choosing a system- you are choosing a standard of excellence
-          </footer>
         </>
       )}
 
@@ -264,6 +290,13 @@ export default function OwnerProfilePage() {
           setEditCityId(city.id);
           setEditCityName(city.name);
         }}
+      />
+
+      <OwnerFaqsDialog
+        open={faqsOpen}
+        onClose={() => setFaqsOpen(false)}
+        heading={faqsHeading}
+        description={faqsDescription}
       />
     </PortalPageContent>
   );

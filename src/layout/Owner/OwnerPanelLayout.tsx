@@ -3,6 +3,7 @@ import PortalShell from "../../components/admin/PortalShell";
 import { RequirePortal } from "../../auth/guards/RequirePortal";
 import useAuth from "../../auth/useAuth";
 import { ownerPrimaryNav } from "../../config/ownerNav";
+import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 
 function OwnerLayoutContent() {
   const { profile, session } = useAuth();
@@ -24,6 +25,8 @@ function OwnerLayoutContent() {
     </p>
   ) : null;
 
+  const headerAvatarSrc = normalizeMediaUrl(profile?.profilePhoto ?? null);
+
   return (
     <PortalShell
       homePath="/owner"
@@ -31,6 +34,7 @@ function OwnerLayoutContent() {
       primaryNav={ownerPrimaryNav}
       loginAs={loginAs}
       headerCenter={headerCenter}
+      headerAvatarSrc={headerAvatarSrc}
     >
       <Outlet />
     </PortalShell>

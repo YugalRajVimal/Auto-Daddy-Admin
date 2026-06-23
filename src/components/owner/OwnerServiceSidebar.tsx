@@ -230,7 +230,7 @@ export default function OwnerServiceSidebar({
           <button
             type="button"
             onClick={onFaqsClick}
-            className="w-full rounded-full border border-blue-600 bg-white/70 px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-blue-600 transition-colors hover:bg-white"
+            className="w-full rounded-full border border-red-700 bg-red-600 px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-red-700"
           >
             FAQs
           </button>

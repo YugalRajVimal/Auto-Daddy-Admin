@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import { PORTAL_HOME_HERO_IMAGE } from "../../lib/portalHeroImage";
@@ -7,15 +7,38 @@ import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
 import OwnerServiceSidebar from "../../components/owner/OwnerServiceSidebar";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import { useCarOwnerDashboard, useCarOwnerServiceSidebar } from "../../hooks/useOwnerPortal";
-import { partitionOwnerHomeSidebarServices } from "../../lib/serviceCatalog";
+
+function ThoughtOfTheDayQuote({ text }: { text: string }) {
+  const [charIndex, setCharIndex] = useState(0);
+
+  useEffect(() => {
+    setCharIndex(0);
+  }, [text]);
+
+  useEffect(() => {
+    if (charIndex >= text.length) return;
+
+    const timer = window.setTimeout(() => setCharIndex((index) => index + 1), 42);
+    return () => window.clearTimeout(timer);
+  }, [charIndex, text]);
+
+  const isComplete = charIndex >= text.length;
+
+  return (
+    <p className="text-center font-serif text-lg italic leading-relaxed text-gray-800 md:text-xl">
+      {text.slice(0, charIndex)}
+      {!isComplete ? (
+        <span className="ml-0.5 inline-block animate-pulse text-ad-purple" aria-hidden>
+          |
+        </span>
+      ) : null}
+    </p>
+  );
+}
 
 export default function OwnerHomePage() {
   const { thoughtOfTheDay, faqsHeading, faqsDescription, loading } = useCarOwnerDashboard();
-  const { indoor: apiIndoor, outdoor: apiOutdoor, loading: servicesLoading } = useCarOwnerServiceSidebar();
-  const { indoor, outdoor } = useMemo(
-    () => partitionOwnerHomeSidebarServices([...apiIndoor, ...apiOutdoor]),
-    [apiIndoor, apiOutdoor]
-  );
+  const { indoor, outdoor, loading: servicesLoading } = useCarOwnerServiceSidebar();
   const { vehicles, loading: vehiclesLoading, error: vehiclesError } = useCarOwnerVehicles();
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [showDueService, setShowDueService] = useState(false);
@@ -62,9 +85,7 @@ export default function OwnerHomePage() {
                         "polygon(0% 4%, 3% 0%, 8% 3%, 14% 0%, 22% 4%, 30% 1%, 38% 4%, 46% 0%, 54% 3%, 62% 0%, 70% 4%, 78% 1%, 86% 4%, 94% 0%, 100% 3%, 100% 96%, 97% 100%, 90% 97%, 82% 100%, 74% 96%, 66% 100%, 58% 97%, 50% 100%, 42% 96%, 34% 100%, 26% 97%, 18% 100%, 10% 96%, 4% 100%, 0% 97%)",
                     }}
                   >
-                    <p className="text-center font-serif text-lg italic leading-relaxed text-gray-800 md:text-xl">
-                      {thoughtOfTheDay}
-                    </p>
+                    <ThoughtOfTheDayQuote text={thoughtOfTheDay} />
                   </div>
                 </div>
               ) : null}

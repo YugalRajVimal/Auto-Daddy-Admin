@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { getJson } from "../api/mobileAuth";
 import { useAuth } from "../auth";
 import {
-  isOutdoorServiceCategory,
   parseServiceCatalogResponse,
+  partitionOwnerHomeSidebarServices,
   type ServiceCategory,
   type ServiceSubItem,
 } from "../lib/serviceCatalog";
@@ -98,8 +98,9 @@ export function useCarOwnerServiceSidebar() {
         const res = await getJson<unknown>("/api/auto-shop-owner/services", token);
         if (cancelled) return;
         const categories = parseServiceCatalogResponse(res.data);
-        setIndoor(categories.filter((c) => !isOutdoorServiceCategory(c)));
-        setOutdoor(categories.filter((c) => isOutdoorServiceCategory(c)));
+        const partitioned = partitionOwnerHomeSidebarServices(categories);
+        setIndoor(partitioned.indoor);
+        setOutdoor(partitioned.outdoor);
       } finally {
         if (!cancelled) setLoading(false);
       }

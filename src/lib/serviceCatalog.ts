@@ -65,9 +65,9 @@ function normalizeCategory(raw: unknown): ServiceCategory | null {
   const shopTypeRaw = typeof o.shopType === "string" ? o.shopType.trim() : "";
   const shopType =
     shopTypeRaw === "autoShop" ||
-    shopTypeRaw === "tyreShop" ||
-    shopTypeRaw === "carWash" ||
-    shopTypeRaw === "towTruck"
+      shopTypeRaw === "tyreShop" ||
+      shopTypeRaw === "carWash" ||
+      shopTypeRaw === "towTruck"
       ? shopTypeRaw
       : undefined;
   return {
@@ -118,47 +118,118 @@ export function isTowServiceName(name: string): boolean {
   return n.includes("tow") || n.includes("towing");
 }
 
+export function isCarWashingSubCategory(
+  category: Pick<ServiceCategory, "name" | "shopType">
+): boolean {
+  if (category.shopType === "carWash") return false;
+  const n = normalizeServiceKey(category.name);
+  if (n.includes("double foam")) return true;
+  if ((n.includes("outdoor") || n.includes("out door")) && n.includes("wash")) return true;
+  if (n === "detailing" || (n.includes("detailing") && !n.includes("car wash"))) return true;
+  return false;
+}
+
+export function isTowSubCategory(category: Pick<ServiceCategory, "name">): boolean {
+  const n = normalizeServiceKey(category.name);
+  return n.includes("in city") || n.includes("within city") || n.includes("out of city");
+}
+
 export function isOutdoorService(name: string): boolean {
-  return isCarWashingServiceName(name) || isTowServiceName(name) || normalizeServiceKey(name).includes("detailing");
+  return (
+    isCarWashingServiceName(name) ||
+    isTowServiceName(name) ||
+    isCarWashingSubCategory({ name }) ||
+    isTowSubCategory({ name })
+  );
 }
 
 export function isOutdoorServiceCategory(category: Pick<ServiceCategory, "name" | "shopType">): boolean {
   if (category.shopType === "carWash" || category.shopType === "towTruck") return true;
+  if (isCarWashingSubCategory(category) || isTowSubCategory(category)) return true;
   return isOutdoorService(category.name);
 }
 
-const HOME_OUTDOOR_FALLBACKS: ServiceCategory[] = [
-  { name: "Car Washing", subServices: [], shopType: "carWash" },
-  { name: "Tow Service", subServices: [], shopType: "towTruck" },
+const DEFAULT_CAR_WASHING_SUBS: ServiceSubItem[] = [
+  { name: "OUT DOOR CAR WASH" },
+  { name: "DETAILING" },
+  { name: "DOUBLE FOAM COMPLETE WASH & DETAILING" },
 ];
+
+const DEFAULT_TOW_SUBS: ServiceSubItem[] = [
+  { name: "WITH IN CITY" },
+  { name: "OUT OF CITY" },
+];
+
+function categoryAsSubItem(category: ServiceCategory): ServiceSubItem {
+  return { id: category.id, name: category.name, desc: category.desc };
+}
+
+function mergeSubServices(...sources: ServiceSubItem[][]): ServiceSubItem[] {
+  const seen = new Set<string>();
+  const out: ServiceSubItem[] = [];
+  for (const list of sources) {
+    for (const sub of list) {
+      const key = normalizeServiceKey(sub.name);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(sub);
+    }
+  }
+  return out;
+}
 
 export function partitionOwnerHomeSidebarServices(categories: ServiceCategory[]): {
   indoor: ServiceCategory[];
   outdoor: ServiceCategory[];
 } {
   const indoor: ServiceCategory[] = [];
-  let carWashing: ServiceCategory | null = null;
-  let towService: ServiceCategory | null = null;
+  const carWashSubs: ServiceSubItem[] = [];
+  const towSubs: ServiceSubItem[] = [];
+  let carWashingParent: ServiceCategory | null = null;
+  let towParent: ServiceCategory | null = null;
 
   for (const category of categories) {
-    if (isCarWashingServiceName(category.name) || category.shopType === "carWash") {
-      if (!carWashing) carWashing = category;
+    if (isTowSubCategory(category)) {
+      towSubs.push(categoryAsSubItem(category), ...category.subServices);
+      continue;
+    }
+    if (isCarWashingSubCategory(category)) {
+      carWashSubs.push(categoryAsSubItem(category), ...category.subServices);
       continue;
     }
     if (isTowServiceName(category.name) || category.shopType === "towTruck") {
-      if (!towService) towService = category;
+      if (!towParent) towParent = category;
+      towSubs.push(...category.subServices);
+      continue;
+    }
+    if (isCarWashingServiceName(category.name) || category.shopType === "carWash") {
+      if (!carWashingParent) carWashingParent = category;
+      carWashSubs.push(...category.subServices);
+      continue;
+    }
+    if (normalizeServiceKey(category.name).includes("detailing")) {
+      carWashSubs.push(categoryAsSubItem(category), ...category.subServices);
       continue;
     }
     indoor.push(category);
   }
 
+  const carWashingSubServices = mergeSubServices(carWashSubs, DEFAULT_CAR_WASHING_SUBS);
+  const towSubServices = mergeSubServices(towSubs, DEFAULT_TOW_SUBS);
+
   const outdoor: ServiceCategory[] = [
-    carWashing
-      ? { ...carWashing, name: "Car Washing", shopType: "carWash" }
-      : HOME_OUTDOOR_FALLBACKS[0],
-    towService
-      ? { ...towService, name: "Tow Service", shopType: "towTruck" }
-      : HOME_OUTDOOR_FALLBACKS[1],
+    {
+      ...(carWashingParent ?? { subServices: [] }),
+      name: "Car Washing",
+      shopType: "carWash",
+      subServices: carWashingSubServices,
+    },
+    {
+      ...(towParent ?? { subServices: [] }),
+      name: "Tow Service",
+      shopType: "towTruck",
+      subServices: towSubServices,
+    },
   ];
 
   return { indoor, outdoor };
