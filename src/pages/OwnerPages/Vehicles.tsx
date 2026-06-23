@@ -5,7 +5,12 @@ import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
 import { AddNewButton } from "../../components/admin/AdminPage";
-import { CompactFormPanel } from "../../components/admin/ContentPanel";
+import {
+  CompactField,
+  CompactFormPanel,
+  CompactFormRow,
+  compactInputClass,
+} from "../../components/admin/ContentPanel";
 import OwnerAddVehicleForm from "../../components/owner/OwnerAddVehicleForm";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
 import VehiclePickerPopup from "../../components/owner/OwnerVehiclePicker";
@@ -432,29 +437,54 @@ function InvoiceCard({ row, countryCode }: { row: CarOwnerInvoiceRow; countryCod
   );
 }
 
+function odometerToNumber(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  const n = Number(String(value).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+function remainingKmLabel(due: number | null, reading: number | null): string {
+  if (due == null || reading == null) return "—";
+  const remaining = due - reading;
+  if (remaining > 0) return `${remaining.toLocaleString()} km`;
+  if (remaining === 0) return "Due now";
+  return `${Math.abs(remaining).toLocaleString()} km overdue`;
+}
+
+const odometerReadOnlyClass =
+  "flex min-h-[30px] w-full cursor-default select-none items-center rounded-sm border border-gray-200 bg-gray-100 px-2 py-1.5 text-sm font-medium text-gray-600";
+
+function OdometerReadOnlyValue({ value }: { value: string }) {
+  return <div className={odometerReadOnlyClass}>{value}</div>;
+}
+
 function OdometerUpdatePanel({
   vehicle,
   token,
+  serviceBy,
   onSaved,
 }: {
   vehicle: CarOwnerVehicle;
   token: string | null;
+  serviceBy?: string | null;
   onSaved: () => void;
 }) {
   const current =
     vehicle.odometerReading != null && String(vehicle.odometerReading).trim()
       ? String(vehicle.odometerReading).trim()
       : "";
-  const due =
-    vehicle.dueOdometerReading != null && String(vehicle.dueOdometerReading).trim()
-      ? `${String(vehicle.dueOdometerReading).trim()} km`
-      : "—";
+  const dueNum = odometerToNumber(vehicle.dueOdometerReading);
+  const dueDisplay = dueNum != null ? `${dueNum.toLocaleString()} km` : "—";
+  const plate = vehicle.licensePlateNo?.trim() ?? "";
 
   const [value, setValue] = useState(current);
   const [saving, setSaving] = useState(false);
 
   const parsed = value.trim() ? Number(value.trim()) : null;
   const currentNum = current ? Number(current) : null;
+  const readingForRemaining = parsed != null && Number.isFinite(parsed) ? parsed : currentNum;
+  const remainingKm = remainingKmLabel(dueNum, readingForRemaining);
+  const serviceByDisplay = serviceBy?.trim() || "—";
   const canSave =
     !saving &&
     parsed != null &&
@@ -494,48 +524,59 @@ function OdometerUpdatePanel({
   };
 
   return (
-    <CompactFormPanel className="!mb-0">
-      <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-md border border-gray-200 bg-white/80 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Current</p>
-            <p className="text-sm font-bold text-gray-900">{current ? `${current} km` : "—"}</p>
+    <CompactFormPanel
+      className="!mb-0"
+      footer={
+        <div className="flex flex-wrap items-stretch justify-between gap-2 border-t border-ad-form-border bg-ad-form-bg">
+          <div className="flex min-w-[180px] flex-1 items-center bg-ad-form-required-bg px-3 py-2.5 text-xs text-gray-800">
+            {error ? <span className="text-red-600">{error}</span> : "\u00a0"}
           </div>
-          <div className="rounded-md border border-gray-200 bg-white/80 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Service due</p>
-            <p className="text-sm font-bold text-gray-900">{due}</p>
+          <div className="flex items-center gap-2 px-3 py-2.5">
+            <button
+              type="button"
+              disabled={!canSave}
+              onClick={() => void handleSave()}
+              className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save odometer"}
+              <span aria-hidden className="text-base leading-none">
+                →
+              </span>
+            </button>
           </div>
         </div>
+      }
+    >
+      <CompactFormRow>
+        <CompactField label="License plate" className="min-w-[90px] flex-1">
+          <OdometerReadOnlyValue value={plate || "—"} />
+        </CompactField>
 
-        <div>
-          <label htmlFor="odometer-input" className="mb-1 block text-xs font-bold uppercase tracking-wide text-ad-green-dark">
-            New odometer reading (km)
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              id="odometer-input"
-              type="text"
-              inputMode="numeric"
-              value={value}
-              onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, ""))}
-              placeholder="e.g. 45000"
-              disabled={saving}
-              className="w-full max-w-xs rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-ad-purple sm:flex-1"
-            />
-            <span className="text-sm font-semibold text-gray-500">km</span>
-          </div>
-          {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
-        </div>
+        <CompactField label="CURRENT READING" className="min-w-[90px] flex-1">
+          <input
+            id="odometer-input"
+            type="text"
+            inputMode="numeric"
+            value={value}
+            onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, ""))}
+            placeholder="e.g. 45000"
+            disabled={saving}
+            className={compactInputClass}
+          />
+        </CompactField>
 
-        <button
-          type="button"
-          disabled={!canSave}
-          onClick={() => void handleSave()}
-          className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white hover:bg-ad-purple-dark disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save odometer"}
-        </button>
-      </div>
+        <CompactField label="SERVICE DUE ON" className="min-w-[90px] flex-1">
+          <OdometerReadOnlyValue value={dueDisplay} />
+        </CompactField>
+
+        <CompactField label="REMAINING Km" className="min-w-[90px] flex-1">
+          <OdometerReadOnlyValue value={remainingKm} />
+        </CompactField>
+
+        <CompactField label="SERVICE BY" className="min-w-[90px] flex-1">
+          <OdometerReadOnlyValue value={serviceByDisplay} />
+        </CompactField>
+      </CompactFormRow>
     </CompactFormPanel>
   );
 }
@@ -556,7 +597,7 @@ export default function OwnerVehiclesPage() {
   const asideRef = useRef<HTMLElement>(null);
 
   const { items: jobCards, loading: jobCardsLoading, error: jobCardsError } = useCarOwnerJobCards(
-    activeSection === "job-cards" ? selectedVehicleId : null
+    activeSection === "job-cards" || activeSection === "update-odometer" ? selectedVehicleId : null
   );
   const { loading: invoicesLoading, error: invoicesError, paidInvoices, unpaidInvoices } = useCarOwnerInvoices();
 
@@ -758,6 +799,7 @@ export default function OwnerVehiclesPage() {
             key={selectedVehicle.id}
             vehicle={selectedVehicle}
             token={token}
+            serviceBy={jobCards[0] ? businessName(jobCards[0].business) : null}
             onSaved={() => void refresh()}
           />
         );
