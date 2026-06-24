@@ -299,61 +299,63 @@ function VehicleRowForm({
               </>
             ) : null
           ) : (
-          <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-            <input
-              type="checkbox"
-              checked={v.attachVehiclePhoto}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                if (!checked) {
-                  if (v.vehicleImagePreview?.startsWith("blob:")) URL.revokeObjectURL(v.vehicleImagePreview);
-                  onChange({
-                    attachVehiclePhoto: false,
-                    vehicleImageFile: null,
-                    vehicleImagePreview: "",
-                  });
-                  if (ref.current) ref.current.value = "";
-                } else {
-                  onChange({ attachVehiclePhoto: true });
-                }
-              }}
-              className="h-3.5 w-3.5 accent-ad-green"
-            />
-            Photo
-          </label>
-          {v.attachVehiclePhoto ? (
-            <div className="flex w-full min-w-0 items-center gap-1.5">
-              {v.vehicleImagePreview ? (
-                <img
-                  src={v.vehicleImagePreview}
-                  alt=""
-                  className="h-[30px] w-[30px] shrink-0 rounded border border-gray-300 object-cover"
+            <>
+              <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                <input
+                  type="checkbox"
+                  checked={v.attachVehiclePhoto}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    if (!checked) {
+                      if (v.vehicleImagePreview?.startsWith("blob:")) URL.revokeObjectURL(v.vehicleImagePreview);
+                      onChange({
+                        attachVehiclePhoto: false,
+                        vehicleImageFile: null,
+                        vehicleImagePreview: "",
+                      });
+                      if (ref.current) ref.current.value = "";
+                    } else {
+                      onChange({ attachVehiclePhoto: true });
+                    }
+                  }}
+                  className="h-3.5 w-3.5 accent-ad-green"
                 />
+                Photo
+              </label>
+              {v.attachVehiclePhoto ? (
+                <div className="flex w-full min-w-0 items-center gap-1.5">
+                  {v.vehicleImagePreview ? (
+                    <img
+                      src={v.vehicleImagePreview}
+                      alt=""
+                      className="h-[30px] w-[30px] shrink-0 rounded border border-gray-300 object-cover"
+                    />
+                  ) : null}
+                  <input
+                    readOnly
+                    value={v.vehicleImageFile?.name ?? ""}
+                    placeholder="No file chosen"
+                    tabIndex={-1}
+                    className={`${compactInputClass} min-w-0 flex-1 cursor-default`}
+                  />
+                  <button type="button" onClick={() => ref.current?.click()} className={`${uploadBtnClass} shrink-0`}>
+                    Upload
+                  </button>
+                  <input
+                    ref={ref}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (v.vehicleImagePreview?.startsWith("blob:")) URL.revokeObjectURL(v.vehicleImagePreview);
+                      onChange({ vehicleImageFile: file, vehicleImagePreview: URL.createObjectURL(file) });
+                    }}
+                  />
+                </div>
               ) : null}
-              <input
-                readOnly
-                value={v.vehicleImageFile?.name ?? ""}
-                placeholder="No file chosen"
-                tabIndex={-1}
-                className={`${compactInputClass} min-w-0 flex-1 cursor-default`}
-              />
-              <button type="button" onClick={() => ref.current?.click()} className={`${uploadBtnClass} shrink-0`}>
-                Upload
-              </button>
-              <input
-                ref={ref}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (v.vehicleImagePreview?.startsWith("blob:")) URL.revokeObjectURL(v.vehicleImagePreview);
-                  onChange({ vehicleImageFile: file, vehicleImagePreview: URL.createObjectURL(file) });
-                }}
-              />
-            </div>
-          ) : null}
+            </>
           )}
         </div>
         <div className="col-start-6 min-w-0 w-full">
@@ -370,30 +372,32 @@ function VehicleRowForm({
               </>
             ) : null
           ) : (
-          <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-            <input
-              type="checkbox"
-              checked={v.attachNextDueService}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                onChange({
-                  attachNextDueService: checked,
-                  ...(!checked ? { nextDueService: "" } : {}),
-                });
-              }}
-              className="h-3.5 w-3.5 accent-ad-green"
-            />
-            Next Due Service
-          </label>
-          {v.attachNextDueService ? (
-            <input
-              type="text"
-              value={v.nextDueService}
-              onChange={(e) => onChange({ nextDueService: e.target.value.replace(/\D/g, "") })}
-              placeholder="km"
-              className={compactInputClass}
-            />
-          ) : null}
+            <>
+              <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                <input
+                  type="checkbox"
+                  checked={v.attachNextDueService}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    onChange({
+                      attachNextDueService: checked,
+                      ...(!checked ? { nextDueService: "" } : {}),
+                    });
+                  }}
+                  className="h-3.5 w-3.5 accent-ad-green"
+                />
+                Next Due Service
+              </label>
+              {v.attachNextDueService ? (
+                <input
+                  type="text"
+                  value={v.nextDueService}
+                  onChange={(e) => onChange({ nextDueService: e.target.value.replace(/\D/g, "") })}
+                  placeholder="km"
+                  className={compactInputClass}
+                />
+              ) : null}
+            </>
           )}
         </div>
       </div>

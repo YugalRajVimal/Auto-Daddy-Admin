@@ -1,5 +1,5 @@
 import type { ShopServiceCategory } from "../types/shopOwner";
-import { normalizeShopType, type ShopType } from "./shopTypes";
+import { type ShopType } from "./shopTypes";
 
 function serviceImage(seed: string): string {
   return `https://picsum.photos/seed/${encodeURIComponent(seed)}/400/400`;
