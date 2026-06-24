@@ -39,7 +39,7 @@ export default function ShopMessagesPage() {
   return (
     <ShopPageShell
       metaTitle="Messages | AutoDaddy"
-      metaDescription="Auto shop messages and notifications"
+      metaDescription="Auto shop notifications and messages"
       sidebarItems={MESSAGE_SECTIONS}
       activeSidebarId={activeId}
       onSidebarSelect={setActiveId}

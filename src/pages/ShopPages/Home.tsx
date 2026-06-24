@@ -21,7 +21,12 @@ export default function ShopHomePage() {
             <p className="text-xs text-gray-500">Loading…</p>
           ) : (
             dealers.map((dealer) => (
-              <ShopDealerCard key={dealer.name} name={dealer.name} phone={dealer.phone} />
+              <ShopDealerCard
+                key={dealer.name}
+                name={dealer.name}
+                phone={dealer.phone}
+                imageUrl={dealer.imageUrl}
+              />
             ))
           )}
         </div>

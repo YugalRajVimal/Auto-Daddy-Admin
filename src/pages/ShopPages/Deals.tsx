@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import ShopDealFormDialog from "../../components/shop/forms/ShopDealFormDialog";
 import ShopPageShell from "../../components/shop/ShopPageShell";
@@ -7,33 +7,84 @@ import {
   ShopErrorPanel,
   ShopListPanel,
   ShopLoadingPanel,
-  ShopRefreshButton,
 } from "../../components/shop/ShopPanels";
 import useAuth from "../../auth/useAuth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopDeals, type DealFilter } from "../../hooks/useShopDeals";
-import { formatCurrencyAmount } from "../../lib/currency";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import { apiMessage, deleteDeal } from "../../lib/shopOwnerMutations";
 import { dealId } from "../../lib/shopOwnerParsers";
 import type { ShopDeal } from "../../types/shopOwner";
 
-const DEAL_SECTIONS = [
-  { id: "all", label: "All deals", variant: "primary" as const },
-  { id: "service", label: "Service Deals", variant: "secondary" as const },
-  { id: "parts", label: "Parts Deal", variant: "secondary" as const },
+type DealSectionId = "all" | "service" | "parts" | "salvage";
+
+const DEAL_SECTIONS: { id: DealSectionId; label: string; tone: "green" | "peach" | "blue" }[] = [
+  { id: "all", label: "All deals", tone: "green" },
+  { id: "service", label: "Service Deals", tone: "peach" },
+  { id: "parts", label: "Parts Deal", tone: "peach" },
+  { id: "salvage", label: "Salvages", tone: "blue" },
 ];
 
-function toFilter(id: string): DealFilter {
+const SECTION_HEADINGS: Record<DealSectionId, string> = {
+  all: "All Deals",
+  service: "Deals on Service",
+  parts: "Parts Deal",
+  salvage: "Salvages",
+};
+
+function toFilter(id: DealSectionId): DealFilter {
   if (id === "service" || id === "parts") return id;
   return "all";
+}
+
+function dealNavBtn(active: boolean, tone: "green" | "peach" | "blue") {
+  const base =
+    "flex w-full items-center justify-center rounded-full px-4 py-2.5 text-sm font-bold shadow-sm transition-colors";
+
+  if (tone === "green") {
+    return `${base} ${
+      active
+        ? "bg-[#008000] text-white"
+        : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
+    }`;
+  }
+
+  if (tone === "peach") {
+    return `${base} ${
+      active
+        ? "bg-[#FDE4D0] text-ad-purple ring-2 ring-ad-purple/35"
+        : "bg-[#FDE4D0] text-ad-purple hover:bg-[#fce0c8]"
+    }`;
+  }
+
+  return `${base} ${
+    active
+      ? "bg-blue-600 text-white"
+      : "border border-blue-600 bg-white text-blue-600 hover:bg-blue-50"
+  }`;
+}
+
+function displayPhone(phone: string | undefined): string {
+  const p = (phone ?? "").trim();
+  if (!p) return "—";
+  const digits = p.replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+  }
+  return p;
 }
 
 function formatEndDate(iso?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function dealMode(deal: ShopDeal): "service" | "parts" {
@@ -41,20 +92,140 @@ function dealMode(deal: ShopDeal): "service" | "parts" {
   return "service";
 }
 
+function shopDealTitle(deal: ShopDeal): string {
+  if (dealMode(deal) === "parts") {
+    return deal.partName?.trim() || deal.productName?.trim() || "Parts deal";
+  }
+  return deal.service?.name?.trim() || deal.productName?.trim() || deal.description?.trim() || "Service deal";
+}
+
+function shopDealDiscountPercent(deal: ShopDeal): number | null {
+  const price = Number(deal.price);
+  const discounted = Number(deal.discountedPrice);
+  if (!Number.isFinite(price) || !Number.isFinite(discounted) || price <= 0 || discounted <= 0 || discounted >= price) {
+    return null;
+  }
+  return Math.round((1 - discounted / price) * 100);
+}
+
+function isSalvageDeal(deal: ShopDeal): boolean {
+  const haystack = [deal.productName, deal.partName, deal.description, deal.dealType, deal.service?.name]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return /\bsalvage/i.test(haystack);
+}
+
+function DealCard({
+  deal,
+  businessName,
+  businessPhone,
+  deletingId,
+  onEdit,
+  onDelete,
+}: {
+  deal: ShopDeal;
+  businessName: string;
+  businessPhone: string;
+  deletingId: string | null;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const id = dealId(deal);
+  const imageUri = normalizeMediaUrl(deal.dealImage ?? deal.productImage);
+  const discount = shopDealDiscountPercent(deal);
+  const phoneHref = businessPhone ? `tel:${businessPhone.replace(/\s/g, "")}` : undefined;
+
+  return (
+    <article className="flex flex-col gap-3 rounded-md border border-[#008000] bg-[#d4fcd4] p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5 sm:py-4">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-sm border border-gray-300 bg-white">
+          {imageUri ? <img src={imageUri} alt="" className="h-full w-full object-cover" /> : null}
+        </div>
+
+        <div className="min-w-0 shrink-0 sm:w-[22%]">
+          <p className="truncate text-base font-bold text-[#008000]">{businessName || "—"}</p>
+          {phoneHref ? (
+            <a href={phoneHref} className="text-sm font-semibold text-blue-700 hover:underline">
+              {displayPhone(businessPhone)}
+            </a>
+          ) : (
+            <p className="text-sm font-semibold text-blue-700">{displayPhone(businessPhone)}</p>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-bold text-gray-900">{shopDealTitle(deal)}</p>
+          <p className="text-sm font-semibold text-blue-700">Ends on : {formatEndDate(deal.offersEndOnDate)}</p>
+          {deal.dealEnabled === false ? (
+            <p className="mt-0.5 text-xs font-semibold text-red-600">Disabled</p>
+          ) : null}
+          <div className="mt-1 flex gap-3 sm:hidden">
+            <button
+              type="button"
+              className="text-xs font-semibold text-ad-purple hover:underline"
+              onClick={onEdit}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
+              disabled={deletingId === id}
+              onClick={onDelete}
+            >
+              {deletingId === id ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 sm:shrink-0 sm:flex-col sm:justify-center sm:text-center">
+        <div>
+          <p className="text-2xl font-bold leading-none text-[#008000]">{discount != null ? `${discount} %` : "—"}</p>
+          <p className="mt-1 text-sm font-semibold text-blue-700">Discount</p>
+        </div>
+        <div className="hidden gap-3 sm:flex">
+          <button
+            type="button"
+            className="text-xs font-semibold text-ad-purple hover:underline"
+            onClick={onEdit}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
+            disabled={deletingId === id}
+            onClick={onDelete}
+          >
+            {deletingId === id ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function ShopDealsPage() {
-  const { session, token } = useAuth();
-  const { faqsHeading, faqsDescription } = useShopOwnerPortal();
-  const [activeId, setActiveId] = useState("all");
+  const { token } = useAuth();
+  const { faqsHeading, faqsDescription, displayName, businessPhone } = useShopOwnerPortal();
+  const [activeId, setActiveId] = useState<DealSectionId>("service");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"service" | "parts">("service");
   const [editingDeal, setEditingDeal] = useState<ShopDeal | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const { deals, loading, error, refresh } = useShopDeals(toFilter(activeId));
+  const { deals: rawDeals, loading, error, refresh } = useShopDeals(toFilter(activeId));
 
-  const openCreate = (mode: "service" | "parts") => {
+  const deals = useMemo(() => {
+    if (activeId === "salvage") return rawDeals.filter(isSalvageDeal);
+    return rawDeals;
+  }, [activeId, rawDeals]);
+
+  const openCreate = () => {
     setEditingDeal(null);
-    setDialogMode(mode);
+    setDialogMode(activeId === "parts" ? "parts" : "service");
     setDialogOpen(true);
   };
 
@@ -86,19 +257,20 @@ export default function ShopDealsPage() {
     <ShopPageShell
       metaTitle="Deals | AutoDaddy"
       metaDescription="Auto shop deals"
-      sidebarItems={DEAL_SECTIONS}
-      activeSidebarId={activeId}
-      onSidebarSelect={setActiveId}
-      headerAction={
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="rounded-md bg-[#008000] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#006600]"
-            onClick={() => openCreate(activeId === "parts" ? "parts" : "service")}
-          >
-            + Add
-          </button>
-          <ShopRefreshButton onClick={() => void refresh()} />
+      sidebarHeading="My Deals"
+      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600"
+      sidebarExtra={
+        <div className="flex flex-col gap-3">
+          {DEAL_SECTIONS.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => setActiveId(section.id)}
+              className={dealNavBtn(activeId === section.id, section.tone)}
+            >
+              {section.label}
+            </button>
+          ))}
         </div>
       }
       onFaqsOpen={() => setFaqsOpen(true)}
@@ -107,67 +279,42 @@ export default function ShopDealsPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      {loading ? (
-        <ShopLoadingPanel />
-      ) : error ? (
-        <ShopErrorPanel message={error} onRetry={() => void refresh()} />
-      ) : deals.length === 0 ? (
-        <ShopEmptyPanel message="No deals in this category." />
-      ) : (
-        <ShopListPanel>
-          {deals.map((deal) => {
-            const id = dealId(deal);
-            const imageUri = normalizeMediaUrl(deal.dealImage ?? deal.productImage);
-            return (
-              <article
-                key={id}
-                className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm"
-              >
-                <div className="bg-[#FDE4D0] px-4 py-3">
-                  <p className="text-sm font-bold text-ad-purple">{deal.productName ?? deal.partName ?? "Deal"}</p>
-                  {deal.description ? <p className="mt-1 text-xs text-gray-600">{deal.description}</p> : null}
-                </div>
-                <div className="flex gap-4 p-4">
-                  {imageUri ? (
-                    <img src={imageUri} alt="" className="h-20 w-20 shrink-0 rounded object-cover" />
-                  ) : null}
-                  <div className="flex flex-1 flex-col justify-center gap-1">
-                    <p className="text-sm text-gray-700">
-                      <span className="line-through">
-                        {formatCurrencyAmount(deal.price, session?.meta?.countryCode)}
-                      </span>{" "}
-                      <span className="font-bold text-[#006600]">
-                        {formatCurrencyAmount(deal.discountedPrice, session?.meta?.countryCode)}
-                      </span>
-                    </p>
-                    <p className="text-xs text-gray-500">Ends {formatEndDate(deal.offersEndOnDate)}</p>
-                    {deal.dealEnabled === false ? (
-                      <p className="text-xs font-semibold text-red-600">Disabled</p>
-                    ) : null}
-                    <div className="mt-1 flex gap-3">
-                      <button
-                        type="button"
-                        className="text-xs font-semibold text-ad-purple hover:underline"
-                        onClick={() => openEdit(deal)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
-                        disabled={deletingId === id}
-                        onClick={() => void handleDelete(deal)}
-                      >
-                        {deletingId === id ? "Deleting…" : "Delete"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </ShopListPanel>
-      )}
+      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+        <div className="relative mb-4 flex items-center justify-end gap-3">
+          <h2 className="pointer-events-none absolute inset-x-0 text-center text-base font-bold text-blue-700 sm:text-lg">
+            {SECTION_HEADINGS[activeId]}
+          </h2>
+          <button
+            type="button"
+            className="relative z-10 shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
+            onClick={openCreate}
+          >
+            + Add New
+          </button>
+        </div>
+
+        {loading ? (
+          <ShopLoadingPanel className="min-h-0 flex-1" />
+        ) : error ? (
+          <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+        ) : deals.length === 0 ? (
+          <ShopEmptyPanel className="min-h-0 flex-1" message="No deals in this category." />
+        ) : (
+          <ShopListPanel className="min-h-0 flex-1">
+            {deals.map((deal) => (
+              <DealCard
+                key={dealId(deal)}
+                deal={deal}
+                businessName={displayName}
+                businessPhone={businessPhone}
+                deletingId={deletingId}
+                onEdit={() => openEdit(deal)}
+                onDelete={() => void handleDelete(deal)}
+              />
+            ))}
+          </ShopListPanel>
+        )}
+      </div>
 
       <ShopDealFormDialog
         open={dialogOpen}

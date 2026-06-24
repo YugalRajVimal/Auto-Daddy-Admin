@@ -991,3 +991,31 @@ span.flatpickr-weekday,
 .simplebar-scrollbar.simplebar-visible:before {
   @apply opacity-100;
 }
+
+.job-card-incl-btn {
+  @apply inline-flex h-7 w-7 items-center justify-center rounded border text-xs font-bold;
+}
+
+.job-card-incl-btn-on {
+  @apply border-[#008000] bg-[#008000] text-white;
+}
+
+.job-card-incl-btn-off {
+  @apply border-gray-400 bg-white text-gray-500;
+}
+
+.job-card-odo-input {
+  @apply max-w-[5.5rem];
+}
+
+.job-card-qty-input {
+  @apply max-w-[3.5rem] mx-auto;
+}
+
+.job-card-numeric-input {
+  @apply max-w-[5.5rem] ml-auto;
+}
+
+.job-card-date-input {
+  @apply max-w-[10rem];
+}

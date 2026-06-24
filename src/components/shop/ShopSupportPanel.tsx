@@ -1,4 +1,6 @@
-import { FiPause, FiX } from "react-icons/fi";
+import { FiPause } from "react-icons/fi";
+import DashboardPanelCard from "../COMP";
+import { compactInputClass } from "../admin/ContentPanel";
 
 const INTRO =
   "Autodaddy is providing better solution to its user promptly. Any question that help to improve system would be respected. Only help of collaborative efforts makes the system strong.";
@@ -18,7 +20,6 @@ type ShopSupportPanelProps = {
   saving: boolean;
   onSave: () => void;
   onCancel: () => void;
-  onClose: () => void;
 };
 
 export default function ShopSupportPanel({
@@ -34,30 +35,22 @@ export default function ShopSupportPanel({
   saving,
   onSave,
   onCancel,
-  onClose,
 }: ShopSupportPanelProps) {
   return (
-    <div className="flex min-h-[420px] flex-1 flex-col rounded-md border-2 border-ad-green-light bg-ad-green-light/40 lg:min-h-[calc(100vh-220px)]">
-      <div className="flex items-center justify-between border-b border-ad-green-dark/30 px-5 py-3">
-        <h2 className="text-lg font-bold text-ad-green-dark">Support</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded p-1 text-gray-600 hover:bg-white/60"
-          aria-label="Close support form"
-        >
-          <FiX size={20} />
-        </button>
+    <DashboardPanelCard variant="form" className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-4 border-b border-ad-form-border pb-3">
+        <h2 className="text-lg font-bold text-ad-green-dark">Raise Ticket</h2>
+        <p className="mt-1 text-sm font-semibold text-ad-green">Ticket No. {ticketNo}</p>
       </div>
 
-      <div className="flex flex-1 flex-col px-5 py-6">
+      <div className="flex flex-1 flex-col">
         <p className="mx-auto mb-8 max-w-xl text-center text-sm italic leading-relaxed text-gray-600">
           {INTRO}
         </p>
 
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
-            <label className="sr-only" htmlFor="support-subject">
+            <label className="mb-1 block text-xs font-bold text-ad-green-dark" htmlFor="support-subject">
               Subject
             </label>
             <select
@@ -65,7 +58,7 @@ export default function ShopSupportPanel({
               value={selectedServiceId}
               onChange={(e) => onServiceChange(e.target.value)}
               disabled={servicesLoading || services.length === 0}
-              className="w-full rounded border border-ad-form-border bg-ad-form-bg px-4 py-2.5 text-sm text-gray-800 focus:border-ad-green focus:outline-none disabled:opacity-60"
+              className={`${compactInputClass} disabled:opacity-60`}
             >
               <option value="">{servicesLoading ? "Loading…" : "Subject"}</option>
               {services.map((s) => (
@@ -75,18 +68,13 @@ export default function ShopSupportPanel({
               ))}
             </select>
           </div>
-          <div className="shrink-0 sm:w-[200px]">
-            <div className="rounded border border-ad-form-border bg-ad-form-bg px-4 py-2.5 text-sm text-gray-700">
-              Ticket No. {ticketNo}
-            </div>
-          </div>
         </div>
 
         <div className="mb-8">
-          <p className="mb-2 text-sm font-semibold text-gray-800">
+          <p className="mb-2 text-xs font-bold text-ad-green-dark">
             Speak <span className="text-ad-green-dark">&gt;&gt;&gt;</span>
           </p>
-          <div className="flex items-center gap-3 rounded border border-ad-form-border bg-ad-form-bg px-4 py-3">
+          <div className="flex items-center gap-3 rounded border border-gray-400 bg-white px-4 py-3">
             <button
               type="button"
               onClick={onToggleRecording}
@@ -113,16 +101,16 @@ export default function ShopSupportPanel({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-ad-form-border bg-ad-form-bg px-5 py-4">
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-bg px-3 py-2.5">
         <button
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="rounded bg-ad-green-dark px-6 py-2 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
+          className="rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save"}
         </button>
-        <span className="text-sm text-gray-700">
+        <span className="text-xs text-gray-700">
           or{" "}
           <button
             type="button"
@@ -133,6 +121,6 @@ export default function ShopSupportPanel({
           </button>
         </span>
       </div>
-    </div>
+    </DashboardPanelCard>
   );
 }

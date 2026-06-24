@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import PortalSidebarButton from "../admin/PortalSidebarButton";
+import { OwnerSidebarFaqsSlot } from "../owner/OwnerFaqsButton";
 
 export type ShopSidebarItem = {
   id: string;
@@ -15,6 +16,7 @@ type ShopSidebarProps = {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   heading?: string;
+  headingClassName?: string;
   children?: ReactNode;
   onFaqsClick?: () => void;
   className?: string;
@@ -28,6 +30,7 @@ export default function ShopSidebar({
   searchValue,
   onSearchChange,
   heading,
+  headingClassName = "text-base font-bold text-blue-700",
   children,
   onFaqsClick,
   className = "",
@@ -36,7 +39,7 @@ export default function ShopSidebar({
     <aside
       className={`flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)] ${className}`}
     >
-      {heading ? <h2 className="text-base font-bold text-blue-700">{heading}</h2> : null}
+      {heading ? <h2 className={headingClassName}>{heading}</h2> : null}
 
       {searchPlaceholder != null ? (
         <input
@@ -61,17 +64,7 @@ export default function ShopSidebar({
         ))}
       </div>
 
-      {onFaqsClick ? (
-        <div className="mt-auto pt-6">
-          <button
-            type="button"
-            onClick={onFaqsClick}
-            className="w-full rounded-full border border-blue-600 bg-white/70 px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-blue-600 transition-colors hover:bg-white"
-          >
-            FAQs
-          </button>
-        </div>
-      ) : null}
+      {onFaqsClick ? <OwnerSidebarFaqsSlot onClick={onFaqsClick} /> : null}
     </aside>
   );
 }

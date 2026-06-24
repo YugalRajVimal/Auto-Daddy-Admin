@@ -6,7 +6,6 @@ type ShopHelpSidebarProps = {
   activeSection: HelpSection;
   onSectionChange: (section: HelpSection) => void;
   onFaqsClick: () => void;
-  faqsStyle?: "owner" | "shop";
 };
 
 function sectionButtonClass(active: boolean, section: HelpSection) {
@@ -27,7 +26,6 @@ export default function ShopHelpSidebar({
   activeSection,
   onSectionChange,
   onFaqsClick,
-  faqsStyle = "shop",
 }: ShopHelpSidebarProps) {
   return (
     <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]">
@@ -45,19 +43,7 @@ export default function ShopHelpSidebar({
       >
         Resolved
       </button>
-      {faqsStyle === "owner" ? (
-        <OwnerSidebarFaqsSlot onClick={onFaqsClick} />
-      ) : (
-        <div className="mt-auto flex flex-col gap-3 pt-6">
-          <button
-            type="button"
-            onClick={onFaqsClick}
-            className="w-full rounded-full border border-ad-purple bg-ad-purple px-5 py-3 text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-ad-purple-dark"
-          >
-            FAQs
-          </button>
-        </div>
-      )}
+      <OwnerSidebarFaqsSlot onClick={onFaqsClick} />
     </aside>
   );
 }

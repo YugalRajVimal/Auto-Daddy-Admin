@@ -15,6 +15,7 @@ type ShopPageShellProps = {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   sidebarHeading?: string;
+  sidebarHeadingClassName?: string;
   sidebarExtra?: ReactNode;
   faqsOpen?: boolean;
   onFaqsOpen?: () => void;
@@ -36,6 +37,7 @@ export default function ShopPageShell({
   searchValue,
   onSearchChange,
   sidebarHeading,
+  sidebarHeadingClassName,
   sidebarExtra,
   faqsOpen = false,
   onFaqsOpen,
@@ -66,6 +68,7 @@ export default function ShopPageShell({
             searchValue={searchValue}
             onSearchChange={onSearchChange}
             heading={sidebarHeading}
+            headingClassName={sidebarHeadingClassName}
             onFaqsClick={onFaqsOpen}
           >
             {sidebarExtra}

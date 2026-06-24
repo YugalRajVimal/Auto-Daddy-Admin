@@ -1,103 +1,186 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router";
-import { toast } from "react-toastify";
+import { useEffect, useMemo, useState } from "react";
+import JobCardForm from "../../components/JobCard/JobCardForm";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopEmptyPanel,
   ShopErrorPanel,
-  ShopGreenRow,
   ShopListPanel,
   ShopLoadingPanel,
-  ShopRefreshButton,
 } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopJobCards } from "../../hooks/useShopJobCards";
 import { formatCurrencyAmount } from "../../lib/currency";
 import useAuth from "../../auth/useAuth";
-import {
-  apiMessage,
-  deleteJobCard,
-  markJobCardPaymentStatus,
-  resendJobCardNotification,
-} from "../../lib/shopOwnerMutations";
-import { isJobCardPending } from "../../lib/shopOwnerJobCards";
+import type { JobCardListRow } from "../../lib/shopOwnerJobCards";
 
-const JOB_CARD_SECTIONS = [{ id: "job-cards", label: "Job Cards", variant: "primary" as const }];
+const PAGE_SIZE = 10;
+
+function displayJobId(jobNo: string | undefined): string {
+  const raw = (jobNo ?? "").trim().replace(/^#/, "");
+  if (!raw) return "—";
+  const stripped = raw.replace(/^job\s*#?\s*/i, "").trim();
+  if (!stripped) return "—";
+  if (/^j/i.test(stripped)) {
+    return stripped.replace(/^j/i, "J ");
+  }
+  return `J ${stripped}`;
+}
+
+function displayPhone(phone: string | undefined): string {
+  const p = (phone ?? "").trim();
+  if (!p) return "—";
+  const digits = p.replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+  }
+  return p;
+}
+
+function formatJobPrice(total: number | string | undefined, countryCode: string | null | undefined): string {
+  const formatted = formatCurrencyAmount(total, countryCode, { fallback: "—" });
+  if (formatted === "—") return formatted;
+  const match = /^([^\d]+)(.+)$/.exec(formatted);
+  if (match) {
+    return `${match[1].trim()} ${match[2].trim()}`;
+  }
+  return formatted;
+}
+
+function JobCardRow({
+  jc,
+  countryCode,
+  onSelect,
+}: {
+  jc: JobCardListRow;
+  countryCode: string | null | undefined;
+  onSelect: () => void;
+}) {
+  return (
+    <article
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className="flex cursor-pointer items-stretch rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008000]"
+    >
+      <div className="flex w-[76px] shrink-0 flex-col items-center justify-center border border-gray-400 bg-white px-2 py-3 text-center sm:w-[88px]">
+        <p className="text-[11px] font-semibold leading-tight text-gray-800">Job no.</p>
+        <p className="mt-0.5 text-sm font-bold leading-tight text-blue-700">{displayJobId(jc.jobNo)}</p>
+      </div>
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-2 bg-[#d4ffd4] px-3 py-3 sm:gap-4 sm:px-5">
+        <div className="min-w-0 shrink-0 sm:max-w-[34%]">
+          <p className="truncate text-sm font-bold text-[#008000]">{jc.customerName ?? "—"}</p>
+          {jc.phone ? (
+            <a
+              href={`tel:${jc.phone.replace(/\s/g, "")}`}
+              className="text-sm font-semibold text-blue-700 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {displayPhone(jc.phone)}
+            </a>
+          ) : (
+            <p className="text-sm font-semibold text-blue-700">—</p>
+          )}
+        </div>
+        <p className="min-w-0 flex-1 truncate text-center text-lg font-bold tracking-wide text-gray-900 sm:text-xl">
+          {jc.vehiclePlate?.trim() || "—"}
+        </p>
+        <div className="shrink-0 text-right sm:max-w-[28%]">
+          <p className="text-sm font-bold text-[#008000]">{formatJobPrice(jc.total, countryCode)}</p>
+          <p className="text-sm font-semibold text-blue-700">{jc.date ?? "—"}</p>
+        </div>
+      </div>
+    </article>
+  );
+}
 
 export default function ShopJobCardsPage() {
-  const navigate = useNavigate();
-  const { session, token } = useAuth();
+  const { session } = useAuth();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
   const [search, setSearch] = useState("");
   const [faqsOpen, setFaqsOpen] = useState(false);
-  const [actionId, setActionId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [view, setView] = useState<"list" | "form">("list");
+  const [formMode, setFormMode] = useState<"add" | "edit">("add");
+  const [editJobCardId, setEditJobCardId] = useState<string | null>(null);
   const { cards, loading, error, refresh } = useShopJobCards(search);
 
-  const runAction = async (id: string, fn: () => Promise<void>) => {
-    setActionId(id);
-    try {
-      await fn();
-    } finally {
-      setActionId(null);
+  const totalPages = Math.max(1, Math.ceil(cards.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+
+  const paginatedList = useMemo(
+    () => cards.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [cards, safePage],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
     }
+  }, [page, totalPages]);
+
+  const openJobCard = (jc: JobCardListRow) => {
+    setFormMode("edit");
+    setEditJobCardId(jc.id);
+    setView("form");
   };
 
-  const handleDelete = (id: string) => {
-    if (!token || !window.confirm("Delete this job card?")) return;
-    void runAction(id, async () => {
-      const res = await deleteJobCard(token, id);
-      if (!res.ok) {
-        toast.error(apiMessage(res.data) || "Could not delete job card.");
-        return;
-      }
-      toast.success("Job card deleted.");
-      void refresh();
-    });
+  const openNewJobCard = () => {
+    setFormMode("add");
+    setEditJobCardId(null);
+    setView("form");
   };
 
-  const handleMarkPaid = (id: string) => {
-    if (!token) return;
-    void runAction(id, async () => {
-      const res = await markJobCardPaymentStatus(token, id, "Paid");
-      if (!res.ok) {
-        toast.error(apiMessage(res.data) || "Could not update payment status.");
-        return;
-      }
-      toast.success("Marked as paid.");
-      void refresh();
-    });
-  };
-
-  const handleResend = (id: string) => {
-    if (!token) return;
-    void runAction(id, async () => {
-      const res = await resendJobCardNotification(token, id);
-      if (!res.ok) {
-        toast.error(apiMessage(res.data) || "Could not resend notification.");
-        return;
-      }
-      toast.success("Notification resent.");
-    });
+  const showList = () => {
+    setView("list");
+    setEditJobCardId(null);
   };
 
   return (
     <ShopPageShell
       metaTitle="Job Cards | AutoDaddy"
       metaDescription="Auto shop job cards"
-      sidebarItems={JOB_CARD_SECTIONS}
-      activeSidebarId="job-cards"
-      searchPlaceholder="Search customer"
+      sidebarHeading="Job Cards"
+      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600"
+      searchPlaceholder="Search Customer"
       searchValue={search}
       onSearchChange={setSearch}
-      headerAction={
-        <div className="flex items-center gap-2">
-          <Link
-            to="/shop/job-cards/new"
-            className="rounded-md bg-[#008000] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#006600]"
+      sidebarExtra={
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={showList}
+            className={`w-full rounded-full px-4 py-2.5 text-sm font-bold shadow-sm ${
+              view === "list"
+                ? "bg-[#008000] text-white"
+                : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
+            }`}
           >
-            + Add
-          </Link>
-          <ShopRefreshButton onClick={() => void refresh()} />
+            Job Card List
+          </button>
+          <button
+            type="button"
+            onClick={openNewJobCard}
+            className={`w-full rounded-full border px-4 py-2.5 text-sm font-bold ${
+              view === "form" && formMode === "add"
+                ? "border-ad-purple bg-[#fce8f0] text-ad-purple"
+                : "border-ad-purple bg-[#fce8f0] text-ad-purple hover:bg-[#f9dce8]"
+            }`}
+          >
+            Create New Job Card
+          </button>
         </div>
       }
       onFaqsOpen={() => setFaqsOpen(true)}
@@ -106,98 +189,68 @@ export default function ShopJobCardsPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      {loading ? (
-        <ShopLoadingPanel />
-      ) : error ? (
-        <ShopErrorPanel message={error} onRetry={() => void refresh()} />
-      ) : cards.length === 0 ? (
-        <ShopEmptyPanel message="No job cards yet." />
-      ) : (
-        <ShopListPanel>
-          {cards.map((jc) => {
-            const pending = isJobCardPending(jc);
-            const busy = actionId === jc.id;
-            return (
-              <ShopGreenRow
-                key={jc.id}
-                left={
-                  <p className="text-sm font-bold leading-tight text-white">
-                    {jc.jobNo ?? jc.listBucket ?? "Job"}
-                  </p>
-                }
-                center={
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{jc.customerName ?? "—"}</p>
-                    {jc.phone ? (
-                      <a
-                        href={`tel:${jc.phone.replace(/\s/g, "")}`}
-                        className="text-sm font-semibold text-blue-700 hover:underline"
-                      >
-                        {jc.phone}
-                      </a>
-                    ) : null}
-                    {jc.vehiclePlate ? <p className="text-xs text-gray-600">{jc.vehiclePlate}</p> : null}
-                    {jc.servicesSummary ? <p className="text-xs text-gray-500">{jc.servicesSummary}</p> : null}
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {pending ? (
-                        <button
-                          type="button"
-                          className="text-xs font-semibold text-ad-purple hover:underline disabled:opacity-50"
-                          disabled={busy}
-                          onClick={() =>
-                            navigate(`/shop/job-cards/${jc.id}/edit`, {
-                              state: { jobCard: jc.raw as Record<string, unknown> },
-                            })
-                          }
-                        >
-                          Edit
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
-                        disabled={busy}
-                        onClick={() => handleDelete(jc.id)}
-                      >
-                        Delete
-                      </button>
-                      {jc.unpaid || jc.paymentStatus?.toLowerCase() !== "paid" ? (
-                        <button
-                          type="button"
-                          className="text-xs font-semibold text-[#008000] hover:underline disabled:opacity-50"
-                          disabled={busy}
-                          onClick={() => handleMarkPaid(jc.id)}
-                        >
-                          Mark paid
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="text-xs font-semibold text-blue-700 hover:underline disabled:opacity-50"
-                        disabled={busy}
-                        onClick={() => handleResend(jc.id)}
-                      >
-                        Resend
-                      </button>
+      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+        {view === "form" ? (
+          <JobCardForm
+            active
+            mode={formMode}
+            jobCardId={editJobCardId}
+            onCancel={showList}
+            onSaved={() => void refresh()}
+          />
+        ) : (
+          <>
+            <h1 className="mb-4 text-center text-base font-bold text-blue-700 sm:text-lg">Job List</h1>
+
+            {loading ? (
+              <ShopLoadingPanel className="min-h-0 flex-1" />
+            ) : error ? (
+              <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+            ) : cards.length === 0 ? (
+              <ShopEmptyPanel className="min-h-0 flex-1" message="No job cards yet." />
+            ) : (
+              <>
+                <ShopListPanel className="min-h-0 flex-1">
+                  {paginatedList.map((jc) => (
+                    <JobCardRow
+                      key={jc.id}
+                      jc={jc}
+                      countryCode={session?.meta?.countryCode}
+                      onSelect={() => openJobCard(jc)}
+                    />
+                  ))}
+                </ShopListPanel>
+
+                <footer className="mt-3 flex items-center justify-between gap-3 pt-2">
+                  <p className="text-sm font-semibold text-blue-700">{cards.length} Entries</p>
+                  {totalPages > 1 ? (
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
+                        const isActive = pageNumber === safePage;
+                        return (
+                          <button
+                            key={pageNumber}
+                            type="button"
+                            onClick={() => setPage(pageNumber)}
+                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
+                              isActive
+                                ? "bg-[#008000] text-white"
+                                : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
+                            }`}
+                            aria-current={isActive ? "page" : undefined}
+                          >
+                            {pageNumber}
+                          </button>
+                        );
+                      })}
                     </div>
-                  </div>
-                }
-                right={
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-[#008000]">{jc.status ?? jc.paymentStatus ?? "—"}</p>
-                    <p className="text-sm font-semibold text-blue-700">{jc.date ?? "—"}</p>
-                    {jc.total != null ? (
-                      <p className="text-xs font-bold text-gray-800">
-                        {formatCurrencyAmount(jc.total, session?.meta?.countryCode)}
-                      </p>
-                    ) : null}
-                  </div>
-                }
-              />
-            );
-          })}
-        </ShopListPanel>
-      )}
+                  ) : null}
+                </footer>
+              </>
+            )}
+          </>
+        )}
+      </div>
     </ShopPageShell>
   );
 }

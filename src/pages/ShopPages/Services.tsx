@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ShopServiceSubDialog from "../../components/shop/forms/ShopServiceSubDialog";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
@@ -6,28 +6,82 @@ import {
   ShopErrorPanel,
   ShopListPanel,
   ShopLoadingPanel,
-  ShopRefreshButton,
 } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
 import type { ShopServiceCategory } from "../../types/shopOwner";
 
-const SERVICE_SECTIONS = [
-  { id: "categories", label: "My Service Categories", variant: "primary" as const },
-  { id: "add-sub", label: "+ Add Sub-Services", variant: "secondary" as const },
-];
+const PAGE_SIZE = 5;
+
+function SubServiceCard({
+  sub,
+  onEdit,
+}: {
+  sub: ShopServiceCategory["subServices"][number];
+  onEdit: () => void;
+}) {
+  const price =
+    sub.price % 1 === 0 ? sub.price.toFixed(0) : sub.price.toFixed(2);
+
+  return (
+    <article className="flex items-center gap-4 rounded-md border border-[#008000] bg-[#d4fcd4] p-3 sm:px-5 sm:py-4">
+      <div
+        className="h-16 w-16 shrink-0 rounded-sm border border-gray-300 bg-white"
+        aria-hidden
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-base font-bold text-[#008000]">{sub.name}</p>
+        <p className="text-sm font-semibold text-blue-700">Description :</p>
+        {sub.desc ? <p className="text-sm text-gray-700">{sub.desc}</p> : null}
+        <button
+          type="button"
+          className="mt-1 text-xs font-semibold text-ad-purple hover:underline"
+          onClick={onEdit}
+        >
+          Edit
+        </button>
+      </div>
+      <p className="shrink-0 text-base font-bold text-[#008000]">$ {price}</p>
+    </article>
+  );
+}
 
 export default function ShopServicesPage() {
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
-  const [activeId, setActiveId] = useState("categories");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
   const { categories, loading, error, refresh } = useShopServices();
 
   const activeCategory: ShopServiceCategory | null =
     categories.find((c) => c.id === activeCategoryId) ?? categories[0] ?? null;
+
+  const subs = activeCategory?.subServices ?? [];
+  const totalPages = Math.max(1, Math.ceil(subs.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+
+  const paginatedSubs = useMemo(
+    () => subs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [subs, safePage],
+  );
+
+  useEffect(() => {
+    if (categories.length > 0 && !categories.some((c) => c.id === activeCategoryId)) {
+      setActiveCategoryId(categories[0].id);
+    }
+  }, [categories, activeCategoryId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeCategoryId]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const openAdd = (cat: ShopServiceCategory) => {
     setActiveCategoryId(cat.id);
@@ -45,89 +99,90 @@ export default function ShopServicesPage() {
     <ShopPageShell
       metaTitle="Services | AutoDaddy"
       metaDescription="Auto shop services"
-      sidebarItems={SERVICE_SECTIONS}
-      activeSidebarId={activeId}
-      onSidebarSelect={setActiveId}
-      headerAction={<ShopRefreshButton onClick={() => void refresh()} />}
+      sidebarHeading="My Services"
+      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600"
+      sidebarItems={categories.map((cat) => ({
+        id: cat.id,
+        label: cat.name ?? "Category",
+        variant: "primary" as const,
+      }))}
+      activeSidebarId={activeCategoryId}
+      onSidebarSelect={setActiveCategoryId}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      {loading ? (
-        <ShopLoadingPanel />
-      ) : error ? (
-        <ShopErrorPanel message={error} onRetry={() => void refresh()} />
-      ) : categories.length === 0 ? (
-        <ShopEmptyPanel message="No service categories yet. Select services from Profile → Operational Services." />
-      ) : (
-        <ShopListPanel>
-          {activeId === "add-sub" && categories.length > 1 ? (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  className={`rounded-md px-3 py-1 text-xs font-semibold ${
-                    activeCategory?.id === cat.id
-                      ? "bg-ad-purple text-white"
-                      : "border border-ad-purple/40 bg-white text-ad-purple"
-                  }`}
-                  onClick={() => setActiveCategoryId(cat.id)}
-                >
-                  {cat.name ?? "Category"}
-                </button>
-              ))}
+      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+        {loading ? (
+          <ShopLoadingPanel className="min-h-0 flex-1" />
+        ) : error ? (
+          <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+        ) : categories.length === 0 ? (
+          <ShopEmptyPanel
+            className="min-h-0 flex-1"
+            message="No service categories yet. Select services from Profile → Operational Services."
+          />
+        ) : activeCategory ? (
+          <>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-base font-bold text-blue-700">{activeCategory.name ?? "Category"}</h2>
+              <button
+                type="button"
+                className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
+                onClick={() => openAdd(activeCategory)}
+              >
+                + Add New
+              </button>
             </div>
-          ) : null}
 
-          {(activeId === "add-sub" && activeCategory ? [activeCategory] : categories).map((cat) => (
-            <div key={cat.id} className="overflow-hidden rounded-md shadow-sm">
-              <div className="flex items-center justify-between bg-[#006600] px-4 py-3">
-                <div>
-                  <p className="text-sm font-bold text-white">{cat.name ?? "Category"}</p>
-                  {cat.desc ? <p className="text-xs text-white/80">{cat.desc}</p> : null}
-                </div>
-                <button
-                  type="button"
-                  className="rounded bg-white/20 px-2 py-1 text-xs font-bold text-white hover:bg-white/30"
-                  onClick={() => openAdd(cat)}
-                >
-                  + Sub-service
-                </button>
-              </div>
-              <div className="flex flex-col gap-2 bg-white p-3">
-                {cat.subServices.length === 0 ? (
-                  <p className="text-sm text-gray-500">No sub-services</p>
-                ) : (
-                  cat.subServices.map((sub, subIdx) => (
-                    <div
-                      key={sub.id ?? sub.name}
-                      className="flex items-center justify-between rounded-md border border-ad-purple/30 bg-[#FDE4D0] px-4 py-3"
-                    >
-                      <div>
-                        <p className="text-sm font-bold text-ad-purple">{sub.name}</p>
-                        {sub.desc ? <p className="text-xs text-gray-600">{sub.desc}</p> : null}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <p className="text-sm font-bold text-[#006600]">${sub.price.toFixed(2)}</p>
-                        <button
-                          type="button"
-                          className="text-xs font-semibold text-ad-purple hover:underline"
-                          onClick={() => openEdit(cat, subIdx)}
-                        >
-                          Edit
-                        </button>
-                      </div>
+            {subs.length === 0 ? (
+              <ShopEmptyPanel className="min-h-0 flex-1" message="No sub-services yet." />
+            ) : (
+              <>
+                <ShopListPanel className="min-h-0 flex-1">
+                  {paginatedSubs.map((sub, idx) => {
+                    const subIdx = (safePage - 1) * PAGE_SIZE + idx;
+                    return (
+                      <SubServiceCard
+                        key={sub.id ?? sub.name}
+                        sub={sub}
+                        onEdit={() => openEdit(activeCategory, subIdx)}
+                      />
+                    );
+                  })}
+                </ShopListPanel>
+
+                <footer className="mt-3 flex items-center justify-between gap-3 pt-2">
+                  <p className="text-sm font-semibold text-blue-700">{subs.length} Entries</p>
+                  {totalPages > 1 ? (
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
+                        const isActive = pageNumber === safePage;
+                        return (
+                          <button
+                            key={pageNumber}
+                            type="button"
+                            onClick={() => setPage(pageNumber)}
+                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${isActive
+                                ? "bg-[#008000] text-white"
+                                : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4fcd4]"
+                              }`}
+                            aria-current={isActive ? "page" : undefined}
+                          >
+                            {pageNumber}
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
-          ))}
-        </ShopListPanel>
-      )}
+                  ) : null}
+                </footer>
+              </>
+            )}
+          </>
+        ) : null}
+      </div>
 
       <ShopServiceSubDialog
         open={dialogOpen}

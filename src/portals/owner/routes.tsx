@@ -19,6 +19,7 @@ import ShopServicesPage from "../../pages/ShopPages/Services";
 import ShopJobCardsPage from "../../pages/ShopPages/JobCards";
 import ShopWalletPage from "../../pages/ShopPages/Wallet";
 import ShopMessagesPage from "../../pages/ShopPages/Messages";
+import ShopMyWebsitePage from "../../pages/ShopPages/MyWebsite";
 import ShopReportsPage from "../../pages/ShopPages/Reports";
 import ShopDealsPage from "../../pages/ShopPages/Deals";
 import ShopCustomerAddPage, { ShopCustomerEditPage } from "../../pages/ShopPages/CustomerFormPage";
@@ -58,6 +59,7 @@ export const shopRoutes = (
     <Route path="/shop/job-cards/:id/edit" element={<ShopJobCardEditPage />} />
     <Route path="/shop/wallet" element={<ShopWalletPage />} />
     <Route path="/shop/messages" element={<ShopMessagesPage />} />
+    <Route path="/shop/my-website" element={<ShopMyWebsitePage />} />
     <Route path="/shop/reports" element={<ShopReportsPage />} />
     <Route path="/shop/deals" element={<ShopDealsPage />} />
     <Route path="/shop/profile/car-companies" element={<ShopCarCompaniesPage />} />

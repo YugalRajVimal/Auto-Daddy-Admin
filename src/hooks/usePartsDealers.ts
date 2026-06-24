@@ -5,6 +5,7 @@ import { useAuth } from "../auth";
 export type PartsDealerCard = {
   name: string;
   phone: string;
+  imageUrl?: string;
 };
 
 const FALLBACK_DEALERS: PartsDealerCard[] = [
@@ -30,7 +31,8 @@ function parseDealersFromPayload(payload: unknown): PartsDealerCard[] {
     const o = item as Record<string, unknown>;
     const name = String(o.name ?? o.businessName ?? o.dealerName ?? "").trim();
     const phone = String(o.phone ?? o.contactNo ?? o.businessPhone ?? "").trim();
-    if (name) out.push({ name, phone });
+    const imageUrl = String(o.imageUrl ?? o.photo ?? o.image ?? o.logoUrl ?? "").trim();
+    if (name) out.push({ name, phone, ...(imageUrl ? { imageUrl } : {}) });
   }
   return out;
 }

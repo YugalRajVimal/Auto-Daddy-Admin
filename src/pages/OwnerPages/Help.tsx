@@ -18,7 +18,6 @@ export default function OwnerHelpPage() {
       metaDescription="Car owner support and help tickets"
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
-      faqsStyle="owner"
       services={SUBJECT_OPTIONS}
       servicesLoading={false}
       onSubmit={async () => true}

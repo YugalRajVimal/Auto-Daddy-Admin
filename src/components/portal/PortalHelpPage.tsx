@@ -35,7 +35,6 @@ type PortalHelpPageProps = {
   services: HelpServiceOption[];
   servicesLoading: boolean;
   onSubmit: (service: HelpServiceOption, audio: Blob) => Promise<boolean>;
-  faqsStyle?: "owner" | "shop";
 };
 
 function todayYMD() {
@@ -59,7 +58,6 @@ export default function PortalHelpPage({
   services,
   servicesLoading,
   onSubmit,
-  faqsStyle = "shop",
 }: PortalHelpPageProps) {
   const { recording, audioBlob, error: recorderError, hasRecording, toggle, reset } =
     useWebVoiceRecorder();
@@ -143,7 +141,6 @@ export default function PortalHelpPage({
           activeSection={activeSection}
           onSectionChange={handleSectionChange}
           onFaqsClick={() => setFaqsOpen(true)}
-          faqsStyle={faqsStyle}
         />
 
         {showForm ? (
@@ -160,7 +157,6 @@ export default function PortalHelpPage({
             saving={saving}
             onSave={() => void handleSave()}
             onCancel={closeForm}
-            onClose={closeForm}
           />
         ) : (
           <div className="flex min-h-[420px] flex-1 flex-col gap-3 lg:min-h-[calc(100vh-220px)]">

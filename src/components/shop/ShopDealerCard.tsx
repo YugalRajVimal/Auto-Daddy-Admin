@@ -1,24 +1,30 @@
 type ShopDealerCardProps = {
   name: string;
   phone: string;
+  imageUrl?: string;
 };
 
-export default function ShopDealerCard({ name, phone }: ShopDealerCardProps) {
+export default function ShopDealerCard({ name, phone, imageUrl }: ShopDealerCardProps) {
+  const hasPhoto = Boolean(imageUrl?.trim());
+  const footerText = hasPhoto ? name : phone;
+  const footerHref = !hasPhoto && phone ? `tel:${phone.replace(/\s/g, "")}` : undefined;
+
   return (
-    <article className="overflow-hidden rounded-md shadow-sm">
-      <div className="bg-[#CCFFCC] px-4 py-3">
-        <p className="text-sm font-bold text-[#006600]">{name}</p>
+    <article className="overflow-hidden rounded-sm border border-[#006600]">
+      <div className="flex min-h-[88px] items-center justify-center bg-[#DFFFD6] px-3 py-4">
+        {hasPhoto ? (
+          <img src={imageUrl} alt={name} className="max-h-[72px] w-full object-contain" />
+        ) : (
+          <p className="text-center text-sm font-bold text-[#006600]">{name}</p>
+        )}
       </div>
-      <div className="bg-[#006600] px-4 py-2.5">
-        {phone ? (
-          <a
-            href={`tel:${phone.replace(/\s/g, "")}`}
-            className="text-sm font-bold text-white hover:underline"
-          >
-            {phone}
+      <div className="bg-[#008000] px-3 py-2 text-center">
+        {footerHref ? (
+          <a href={footerHref} className="text-sm font-bold text-white hover:underline">
+            {footerText || "—"}
           </a>
         ) : (
-          <p className="text-sm font-bold text-white/80">—</p>
+          <p className="text-sm font-bold text-white">{footerText || "—"}</p>
         )}
       </div>
     </article>

@@ -1,20 +1,28 @@
+import type { ReactNode } from "react";
 import { PanelBottomBorder, PANEL_BOTTOM_BORDER_HEIGHT } from "./admin/ContentPanel";
+
+type DashboardPanelCardProps = {
+  children: ReactNode;
+  className?: string;
+  /** Green/yellow shop form panel — used for job card create/edit */
+  variant?: "default" | "form";
+};
 
 const DashboardPanelCard = ({
   children,
   className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) => {
+  variant = "default",
+}: DashboardPanelCardProps) => {
+  const isForm = variant === "form";
+
   return (
     <div
-      className={`relative w-full ${className}`}
+      className={`relative w-full shadow-sm ${
+        isForm
+          ? "rounded border border-ad-form-border bg-ad-form-bg px-4 py-4 md:px-5 md:py-5"
+          : "rounded-lg border border-gray-200 bg-white px-3.5 py-2.5"
+      } ${className}`}
       style={{
-        background: "white",
-        borderRadius: 8,
-        padding: "10px 14px",
-        border: `1px solid #e5e7eb`,
         zIndex: 50,
         marginBottom: PANEL_BOTTOM_BORDER_HEIGHT,
       }}

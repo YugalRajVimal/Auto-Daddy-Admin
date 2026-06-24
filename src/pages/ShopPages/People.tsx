@@ -1,47 +1,125 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "react-toastify";
+import CarOwnerAddEditForm from "../../components/admin/CarOwnerAddEditForm";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopEmptyPanel,
   ShopErrorPanel,
-  ShopGreenRow,
   ShopListPanel,
   ShopLoadingPanel,
-  ShopRefreshButton,
 } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopCustomers } from "../../hooks/useShopCustomers";
-import {
-  addCarOwnerToMyCustomers,
-  apiMessage,
-  removeCarOwnerFromMyCustomers,
-} from "../../lib/shopOwnerMutations";
+import { addCarOwnerToMyCustomers, apiMessage } from "../../lib/shopOwnerMutations";
 import type { MyCustomer } from "../../types/shopOwner";
 
-const PEOPLE_SECTIONS = [
-  { id: "customers", label: "My Customers", variant: "primary" as const },
-  { id: "visited", label: "Visited", variant: "secondary" as const },
-];
+const PEOPLE_SECTIONS = [{ id: "customers", label: "My Customers", variant: "primary" as const }];
+
+const PAGE_SIZE = 10;
 
 function customerId(c: MyCustomer) {
   return c.carOwnerId ?? c.id ?? c._id ?? "";
 }
 
+function CustomerCard({
+  customer,
+  isSearch,
+  addingId,
+  onAdd,
+}: {
+  customer: MyCustomer;
+  isSearch: boolean;
+  addingId: string | null;
+  onAdd: (c: MyCustomer) => void;
+}) {
+  const id = customerId(customer);
+
+  const body = (
+    <article className="flex items-center gap-4 rounded-md border border-[#008000] bg-[#d4fcd4] p-3 sm:px-5 sm:py-4">
+      <div
+        className="h-16 w-16 shrink-0 rounded-sm border border-gray-300 bg-white"
+        aria-hidden
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
+        {customer.phone ? (
+          <a
+            href={`tel:${customer.phone.replace(/\s/g, "")}`}
+            className="text-sm font-semibold text-blue-700 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {customer.phone}
+          </a>
+        ) : null}
+        {isSearch ? (
+          <button
+            type="button"
+            className="mt-1 text-xs font-semibold text-[#008000] hover:underline disabled:opacity-50"
+            disabled={addingId === id}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onAdd(customer);
+            }}
+          >
+            {addingId === id ? "Adding…" : "Add to my customers"}
+          </button>
+        ) : null}
+      </div>
+      {customer.recentJobCard?.date ? (
+        <div className="shrink-0 text-right">
+          <p className="text-sm font-semibold text-[#008000]">Recent Visited</p>
+          <p className="text-sm font-bold text-blue-700">{customer.recentJobCard.date}</p>
+        </div>
+      ) : null}
+    </article>
+  );
+
+  if (isSearch || !id) {
+    return body;
+  }
+
+  return (
+    <Link
+      to={`/shop/people/${id}/edit`}
+      state={{ customer }}
+      className="block rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008000]"
+    >
+      {body}
+    </Link>
+  );
+}
+
 export default function ShopPeoplePage() {
   const { token } = useAuth();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
-  const [activeId, setActiveId] = useState("customers");
   const [search, setSearch] = useState("");
   const [faqsOpen, setFaqsOpen] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
-  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const { customers, loading, error, refresh } = useShopCustomers(search);
 
-  const visited = customers.filter((c) => c.recentJobCard?.date);
-  const list = activeId === "visited" ? visited : customers;
   const isSearch = Boolean(search.trim());
+  const totalPages = Math.max(1, Math.ceil(customers.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+
+  const paginatedList = useMemo(
+    () => customers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [customers, safePage],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const handleAddExisting = async (c: MyCustomer) => {
     if (!token) return;
@@ -61,128 +139,98 @@ export default function ShopPeoplePage() {
     }
   };
 
-  const handleRemove = async (c: MyCustomer) => {
-    if (!token) return;
-    const id = customerId(c);
-    if (!id || !window.confirm(`Remove ${c.name ?? "this customer"} from your list?`)) return;
-    setRemovingId(id);
-    try {
-      const res = await removeCarOwnerFromMyCustomers(token, id);
-      if (!res.ok) {
-        toast.error(apiMessage(res.data) || "Could not remove customer.");
-        return;
-      }
-      toast.success("Customer removed.");
-      void refresh();
-    } finally {
-      setRemovingId(null);
-    }
+  const handleFormSaved = () => {
+    setShowForm(false);
+    toast.success("Customer created.");
+    void refresh();
   };
 
   return (
     <ShopPageShell
-      title="People"
       metaTitle="People | AutoDaddy"
       metaDescription="Auto shop customers"
       sidebarItems={PEOPLE_SECTIONS}
-      activeSidebarId={activeId}
-      onSidebarSelect={setActiveId}
+      activeSidebarId="customers"
       searchPlaceholder="Search customer"
       searchValue={search}
       onSearchChange={setSearch}
-      headerAction={
-        <div className="flex items-center gap-2">
-          <Link
-            to="/shop/people/new"
-            className="rounded-md bg-[#008000] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#006600]"
-          >
-            + Add
-          </Link>
-          <ShopRefreshButton onClick={() => void refresh()} />
-        </div>
-      }
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      {loading ? (
-        <ShopLoadingPanel />
-      ) : error ? (
-        <ShopErrorPanel message={error} onRetry={() => void refresh()} />
-      ) : list.length === 0 ? (
-        <ShopEmptyPanel message={activeId === "visited" ? "No visited customers yet." : "No customers yet."} />
-      ) : (
-        <ShopListPanel>
-          {list.map((c) => {
-            const id = customerId(c);
-            const vehicles = c.vehicles ?? [];
-            const vehicleLabel =
-              vehicles.length > 0
-                ? vehicles.map((v) => v.licensePlateNo ?? v.vehicleName).filter(Boolean).join(", ")
-                : undefined;
-            return (
-              <ShopGreenRow
-                key={id || c.name}
-                left={<p className="text-sm font-bold leading-tight text-white">{c.city ?? "Customer"}</p>}
-                center={
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{c.name ?? "—"}</p>
-                    {c.phone ? (
-                      <a
-                        href={`tel:${c.phone.replace(/\s/g, "")}`}
-                        className="text-sm font-semibold text-blue-700 hover:underline"
-                      >
-                        {c.phone}
-                      </a>
-                    ) : null}
-                    {vehicleLabel ? <p className="text-xs text-gray-600">{vehicleLabel}</p> : null}
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {isSearch ? (
-                        <button
-                          type="button"
-                          className="text-xs font-semibold text-[#008000] hover:underline disabled:opacity-50"
-                          disabled={addingId === id}
-                          onClick={() => void handleAddExisting(c)}
-                        >
-                          {addingId === id ? "Adding…" : "Add to my customers"}
-                        </button>
-                      ) : (
-                        <>
-                          <Link
-                            to={`/shop/people/${id}/edit`}
-                            state={{ customer: c }}
-                            className="text-xs font-semibold text-ad-purple hover:underline"
-                          >
-                            Edit
-                          </Link>
+      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+        {showForm ? (
+          <CarOwnerAddEditForm
+            key="new-customer"
+            apiVariant="shop"
+            onCancel={() => setShowForm(false)}
+            onSaved={handleFormSaved}
+          />
+        ) : (
+          <>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h1 className="font-serif text-2xl font-bold text-gray-600 md:text-3xl">My Customers</h1>
+              <button
+                type="button"
+                onClick={() => setShowForm(true)}
+                className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
+              >
+                + Add New
+              </button>
+            </div>
+
+            {loading ? (
+              <ShopLoadingPanel className="min-h-0 flex-1" />
+            ) : error ? (
+              <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+            ) : customers.length === 0 ? (
+              <ShopEmptyPanel className="min-h-0 flex-1" message="No customers yet." />
+            ) : (
+              <>
+                <ShopListPanel className="min-h-0 flex-1">
+                  {paginatedList.map((c) => (
+                    <CustomerCard
+                      key={customerId(c) || c.name}
+                      customer={c}
+                      isSearch={isSearch}
+                      addingId={addingId}
+                      onAdd={(customer) => void handleAddExisting(customer)}
+                    />
+                  ))}
+                </ShopListPanel>
+
+                <footer className="mt-3 flex items-center justify-between gap-3 pt-2">
+                  <p className="text-sm font-semibold text-blue-700">{customers.length} Entries</p>
+                  {totalPages > 1 ? (
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
+                        const isActive = pageNumber === safePage;
+                        return (
                           <button
+                            key={pageNumber}
                             type="button"
-                            className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
-                            disabled={removingId === id}
-                            onClick={() => void handleRemove(c)}
+                            onClick={() => setPage(pageNumber)}
+                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
+                              isActive
+                                ? "bg-[#008000] text-white"
+                                : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4fcd4]"
+                            }`}
+                            aria-current={isActive ? "page" : undefined}
                           >
-                            {removingId === id ? "Removing…" : "Remove"}
+                            {pageNumber}
                           </button>
-                        </>
-                      )}
+                        );
+                      })}
                     </div>
-                  </div>
-                }
-                right={
-                  c.recentJobCard?.date ? (
-                    <div className="text-right">
-                      <p className="text-xs font-semibold text-[#008000]">Last visit</p>
-                      <p className="text-sm font-bold text-blue-700">{c.recentJobCard.date}</p>
-                    </div>
-                  ) : null
-                }
-              />
-            );
-          })}
-        </ShopListPanel>
-      )}
+                  ) : null}
+                </footer>
+              </>
+            )}
+          </>
+        )}
+      </div>
     </ShopPageShell>
   );
 }

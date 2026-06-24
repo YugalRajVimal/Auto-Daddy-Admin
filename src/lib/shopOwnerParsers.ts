@@ -49,6 +49,8 @@ function parseVehicles(o: Record<string, unknown>) {
             ? (v.vehicleMake as Record<string, unknown>)
             : null;
       return {
+        _id: s(v._id) ?? s(v.vId) ?? s(v.id),
+        vId: s(v.vId) ?? s(v._id) ?? s(v.id),
         licensePlateNo: s(v.licensePlateNo),
         vehicleName: s(v.vehicleName) ?? s(make?.name) ?? s(v.name),
         model: s(v.model) ?? s(make?.model),

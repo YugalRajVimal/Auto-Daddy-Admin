@@ -32,9 +32,9 @@ export const shopPrimaryNav: NavItem[] = [
     matchPaths: ["/shop/wallet"],
   },
   {
-    name: "Messages",
-    path: "/shop/messages",
-    matchPaths: ["/shop/messages"],
+    name: "My Website",
+    path: "/shop/my-website",
+    matchPaths: ["/shop/my-website"],
   },
   {
     name: "Reports",
