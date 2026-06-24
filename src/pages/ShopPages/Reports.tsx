@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
+  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopGreenRow,
@@ -43,49 +44,54 @@ export default function ShopReportsPage() {
     <ShopPageShell
       metaTitle="Reports | AutoDaddy"
       metaDescription="Auto shop reports and payments"
+      sidebarHeading="Reports"
+      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600 md:text-3xl"
       sidebarItems={REPORT_SECTIONS}
       activeSidebarId={activeId}
       onSidebarSelect={setActiveId}
-      headerAction={<ShopRefreshButton onClick={() => void refresh()} />}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      {loading ? (
-        <ShopLoadingPanel />
-      ) : error ? (
-        <ShopErrorPanel message={error} onRetry={() => void refresh()} />
-      ) : filtered.length === 0 ? (
-        <ShopEmptyPanel message={`No ${activeId === "resolved" ? "resolved" : "open"} payment records.`} />
-      ) : (
-        <ShopListPanel>
-          {filtered.map((row, idx) => (
-            <ShopGreenRow
-              key={pickField(row, ["_id", "id"]) !== "—" ? pickField(row, ["_id", "id"]) : String(idx)}
-              left={
-                <p className="text-sm font-bold text-white">
-                  {pickField(row, ["type", "category", "paymentMethod"])}
-                </p>
-              }
-              center={
-                <div>
-                  <p className="text-sm font-bold text-gray-900">
-                    {pickField(row, ["description", "title", "customerName", "name"])}
+      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+        <ShopContentHeader action={<ShopRefreshButton onClick={() => void refresh()} />} />
+
+        {loading ? (
+          <ShopLoadingPanel className="min-h-0 flex-1" />
+        ) : error ? (
+          <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+        ) : filtered.length === 0 ? (
+          <ShopEmptyPanel className="min-h-0 flex-1" message={`No ${activeId === "resolved" ? "resolved" : "open"} payment records.`} />
+        ) : (
+          <ShopListPanel className="min-h-0 flex-1">
+            {filtered.map((row, idx) => (
+              <ShopGreenRow
+                key={pickField(row, ["_id", "id"]) !== "—" ? pickField(row, ["_id", "id"]) : String(idx)}
+                left={
+                  <p className="text-sm font-bold text-white">
+                    {pickField(row, ["type", "category", "paymentMethod"])}
                   </p>
-                  <p className="text-xs text-gray-600">{pickField(row, ["date", "createdAt", "paymentDate"])}</p>
-                </div>
-              }
-              right={
-                <p className="text-sm font-bold text-[#008000]">
-                  {pickField(row, ["amount", "total", "price"])}
-                </p>
-              }
-            />
-          ))}
-        </ShopListPanel>
-      )}
+                }
+                center={
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">
+                      {pickField(row, ["description", "title", "customerName", "name"])}
+                    </p>
+                    <p className="text-xs text-gray-600">{pickField(row, ["date", "createdAt", "paymentDate"])}</p>
+                  </div>
+                }
+                right={
+                  <p className="text-sm font-bold text-[#008000]">
+                    {pickField(row, ["amount", "total", "price"])}
+                  </p>
+                }
+              />
+            ))}
+          </ShopListPanel>
+        )}
+      </div>
     </ShopPageShell>
   );
 }

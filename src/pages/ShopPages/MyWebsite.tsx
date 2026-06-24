@@ -8,7 +8,7 @@ import {
   compactInputClass,
 } from "../../components/admin/ContentPanel";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { ShopContentHeader, ShopLoadingPanel } from "../../components/shop/ShopPanels";
 import ShopWebsiteSidebar, {
   type ShopWebsiteSection,
 } from "../../components/shop/ShopWebsiteSidebar";
@@ -80,11 +80,11 @@ const EMPTY_DOMAIN_FORM: DomainForm = {
 
 function WebsiteSectionHeader({ title }: { title: string }) {
   return (
-    <div className="relative mb-4 flex min-h-[36px] items-center justify-end">
-      <h2 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center text-lg font-bold text-blue-700 md:text-xl">
-        {title}
-      </h2>
-    </div>
+    <ShopContentHeader
+      title={title}
+      titleClassName="text-lg font-bold text-blue-700 md:text-xl"
+      className="mb-4"
+    />
   );
 }
 

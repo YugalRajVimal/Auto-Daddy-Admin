@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
+  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
@@ -40,48 +41,53 @@ export default function ShopMessagesPage() {
     <ShopPageShell
       metaTitle="Messages | AutoDaddy"
       metaDescription="Auto shop notifications and messages"
+      sidebarHeading="Messages"
+      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600 md:text-3xl"
       sidebarItems={MESSAGE_SECTIONS}
       activeSidebarId={activeId}
       onSidebarSelect={setActiveId}
-      headerAction={<ShopRefreshButton onClick={() => void refresh()} />}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      {!showNotifications ? (
-        <ShopEmptyPanel message="No sent messages yet." />
-      ) : loading ? (
-        <ShopLoadingPanel />
-      ) : error ? (
-        <ShopErrorPanel message={error} onRetry={() => void refresh()} />
-      ) : items.length === 0 ? (
-        <ShopEmptyPanel message="No notifications yet." />
-      ) : (
-        <ShopListPanel>
-          {items.map((item) => (
-            <article key={item.id} className="rounded-md bg-[#CCFFCC] px-4 py-3 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="min-w-0 flex-1 text-sm font-semibold text-gray-900">{item.message}</p>
-                {item.time ? (
-                  <p className="shrink-0 text-xs font-medium text-gray-600">{formatTime(item.time)}</p>
-                ) : null}
-              </div>
-            </article>
-          ))}
-          {hasMore ? (
-            <button
-              type="button"
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-ad-purple hover:bg-gray-50 disabled:opacity-60"
-            >
-              {loadingMore ? "Loading…" : "Load more"}
-            </button>
-          ) : null}
-        </ShopListPanel>
-      )}
+      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+        <ShopContentHeader action={<ShopRefreshButton onClick={() => void refresh()} />} />
+
+        {!showNotifications ? (
+          <ShopEmptyPanel className="min-h-0 flex-1" message="No sent messages yet." />
+        ) : loading ? (
+          <ShopLoadingPanel className="min-h-0 flex-1" />
+        ) : error ? (
+          <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+        ) : items.length === 0 ? (
+          <ShopEmptyPanel className="min-h-0 flex-1" message="No notifications yet." />
+        ) : (
+          <ShopListPanel className="min-h-0 flex-1">
+            {items.map((item) => (
+              <article key={item.id} className="rounded-md bg-[#CCFFCC] px-4 py-3 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="min-w-0 flex-1 text-sm font-semibold text-gray-900">{item.message}</p>
+                  {item.time ? (
+                    <p className="shrink-0 text-xs font-medium text-gray-600">{formatTime(item.time)}</p>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-ad-purple hover:bg-gray-50 disabled:opacity-60"
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            ) : null}
+          </ShopListPanel>
+        )}
+      </div>
     </ShopPageShell>
   );
 }

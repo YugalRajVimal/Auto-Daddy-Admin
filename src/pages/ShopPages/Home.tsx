@@ -24,6 +24,7 @@ export default function ShopHomePage() {
     <ShopPageShell
       metaTitle="Home | AutoDaddy"
       metaDescription="Auto shop owner home"
+      contentTopOffset={false}
       sidebarHeading={SIDEBAR_HEADINGS[adPhase]}
       sidebarExtra={
         <div className="mb-2">

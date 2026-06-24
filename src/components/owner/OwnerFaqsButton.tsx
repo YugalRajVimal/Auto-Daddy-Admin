@@ -18,11 +18,19 @@ export function OwnerFaqsButton({ className = "", ...props }: OwnerFaqsButtonPro
 type OwnerSidebarFaqsSlotProps = {
   onClick: () => void;
   className?: string;
+  /** When true, stays at the bottom of a fixed-height sidebar (no mt-auto). */
+  pinned?: boolean;
 };
 
-export function OwnerSidebarFaqsSlot({ onClick, className = "" }: OwnerSidebarFaqsSlotProps) {
+export function OwnerSidebarFaqsSlot({
+  onClick,
+  className = "",
+  pinned = false,
+}: OwnerSidebarFaqsSlotProps) {
   return (
-    <div className={`mt-auto flex flex-col gap-3 pt-6 ${className}`.trim()}>
+    <div
+      className={`${pinned ? "shrink-0" : "mt-auto"} flex flex-col gap-3 pt-6 ${className}`.trim()}
+    >
       <OwnerFaqsButton onClick={onClick} />
     </div>
   );

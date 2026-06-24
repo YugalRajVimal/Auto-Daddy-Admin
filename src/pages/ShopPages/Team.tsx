@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopListPanel, ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { ShopContentHeader, ShopListPanel, ShopLoadingPanel } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
+import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { deleteTeamMember, fetchTeamMembers } from "../../lib/shopOwnerMutations";
 import { toast } from "react-toastify";
 
@@ -20,8 +21,10 @@ function parseMembers(payload: unknown) {
 
 export default function ShopTeamPage() {
   const { token } = useAuth();
+  const { faqsHeading, faqsDescription } = useShopOwnerPortal();
   const [members, setMembers] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
+  const [faqsOpen, setFaqsOpen] = useState(false);
 
   const refresh = async () => {
     if (!token) return;
@@ -48,19 +51,32 @@ export default function ShopTeamPage() {
 
   return (
     <ShopPageShell
-      title="Team Members"
       metaTitle="Team | AutoDaddy"
       metaDescription="Shop team members"
-      headerAction={
-        <Link to="/shop/team/new" className="rounded-md bg-[#008000] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#006600]">
-          + Add
-        </Link>
-      }
+      sidebarHeading="Team Members"
+      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600 md:text-3xl"
+      onFaqsOpen={() => setFaqsOpen(true)}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsOpen={faqsOpen}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
     >
-      {loading ? (
-        <ShopLoadingPanel />
-      ) : (
-        <ShopListPanel>
+      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+        <ShopContentHeader
+          action={
+            <Link
+              to="/shop/team/new"
+              className="rounded-md bg-[#008000] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#006600]"
+            >
+              + Add
+            </Link>
+          }
+        />
+
+        {loading ? (
+          <ShopLoadingPanel className="min-h-0 flex-1" />
+        ) : (
+          <ShopListPanel className="min-h-0 flex-1">
           {members.length === 0 ? (
             <p className="text-sm text-gray-600">No team members yet.</p>
           ) : (
@@ -82,7 +98,8 @@ export default function ShopTeamPage() {
             })
           )}
         </ShopListPanel>
-      )}
+        )}
+      </div>
     </ShopPageShell>
   );
 }

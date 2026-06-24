@@ -14,7 +14,7 @@ import {
   ShopServiceAddEditor,
   type ShopCarCompany,
 } from "../../components/shop/forms/ShopProfileEditors";
-import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { ShopContentHeader, ShopLoadingPanel } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
 import {
   addMyCarCompanies,
@@ -79,12 +79,12 @@ function ProfileSectionHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="relative mb-4 flex min-h-[36px] items-center justify-end">
-      <h2 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center text-lg font-bold text-blue-700 md:text-xl">
-        {title}
-      </h2>
-      {action}
-    </div>
+    <ShopContentHeader
+      title={title}
+      titleClassName="text-lg font-bold text-blue-700 md:text-xl"
+      action={action}
+      className="mb-4"
+    />
   );
 }
 
@@ -141,12 +141,7 @@ export default function ShopProfilePage() {
   const [usingDummyServices, setUsingDummyServices] = useState(false);
   const [savingService, setSavingService] = useState<string | null>(null);
   const [showAddService, setShowAddService] = useState(false);
-  const [sectionEditing, setSectionEditing] = useState(false);
   const servicesTabInitRef = useRef(false);
-
-  useEffect(() => {
-    setSectionEditing(false);
-  }, [activeId]);
 
   useEffect(() => {
     if (activeId !== "brands") return;
@@ -310,13 +305,7 @@ export default function ShopProfilePage() {
             <ShopPersonalProfileEditor
               user={user}
               city={business?.city}
-              isEditing={sectionEditing}
-              onStartEdit={() => setSectionEditing(true)}
-              onCancelEdit={() => setSectionEditing(false)}
-              onSaved={() => {
-                setSectionEditing(false);
-                void refresh();
-              }}
+              onSaved={() => void refresh()}
             />
           </>
         );
@@ -328,13 +317,7 @@ export default function ShopProfilePage() {
               business={business}
               zipCode={user?.pincode}
               shopType={user?.shopType ?? business?.shopType}
-              isEditing={sectionEditing}
-              onStartEdit={() => setSectionEditing(true)}
-              onCancelEdit={() => setSectionEditing(false)}
-              onSaved={() => {
-                setSectionEditing(false);
-                void refresh();
-              }}
+              onSaved={() => void refresh()}
             />
           </>
         );
@@ -346,14 +329,8 @@ export default function ShopProfilePage() {
               perDayOpenHours={business?.perDayOpenHours}
               isBusinessActive={isBusinessActive}
               updatingActive={updatingActive}
-              isEditing={sectionEditing}
-              onStartEdit={() => setSectionEditing(true)}
-              onCancelEdit={() => setSectionEditing(false)}
               onActiveChange={(next) => void setBusinessActive(next)}
-              onSaved={() => {
-                setSectionEditing(false);
-                void refresh();
-              }}
+              onSaved={() => void refresh()}
             />
           </>
         );

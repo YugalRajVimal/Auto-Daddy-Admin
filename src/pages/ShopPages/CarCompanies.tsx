@@ -18,11 +18,12 @@ function parseCompanies(payload: unknown): CarCompany[] {
 
 export default function ShopCarCompaniesPage() {
   const { token } = useAuth();
-  const { refresh: refreshProfile } = useShopOwnerPortal();
+  const { refresh: refreshProfile, faqsHeading, faqsDescription } = useShopOwnerPortal();
   const [all, setAll] = useState<CarCompany[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [faqsOpen, setFaqsOpen] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -61,7 +62,16 @@ export default function ShopCarCompaniesPage() {
   };
 
   return (
-    <ShopPageShell title="Car Brands Specialist" metaTitle="Car Companies | AutoDaddy" metaDescription="Car brands">
+    <ShopPageShell
+      title="Car Brands Specialist"
+      metaTitle="Car Companies | AutoDaddy"
+      metaDescription="Car brands"
+      onFaqsOpen={() => setFaqsOpen(true)}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsOpen={faqsOpen}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
       {loading ? (
         <ShopLoadingPanel />
       ) : (

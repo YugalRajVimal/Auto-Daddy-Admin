@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FiChevronDown } from "react-icons/fi";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
+  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
@@ -394,27 +395,21 @@ export default function ShopWalletPage() {
       faqsDescription={faqsDescription}
     >
       <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
-        <div
-          className={`mb-4 flex items-center gap-3 ${
-            view === "expenses" ? "justify-between" : "justify-center"
-          }`}
-        >
-          {view === "expenses" ? (
-            <h1 className="font-serif text-2xl font-bold text-gray-600 md:text-3xl">Wallet</h1>
-          ) : null}
-          <h2 className={view === "expenses" ? "text-base font-bold text-blue-700 sm:text-lg" : titleClassName}>
-            {contentTitle}
-          </h2>
-          {view === "expenses" ? (
-            <button
-              type="button"
-              disabled
-              className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white opacity-60"
-            >
-              + Add New
-            </button>
-          ) : null}
-        </div>
+        <ShopContentHeader
+          title={contentTitle}
+          titleClassName={titleClassName}
+          action={
+            view === "expenses" ? (
+              <button
+                type="button"
+                disabled
+                className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white opacity-60"
+              >
+                + Add New
+              </button>
+            ) : undefined
+          }
+        />
 
         {view === "expenses" ? (
           !USE_DUMMY_SHOP_WALLET ? (

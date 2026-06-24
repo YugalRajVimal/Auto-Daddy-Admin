@@ -168,16 +168,18 @@ export function CompactFormFooter({
 
   const actions = (
     <div className="flex items-center gap-2">
-      <button
-        type={actionType}
-        onClick={onSave}
-        className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95"
-      >
-        {actionLabel}
-        <span aria-hidden className="text-base leading-none">
-          →
-        </span>
-      </button>
+      {onSave ? (
+        <button
+          type={actionType}
+          onClick={onSave}
+          className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95"
+        >
+          {actionLabel}
+          <span aria-hidden className="text-base leading-none">
+            →
+          </span>
+        </button>
+      ) : null}
       {onCancel ? (
         <span className="text-xs text-gray-700">
           or{" "}

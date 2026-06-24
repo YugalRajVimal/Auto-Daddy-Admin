@@ -17,6 +17,8 @@ type ShopPageShellProps = {
   sidebarHeading?: string;
   sidebarHeadingClassName?: string;
   sidebarExtra?: ReactNode;
+  sidebarFooter?: ReactNode;
+  searchInputId?: string;
   faqsOpen?: boolean;
   onFaqsOpen?: () => void;
   onFaqsClose?: () => void;
@@ -24,6 +26,8 @@ type ShopPageShellProps = {
   faqsDescription?: string;
   children: ReactNode;
   headerAction?: ReactNode;
+  /** When false, main content starts flush with the sidebar top (e.g. home hero). Default true when sidebarHeading is set. */
+  contentTopOffset?: boolean;
 };
 
 export default function ShopPageShell({
@@ -39,6 +43,8 @@ export default function ShopPageShell({
   sidebarHeading,
   sidebarHeadingClassName,
   sidebarExtra,
+  sidebarFooter,
+  searchInputId,
   faqsOpen = false,
   onFaqsOpen,
   onFaqsClose,
@@ -46,7 +52,15 @@ export default function ShopPageShell({
   faqsDescription,
   children,
   headerAction,
+  contentTopOffset,
 }: ShopPageShellProps) {
+  const applyContentTopOffset = contentTopOffset ?? Boolean(sidebarHeading);
+  const showSidebar =
+    sidebarItems.length > 0 ||
+    sidebarExtra != null ||
+    sidebarFooter != null ||
+    sidebarHeading != null ||
+    onFaqsOpen != null;
   return (
     <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
       <PageMeta title={metaTitle} description={metaDescription} />
@@ -59,7 +73,7 @@ export default function ShopPageShell({
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
-        {sidebarItems.length > 0 || sidebarExtra || onFaqsOpen ? (
+        {showSidebar ? (
           <ShopSidebar
             items={sidebarItems}
             activeId={activeSidebarId}
@@ -70,12 +84,14 @@ export default function ShopPageShell({
             heading={sidebarHeading}
             headingClassName={sidebarHeadingClassName}
             onFaqsClick={onFaqsOpen}
+            footer={sidebarFooter}
+            searchInputId={searchInputId}
           >
             {sidebarExtra}
           </ShopSidebar>
         ) : null}
 
-        {children}
+        <div className={`min-w-0 flex-1 ${applyContentTopOffset ? "lg:pt-12" : ""}`}>{children}</div>
       </div>
 
       {onFaqsClose ? (

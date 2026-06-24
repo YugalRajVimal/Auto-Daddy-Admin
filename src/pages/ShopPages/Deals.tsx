@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import ShopDealFormDialog from "../../components/shop/forms/ShopDealFormDialog";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
+  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
@@ -280,18 +281,18 @@ export default function ShopDealsPage() {
       faqsDescription={faqsDescription}
     >
       <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
-        <div className="relative mb-4 flex items-center justify-end gap-3">
-          <h2 className="pointer-events-none absolute inset-x-0 text-center text-base font-bold text-blue-700 sm:text-lg">
-            {SECTION_HEADINGS[activeId]}
-          </h2>
-          <button
-            type="button"
-            className="relative z-10 shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
-            onClick={openCreate}
-          >
-            + Add New
-          </button>
-        </div>
+        <ShopContentHeader
+          title={SECTION_HEADINGS[activeId]}
+          action={
+            <button
+              type="button"
+              className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
+              onClick={openCreate}
+            >
+              + Add New
+            </button>
+          }
+        />
 
         {loading ? (
           <ShopLoadingPanel className="min-h-0 flex-1" />

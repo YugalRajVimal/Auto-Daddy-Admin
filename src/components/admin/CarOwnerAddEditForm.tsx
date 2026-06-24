@@ -29,11 +29,6 @@ function mediaUrl(path?: string): string {
   return `${UPLOADS()}/${path.replace(/^\/+/, "")}`;
 }
 
-function fmtDate(d?: string): string {
-  if (!d) return "-";
-  return new Date(d).toISOString().slice(0, 10);
-}
-
 function getMakeName(v: CarOwnerFormVehicle): string {
   if (!v.make) return "-";
   if (typeof v.make === "object") return v.make.name || "-";
@@ -109,7 +104,7 @@ function isValidEmail(e: string) {
 const fieldErrorClass = "mt-0.5 text-[11px] font-semibold text-red-700";
 const uploadBtnClass =
   "rounded border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300";
-const carOwnerAddressFieldWidth = "min-w-[220px] flex-1 sm:min-w-[300px]";
+const carOwnerAddressFieldWidth = "w-[140px] shrink-0 flex-none sm:w-[180px]";
 const vehicleGridClass = "grid w-full grid-cols-6 gap-x-4 gap-y-3 items-start";
 const vehicleFieldClass = "!flex-none min-w-0 w-full";
 
@@ -148,7 +143,35 @@ type CarOwnerAddEditFormProps = {
   onUpdate?: () => void;
   readOnly?: boolean;
   apiVariant?: "admin" | "shop";
+  /** Hide profile fields and only show the vehicles section (requires owner). */
+  vehiclesOnly?: boolean;
+  /** Show a single new vehicle row and merge it onto the owner's existing vehicles on save. */
+  appendVehicle?: boolean;
+  /** Start with only phone editable; lookup customer when 10 digits entered. */
+  phoneLookup?: boolean;
+  /** When false, all fields stay editable while phone lookup runs (add-customer flow). */
+  phoneLookupLockFields?: boolean;
+  /** Vehicles flow: phone field only until a customer is found, then vehicles only. */
+  vehiclesByPhone?: boolean;
+  onLookupCustomer?: (phoneDigits: string) => Promise<CarOwnerFormRecord | null>;
 };
+
+function ownerVehicleToFormRow(v: CarOwnerFormVehicle): VehicleFormRow {
+  return {
+    _id: v._id,
+    licensePlateNo: v.licensePlateNo || "",
+    vinNo: v.vinNo || "",
+    vehicleName: getMakeName(v) === "-" ? "" : getMakeName(v),
+    model: getMakeModel(v) === "-" ? "" : getMakeModel(v),
+    year: v.year ? String(v.year) : "",
+    odometerReading: v.odometerReading != null ? String(v.odometerReading) : "",
+    nextDueService: v.dueOdometerReading != null ? String(v.dueOdometerReading) : "",
+    attachNextDueService: false,
+    attachVehiclePhoto: false,
+    vehicleImageFile: null,
+    vehicleImagePreview: "",
+  };
+}
 
 function VehicleRowForm({
   v,
@@ -427,19 +450,26 @@ export default function CarOwnerAddEditForm({
   onUpdate,
   readOnly = false,
   apiVariant = "admin",
+  vehiclesOnly = false,
+  appendVehicle = false,
+  phoneLookup = false,
+  phoneLookupLockFields = true,
+  vehiclesByPhone = false,
+  onLookupCustomer,
 }: CarOwnerAddEditFormProps) {
   const { token, session } = useAuth();
   const isShop = apiVariant === "shop";
   const isEdit = !!owner;
   const viewOnly = readOnly && isEdit;
+  const profileLocked = vehiclesOnly && isEdit;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [pincode, setPincode] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
-  const [joiningDate, setJoiningDate] = useState("");
   const [vehicles, setVehicles] = useState<VehicleFormRow[]>([emptyVehicle()]);
+  const [vehiclesBaseline, setVehiclesBaseline] = useState<VehicleFormRow[]>([]);
   const [attachEmail, setAttachEmail] = useState(false);
   const [attachProfilePhoto, setAttachProfilePhoto] = useState(false);
   const [profileFile, setProfileFile] = useState<File | null>(null);
@@ -449,7 +479,54 @@ export default function CarOwnerAddEditForm({
   const [apiError, setApiError] = useState<string | null>(null);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [carCatalog, setCarCatalog] = useState<CarCatalogItem[]>([]);
+  const [fieldsUnlocked, setFieldsUnlocked] = useState(
+    !phoneLookup || !phoneLookupLockFields || isEdit,
+  );
+  const [resolvedOwnerId, setResolvedOwnerId] = useState<string | null>(owner?._id ?? null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupHint, setLookupHint] = useState<string | null>(null);
+  const lastLookupDigitsRef = useRef("");
   const pRef = useRef<HTMLInputElement>(null);
+
+  function applyOwnerToForm(nextOwner: CarOwnerFormRecord, options?: { appendVehicleMode?: boolean }) {
+    setName(nextOwner.name || "");
+    setEmail(nextOwner.email || "");
+    setPhone((nextOwner.phone || "").replace(/\D/g, "").slice(0, 10));
+    setPincode(nextOwner.pincode || "");
+    setAddress(nextOwner.address || "");
+    setCity(nextOwner.city || "");
+    const existingProfileImg = ownerProfileImg(nextOwner);
+    setAttachEmail(!!nextOwner.email?.trim());
+    setAttachProfilePhoto(!!existingProfileImg);
+    setProfileFile(null);
+    setProfilePreview(existingProfileImg);
+    const mapped = (nextOwner.myVehicles ?? []).map(ownerVehicleToFormRow);
+    const useAppend = options?.appendVehicleMode ?? appendVehicle;
+    if (useAppend) {
+      setVehiclesBaseline(mapped);
+      setVehicles([emptyVehicle()]);
+    } else {
+      setVehiclesBaseline([]);
+      setVehicles(mapped.length > 0 ? mapped : [emptyVehicle()]);
+    }
+    setResolvedOwnerId(nextOwner._id || null);
+  }
+
+  function clearProfileFieldsKeepPhone(digits: string) {
+    setName("");
+    setEmail("");
+    setPhone(digits);
+    setPincode("");
+    setAddress("");
+    setCity("");
+    setAttachEmail(false);
+    setAttachProfilePhoto(false);
+    setProfileFile(null);
+    setProfilePreview("");
+    setVehiclesBaseline([]);
+    setVehicles([emptyVehicle()]);
+    setResolvedOwnerId(null);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -515,58 +592,132 @@ export default function CarOwnerAddEditForm({
   useEffect(() => {
     setAttempted(false);
     setApiError(null);
+    lastLookupDigitsRef.current = "";
     if (isEdit && owner) {
-      setName(owner.name || "");
-      setEmail(owner.email || "");
-      setPhone(owner.phone || "");
-      setPincode(owner.pincode || "");
-      setAddress(owner.address || "");
-      setCity(owner.city || "");
-      setJoiningDate(fmtDate(owner.createdAt) !== "-" ? fmtDate(owner.createdAt) : "");
-      const existingProfileImg = ownerProfileImg(owner);
-      setAttachEmail(!!owner.email?.trim());
-      setAttachProfilePhoto(!!existingProfileImg);
-      setProfileFile(null);
-      setProfilePreview(existingProfileImg);
-      setVehicles(
-        (owner.myVehicles ?? []).map((v) => ({
-          _id: v._id,
-          licensePlateNo: v.licensePlateNo || "",
-          vinNo: v.vinNo || "",
-          vehicleName: getMakeName(v) === "-" ? "" : getMakeName(v),
-          model: getMakeModel(v) === "-" ? "" : getMakeModel(v),
-          year: v.year ? String(v.year) : "",
-          odometerReading: v.odometerReading != null ? String(v.odometerReading) : "",
-          nextDueService: v.dueOdometerReading != null ? String(v.dueOdometerReading) : "",
-          attachNextDueService: false,
-          attachVehiclePhoto: false,
-          vehicleImageFile: null,
-          vehicleImagePreview: Array.isArray(v.carImages) && v.carImages[0] ? mediaUrl(v.carImages[0]) : "",
-        })) || [emptyVehicle()],
-      );
-    } else {
-      setName("");
-      setEmail("");
-      setPhone("");
-      setPincode("");
-      setAddress("");
-      setCity("");
-      setJoiningDate(new Date().toISOString().slice(0, 10));
-      setAttachEmail(false);
-      setAttachProfilePhoto(false);
-      setProfileFile(null);
-      setProfilePreview("");
-      setVehicles([emptyVehicle()]);
+      applyOwnerToForm(owner);
+      setFieldsUnlocked(true);
+      return;
     }
-  }, [isEdit, owner]);
+    if (phoneLookup) {
+      setFieldsUnlocked(!phoneLookupLockFields);
+      setLookupHint(null);
+      if (phoneLookupLockFields) {
+        clearProfileFieldsKeepPhone("");
+      } else {
+        setResolvedOwnerId(null);
+        lastLookupDigitsRef.current = "";
+        setName("");
+        setEmail("");
+        setPhone("");
+        setPincode("");
+        setAddress("");
+        setCity("");
+        setAttachEmail(false);
+        setAttachProfilePhoto(false);
+        setProfileFile(null);
+        setProfilePreview("");
+        setVehiclesBaseline([]);
+        setVehicles([emptyVehicle()]);
+      }
+      return;
+    }
+    setFieldsUnlocked(true);
+    setResolvedOwnerId(null);
+    setName("");
+    setEmail("");
+    setPhone("");
+    setPincode("");
+    setAddress("");
+    setCity("");
+    setAttachEmail(false);
+    setAttachProfilePhoto(false);
+    setProfileFile(null);
+    setProfilePreview("");
+    setVehiclesBaseline([]);
+    setVehicles([emptyVehicle()]);
+  }, [appendVehicle, isEdit, owner, phoneLookup, phoneLookupLockFields]);
+
+  useEffect(() => {
+    if (!phoneLookup || owner || !onLookupCustomer) return;
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length !== 10) {
+      if (phoneLookupLockFields && fieldsUnlocked && lastLookupDigitsRef.current) {
+        setFieldsUnlocked(false);
+        setLookupHint(null);
+        lastLookupDigitsRef.current = "";
+        clearProfileFieldsKeepPhone(digits);
+      } else if (!phoneLookupLockFields && lastLookupDigitsRef.current) {
+        setResolvedOwnerId(null);
+        lastLookupDigitsRef.current = "";
+        setLookupHint(null);
+      }
+      return;
+    }
+    if (digits === lastLookupDigitsRef.current && fieldsUnlocked) return;
+
+    const t = setTimeout(() => {
+      void (async () => {
+        setLookupLoading(true);
+        setLookupHint(null);
+        setApiError(null);
+        try {
+          const record = await onLookupCustomer(digits);
+          lastLookupDigitsRef.current = digits;
+          if (record) {
+            applyOwnerToForm(record);
+            setLookupHint(
+              phoneLookupLockFields
+                ? "Customer found. Details are ready to edit."
+                : "Customer found with this phone. Saving will update their record.",
+            );
+          } else {
+            if (phoneLookupLockFields) {
+              if (vehiclesByPhone) {
+                setLookupHint("No customer found with this phone number.");
+              } else {
+                clearProfileFieldsKeepPhone(digits);
+                setLookupHint("No customer found with this phone. Fill in the details to add them.");
+              }
+            } else {
+              setResolvedOwnerId(null);
+              setLookupHint("No existing customer with this phone. Saving will create a new customer.");
+            }
+          }
+          setFieldsUnlocked(true);
+        } catch {
+          setApiError("Could not look up customer.");
+        } finally {
+          setLookupLoading(false);
+        }
+      })();
+    }, 400);
+    return () => clearTimeout(t);
+  }, [phone, phoneLookup, phoneLookupLockFields, vehiclesByPhone, owner, onLookupCustomer, fieldsUnlocked]);
+
+  const phoneOnlyMode = vehiclesByPhone && !resolvedOwnerId;
+  const showCustomerHeader = profileLocked || (vehiclesByPhone && !!resolvedOwnerId);
 
   function validate(): string | null {
-    if (!name.trim()) return "Name is required.";
-    if (attachEmail && (!email.trim() || !isValidEmail(email))) {
-      return "Valid email required.";
+    if (phoneOnlyMode) {
+      if (phone.replace(/\D/g, "").length !== 10) return "Enter a 10-digit phone number.";
+      if (fieldsUnlocked && !resolvedOwnerId) return "No customer found with this phone number.";
+      return "Look up a customer by phone first.";
     }
-    if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
-    if (!pincode.trim()) return "Zip code required.";
+    if (phoneLookup && phoneLookupLockFields && !fieldsUnlocked) {
+      return "Enter a 10-digit phone number to search.";
+    }
+    if (!profileLocked && !showCustomerHeader) {
+      if (!name.trim()) return "Name is required.";
+      if (attachEmail && (!email.trim() || !isValidEmail(email))) {
+        return "Valid email required.";
+      }
+      if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
+      if (!pincode.trim()) return "Zip code required.";
+    }
+    if (appendVehicle) {
+      const hasNew = vehicles.some((v) => v.licensePlateNo.trim() || v.vehicleName.trim());
+      if (!hasNew) return "Enter the new vehicle details.";
+    }
     return null;
   }
 
@@ -582,11 +733,12 @@ export default function CarOwnerAddEditForm({
       vehicleImages: filled.map((v) => (v.attachVehiclePhoto ? v.vehicleImageFile : null)),
     };
 
-    if (isEdit && owner) {
+    const carOwnerId = owner?._id ?? resolvedOwnerId;
+    if (carOwnerId) {
       const res = await updateMyCustomer(
         token,
         {
-          carOwnerId: owner._id,
+          carOwnerId,
           name: name.trim(),
           email: attachEmail ? email.trim() : "",
           countryCode,
@@ -601,6 +753,9 @@ export default function CarOwnerAddEditForm({
       if (!res.ok) {
         setApiError(apiMessage(res.data) || "Could not update.");
         return;
+      }
+      if (phoneLookup) {
+        await addCarOwnerToMyCustomers(token, carOwnerId);
       }
       onSaved();
       return;
@@ -626,23 +781,23 @@ export default function CarOwnerAddEditForm({
       return;
     }
     const data = res.data as { data?: { carOwnerId?: string; _id?: string }; carOwnerId?: string; _id?: string } | null;
-    const carOwnerId = data?.carOwnerId ?? data?.data?.carOwnerId ?? data?._id ?? data?.data?._id;
-    if (carOwnerId) {
-      await addCarOwnerToMyCustomers(token, carOwnerId);
+    const newCarOwnerId = data?.carOwnerId ?? data?.data?.carOwnerId ?? data?._id ?? data?.data?._id;
+    if (newCarOwnerId) {
+      await addCarOwnerToMyCustomers(token, newCarOwnerId);
     }
     onSaved();
   }
 
   async function saveAdmin(filled: VehicleFormRow[]) {
     const fd = new FormData();
-    if (isEdit && owner) fd.append("carOwnerId", owner._id);
+    const carOwnerId = owner?._id ?? resolvedOwnerId;
+    if (carOwnerId) fd.append("carOwnerId", carOwnerId);
     fd.append("name", name.trim());
     if (attachEmail && email.trim()) fd.append("email", email.trim());
     fd.append("phone", phone.replace(/\D/g, ""));
     fd.append("pincode", pincode.trim().replace(/\s/g, "").toUpperCase());
     fd.append("address", address.trim().slice(0, 50));
     if (city.trim()) fd.append("city", city.trim());
-    if (joiningDate.trim()) fd.append("createdAt", joiningDate.trim());
     if (!isEdit) fd.append("role", "carowner");
     fd.append(
       "vehicles",
@@ -667,7 +822,7 @@ export default function CarOwnerAddEditForm({
         fd.append(`carImage_${idx}`, v.vehicleImageFile, v.vehicleImageFile.name);
       }
     });
-    if (isEdit) await axios.put(`${API()}/api/admin/my-customers`, fd, { headers: getToken() });
+    if (carOwnerId) await axios.put(`${API()}/api/admin/my-customers`, fd, { headers: getToken() });
     else await axios.post(`${API()}/api/admin/onboard-carowner`, fd, { headers: getToken() });
     onSaved();
   }
@@ -680,7 +835,9 @@ export default function CarOwnerAddEditForm({
       return;
     }
     setApiError(null);
-    const filled = vehicles.filter((v) => v.licensePlateNo.trim() || v.vehicleName.trim());
+    const newRows = vehicles.filter((v) => v.licensePlateNo.trim() || v.vehicleName.trim());
+    const filled =
+      appendVehicle && isEdit ? [...vehiclesBaseline, ...newRows] : newRows;
     setSubmitting(true);
     try {
       if (isShop) await saveShop(filled);
@@ -699,15 +856,40 @@ export default function CarOwnerAddEditForm({
     ? isShop
       ? "Customer details"
       : "Car owner details"
-    : isEdit
-      ? isShop
-        ? "You are updating a customer"
-        : "You are updating a 'Car Owner'"
-      : isShop
-        ? "You are adding a new customer"
-        : "You are creating a 'Car Owner'";
+    : vehiclesByPhone && !resolvedOwnerId
+      ? "Enter customer phone number to view vehicles"
+      : vehiclesByPhone
+        ? "You are managing customer vehicles"
+        : phoneLookup && phoneLookupLockFields && !fieldsUnlocked
+          ? "Enter customer phone number to search"
+          : appendVehicle
+            ? "You are adding a vehicle"
+            : resolvedOwnerId || isEdit
+              ? isShop
+                ? "You are updating a customer"
+                : "You are updating a 'Car Owner'"
+              : isShop
+                ? "You are adding a new customer"
+                : "You are creating a 'Car Owner'";
 
   const readOnlyFieldClass = viewOnly ? " cursor-default bg-gray-50" : "";
+  const lockNonPhoneFields = phoneLookup && phoneLookupLockFields && !fieldsUnlocked;
+  const nonPhoneReadOnly = viewOnly || lockNonPhoneFields;
+  const nonPhoneFieldClass = `${compactInputClass}${nonPhoneReadOnly ? " cursor-default bg-gray-50" : ""}`;
+  const showVehiclesSection =
+    (vehiclesByPhone && !!resolvedOwnerId) ||
+    ((!phoneLookup || fieldsUnlocked) && !profileLocked && !phoneOnlyMode);
+  const canSave = !phoneOnlyMode;
+  const savingExisting = Boolean(owner?._id ?? resolvedOwnerId);
+  const actionLabel = viewOnly
+    ? "Update"
+    : submitting
+      ? savingExisting
+        ? "Updating..."
+        : "Saving..."
+      : savingExisting
+        ? "Update"
+        : "Save";
 
   return (
     <CompactFormPanel
@@ -715,8 +897,8 @@ export default function CarOwnerAddEditForm({
         <CompactFormFooter
           message={formMessage}
           messageCenter
-          actionLabel={viewOnly ? "Update" : submitting ? "Saving..." : "Save"}
-          onSave={viewOnly ? onUpdate : () => void handleSave()}
+          actionLabel={actionLabel}
+          onSave={viewOnly ? onUpdate : canSave ? () => void handleSave() : undefined}
           onCancel={onCancel}
         />
       }
@@ -726,17 +908,37 @@ export default function CarOwnerAddEditForm({
           {apiError}
         </div>
       ) : null}
-      <div className="grid w-full grid-cols-1 items-start gap-x-4 gap-y-4 sm:grid-cols-5">
-        <CompactField label="Date" className="!flex-none w-full sm:col-span-1">
+      {lookupHint ? (
+        <div className="mb-2 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+          {lookupLoading ? "Looking up customer…" : lookupHint}
+        </div>
+      ) : lookupLoading ? (
+        <div className="mb-2 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+          Looking up customer…
+        </div>
+      ) : null}
+      {phoneOnlyMode ? (
+        <CompactField label="Phone" required className="mx-auto w-full max-w-xs">
           <input
-            type="date"
-            value={joiningDate}
-            onChange={(e) => setJoiningDate(e.target.value)}
-            readOnly={viewOnly}
-            className={`${compactInputClass}${readOnlyFieldClass}`}
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            placeholder="10-digit phone"
+            className={compactInputClass}
           />
+          {attempted && phone.replace(/\D/g, "").length !== 10 ? (
+            <p className={fieldErrorClass}>Must be 10 digits</p>
+          ) : null}
         </CompactField>
-        <CompactField label="Phone" required className="!flex-none w-full sm:col-span-1">
+      ) : showCustomerHeader ? (
+        <div className="mb-2 rounded border border-gray-300 bg-white px-4 py-3">
+          <p className="text-sm font-bold text-ad-green-dark">{name || "—"}</p>
+          {phone ? <p className="text-sm font-semibold text-blue-700">{phone}</p> : null}
+        </div>
+      ) : (
+      <>
+      <div className="flex w-full flex-wrap items-start gap-x-4 gap-y-4">
+        <CompactField label="Phone" required className={compactFixedFieldWidth}>
           <input
             type="tel"
             value={phone}
@@ -748,22 +950,22 @@ export default function CarOwnerAddEditForm({
             <p className={fieldErrorClass}>Must be 10 digits</p>
           ) : null}
         </CompactField>
-        <CompactField label="Full Name" required className="!flex-none w-full sm:col-span-1">
+        <CompactField label="Full Name" required className={compactFixedFieldWidth}>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value.slice(0, 20))}
-            readOnly={viewOnly}
-            className={`${compactInputClass}${readOnlyFieldClass}`}
+            readOnly={nonPhoneReadOnly}
+            className={nonPhoneFieldClass}
           />
           {attempted && !name.trim() ? <p className={fieldErrorClass}>Required</p> : null}
         </CompactField>
-        <CompactField label="City" className="!flex-none w-full sm:col-span-1">
+        <CompactField label="City" className={compactFixedFieldWidth}>
           <select
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            disabled={viewOnly}
-            className={`${compactInputClass}${readOnlyFieldClass}`}
+            disabled={nonPhoneReadOnly}
+            className={nonPhoneFieldClass}
           >
             <option value="">Select city</option>
             {citySelectOptions.map((cityName) => (
@@ -773,19 +975,30 @@ export default function CarOwnerAddEditForm({
             ))}
           </select>
         </CompactField>
-        <CompactField label="Zip / Postal Code" required className="!flex-none w-full sm:col-span-1">
+        <CompactField label="Zip / Postal Code" required className={compactFixedFieldWidth}>
           <input
             type="text"
             value={pincode}
             onChange={(e) => setPincode(e.target.value.slice(0, 10))}
             placeholder="A1A 1A1"
-            readOnly={viewOnly}
-            className={`${compactInputClass}${readOnlyFieldClass}`}
+            readOnly={nonPhoneReadOnly}
+            className={nonPhoneFieldClass}
           />
           {attempted && !pincode.trim() ? <p className={fieldErrorClass}>Required</p> : null}
         </CompactField>
-
-        <div className={`min-w-0 w-full sm:col-span-1 ${compactFixedFieldWidth}`}>
+        <div className={`ml-auto min-w-0 ${carOwnerAddressFieldWidth}`}>
+          <label className="mb-1 block text-xs font-bold text-ad-green-dark">Address</label>
+          <CompactAutoGrowTextarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value.slice(0, 50))}
+            placeholder="Max 50 chars"
+            readOnly={nonPhoneReadOnly}
+            className={nonPhoneReadOnly ? " cursor-default bg-gray-50" : ""}
+          />
+        </div>
+      </div>
+      <div className="mt-4 flex w-full flex-wrap items-start gap-x-4 gap-y-4">
+        <div className={`min-w-0 ${compactFixedFieldWidth}`}>
           {viewOnly ? (
             attachProfilePhoto && profilePreview ? (
               <>
@@ -798,10 +1011,11 @@ export default function CarOwnerAddEditForm({
               </>
             ) : null
           ) : (
-          <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+          <label className={`mb-1 flex items-center gap-1.5 text-xs font-bold text-ad-green-dark${lockNonPhoneFields ? " opacity-50" : " cursor-pointer"}`}>
             <input
               type="checkbox"
               checked={attachProfilePhoto}
+              disabled={lockNonPhoneFields}
               onChange={(e) => {
                 const checked = e.target.checked;
                 setAttachProfilePhoto(checked);
@@ -817,7 +1031,7 @@ export default function CarOwnerAddEditForm({
             Profile Photo
           </label>
           )}
-          {!viewOnly && attachProfilePhoto ? (
+          {!viewOnly && attachProfilePhoto && !lockNonPhoneFields ? (
             <div className="flex items-center gap-1.5">
               {profilePreview ? (
                 <img
@@ -852,7 +1066,7 @@ export default function CarOwnerAddEditForm({
             </div>
           ) : null}
         </div>
-        <div className={`min-w-0 w-full sm:col-span-1 ${compactFixedFieldWidth}`}>
+        <div className={`min-w-0 ${compactFixedFieldWidth}`}>
           {viewOnly ? (
             attachEmail ? (
               <>
@@ -866,10 +1080,11 @@ export default function CarOwnerAddEditForm({
               </>
             ) : null
           ) : (
-          <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+          <label className={`mb-1 flex items-center gap-1.5 text-xs font-bold text-ad-green-dark${lockNonPhoneFields ? " opacity-50" : " cursor-pointer"}`}>
             <input
               type="checkbox"
               checked={attachEmail}
+              disabled={lockNonPhoneFields}
               onChange={(e) => {
                 const checked = e.target.checked;
                 setAttachEmail(checked);
@@ -882,7 +1097,7 @@ export default function CarOwnerAddEditForm({
             Email
           </label>
           )}
-          {!viewOnly && attachEmail ? (
+          {!viewOnly && attachEmail && !lockNonPhoneFields ? (
             <>
               <input
                 type="email"
@@ -897,20 +1112,14 @@ export default function CarOwnerAddEditForm({
             </>
           ) : null}
         </div>
-        <div className={`min-w-0 w-full sm:col-span-3 ${carOwnerAddressFieldWidth}`}>
-          <label className="mb-1 block text-xs font-bold text-ad-green-dark">Address</label>
-          <CompactAutoGrowTextarea
-            value={address}
-            onChange={(e) => setAddress(e.target.value.slice(0, 50))}
-            placeholder="Max 50 chars"
-            readOnly={viewOnly}
-            className={readOnlyFieldClass}
-          />
-        </div>
       </div>
+      </>
+      )}
+      {showVehiclesSection ? (
+      <>
       <div className="flex items-center justify-between border-t border-gray-300 pt-3">
         <span className="text-xs font-bold text-ad-green-dark">Vehicles</span>
-        {!viewOnly && vehicles.length < 5 ? (
+        {!viewOnly && !appendVehicle && vehicles.length < 5 ? (
           <button
             type="button"
             onClick={() => setVehicles((v) => [...v, emptyVehicle()])}
@@ -941,6 +1150,8 @@ export default function CarOwnerAddEditForm({
           />
         ))}
       </div>
+      </>
+      ) : null}
     </CompactFormPanel>
   );
 }

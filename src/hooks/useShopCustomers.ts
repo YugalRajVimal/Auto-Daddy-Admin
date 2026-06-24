@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth";
-import {
-  buildMyCustomersQuery,
-  fetchMyCustomers,
-  searchCarOwners,
-  type MyCustomersPeriod,
-} from "../lib/shopOwnerApi";
+import { buildMyCustomersQuery, fetchMyCustomers, type MyCustomersPeriod } from "../lib/shopOwnerApi";
 import { customerKey, parseMyCustomers } from "../lib/shopOwnerParsers";
 import type { MyCustomer } from "../types/shopOwner";
 
 const DEFAULT_PERIOD: MyCustomersPeriod = { timeFilter: "All", anchorDate: new Date() };
 
-export function useShopCustomers(search?: string) {
+export function useShopCustomers() {
   const { token } = useAuth();
   const [customers, setCustomers] = useState<MyCustomer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,20 +18,9 @@ export function useShopCustomers(search?: string) {
       setLoading(false);
       return;
     }
-    const q = (search ?? "").trim();
     setLoading(true);
     setError(null);
     try {
-      if (q) {
-        const res = await searchCarOwners(token, q);
-        if (!res.ok) {
-          setError("Could not search customers.");
-          setCustomers([]);
-          return;
-        }
-        setCustomers(parseMyCustomers(res.data));
-        return;
-      }
       const res = await fetchMyCustomers(token, buildMyCustomersQuery(DEFAULT_PERIOD));
       if (!res.ok) {
         setError("Could not load customers.");
@@ -50,12 +34,11 @@ export function useShopCustomers(search?: string) {
     } finally {
       setLoading(false);
     }
-  }, [token, search]);
+  }, [token]);
 
   useEffect(() => {
-    const t = setTimeout(() => void refresh(), search?.trim() ? 300 : 0);
-    return () => clearTimeout(t);
-  }, [refresh, search]);
+    void refresh();
+  }, [refresh]);
 
   return { customers, loading, error, refresh, customerKey };
 }

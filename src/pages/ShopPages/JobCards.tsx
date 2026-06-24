@@ -200,8 +200,6 @@ export default function ShopJobCardsPage() {
           />
         ) : (
           <>
-            <h1 className="mb-4 text-center text-base font-bold text-blue-700 sm:text-lg">Job List</h1>
-
             {loading ? (
               <ShopLoadingPanel className="min-h-0 flex-1" />
             ) : error ? (

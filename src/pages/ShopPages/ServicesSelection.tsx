@@ -6,6 +6,7 @@ import { shopSaveButtonClass } from "../../components/shop/forms/ShopFormPage";
 import { useAuth } from "../../auth";
 import { apiMessage, fetchServiceCatalog, updateServiceWeWorkWith } from "../../lib/shopOwnerMutations";
 import { useShopServices } from "../../hooks/useShopServices";
+import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 
 type CatalogItem = { id: string; name: string };
 
@@ -28,10 +29,12 @@ function parseCatalog(payload: unknown): CatalogItem[] {
 export default function ShopServicesSelectionPage() {
   const { token } = useAuth();
   const { categories, refresh: refreshMine } = useShopServices();
+  const { faqsHeading, faqsDescription } = useShopOwnerPortal();
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [faqsOpen, setFaqsOpen] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -80,6 +83,11 @@ export default function ShopServicesSelectionPage() {
           {saving ? "Saving…" : "Save"}
         </button>
       }
+      onFaqsOpen={() => setFaqsOpen(true)}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsOpen={faqsOpen}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
     >
       {loading ? (
         <ShopLoadingPanel />

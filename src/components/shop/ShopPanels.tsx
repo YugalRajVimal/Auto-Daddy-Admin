@@ -1,9 +1,42 @@
 import type { ReactNode } from "react";
 
+/** Top row in the main content column: aligns with the sidebar page heading on large screens. */
+export function ShopContentHeader({
+  title,
+  titleClassName = "text-base font-bold text-blue-700 sm:text-lg",
+  action,
+  className = "",
+}: {
+  title?: ReactNode;
+  titleClassName?: string;
+  action?: ReactNode;
+  className?: string;
+}) {
+  const hasTitle = title != null && title !== "";
+  if (!hasTitle && !action) return null;
+
+  return (
+    <div
+      className={`relative mb-3 flex min-h-[2rem] items-center gap-3 md:min-h-[2.25rem] lg:-mt-12 ${
+        action ? "justify-end" : hasTitle ? "justify-center" : "justify-end"
+      } ${className}`}
+    >
+      {hasTitle ? (
+        <h2
+          className={`${titleClassName} ${action ? "pointer-events-none absolute inset-x-0 text-center" : "text-center"}`}
+        >
+          {title}
+        </h2>
+      ) : null}
+      {action ? <div className="relative z-10 shrink-0">{action}</div> : null}
+    </div>
+  );
+}
+
 export function ShopLoadingPanel({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`flex min-h-[420px] flex-1 items-center justify-center rounded-md border border-white/70 bg-ad-glass lg:min-h-[calc(100vh-220px)] ${className}`}
+      className={`flex min-h-[420px] flex-1 items-center justify-center lg:min-h-[calc(100vh-220px)] ${className}`}
     >
       <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
     </div>

@@ -3,6 +3,7 @@ import ShopServiceSubDialog from "../../components/shop/forms/ShopServiceSubDial
 import ServiceImage from "../../components/shop/ServiceImage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
+  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
@@ -151,16 +152,18 @@ export default function ShopServicesPage() {
           />
         ) : activeCategory ? (
           <>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-base font-bold text-blue-700">{activeCategory.name ?? "Category"}</h2>
-              <button
-                type="button"
-                className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
-                onClick={() => openAdd(activeCategory)}
-              >
-                + Add New
-              </button>
-            </div>
+            <ShopContentHeader
+              title={activeCategory.name ?? "Category"}
+              action={
+                <button
+                  type="button"
+                  className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
+                  onClick={() => openAdd(activeCategory)}
+                >
+                  + Add New
+                </button>
+              }
+            />
 
             {subs.length === 0 ? (
               <ShopEmptyPanel className="min-h-0 flex-1" message="No sub-services yet." />
