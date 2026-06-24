@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
 import { toast } from "react-toastify";
-import CarOwnerAddEditForm from "../../components/admin/CarOwnerAddEditForm";
+import CarOwnerAddEditForm, {
+  type CarOwnerFormRecord,
+} from "../../components/admin/CarOwnerAddEditForm";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopEmptyPanel,
@@ -23,16 +24,46 @@ function customerId(c: MyCustomer) {
   return c.carOwnerId ?? c.id ?? c._id ?? "";
 }
 
+function customerToOwnerForm(customer: MyCustomer): CarOwnerFormRecord {
+  const id = customerId(customer);
+  return {
+    _id: id,
+    name: customer.name ?? "",
+    email: customer.email,
+    phone: customer.phone,
+    pincode: customer.pincode,
+    address: customer.address,
+    city: customer.city,
+    createdAt: customer.createdAt,
+    myVehicles: (customer.vehicles ?? []).map((v) => ({
+      _id: v._id ?? v.vId ?? "",
+      licensePlateNo: v.licensePlateNo,
+      vinNo: v.vinNo,
+      year: v.year,
+      odometerReading: v.odometerReading,
+      dueOdometerReading: v.dueOdometerReading,
+      make: v.vehicleName ? { name: v.vehicleName, model: v.model ?? "" } : undefined,
+    })),
+  };
+}
+
+type CustomerFormState =
+  | { mode: "add" }
+  | { mode: "view"; customer: MyCustomer }
+  | { mode: "edit"; customer: MyCustomer };
+
 function CustomerCard({
   customer,
   isSearch,
   addingId,
   onAdd,
+  onView,
 }: {
   customer: MyCustomer;
   isSearch: boolean;
   addingId: string | null;
   onAdd: (c: MyCustomer) => void;
+  onView: (c: MyCustomer) => void;
 }) {
   const id = customerId(customer);
 
@@ -82,13 +113,13 @@ function CustomerCard({
   }
 
   return (
-    <Link
-      to={`/shop/people/${id}/edit`}
-      state={{ customer }}
-      className="block rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008000]"
+    <button
+      type="button"
+      onClick={() => onView(customer)}
+      className="block w-full rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008000]"
     >
       {body}
-    </Link>
+    </button>
   );
 }
 
@@ -97,7 +128,7 @@ export default function ShopPeoplePage() {
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
   const [search, setSearch] = useState("");
   const [faqsOpen, setFaqsOpen] = useState(false);
-  const [showForm, setShowForm] = useState(false);
+  const [formState, setFormState] = useState<CustomerFormState | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const { customers, loading, error, refresh } = useShopCustomers(search);
@@ -140,8 +171,9 @@ export default function ShopPeoplePage() {
   };
 
   const handleFormSaved = () => {
-    setShowForm(false);
-    toast.success("Customer created.");
+    const wasEdit = formState?.mode === "edit";
+    setFormState(null);
+    toast.success(wasEdit ? "Customer updated." : "Customer created.");
     void refresh();
   };
 
@@ -161,11 +193,24 @@ export default function ShopPeoplePage() {
       faqsDescription={faqsDescription}
     >
       <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
-        {showForm ? (
+        {formState ? (
           <CarOwnerAddEditForm
-            key="new-customer"
+            key={
+              formState.mode === "add"
+                ? "new-customer"
+                : `${formState.mode}-customer-${customerId(formState.customer)}`
+            }
             apiVariant="shop"
-            onCancel={() => setShowForm(false)}
+            owner={
+              formState.mode === "add" ? undefined : customerToOwnerForm(formState.customer)
+            }
+            readOnly={formState.mode === "view"}
+            onUpdate={
+              formState.mode === "view"
+                ? () => setFormState({ mode: "edit", customer: formState.customer })
+                : undefined
+            }
+            onCancel={() => setFormState(null)}
             onSaved={handleFormSaved}
           />
         ) : (
@@ -174,7 +219,7 @@ export default function ShopPeoplePage() {
               <h1 className="font-serif text-2xl font-bold text-gray-600 md:text-3xl">My Customers</h1>
               <button
                 type="button"
-                onClick={() => setShowForm(true)}
+                onClick={() => setFormState({ mode: "add" })}
                 className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
               >
                 + Add New
@@ -197,6 +242,7 @@ export default function ShopPeoplePage() {
                       isSearch={isSearch}
                       addingId={addingId}
                       onAdd={(customer) => void handleAddExisting(customer)}
+                      onView={(customer) => setFormState({ mode: "view", customer })}
                     />
                   ))}
                 </ShopListPanel>

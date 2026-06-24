@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import ShopServiceSubDialog from "../../components/shop/forms/ShopServiceSubDialog";
+import ServiceImage from "../../components/shop/ServiceImage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopEmptyPanel,
@@ -9,6 +10,7 @@ import {
 } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
+import { getDummyMyServices } from "../../lib/dummyServices";
 import type { ShopServiceCategory } from "../../types/shopOwner";
 
 const PAGE_SIZE = 5;
@@ -25,10 +27,12 @@ function SubServiceCard({
 
   return (
     <article className="flex items-center gap-4 rounded-md border border-[#008000] bg-[#d4fcd4] p-3 sm:px-5 sm:py-4">
-      <div
-        className="h-16 w-16 shrink-0 rounded-sm border border-gray-300 bg-white"
-        aria-hidden
-      />
+      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-sm border border-gray-300 bg-white">
+        <ServiceImage
+          category={{ id: sub.id ?? sub.name, name: sub.name, subServices: [] }}
+          className="h-full w-full object-cover"
+        />
+      </div>
       <div className="min-w-0 flex-1">
         <p className="text-base font-bold text-[#008000]">{sub.name}</p>
         <p className="text-sm font-semibold text-blue-700">Description :</p>
@@ -53,7 +57,28 @@ export default function ShopServicesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [page, setPage] = useState(1);
-  const { categories, loading, error, refresh } = useShopServices();
+  const { categories: apiCategories, loading, error, refresh } = useShopServices();
+  const [categories, setCategories] = useState<ShopServiceCategory[]>([]);
+  const [usingDummy, setUsingDummy] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (apiCategories.length > 0) {
+      setUsingDummy(false);
+      setCategories(apiCategories);
+      return;
+    }
+    setUsingDummy(true);
+    setCategories(getDummyMyServices());
+  }, [apiCategories, loading]);
+
+  const handleRefresh = () => {
+    if (usingDummy) {
+      setCategories(getDummyMyServices());
+      return;
+    }
+    void refresh();
+  };
 
   const activeCategory: ShopServiceCategory | null =
     categories.find((c) => c.id === activeCategoryId) ?? categories[0] ?? null;
@@ -117,7 +142,7 @@ export default function ShopServicesPage() {
       <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
         {loading ? (
           <ShopLoadingPanel className="min-h-0 flex-1" />
-        ) : error ? (
+        ) : error && !usingDummy ? (
           <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
         ) : categories.length === 0 ? (
           <ShopEmptyPanel
@@ -188,9 +213,17 @@ export default function ShopServicesPage() {
         open={dialogOpen}
         category={activeCategory}
         editIndex={editIndex}
-        hasExistingServices={categories.length > 0}
+        hasExistingServices={categories.length > 0 && !usingDummy}
+        demoMode={usingDummy}
+        onDemoSave={(categoryId, subServices) => {
+          setCategories((prev) =>
+            prev.map((category) =>
+              category.id === categoryId ? { ...category, subServices } : category
+            )
+          );
+        }}
         onClose={() => setDialogOpen(false)}
-        onSaved={() => void refresh()}
+        onSaved={() => handleRefresh()}
       />
     </ShopPageShell>
   );

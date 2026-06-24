@@ -145,6 +145,8 @@ type CarOwnerAddEditFormProps = {
   owner?: CarOwnerFormRecord | null;
   onCancel: () => void;
   onSaved: () => void;
+  onUpdate?: () => void;
+  readOnly?: boolean;
   apiVariant?: "admin" | "shop";
 };
 
@@ -156,6 +158,7 @@ function VehicleRowForm({
   onChange,
   onRemove,
   canRemove,
+  readOnly = false,
 }: {
   v: VehicleFormRow;
   i: number;
@@ -164,6 +167,7 @@ function VehicleRowForm({
   onChange: (p: Partial<VehicleFormRow>) => void;
   onRemove: () => void;
   canRemove: boolean;
+  readOnly?: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
 
@@ -187,7 +191,7 @@ function VehicleRowForm({
     <div className="mb-2 w-full rounded border border-gray-300 bg-white px-6 py-3 shadow-sm last:mb-0">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-bold text-ad-green-dark">Vehicle #{i + 1}</span>
-        {canRemove ? (
+        {canRemove && !readOnly ? (
           <button type="button" onClick={onRemove} className="text-xs font-semibold text-red-600 hover:underline">
             Remove
           </button>
@@ -198,7 +202,8 @@ function VehicleRowForm({
           <select
             value={v.vehicleName}
             onChange={(e) => onChange({ vehicleName: e.target.value, model: "", year: "" })}
-            className={compactInputClass}
+            disabled={readOnly}
+            className={`${compactInputClass}${readOnly ? " disabled:cursor-default disabled:bg-gray-50" : ""}`}
           >
             <option value="">Select make</option>
             {makeOptions.map((make) => (
@@ -215,8 +220,8 @@ function VehicleRowForm({
           <select
             value={v.model}
             onChange={(e) => onChange({ model: e.target.value, year: "" })}
-            disabled={!v.vehicleName}
-            className={`${compactInputClass} disabled:cursor-not-allowed disabled:bg-gray-100`}
+            disabled={readOnly || !v.vehicleName}
+            className={`${compactInputClass} disabled:cursor-not-allowed disabled:bg-gray-100${readOnly ? " disabled:cursor-default disabled:bg-gray-50" : ""}`}
           >
             <option value="">Select model</option>
             {modelOptions.map((modelName) => (
@@ -233,8 +238,8 @@ function VehicleRowForm({
           <select
             value={v.year}
             onChange={(e) => onChange({ year: e.target.value })}
-            disabled={!v.vehicleName || !v.model}
-            className={`${compactInputClass} disabled:cursor-not-allowed disabled:bg-gray-100`}
+            disabled={readOnly || !v.vehicleName || !v.model}
+            className={`${compactInputClass} disabled:cursor-not-allowed disabled:bg-gray-100${readOnly ? " disabled:cursor-default disabled:bg-gray-50" : ""}`}
           >
             <option value="">Select year</option>
             {yearOptions.map((year) => (
@@ -251,7 +256,8 @@ function VehicleRowForm({
             value={v.licensePlateNo}
             onChange={(e) => onChange({ licensePlateNo: e.target.value.slice(0, 14) })}
             placeholder="ABC 1234"
-            className={compactInputClass}
+            readOnly={readOnly}
+            className={`${compactInputClass}${readOnly ? " cursor-default bg-gray-50" : ""}`}
           />
           {attempted && !v.licensePlateNo.trim() ? <p className={fieldErrorClass}>Required</p> : null}
         </CompactField>
@@ -262,7 +268,8 @@ function VehicleRowForm({
             onChange={(e) => onChange({ vinNo: e.target.value.slice(0, 17).toUpperCase() })}
             placeholder="17-char VIN"
             maxLength={17}
-            className={compactInputClass}
+            readOnly={readOnly}
+            className={`${compactInputClass}${readOnly ? " cursor-default bg-gray-50" : ""}`}
           />
           {attempted && v.vinNo && v.vinNo.length !== 17 ? (
             <p className={fieldErrorClass}>Must be 17 chars</p>
@@ -275,10 +282,23 @@ function VehicleRowForm({
             value={v.odometerReading}
             onChange={(e) => onChange({ odometerReading: e.target.value.replace(/\D/g, "") })}
             placeholder="km"
-            className={compactInputClass}
+            readOnly={readOnly}
+            className={`${compactInputClass}${readOnly ? " cursor-default bg-gray-50" : ""}`}
           />
         </div>
         <div className="col-start-1 min-w-0 w-full">
+          {readOnly ? (
+            v.vehicleImagePreview ? (
+              <>
+                <label className="mb-1 block text-xs font-bold text-ad-green-dark">Photo</label>
+                <img
+                  src={v.vehicleImagePreview}
+                  alt=""
+                  className="h-[30px] w-[30px] rounded border border-gray-300 object-cover"
+                />
+              </>
+            ) : null
+          ) : (
           <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
             <input
               type="checkbox"
@@ -334,8 +354,22 @@ function VehicleRowForm({
               />
             </div>
           ) : null}
+          )}
         </div>
         <div className="col-start-6 min-w-0 w-full">
+          {readOnly ? (
+            v.attachNextDueService && v.nextDueService ? (
+              <>
+                <label className="mb-1 block text-xs font-bold text-ad-green-dark">Next Due Service</label>
+                <input
+                  type="text"
+                  value={v.nextDueService}
+                  readOnly
+                  className={`${compactInputClass} cursor-default bg-gray-50`}
+                />
+              </>
+            ) : null
+          ) : (
           <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
             <input
               type="checkbox"
@@ -360,6 +394,7 @@ function VehicleRowForm({
               className={compactInputClass}
             />
           ) : null}
+          )}
         </div>
       </div>
     </div>
@@ -385,11 +420,14 @@ export default function CarOwnerAddEditForm({
   owner,
   onCancel,
   onSaved,
+  onUpdate,
+  readOnly = false,
   apiVariant = "admin",
 }: CarOwnerAddEditFormProps) {
   const { token, session } = useAuth();
   const isShop = apiVariant === "shop";
   const isEdit = !!owner;
+  const viewOnly = readOnly && isEdit;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -653,13 +691,19 @@ export default function CarOwnerAddEditForm({
     }
   }
 
-  const formMessage = isEdit
+  const formMessage = viewOnly
     ? isShop
-      ? "You are updating a customer"
-      : "You are updating a 'Car Owner'"
-    : isShop
-      ? "You are adding a new customer"
-      : "You are creating a 'Car Owner'";
+      ? "Customer details"
+      : "Car owner details"
+    : isEdit
+      ? isShop
+        ? "You are updating a customer"
+        : "You are updating a 'Car Owner'"
+      : isShop
+        ? "You are adding a new customer"
+        : "You are creating a 'Car Owner'";
+
+  const readOnlyFieldClass = viewOnly ? " cursor-default bg-gray-50" : "";
 
   return (
     <CompactFormPanel
@@ -667,8 +711,8 @@ export default function CarOwnerAddEditForm({
         <CompactFormFooter
           message={formMessage}
           messageCenter
-          actionLabel={submitting ? "Saving..." : "Save"}
-          onSave={() => void handleSave()}
+          actionLabel={viewOnly ? "Update" : submitting ? "Saving..." : "Save"}
+          onSave={viewOnly ? onUpdate : () => void handleSave()}
           onCancel={onCancel}
         />
       }
@@ -684,7 +728,8 @@ export default function CarOwnerAddEditForm({
             type="date"
             value={joiningDate}
             onChange={(e) => setJoiningDate(e.target.value)}
-            className={compactInputClass}
+            readOnly={viewOnly}
+            className={`${compactInputClass}${readOnlyFieldClass}`}
           />
         </CompactField>
         <CompactField label="Phone" required className="!flex-none w-full sm:col-span-1">
@@ -692,7 +737,8 @@ export default function CarOwnerAddEditForm({
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-            className={compactInputClass}
+            readOnly={viewOnly}
+            className={`${compactInputClass}${readOnlyFieldClass}`}
           />
           {attempted && phone.replace(/\D/g, "").length !== 10 ? (
             <p className={fieldErrorClass}>Must be 10 digits</p>
@@ -703,12 +749,18 @@ export default function CarOwnerAddEditForm({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value.slice(0, 20))}
-            className={compactInputClass}
+            readOnly={viewOnly}
+            className={`${compactInputClass}${readOnlyFieldClass}`}
           />
           {attempted && !name.trim() ? <p className={fieldErrorClass}>Required</p> : null}
         </CompactField>
         <CompactField label="City" className="!flex-none w-full sm:col-span-1">
-          <select value={city} onChange={(e) => setCity(e.target.value)} className={compactInputClass}>
+          <select
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            disabled={viewOnly}
+            className={`${compactInputClass}${readOnlyFieldClass}`}
+          >
             <option value="">Select city</option>
             {citySelectOptions.map((cityName) => (
               <option key={cityName} value={cityName}>
@@ -723,12 +775,25 @@ export default function CarOwnerAddEditForm({
             value={pincode}
             onChange={(e) => setPincode(e.target.value.slice(0, 10))}
             placeholder="A1A 1A1"
-            className={compactInputClass}
+            readOnly={viewOnly}
+            className={`${compactInputClass}${readOnlyFieldClass}`}
           />
           {attempted && !pincode.trim() ? <p className={fieldErrorClass}>Required</p> : null}
         </CompactField>
 
         <div className={`min-w-0 w-full sm:col-span-1 ${compactFixedFieldWidth}`}>
+          {viewOnly ? (
+            attachProfilePhoto && profilePreview ? (
+              <>
+                <label className="mb-1 block text-xs font-bold text-ad-green-dark">Profile Photo</label>
+                <img
+                  src={profilePreview}
+                  alt=""
+                  className="h-[30px] w-[30px] rounded border border-gray-300 object-cover"
+                />
+              </>
+            ) : null
+          ) : (
           <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
             <input
               type="checkbox"
@@ -747,7 +812,8 @@ export default function CarOwnerAddEditForm({
             />
             Profile Photo
           </label>
-          {attachProfilePhoto ? (
+          )}
+          {!viewOnly && attachProfilePhoto ? (
             <div className="flex items-center gap-1.5">
               {profilePreview ? (
                 <img
@@ -783,6 +849,19 @@ export default function CarOwnerAddEditForm({
           ) : null}
         </div>
         <div className={`min-w-0 w-full sm:col-span-1 ${compactFixedFieldWidth}`}>
+          {viewOnly ? (
+            attachEmail ? (
+              <>
+                <label className="mb-1 block text-xs font-bold text-ad-green-dark">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  readOnly
+                  className={`${compactInputClass}${readOnlyFieldClass}`}
+                />
+              </>
+            ) : null
+          ) : (
           <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
             <input
               type="checkbox"
@@ -798,7 +877,8 @@ export default function CarOwnerAddEditForm({
             />
             Email
           </label>
-          {attachEmail ? (
+          )}
+          {!viewOnly && attachEmail ? (
             <>
               <input
                 type="email"
@@ -819,12 +899,14 @@ export default function CarOwnerAddEditForm({
             value={address}
             onChange={(e) => setAddress(e.target.value.slice(0, 50))}
             placeholder="Max 50 chars"
+            readOnly={viewOnly}
+            className={readOnlyFieldClass}
           />
         </div>
       </div>
       <div className="flex items-center justify-between border-t border-gray-300 pt-3">
         <span className="text-xs font-bold text-ad-green-dark">Vehicles</span>
-        {vehicles.length < 5 ? (
+        {!viewOnly && vehicles.length < 5 ? (
           <button
             type="button"
             onClick={() => setVehicles((v) => [...v, emptyVehicle()])}
@@ -851,6 +933,7 @@ export default function CarOwnerAddEditForm({
             }
             onRemove={() => setVehicles((prev) => prev.filter((_, idx) => idx !== i))}
             canRemove={vehicles.length > 1}
+            readOnly={viewOnly}
           />
         ))}
       </div>

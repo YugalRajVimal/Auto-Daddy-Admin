@@ -73,6 +73,7 @@ export type ShopServiceCategory = {
   id: string;
   name?: string;
   desc?: string;
+  shopType?: string;
   subServices: { id?: string; name: string; desc: string; price: number }[];
 };
 
@@ -99,6 +100,7 @@ export type ShopProfileBusiness = {
   email?: string;
   hstNumber?: string;
   gstPercent?: number | string;
+  shopType?: string;
 };
 
 export type ShopProfileUser = {
@@ -109,6 +111,7 @@ export type ShopProfileUser = {
   address?: string;
   pincode?: string;
   profilePhoto?: string | null;
+  shopType?: string;
 };
 
 export type ShopProfileResponse = {

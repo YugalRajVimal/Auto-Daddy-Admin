@@ -11,6 +11,8 @@ type ShopServiceSubDialogProps = {
   category: ShopServiceCategory | null;
   editIndex: number | null;
   hasExistingServices: boolean;
+  demoMode?: boolean;
+  onDemoSave?: (categoryId: string, subServices: ShopServiceCategory["subServices"]) => void;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -20,6 +22,8 @@ export default function ShopServiceSubDialog({
   category,
   editIndex,
   hasExistingServices,
+  demoMode = false,
+  onDemoSave,
   onClose,
   onSaved,
 }: ShopServiceSubDialogProps) {
@@ -44,7 +48,7 @@ export default function ShopServiceSubDialog({
   }, [category, editIndex, open]);
 
   const handleSave = async () => {
-    if (!token || !category) return;
+    if (!category) return;
     if (!name.trim()) {
       toast.error("Sub-service name is required.");
       return;
@@ -59,6 +63,15 @@ export default function ShopServiceSubDialog({
     if (editIndex != null) nextSubs[editIndex] = entry;
     else nextSubs.push(entry);
 
+    if (demoMode && onDemoSave) {
+      onDemoSave(category.id, nextSubs);
+      toast.success("Saved.");
+      onSaved();
+      onClose();
+      return;
+    }
+
+    if (!token) return;
     setSaving(true);
     try {
       const payload = [{ id: category.id, subServices: nextSubs }];
@@ -78,9 +91,20 @@ export default function ShopServiceSubDialog({
   };
 
   const handleDelete = async () => {
-    if (!token || !category || editIndex == null) return;
+    if (!category || editIndex == null) return;
     const subName = category.subServices[editIndex]?.name;
     if (!subName) return;
+
+    if (demoMode && onDemoSave) {
+      const nextSubs = category.subServices.filter((_, index) => index !== editIndex);
+      onDemoSave(category.id, nextSubs);
+      toast.success("Deleted.");
+      onSaved();
+      onClose();
+      return;
+    }
+
+    if (!token) return;
     setSaving(true);
     try {
       const res = await removeMyServiceSubServices(token, category.id, subName);

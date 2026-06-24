@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { toast } from "react-toastify";
+import { getJson } from "../../../api/mobileAuth";
 import {
   CompactField,
   CompactFormPanel,
   CompactFormRow,
   compactInputClass,
 } from "../../admin/ContentPanel";
-import OwnerCityPicker from "../../owner/OwnerCityPicker";
 import { useAuth } from "../../../auth";
 import {
   addMyCarCompanies,
@@ -15,6 +15,7 @@ import {
   updateBusinessOpenHours,
   updateBusinessProfileMultipart,
   updatePersonalProfile,
+  updateServiceWeWorkWith,
 } from "../../../lib/shopOwnerMutations";
 import {
   resolvePerDaySchedule,
@@ -22,55 +23,106 @@ import {
   WEEK_DAYS,
   type PerDaySchedule,
 } from "../../../lib/perDayOpenHours";
-import type { ShopProfileBusiness, ShopProfileUser } from "../../../types/shopOwner";
+import { filterServicesByShopType, getShopTypeLabel, normalizeShopType, SHOP_TYPE_OPTIONS, type ShopType } from "../../../lib/shopTypes";
+import type { ShopProfileBusiness, ShopProfileUser, ShopServiceCategory } from "../../../types/shopOwner";
 import OpenHoursTimePicker from "./OpenHoursTimePicker";
 import CarBrandLogo from "../CarBrandLogo";
+import { getServiceId, getServiceName } from "../../../lib/dummyServices";
+import { parseCitiesApiResponse } from "../../../lib/carOwnerCities";
 import { shopSaveButtonClass } from "./ShopFormPage";
 
 const checkboxBoxClass =
   "inline-block border border-gray-300 bg-gray-100 px-2 py-0.5 text-xs text-gray-800";
 
+function ProfileStatusFooter({
+  message,
+  actions,
+}: {
+  message: string;
+  actions: ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+      <div />
+      <span className="text-center text-xs font-serif italic text-gray-800">{message}</span>
+      <div className="flex justify-end">{actions}</div>
+    </div>
+  );
+}
+
 function ProfileFormFooter({
+  message,
   saving,
   onSave,
   onReset,
+  cancelLabel = "Cancel",
 }: {
+  message: string;
   saving: boolean;
   onSave: () => void;
   onReset: () => void;
+  cancelLabel?: string;
 }) {
   return (
-    <div className="flex items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={saving}
-        className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
-      >
-        {saving ? "Saving…" : "Save"}
-      </button>
-      <span className="text-xs text-gray-700">
-        or{" "}
+    <ProfileStatusFooter
+      message={message}
+      actions={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <span className="text-xs text-gray-700">
+            or{" "}
+            <button
+              type="button"
+              onClick={onReset}
+              disabled={saving}
+              className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+            >
+              {cancelLabel}
+            </button>
+          </span>
+        </div>
+      }
+    />
+  );
+}
+
+function ProfileViewFooter({ message, onUpdate }: { message: string; onUpdate: () => void }) {
+  return (
+    <ProfileStatusFooter
+      message={message}
+      actions={
         <button
           type="button"
-          onClick={onReset}
-          disabled={saving}
-          className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+          onClick={onUpdate}
+          className="inline-flex items-center gap-1.5 rounded bg-ad-purple px-4 py-1 text-sm font-bold text-white hover:bg-ad-purple-dark"
         >
-          Reset
+          Update
         </button>
-      </span>
-    </div>
+      }
+    />
   );
 }
 
 export function ShopPersonalProfileEditor({
   user,
   city,
+  isEditing = false,
+  onStartEdit,
+  onCancelEdit,
   onSaved,
 }: {
   user?: ShopProfileUser;
   city?: string;
+  isEditing?: boolean;
+  onStartEdit?: () => void;
+  onCancelEdit?: () => void;
   onSaved: () => void;
 }) {
   const { token, session } = useAuth();
@@ -80,23 +132,58 @@ export function ShopPersonalProfileEditor({
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [address, setAddress] = useState(user?.address ?? "");
   const [pincode, setPincode] = useState(user?.pincode ?? "");
+  const [selectedCity, setSelectedCity] = useState(city ?? "");
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [showUploadImage, setShowUploadImage] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const reset = () => {
+  const syncFromUser = () => {
     setName(user?.name ?? "");
     setEmail(user?.email ?? "");
     setPhone(user?.phone ?? "");
     setAddress(user?.address ?? "");
     setPincode(user?.pincode ?? "");
-    setShowEmail(false);
+    setSelectedCity(city ?? "");
+    setShowEmail(Boolean(user?.email?.trim()));
     setShowUploadImage(false);
   };
 
+  const reset = () => {
+    syncFromUser();
+    onCancelEdit?.();
+  };
+
   useEffect(() => {
-    reset();
-  }, [user?.name, user?.email, user?.phone, user?.address, user?.pincode]);
+    syncFromUser();
+  }, [user?.name, user?.email, user?.phone, user?.address, user?.pincode, city]);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    void (async () => {
+      const res = await getJson<unknown>("/api/user/cities?page=1", token);
+      if (cancelled) return;
+      if (res.ok) {
+        setCityOptions(parseCitiesApiResponse(res.data).map((c) => c.name));
+      } else {
+        setCityOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const citySelectOptions = useMemo(() => {
+    const names = new Set(cityOptions);
+    if (selectedCity.trim()) names.add(selectedCity.trim());
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [cityOptions, selectedCity]);
+
+  useEffect(() => {
+    if (user?.email?.trim()) setShowEmail(true);
+  }, [user?.email]);
 
   const handleSave = async () => {
     if (!token) return;
@@ -109,6 +196,7 @@ export function ShopPersonalProfileEditor({
         countryCode: session?.meta?.countryCode ?? user?.countryCode ?? "+1",
         pincode: pincode.trim(),
         address: address.trim(),
+        city: selectedCity.trim(),
       });
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save.");
@@ -123,21 +211,66 @@ export function ShopPersonalProfileEditor({
 
   return (
     <CompactFormPanel
-      footer={<ProfileFormFooter saving={saving} onSave={() => void handleSave()} onReset={reset} />}
+      footer={
+        isEditing ? (
+          <ProfileFormFooter
+            message="You are updating your personal profile"
+            saving={saving}
+            onSave={() => void handleSave()}
+            onReset={reset}
+          />
+        ) : (
+          <ProfileViewFooter
+            message="You are viewing your personal profile"
+            onUpdate={() => onStartEdit?.()}
+          />
+        )
+      }
     >
       <div className="space-y-4">
         <CompactFormRow>
           <CompactField label="Name" className="min-w-[120px] flex-1">
-            <input className={compactInputClass} value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              className={compactInputClass}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={!isEditing || saving}
+            />
           </CompactField>
           <CompactField label="Phone" className="min-w-[120px] flex-1">
-            <input className={compactInputClass} value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <input
+              className={compactInputClass}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              disabled={!isEditing || saving}
+            />
           </CompactField>
           <CompactField label="City" className="min-w-[120px] flex-1">
-            <input className={compactInputClass} value={city ?? pincode} readOnly />
+            {isEditing ? (
+              <select
+                className={compactInputClass}
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                disabled={saving}
+              >
+                <option value="">Select city</option>
+                {citySelectOptions.map((cityName) => (
+                  <option key={cityName} value={cityName}>
+                    {cityName}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input className={compactInputClass} value={selectedCity} readOnly />
+            )}
           </CompactField>
           <CompactField label="Address" className="min-w-[120px] flex-1">
-            <input className={compactInputClass} value={address} onChange={(e) => setAddress(e.target.value)} />
+            <input
+              className={compactInputClass}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              disabled={!isEditing || saving}
+            />
           </CompactField>
         </CompactFormRow>
 
@@ -150,13 +283,14 @@ export function ShopPersonalProfileEditor({
                   id="shop-personal-upload-image"
                   checked={showUploadImage}
                   onChange={(e) => setShowUploadImage(e.target.checked)}
+                  disabled={!isEditing || saving}
                   className="h-3.5 w-3.5 accent-ad-green"
                 />
                 <label htmlFor="shop-personal-upload-image" className="text-xs font-bold text-ad-green-dark">
                   Upload Image
                 </label>
               </div>
-              {showUploadImage ? (
+              {showUploadImage && isEditing ? (
                 <>
                   <button
                     type="button"
@@ -178,6 +312,7 @@ export function ShopPersonalProfileEditor({
                   id="shop-personal-show-email"
                   checked={showEmail}
                   onChange={(e) => setShowEmail(e.target.checked)}
+                  disabled={!isEditing || saving}
                   className="h-3.5 w-3.5 accent-ad-green"
                 />
                 <label htmlFor="shop-personal-show-email" className="text-xs font-bold text-ad-green-dark">
@@ -189,6 +324,7 @@ export function ShopPersonalProfileEditor({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={!isEditing || saving}
                   className={`${compactInputClass} w-full`}
                 />
               ) : null}
@@ -205,16 +341,24 @@ export function ShopPersonalProfileEditor({
 export function ShopBusinessProfileEditor({
   business,
   zipCode,
+  shopType: initialShopType,
+  isEditing = false,
+  onStartEdit,
+  onCancelEdit,
   onSaved,
 }: {
   business?: ShopProfileBusiness;
   zipCode?: string;
+  shopType?: string;
+  isEditing?: boolean;
+  onStartEdit?: () => void;
+  onCancelEdit?: () => void;
   onSaved: () => void;
 }) {
   const { token } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
-  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [businessName, setBusinessName] = useState(business?.businessName ?? "");
   const [businessPhone, setBusinessPhone] = useState(business?.businessPhone ?? "");
   const [city, setCity] = useState(business?.city ?? "");
@@ -223,13 +367,16 @@ export function ShopBusinessProfileEditor({
   const [email, setEmail] = useState(business?.email ?? "");
   const [hst, setHst] = useState(business?.hstNumber ?? "");
   const [tax, setTax] = useState(business?.gstPercent != null ? String(business.gstPercent) : "");
+  const [shopType, setShopType] = useState<ShopType>(() =>
+    normalizeShopType(initialShopType ?? business?.shopType)
+  );
   const [showUploadImage, setShowUploadImage] = useState(false);
   const [showUploadBanner, setShowUploadBanner] = useState(false);
   const [logo, setLogo] = useState<File | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const reset = () => {
+  const syncFromBusiness = () => {
     setBusinessName(business?.businessName ?? "");
     setBusinessPhone(business?.businessPhone ?? "");
     setCity(business?.city ?? "");
@@ -238,14 +385,20 @@ export function ShopBusinessProfileEditor({
     setEmail(business?.email ?? "");
     setHst(business?.hstNumber ?? "");
     setTax(business?.gstPercent != null ? String(business.gstPercent) : "");
+    setShopType(normalizeShopType(initialShopType ?? business?.shopType));
     setShowUploadImage(false);
     setShowUploadBanner(false);
     setLogo(null);
     setBanner(null);
   };
 
+  const reset = () => {
+    syncFromBusiness();
+    onCancelEdit?.();
+  };
+
   useEffect(() => {
-    reset();
+    syncFromBusiness();
   }, [
     business?.businessName,
     business?.businessPhone,
@@ -254,8 +407,33 @@ export function ShopBusinessProfileEditor({
     business?.email,
     business?.hstNumber,
     business?.gstPercent,
+    business?.shopType,
+    initialShopType,
     zipCode,
   ]);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    void (async () => {
+      const res = await getJson<unknown>("/api/user/cities?page=1", token);
+      if (cancelled) return;
+      if (res.ok) {
+        setCityOptions(parseCitiesApiResponse(res.data).map((c) => c.name));
+      } else {
+        setCityOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const citySelectOptions = useMemo(() => {
+    const names = new Set(cityOptions);
+    if (city.trim()) names.add(city.trim());
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [cityOptions, city]);
 
   const handleSave = async () => {
     if (!token) return;
@@ -269,6 +447,7 @@ export function ShopBusinessProfileEditor({
         businessEmail: email.trim(),
         businessHSTNumber: hst.trim(),
         gst: tax.trim() || "0",
+        shopType,
       };
       if (logo) fields.businessLogo = logo;
       if (banner) fields.bannerImage = banner;
@@ -284,42 +463,122 @@ export function ShopBusinessProfileEditor({
     }
   };
 
+  const shopTypeRadios = (
+    <>
+      <span className="text-xs font-bold text-gray-800">Shop Type:</span>
+      {SHOP_TYPE_OPTIONS.map((option) => (
+        <label key={option.value} className="flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+          <input
+            type="radio"
+            name="shop-business-type"
+            value={option.value}
+            checked={shopType === option.value}
+            onChange={() => setShopType(option.value)}
+            disabled={!isEditing || saving}
+            className="h-3.5 w-3.5 accent-ad-green"
+          />
+          {option.label}
+        </label>
+      ))}
+    </>
+  );
+
   return (
     <>
       <CompactFormPanel
-        footer={<ProfileFormFooter saving={saving} onSave={() => void handleSave()} onReset={reset} />}
+        footer={
+          isEditing ? (
+            <ProfileFormFooter
+              message="You are updating your business profile"
+              saving={saving}
+              onSave={() => void handleSave()}
+              onReset={reset}
+            />
+          ) : (
+            <ProfileViewFooter
+              message="You are viewing your business profile"
+              onUpdate={() => onStartEdit?.()}
+            />
+          )
+        }
       >
         <CompactFormRow>
           <CompactField label="Business Name">
-            <input className={compactInputClass} value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
+            <input
+              className={compactInputClass}
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              disabled={!isEditing || saving}
+            />
           </CompactField>
           <CompactField label="Phone">
-            <input className={compactInputClass} value={businessPhone} onChange={(e) => setBusinessPhone(e.target.value)} />
+            <input
+              className={compactInputClass}
+              value={businessPhone}
+              onChange={(e) => setBusinessPhone(e.target.value)}
+              disabled={!isEditing || saving}
+            />
           </CompactField>
           <CompactField label="City">
-            <div className="flex gap-2">
+            {isEditing ? (
+              <select
+                className={compactInputClass}
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                disabled={saving}
+              >
+                <option value="">Select city</option>
+                {citySelectOptions.map((cityName) => (
+                  <option key={cityName} value={cityName}>
+                    {cityName}
+                  </option>
+                ))}
+              </select>
+            ) : (
               <input className={compactInputClass} value={city} readOnly />
-              <button type="button" className={checkboxBoxClass} onClick={() => setCityPickerOpen(true)}>
-                Pick
-              </button>
-            </div>
+            )}
           </CompactField>
           <CompactField label="Zip Code">
-            <input className={compactInputClass} value={zip} onChange={(e) => setZip(e.target.value)} />
+            <input
+              className={compactInputClass}
+              value={zip}
+              onChange={(e) => setZip(e.target.value)}
+              disabled={!isEditing || saving}
+            />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="Address">
-            <input className={compactInputClass} value={address} onChange={(e) => setAddress(e.target.value)} />
+            <input
+              className={compactInputClass}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              disabled={!isEditing || saving}
+            />
           </CompactField>
           <CompactField label="Business Email">
-            <input className={compactInputClass} value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input
+              className={compactInputClass}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={!isEditing || saving}
+            />
           </CompactField>
           <CompactField label="HST Number">
-            <input className={compactInputClass} value={hst} onChange={(e) => setHst(e.target.value)} />
+            <input
+              className={compactInputClass}
+              value={hst}
+              onChange={(e) => setHst(e.target.value)}
+              disabled={!isEditing || saving}
+            />
           </CompactField>
           <CompactField label="Tax %">
-            <input className={compactInputClass} value={tax} onChange={(e) => setTax(e.target.value)} />
+            <input
+              className={compactInputClass}
+              value={tax}
+              onChange={(e) => setTax(e.target.value)}
+              disabled={!isEditing || saving}
+            />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow className="items-start pt-2">
@@ -331,13 +590,14 @@ export function ShopBusinessProfileEditor({
                   id="shop-business-upload-image"
                   checked={showUploadImage}
                   onChange={(e) => setShowUploadImage(e.target.checked)}
+                  disabled={!isEditing || saving}
                   className="h-3.5 w-3.5 accent-ad-green"
                 />
                 <label htmlFor="shop-business-upload-image" className="text-xs font-bold text-ad-green-dark">
                   Upload Logo
                 </label>
               </div>
-              {showUploadImage ? (
+              {showUploadImage && isEditing ? (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -363,13 +623,14 @@ export function ShopBusinessProfileEditor({
                   id="shop-business-upload-banner"
                   checked={showUploadBanner}
                   onChange={(e) => setShowUploadBanner(e.target.checked)}
+                  disabled={!isEditing || saving}
                   className="h-3.5 w-3.5 accent-ad-green"
                 />
                 <label htmlFor="shop-business-upload-banner" className="text-xs font-bold text-ad-green-dark">
                   Upload Banner Image
                 </label>
               </div>
-              {showUploadBanner ? (
+              {showUploadBanner && isEditing ? (
                 <button
                   type="button"
                   onClick={() => bannerFileInputRef.current?.click()}
@@ -390,17 +651,16 @@ export function ShopBusinessProfileEditor({
           <div className="min-w-0 flex-1" aria-hidden />
           <div className="min-w-0 flex-1" aria-hidden />
         </CompactFormRow>
+        {isEditing ? (
+          <CompactFormRow className="items-center pt-1">
+            <div className="flex flex-wrap items-center gap-4">{shopTypeRadios}</div>
+          </CompactFormRow>
+        ) : (
+          <p className="pt-1 text-xs font-bold text-gray-800">
+            Shop Type: <span className="text-ad-green-dark">{getShopTypeLabel(shopType)}</span>
+          </p>
+        )}
       </CompactFormPanel>
-      <OwnerCityPicker
-        open={cityPickerOpen}
-        onClose={() => setCityPickerOpen(false)}
-        token={token}
-        selectedId={null}
-        onSelect={(c) => {
-          setCity(c.name);
-          setCityPickerOpen(false);
-        }}
-      />
     </>
   );
 }
@@ -409,12 +669,18 @@ export function ShopOpenHoursEditor({
   perDayOpenHours,
   isBusinessActive,
   updatingActive,
+  isEditing = false,
+  onStartEdit,
+  onCancelEdit,
   onActiveChange,
   onSaved,
 }: {
   perDayOpenHours?: string;
   isBusinessActive?: boolean | null;
   updatingActive?: boolean;
+  isEditing?: boolean;
+  onStartEdit?: () => void;
+  onCancelEdit?: () => void;
   onActiveChange?: (next: boolean) => void;
   onSaved: () => void;
 }) {
@@ -447,11 +713,22 @@ export function ShopOpenHoursEditor({
   return (
     <CompactFormPanel
       footer={
-        <ProfileFormFooter
-          saving={saving}
-          onSave={() => void handleSave()}
-          onReset={() => setSchedule(resolvePerDaySchedule(perDayOpenHours ? { perDayOpenHours } : null))}
-        />
+        isEditing ? (
+          <ProfileFormFooter
+            message="You are updating your opening timings"
+            saving={saving}
+            onSave={() => void handleSave()}
+            onReset={() => {
+              setSchedule(resolvePerDaySchedule(perDayOpenHours ? { perDayOpenHours } : null));
+              onCancelEdit?.();
+            }}
+          />
+        ) : (
+          <ProfileViewFooter
+            message="You are viewing your opening timings"
+            onUpdate={() => onStartEdit?.()}
+          />
+        )
       }
     >
       {isBusinessActive != null ? (
@@ -459,7 +736,7 @@ export function ShopOpenHoursEditor({
           <input
             type="checkbox"
             checked={isBusinessActive}
-            disabled={updatingActive}
+            disabled={!isEditing || updatingActive}
             onChange={(e) => onActiveChange?.(e.target.checked)}
             className="h-5 w-5 accent-ad-purple"
           />
@@ -476,6 +753,7 @@ export function ShopOpenHoursEditor({
               <input
                 type="checkbox"
                 checked={schedule[day].enabled}
+                disabled={!isEditing || saving}
                 onChange={(e) =>
                   setSchedule((s) => ({ ...s, [day]: { ...s[day], enabled: e.target.checked } }))
                 }
@@ -488,7 +766,7 @@ export function ShopOpenHoursEditor({
               <OpenHoursTimePicker
                 id={`${day}-opening`}
                 value={schedule[day].start}
-                disabled={!schedule[day].enabled}
+                disabled={!isEditing || !schedule[day].enabled || saving}
                 className="w-[88px]"
                 onChange={(start) => setSchedule((s) => ({ ...s, [day]: { ...s[day], start } }))}
               />
@@ -498,7 +776,7 @@ export function ShopOpenHoursEditor({
               <OpenHoursTimePicker
                 id={`${day}-closing`}
                 value={schedule[day].end}
-                disabled={!schedule[day].enabled}
+                disabled={!isEditing || !schedule[day].enabled || saving}
                 className="w-[88px]"
                 onChange={(end) => setSchedule((s) => ({ ...s, [day]: { ...s[day], end } }))}
               />
@@ -581,7 +859,15 @@ export function ShopCarBrandAddEditor({
   return (
     <CompactFormPanel
       className="mb-4"
-      footer={<ProfileFormFooter saving={saving} onSave={() => void handleSave()} onReset={reset} />}
+      footer={
+        <ProfileFormFooter
+          message="You are adding a car brand"
+          saving={saving}
+          onSave={() => void handleSave()}
+          onReset={reset}
+          cancelLabel="Cancel"
+        />
+      }
     >
       <CompactFormRow className="items-end">
         <CompactField label="Select Brand Name" className="min-w-[180px] flex-1">
@@ -606,13 +892,111 @@ export function ShopCarBrandAddEditor({
           </select>
         </CompactField>
         <CompactField label="Emblem" className="min-w-[180px] flex-1">
-          <div className="flex h-20 w-full items-center justify-center rounded border border-gray-300 bg-white px-3">
-            {brandId ? (
-              <CarBrandLogo company={selected} className="max-h-16 max-w-full object-contain" />
-            ) : (
-              <span className="text-xs text-gray-400">Select a brand</span>
-            )}
-          </div>
+          {brandId ? (
+            <CarBrandLogo company={selected} className="h-20 w-full object-contain" />
+          ) : (
+            <span className="text-xs text-gray-400">Select a brand</span>
+          )}
+        </CompactField>
+      </CompactFormRow>
+    </CompactFormPanel>
+  );
+}
+
+export function ShopServiceAddEditor({
+  services,
+  selectedIds,
+  shopType,
+  onSaved,
+  onClose,
+  onSaveService,
+}: {
+  services: ShopServiceCategory[];
+  selectedIds: Set<string>;
+  shopType?: string | null;
+  onSaved: (id: string) => void;
+  onClose?: () => void;
+  /** When set, handles save locally. Return true if handled, false to fall through to API. */
+  onSaveService?: (id: string) => Promise<boolean> | boolean;
+}) {
+  const { token } = useAuth();
+  const shopTypeFiltered = filterServicesByShopType(services, normalizeShopType(shopType));
+  const available = shopTypeFiltered.filter((service) => {
+    const id = getServiceId(service);
+    return id && !selectedIds.has(id);
+  });
+  const [serviceId, setServiceId] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleCancel = () => {
+    setServiceId("");
+    onClose?.();
+  };
+
+  const handleSave = async () => {
+    if (!serviceId) {
+      toast.error("Please select a service.");
+      return;
+    }
+    setSaving(true);
+    try {
+      if (onSaveService) {
+        const handled = await onSaveService(serviceId);
+        if (handled) {
+          toast.success("Service added.");
+          setServiceId("");
+          onSaved(serviceId);
+          return;
+        }
+      }
+      if (!token) return;
+      const res = await updateServiceWeWorkWith(token, [...selectedIds, serviceId]);
+      if (!res.ok) {
+        toast.error(apiMessage(res.data) || "Could not save.");
+        return;
+      }
+      toast.success("Service added.");
+      setServiceId("");
+      onSaved(serviceId);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <CompactFormPanel
+      className="mb-4"
+      footer={
+        <ProfileFormFooter
+          message="You are adding a service"
+          saving={saving}
+          onSave={() => void handleSave()}
+          onReset={handleCancel}
+          cancelLabel="Cancel"
+        />
+      }
+    >
+      <CompactFormRow className="items-end">
+        <CompactField label="Select Service Name" className="min-w-[180px] flex-1">
+          <select
+            className={compactInputClass}
+            value={serviceId}
+            onChange={(e) => setServiceId(e.target.value)}
+            disabled={available.length === 0}
+          >
+            <option value="">
+              {available.length === 0 ? "All services already added" : "Select service"}
+            </option>
+            {available.map((service) => {
+              const id = getServiceId(service);
+              const name = getServiceName(service);
+              return (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              );
+            })}
+          </select>
         </CompactField>
       </CompactFormRow>
     </CompactFormPanel>

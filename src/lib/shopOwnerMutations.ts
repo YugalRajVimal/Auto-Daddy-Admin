@@ -184,7 +184,15 @@ export function removeMyCarCompanies(token: string, carCompanyIds: string[]) {
 
 export function updatePersonalProfile(
   token: string,
-  body: { name?: string; email?: string; phone?: string; countryCode?: string; pincode?: string; address?: string }
+  body: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    countryCode?: string;
+    pincode?: string;
+    address?: string;
+    city?: string;
+  }
 ) {
   return putJson<ApiEnvelope>("/api/auto-shop-owner/edit-profile", body, token);
 }
