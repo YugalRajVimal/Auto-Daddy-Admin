@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getJson } from "../api/mobileAuth";
 import { useAuth } from "../auth";
+import { extractThought } from "../lib/extractThought";
 import {
   parseServiceCatalogResponse,
   partitionOwnerHomeSidebarServices,
@@ -23,18 +24,6 @@ export type CarOwnerDashboardData = {
     profilePhoto?: string | null;
   };
 };
-
-function extractThought(raw: unknown): string {
-  if (typeof raw === "string") return raw.trim();
-  if (raw && typeof raw === "object") {
-    const o = raw as Record<string, unknown>;
-    for (const key of ["text", "quote", "thought", "message", "content"]) {
-      const v = o[key];
-      if (typeof v === "string" && v.trim()) return v.trim();
-    }
-  }
-  return "";
-}
 
 export function useCarOwnerDashboard() {
   const { token } = useAuth();

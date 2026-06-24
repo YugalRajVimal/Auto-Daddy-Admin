@@ -1,5 +1,5 @@
 import { useState } from "react";
-import ShopDealerCard from "../../components/shop/ShopDealerCard";
+import ShopDealerCarousel from "../../components/shop/ShopDealerCarousel";
 import ShopHeroPanel from "../../components/shop/ShopHeroPanel";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { usePartsDealers } from "../../hooks/usePartsDealers";
@@ -16,19 +16,8 @@ export default function ShopHomePage() {
       metaDescription="Auto shop owner home"
       sidebarHeading="Auto Parts dealer"
       sidebarExtra={
-        <div className="mb-2 flex flex-col gap-2">
-          {dealersLoading ? (
-            <p className="text-xs text-gray-500">Loading…</p>
-          ) : (
-            dealers.map((dealer) => (
-              <ShopDealerCard
-                key={dealer.name}
-                name={dealer.name}
-                phone={dealer.phone}
-                imageUrl={dealer.imageUrl}
-              />
-            ))
-          )}
+        <div className="mb-2">
+          <ShopDealerCarousel dealers={dealers} loading={dealersLoading} />
         </div>
       }
       onFaqsOpen={() => setFaqsOpen(true)}

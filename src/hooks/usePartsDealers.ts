@@ -8,10 +8,23 @@ export type PartsDealerCard = {
   imageUrl?: string;
 };
 
-const FALLBACK_DEALERS: PartsDealerCard[] = [
+function dealerPlaceholderImage(name: string, index = 0): string {
+  const seed = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || `dealer-${index}`;
+  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/400/400`;
+}
+
+function withPlaceholderImages(dealers: PartsDealerCard[]): PartsDealerCard[] {
+  return dealers.map((dealer, index) => ({
+    ...dealer,
+    imageUrl: dealer.imageUrl?.trim() || dealerPlaceholderImage(dealer.name, index),
+  }));
+}
+
+const FALLBACK_DEALERS: PartsDealerCard[] = withPlaceholderImages([
   { name: "Ram Singh & Sons", phone: "289 763 5476" },
   { name: "Hindustan Spare Parts", phone: "289 763 5476" },
-];
+  { name: "Metro Auto Supply", phone: "416 555 0192" },
+]);
 
 function parseDealersFromPayload(payload: unknown): PartsDealerCard[] {
   if (!payload || typeof payload !== "object") return [];
@@ -53,7 +66,7 @@ export function usePartsDealers() {
     try {
       const res = await getJson<unknown>("/api/auto-shop-owner/dashboard-details-new", token);
       const parsed = res.ok && res.data ? parseDealersFromPayload(res.data) : [];
-      setDealers(parsed.length > 0 ? parsed : FALLBACK_DEALERS);
+      setDealers(parsed.length > 0 ? withPlaceholderImages(parsed) : FALLBACK_DEALERS);
     } catch {
       setDealers(FALLBACK_DEALERS);
     } finally {

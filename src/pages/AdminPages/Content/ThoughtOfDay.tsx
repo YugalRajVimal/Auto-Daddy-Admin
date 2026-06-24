@@ -11,37 +11,107 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 
-type NoteRow = {
+type ThoughtRow = {
   id: number;
   date: string;
-  subject: string;
-  notes: string;
+  title: string;
+  text: string;
   country: string;
   hasClip: boolean;
 };
 
-const DUMMY_NOTES: NoteRow[] = [
-  { id: 1, date: "2026-06-16", subject: "Super Admin", notes: "705 991 3785", country: "Canada", hasClip: true },
-  { id: 2, date: "2026-06-15", subject: "Admin-1", notes: "705 991 3785", country: "Canada", hasClip: false },
-  { id: 3, date: "2026-06-14", subject: "Business Associates", notes: "705 991 3785", country: "Canada", hasClip: true },
-  { id: 4, date: "2026-06-13", subject: "Super Admin", notes: "705 991 3785", country: "Canada", hasClip: false },
-  { id: 5, date: "2026-06-12", subject: "Admin-1", notes: "705 991 3785", country: "Canada", hasClip: true },
-  { id: 6, date: "2026-06-11", subject: "Business Associates", notes: "705 991 3785", country: "Canada", hasClip: false },
-  { id: 7, date: "2026-06-10", subject: "Super Admin", notes: "705 991 3785", country: "Canada", hasClip: true },
-  { id: 8, date: "2026-06-09", subject: "Admin-1", notes: "705 991 3785", country: "Canada", hasClip: false },
-  { id: 9, date: "2026-06-08", subject: "Business Associates", notes: "705 991 3785", country: "Canada", hasClip: true },
-  { id: 10, date: "2026-06-07", subject: "Super Admin", notes: "705 991 3785", country: "Canada", hasClip: false },
+const DUMMY_THOUGHTS: ThoughtRow[] = [
+  {
+    id: 1,
+    date: "2026-06-16",
+    title: "Monday Motivation",
+    text: "Push yourself, because no one else is going to do it for you.",
+    country: "Canada",
+    hasClip: true,
+  },
+  {
+    id: 2,
+    date: "2026-06-15",
+    title: "Drive Safe",
+    text: "A smooth road never made a skilled driver.",
+    country: "Canada",
+    hasClip: false,
+  },
+  {
+    id: 3,
+    date: "2026-06-14",
+    title: "Daily Wisdom",
+    text: "Start each day with a positive thought.",
+    country: "Canada",
+    hasClip: true,
+  },
+  {
+    id: 4,
+    date: "2026-06-13",
+    title: "Care for Your Car",
+    text: "Routine maintenance today saves costly repairs tomorrow.",
+    country: "Canada",
+    hasClip: false,
+  },
+  {
+    id: 5,
+    date: "2026-06-12",
+    title: "Stay Prepared",
+    text: "The best time to check your tires was yesterday. The second best time is now.",
+    country: "Canada",
+    hasClip: true,
+  },
+  {
+    id: 6,
+    date: "2026-06-11",
+    title: "Road Ahead",
+    text: "Focus on the journey, not just the destination.",
+    country: "USA",
+    hasClip: false,
+  },
+  {
+    id: 7,
+    date: "2026-06-10",
+    title: "Small Steps",
+    text: "Great things are done by a series of small things brought together.",
+    country: "USA",
+    hasClip: true,
+  },
+  {
+    id: 8,
+    date: "2026-06-09",
+    title: "Keep Moving",
+    text: "Do not wait for the perfect moment. Take the moment and make it perfect.",
+    country: "USA",
+    hasClip: false,
+  },
+  {
+    id: 9,
+    date: "2026-06-08",
+    title: "Trust the Process",
+    text: "Every expert was once a beginner.",
+    country: "Canada",
+    hasClip: true,
+  },
+  {
+    id: 10,
+    date: "2026-06-07",
+    title: "Weekend Reflection",
+    text: "A good friend is always a best friend — soonest chosen, longest retained, never parted with.",
+    country: "Canada",
+    hasClip: false,
+  },
 ];
 
-const DEFAULT_NOTE =
-  "A goodman is always a best friend and, soonest to be choosen, longer to be retained it in-deed and, never to be parted with.";
+const DEFAULT_TEXT =
+  "A good friend is always a best friend — soonest chosen, longest retained, never parted with.";
 
 type ThoughtOfDayPageProps = {
   initialShowForm?: boolean;
 };
 
 export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfDayPageProps) {
-  const [notes] = useState(DUMMY_NOTES);
+  const [thoughts] = useState(DUMMY_THOUGHTS);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -50,15 +120,15 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const [date, setDate] = useState("2026-06-16");
   const [country, setCountry] = useState("Canada");
   const [title, setTitle] = useState("");
-  const [note, setNote] = useState(DEFAULT_NOTE);
+  const [text, setText] = useState(DEFAULT_TEXT);
   const [attachImage, setAttachImage] = useState(false);
 
-  const filtered = notes.filter(
-    (n) =>
-      n.date.includes(search) ||
-      n.subject.toLowerCase().includes(search.toLowerCase()) ||
-      n.notes.includes(search) ||
-      n.country.toLowerCase().includes(search.toLowerCase())
+  const filtered = thoughts.filter(
+    (row) =>
+      row.date.includes(search) ||
+      row.title.toLowerCase().includes(search.toLowerCase()) ||
+      row.text.toLowerCase().includes(search.toLowerCase()) ||
+      row.country.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
@@ -75,14 +145,14 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
 
   const toggleSelectAll = () => {
     if (selected.size === paged.length) setSelected(new Set());
-    else setSelected(new Set(paged.map((n) => n.id)));
+    else setSelected(new Set(paged.map((row) => row.id)));
   };
 
   const resetForm = () => {
     setDate("2026-06-16");
     setCountry("Canada");
     setTitle("");
-    setNote(DEFAULT_NOTE);
+    setText(DEFAULT_TEXT);
     setAttachImage(false);
   };
 
@@ -139,10 +209,11 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Note" required>
+              <CompactField label="Text" required>
                 <CompactAutoGrowTextarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Quote shown as Thought of the Day on home screens"
                 />
               </CompactField>
             </CompactFormRow>
@@ -155,7 +226,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                     onChange={(e) => setAttachImage(e.target.checked)}
                     className="h-3.5 w-3.5 accent-ad-green"
                   />
-                  Attach Image of Receipt
+                  Attach Image
                 </label>
                 {attachImage ? (
                   <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
@@ -234,8 +305,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Country</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Subject</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Title</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Text</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
             </tr>
           </thead>
@@ -260,8 +331,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   </button>
                 </td>
                 <td className="border border-gray-300 px-3 py-2">{row.country}</td>
-                <td className="border border-gray-300 px-3 py-2">{row.subject}</td>
-                <td className="border border-gray-300 px-3 py-2">{row.notes}</td>
+                <td className="border border-gray-300 px-3 py-2">{row.title}</td>
+                <td className="max-w-md border border-gray-300 px-3 py-2 italic text-gray-700">{row.text}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {row.hasClip ? (
                     <FiRefreshCw className="inline text-ad-green" size={16} />

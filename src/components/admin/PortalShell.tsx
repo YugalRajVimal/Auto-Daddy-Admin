@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { FiBell, FiUser } from "react-icons/fi";
+import { FiBell, FiImage, FiUser } from "react-icons/fi";
 import useAuth from "../../auth/useAuth";
 import { getRoleConfig } from "../../auth/roleRegistry";
 import { getActivePrimaryItem, type NavItem, type NavSubItem } from "../../config/adminNav";
@@ -25,6 +25,11 @@ function getActiveSubItemPath(pathname: string, subItems: NavSubItem[], homePath
   return prefixMatch?.path ?? null;
 }
 
+export type PortalBrandLogo = {
+  src: string | null;
+  placeholderLabel?: string;
+};
+
 export type PortalShellProps = {
   children: React.ReactNode;
   homePath: string;
@@ -34,6 +39,8 @@ export type PortalShellProps = {
   utilityNavLabel?: string;
   /** Shown in the top utility row as `Login as : …` (defaults to role label). */
   loginAs?: string;
+  /** When set, replaces the default AutoDaddy logo in the header. */
+  brandLogo?: PortalBrandLogo;
   /** Center header content (e.g. owner name and city). */
   headerCenter?: React.ReactNode;
   /** Optional profile photo shown beside the notification bell. */
@@ -52,6 +59,7 @@ export default function PortalShell({
   utilityNav = [],
   utilityNavLabel = "Admin",
   loginAs,
+  brandLogo,
   headerCenter,
   headerAvatarSrc,
   subscriptionDaysLeft,
@@ -115,6 +123,27 @@ export default function PortalShell({
     session?.profile?.phone?.trim() ||
     loginRole;
 
+  const logoImageClass =
+    "block h-auto w-auto max-h-16 max-w-[200px] object-contain sm:max-h-[72px] sm:max-w-[220px] md:max-h-20 md:max-w-[260px]";
+  const brandLogoLabel = brandLogo?.placeholderLabel?.trim() || "Business logo";
+  const headerLogo = brandLogo ? (
+    brandLogo.src ? (
+      <img src={brandLogo.src} alt={brandLogoLabel} className={logoImageClass} />
+    ) : (
+      <div
+        className="flex min-h-16 min-w-[100px] max-h-20 max-w-[200px] flex-col items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50 px-3 py-2 sm:max-h-[72px] sm:max-w-[220px] md:max-h-20 md:max-w-[260px]"
+        aria-label={brandLogoLabel}
+      >
+        <FiImage size={28} className="text-gray-400" strokeWidth={1.5} aria-hidden />
+        <span className="mt-1 text-center text-[10px] font-medium leading-tight text-gray-500">
+          {brandLogoLabel}
+        </span>
+      </div>
+    )
+  ) : (
+    <img src={LOGO} alt="AutoDaddy" className={logoImageClass} />
+  );
+
   useEffect(() => {
     document.body.style.overflow = "";
     document.documentElement.style.overflow = "";
@@ -138,13 +167,7 @@ export default function PortalShell({
                   <rect width="16" height="2" y="10" />
                 </svg>
               </button>
-              <Link to={homePath}>
-                <img
-                  src={LOGO}
-                  alt="AutoDaddy"
-                  className="block h-auto w-auto max-h-16 max-w-[200px] object-contain sm:max-h-[72px] sm:max-w-[220px] md:max-h-20 md:max-w-[260px]"
-                />
-              </Link>
+              <Link to={homePath}>{headerLogo}</Link>
             </div>
 
             <div className="col-span-2 flex items-center justify-center md:col-span-1 md:self-center">

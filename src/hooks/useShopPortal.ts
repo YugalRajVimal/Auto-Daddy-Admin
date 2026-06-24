@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getJson } from "../api/mobileAuth";
 import { useAuth } from "../auth";
+import { extractThought } from "../lib/extractThought";
 import { updateBusinessActiveStatus } from "../lib/shopOwnerApi";
 import type { DashboardIncomeOverview, ShopProfileResponse } from "../types/shopOwner";
 
@@ -14,7 +15,7 @@ export type ShopDashboardData = {
   businessName?: string;
   businessContactNo?: string;
   subscriptionDaysLeftCount?: number;
-  thoughtOfTheDay?: string;
+  thoughtOfTheDay?: string | { text?: string; quote?: string; thought?: string };
   incomeOverview?: DashboardIncomeOverview;
   idBusinessActive?: boolean;
   FAQs?: ShopContentBlock;
@@ -64,7 +65,8 @@ export function useShopOwnerPortal() {
   const city = business?.city?.trim() || "";
   const daysLeft = dashboard?.subscriptionDaysLeftCount;
   const thoughtOfTheDay =
-    dashboard?.thoughtOfTheDay?.trim() || "Start each day with a positive thought.";
+    extractThought(dashboard?.thoughtOfTheDay) ||
+    "Start each day with a positive thought.";
   const faqsHeading = dashboard?.FAQs?.heading?.trim() || "FAQs";
   const faqsDescription = dashboard?.FAQs?.desc?.trim() || "";
   const incomeOverview = dashboard?.incomeOverview ?? null;
