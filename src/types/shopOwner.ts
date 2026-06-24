@@ -92,6 +92,7 @@ export type ShopProfileBusiness = {
   businessPhone?: string;
   city?: string;
   businessLogo?: string;
+  bannerImage?: string;
   isBusinessActive?: boolean;
   perDayOpenHours?: string;
   address?: string;

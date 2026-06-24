@@ -60,16 +60,22 @@ export function CompactAutoGrowTextarea({
 
 export const PANEL_BOTTOM_BORDER_HEIGHT = 24;
 
-export function PanelBottomBorder({ fill = "silver" }: { fill?: string }) {
+export function PanelBottomBorder({
+  fill = "silver",
+  height = PANEL_BOTTOM_BORDER_HEIGHT,
+}: {
+  fill?: string;
+  height?: number;
+}) {
   return (
     <div
       className="pointer-events-none absolute left-0 z-20 mx-auto w-full overflow-hidden"
-      style={{ bottom: -PANEL_BOTTOM_BORDER_HEIGHT, height: PANEL_BOTTOM_BORDER_HEIGHT }}
+      style={{ bottom: -height, height }}
       aria-hidden
     >
       <svg
         width="95%"
-        height={PANEL_BOTTOM_BORDER_HEIGHT}
+        height={height}
         viewBox="0 0 400 20"
         preserveAspectRatio="none"
         className="mx-auto block"

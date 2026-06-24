@@ -1019,3 +1019,55 @@ span.flatpickr-weekday,
 .job-card-date-input {
   @apply max-w-[10rem];
 }
+
+@keyframes shop-ad-curtain-enter-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes shop-ad-curtain-exit-up {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes shop-ad-curtain-enter-down {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes shop-ad-curtain-exit-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.shop-ad-curtain-enter-up {
+  animation: shop-ad-curtain-enter-up 0.55s ease-in-out both;
+}
+
+.shop-ad-curtain-exit-up {
+  animation: shop-ad-curtain-exit-up 0.55s ease-in-out both;
+}
+
+.shop-ad-curtain-enter-down {
+  animation: shop-ad-curtain-enter-down 0.55s ease-in-out both;
+}
+
+.shop-ad-curtain-exit-down {
+  animation: shop-ad-curtain-exit-down 0.55s ease-in-out both;
+}

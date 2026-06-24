@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { PanelBottomBorder, PANEL_BOTTOM_BORDER_HEIGHT } from "./admin/ContentPanel";
+import { PanelBottomBorder } from "./admin/ContentPanel";
+
+const DASHBOARD_PANEL_SHADOW_HEIGHT = 14;
 
 type DashboardPanelCardProps = {
   children: ReactNode;
@@ -24,11 +26,11 @@ const DashboardPanelCard = ({
       } ${className}`}
       style={{
         zIndex: 50,
-        marginBottom: PANEL_BOTTOM_BORDER_HEIGHT,
+        marginBottom: DASHBOARD_PANEL_SHADOW_HEIGHT,
       }}
     >
       {children}
-      <PanelBottomBorder />
+      <PanelBottomBorder height={DASHBOARD_PANEL_SHADOW_HEIGHT} />
     </div>
   );
 };

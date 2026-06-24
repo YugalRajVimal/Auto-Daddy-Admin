@@ -22,6 +22,7 @@ import {
   type PerDaySchedule,
 } from "../../../lib/perDayOpenHours";
 import type { ShopProfileBusiness, ShopProfileUser } from "../../../types/shopOwner";
+import OpenHoursTimePicker from "./OpenHoursTimePicker";
 import { shopSaveButtonClass } from "./ShopFormPage";
 
 const checkboxBoxClass =
@@ -210,6 +211,7 @@ export function ShopBusinessProfileEditor({
 }) {
   const { token } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const [businessName, setBusinessName] = useState(business?.businessName ?? "");
   const [businessPhone, setBusinessPhone] = useState(business?.businessPhone ?? "");
@@ -220,7 +222,9 @@ export function ShopBusinessProfileEditor({
   const [hst, setHst] = useState(business?.hstNumber ?? "");
   const [tax, setTax] = useState(business?.gstPercent != null ? String(business.gstPercent) : "");
   const [showUploadImage, setShowUploadImage] = useState(false);
+  const [showUploadBanner, setShowUploadBanner] = useState(false);
   const [logo, setLogo] = useState<File | null>(null);
+  const [banner, setBanner] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   const reset = () => {
@@ -233,7 +237,9 @@ export function ShopBusinessProfileEditor({
     setHst(business?.hstNumber ?? "");
     setTax(business?.gstPercent != null ? String(business.gstPercent) : "");
     setShowUploadImage(false);
+    setShowUploadBanner(false);
     setLogo(null);
+    setBanner(null);
   };
 
   useEffect(() => {
@@ -263,6 +269,7 @@ export function ShopBusinessProfileEditor({
         gst: tax.trim() || "0",
       };
       if (logo) fields.businessLogo = logo;
+      if (banner) fields.bannerImage = banner;
       const res = await updateBusinessProfileMultipart(token, fields);
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save.");
@@ -313,35 +320,73 @@ export function ShopBusinessProfileEditor({
             <input className={compactInputClass} value={tax} onChange={(e) => setTax(e.target.value)} />
           </CompactField>
         </CompactFormRow>
-        <CompactFormRow className="items-center">
-          <div className="inline-flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="shop-business-upload-image"
-              checked={showUploadImage}
-              onChange={(e) => setShowUploadImage(e.target.checked)}
-              className="h-3.5 w-3.5 accent-ad-green"
-            />
-            <label htmlFor="shop-business-upload-image" className="text-xs font-bold text-ad-green-dark">
-              Upload Image
-            </label>
+        <CompactFormRow className="items-start pt-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-col items-start gap-2">
+              <div className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="shop-business-upload-image"
+                  checked={showUploadImage}
+                  onChange={(e) => setShowUploadImage(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-ad-green"
+                />
+                <label htmlFor="shop-business-upload-image" className="text-xs font-bold text-ad-green-dark">
+                  Upload Logo
+                </label>
+              </div>
+              {showUploadImage ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`${checkboxBoxClass} hover:bg-gray-200`}
+                >
+                  Choose image
+                </button>
+              ) : null}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
+              />
+            </div>
           </div>
-          {showUploadImage ? (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className={`${checkboxBoxClass} hover:bg-gray-200`}
-            >
-              Choose image
-            </button>
-          ) : null}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
-          />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-col items-start gap-2">
+              <div className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="shop-business-upload-banner"
+                  checked={showUploadBanner}
+                  onChange={(e) => setShowUploadBanner(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-ad-green"
+                />
+                <label htmlFor="shop-business-upload-banner" className="text-xs font-bold text-ad-green-dark">
+                  Upload Banner Image
+                </label>
+              </div>
+              {showUploadBanner ? (
+                <button
+                  type="button"
+                  onClick={() => bannerFileInputRef.current?.click()}
+                  className={`${checkboxBoxClass} hover:bg-gray-200`}
+                >
+                  Choose image
+                </button>
+              ) : null}
+              <input
+                ref={bannerFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => setBanner(e.target.files?.[0] ?? null)}
+              />
+            </div>
+          </div>
+          <div className="min-w-0 flex-1" aria-hidden />
+          <div className="min-w-0 flex-1" aria-hidden />
         </CompactFormRow>
       </CompactFormPanel>
       <OwnerCityPicker
@@ -419,36 +464,43 @@ export function ShopOpenHoursEditor({
           {isBusinessActive ? "Your shop is currently open" : "Your shop is currently closed"}
         </label>
       ) : null}
-      <div className="space-y-3">
+      <div className="w-full space-y-4">
         {WEEK_DAYS.map((day) => (
           <div
             key={day}
-            className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 rounded border border-gray-200 bg-white p-2 text-sm"
+            className="grid w-full grid-cols-1 items-center gap-5 rounded border border-gray-200 bg-white px-4 py-3 text-sm sm:grid-cols-3 sm:justify-items-start sm:gap-x-8"
           >
-            <label className="flex items-center gap-2 font-semibold">
+            <label className="flex w-full items-center justify-start gap-3 font-semibold">
               <input
                 type="checkbox"
                 checked={schedule[day].enabled}
                 onChange={(e) =>
                   setSchedule((s) => ({ ...s, [day]: { ...s[day], enabled: e.target.checked } }))
                 }
+                className="h-5 w-5 shrink-0 accent-ad-purple"
               />
-              {day}
+              <span className="inline-block min-w-[5.75rem] text-left">{day}</span>
             </label>
-            <input
-              type="time"
-              className={compactInputClass}
-              value={schedule[day].start}
-              disabled={!schedule[day].enabled}
-              onChange={(e) => setSchedule((s) => ({ ...s, [day]: { ...s[day], start: e.target.value } }))}
-            />
-            <input
-              type="time"
-              className={compactInputClass}
-              value={schedule[day].end}
-              disabled={!schedule[day].enabled}
-              onChange={(e) => setSchedule((s) => ({ ...s, [day]: { ...s[day], end: e.target.value } }))}
-            />
+            <div className="flex w-full items-center justify-start gap-2">
+              <span className="w-14 shrink-0 text-xs font-bold text-ad-green-dark">Opening</span>
+              <OpenHoursTimePicker
+                id={`${day}-opening`}
+                value={schedule[day].start}
+                disabled={!schedule[day].enabled}
+                className="w-[88px]"
+                onChange={(start) => setSchedule((s) => ({ ...s, [day]: { ...s[day], start } }))}
+              />
+            </div>
+            <div className="flex w-full items-center justify-start gap-2">
+              <span className="w-14 shrink-0 text-xs font-bold text-ad-green-dark">Closing</span>
+              <OpenHoursTimePicker
+                id={`${day}-closing`}
+                value={schedule[day].end}
+                disabled={!schedule[day].enabled}
+                className="w-[88px]"
+                onChange={(end) => setSchedule((s) => ({ ...s, [day]: { ...s[day], end } }))}
+              />
+            </div>
           </div>
         ))}
       </div>

@@ -18,8 +18,8 @@ const PROFILE_SECTIONS = [
   { id: "personal", label: "Personal Profile", variant: "primary" as const },
   { id: "business", label: "Business Profile", variant: "primary" as const },
   { id: "open", label: "Opening Timings", variant: "primary" as const },
-  { id: "brands", label: "Car Brands Specialist", variant: "primary" as const },
-  { id: "services", label: "Operational Services", variant: "primary" as const },
+  { id: "brands", label: "Car Brands", variant: "primary" as const },
+  { id: "services", label: "My Services", variant: "primary" as const },
   { id: "team", label: "Team Members", variant: "primary" as const },
 ];
 
