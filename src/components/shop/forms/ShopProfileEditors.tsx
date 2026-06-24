@@ -10,6 +10,7 @@ import {
 import OwnerCityPicker from "../../owner/OwnerCityPicker";
 import { useAuth } from "../../../auth";
 import {
+  addMyCarCompanies,
   apiMessage,
   updateBusinessOpenHours,
   updateBusinessProfileMultipart,
@@ -23,6 +24,7 @@ import {
 } from "../../../lib/perDayOpenHours";
 import type { ShopProfileBusiness, ShopProfileUser } from "../../../types/shopOwner";
 import OpenHoursTimePicker from "./OpenHoursTimePicker";
+import CarBrandLogo from "../CarBrandLogo";
 import { shopSaveButtonClass } from "./ShopFormPage";
 
 const checkboxBoxClass =
@@ -504,6 +506,115 @@ export function ShopOpenHoursEditor({
           </div>
         ))}
       </div>
+    </CompactFormPanel>
+  );
+}
+
+export type ShopCarCompany = {
+  _id?: string;
+  id?: string;
+  name?: string;
+  companyName?: string;
+  brandLogo?: string | null;
+  logoUrl?: string | null;
+};
+
+export function ShopCarBrandAddEditor({
+  companies,
+  selectedIds,
+  onSaved,
+  onClose,
+  onSaveBrand,
+}: {
+  companies: ShopCarCompany[];
+  selectedIds: Set<string>;
+  onSaved: (id: string) => void;
+  onClose?: () => void;
+  /** When set, handles save locally. Return true if handled, false to fall through to API. */
+  onSaveBrand?: (id: string) => Promise<boolean> | boolean;
+}) {
+  const { token } = useAuth();
+  const available = companies.filter((c) => {
+    const id = String(c._id ?? c.id ?? "");
+    return id && !selectedIds.has(id);
+  });
+  const [brandId, setBrandId] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const selected = companies.find((c) => String(c._id ?? c.id ?? "") === brandId);
+
+  const reset = () => {
+    setBrandId("");
+    onClose?.();
+  };
+
+  const handleSave = async () => {
+    if (!brandId) {
+      toast.error("Please select a brand.");
+      return;
+    }
+    setSaving(true);
+    try {
+      if (onSaveBrand) {
+        const handled = await onSaveBrand(brandId);
+        if (handled) {
+          toast.success("Car brand added.");
+          setBrandId("");
+          onSaved(brandId);
+          return;
+        }
+      }
+      if (!token) return;
+      const res = await addMyCarCompanies(token, [brandId]);
+      if (!res.ok) {
+        toast.error(apiMessage(res.data) || "Could not save.");
+        return;
+      }
+      toast.success("Car brand added.");
+      setBrandId("");
+      onSaved(brandId);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <CompactFormPanel
+      className="mb-4"
+      footer={<ProfileFormFooter saving={saving} onSave={() => void handleSave()} onReset={reset} />}
+    >
+      <CompactFormRow className="items-end">
+        <CompactField label="Select Brand Name" className="min-w-[180px] flex-1">
+          <select
+            className={compactInputClass}
+            value={brandId}
+            onChange={(e) => setBrandId(e.target.value)}
+            disabled={available.length === 0}
+          >
+            <option value="">
+              {available.length === 0 ? "All brands already added" : "Select brand"}
+            </option>
+            {available.map((company) => {
+              const id = String(company._id ?? company.id ?? "");
+              const name = company.name ?? company.companyName ?? "—";
+              return (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              );
+            })}
+          </select>
+        </CompactField>
+        <CompactField label="Emblem" className="min-w-[180px] flex-1">
+          <div className="flex h-20 w-full items-center justify-center rounded border border-gray-300 bg-white px-3">
+            {brandId ? (
+              <CarBrandLogo company={selected} className="max-h-16 max-w-full object-contain" />
+            ) : (
+              <span className="text-xs text-gray-400">Select a brand</span>
+            )}
+          </div>
+        </CompactField>
+      </CompactFormRow>
     </CompactFormPanel>
   );
 }
