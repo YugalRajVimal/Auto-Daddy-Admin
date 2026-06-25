@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopContentHeader, ShopListPanel, ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { ShopListPanel, ShopLoadingPanel } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { deleteTeamMember, fetchTeamMembers } from "../../lib/shopOwnerMutations";
@@ -51,10 +51,17 @@ export default function ShopTeamPage() {
 
   return (
     <ShopPageShell
+      title="Team Members"
       metaTitle="Team | AutoDaddy"
       metaDescription="Shop team members"
-      sidebarHeading="Team Members"
-      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600 md:text-3xl"
+      headerAction={
+        <Link
+          to="/shop/team/new"
+          className="rounded-md bg-[#008000] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#006600]"
+        >
+          + Add
+        </Link>
+      }
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
@@ -62,17 +69,6 @@ export default function ShopTeamPage() {
       faqsDescription={faqsDescription}
     >
       <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
-        <ShopContentHeader
-          action={
-            <Link
-              to="/shop/team/new"
-              className="rounded-md bg-[#008000] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#006600]"
-            >
-              + Add
-            </Link>
-          }
-        />
-
         {loading ? (
           <ShopLoadingPanel className="min-h-0 flex-1" />
         ) : (

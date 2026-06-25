@@ -256,10 +256,18 @@ export default function ShopDealsPage() {
 
   return (
     <ShopPageShell
+      title="My Deals"
       metaTitle="Deals | AutoDaddy"
       metaDescription="Auto shop deals"
-      sidebarHeading="My Deals"
-      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600"
+      headerAction={
+        <button
+          type="button"
+          className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
+          onClick={openCreate}
+        >
+          + Add New
+        </button>
+      }
       sidebarExtra={
         <div className="flex flex-col gap-3">
           {DEAL_SECTIONS.map((section) => (
@@ -281,18 +289,7 @@ export default function ShopDealsPage() {
       faqsDescription={faqsDescription}
     >
       <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
-        <ShopContentHeader
-          title={SECTION_HEADINGS[activeId]}
-          action={
-            <button
-              type="button"
-              className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
-              onClick={openCreate}
-            >
-              + Add New
-            </button>
-          }
-        />
+        <ShopContentHeader title={SECTION_HEADINGS[activeId]} />
 
         {loading ? (
           <ShopLoadingPanel className="min-h-0 flex-1" />

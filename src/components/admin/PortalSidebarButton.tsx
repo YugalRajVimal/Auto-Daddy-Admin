@@ -1,4 +1,5 @@
 import { FiChevronRight } from "react-icons/fi";
+import { portalSidebarButtonClass } from "./portalSidebarStyles";
 
 function ListIcon() {
   return (
@@ -15,7 +16,10 @@ function ListIcon() {
 
 export type PortalSidebarButtonProps = {
   label: string;
+  /** Related content is currently shown for this button. */
   active?: boolean;
+  /** Persistent filled style (e.g. while a sub-menu is open). */
+  filled?: boolean;
   onClick?: () => void;
   className?: string;
 };
@@ -23,6 +27,7 @@ export type PortalSidebarButtonProps = {
 export default function PortalSidebarButton({
   label,
   active = false,
+  filled = false,
   onClick,
   className = "",
 }: PortalSidebarButtonProps) {
@@ -30,11 +35,8 @@ export default function PortalSidebarButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-full border px-4 py-2.5 text-left text-sm font-bold uppercase tracking-wide transition-colors ${
-        active
-          ? "border-blue-700 bg-blue-600 text-white shadow-md"
-          : "border-blue-600 bg-white/70 text-blue-600 hover:bg-white"
-      } ${className}`}
+      aria-current={active ? "true" : undefined}
+      className={portalSidebarButtonClass(active, filled, className)}
     >
       <ListIcon />
       <span className="min-w-0 flex-1">{label}</span>

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
-  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopGreenRow,
@@ -42,10 +41,10 @@ export default function ShopReportsPage() {
 
   return (
     <ShopPageShell
+      title="Reports"
       metaTitle="Reports | AutoDaddy"
       metaDescription="Auto shop reports and payments"
-      sidebarHeading="Reports"
-      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600 md:text-3xl"
+      headerAction={<ShopRefreshButton onClick={() => void refresh()} />}
       sidebarItems={REPORT_SECTIONS}
       activeSidebarId={activeId}
       onSidebarSelect={setActiveId}
@@ -56,8 +55,6 @@ export default function ShopReportsPage() {
       faqsDescription={faqsDescription}
     >
       <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
-        <ShopContentHeader action={<ShopRefreshButton onClick={() => void refresh()} />} />
-
         {loading ? (
           <ShopLoadingPanel className="min-h-0 flex-1" />
         ) : error ? (

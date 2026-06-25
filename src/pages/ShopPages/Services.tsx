@@ -123,10 +123,9 @@ export default function ShopServicesPage() {
 
   return (
     <ShopPageShell
+      title="My Services"
       metaTitle="Services | AutoDaddy"
       metaDescription="Auto shop services"
-      sidebarHeading="My Services"
-      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600"
       sidebarItems={categories.map((cat) => ({
         id: cat.id,
         label: cat.name ?? "Category",

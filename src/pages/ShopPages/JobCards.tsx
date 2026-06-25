@@ -150,10 +150,9 @@ export default function ShopJobCardsPage() {
 
   return (
     <ShopPageShell
+      title="Job Cards"
       metaTitle="Job Cards | AutoDaddy"
       metaDescription="Auto shop job cards"
-      sidebarHeading="Job Cards"
-      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600"
       searchPlaceholder="Search Customer"
       searchValue={search}
       onSearchChange={setSearch}

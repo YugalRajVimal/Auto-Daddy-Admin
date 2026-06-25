@@ -3,7 +3,6 @@ import { toast } from "react-toastify";
 import useAuth from "../../auth/useAuth";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
-  ShopContentHeader,
   ShopEmptyPanel,
   ShopGreenRow,
   ShopListPanel,
@@ -147,10 +146,20 @@ export default function ShopHelpPage() {
 
   return (
     <ShopPageShell
+      title="Help"
       metaTitle="Help | AutoDaddy"
       metaDescription="Auto shop support and help tickets"
-      sidebarHeading="Help"
-      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600 md:text-3xl"
+      headerAction={
+        activeId === "ticket-raised" && !showForm ? (
+          <button
+            type="button"
+            onClick={openNewTicketForm}
+            className="shrink-0 rounded-full border border-[#006600] bg-[#006600] px-5 py-2 text-sm font-bold text-white hover:brightness-95"
+          >
+            Raise Ticket
+          </button>
+        ) : undefined
+      }
       sidebarItems={HELP_SECTIONS}
       activeSidebarId={activeId}
       onSidebarSelect={(id) => handleSectionChange(id as HelpSection)}
@@ -177,20 +186,6 @@ export default function ShopHelpPage() {
         />
       ) : (
         <div className="flex min-h-[420px] flex-1 flex-col gap-3 lg:min-h-[calc(100vh-220px)]">
-          {activeId === "ticket-raised" ? (
-            <ShopContentHeader
-              action={
-                <button
-                  type="button"
-                  onClick={openNewTicketForm}
-                  className="rounded-full border border-[#006600] bg-[#006600] px-5 py-2 text-sm font-bold text-white hover:brightness-95"
-                >
-                  Raise Ticket
-                </button>
-              }
-            />
-          ) : null}
-
           {filteredTickets.length === 0 ? (
             <ShopEmptyPanel
               message={

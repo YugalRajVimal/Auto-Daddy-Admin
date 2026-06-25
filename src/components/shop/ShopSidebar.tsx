@@ -35,7 +35,7 @@ export default function ShopSidebar({
   searchValue,
   onSearchChange,
   heading,
-  headingClassName = "text-base font-bold text-blue-700",
+  headingClassName = "text-sm font-bold text-gray-600",
   children,
   footer,
   searchInputId,

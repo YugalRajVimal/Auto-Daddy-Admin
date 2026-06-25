@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import axios, { AxiosError } from "axios";
+import AdminPage from "../../../components/admin/AdminPage";
 
 interface SectionData { heading: string; desc: string; }
 interface DashboardDataType { thoughtOfTheDay?: string; sections?: SectionData[]; }
@@ -292,24 +293,22 @@ const DashboardData: React.FC = () => {
   };
 
   return (
-<div
-        // You may use Tailwind class if setup, or fallback to CSS below.
-        className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans"
-      
-      >
-      {/* Heading */}
-      <h1 className="mb-6 text-xl md:text-2xl font-bold text-ad-green mb-4">Dashboard Data</h1>
-
-      {/* Card */}
+    <AdminPage
+      title="Dashboard Data"
+      noPanel
+      headerAction={
+        <button
+          type="button"
+          className="h-9 rounded bg-ad-purple px-5 text-sm font-bold text-white hover:bg-ad-purple-dark"
+          onClick={() => openModal("all", dashboardData)}
+        >
+          {dashboardData ? "Edit All" : "Create"}
+        </button>
+      }
+    >
       <div className="mb-10 overflow-hidden rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light shadow-sm">
         <div className="flex items-center justify-between border-b border-ad-green-dark/40 px-6 py-4">
           <h3 className="text-lg font-bold text-ad-green-dark">Dashboard Content</h3>
-          <button
-            className="h-9 rounded bg-ad-purple px-5 font-bold text-white hover:bg-ad-purple-dark"
-            onClick={() => openModal("all", dashboardData)}
-          >
-            {dashboardData ? "Edit All" : "Create"}
-          </button>
         </div>
 
         <div className="p-6">
@@ -437,7 +436,7 @@ const DashboardData: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </AdminPage>
   );
 };
 

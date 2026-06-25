@@ -3,6 +3,8 @@ import { type ComponentPropsWithoutRef } from "react";
 export const OWNER_FAQS_BUTTON_CLASSES =
   "w-full rounded-full border border-red-600 bg-red-50 px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-red-600 transition-colors hover:bg-red-100";
 
+export const ownerPageSidebarFooterClass = "mt-auto flex flex-col gap-3 pt-6";
+
 type OwnerFaqsButtonProps = Omit<ComponentPropsWithoutRef<"button">, "children" | "type"> & {
   className?: string;
 };

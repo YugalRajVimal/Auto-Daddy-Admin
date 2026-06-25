@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, ChangeEvent, useMemo } from "react";
 import axios from "axios";
+import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
 // --- Types ---
@@ -313,24 +314,10 @@ const CarCompany: React.FC = () => {
       )}
 
       {/* ── Page ──────────────────────────────────────────────────────────── */}
-      <div
-        // You may use Tailwind class if setup, or fallback to CSS below.
-        className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans"
-      >
-
-        {/* Heading */}
-        <h1 style={{ fontSize: 46, fontWeight: 300, color: "#333", marginBottom: 28, marginTop: 0 }}>Car Companies</h1>
-
-        {/* Card */}
+      <AdminPage title="Car Companies" noPanel headerAction={<AddNewButton onClick={openAddModal} />}>
         <div className="mb-10" style={{ background: "#fff", border: "1px solid #d2d6de", borderRadius: 3, boxShadow: "0 1px 1px rgba(0,0,0,.1)" }}>
-
-          {/* Card Header */}
-          <div style={{ padding: "14px 22px", borderBottom: "1px solid #f4f4f4", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 23, fontWeight: 400, color: "#444" }}>Company List</h3>
-            <button type="button" onClick={openAddModal}
-              style={{ padding: "8px 20px", borderRadius: 3, border: "none", background: "#0073b7", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
-              Add New
-            </button>
+          <div style={{ padding: "14px 22px", borderBottom: "1px solid #f4f4f4" }}>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: "#444" }}>Company List</h3>
           </div>
 
           {/* Alerts */}
@@ -386,7 +373,7 @@ const CarCompany: React.FC = () => {
             />
           </div>
         </div>
-      </div>
+      </AdminPage>
     </>
   );
 };

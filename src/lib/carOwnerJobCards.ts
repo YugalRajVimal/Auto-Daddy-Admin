@@ -1,3 +1,4 @@
+import { getJson } from "../api/mobileAuth";
 import { digitsOnly, formatNationalPhoneDisplay } from "./carOwnerProfile";
 import type { CarOwnerJobCard } from "../types/carOwnerJobCards";
 
@@ -52,6 +53,10 @@ export function formatJobCardDate(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
+export function isPaidJobCard(jc: CarOwnerJobCard): boolean {
+  return (jc.paymentStatus ?? "").trim().toLowerCase() === "paid";
+}
+
 export function resolveJobCardsBuckets(payload: Record<string, unknown> | undefined) {
   if (!payload || typeof payload !== "object") return undefined;
 
@@ -81,4 +86,13 @@ export function normalizeJobCardsPayload(payload: Record<string, unknown> | unde
     status: (jc as CarOwnerJobCard).status?.trim() ? (jc as CarOwnerJobCard).status : "AutoRejected",
   }));
   return [...pending, ...approved, ...rejected, ...autoRejected];
+}
+
+/** GET /api/user/job-cards/:id — full job card for invoice / job card viewer. */
+export function fetchCarOwnerJobCardById(token: string, jobCardId: string) {
+  const id = jobCardId.trim();
+  if (!id) {
+    return Promise.resolve({ ok: false, status: 400, data: null });
+  }
+  return getJson<unknown>(`/api/user/job-cards/${encodeURIComponent(id)}`, token);
 }

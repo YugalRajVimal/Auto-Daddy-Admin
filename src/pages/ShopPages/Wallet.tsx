@@ -304,15 +304,14 @@ export default function ShopWalletPage() {
 
   const titleClassName =
     view === "unpaid"
-      ? "text-base font-bold text-ad-purple sm:text-lg"
-      : "text-base font-bold text-blue-700 sm:text-lg";
+      ? "text-lg font-bold text-ad-purple md:text-xl"
+      : "text-lg font-bold text-blue-700 md:text-xl";
 
   return (
     <ShopPageShell
+      title="Wallet"
       metaTitle="Wallet | AutoDaddy"
       metaDescription="Auto shop wallet and invoices"
-      sidebarHeading="Wallet"
-      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600"
       searchPlaceholder="Search Customer"
       searchValue={search}
       onSearchChange={setSearch}

@@ -3,7 +3,7 @@ import type { DummyInvoiceRow } from "./dummyOwnerReports";
 import { formatJobCardDate, businessName, serviceTypeLabel, jobCardLicensePlate } from "./carOwnerJobCards";
 import type { CarOwnerAutoShopListItem } from "../types/carOwnerAutoShops";
 import type { CarOwnerJobCard } from "../types/carOwnerJobCards";
-import type { CarOwnerNotification } from "../types/carOwnerNotifications";
+import { notificationDisplay, type CarOwnerNotification } from "../types/carOwnerNotifications";
 import {
   formatLongDate,
   formatReportAmount,
@@ -93,13 +93,16 @@ export function shopToReportRow(shop: CarOwnerAutoShopListItem): OwnerReportRow 
 }
 
 export function ticketToReportRow(item: CarOwnerNotification): OwnerReportRow {
+  const { title, description } = notificationDisplay(item);
+  const notes = [title, description].filter(Boolean).join(" — ");
+
   return {
     id: item.id,
     date: rowDate(item.time),
     vendor: "—",
     category: "—",
     project: "—",
-    notes: item.message,
+    notes: notes || item.message,
     amount: 0,
   };
 }

@@ -1,9 +1,14 @@
 import { useMemo, useState } from "react";
-import PageMeta from "../../components/common/PageMeta";
-import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
-import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
-import { OwnerSidebarFaqsSlot } from "../../components/owner/OwnerFaqsButton";
+import OwnerPageShell, {
+  OwnerPageRefreshButton,
+  OwnerPageSidebar,
+  ownerPageHeaderClass,
+  ownerPageLayoutClass,
+  ownerPageMainClass,
+  ownerPageSectionTitleClass,
+  ownerPageTitleClass,
+} from "../../components/owner/OwnerPageShell";
 import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 import { useCarOwnerNotifications } from "../../hooks/useCarOwnerNotifications";
 import {
@@ -11,7 +16,7 @@ import {
   DUMMY_OWNER_SERVICE_REQUESTS,
   type DummyOwnerServiceRequest,
 } from "../../lib/dummyOwnerMessages";
-import type { CarOwnerNotification } from "../../types/carOwnerNotifications";
+import { notificationDisplay, type CarOwnerNotification } from "../../types/carOwnerNotifications";
 
 type MessagesTab = "messages" | "notifications";
 
@@ -46,14 +51,16 @@ function ServiceRequestRow({ item }: { item: DummyOwnerServiceRequest }) {
 
   return (
     <MessageRow>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-gray-900">
-            {item.service} — {item.shopName}
-          </p>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-x-2 gap-y-1">
+        <div className="min-w-0 text-left">
+          <p className="text-sm font-semibold text-gray-900">{item.service}</p>
           <p className="mt-0.5 text-xs font-medium text-gray-600">Vehicle {item.plate}</p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="text-center">
+          <p className="text-sm font-semibold text-gray-900">{item.shopName}</p>
+          <p className="mt-0.5 text-xs font-medium text-gray-600">{item.shopCity}</p>
+        </div>
+        <div className="flex flex-col items-end gap-1 justify-self-end">
           <span
             className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${REQUEST_STATUS_STYLES[item.status]}`}
           >
@@ -68,11 +75,17 @@ function ServiceRequestRow({ item }: { item: DummyOwnerServiceRequest }) {
 
 function NotificationRow({ item }: { item: CarOwnerNotification }) {
   const when = formatNotificationTime(item.time);
+  const { title, description } = notificationDisplay(item);
 
   return (
     <MessageRow>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="min-w-0 flex-1 text-sm font-semibold text-gray-900">{item.message}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-900">{title}</p>
+          {description ? (
+            <p className="mt-0.5 text-xs font-medium text-gray-600">{description}</p>
+          ) : null}
+        </div>
         {when ? <p className="shrink-0 text-xs font-medium text-gray-600">{when}</p> : null}
       </div>
     </MessageRow>
@@ -103,38 +116,35 @@ export default function OwnerMessagesPage() {
   const [faqsOpen, setFaqsOpen] = useState(false);
 
   const notifications = useMemo(() => mergeNotifications(DUMMY_OWNER_NOTIFICATIONS, items), [items]);
+  const sectionLabel = tab === "messages" ? "Messages Sent" : "Notifications Received";
 
   return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title="Messages | AutoDaddy" description="Car owner messages and notifications" />
-
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h1 className="text-base font-bold text-blue-700">Messages</h1>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-ad-purple hover:bg-gray-50"
-        >
-          Refresh
-        </button>
+    <OwnerPageShell
+      metaTitle="Messages | AutoDaddy"
+      metaDescription="Car owner messages and notifications"
+      faqsOpen={faqsOpen}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
+      <div
+        className={`${ownerPageHeaderClass} grid grid-cols-1 gap-2 lg:grid-cols-[220px_1fr] xl:grid-cols-[260px_1fr] lg:items-center lg:gap-5`}
+      >
+        <h1 className={ownerPageTitleClass}>Messages</h1>
+        <div className="relative min-w-0">
+          <h2 className={`${ownerPageSectionTitleClass} pr-[148px] sm:pr-[196px]`}>{sectionLabel}</h2>
+          <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            <OwnerPageRefreshButton onClick={() => void refresh()} />
+          </div>
+        </div>
       </div>
+      <div className={ownerPageLayoutClass}>
+        <OwnerPageSidebar onFaqsClick={() => setFaqsOpen(true)}>
+          <PortalSidebarButton label="Messages" active={tab === "messages"} onClick={() => setTab("messages")} />
+          <PortalSidebarButton label="Notifications" active={tab === "notifications"} onClick={() => setTab("notifications")} />
+        </OwnerPageSidebar>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
-        <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]">
-          <PortalSidebarButton
-            label="Messages"
-            active={tab === "messages"}
-            onClick={() => setTab("messages")}
-          />
-          <PortalSidebarButton
-            label="Notifications"
-            active={tab === "notifications"}
-            onClick={() => setTab("notifications")}
-          />
-          <OwnerSidebarFaqsSlot onClick={() => setFaqsOpen(true)} />
-        </aside>
-
-        <div className="flex min-h-[420px] flex-1 flex-col">
+        <div className={`flex min-h-[420px] flex-col ${ownerPageMainClass}`}>
           {tab === "messages" ? (
             <div className="flex flex-col gap-3">
               {DUMMY_OWNER_SERVICE_REQUESTS.map((item) => (
@@ -179,13 +189,6 @@ export default function OwnerMessagesPage() {
           )}
         </div>
       </div>
-
-      <OwnerFaqsDialog
-        open={faqsOpen}
-        onClose={() => setFaqsOpen(false)}
-        heading={faqsHeading}
-        description={faqsDescription}
-      />
-    </PortalPageContent>
+    </OwnerPageShell>
   );
 }

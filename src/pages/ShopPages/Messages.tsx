@@ -1,7 +1,6 @@
 import { useState } from "react";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
-  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
@@ -39,10 +38,10 @@ export default function ShopMessagesPage() {
 
   return (
     <ShopPageShell
+      title="Messages"
       metaTitle="Messages | AutoDaddy"
       metaDescription="Auto shop notifications and messages"
-      sidebarHeading="Messages"
-      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600 md:text-3xl"
+      headerAction={<ShopRefreshButton onClick={() => void refresh()} />}
       sidebarItems={MESSAGE_SECTIONS}
       activeSidebarId={activeId}
       onSidebarSelect={setActiveId}
@@ -53,8 +52,6 @@ export default function ShopMessagesPage() {
       faqsDescription={faqsDescription}
     >
       <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
-        <ShopContentHeader action={<ShopRefreshButton onClick={() => void refresh()} />} />
-
         {!showNotifications ? (
           <ShopEmptyPanel className="min-h-0 flex-1" message="No sent messages yet." />
         ) : loading ? (

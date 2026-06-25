@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import AdminPage from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -239,11 +240,7 @@ const Wallet: React.FC = () => {
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5 font-sans">
-      <h1 className="mb-6 text-xl md:text-2xl font-bold text-ad-green mb-4">
-        Wallet <span className="text-[28px] text-[#999]">(Job Card Payments)</span>
-      </h1>
-
+    <AdminPage title="Wallet (Job Card Payments)" noPanel>
       <div className="mb-10">
         {filterForm}
         <AdminDataTable
@@ -267,7 +264,7 @@ const Wallet: React.FC = () => {
           exportFilename="wallet-payments"
         />
       </div>
-    </div>
+    </AdminPage>
   );
 };
 

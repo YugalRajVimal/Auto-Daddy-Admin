@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import AdminPage from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
 const API_BASE = import.meta.env.VITE_API_URL
@@ -249,27 +250,29 @@ const Tasks: React.FC = () => {
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-ad-app-bg py-4 md:py-5">
-      <h1 className="mb-4 text-xl font-bold text-ad-green md:text-2xl">Manage Tasks</h1>
-
-      <div className="mb-5 flex flex-col md:flex-row gap-2 items-start md:items-center">
-        <button
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm"
-          onClick={() => setShowAdd((show) => !show)}
-        >
-          {showAdd ? "Close Add Form" : "Add Task"}
-        </button>
-        {tasks.length > 0 && (
+    <AdminPage
+      title="Manage Tasks"
+      noPanel
+      headerAction={
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            className="ml-2 bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded text-sm"
-            onClick={handleDeleteAll}
-            disabled={deleting}
+            className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+            onClick={() => setShowAdd((show) => !show)}
           >
-            Delete All
+            {showAdd ? "Close Add Form" : "Add Task"}
           </button>
-        )}
-      </div>
-
+          {tasks.length > 0 ? (
+            <button
+              className="rounded bg-rose-700 px-3 py-1.5 text-sm text-white hover:bg-rose-800"
+              onClick={handleDeleteAll}
+              disabled={deleting}
+            >
+              Delete All
+            </button>
+          ) : null}
+        </div>
+      }
+    >
       {showAdd && (
         <div className="mb-6">
           <form
@@ -377,7 +380,7 @@ const Tasks: React.FC = () => {
           </button>
         )}
       />
-    </div>
+    </AdminPage>
   );
 };
 

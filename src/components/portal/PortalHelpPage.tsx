@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { toast } from "react-toastify";
-import PageMeta from "../common/PageMeta";
-import { PortalPageContent } from "../admin/PortalPageContent";
-import OwnerFaqsDialog from "../owner/OwnerFaqsDialog";
+import OwnerPageShell, {
+  ownerPageLayoutClass,
+  ownerPageMainClass,
+} from "../owner/OwnerPageShell";
 import ShopHelpSidebar from "../shop/ShopHelpSidebar";
 import ShopSupportPanel from "../shop/ShopSupportPanel";
 import ShopTicketRow, { type ShopTicket } from "../shop/ShopTicketRow";
@@ -35,6 +36,8 @@ type PortalHelpPageProps = {
   services: HelpServiceOption[];
   servicesLoading: boolean;
   onSubmit: (service: HelpServiceOption, audio: Blob) => Promise<boolean>;
+  title?: string;
+  headerAction?: ReactNode;
 };
 
 function todayYMD() {
@@ -58,6 +61,8 @@ export default function PortalHelpPage({
   services,
   servicesLoading,
   onSubmit,
+  title = "Help",
+  headerAction,
 }: PortalHelpPageProps) {
   const { recording, audioBlob, error: recorderError, hasRecording, toggle, reset } =
     useWebVoiceRecorder();
@@ -132,11 +137,29 @@ export default function PortalHelpPage({
     }
   };
 
-  return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title="Help | AutoDaddy" description={metaDescription} />
+  const raiseTicketButton =
+    activeSection === "ticket-raised" && !showForm ? (
+      <button
+        type="button"
+        onClick={openNewTicketForm}
+        className="shrink-0 rounded-full border border-[#006600] bg-[#006600] px-5 py-2 text-sm font-bold text-white hover:brightness-95"
+      >
+        Raise Ticket
+      </button>
+    ) : undefined;
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
+  return (
+    <OwnerPageShell
+      title={title}
+      metaTitle="Help | AutoDaddy"
+      metaDescription={metaDescription}
+      headerAction={headerAction ?? raiseTicketButton}
+      faqsOpen={faqsOpen}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
+      <div className={ownerPageLayoutClass}>
         <ShopHelpSidebar
           activeSection={activeSection}
           onSectionChange={handleSectionChange}
@@ -159,19 +182,7 @@ export default function PortalHelpPage({
             onCancel={closeForm}
           />
         ) : (
-          <div className="flex min-h-[420px] flex-1 flex-col gap-3 lg:min-h-[calc(100vh-220px)]">
-            {activeSection === "ticket-raised" ? (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={openNewTicketForm}
-                  className="rounded-full border border-[#006600] bg-[#006600] px-5 py-2 text-sm font-bold text-white hover:brightness-95"
-                >
-                  Raise Ticket
-                </button>
-              </div>
-            ) : null}
-
+          <div className={`flex min-h-[420px] flex-col gap-3 lg:min-h-[calc(100vh-220px)] ${ownerPageMainClass}`}>
             {filteredTickets.length === 0 ? (
               <ShopEmptyPanel
                 message={
@@ -190,13 +201,6 @@ export default function PortalHelpPage({
           </div>
         )}
       </div>
-
-      <OwnerFaqsDialog
-        open={faqsOpen}
-        onClose={() => setFaqsOpen(false)}
-        heading={faqsHeading}
-        description={faqsDescription}
-      />
-    </PortalPageContent>
+    </OwnerPageShell>
   );
 }

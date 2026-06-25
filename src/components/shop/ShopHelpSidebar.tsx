@@ -1,4 +1,5 @@
-import { OwnerSidebarFaqsSlot } from "../owner/OwnerFaqsButton";
+import { OwnerFaqsButton, ownerPageSidebarFooterClass } from "../owner/OwnerFaqsButton";
+import { ownerPageSidebarClass } from "../owner/OwnerPageShell";
 
 type HelpSection = "ticket-raised" | "resolved";
 
@@ -8,18 +9,19 @@ type ShopHelpSidebarProps = {
   onFaqsClick: () => void;
 };
 
+const PILL_BASE =
+  "w-full rounded-full border px-5 py-3 text-sm font-bold uppercase tracking-wide transition-colors";
+
 function sectionButtonClass(active: boolean, section: HelpSection) {
-  const base = "w-full rounded-full px-5 py-3 text-sm font-bold uppercase tracking-wide transition-colors";
-  if (active && section === "ticket-raised") {
-    return `${base} border border-[#006600] bg-[#006600] text-white shadow-md`;
-  }
-  if (active && section === "resolved") {
-    return `${base} border border-ad-purple bg-[#FFE4CC] text-ad-purple shadow-md`;
-  }
   if (section === "ticket-raised") {
-    return `${base} border border-[#006600] bg-white/70 text-[#006600] hover:bg-white`;
+    return active
+      ? `${PILL_BASE} border-[#006600] bg-[#006600] text-white shadow-md`
+      : `${PILL_BASE} border-[#006600] bg-transparent text-[#006600] hover:border-[#005500] hover:bg-[#006600] hover:text-white hover:shadow-md`;
   }
-  return `${base} border border-ad-purple bg-[#FFE4CC] text-ad-purple hover:bg-[#FFD9B3]`;
+
+  return active
+    ? `${PILL_BASE} border-ad-purple bg-ad-purple text-white shadow-md`
+    : `${PILL_BASE} border-ad-purple bg-transparent text-ad-purple hover:border-ad-purple-dark hover:bg-ad-purple hover:text-white hover:shadow-md`;
 }
 
 export default function ShopHelpSidebar({
@@ -28,22 +30,26 @@ export default function ShopHelpSidebar({
   onFaqsClick,
 }: ShopHelpSidebarProps) {
   return (
-    <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]">
-      <button
-        type="button"
-        onClick={() => onSectionChange("ticket-raised")}
-        className={sectionButtonClass(activeSection === "ticket-raised", "ticket-raised")}
-      >
-        Ticket Raised
-      </button>
-      <button
-        type="button"
-        onClick={() => onSectionChange("resolved")}
-        className={sectionButtonClass(activeSection === "resolved", "resolved")}
-      >
-        Resolved
-      </button>
-      <OwnerSidebarFaqsSlot onClick={onFaqsClick} />
+    <aside className={ownerPageSidebarClass}>
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => onSectionChange("ticket-raised")}
+          className={sectionButtonClass(activeSection === "ticket-raised", "ticket-raised")}
+        >
+          Ticket Raised
+        </button>
+        <button
+          type="button"
+          onClick={() => onSectionChange("resolved")}
+          className={sectionButtonClass(activeSection === "resolved", "resolved")}
+        >
+          Resolved
+        </button>
+      </div>
+      <div className={ownerPageSidebarFooterClass}>
+        <OwnerFaqsButton onClick={onFaqsClick} />
+      </div>
     </aside>
   );
 }

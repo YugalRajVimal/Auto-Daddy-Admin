@@ -5,6 +5,24 @@ export type CarOwnerJobCardBusiness = {
   cityName?: string;
   businessPhone?: string;
   phone?: string;
+  businessAddress?: string;
+  address?: string;
+  pincode?: string;
+  businessLogo?: string;
+  businessHSTNumber?: string;
+  accountName?: string;
+  interacEmail?: string;
+  termsAndConditions?: string;
+  gst?: number;
+};
+
+export type CarOwnerJobCardPayableAmounts = {
+  invoiceTotal?: number;
+  cash?: number;
+  online?: number;
+  gstRate?: number;
+  gstAmount?: number;
+  roundOff?: number;
 };
 
 export type CarOwnerJobCardCustomer = {
@@ -12,6 +30,9 @@ export type CarOwnerJobCardCustomer = {
   name: string;
   email?: string;
   phone?: string;
+  address?: string;
+  city?: string;
+  pincode?: string;
 };
 
 export type CarOwnerJobCardVehicleMake = {
@@ -24,6 +45,8 @@ export type CarOwnerJobCardVehicle = {
   licensePlateNo: string;
   make: CarOwnerJobCardVehicleMake;
   carImages?: string[];
+  vin?: string;
+  cin?: string;
 };
 
 export type CarOwnerJobCardSubService = {
@@ -58,6 +81,7 @@ export type CarOwnerJobCard = {
   vehiclePhotos?: string[];
   images?: string[];
   totalPayableAmount: number;
+  payableAmounts?: CarOwnerJobCardPayableAmounts;
   paymentStatus: string;
   paymentMethod?: string;
   technicalRemarks?: string;
@@ -65,6 +89,7 @@ export type CarOwnerJobCard = {
   labourDuration?: string | number;
   status: string;
   jobNo: string;
+  invoiceNumber?: string;
   createdAt: string;
   updatedAt: string;
   unpaid?: boolean;

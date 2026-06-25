@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
+import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { authHeaders } from "../../../api/client";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
@@ -317,18 +318,11 @@ const VehicleType: React.FC = () => {
   );
 
   return (
-    <div className="h-[85vh] overflow-y-auto bg-gray-50 px-2 py-6 sm:px-8">
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-x-4 gap-y-2">
-        <h2 className="text-2xl font-bold text-gray-700">
-          Car Companies & Models
-        </h2>
-        <button
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-md shadow transition-colors duration-150"
-          onClick={openAddModal}
-        >
-          Add Car Company
-        </button>
-      </div>
+    <AdminPage
+      title="Car Companies & Models"
+      noPanel
+      headerAction={<AddNewButton onClick={openAddModal} />}
+    >
       {error && (
         <div className="mb-4 text-sm rounded bg-red-100 text-red-800 px-3 py-2 border border-red-200 shadow">
           {error}
@@ -537,7 +531,7 @@ const VehicleType: React.FC = () => {
         .animate-fadein { animation: fadein .24s cubic-bezier(.4,1,.6,1) both; }
         `}
       </style>
-    </div>
+    </AdminPage>
   );
 };
 

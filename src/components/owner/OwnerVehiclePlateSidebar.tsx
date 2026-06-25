@@ -1,5 +1,4 @@
 import PortalSidebarButton from "../admin/PortalSidebarButton";
-import { OwnerFaqsButton } from "./OwnerFaqsButton";
 import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
 
 type OwnerVehiclePlateSidebarProps = {
@@ -7,7 +6,6 @@ type OwnerVehiclePlateSidebarProps = {
   selectedVehicleId: string | null;
   loading?: boolean;
   onSelect: (vehicleId: string) => void;
-  onFaqsClick?: () => void;
 };
 
 function vehiclePlateLabel(vehicle: CarOwnerVehicle): string {
@@ -21,7 +19,6 @@ export default function OwnerVehiclePlateSidebar({
   selectedVehicleId,
   loading,
   onSelect,
-  onFaqsClick,
 }: OwnerVehiclePlateSidebarProps) {
   return (
     <div className="flex flex-col gap-3">
@@ -39,8 +36,6 @@ export default function OwnerVehiclePlateSidebar({
           />
         ))
       )}
-
-      {onFaqsClick ? <OwnerFaqsButton onClick={onFaqsClick} /> : null}
     </div>
   );
 }

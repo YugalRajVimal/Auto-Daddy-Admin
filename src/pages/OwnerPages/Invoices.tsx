@@ -1,9 +1,11 @@
 import { useState } from "react";
-import PageMeta from "../../components/common/PageMeta";
-import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
-import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
-import { OwnerSidebarFaqsSlot } from "../../components/owner/OwnerFaqsButton";
+import OwnerPageShell, {
+  OwnerPageRefreshButton,
+  OwnerPageSidebar,
+  ownerPageLayoutClass,
+  ownerPageMainClass,
+} from "../../components/owner/OwnerPageShell";
 import { useAuth } from "../../auth";
 import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 import { useCarOwnerInvoices, type CarOwnerInvoiceRow, type InvoiceTab } from "../../hooks/useCarOwnerInvoices";
@@ -60,36 +62,23 @@ export default function OwnerInvoicesPage() {
   const visibleInvoices = tab === "paid" ? paidInvoices : unpaidInvoices;
 
   return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title="Invoices | AutoDaddy" description="Car owner invoices" />
+    <OwnerPageShell
+      title="Invoices"
+      metaTitle="Invoices | AutoDaddy"
+      metaDescription="Car owner invoices"
+      headerAction={<OwnerPageRefreshButton onClick={() => void refresh()} />}
+      faqsOpen={faqsOpen}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
+      <div className={ownerPageLayoutClass}>
+        <OwnerPageSidebar onFaqsClick={() => setFaqsOpen(true)}>
+          <PortalSidebarButton label="Paid Invoices" active={tab === "paid"} onClick={() => setTab("paid")} />
+          <PortalSidebarButton label="Un-Paid Invoices" active={tab === "unpaid"} onClick={() => setTab("unpaid")} />
+        </OwnerPageSidebar>
 
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h1 className="text-base font-bold text-blue-700">Invoices</h1>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-ad-purple hover:bg-gray-50"
-        >
-          Refresh
-        </button>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
-        <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]">
-          <PortalSidebarButton
-            label="Paid Invoices"
-            active={tab === "paid"}
-            onClick={() => setTab("paid")}
-          />
-          <PortalSidebarButton
-            label="Un-Paid Invoices"
-            active={tab === "unpaid"}
-            onClick={() => setTab("unpaid")}
-          />
-          <OwnerSidebarFaqsSlot onClick={() => setFaqsOpen(true)} />
-        </aside>
-
-        <div className="flex min-h-[420px] flex-1 flex-col">
+        <div className={`flex min-h-[420px] flex-col ${ownerPageMainClass}`}>
           {loading ? (
             <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
@@ -118,13 +107,6 @@ export default function OwnerInvoicesPage() {
           )}
         </div>
       </div>
-
-      <OwnerFaqsDialog
-        open={faqsOpen}
-        onClose={() => setFaqsOpen(false)}
-        heading={faqsHeading}
-        description={faqsDescription}
-      />
-    </PortalPageContent>
+    </OwnerPageShell>
   );
 }

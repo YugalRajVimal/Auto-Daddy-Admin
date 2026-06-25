@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getJson } from "../api/mobileAuth";
+import {
+  businessName,
+  formatBusinessPhone,
+  serviceTypeLabel,
+} from "../lib/carOwnerJobCards";
 import type {
   CarOwnerJobCard,
   CarOwnerJobCardsBuckets,
@@ -50,11 +55,6 @@ function isPaidInvoice(jc: CarOwnerJobCard): boolean {
   return (jc.paymentStatus ?? "").trim().toLowerCase() === "paid";
 }
 
-function businessName(business: CarOwnerJobCard["business"]): string {
-  if (!business || typeof business === "string") return "Auto shop";
-  return business.businessName?.trim() || "Auto shop";
-}
-
 function vehiclePlate(jc: CarOwnerJobCard): string {
   return jc.vehicleId?.licensePlateNo?.trim().toUpperCase() || "";
 }
@@ -84,6 +84,7 @@ export function isPaidInvoiceRow(row: CarOwnerInvoiceRow): boolean {
 }
 
 function toInvoiceRow(jc: CarOwnerJobCard): CarOwnerInvoiceRow {
+  const phone = formatBusinessPhone(jc.business);
   return {
     id: jc._id,
     jobNo: jc.jobNo?.trim() || "—",
@@ -94,6 +95,8 @@ function toInvoiceRow(jc: CarOwnerJobCard): CarOwnerInvoiceRow {
     createdAt: jc.createdAt,
     paymentStatus: jc.paymentStatus ?? "",
     paymentMethod: jc.paymentMethod,
+    phone: phone || undefined,
+    service: serviceTypeLabel(jc),
   };
 }
 
@@ -154,11 +157,18 @@ export function useCarOwnerInvoices() {
     [invoiceRows, items]
   );
 
+  const findJobCardById = useCallback(
+    (id: string) => items.find((jc) => jc._id === id) ?? null,
+    [items]
+  );
+
   return {
     loading,
     error,
     refresh: load,
+    invoiceRows,
     paidInvoices,
     unpaidInvoices,
+    findJobCardById,
   };
 }

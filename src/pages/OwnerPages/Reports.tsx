@@ -1,6 +1,4 @@
 import { useMemo, useState } from "react";
-import PageMeta from "../../components/common/PageMeta";
-import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import {
   CompactField,
   CompactFormFooter,
@@ -9,7 +7,10 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../components/admin/ContentPanel";
-import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
+import OwnerPageShell, {
+  ownerPageLayoutClass,
+  ownerPageMainClass,
+} from "../../components/owner/OwnerPageShell";
 import {
   OwnerFlatReportTable,
   OwnerGroupedReportTable,
@@ -171,7 +172,8 @@ export default function OwnerReportsPage() {
     return source.filter((item) => {
       if (!inDateRange(item.time, applied.fromDate, applied.toDate)) return false;
       if (applied.category) {
-        if (!item.message.toLowerCase().includes(applied.category.toLowerCase())) return false;
+        const haystack = `${item.title} ${item.message}`.toLowerCase();
+        if (!haystack.includes(applied.category.toLowerCase())) return false;
       }
       return true;
     });
@@ -288,14 +290,16 @@ export default function OwnerReportsPage() {
   };
 
   return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title="Reports | AutoDaddy" description="Car owner reports" />
-
-      <div className="mb-4">
-        <h1 className="font-serif text-2xl text-gray-600 md:text-3xl">Reports</h1>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
+    <OwnerPageShell
+      title="Reports"
+      metaTitle="Reports | AutoDaddy"
+      metaDescription="Car owner reports"
+      faqsOpen={faqsOpen}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
+      <div className={ownerPageLayoutClass}>
         <OwnerReportsSidebar
           activeReport={activeReport}
           onSelect={(report) => {
@@ -305,7 +309,7 @@ export default function OwnerReportsPage() {
           onFaqsClick={() => setFaqsOpen(true)}
         />
 
-        <div className="min-w-0 flex-1 lg:min-h-[calc(100vh-220px)]">
+        <div className={`${ownerPageMainClass} lg:min-h-[calc(100vh-220px)]`}>
           <CompactFormPanel
             className="mb-4"
             footer={
@@ -373,13 +377,6 @@ export default function OwnerReportsPage() {
           {renderResults()}
         </div>
       </div>
-
-      <OwnerFaqsDialog
-        open={faqsOpen}
-        onClose={() => setFaqsOpen(false)}
-        heading={faqsHeading}
-        description={faqsDescription}
-      />
-    </PortalPageContent>
+    </OwnerPageShell>
   );
 }

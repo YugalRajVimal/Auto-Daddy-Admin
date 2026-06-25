@@ -218,14 +218,16 @@ export const DUMMY_REPORT_TICKETS_RAISED: CarOwnerNotification[] = [
   {
     id: "dummy-ticket-1",
     userId: null,
-    message: "Brake noise complaint — awaiting shop response",
+    title: "Brake noise complaint",
+    message: "Awaiting shop response",
     time: "2026-05-10T08:00:00.000Z",
     arrayIdx: null,
   },
   {
     id: "dummy-ticket-2",
     userId: null,
-    message: "Invoice amount mismatch for Job 1289",
+    title: "Invoice amount mismatch",
+    message: "Job 1289 total does not match the invoice amount.",
     time: "2026-05-22T16:20:00.000Z",
     arrayIdx: null,
   },
@@ -235,6 +237,7 @@ export const DUMMY_REPORT_TICKETS_RESOLVED: CarOwnerNotification[] = [
   {
     id: "dummy-ticket-3",
     userId: null,
+    title: "Appointment rescheduled",
     message: "Oil change appointment rescheduled — resolved",
     time: "2026-04-05T12:00:00.000Z",
     arrayIdx: null,
@@ -242,6 +245,7 @@ export const DUMMY_REPORT_TICKETS_RESOLVED: CarOwnerNotification[] = [
   {
     id: "dummy-ticket-4",
     userId: null,
+    title: "Warranty claim closed",
     message: "Warranty claim closed and complete",
     time: "2026-03-28T09:30:00.000Z",
     arrayIdx: null,

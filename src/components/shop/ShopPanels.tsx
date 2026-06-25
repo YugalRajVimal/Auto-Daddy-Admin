@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
-/** Top row in the main content column: aligns with the sidebar page heading on large screens. */
+/** Section row inside main content: left heading, right actions. */
 export function ShopContentHeader({
   title,
-  titleClassName = "text-base font-bold text-blue-700 sm:text-lg",
+  titleClassName = "text-lg font-bold text-blue-700 md:text-xl",
   action,
   className = "",
 }: {
@@ -17,18 +17,10 @@ export function ShopContentHeader({
 
   return (
     <div
-      className={`relative mb-3 flex min-h-[2rem] items-center gap-3 md:min-h-[2.25rem] lg:-mt-12 ${
-        action ? "justify-end" : hasTitle ? "justify-center" : "justify-end"
-      } ${className}`}
+      className={`mb-3 flex items-center justify-between gap-3 ${hasTitle ? "" : "justify-end"} ${className}`}
     >
-      {hasTitle ? (
-        <h2
-          className={`${titleClassName} ${action ? "pointer-events-none absolute inset-x-0 text-center" : "text-center"}`}
-        >
-          {title}
-        </h2>
-      ) : null}
-      {action ? <div className="relative z-10 shrink-0">{action}</div> : null}
+      {hasTitle ? <h2 className={titleClassName}>{title}</h2> : <span />}
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }

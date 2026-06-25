@@ -1,37 +1,80 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { FiExternalLink } from "react-icons/fi";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "react-toastify";
-import PageMeta from "../../components/common/PageMeta";
-import { PortalPageContent } from "../../components/admin/PortalPageContent";
+import {
+  InvoiceViewerDialog,
+  JobCardViewerDialog,
+} from "../../../invoice-job-card-viewer/InvoiceJobCardViewer.jsx";
 import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
+import { isPortalSidebarHighlighted, portalSidebarPillClass } from "../../components/admin/portalSidebarStyles";
 import { AddNewButton } from "../../components/admin/AdminPage";
 import {
   CompactFormPanel,
   compactInputClass,
 } from "../../components/admin/ContentPanel";
 import OwnerAddVehicleForm from "../../components/owner/OwnerAddVehicleForm";
-import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
-import { OwnerFaqsButton } from "../../components/owner/OwnerFaqsButton";
+import OwnerEditVehiclePanel from "../../components/owner/OwnerEditVehiclePanel";
+import OwnerPageShell, {
+  OwnerPageSearchInput,
+  OwnerPageSidebar,
+  ownerPageHeaderClass,
+  ownerPageLayoutClass,
+  ownerPageMainClass,
+  ownerPageSectionTitleClass,
+  ownerPageTitleClass,
+} from "../../components/owner/OwnerPageShell";
 import OwnerInvoiceRow from "../../components/owner/OwnerInvoiceRow";
 import OwnerJobCardRow from "../../components/owner/OwnerJobCardRow";
 import VehiclePickerPopup from "../../components/owner/OwnerVehiclePicker";
-import { putFormData, putJson } from "../../api/mobileAuth";
+import { putJson } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
 import { useCarOwnerDocuments } from "../../hooks/useCarOwnerDocuments";
 import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "../../hooks/useCarOwnerInvoices";
-import { businessName } from "../../lib/carOwnerJobCards";
-import { DUMMY_OWNER_INVOICES } from "../../lib/dummyOwnerInvoices";
+import {
+  businessName,
+  fetchCarOwnerJobCardById,
+  formatBusinessPhone,
+  formatJobCardDate,
+  jobCardLicensePlate,
+  jobChipLabel,
+  serviceTypeLabel,
+} from "../../lib/carOwnerJobCards";
+import { formatCurrencyAmount } from "../../lib/currency";
+import { resolveCarBrandLogo } from "../../lib/dummyCarBrands";
 import {
   VEHICLE_DOCUMENT_FIELDS,
   type VehicleDocumentFieldKey,
 } from "../../lib/carOwnerDocuments";
-import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
-import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
+import { type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
+import type { CarOwnerJobCard } from "../../types/carOwnerJobCards";
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
+
+type ViewerKind = "invoice" | "jobcard";
 
 type VehiclePanelSection = "vehicle-details" | "job-cards" | "invoices" | "documents" | "update-odometer";
+
+const VEHICLE_SECTION_LABELS: Record<VehiclePanelSection, string> = {
+  "vehicle-details": "Vehicle Details",
+  "job-cards": "Job Cards",
+  invoices: "Invoices",
+  documents: "Documents",
+  "update-odometer": "Update Odometer",
+};
+
+function vehicleSectionLabel(showForm: boolean, activeSection: VehiclePanelSection | null): string | null {
+  if (showForm) return "Add your Vehicle";
+  if (!activeSection) return null;
+  return VEHICLE_SECTION_LABELS[activeSection];
+}
+
+function matchesListSearch(query: string, ...parts: (string | number | null | undefined)[]): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return parts.some((part) => String(part ?? "").toLowerCase().includes(q));
+}
 
 function SidebarSectionItem({
   section,
@@ -52,64 +95,27 @@ function SidebarSectionItem({
   onVehicleSelect: (vehicleId: string, section: VehiclePanelSection) => void;
   children?: ReactNode;
 }) {
+  const anchorRef = useRef<HTMLDivElement>(null);
+
   return (
-    <div className="relative">
+    <div ref={anchorRef} className="relative">
       {children ?? (
-        <PortalSidebarButton label={label} active={active} onClick={() => onSectionClick(section)} />
+        <PortalSidebarButton
+          label={label}
+          active={active}
+          filled={popupOpen}
+          onClick={() => onSectionClick(section)}
+        />
       )}
       {popupOpen && vehicles.length > 1 ? (
-        <VehiclePickerPopup vehicles={vehicles} onSelect={(vehicleId) => onVehicleSelect(vehicleId, section)} />
+        <VehiclePickerPopup
+          anchorRef={anchorRef}
+          vehicles={vehicles}
+          onSelect={(vehicleId) => onVehicleSelect(vehicleId, section)}
+        />
       ) : null}
     </div>
   );
-}
-
-function DetailChip({
-  label,
-  value,
-  placeholder,
-  className = "",
-}: {
-  label: string;
-  value: string;
-  placeholder?: boolean;
-  className?: string;
-}) {
-  return (
-    <div className={`rounded border border-ad-green-dark/20 bg-white/90 px-2 py-1 ${className}`}>
-      <p className="text-[9px] font-bold uppercase leading-tight tracking-wide text-ad-green-dark">{label}</p>
-      <p
-        className={`truncate text-xs leading-tight ${placeholder ? "text-gray-400" : "font-semibold text-gray-800"}`}
-      >
-        {value || "—"}
-      </p>
-    </div>
-  );
-}
-
-function vehicleImageUri(v: CarOwnerVehicle): string | null {
-  const path = v.carImage ?? v.carImages?.[0] ?? null;
-  return normalizeMediaUrl(path);
-}
-
-function vehicleGalleryItems(v: CarOwnerVehicle): Array<{ label: string; uri: string }> {
-  const items: Array<{ label: string; path?: string | null }> = [
-    { label: "Plate image", path: v.licensePlateImagePath },
-    { label: "Plate front", path: v.licensePlateFrontImagePath },
-    { label: "Plate back", path: v.licensePlateBackImagePath },
-    { label: "Car image", path: v.carImage },
-    ...(v.carImages ?? []).map((path, index) => ({ label: `Car photo ${index + 1}`, path })),
-  ];
-  const seen = new Set<string>();
-  const out: Array<{ label: string; uri: string }> = [];
-  for (const item of items) {
-    const uri = normalizeMediaUrl(item.path);
-    if (uri && !seen.has(uri)) {
-      seen.add(uri);
-      out.push({ label: item.label, uri });
-    }
-  }
-  return out;
 }
 
 const EXCELLENCE_QUOTE_LINES = [
@@ -162,112 +168,6 @@ function VehiclesPanelPlaceholder() {
     <div className="flex min-h-[420px] flex-col items-center justify-center px-6 py-10 lg:min-h-[calc(100vh-220px)]">
       <TypingExcellenceQuote />
     </div>
-  );
-}
-
-function VehicleDetails({
-  vehicle,
-  uploading,
-  onUploadImage,
-}: {
-  vehicle: CarOwnerVehicle;
-  uploading: boolean;
-  onUploadImage: (vehicleId: string, file: File) => void;
-}) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageUri = vehicleImageUri(vehicle);
-  const gallery = vehicleGalleryItems(vehicle);
-
-  const plate = vehicle.licensePlateNo?.trim() ?? "";
-  const makeName = (vehicle.make?.name ?? "").trim();
-  const modelName = (vehicle.make?.model ?? "").trim();
-  const year = vehicle.year != null && String(vehicle.year).trim() ? String(vehicle.year).trim() : "";
-  const odo =
-    vehicle.odometerReading != null && String(vehicle.odometerReading).trim()
-      ? `${String(vehicle.odometerReading).trim()} km`
-      : "";
-  const dueOdo =
-    vehicle.dueOdometerReading != null && String(vehicle.dueOdometerReading).trim()
-      ? `${String(vehicle.dueOdometerReading).trim()} km`
-      : "";
-  const vin = vehicle.vinNo?.trim() ?? "";
-
-  return (
-    <CompactFormPanel className="!mb-0 w-full">
-      <div className="space-y-3">
-        <div className="border-b border-ad-green-dark/15 pb-2">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ad-green-dark">Selected vehicle</p>
-          <p className="text-sm font-bold text-gray-900">{vehicleSidebarLabel(vehicle)}</p>
-          {plate ? <p className="text-xs text-gray-600">Plate: {plate}</p> : null}
-        </div>
-
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-          <div className="flex shrink-0 flex-col items-center lg:w-[108px]">
-            <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border-2 border-ad-green bg-white shadow-sm">
-              {imageUri ? (
-                <img src={imageUri} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-[10px] font-semibold text-gray-400">No image</span>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (file) onUploadImage(vehicle.id, file);
-              }}
-            />
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => fileInputRef.current?.click()}
-              className="mt-1.5 w-24 rounded border border-ad-form-border bg-white px-1.5 py-1 text-[10px] font-semibold text-ad-green-dark hover:bg-ad-green-light disabled:opacity-50"
-            >
-              {uploading ? "Uploading…" : "Upload Image"}
-            </button>
-          </div>
-
-          <div className="min-w-0 flex-1 rounded-lg bg-ad-green-light/80 p-2 ring-1 ring-ad-green-dark/10">
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              <DetailChip label="Plate" value={plate} placeholder={!plate} />
-              <DetailChip label="Make" value={makeName} placeholder={!makeName} />
-              <DetailChip label="Model" value={modelName} placeholder={!modelName} />
-              <DetailChip label="Year" value={year} placeholder={!year} />
-            </div>
-            <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              <DetailChip label="Odometer" value={odo} placeholder={!odo} />
-              <DetailChip label="Due odometer" value={dueOdo} placeholder={!dueOdo} />
-              <DetailChip label="VIN" value={vin} placeholder={!vin} />
-              {gallery.length > 0 ? (
-                <div className="rounded border border-ad-green-dark/20 bg-white/90 px-2 py-1">
-                  <p className="text-[9px] font-bold uppercase leading-tight tracking-wide text-ad-green-dark">
-                    Photos & documents
-                  </p>
-                  <div className="mt-0.5 flex flex-wrap gap-1">
-                    {gallery.map((item) => (
-                      <a
-                        key={`${item.label}-${item.uri}`}
-                        href={item.uri}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-0.5 rounded-full border border-ad-green-dark/25 bg-ad-green-light/50 px-1.5 py-0.5 text-[9px] font-semibold text-ad-green-dark hover:bg-ad-green-light"
-                      >
-                        {item.label}
-                        <FiExternalLink size={8} aria-hidden />
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </div>
-    </CompactFormPanel>
   );
 }
 
@@ -428,11 +328,15 @@ function OdometerUpdatePanel({
       : "";
   const dueNum = odometerToNumber(vehicle.dueOdometerReading);
   const dueDisplay = dueNum != null ? dueNum.toLocaleString() : "—";
-  const plate = vehicle.licensePlateNo?.trim() ?? "";
-  const imageUri = vehicleImageUri(vehicle);
+  const makeName = (vehicle.make?.name ?? "").trim();
+  const makeLogo = resolveCarBrandLogo(makeName ? { companyName: makeName } : null);
 
   const [value, setValue] = useState(current);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(current);
+  }, [vehicle.id, current]);
 
   const parsed = value.trim() ? Number(value.trim()) : null;
   const currentNum = current ? Number(current) : null;
@@ -485,8 +389,6 @@ function OdometerUpdatePanel({
 
   return (
     <div className="w-full">
-      <h2 className="mb-3 text-xl font-bold text-ad-purple">Update Odometer</h2>
-
       <CompactFormPanel
         className="!mb-0"
         footer={
@@ -514,51 +416,45 @@ function OdometerUpdatePanel({
           </div>
         }
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="flex w-full shrink-0 flex-col sm:w-[132px]">
-            <div className="flex aspect-square w-full max-w-[132px] items-center justify-center overflow-hidden border border-gray-300 bg-white">
-              {imageUri ? (
-                <img src={imageUri} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-xs font-semibold text-gray-400">No image</span>
-              )}
+        <div className="min-w-0">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label htmlFor="odometer-input" className="mb-1 block text-sm font-medium text-gray-900">
+                New Odometer
+              </label>
+              <input
+                id="odometer-input"
+                type="text"
+                inputMode="numeric"
+                value={value}
+                onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, ""))}
+                placeholder=""
+                disabled={saving}
+                className={compactInputClass}
+              />
             </div>
-            <div className="w-full max-w-[132px] bg-ad-green-dark px-2 py-2 text-center text-sm font-bold tracking-wide text-white">
-              {plate || "—"}
+
+            <div>
+              <p className="mb-1 text-sm font-medium text-gray-900">Due On</p>
+              <div className={odometerDisplayClass}>{dueDisplay}</div>
+            </div>
+
+            <div>
+              <p className="mb-1 text-sm font-medium text-gray-900">Auto shop</p>
+              <div className={odometerDisplayClass}>{serviceByDisplay}</div>
             </div>
           </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div>
-                <label htmlFor="odometer-input" className="mb-1 block text-sm font-medium text-gray-900">
-                  New Odometer
-                </label>
-                <input
-                  id="odometer-input"
-                  type="text"
-                  inputMode="numeric"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, ""))}
-                  placeholder=""
-                  disabled={saving}
-                  className={compactInputClass}
-                />
-              </div>
-
-              <div>
-                <p className="mb-1 text-sm font-medium text-gray-900">Due On</p>
-                <div className={odometerDisplayClass}>{dueDisplay}</div>
-              </div>
-
-              <div>
-                <p className="mb-1 text-sm font-medium text-gray-900">Auto shop</p>
-                <div className={odometerDisplayClass}>{serviceByDisplay}</div>
-              </div>
+          <div className="mt-5 flex items-center gap-4">
+            <div className="flex h-12 w-[88px] shrink-0 items-center justify-center overflow-hidden rounded border border-gray-300 bg-white p-1.5">
+              {makeName ? (
+                <img src={makeLogo} alt="" className="h-full w-full object-contain" />
+              ) : (
+                <span className="text-[10px] font-semibold text-gray-400">No logo</span>
+              )}
             </div>
-
-            <p className="mt-5 text-center text-sm font-bold text-blue-600">
-              {remainingKmStatusText(remainingNum)}{" "}
+            <p className="flex min-w-0 flex-1 flex-wrap items-baseline justify-center gap-x-2 text-base font-semibold text-ad-green">
+              <span>{remainingKmStatusText(remainingNum)}</span>
               <span className="text-4xl font-bold leading-none">{remainingDisplay}</span>
             </p>
           </div>
@@ -576,17 +472,74 @@ export default function OwnerVehiclesPage() {
   const { sections, loading: docsLoading, mutating, busyField, uploadDocumentField } = useCarOwnerDocuments();
 
   const [showForm, setShowForm] = useState(false);
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [addFormDismissed, setAddFormDismissed] = useState(false);
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<VehiclePanelSection | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [popupSection, setPopupSection] = useState<VehiclePanelSection | null>(null);
-  const asideRef = useRef<HTMLElement>(null);
+  const asideRef = useRef<HTMLDivElement>(null);
 
   const { items: jobCards, loading: jobCardsLoading, error: jobCardsError } = useCarOwnerJobCards(
     activeSection === "job-cards" || activeSection === "update-odometer" ? selectedVehicleId : null
   );
-  const { loading: invoicesLoading, error: invoicesError, paidInvoices, unpaidInvoices } = useCarOwnerInvoices();
+  const {
+    loading: invoicesLoading,
+    error: invoicesError,
+    invoiceRows: visibleInvoices,
+    findJobCardById,
+  } = useCarOwnerInvoices();
+
+  const [viewerKind, setViewerKind] = useState<ViewerKind | null>(null);
+  const [selectedJobCardId, setSelectedJobCardId] = useState<string | null>(null);
+  const [jobCardsSearch, setJobCardsSearch] = useState("");
+  const [invoicesSearch, setInvoicesSearch] = useState("");
+  const jobCardsRef = useRef<CarOwnerJobCard[]>([]);
+  jobCardsRef.current = jobCards;
+
+  useEffect(() => {
+    if (activeSection !== "job-cards") setJobCardsSearch("");
+    if (activeSection !== "invoices") setInvoicesSearch("");
+  }, [activeSection]);
+
+  const filteredJobCards = useMemo(() => {
+    const q = jobCardsSearch.trim();
+    if (!q) return jobCards;
+    return jobCards.filter((jc) =>
+      matchesListSearch(
+        q,
+        businessName(jc.business),
+        formatBusinessPhone(jc.business),
+        jobCardLicensePlate(jc),
+        serviceTypeLabel(jc),
+        jobChipLabel(jc),
+        jc.jobNo,
+        formatJobCardDate(jc.createdAt),
+        jc.totalPayableAmount,
+        formatCurrencyAmount(jc.totalPayableAmount, countryCode)
+      )
+    );
+  }, [jobCards, jobCardsSearch, countryCode]);
+
+  const filteredInvoices = useMemo(() => {
+    const q = invoicesSearch.trim();
+    if (!q) return visibleInvoices;
+    return visibleInvoices.filter((row) =>
+      matchesListSearch(
+        q,
+        row.shopName,
+        row.phone,
+        row.plate,
+        row.service,
+        row.vehicle,
+        row.jobNo,
+        row.paymentStatus,
+        row.paymentMethod,
+        formatJobCardDate(row.createdAt),
+        row.amount,
+        formatCurrencyAmount(row.amount, countryCode)
+      )
+    );
+  }, [visibleInvoices, invoicesSearch, countryCode]);
 
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId) ?? null;
   const documentSection = sections.find((s) => s.vehicleId === selectedVehicleId) ?? null;
@@ -600,6 +553,13 @@ export default function OwnerVehiclesPage() {
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
+
+  useEffect(() => {
+    if (!loading && !error && vehicles.length === 0 && !addFormDismissed) {
+      setShowForm(true);
+      setActiveSection("vehicle-details");
+    }
+  }, [loading, error, vehicles.length, addFormDismissed]);
 
   const openSection = (section: VehiclePanelSection) => {
     if (vehicles.length === 0) {
@@ -629,31 +589,6 @@ export default function OwnerVehiclesPage() {
     setPopupSection(null);
   };
 
-  const handleUploadImage = async (vehicleId: string, file: File) => {
-    if (!token) {
-      toast.error("Please log in again.");
-      return;
-    }
-
-    setUploadingId(vehicleId);
-    try {
-      const body = new FormData();
-      body.append("vehicleImage", file, file.name || "vehicle.jpg");
-      const res = await putFormData<{ message?: string }>(`/api/user/vehicle/${vehicleId}`, body, token);
-      const message = typeof res.data?.message === "string" ? res.data.message.trim() : "";
-      if (!res.ok) {
-        toast.error(message || "Could not upload image.");
-        return;
-      }
-      toast.success(message || "Image uploaded.");
-      void refresh();
-    } catch {
-      toast.error("Network error while uploading image.");
-    } finally {
-      setUploadingId(null);
-    }
-  };
-
   const handleDocumentUpload = async (vehicleId: string, field: VehicleDocumentFieldKey, file: File) => {
     const res = await uploadDocumentField(vehicleId, field, file);
     if (res.ok) {
@@ -663,19 +598,41 @@ export default function OwnerVehiclesPage() {
     }
   };
 
-  const apiInvoices = [...paidInvoices, ...unpaidInvoices].filter(
-    (row, index, list) => list.findIndex((r) => r.id === row.id) === index
+  const fetchJobCardForViewer = useCallback(
+    async (id: string) => {
+      if (!token) {
+        throw new Error("Please log in again.");
+      }
+
+      const res = await fetchCarOwnerJobCardById(token, id);
+      if (res.ok && res.data) {
+        return res.data;
+      }
+
+      const cached = findJobCardById(id) ?? jobCardsRef.current.find((jc) => jc._id === id);
+      if (cached) {
+        return cached;
+      }
+
+      throw new Error("Could not load job card.");
+    },
+    [token, findJobCardById]
   );
-  const visibleInvoices = (() => {
-    const seen = new Set<string>();
-    const rows: CarOwnerInvoiceRow[] = [];
-    for (const row of [...DUMMY_OWNER_INVOICES, ...apiInvoices]) {
-      if (seen.has(row.id)) continue;
-      seen.add(row.id);
-      rows.push(row);
-    }
-    return rows;
-  })();
+
+  const handleInvoiceRowClick = (row: CarOwnerInvoiceRow) => {
+    setSelectedJobCardId(row.id);
+    setViewerKind("invoice");
+  };
+
+  const handleJobCardRowClick = (jc: CarOwnerJobCard) => {
+    setSelectedJobCardId(jc._id);
+    setViewerKind("jobcard");
+  };
+
+  const closeViewer = () => {
+    setViewerKind(null);
+    setSelectedJobCardId(null);
+  };
 
   const documentFields = VEHICLE_DOCUMENT_FIELDS.map((field) => {
     const match = documentSection?.fields.find((f) => f.key === field.key);
@@ -714,7 +671,13 @@ export default function OwnerVehiclesPage() {
       return (
         <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 text-center">
           <p className="text-sm text-gray-600">No vehicles added yet.</p>
-          {!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : null}
+          <AddNewButton
+            onClick={() => {
+              setAddFormDismissed(false);
+              setShowForm(true);
+              setActiveSection("vehicle-details");
+            }}
+          />
         </div>
       );
     }
@@ -737,10 +700,18 @@ export default function OwnerVehiclesPage() {
       if (visibleInvoices.length === 0) {
         return <p className="text-sm text-gray-600">No invoices yet.</p>;
       }
+      if (filteredInvoices.length === 0) {
+        return <p className="text-sm text-gray-600">No invoices match your search.</p>;
+      }
       return (
         <div className="flex flex-col gap-3">
-          {visibleInvoices.map((row) => (
-            <OwnerInvoiceRow key={row.id} row={row} countryCode={countryCode} />
+          {filteredInvoices.map((row) => (
+            <OwnerInvoiceRow
+              key={row.id}
+              row={row}
+              countryCode={countryCode}
+              onClick={() => handleInvoiceRowClick(row)}
+            />
           ))}
         </div>
       );
@@ -753,10 +724,14 @@ export default function OwnerVehiclesPage() {
     switch (activeSection) {
       case "vehicle-details":
         return (
-          <VehicleDetails
+          <OwnerEditVehiclePanel
             vehicle={selectedVehicle}
-            uploading={uploadingId === selectedVehicle.id}
-            onUploadImage={handleUploadImage}
+            onUpdated={() => void refresh()}
+            onDeleted={() => {
+              void refresh();
+              setSelectedVehicleId(null);
+              setActiveSection(null);
+            }}
           />
         );
 
@@ -794,10 +769,18 @@ export default function OwnerVehiclesPage() {
         if (jobCards.length === 0) {
           return <p className="text-sm text-gray-600">No job cards for this vehicle yet.</p>;
         }
+        if (filteredJobCards.length === 0) {
+          return <p className="text-sm text-gray-600">No job cards match your search.</p>;
+        }
         return (
           <div className="flex flex-col gap-3">
-            {jobCards.map((jc) => (
-              <OwnerJobCardRow key={jc._id} jc={jc} countryCode={countryCode} />
+            {filteredJobCards.map((jc) => (
+              <OwnerJobCardRow
+                key={jc._id}
+                jc={jc}
+                countryCode={countryCode}
+                onClick={() => handleJobCardRowClick(jc)}
+              />
             ))}
           </div>
         );
@@ -818,35 +801,103 @@ export default function OwnerVehiclesPage() {
     }
   };
 
+  const mainSectionLabel = vehicleSectionLabel(showForm, activeSection);
+  const headerAction =
+    !showForm && vehicles.length > 0 && (activeSection === null || activeSection === "vehicle-details") ? (
+      <AddNewButton
+        onClick={() => {
+          setAddFormDismissed(false);
+          setShowForm(true);
+          setActiveSection("vehicle-details");
+        }}
+      />
+    ) : undefined;
+  const sectionSearchInput =
+    !showForm && activeSection === "job-cards" ? (
+      <OwnerPageSearchInput
+        value={jobCardsSearch}
+        onChange={setJobCardsSearch}
+        placeholder="Search job cards…"
+        id="owner-vehicle-job-cards-search"
+      />
+    ) : !showForm && activeSection === "invoices" ? (
+      <OwnerPageSearchInput
+        value={invoicesSearch}
+        onChange={setInvoicesSearch}
+        placeholder="Search invoices…"
+        id="owner-vehicle-invoices-search"
+      />
+    ) : null;
+
   return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title="Vehicles | AutoDaddy" description="Car owner vehicles" />
-
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="font-serif text-2xl text-gray-600 md:text-3xl">Vehicles</h1>
-        {!showForm && (activeSection === null || activeSection === "vehicle-details") ? (
-          <AddNewButton onClick={() => setShowForm(true)} />
-        ) : null}
-      </div>
-
-      {showForm ? (
-        <OwnerAddVehicleForm onCancel={() => setShowForm(false)} onAdded={() => void refresh()} />
+    <OwnerPageShell
+      title={mainSectionLabel ? undefined : "Vehicles"}
+      metaTitle="Vehicles | AutoDaddy"
+      metaDescription="Car owner vehicles"
+      headerAction={mainSectionLabel ? undefined : headerAction}
+      faqsOpen={faqsOpen}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
+      {mainSectionLabel ? (
+        <div
+          className={`${ownerPageHeaderClass} grid grid-cols-1 gap-2 lg:grid-cols-[220px_1fr] xl:grid-cols-[260px_1fr] lg:items-center lg:gap-5`}
+        >
+          <h1 className={ownerPageTitleClass}>Vehicles</h1>
+          <div className="relative min-w-0">
+            <h2
+              className={`${ownerPageSectionTitleClass}${headerAction || sectionSearchInput ? " pr-[148px] sm:pr-[196px]" : ""}`}
+            >
+              {mainSectionLabel}
+            </h2>
+            {headerAction || sectionSearchInput ? (
+              <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
+                {sectionSearchInput}
+                {headerAction}
+              </div>
+            ) : null}
+          </div>
+        </div>
       ) : null}
-
-      {!showForm ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
-          <aside
-            ref={asideRef}
-            className="relative flex w-full shrink-0 flex-col gap-3 overflow-visible lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]"
+      <div className={ownerPageLayoutClass}>
+        <div ref={asideRef}>
+          <OwnerPageSidebar
+            onFaqsClick={() => setFaqsOpen(true)}
+            footer={
+              <SidebarSectionItem
+                section="update-odometer"
+                label="Update Odometer"
+                active={activeSection === "update-odometer"}
+                popupOpen={popupSection === "update-odometer"}
+                vehicles={vehicles}
+                onSectionClick={openSection}
+                onVehicleSelect={handleVehiclePicked}
+              >
+                <button
+                  type="button"
+                  onClick={() => openSection("update-odometer")}
+                  className={`w-full text-center ${portalSidebarPillClass(isPortalSidebarHighlighted(activeSection === "update-odometer", popupSection === "update-odometer"))}`}
+                >
+                  Update Odometer
+                </button>
+              </SidebarSectionItem>
+            }
           >
-            <div className="flex flex-col gap-3">
+            <div className="relative flex flex-col gap-3 overflow-visible">
               <SidebarSectionItem
                 section="vehicle-details"
                 label="Vehicle Details"
-                active={activeSection === "vehicle-details"}
+                active={activeSection === "vehicle-details" || showForm}
                 popupOpen={popupSection === "vehicle-details"}
                 vehicles={vehicles}
-                onSectionClick={openSection}
+                onSectionClick={(section) => {
+                  if (showForm) {
+                    setShowForm(false);
+                    setAddFormDismissed(true);
+                  }
+                  openSection(section);
+                }}
                 onVehicleSelect={handleVehiclePicked}
               />
               <SidebarSectionItem
@@ -877,44 +928,45 @@ export default function OwnerVehiclesPage() {
                 onVehicleSelect={handleVehiclePicked}
               />
             </div>
-
-            <div className="mt-auto mb-10 flex flex-col gap-3 pt-6 lg:mb-14">
-              <SidebarSectionItem
-                section="update-odometer"
-                label="Update Odometer"
-                active={activeSection === "update-odometer"}
-                popupOpen={popupSection === "update-odometer"}
-                vehicles={vehicles}
-                onSectionClick={openSection}
-                onVehicleSelect={handleVehiclePicked}
-              >
-                <button
-                  type="button"
-                  onClick={() => openSection("update-odometer")}
-                  className={`w-full rounded-full border px-4 py-2.5 text-center text-sm font-bold uppercase tracking-wide transition-colors ${activeSection === "update-odometer"
-                      ? "border-blue-700 bg-blue-600 text-white shadow-md"
-                      : "border-blue-600 bg-white/70 text-blue-600 hover:bg-white"
-                    }`}
-                >
-                  Update Odometer
-                </button>
-              </SidebarSectionItem>
-              <OwnerFaqsButton onClick={() => setFaqsOpen(true)} />
-            </div>
-          </aside>
-
-          <div className="min-w-0 flex-1 lg:min-h-[calc(100vh-220px)]">
-            {renderRightPanel()}
-          </div>
+          </OwnerPageSidebar>
         </div>
-      ) : null}
 
-      <OwnerFaqsDialog
-        open={faqsOpen}
-        onClose={() => setFaqsOpen(false)}
-        heading={faqsHeading}
-        description={faqsDescription}
+        <div className={`${ownerPageMainClass} lg:min-h-[calc(100vh-220px)]`}>
+          {showForm ? (
+            <OwnerAddVehicleForm
+              onCancel={() => {
+                setShowForm(false);
+                setAddFormDismissed(true);
+              }}
+              onAdded={() => {
+                setAddFormDismissed(false);
+                setShowForm(false);
+                void refresh();
+                setActiveSection("vehicle-details");
+              }}
+            />
+          ) : (
+            renderRightPanel()
+          )}
+        </div>
+      </div>
+
+      <InvoiceViewerDialog
+        open={viewerKind === "invoice"}
+        onClose={closeViewer}
+        jobCardId={selectedJobCardId ?? undefined}
+        fetchJobCard={fetchJobCardForViewer}
+        countryCode={countryCode}
+        apiBaseUrl={API_BASE_URL}
       />
-    </PortalPageContent>
+      <JobCardViewerDialog
+        open={viewerKind === "jobcard"}
+        onClose={closeViewer}
+        jobCardId={selectedJobCardId ?? undefined}
+        fetchJobCard={fetchJobCardForViewer}
+        countryCode={countryCode}
+        apiBaseUrl={API_BASE_URL}
+      />
+    </OwnerPageShell>
   );
 }

@@ -5,6 +5,7 @@ import { isPaidInvoiceRow, type CarOwnerInvoiceRow } from "../../hooks/useCarOwn
 type OwnerInvoiceRowProps = {
   row: CarOwnerInvoiceRow;
   countryCode?: string;
+  onClick?: () => void;
 };
 
 function invoiceChipLabel(row: CarOwnerInvoiceRow): string {
@@ -13,7 +14,7 @@ function invoiceChipLabel(row: CarOwnerInvoiceRow): string {
   return no.toLowerCase().startsWith("invoice") ? no : `Invoice No # ${no}`;
 }
 
-export default function OwnerInvoiceRow({ row, countryCode }: OwnerInvoiceRowProps) {
+export default function OwnerInvoiceRow({ row, countryCode, onClick }: OwnerInvoiceRowProps) {
   const paid = isPaidInvoiceRow(row);
   const plate = row.plate?.trim().toUpperCase() || "—";
   const service = row.service?.trim() || row.vehicle?.trim() || "—";
@@ -22,7 +23,22 @@ export default function OwnerInvoiceRow({ row, countryCode }: OwnerInvoiceRowPro
   const amount = formatCurrencyAmount(row.amount, countryCode);
 
   return (
-    <article className="flex overflow-hidden rounded-md shadow-sm">
+    <article
+      className={`flex overflow-hidden rounded-md shadow-sm${onClick ? " cursor-pointer transition hover:brightness-[0.98]" : ""}`}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div
         className={`flex w-[28%] min-w-[100px] max-w-[160px] shrink-0 items-center justify-center px-3 py-4 text-center sm:min-w-[120px] ${
           paid ? "bg-[#006600] text-white" : "border-2 border-red-700 bg-white text-red-700"
@@ -39,7 +55,11 @@ export default function OwnerInvoiceRow({ row, countryCode }: OwnerInvoiceRowPro
         <div className="min-w-0 justify-self-start">
           <p className="truncate text-sm font-bold text-gray-900">{row.shopName}</p>
           {phone ? (
-            <a href={`tel:${phone.replace(/\s/g, "")}`} className="text-sm font-semibold text-blue-700 hover:underline">
+            <a
+              href={`tel:${phone.replace(/\s/g, "")}`}
+              className="text-sm font-semibold text-blue-700 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
               {phone}
             </a>
           ) : (

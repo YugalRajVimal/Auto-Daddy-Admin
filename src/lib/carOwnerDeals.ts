@@ -191,3 +191,76 @@ export function matchesDealCategory(d: CarOwnerDeal, category: DealCategory): bo
   if (category === "salvage") return /\bsalvage/i.test(haystack);
   return true;
 }
+
+export type DealListFilters = {
+  make: string;
+  model: string;
+  city: string;
+};
+
+export const EMPTY_DEAL_LIST_FILTERS: DealListFilters = { make: "", model: "", city: "" };
+
+export function dealMake(d: CarOwnerDeal): string | null {
+  if ("selectedVehicle" in d && d.selectedVehicle?.name?.trim()) {
+    return d.selectedVehicle.name.trim();
+  }
+  return null;
+}
+
+export function dealModel(d: CarOwnerDeal): string | null {
+  if ("selectedVehicle" in d && d.selectedVehicle?.model?.trim()) {
+    return d.selectedVehicle.model.trim();
+  }
+  return null;
+}
+
+export function dealCity(d: CarOwnerDeal): string | null {
+  return d.createdBy.city?.trim() || null;
+}
+
+function sameFilterValue(a: string | null | undefined, b: string): boolean {
+  if (!b) return true;
+  return (a ?? "").trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+export function matchesDealListFilters(d: CarOwnerDeal, filters: DealListFilters): boolean {
+  if (filters.make && !sameFilterValue(dealMake(d), filters.make)) return false;
+  if (filters.model && !sameFilterValue(dealModel(d), filters.model)) return false;
+  if (filters.city && !sameFilterValue(dealCity(d), filters.city)) return false;
+  return true;
+}
+
+function uniqueSorted(values: Array<string | null | undefined>): string[] {
+  const set = new Set<string>();
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) set.add(trimmed);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+export function dealMakeOptions(deals: CarOwnerDeal[]): string[] {
+  return uniqueSorted(deals.map(dealMake));
+}
+
+export function dealModelOptions(deals: CarOwnerDeal[], make: string): string[] {
+  if (!make.trim()) return [];
+  const scoped = deals.filter((d) => sameFilterValue(dealMake(d), make));
+  return uniqueSorted(scoped.map(dealModel));
+}
+
+export function dealCityOptions(deals: CarOwnerDeal[], make: string, model: string): string[] {
+  const hasVehicleMakes = deals.some((d) => dealMake(d));
+  if (!hasVehicleMakes) {
+    return uniqueSorted(deals.map(dealCity));
+  }
+  if (!make.trim() || !model.trim()) return [];
+  const scoped = deals.filter(
+    (d) => sameFilterValue(dealMake(d), make) && sameFilterValue(dealModel(d), model)
+  );
+  return uniqueSorted(scoped.map(dealCity));
+}
+
+export function dealFiltersUseVehicleCascade(deals: CarOwnerDeal[]): boolean {
+  return deals.some((d) => dealMake(d));
+}

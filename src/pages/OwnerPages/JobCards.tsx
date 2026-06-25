@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import PageMeta from "../../components/common/PageMeta";
-import { PortalPageContent } from "../../components/admin/PortalPageContent";
-import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
+import OwnerPageShell, {
+  OwnerPageRefreshButton,
+  ownerPageLayoutClass,
+  ownerPageMainClass,
+} from "../../components/owner/OwnerPageShell";
 import OwnerJobCardRow from "../../components/owner/OwnerJobCardRow";
 import OwnerVehicleSidebar from "../../components/owner/OwnerVehicleSidebar";
 import { useAuth } from "../../auth";
@@ -34,21 +36,17 @@ export default function OwnerJobCardsPage() {
   };
 
   return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title="Job Cards | AutoDaddy" description="Car owner job cards" />
-
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h1 className="text-base font-bold text-blue-700">Job Cards</h1>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-ad-purple hover:bg-gray-50"
-        >
-          Refresh
-        </button>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
+    <OwnerPageShell
+      title="Job Cards"
+      metaTitle="Job Cards | AutoDaddy"
+      metaDescription="Car owner job cards"
+      headerAction={<OwnerPageRefreshButton onClick={handleRefresh} />}
+      faqsOpen={faqsOpen}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
+      <div className={ownerPageLayoutClass}>
         <OwnerVehicleSidebar
           vehicles={vehicles}
           selectedVehicleId={selectedVehicleId}
@@ -57,7 +55,7 @@ export default function OwnerJobCardsPage() {
           onFaqsClick={() => setFaqsOpen(true)}
         />
 
-        <div className="flex min-h-[420px] flex-1 flex-col">
+        <div className={`flex min-h-[420px] flex-col ${ownerPageMainClass}`}>
           {loading || vehiclesLoading ? (
             <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
@@ -86,13 +84,6 @@ export default function OwnerJobCardsPage() {
           )}
         </div>
       </div>
-
-      <OwnerFaqsDialog
-        open={faqsOpen}
-        onClose={() => setFaqsOpen(false)}
-        heading={faqsHeading}
-        description={faqsDescription}
-      />
-    </PortalPageContent>
+    </OwnerPageShell>
   );
 }

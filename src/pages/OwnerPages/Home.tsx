@@ -1,10 +1,8 @@
 import { useState } from "react";
-import PageMeta from "../../components/common/PageMeta";
-import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import { ThoughtOfTheDayCard } from "../../components/portal/ThoughtOfTheDayCard";
 import { PORTAL_HOME_HERO_IMAGE } from "../../lib/portalHeroImage";
 import OwnerDueServiceHero from "../../components/owner/OwnerDueServiceHero";
-import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
+import OwnerPageShell, { ownerPageLayoutClass } from "../../components/owner/OwnerPageShell";
 import OwnerServiceSidebar from "../../components/owner/OwnerServiceSidebar";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import { useCarOwnerDashboard, useCarOwnerServiceSidebar } from "../../hooks/useOwnerPortal";
@@ -17,10 +15,15 @@ export default function OwnerHomePage() {
   const [showDueService, setShowDueService] = useState(false);
 
   return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title="Home | AutoDaddy" description="Car owner home" />
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
+    <OwnerPageShell
+      metaTitle="Home | AutoDaddy"
+      metaDescription="Car owner home"
+      faqsOpen={faqsOpen}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
+      <div className={ownerPageLayoutClass}>
         <OwnerServiceSidebar
           indoor={indoor}
           outdoor={outdoor}
@@ -48,6 +51,7 @@ export default function OwnerHomePage() {
                   vehicles={vehicles}
                   loading={vehiclesLoading}
                   error={vehiclesError}
+                  onClose={() => setShowDueService(false)}
                 />
               ) : thoughtOfTheDay ? (
                 <ThoughtOfTheDayCard text={thoughtOfTheDay} />
@@ -57,13 +61,6 @@ export default function OwnerHomePage() {
 
         </div>
       </div>
-
-      <OwnerFaqsDialog
-        open={faqsOpen}
-        onClose={() => setFaqsOpen(false)}
-        heading={faqsHeading}
-        description={faqsDescription}
-      />
-    </PortalPageContent>
+    </OwnerPageShell>
   );
 }

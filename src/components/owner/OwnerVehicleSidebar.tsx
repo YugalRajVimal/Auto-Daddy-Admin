@@ -1,7 +1,8 @@
 import { FiCheck } from "react-icons/fi";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
-import { OwnerSidebarFaqsSlot } from "./OwnerFaqsButton";
+import { OwnerFaqsButton, ownerPageSidebarFooterClass } from "./OwnerFaqsButton";
+import { ownerPageSidebarClass } from "./OwnerPageShell";
 
 type OwnerVehicleSidebarProps = {
   vehicles: CarOwnerVehicle[];
@@ -35,9 +36,8 @@ function VehicleRow({
     >
       <p className="text-sm font-bold text-gray-800">{vehicleSidebarLabel(vehicle)}</p>
       <div
-        className={`relative flex h-24 w-full max-w-[140px] items-center justify-center overflow-hidden rounded-sm border-2 ${
-          selected ? "border-gray-400 bg-gray-300" : "border-[#008000] bg-white"
-        }`}
+        className={`relative flex h-24 w-full max-w-[140px] items-center justify-center overflow-hidden rounded-sm border-2 ${selected ? "border-gray-400 bg-gray-300" : "border-[#008000] bg-white"
+          }`}
       >
         {imageUri ? (
           <img src={imageUri} alt="" className="h-full w-full object-cover" />
@@ -62,7 +62,7 @@ export default function OwnerVehicleSidebar({
   onFaqsClick,
 }: OwnerVehicleSidebarProps) {
   return (
-    <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[240px] lg:min-h-[calc(100vh-220px)]">
+    <aside className={ownerPageSidebarClass}>
       <div className="flex flex-col gap-4">
         {loading ? (
           <p className="px-1 text-xs text-gray-500">Loading vehicles…</p>
@@ -80,7 +80,11 @@ export default function OwnerVehicleSidebar({
         )}
       </div>
 
-      {onFaqsClick ? <OwnerSidebarFaqsSlot onClick={onFaqsClick} /> : null}
+      {onFaqsClick ? (
+        <div className={ownerPageSidebarFooterClass}>
+          <OwnerFaqsButton onClick={onFaqsClick} />
+        </div>
+      ) : null}
     </aside>
   );
 }

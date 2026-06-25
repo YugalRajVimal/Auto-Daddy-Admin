@@ -516,13 +516,12 @@ export default function ShopProfilePage() {
 
   return (
     <ShopPageShell
+      title="Profile"
       metaTitle="Profile | AutoDaddy"
       metaDescription="Auto shop owner profile"
       sidebarItems={PROFILE_SECTIONS}
       activeSidebarId={activeId}
       onSidebarSelect={setActiveId}
-      sidebarHeading="Profile"
-      sidebarHeadingClassName="font-serif text-2xl text-gray-600 md:text-3xl"
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}

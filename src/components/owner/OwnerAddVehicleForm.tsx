@@ -1,46 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import {
-  CompactField,
-  CompactFormFooter,
-  CompactFormPanel,
-  CompactFormRow,
-  compactInputClass,
-} from "../admin/ContentPanel";
 import { getJson, postFormData } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
-
-type ApiEnvelope = {
-  success?: boolean;
-  message?: string;
-};
-
-type CarCompanyCatalogModel = {
-  modelName: string;
-  years: Array<string | number>;
-};
-
-type CarCompanyCatalogItem = {
-  companyName: string;
-  models: CarCompanyCatalogModel[];
-};
-
-type CarCompaniesResponse = {
-  data?: CarCompanyCatalogItem[];
-  message?: string;
-  success?: boolean;
-};
-
-const currentYear = new Date().getFullYear();
-
-function isValidYear(value: string) {
-  const year = Number(value);
-  return /^\d{4}$/.test(value) && year >= 1900 && year <= currentYear + 1;
-}
-
-function trimMessage(payload: ApiEnvelope | null) {
-  return typeof payload?.message === "string" ? payload.message.trim() : "";
-}
+import { getCarBrandName, resolveCarBrandLogo } from "../../lib/dummyCarBrands";
+import OwnerVehicleDetailCard from "./OwnerVehicleDetailCard";
+import {
+  type CarCompaniesResponse,
+  type CarCompanyCatalogItem,
+  cropImageToPreviewFrame,
+  isValidVehicleYear,
+  ownerVehicleFieldClass,
+  ownerVehicleSelectClass,
+  trimVehicleApiMessage,
+  type VehicleApiEnvelope,
+} from "./ownerVehicleFormUtils";
 
 type OwnerAddVehicleFormProps = {
   onCancel: () => void;
@@ -49,10 +22,12 @@ type OwnerAddVehicleFormProps = {
 
 export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehicleFormProps) {
   const { token } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [companies, setCompanies] = useState<CarCompanyCatalogItem[]>([]);
   const [companiesLoading, setCompaniesLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [imageProcessing, setImageProcessing] = useState(false);
 
   const [licensePlateNo, setLicensePlateNo] = useState("");
   const [vinNo, setVinNo] = useState("");
@@ -60,9 +35,8 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [odometerReading, setOdometerReading] = useState("");
-  const [dueOdometerReading, setDueOdometerReading] = useState("");
-  const [attachImage, setAttachImage] = useState(false);
   const [vehicleImage, setVehicleImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -82,10 +56,35 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
     };
   }, [token]);
 
-  const modelOptions = useMemo(() => {
-    const company = companies.find((c) => (c.companyName ?? "").trim() === name.trim());
-    return company?.models ?? [];
-  }, [companies, name]);
+  useEffect(() => {
+    if (!vehicleImage) {
+      setImagePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(vehicleImage);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [vehicleImage]);
+
+  const selectedCompany = useMemo(
+    () => companies.find((c) => (c.companyName ?? "").trim() === name.trim()) ?? null,
+    [companies, name]
+  );
+
+  const makeLogo = useMemo(
+    () =>
+      resolveCarBrandLogo(
+        selectedCompany
+          ? {
+              companyName: getCarBrandName(selectedCompany),
+              brandLogo: selectedCompany.brandLogo ?? selectedCompany.logoUrl ?? null,
+            }
+          : null
+      ),
+    [selectedCompany]
+  );
+
+  const modelOptions = useMemo(() => selectedCompany?.models ?? [], [selectedCompany]);
 
   const yearOptions = useMemo(() => {
     const selectedModel = modelOptions.find((m) => (m.modelName ?? "").trim() === model.trim());
@@ -104,15 +103,29 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
     setModel("");
     setYear("");
     setOdometerReading("");
-    setDueOdometerReading("");
-    setAttachImage(false);
     setVehicleImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleCancel = () => {
-    if (submitting) return;
+    if (submitting || imageProcessing) return;
     resetForm();
     onCancel();
+  };
+
+  const handleImagePick = async (file: File | null) => {
+    if (!file) return;
+    setImageProcessing(true);
+    try {
+      const cropped = await cropImageToPreviewFrame(file);
+      setVehicleImage(cropped);
+    } catch {
+      toast.error("Could not process image. Try another file.");
+      setVehicleImage(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } finally {
+      setImageProcessing(false);
+    }
   };
 
   const handleSave = async () => {
@@ -127,7 +140,6 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
     const nextModel = model.trim();
     const nextYear = year.trim();
     const nextOdometer = odometerReading.trim();
-    const nextDueOdometer = dueOdometerReading.trim();
 
     if (!nextPlate || !nextName || !nextModel || !nextYear) {
       toast.error("Plate, make, model, and year are required.");
@@ -137,7 +149,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
       toast.error("VIN must be exactly 17 characters.");
       return;
     }
-    if (!isValidYear(nextYear)) {
+    if (!isValidVehicleYear(nextYear)) {
       toast.error("Enter a valid vehicle year.");
       return;
     }
@@ -151,13 +163,13 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
       body.append("model", nextModel);
       body.append("year", nextYear);
       body.append("odometerReading", nextOdometer);
-      body.append("dueOdometerReading", nextDueOdometer);
+      body.append("dueOdometerReading", "");
       if (vehicleImage) {
         body.append("vehicleImage", vehicleImage, vehicleImage.name || "vehicle.jpg");
       }
 
-      const res = await postFormData<ApiEnvelope>("/api/user/vehicle", body, token);
-      const message = trimMessage(res.data);
+      const res = await postFormData<VehicleApiEnvelope>("/api/user/vehicle", body, token);
+      const message = trimVehicleApiMessage(res.data);
       if (!res.ok) {
         toast.error(message || "Could not add vehicle.");
         return;
@@ -166,7 +178,6 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
       toast.success(message || "Vehicle added.");
       resetForm();
       onAdded();
-      onCancel();
     } catch {
       toast.error("Network error while adding vehicle.");
     } finally {
@@ -175,150 +186,159 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
   };
 
   return (
-    <CompactFormPanel
-      className="!mb-4"
-      footer={
-        <CompactFormFooter
-          message="You are adding a new vehicle"
-          messageCenter
-          actionLabel={submitting ? "Saving…" : "Save"}
-          onSave={() => void handleSave()}
-          onCancel={handleCancel}
-        />
-      }
-    >
-      <CompactFormRow className="items-start">
-        <CompactField label="License Plate" required>
+    <div className="rounded-[18px] bg-ad-green-light px-5 py-5 md:px-6">
+      <div className="grid w-full grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch lg:gap-8">
+        <div className="min-w-0 w-full space-y-2.5">
           <input
             type="text"
             value={licensePlateNo}
             onChange={(e) => setLicensePlateNo(e.target.value)}
-            className={compactInputClass}
+            placeholder="License Plate"
             autoComplete="off"
+            className={ownerVehicleFieldClass}
           />
-        </CompactField>
 
-        <CompactField label="Make" required>
-          <select
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setModel("");
-              setYear("");
-            }}
-            disabled={companiesLoading}
-            className={compactInputClass}
-          >
-            <option value="">{companiesLoading ? "Loading…" : "Select make"}</option>
-            {companies.map((c) => (
-              <option key={c.companyName} value={c.companyName}>
-                {c.companyName}
-              </option>
-            ))}
-          </select>
-        </CompactField>
+          <div className="flex gap-2">
+            <select
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setModel("");
+                setYear("");
+              }}
+              disabled={companiesLoading}
+              className={`${ownerVehicleSelectClass} flex-1`}
+            >
+              <option value="">{companiesLoading ? "Loading…" : "Make"}</option>
+              {companies.map((c) => (
+                <option key={c.companyName} value={c.companyName}>
+                  {c.companyName}
+                </option>
+              ))}
+            </select>
+            <div className="flex h-[36px] w-[56px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#c8c8c8] bg-white p-1">
+              {name.trim() ? (
+                <img
+                  src={makeLogo}
+                  alt=""
+                  className="h-full w-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : null}
+            </div>
+          </div>
 
-        <CompactField label="Model" required>
-          <select
-            value={model}
-            onChange={(e) => {
-              setModel(e.target.value);
-              setYear("");
-            }}
-            disabled={!name}
-            className={compactInputClass}
-          >
-            <option value="">Select model</option>
-            {modelOptions.map((m) => (
-              <option key={m.modelName} value={m.modelName}>
-                {m.modelName}
-              </option>
-            ))}
-          </select>
-        </CompactField>
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={model}
+              onChange={(e) => {
+                setModel(e.target.value);
+                setYear("");
+              }}
+              disabled={!name}
+              className={ownerVehicleSelectClass}
+            >
+              <option value="">Model</option>
+              {modelOptions.map((m) => (
+                <option key={m.modelName} value={m.modelName}>
+                  {m.modelName}
+                </option>
+              ))}
+            </select>
+            <select
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              disabled={!model}
+              className={ownerVehicleSelectClass}
+            >
+              <option value="">Year</option>
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <CompactField label="Year" required>
-          <select
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            disabled={!model}
-            className={compactInputClass}
-          >
-            <option value="">Select year</option>
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        </CompactField>
-
-        <CompactField label="VIN">
           <input
             type="text"
             value={vinNo}
             onChange={(e) => setVinNo(e.target.value)}
+            placeholder="VIN"
             maxLength={17}
-            className={compactInputClass}
             autoComplete="off"
+            className={ownerVehicleFieldClass}
           />
-        </CompactField>
 
-        <CompactField label="Odometer (km)">
           <input
             type="text"
             value={odometerReading}
-            onChange={(e) => setOdometerReading(e.target.value)}
+            onChange={(e) => setOdometerReading(e.target.value.replace(/[^\d]/g, ""))}
+            placeholder="Current Odometer"
             inputMode="numeric"
-            className={compactInputClass}
+            className={ownerVehicleFieldClass}
           />
-        </CompactField>
 
-        <CompactField label="Due odometer (km)">
+          <button
+            type="button"
+            disabled={imageProcessing}
+            onClick={() => fileInputRef.current?.click()}
+            className={`${ownerVehicleFieldClass} cursor-pointer text-left disabled:cursor-wait disabled:opacity-70`}
+          >
+            <span className={`block truncate ${vehicleImage || imageProcessing ? "text-gray-800" : "text-[#b0b0b0]"}`}>
+              {imageProcessing ? "Processing image…" : vehicleImage?.name || "Upload vehicle image"}
+            </span>
+          </button>
           <input
-            type="text"
-            value={dueOdometerReading}
-            onChange={(e) => setDueOdometerReading(e.target.value)}
-            inputMode="numeric"
-            className={compactInputClass}
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null;
+              e.target.value = "";
+              void handleImagePick(file);
+            }}
           />
-        </CompactField>
-      </CompactFormRow>
 
-      <CompactFormRow className="justify-start">
-        <div className="flex flex-col items-start gap-1.5">
-          <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-            <input
-              type="checkbox"
-              checked={attachImage}
-              onChange={(e) => {
-                setAttachImage(e.target.checked);
-                if (!e.target.checked) setVehicleImage(null);
-              }}
-              className="h-3.5 w-3.5 accent-ad-green"
-            />
-            Attach vehicle image
-          </label>
-          {attachImage ? (
-            <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
-              Upload File
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  e.target.value = "";
-                  setVehicleImage(file);
-                }}
-              />
-            </label>
-          ) : null}
-          {attachImage && vehicleImage ? (
-            <p className="text-xs text-gray-600">{vehicleImage.name}</p>
-          ) : null}
+          <div className="flex flex-col items-center gap-1.5 pt-4">
+            <button
+              type="button"
+              disabled={submitting || imageProcessing}
+              onClick={() => void handleSave()}
+              className="min-w-[128px] rounded-lg bg-[#00a000] px-10 py-2 text-[15px] font-bold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? "Saving…" : "Save"}
+            </button>
+            <p className="text-sm text-gray-700">
+              or{" "}
+              <button
+                type="button"
+                disabled={submitting || imageProcessing}
+                onClick={handleCancel}
+                className="text-[#2563eb] underline hover:text-blue-700 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </p>
+          </div>
         </div>
-      </CompactFormRow>
-    </CompactFormPanel>
+
+        <div className="flex h-full min-h-0 w-full flex-col">
+          <OwnerVehicleDetailCard
+            plate={licensePlateNo}
+            make={name}
+            model={model}
+            year={year}
+            vin={vinNo}
+            odometer={odometerReading}
+            imageUri={imagePreview}
+            fullHeight
+          />
+        </div>
+      </div>
+    </div>
   );
 }

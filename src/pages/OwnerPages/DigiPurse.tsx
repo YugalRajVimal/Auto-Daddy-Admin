@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { toast } from "react-toastify";
-import PageMeta from "../../components/common/PageMeta";
-import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
-import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
-import { OwnerSidebarFaqsSlot } from "../../components/owner/OwnerFaqsButton";
+import OwnerPageShell, {
+  OwnerPageRefreshButton,
+  OwnerPageSidebar,
+  ownerPageLayoutClass,
+  ownerPageMainClass,
+} from "../../components/owner/OwnerPageShell";
 import { useCarOwnerDocuments } from "../../hooks/useCarOwnerDocuments";
 import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 import {
@@ -178,22 +180,18 @@ export default function OwnerDigiPursePage() {
   };
 
   return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title="Digi Purse | AutoDaddy" description="Car owner documents" />
-
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h1 className="text-base font-bold text-blue-700">Digi Purse</h1>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-ad-purple hover:bg-gray-50"
-        >
-          Refresh
-        </button>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
-        <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]">
+    <OwnerPageShell
+      title="Digi Purse"
+      metaTitle="Digi Purse | AutoDaddy"
+      metaDescription="Car owner documents"
+      headerAction={<OwnerPageRefreshButton onClick={() => void refresh()} />}
+      faqsOpen={faqsOpen}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
+      <div className={ownerPageLayoutClass}>
+        <OwnerPageSidebar onFaqsClick={() => setFaqsOpen(true)}>
           {DIGI_PURSE_CATEGORIES.map((item) => (
             <CategoryButton
               key={item.id}
@@ -202,10 +200,9 @@ export default function OwnerDigiPursePage() {
               onClick={() => handleCategoryChange(item.id)}
             />
           ))}
-          <OwnerSidebarFaqsSlot onClick={() => setFaqsOpen(true)} />
-        </aside>
+        </OwnerPageSidebar>
 
-        <div className="flex min-h-[420px] flex-1 flex-col">
+        <div className={`flex min-h-[420px] flex-col ${ownerPageMainClass}`}>
           {loading ? (
             <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
@@ -245,13 +242,6 @@ export default function OwnerDigiPursePage() {
           )}
         </div>
       </div>
-
-      <OwnerFaqsDialog
-        open={faqsOpen}
-        onClose={() => setFaqsOpen(false)}
-        heading={faqsHeading}
-        description={faqsDescription}
-      />
-    </PortalPageContent>
+    </OwnerPageShell>
   );
 }

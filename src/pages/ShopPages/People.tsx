@@ -5,7 +5,6 @@ import CarOwnerAddEditForm, {
 } from "../../components/admin/CarOwnerAddEditForm";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
-  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
@@ -24,12 +23,10 @@ const PEOPLE_SEARCH_INPUT_ID = "shop-people-customer-search";
 
 const PAGE_SIZE = 10;
 
-function peopleSidebarBtn(active: boolean) {
-  return `w-full rounded-full px-4 py-2.5 text-sm font-bold transition-colors ${
-    active
-      ? "bg-[#008000] text-white shadow-sm"
-      : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
-  }`;
+function peopleSidebarBtn(highlighted: boolean) {
+  return highlighted
+    ? "w-full rounded-full border border-[#006600] bg-[#008000] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors"
+    : "w-full rounded-full border border-[#008000] bg-transparent px-4 py-2.5 text-sm font-bold text-[#008000] transition-colors hover:border-[#006600] hover:bg-[#008000] hover:text-white hover:shadow-sm";
 }
 
 function customerId(c: MyCustomer) {
@@ -236,10 +233,19 @@ export default function ShopPeoplePage() {
 
   return (
     <ShopPageShell
+      title="My Customers"
       metaTitle="People | AutoDaddy"
       metaDescription="Auto shop customers"
-      sidebarHeading="My Customers"
-      sidebarHeadingClassName="font-serif text-2xl font-bold text-gray-600 md:text-3xl"
+      headerAction={
+        <input
+          id={PEOPLE_SEARCH_INPUT_ID}
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search my customers"
+          className="w-full max-w-xs rounded-full border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 sm:max-w-sm"
+        />
+      }
       sidebarItems={PEOPLE_SECTIONS}
       activeSidebarId={isSearchForm || formState ? null : "customers"}
       onSidebarSelect={() => showMyCustomers()}
@@ -303,19 +309,6 @@ export default function ShopPeoplePage() {
           />
         ) : (
           <>
-            <ShopContentHeader
-              action={
-                <input
-                  id={PEOPLE_SEARCH_INPUT_ID}
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search my customers"
-                  className="w-full max-w-xs rounded-full border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 sm:max-w-sm"
-                />
-              }
-            />
-
             {listLoading ? (
               <ShopLoadingPanel className="min-h-0 flex-1" />
             ) : listError ? (

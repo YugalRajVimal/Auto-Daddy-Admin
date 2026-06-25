@@ -415,10 +415,9 @@ export default function ShopMyWebsitePage() {
 
   return (
     <ShopPageShell
+      title="My Website"
       metaTitle="My Website | AutoDaddy"
       metaDescription="Manage your auto shop website, domain, and subscription"
-      sidebarHeading="My Website"
-      sidebarHeadingClassName="font-serif text-2xl text-gray-600 md:text-3xl"
       sidebarExtra={
         <ShopWebsiteSidebar
           activeSection={activeSection}

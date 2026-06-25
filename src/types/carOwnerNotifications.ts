@@ -2,10 +2,32 @@
 export type CarOwnerNotification = {
   id: string;
   userId: string | null;
+  title: string;
   message: string;
   time: string;
   arrayIdx: number | null;
 };
+
+export function notificationDisplay(item: CarOwnerNotification): { title: string; description: string } {
+  const title = item.title.trim();
+  const message = item.message.trim();
+
+  if (title) {
+    return { title, description: message };
+  }
+
+  if (!message) return { title: "", description: "" };
+
+  const sentenceEnd = message.search(/[.!?](?:\s|$)/);
+  if (sentenceEnd > 0 && sentenceEnd < message.length - 1) {
+    return {
+      title: message.slice(0, sentenceEnd + 1).trim(),
+      description: message.slice(sentenceEnd + 1).trim(),
+    };
+  }
+
+  return { title: message, description: "" };
+}
 
 export type ParsedCarOwnerNotificationsPage = {
   items: CarOwnerNotification[];
@@ -18,9 +40,10 @@ export type ParsedCarOwnerNotificationsPage = {
 function pickNotificationRow(raw: unknown): CarOwnerNotification | null {
   if (raw == null || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
-  const message = String(o.message ?? o.body ?? o.title ?? "").trim();
+  const title = String(o.title ?? "").trim();
+  const message = String(o.message ?? o.body ?? o.description ?? "").trim();
   const time = String(o.time ?? o.createdAt ?? o.created_at ?? "").trim();
-  if (!message) return null;
+  if (!title && !message) return null;
 
   const userIdRaw = o.user ?? o.userId ?? o.user_id;
   const userId = userIdRaw != null ? String(userIdRaw).trim() : null;
@@ -32,9 +55,9 @@ function pickNotificationRow(raw: unknown): CarOwnerNotification | null {
   const explicitId = String(o._id ?? o.id ?? "").trim();
   const id =
     explicitId ||
-    [time, arrayIdx ?? "", userId ?? "", message.slice(0, 32)].filter(Boolean).join(":");
+    [time, arrayIdx ?? "", userId ?? "", title, message.slice(0, 32)].filter(Boolean).join(":");
 
-  return { id, userId, message, time, arrayIdx };
+  return { id, userId, title, message, time, arrayIdx };
 }
 
 /** Parses `get-notifications` envelope (`notifications`, `page`, `totalPages`). */

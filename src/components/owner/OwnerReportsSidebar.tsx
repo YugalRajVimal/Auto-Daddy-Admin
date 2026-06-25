@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { FiChevronDown } from "react-icons/fi";
+import {
+  portalSidebarSectionHeaderClass,
+} from "../admin/portalSidebarStyles";
 import PortalSidebarButton from "../admin/PortalSidebarButton";
-import { OwnerSidebarFaqsSlot } from "./OwnerFaqsButton";
+import { OwnerFaqsButton, ownerPageSidebarFooterClass } from "./OwnerFaqsButton";
+import { ownerPageSidebarClass } from "./OwnerPageShell";
 
 export type OwnerReportType =
   | "service"
@@ -43,11 +47,7 @@ function TicketSectionHeader({
       type="button"
       onClick={onToggle}
       aria-expanded={expanded}
-      className={`flex w-full items-center justify-between rounded-full border px-4 py-2.5 text-left text-sm font-bold uppercase tracking-wide transition-colors ${
-        active
-          ? "border-blue-700 bg-blue-600 text-white shadow-md"
-          : "border-blue-600 bg-blue-100 text-blue-700 hover:bg-blue-200/80"
-      }`}
+      className={portalSidebarSectionHeaderClass(active, expanded)}
     >
       <span className="min-w-0 flex-1">Ticket Reports</span>
       <FiChevronDown
@@ -85,10 +85,7 @@ export default function OwnerReportsSidebar({
   }, [ticketActive]);
 
   return (
-    <aside
-      ref={asideRef}
-      className="relative flex w-full shrink-0 flex-col gap-3 overflow-visible lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]"
-    >
+    <aside ref={asideRef} className={ownerPageSidebarClass}>
       <div className="flex flex-col gap-3">
         {PRIMARY_REPORTS.map((item) => (
           <PortalSidebarButton
@@ -123,7 +120,11 @@ export default function OwnerReportsSidebar({
         </div>
       </div>
 
-      {onFaqsClick ? <OwnerSidebarFaqsSlot onClick={onFaqsClick} /> : null}
+      {onFaqsClick ? (
+        <div className={ownerPageSidebarFooterClass}>
+          <OwnerFaqsButton onClick={onFaqsClick} />
+        </div>
+      ) : null}
     </aside>
   );
 }

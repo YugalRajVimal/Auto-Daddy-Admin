@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { ContentPanel } from "./ContentPanel";
 
+export const adminPageTitleClass = "text-xl font-bold text-ad-green md:text-2xl";
+
+export const adminPageHeaderClass = "mb-3 flex items-center justify-between gap-3";
+
 type AdminPageProps = {
   title: string;
   children: ReactNode;
@@ -46,17 +50,17 @@ export default function AdminPage({
     <div className="bg-ad-app-bg py-4 md:py-5">
       <div className={narrowPanel ? "mx-auto w-full sm:w-[55%] sm:min-w-[320px]" : undefined}>
         {showPageTitle && (
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className={adminPageHeaderClass}>
             {onTitleClick ? (
               <button
                 type="button"
                 onClick={onTitleClick}
-                className="text-left text-xl font-bold text-ad-green hover:underline md:text-2xl"
+                className={`text-left ${adminPageTitleClass} hover:underline`}
               >
                 {title}
               </button>
             ) : (
-              <h1 className="text-xl font-bold text-ad-green md:text-2xl">{title}</h1>
+              <h1 className={adminPageTitleClass}>{title}</h1>
             )}
             {headerAction}
           </div>

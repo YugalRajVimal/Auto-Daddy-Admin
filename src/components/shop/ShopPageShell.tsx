@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import PageMeta from "../common/PageMeta";
 import { PortalPageContent } from "../admin/PortalPageContent";
 import OwnerFaqsDialog from "../owner/OwnerFaqsDialog";
+import { ownerPageHeaderClass, ownerPageTitleClass } from "../owner/OwnerPageShell";
 import ShopSidebar, { type ShopSidebarItem } from "./ShopSidebar";
 
 type ShopPageShellProps = {
@@ -66,8 +67,8 @@ export default function ShopPageShell({
       <PageMeta title={metaTitle} description={metaDescription} />
 
       {title ? (
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h1 className="text-base font-bold text-blue-700">{title}</h1>
+        <div className={ownerPageHeaderClass}>
+          <h1 className={ownerPageTitleClass}>{title}</h1>
           {headerAction}
         </div>
       ) : null}

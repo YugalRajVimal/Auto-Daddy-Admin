@@ -33,7 +33,7 @@ export function useCarOwnerProfile() {
   const { token, profile: authProfile, setProfile, refreshSession } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(true);
   const [profile, setLocalProfile] = useState<CarOwnerUserProfile | null>(null);
   const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({});
 
@@ -121,7 +121,6 @@ export function useCarOwnerProfile() {
   }, [loading, saving]);
 
   const cancelEditing = useCallback(() => {
-    setIsEditing(false);
     setFieldErrors({});
     setEditName(display.name);
     setEditEmail(display.email);
@@ -168,7 +167,6 @@ export function useCarOwnerProfile() {
       ...(editCityName.trim() ? { city: editCityName.trim() } : {}),
     };
 
-    setIsEditing(false);
     setSaving(true);
     setLocalProfile((prev) => ({
       ...(prev ?? { role: display.role }),

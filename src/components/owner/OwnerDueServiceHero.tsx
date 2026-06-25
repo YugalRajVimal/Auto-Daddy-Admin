@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiX } from "react-icons/fi";
 import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 
@@ -53,11 +53,11 @@ function VehicleDueCard({ vehicle }: { vehicle: CarOwnerVehicle }) {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-        <div className="rounded-md border border-white/50 bg-white/35 px-2 py-2 backdrop-blur-sm">
+        <div className="rounded-md border border-gray-200 bg-gray-50 px-2 py-2">
           <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Current</p>
           <p className="text-sm font-bold text-gray-800">{formatKm(vehicle.odometerReading)}</p>
         </div>
-        <div className="rounded-md border border-white/50 bg-white/35 px-2 py-2 backdrop-blur-sm">
+        <div className="rounded-md border border-gray-200 bg-gray-50 px-2 py-2">
           <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Service due</p>
           <p className="text-sm font-bold text-gray-800">{formatKm(vehicle.dueOdometerReading)}</p>
         </div>
@@ -78,9 +78,10 @@ type OwnerDueServiceHeroProps = {
   vehicles: CarOwnerVehicle[];
   loading?: boolean;
   error?: string | null;
+  onClose?: () => void;
 };
 
-export default function OwnerDueServiceHero({ vehicles, loading, error }: OwnerDueServiceHeroProps) {
+export default function OwnerDueServiceHero({ vehicles, loading, error, onClose }: OwnerDueServiceHeroProps) {
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
@@ -91,14 +92,24 @@ export default function OwnerDueServiceHero({ vehicles, loading, error }: OwnerD
   const activeVehicle = vehicles[activeIndex];
 
   const navButtonClass =
-    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/60 bg-white/30 text-ad-purple backdrop-blur-sm transition-colors hover:bg-white/50 disabled:cursor-not-allowed disabled:opacity-35";
+    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-ad-purple transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-35";
 
   return (
     <div className="absolute inset-x-0 bottom-[8%] z-10 flex justify-center px-4 sm:bottom-[10%] sm:px-6">
-      <div className="w-full max-w-md rounded-xl border border-ad-glass bg-ad-glass p-4 sm:p-5">
-        <h2 className="mb-3 text-center text-sm font-bold uppercase tracking-wide text-ad-purple">
-          Next due service
-        </h2>
+      <div className="relative w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-lg sm:p-5">
+        <div className="mb-3 flex items-center justify-center">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-ad-purple">Next due service</h2>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+              aria-label="Close next due service"
+            >
+              <FiX className="text-lg" aria-hidden />
+            </button>
+          ) : null}
+        </div>
 
         {loading ? (
           <div className="flex justify-center py-6">

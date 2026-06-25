@@ -10,10 +10,14 @@ import {
   FiStar,
   FiTool,
 } from "react-icons/fi";
-import PageMeta from "../../components/common/PageMeta";
-import { PortalPageContent } from "../../components/admin/PortalPageContent";
-import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
-import { OwnerSidebarFaqsSlot } from "../../components/owner/OwnerFaqsButton";
+import OwnerPageShell, {
+  OwnerPageSidebar,
+  ownerPageHeaderClass,
+  ownerPageLayoutClass,
+  ownerPageMainClass,
+  ownerPageSectionTitleClass,
+  ownerPageTitleClass,
+} from "../../components/owner/OwnerPageShell";
 import OwnerVehiclePlateSidebar from "../../components/owner/OwnerVehiclePlateSidebar";
 import { postJson } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
@@ -153,7 +157,7 @@ function ShopListRow({
           openToday ? "bg-ad-green" : "bg-gray-400"
         }`}
       >
-        {openToday ? "Open" : "Closed"}
+        {openToday ? "Shop is open" : "Shop is closed"}
       </span>
 
       <span className="flex h-8 w-8 shrink-0 items-center justify-center text-2xl font-bold leading-none text-ad-purple">
@@ -209,7 +213,7 @@ function ShopExpandedPanel({
               openToday ? "bg-ad-green" : "bg-gray-400"
             }`}
           >
-            {openToday ? "Open" : "Closed"}
+            {openToday ? "Shop is open" : "Shop is closed"}
           </span>
           <CompactStarRating rating={shop.rating} />
         </div>
@@ -481,30 +485,34 @@ export default function OwnerAutoShopsPage() {
   );
 
   return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title="Auto Shops | AutoDaddy" description="Find auto shops near you" />
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
-        <aside className="relative flex w-full shrink-0 flex-col gap-3 overflow-visible lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]">
-          <h2 className="px-1 text-2xl font-semibold text-gray-400">Auto Repair Shops</h2>
-
+    <OwnerPageShell
+      title={selectedVehicleId ? undefined : "Auto Repair Shops"}
+      metaTitle="Auto Shops | AutoDaddy"
+      metaDescription="Find auto shops near you"
+      faqsOpen={faqsOpen}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
+      {selectedVehicleId ? (
+        <div
+          className={`${ownerPageHeaderClass} grid grid-cols-1 gap-2 lg:grid-cols-[220px_1fr] xl:grid-cols-[260px_1fr] lg:items-center lg:gap-5`}
+        >
+          <h1 className={ownerPageTitleClass}>Auto Repair Shops</h1>
+          <h2 className={ownerPageSectionTitleClass}>Auto Repair Shop - {vehicleMakeLabel}</h2>
+        </div>
+      ) : null}
+      <div className={ownerPageLayoutClass}>
+        <OwnerPageSidebar onFaqsClick={() => setFaqsOpen(true)}>
           <OwnerVehiclePlateSidebar
             vehicles={vehicles}
             loading={vehiclesLoading}
             selectedVehicleId={selectedVehicleId}
             onSelect={handleVehicleSelect}
           />
+        </OwnerPageSidebar>
 
-          <OwnerSidebarFaqsSlot onClick={() => setFaqsOpen(true)} />
-        </aside>
-
-        <div className="flex min-h-[420px] flex-1 flex-col">
-          {selectedVehicleId ? (
-            <p className="mb-4 text-center text-base font-semibold text-blue-600">
-              Auto Repair Shop - {vehicleMakeLabel}
-            </p>
-          ) : null}
-
+        <div className={`flex min-h-[420px] flex-col ${ownerPageMainClass}`}>
           {vehiclesLoading ? (
             <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
@@ -569,13 +577,6 @@ export default function OwnerAutoShopsPage() {
           )}
         </div>
       </div>
-
-      <OwnerFaqsDialog
-        open={faqsOpen}
-        onClose={() => setFaqsOpen(false)}
-        heading={faqsHeading}
-        description={faqsDescription}
-      />
-    </PortalPageContent>
+    </OwnerPageShell>
   );
 }

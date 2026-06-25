@@ -11,13 +11,13 @@ const SECTIONS: { id: ShopWebsiteSection; label: string }[] = [
   { id: "subscription", label: "Subscription" },
 ];
 
+const PILL_BASE =
+  "w-full rounded-full border px-5 py-3 text-sm font-bold uppercase tracking-wide transition-colors";
+
 function sectionButtonClass(active: boolean) {
-  const base =
-    "w-full rounded-full px-5 py-3 text-sm font-bold uppercase tracking-wide transition-colors";
-  if (active) {
-    return `${base} border border-gray-400 bg-[#cccccc] text-gray-700 shadow-sm`;
-  }
-  return `${base} border border-[#006600] bg-[#008000] text-white hover:bg-[#006600]`;
+  return active
+    ? `${PILL_BASE} border-[#006600] bg-[#006600] text-white shadow-md`
+    : `${PILL_BASE} border-[#006600] bg-transparent text-[#006600] hover:border-[#005500] hover:bg-[#006600] hover:text-white hover:shadow-md`;
 }
 
 export default function ShopWebsiteSidebar({
