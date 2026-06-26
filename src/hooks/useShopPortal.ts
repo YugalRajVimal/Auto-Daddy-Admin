@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { getJson } from "../api/mobileAuth";
 import { useAuth } from "../auth";
 import { extractThought } from "../lib/extractThought";
 import { updateBusinessActiveStatus } from "../lib/shopOwnerApi";
-import type { DashboardIncomeOverview, ShopProfileResponse } from "../types/shopOwner";
+import { useShopOwnerData } from "../context/ShopOwnerDataProvider";
+import type { DashboardIncomeOverview } from "../types/shopOwner";
 
 export type ShopContentBlock = {
   heading?: string;
@@ -23,34 +23,21 @@ export type ShopDashboardData = {
 
 export function useShopOwnerPortal() {
   const { token } = useAuth();
-  const [dashboard, setDashboard] = useState<ShopDashboardData | null>(null);
-  const [profile, setProfile] = useState<ShopProfileResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { sections, loadSection, refreshSection } = useShopOwnerData();
   const [updatingActive, setUpdatingActive] = useState(false);
 
-  const refresh = useCallback(async () => {
-    if (!token) {
-      setDashboard(null);
-      setProfile(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const [dashRes, profileRes] = await Promise.all([
-        getJson<ShopDashboardData>("/api/auto-shop-owner/dashboard-details-new", token),
-        getJson<ShopProfileResponse>("/api/auto-shop-owner/profile", token),
-      ]);
-      if (dashRes.ok && dashRes.data) setDashboard(dashRes.data);
-      if (profileRes.ok && profileRes.data) setProfile(profileRes.data);
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
+  const portal = sections.portal;
+  const dashboard = portal.data?.dashboard ?? null;
+  const profile = portal.data?.profile ?? null;
+  const loading = portal.loading && !portal.loaded;
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void loadSection("portal");
+  }, [loadSection]);
+
+  const refresh = useCallback(async () => {
+    await refreshSection("portal");
+  }, [refreshSection]);
 
   const business = profile?.data?.businessProfile;
   const user = profile?.data?.userProfile;
@@ -94,7 +81,7 @@ export function useShopOwnerPortal() {
         setUpdatingActive(false);
       }
     },
-    [refresh, token, updatingActive]
+    [refresh, token, updatingActive],
   );
 
   return {

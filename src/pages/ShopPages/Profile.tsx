@@ -466,11 +466,9 @@ export default function ShopProfilePage() {
   return (
     <ShopPageShell
       pageHeading={
-        activeId === "open"
-          ? ""
-          : activeId === "services"
-            ? `${SECTION_TITLES.services} - ${getShopTypeLabel(shopType)}`
-            : (SECTION_TITLES[activeId] ?? "Profile")
+        activeId === "services"
+          ? `${SECTION_TITLES.services} - ${getShopTypeLabel(shopType)}`
+          : (SECTION_TITLES[activeId] ?? "Profile")
       }
       metaTitle="Profile | AutoDaddy"
       metaDescription="Auto shop owner profile"

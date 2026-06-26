@@ -1,56 +1,93 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth";
 import {
-  buildMyCustomersQuery,
-  fetchJobCards,
-  searchJobCards,
-  type MyCustomersPeriod,
-} from "../lib/shopOwnerApi";
-import { parseJobCardsFromPagePayload, type JobCardListRow } from "../lib/shopOwnerJobCards";
-
-const DEFAULT_PERIOD: MyCustomersPeriod = { timeFilter: "All", anchorDate: new Date() };
+  parseJobCardsFromPagePayload,
+  useShopOwnerData,
+  type JobCardListRow,
+} from "../context/ShopOwnerDataProvider";
+import { searchJobCards } from "../lib/shopOwnerApi";
 
 export function useShopJobCards(search?: string) {
   const { token } = useAuth();
-  const [payload, setPayload] = useState<unknown>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { sections, loadSection, refreshSection } = useShopOwnerData();
+  const state = sections.jobCards;
+  const q = (search ?? "").trim();
 
-  const refresh = useCallback(async () => {
-    if (!token) {
-      setPayload(null);
-      setLoading(false);
-      return;
-    }
-    const q = (search ?? "").trim();
-    setLoading(true);
-    setError(null);
-    try {
-      const res = q
-        ? await searchJobCards(token, q)
-        : await fetchJobCards(token, buildMyCustomersQuery(DEFAULT_PERIOD));
-      if (!res.ok) {
-        setError("Could not load job cards.");
-        setPayload(null);
-        return;
-      }
-      setPayload(res.data);
-    } catch {
-      setError("Network error.");
-      setPayload(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, search]);
+  const [searchPayload, setSearchPayload] = useState<unknown>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => void refresh(), search?.trim() ? 300 : 0);
-    return () => clearTimeout(t);
-  }, [refresh, search]);
+    if (!q) {
+      void loadSection("jobCards");
+      return;
+    }
 
-  const cards = useMemo(() => parseJobCardsFromPagePayload(payload), [payload]);
+    if (!token) {
+      setSearchPayload(null);
+      setSearchLoading(false);
+      return;
+    }
 
-  return { cards, loading, error, refresh };
+    setSearchLoading(true);
+    setSearchError(null);
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await searchJobCards(token, q);
+          if (!res.ok) {
+            setSearchError("Could not load job cards.");
+            setSearchPayload(null);
+            return;
+          }
+          setSearchPayload(res.data);
+        } catch {
+          setSearchError("Network error.");
+          setSearchPayload(null);
+        } finally {
+          setSearchLoading(false);
+        }
+      })();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [loadSection, q, token]);
+
+  const refresh = useCallback(async () => {
+    if (q) {
+      if (!token) return;
+      setSearchLoading(true);
+      setSearchError(null);
+      try {
+        const res = await searchJobCards(token, q);
+        if (!res.ok) {
+          setSearchError("Could not load job cards.");
+          setSearchPayload(null);
+          return;
+        }
+        setSearchPayload(res.data);
+      } catch {
+        setSearchError("Network error.");
+        setSearchPayload(null);
+      } finally {
+        setSearchLoading(false);
+      }
+      return;
+    }
+    await refreshSection("jobCards");
+  }, [q, refreshSection, token]);
+
+  const cards = useMemo(() => {
+    const payload = q ? searchPayload : state.data;
+    return parseJobCardsFromPagePayload(payload);
+  }, [q, searchPayload, state.data]);
+
+  return {
+    cards,
+    loading: q ? searchLoading : state.loading && !state.loaded,
+    error: q ? searchError : state.error,
+    refresh,
+  };
 }
 
 export type { JobCardListRow };
