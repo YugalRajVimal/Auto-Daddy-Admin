@@ -5,6 +5,7 @@ import { useAuth } from "../../../auth";
 import { apiMessage, removeMyServiceSubServices, saveMyServices, updateMyServices } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
 import { shopCancelButtonClass, shopSaveButtonClass } from "./ShopFormPage";
+import { ShopDialogMotion } from "../ShopAnimated";
 
 type ShopServiceSubDialogProps = {
   open: boolean;
@@ -120,14 +121,14 @@ export default function ShopServiceSubDialog({
     }
   };
 
-  if (!open || !category) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-xl">
+    <ShopDialogMotion
+      open={open && Boolean(category)}
+      onClose={onClose}
+      panelClassName="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-xl"
+    >
         <h2 className="mb-4 text-lg font-bold text-ad-purple">
-          {editIndex != null ? "Edit" : "Add"} Sub-Service — {category.name}
+          {editIndex != null ? "Edit" : "Add"} Sub-Service — {category?.name}
         </h2>
         <div className="space-y-3">
           <input className={compactInputClass} placeholder="Name *" value={name} onChange={(e) => setName(e.target.value)} />
@@ -147,7 +148,6 @@ export default function ShopServiceSubDialog({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </ShopDialogMotion>
   );
 }

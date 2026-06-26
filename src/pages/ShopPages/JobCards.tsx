@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import JobCardForm from "../../components/JobCard/JobCardForm";
+import { ShopViewTransition } from "../../components/shop/ShopAnimated";
+import { shopHeroCardBodyClass } from "../../components/shop/shopLayoutStyles";
 import ShopPageShell from "../../components/shop/ShopPageShell";
+import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
 import {
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
+  ShopListFooter,
   ShopLoadingPanel,
 } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
@@ -158,28 +162,12 @@ export default function ShopJobCardsPage() {
       onSearchChange={setSearch}
       sidebarExtra={
         <div className="flex flex-col gap-3">
-          <button
-            type="button"
-            onClick={showList}
-            className={`w-full rounded-full px-4 py-2.5 text-sm font-bold shadow-sm ${
-              view === "list"
-                ? "bg-[#008000] text-white"
-                : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
-            }`}
-          >
-            Job Card List
-          </button>
-          <button
-            type="button"
+          <ShopSidebarButton label="Job Card List" active={view === "list"} onClick={showList} />
+          <ShopSidebarButton
+            label="Create New Job Card"
+            active={view === "form" && formMode === "add"}
             onClick={openNewJobCard}
-            className={`w-full rounded-full border px-4 py-2.5 text-sm font-bold ${
-              view === "form" && formMode === "add"
-                ? "border-ad-purple bg-[#fce8f0] text-ad-purple"
-                : "border-ad-purple bg-[#fce8f0] text-ad-purple hover:bg-[#f9dce8]"
-            }`}
-          >
-            Create New Job Card
-          </button>
+          />
         </div>
       }
       onFaqsOpen={() => setFaqsOpen(true)}
@@ -188,7 +176,10 @@ export default function ShopJobCardsPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+      <ShopViewTransition
+        viewKey={view === "form" ? `form-${formMode}-${editJobCardId ?? "new"}` : "list"}
+        className={shopHeroCardBodyClass}
+      >
         {view === "form" ? (
           <JobCardForm
             active
@@ -200,14 +191,14 @@ export default function ShopJobCardsPage() {
         ) : (
           <>
             {loading ? (
-              <ShopLoadingPanel className="min-h-0 flex-1" />
+              <ShopLoadingPanel variant="split-row" count={5} />
             ) : error ? (
-              <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+              <ShopErrorPanel message={error} onRetry={() => void refresh()} />
             ) : cards.length === 0 ? (
-              <ShopEmptyPanel className="min-h-0 flex-1" message="No job cards yet." />
+              <ShopEmptyPanel message="No job cards yet." />
             ) : (
               <>
-                <ShopListPanel className="min-h-0 flex-1">
+                <ShopListPanel>
                   {paginatedList.map((jc) => (
                     <JobCardRow
                       key={jc.id}
@@ -218,8 +209,8 @@ export default function ShopJobCardsPage() {
                   ))}
                 </ShopListPanel>
 
-                <footer className="mt-3 flex items-center justify-between gap-3 pt-2">
-                  <p className="text-sm font-semibold text-blue-700">{cards.length} Entries</p>
+                <ShopListFooter>
+                  <p>{cards.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
@@ -242,12 +233,12 @@ export default function ShopJobCardsPage() {
                       })}
                     </div>
                   ) : null}
-                </footer>
+                </ShopListFooter>
               </>
             )}
           </>
         )}
-      </div>
+      </ShopViewTransition>
     </ShopPageShell>
   );
 }

@@ -449,7 +449,7 @@ export function ShopJobCardEditPage() {
   if (!editRaw) {
     return (
       <ShopFormPage title="Edit Job Card" metaTitle="Edit Job Card | AutoDaddy" backTo="/shop/job-cards">
-        <p className="text-sm text-gray-600">Job card not found.</p>
+        <p className="text-sm text-white/85">Job card not found.</p>
       </ShopFormPage>
     );
   }

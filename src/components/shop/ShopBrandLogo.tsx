@@ -38,9 +38,8 @@ export default function ShopBrandLogo({
         <img
           src={trimmed}
           alt={alt}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-150 ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-150 ${loaded ? "opacity-100" : "opacity-0"
+            }`}
           onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
         />

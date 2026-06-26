@@ -59,8 +59,9 @@ export function useShopOwnerPortal() {
   const displayName =
     dashboard?.businessName?.trim() ||
     business?.businessName?.trim() ||
-    user?.name?.trim() ||
     "";
+
+  const businessNameLoaded = !loading;
 
   const city = business?.city?.trim() || "";
   const daysLeft = dashboard?.subscriptionDaysLeftCount;
@@ -98,6 +99,7 @@ export function useShopOwnerPortal() {
 
   return {
     loading,
+    businessNameLoaded,
     refresh,
     displayName,
     city,

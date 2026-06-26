@@ -4,10 +4,14 @@ import CarOwnerAddEditForm, {
   type CarOwnerFormRecord,
 } from "../../components/admin/CarOwnerAddEditForm";
 import ShopPageShell from "../../components/shop/ShopPageShell";
+import { ShopViewTransition } from "../../components/shop/ShopAnimated";
+import { shopHeroCardBodyClass } from "../../components/shop/shopLayoutStyles";
+import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
 import {
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
+  ShopListFooter,
   ShopLoadingPanel,
 } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
@@ -22,12 +26,6 @@ const PEOPLE_SECTIONS = [{ id: "customers", label: "My Customers", variant: "pri
 const PEOPLE_SEARCH_INPUT_ID = "shop-people-customer-search";
 
 const PAGE_SIZE = 10;
-
-function peopleSidebarBtn(highlighted: boolean) {
-  return highlighted
-    ? "w-full rounded-full border border-[#006600] bg-[#008000] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors"
-    : "w-full rounded-full border border-[#008000] bg-transparent px-4 py-2.5 text-sm font-bold text-[#008000] transition-colors hover:border-[#006600] hover:bg-[#008000] hover:text-white hover:shadow-sm";
-}
 
 function customerId(c: MyCustomer) {
   return c.carOwnerId ?? c.id ?? c._id ?? "";
@@ -245,27 +243,17 @@ export default function ShopPeoplePage() {
       onSidebarSelect={() => showMyCustomers()}
       sidebarFooter={
         <div className="flex flex-col gap-3">
-          <button
-            type="button"
-            onClick={openAddCustomer}
-            className="w-full rounded-full bg-[#008000] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#006600]"
-          >
-            Add New Customer
-          </button>
-          <button
-            type="button"
+          <ShopSidebarButton label="Add New Customer" onClick={openAddCustomer} />
+          <ShopSidebarButton
+            label="Find Customer"
+            active={isSearchForm && formState.intent === "find"}
             onClick={showFindCustomer}
-            className={peopleSidebarBtn(isSearchForm && formState.intent === "find")}
-          >
-            Find Customer
-          </button>
-          <button
-            type="button"
+          />
+          <ShopSidebarButton
+            label="Vehicles"
+            active={isSearchForm && formState.intent === "vehicles"}
             onClick={showVehicles}
-            className={peopleSidebarBtn(isSearchForm && formState.intent === "vehicles")}
-          >
-            Vehicles
-          </button>
+          />
         </div>
       }
       onFaqsOpen={() => setFaqsOpen(true)}
@@ -274,7 +262,18 @@ export default function ShopPeoplePage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+      <ShopViewTransition
+        viewKey={
+          formState
+            ? formState.mode === "add"
+              ? "add-customer"
+              : formState.mode === "search"
+                ? `search-${formState.intent}`
+                : `edit-${customerId(formState.customer)}`
+            : "list"
+        }
+        className={shopHeroCardBodyClass}
+      >
         {formState ? (
           <CarOwnerAddEditForm
             key={
@@ -304,14 +303,14 @@ export default function ShopPeoplePage() {
         ) : (
           <>
             {listLoading ? (
-              <ShopLoadingPanel className="min-h-0 flex-1" />
+              <ShopLoadingPanel variant="customer-card" count={5} />
             ) : listError ? (
-              <ShopErrorPanel className="min-h-0 flex-1" message={listError} onRetry={() => void refresh()} />
+              <ShopErrorPanel message={listError} onRetry={() => void refresh()} />
             ) : customers.length === 0 ? (
-              <ShopEmptyPanel className="min-h-0 flex-1" message={emptyMessage} />
+              <ShopEmptyPanel message={emptyMessage} />
             ) : (
               <>
-                <ShopListPanel className="min-h-0 flex-1">
+                <ShopListPanel>
                   {paginatedCustomers.map((c) => (
                     <CustomerCard
                       key={customerId(c) || c.name}
@@ -321,8 +320,8 @@ export default function ShopPeoplePage() {
                   ))}
                 </ShopListPanel>
 
-                <footer className="mt-3 flex items-center justify-between gap-3 pt-2">
-                  <p className="text-sm font-semibold text-blue-700">{customers.length} Entries</p>
+                <ShopListFooter>
+                  <p>{customers.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
@@ -344,12 +343,12 @@ export default function ShopPeoplePage() {
                       })}
                     </div>
                   ) : null}
-                </footer>
+                </ShopListFooter>
               </>
             )}
           </>
         )}
-      </div>
+      </ShopViewTransition>
     </ShopPageShell>
   );
 }

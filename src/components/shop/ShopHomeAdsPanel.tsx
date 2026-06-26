@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PartsDealerCard } from "../../hooks/usePartsDealers";
 import { DUMMY_SALVAGE_DEALS, type SalvageDeal } from "../../lib/dummySalvageDeals";
 import ShopAdDetailDialog from "./ShopAdDetailDialog";
@@ -16,6 +16,10 @@ type ShopHomeAdsPanelProps = {
   loading?: boolean;
   salvageDeals?: SalvageDeal[];
   onPhaseChange?: (phase: ShopAdPhase) => void;
+  onPartsDealerSelect?: (dealer: PartsDealerCard) => void;
+  onSalvageDealSelect?: (deal: SalvageDeal) => void;
+  /** Pauses carousel rotation while ad detail is shown elsewhere (e.g. hero card). */
+  detailOpen?: boolean;
 };
 
 function curtainClass(index: number, activeIndex: number, leavingIndex: number | null, direction: SlideDirection): string {
@@ -42,7 +46,11 @@ export default function ShopHomeAdsPanel({
   loading,
   salvageDeals = DUMMY_SALVAGE_DEALS,
   onPhaseChange,
+  onPartsDealerSelect,
+  onSalvageDealSelect,
+  detailOpen = false,
 }: ShopHomeAdsPanelProps) {
+  const useExternalDetail = onPartsDealerSelect != null || onSalvageDealSelect != null;
   const [phase, setPhase] = useState<ShopAdPhase>("parts");
   const [activeIndex, setActiveIndex] = useState(0);
   const [leavingIndex, setLeavingIndex] = useState<number | null>(null);
@@ -62,6 +70,10 @@ export default function ShopHomeAdsPanel({
 
   const items = phase === "parts" ? partsDealers : salvageDeals;
   const hasMultiple = items.length > 1;
+  const partsDealersKey = useMemo(
+    () => partsDealers.map((dealer) => dealer.name).join("\0"),
+    [partsDealers],
+  );
 
   useEffect(() => {
     activeIndexRef.current = activeIndex;
@@ -169,11 +181,11 @@ export default function ShopHomeAdsPanel({
     setVisitedSalvage(new Set());
     setTimerKey((key) => key + 1);
     onPhaseChange?.("parts");
-  }, [clearCurtainTimer, partsDealers, onPhaseChange]);
+  }, [clearCurtainTimer, partsDealersKey, onPhaseChange]);
 
   useEffect(() => () => clearCurtainTimer(), [clearCurtainTimer]);
 
-  const paused = hovered || dialogOpen || leavingIndex !== null;
+  const paused = hovered || dialogOpen || detailOpen || leavingIndex !== null;
 
   useEffect(() => {
     if (loading || paused || items.length === 0) return;
@@ -183,12 +195,20 @@ export default function ShopHomeAdsPanel({
   }, [advance, paused, items.length, loading, timerKey]);
 
   const openPartsDialog = (dealer: PartsDealerCard) => {
+    if (onPartsDealerSelect) {
+      onPartsDealerSelect(dealer);
+      return;
+    }
     setSelectedSalvageDeal(null);
     setSelectedPartsDealer(dealer);
     setDialogOpen(true);
   };
 
   const openSalvageDialog = (deal: SalvageDeal) => {
+    if (onSalvageDealSelect) {
+      onSalvageDealSelect(deal);
+      return;
+    }
     setSelectedPartsDealer(null);
     setSelectedSalvageDeal(deal);
     setDialogOpen(true);
@@ -283,12 +303,14 @@ export default function ShopHomeAdsPanel({
           ) : null}
       </div>
 
-      <ShopAdDetailDialog
-        open={dialogOpen}
-        onClose={closeDialog}
-        partsDealer={selectedPartsDealer}
-        salvageDeal={selectedSalvageDeal}
-      />
+      {useExternalDetail ? null : (
+        <ShopAdDetailDialog
+          open={dialogOpen}
+          onClose={closeDialog}
+          partsDealer={selectedPartsDealer}
+          salvageDeal={selectedSalvageDeal}
+        />
+      )}
     </>
   );
 }

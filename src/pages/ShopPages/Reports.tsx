@@ -6,6 +6,7 @@ import {
   ShopGreenRow,
   ShopListPanel,
   ShopLoadingPanel,
+  ShopPageContentShell,
   ShopRefreshButton,
 } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
@@ -54,15 +55,15 @@ export default function ShopReportsPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+      <ShopPageContentShell>
         {loading ? (
-          <ShopLoadingPanel className="min-h-0 flex-1" />
+          <ShopLoadingPanel variant="green-row" count={5} />
         ) : error ? (
-          <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+          <ShopErrorPanel message={error} onRetry={() => void refresh()} />
         ) : filtered.length === 0 ? (
-          <ShopEmptyPanel className="min-h-0 flex-1" message={`No ${activeId === "resolved" ? "resolved" : "open"} payment records.`} />
+          <ShopEmptyPanel message={`No ${activeId === "resolved" ? "resolved" : "open"} payment records.`} />
         ) : (
-          <ShopListPanel className="min-h-0 flex-1">
+          <ShopListPanel>
             {filtered.map((row, idx) => (
               <ShopGreenRow
                 key={pickField(row, ["_id", "id"]) !== "—" ? pickField(row, ["_id", "id"]) : String(idx)}
@@ -88,7 +89,7 @@ export default function ShopReportsPage() {
             ))}
           </ShopListPanel>
         )}
-      </div>
+      </ShopPageContentShell>
     </ShopPageShell>
   );
 }

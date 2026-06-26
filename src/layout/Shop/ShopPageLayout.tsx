@@ -2,7 +2,10 @@ import { Outlet } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import ShopBusinessProfileCard from "../../components/shop/ShopBusinessProfileCard";
+import ShopHeroCardToolbar from "../../components/shop/ShopHeroCardToolbar";
 import ShopPrimaryNav from "../../components/shop/ShopPrimaryNav";
+import ShopProfileHeroPanel from "../../components/shop/ShopProfileHeroPanel";
+import { shopHeroCardBodyClass, shopHeroCardScrollClass, shopPortalHorizPaddingClass } from "../../components/shop/shopLayoutStyles";
 import ShopSidebar from "../../components/shop/ShopSidebar";
 import { shopPrimaryNav } from "../../config/shopNav";
 import {
@@ -10,12 +13,9 @@ import {
   useShopPageChromeContext,
 } from "../../context/ShopPageChromeContext";
 
-const SHOP_MAIN_SEARCH_CLASS =
-  "w-full max-w-xs rounded-full border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 sm:max-w-sm";
-
-/** Row 1: [empty | nav]. Row 2: [sidebar | toolbar + main content]. */
+/** Row 1: [empty | nav]. Row 2: [sidebar | main content card]. */
 export const shopPageBodyGridClass =
-  "grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-5 lg:gap-y-3 xl:grid-cols-[260px_minmax(0,1fr)]";
+  "grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)] lg:items-stretch lg:gap-x-5 lg:gap-y-3 xl:grid-cols-[260px_minmax(0,1fr)]";
 
 export default function ShopPageLayout() {
   const { chrome } = useShopPageChromeContext();
@@ -23,6 +23,7 @@ export default function ShopPageLayout() {
   const metaTitle = chrome.metaTitle ?? DEFAULT_SHOP_PAGE_CHROME.metaTitle!;
   const metaDescription = chrome.metaDescription ?? DEFAULT_SHOP_PAGE_CHROME.metaDescription!;
   const showBusinessCard = chrome.sidebarVariant === "business-card";
+  const useHeroCard = chrome.heroCard !== false;
   const showSearch = chrome.searchPlaceholder != null;
   const showToolbar = showSearch || chrome.headerAction;
 
@@ -36,6 +37,8 @@ export default function ShopPageLayout() {
       heading={chrome.sidebarHeading}
       headingClassName={chrome.sidebarHeadingClassName}
       footer={chrome.sidebarFooter}
+      loading={chrome.sidebarLoading}
+      skeletonCount={chrome.sidebarSkeletonCount}
       shopStyle
       className="lg:!h-auto lg:!max-h-none"
     >
@@ -43,51 +46,50 @@ export default function ShopPageLayout() {
     </ShopSidebar>
   );
 
+  const pageContent = useHeroCard ? (
+    <ShopProfileHeroPanel>
+      <div className="flex h-full min-h-0 w-full flex-col">
+        {showToolbar ? (
+          <div className="shrink-0">
+            <ShopHeroCardToolbar
+              searchInputId={chrome.searchInputId}
+              searchPlaceholder={chrome.searchPlaceholder}
+              searchValue={chrome.searchValue}
+              onSearchChange={chrome.onSearchChange}
+              headerAction={chrome.headerAction}
+            />
+          </div>
+        ) : null}
+        <div className={shopHeroCardScrollClass}>
+          <div className={`${shopHeroCardBodyClass} min-h-full`}>
+            <Outlet />
+          </div>
+        </div>
+      </div>
+    </ShopProfileHeroPanel>
+  ) : (
+    <Outlet />
+  );
+
   return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
+    <PortalPageContent
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden py-3 md:py-4 ${shopPortalHorizPaddingClass}`}
+    >
       <PageMeta title={metaTitle} description={metaDescription} />
 
       <div className={shopPageBodyGridClass}>
         <ShopPrimaryNav
           homePath="/shop"
           primaryNav={shopPrimaryNav}
-          className="order-1 lg:col-start-2 lg:row-start-1"
+          className="order-1 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:justify-self-stretch"
         />
 
         <div className="order-2 lg:col-start-1 lg:row-start-2 lg:self-start">
           {sidebarCell}
         </div>
 
-        <div className="order-3 flex min-w-0 flex-col gap-2 lg:col-start-2 lg:row-start-2">
-          {showToolbar ? (
-            <div
-              className={`flex flex-wrap items-center gap-3 ${
-                showSearch && chrome.headerAction
-                  ? "justify-between"
-                  : chrome.headerAction
-                    ? "justify-end"
-                    : "justify-start"
-              }`}
-            >
-              {showSearch ? (
-                <input
-                  id={chrome.searchInputId}
-                  type="search"
-                  value={chrome.searchValue ?? ""}
-                  onChange={(e) => chrome.onSearchChange?.(e.target.value)}
-                  placeholder={chrome.searchPlaceholder}
-                  className={SHOP_MAIN_SEARCH_CLASS}
-                />
-              ) : null}
-              {chrome.headerAction ? (
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                  {chrome.headerAction}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          <Outlet />
+        <div className="order-3 flex min-h-0 min-w-0 flex-col overflow-hidden lg:col-start-2 lg:row-start-2">
+          {pageContent}
         </div>
       </div>
     </PortalPageContent>

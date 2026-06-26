@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopListPanel, ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { ShopListPanel, ShopLoadingPanel, ShopPageContentShell } from "../../components/shop/ShopPanels";
+import { shopHeroOnImageMutedTextClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { deleteTeamMember, fetchTeamMembers } from "../../lib/shopOwnerMutations";
@@ -68,13 +69,13 @@ export default function ShopTeamPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+      <ShopPageContentShell>
         {loading ? (
-          <ShopLoadingPanel className="min-h-0 flex-1" />
+          <ShopLoadingPanel variant="team-row" count={4} />
         ) : (
-          <ShopListPanel className="min-h-0 flex-1">
+          <ShopListPanel>
           {members.length === 0 ? (
-            <p className="text-sm text-gray-600">No team members yet.</p>
+            <p className={`text-sm ${shopHeroOnImageMutedTextClass}`}>No team members yet.</p>
           ) : (
             members.map((m) => {
               const id = String(m._id ?? m.id ?? "");
@@ -95,7 +96,7 @@ export default function ShopTeamPage() {
           )}
         </ShopListPanel>
         )}
-      </div>
+      </ShopPageContentShell>
     </ShopPageShell>
   );
 }

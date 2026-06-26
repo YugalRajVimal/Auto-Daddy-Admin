@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { FiImage } from "react-icons/fi";
+import { Skeleton } from "../common/Skeleton";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { getShopTypeLabel } from "../../lib/shopTypes";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
@@ -8,10 +9,9 @@ const CARD_CLASS =
   "flex w-full shrink-0 flex-col overflow-hidden rounded-lg border border-white/70 bg-ad-glass shadow-md lg:w-[220px] xl:w-[260px]";
 
 export default function ShopBusinessProfileCard() {
-  const { business, user, displayName, city, businessPhone } = useShopOwnerPortal();
+  const { business, user, displayName, city, businessPhone, businessNameLoaded } = useShopOwnerPortal();
 
-  const businessName =
-    business?.businessName?.trim() || displayName || "Your Business";
+  const businessName = business?.businessName?.trim() || displayName || "Your Business";
   const location = business?.city?.trim() || city || "—";
   const phone =
     business?.businessPhone?.trim() || businessPhone?.trim() || user?.phone?.trim();
@@ -40,7 +40,11 @@ export default function ShopBusinessProfileCard() {
       </div>
 
       <div className="bg-[#008000] px-3 py-2.5 text-center text-sm font-bold text-white">
-        {businessName}
+        {businessNameLoaded ? (
+          businessName
+        ) : (
+          <Skeleton className="mx-auto h-4 w-32 rounded bg-white/30" pulse={false} />
+        )}
       </div>
 
       <div className="flex flex-col items-center gap-3 px-3 py-4">

@@ -3,9 +3,11 @@ import { Link, Outlet, useLocation } from "react-router";
 import { FiBell } from "react-icons/fi";
 import useAuth from "../../auth/useAuth";
 import { getActivePrimaryItem, type NavItem } from "../../config/adminNav";
+import { Skeleton } from "../common/Skeleton";
 import { useShopPageChromeContext } from "../../context/ShopPageChromeContext";
 import type { PortalBrandLogo } from "../admin/PortalShell";
 import ShopBrandLogo from "./ShopBrandLogo";
+import { shopPortalHorizPaddingClass } from "./shopLayoutStyles";
 
 function isPathActive(pathname: string, path: string, homePath: string) {
   if (path === homePath) return pathname === homePath;
@@ -18,6 +20,7 @@ export type ShopPortalShellProps = {
   primaryNav: NavItem[];
   brandLogo?: PortalBrandLogo;
   businessName: string;
+  businessNameLoading?: boolean;
   city?: string;
   subscriptionDaysLeft?: number | null;
   helpPath?: string;
@@ -29,6 +32,7 @@ export default function ShopPortalShell({
   primaryNav,
   brandLogo,
   businessName,
+  businessNameLoading = false,
   city,
   subscriptionDaysLeft,
   helpPath,
@@ -68,22 +72,29 @@ export default function ShopPortalShell({
 
   return (
     <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
-      <header className="px-3 pt-4 pb-1 sm:px-4 md:pt-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link to={homePath} className="shrink-0">
-              {headerLogo}
-            </Link>
-            <Link
-              to={homePath}
-              className="min-w-0 truncate font-serif text-lg italic text-gray-500 hover:text-gray-600 sm:text-xl md:text-2xl"
-            >
-              {businessName}
-            </Link>
+      <header className={`${shopPortalHorizPaddingClass} pt-4 pb-1 md:pt-5`}>
+        <div className="grid grid-cols-[auto_1fr_auto] items-start gap-x-3 gap-y-3">
+          <Link to={homePath} className="row-span-2 shrink-0 self-start">
+            {headerLogo}
+          </Link>
+
+          <div className="min-w-0 flex items-center">
+            {businessNameLoading ? (
+              <span aria-busy="true" aria-label="Loading business name">
+                <Skeleton className="h-7 w-36 rounded sm:h-8 sm:w-44 md:h-9 md:w-52" />
+              </span>
+            ) : (
+              <Link
+                to={homePath}
+                className="min-w-0 truncate font-serif text-lg italic text-gray-500 hover:text-gray-600 sm:text-xl md:text-2xl"
+              >
+                {businessName || "Your Business"}
+              </Link>
+            )}
           </div>
 
           <nav
-            className="flex shrink-0 items-center gap-0 [&>*+*]:-ml-px"
+            className="flex shrink-0 items-center gap-0 self-start [&>*+*]:-ml-px"
             aria-label="Account actions"
           >
             {subscriptionDaysLeft != null ? (
@@ -99,10 +110,8 @@ export default function ShopPortalShell({
               Log out
             </button>
           </nav>
-        </div>
 
-        <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-0.5">
-          <div className="min-w-0 justify-self-start">
+          <div className="col-start-2 row-start-2 min-w-0 justify-self-start self-center">
             {city ? (
               <Link
                 to={profilePath}
@@ -110,14 +119,14 @@ export default function ShopPortalShell({
               >
                 {city}
               </Link>
-            ) : (
-              <span />
-            )}
+            ) : null}
           </div>
-          <h1 className="text-center font-serif text-lg font-bold text-gray-600 md:text-xl lg:text-2xl">
+
+          <h1 className="pointer-events-none col-start-2 col-end-4 row-start-2 self-center text-center font-serif text-lg font-bold text-gray-600 md:text-xl lg:text-2xl">
             {pageHeading}
           </h1>
-          <div className="flex justify-end justify-self-end">
+
+          <div className="relative z-10 col-start-3 row-start-2 flex justify-end justify-self-end self-center">
             <button
               type="button"
               className="relative text-blue-600 hover:text-blue-700"
@@ -130,7 +139,6 @@ export default function ShopPortalShell({
             </button>
           </div>
         </div>
-
       </header>
 
       <main className="min-h-0 flex-1">

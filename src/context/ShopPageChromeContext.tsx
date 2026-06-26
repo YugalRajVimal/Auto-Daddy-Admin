@@ -3,6 +3,7 @@ import {
   useContext,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type ReactNode,
@@ -16,6 +17,9 @@ export type ShopPageChromeConfig = {
   metaTitle?: string;
   metaDescription?: string;
   sidebarItems?: ShopSidebarItem[];
+  /** Placeholder sidebar pills while dynamic nav items load. */
+  sidebarLoading?: boolean;
+  sidebarSkeletonCount?: number;
   activeSidebarId?: string | null;
   onSidebarSelect?: (id: string) => void;
   searchPlaceholder?: string;
@@ -36,6 +40,8 @@ export type ShopPageChromeConfig = {
   pageHeading?: string;
   /** `business-card` shows the profile card; `nav` shows section buttons. */
   sidebarVariant?: "business-card" | "nav";
+  /** When false, uses the home hero layout instead of the profile background card. */
+  heroCard?: boolean;
   /** When false, main content starts flush with the sidebar top (e.g. home hero). */
   contentTopOffset?: boolean;
 };
@@ -79,36 +85,47 @@ export function useShopPageChromeContext() {
   return ctx;
 }
 
+function isSameChromeConfig(prev: ShopPageChromeConfig, next: ShopPageChromeConfig): boolean {
+  return (
+    prev.title === next.title &&
+    prev.metaTitle === next.metaTitle &&
+    prev.metaDescription === next.metaDescription &&
+    prev.sidebarItems === next.sidebarItems &&
+    prev.sidebarLoading === next.sidebarLoading &&
+    prev.sidebarSkeletonCount === next.sidebarSkeletonCount &&
+    prev.activeSidebarId === next.activeSidebarId &&
+    prev.onSidebarSelect === next.onSidebarSelect &&
+    prev.searchPlaceholder === next.searchPlaceholder &&
+    prev.searchValue === next.searchValue &&
+    prev.onSearchChange === next.onSearchChange &&
+    prev.sidebarHeading === next.sidebarHeading &&
+    prev.sidebarHeadingClassName === next.sidebarHeadingClassName &&
+    prev.sidebarExtra === next.sidebarExtra &&
+    prev.sidebarFooter === next.sidebarFooter &&
+    prev.searchInputId === next.searchInputId &&
+    prev.faqsOpen === next.faqsOpen &&
+    prev.onFaqsOpen === next.onFaqsOpen &&
+    prev.onFaqsClose === next.onFaqsClose &&
+    prev.faqsHeading === next.faqsHeading &&
+    prev.faqsDescription === next.faqsDescription &&
+    prev.headerAction === next.headerAction &&
+    prev.pageHeading === next.pageHeading &&
+    prev.sidebarVariant === next.sidebarVariant &&
+    prev.heroCard === next.heroCard &&
+    prev.contentTopOffset === next.contentTopOffset
+  );
+}
+
 /** Register page chrome (title, sidebar, FAQs) with the persistent shop layout. */
 export function useShopPageChrome(config: ShopPageChromeConfig) {
   const { setChrome } = useShopPageChromeContext();
+  const configRef = useRef(config);
+  configRef.current = config;
 
   useLayoutEffect(() => {
-    setChrome({ ...DEFAULT_SHOP_PAGE_CHROME, ...config });
-  }, [
-    setChrome,
-    config.title,
-    config.metaTitle,
-    config.metaDescription,
-    config.sidebarItems,
-    config.activeSidebarId,
-    config.onSidebarSelect,
-    config.searchPlaceholder,
-    config.searchValue,
-    config.onSearchChange,
-    config.sidebarHeading,
-    config.sidebarHeadingClassName,
-    config.sidebarExtra,
-    config.sidebarFooter,
-    config.searchInputId,
-    config.faqsOpen,
-    config.onFaqsOpen,
-    config.onFaqsClose,
-    config.faqsHeading,
-    config.faqsDescription,
-    config.headerAction,
-    config.pageHeading,
-    config.sidebarVariant,
-    config.contentTopOffset,
-  ]);
+    setChrome((prev) => {
+      const next = { ...DEFAULT_SHOP_PAGE_CHROME, ...configRef.current };
+      return isSameChromeConfig(prev, next) ? prev : next;
+    });
+  });
 }

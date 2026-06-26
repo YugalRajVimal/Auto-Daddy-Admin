@@ -3,11 +3,12 @@ import ShopServiceSubDialog from "../../components/shop/forms/ShopServiceSubDial
 import ServiceImage from "../../components/shop/ServiceImage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
-  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
+  ShopListFooter,
   ShopLoadingPanel,
+  ShopPageContentShell,
 } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
@@ -123,9 +124,22 @@ export default function ShopServicesPage() {
 
   return (
     <ShopPageShell
-      title="My Services"
+      pageHeading={activeCategory?.name ?? "My Services"}
       metaTitle="Services | AutoDaddy"
       metaDescription="Auto shop services"
+      headerAction={
+        activeCategory ? (
+          <button
+            type="button"
+            className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
+            onClick={() => openAdd(activeCategory)}
+          >
+            + Add New
+          </button>
+        ) : undefined
+      }
+      sidebarLoading={loading}
+      sidebarSkeletonCount={5}
       sidebarItems={categories.map((cat) => ({
         id: cat.id,
         label: cat.name ?? "Category",
@@ -139,36 +153,22 @@ export default function ShopServicesPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+      <ShopPageContentShell>
         {loading ? (
-          <ShopLoadingPanel className="min-h-0 flex-1" />
+          <ShopLoadingPanel variant="media-card" count={5} />
         ) : error && !usingDummy ? (
-          <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+          <ShopErrorPanel message={error} onRetry={() => void refresh()} />
         ) : categories.length === 0 ? (
           <ShopEmptyPanel
-            className="min-h-0 flex-1"
             message="No service categories yet. Select services from Profile → Operational Services."
           />
         ) : activeCategory ? (
           <>
-            <ShopContentHeader
-              title={activeCategory.name ?? "Category"}
-              action={
-                <button
-                  type="button"
-                  className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
-                  onClick={() => openAdd(activeCategory)}
-                >
-                  + Add New
-                </button>
-              }
-            />
-
             {subs.length === 0 ? (
-              <ShopEmptyPanel className="min-h-0 flex-1" message="No sub-services yet." />
+              <ShopEmptyPanel message="No sub-services yet." />
             ) : (
               <>
-                <ShopListPanel className="min-h-0 flex-1">
+                <ShopListPanel>
                   {paginatedSubs.map((sub, idx) => {
                     const subIdx = (safePage - 1) * PAGE_SIZE + idx;
                     return (
@@ -181,8 +181,8 @@ export default function ShopServicesPage() {
                   })}
                 </ShopListPanel>
 
-                <footer className="mt-3 flex items-center justify-between gap-3 pt-2">
-                  <p className="text-sm font-semibold text-blue-700">{subs.length} Entries</p>
+                <ShopListFooter>
+                  <p>{subs.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
@@ -204,12 +204,12 @@ export default function ShopServicesPage() {
                       })}
                     </div>
                   ) : null}
-                </footer>
+                </ShopListFooter>
               </>
             )}
           </>
         ) : null}
-      </div>
+      </ShopPageContentShell>
 
       <ShopServiceSubDialog
         open={dialogOpen}

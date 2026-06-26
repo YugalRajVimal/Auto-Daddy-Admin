@@ -1,5 +1,27 @@
 import type { ReactNode } from "react";
-import { ShopContentSkeleton } from "../common/Skeleton";
+import {
+  ShopListSkeleton,
+  type ShopLoadingVariant,
+} from "./ShopListSkeletons";
+import {
+  shopHeroCardBodyClass,
+  shopHeroFooterTextClass,
+  shopHeroOpaqueSurfaceClass,
+  shopMainContentFillClass,
+} from "./shopLayoutStyles";
+
+export type { ShopLoadingVariant };
+
+/** Inner flex column for page content inside the hero card body. */
+export function ShopPageContentShell({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`${shopHeroCardBodyClass} ${className}`.trim()}>{children}</div>;
+}
 
 /** Section row inside main content: left heading, right actions. */
 export function ShopContentHeader({
@@ -26,14 +48,18 @@ export function ShopContentHeader({
   );
 }
 
-export function ShopLoadingPanel({ className = "" }: { className?: string }) {
+export function ShopLoadingPanel({
+  className = "",
+  variant = "media-card",
+  count = 5,
+}: {
+  className?: string;
+  variant?: ShopLoadingVariant;
+  count?: number;
+}) {
   return (
-    <div
-      className={`flex min-h-[420px] flex-1 lg:min-h-[calc(100vh-220px)] ${className}`}
-      aria-busy="true"
-      aria-label="Loading"
-    >
-      <ShopContentSkeleton className="w-full" />
+    <div className={`${shopMainContentFillClass} ${className}`.trim()}>
+      <ShopListSkeleton variant={variant} count={count} className="w-full" />
     </div>
   );
 }
@@ -41,7 +67,7 @@ export function ShopLoadingPanel({ className = "" }: { className?: string }) {
 export function ShopEmptyPanel({ message, className = "" }: { message: string; className?: string }) {
   return (
     <div
-      className={`flex min-h-[420px] flex-1 items-center justify-center rounded-md border border-white/70 bg-ad-glass p-6 text-center text-sm text-gray-600 lg:min-h-[calc(100vh-220px)] ${className}`}
+      className={`${shopMainContentFillClass} ${shopHeroOpaqueSurfaceClass} items-center justify-center rounded-md border border-white/70 bg-ad-glass p-6 text-center text-sm text-gray-600 ${className}`}
     >
       {message}
     </div>
@@ -59,7 +85,7 @@ export function ShopErrorPanel({
 }) {
   return (
     <div
-      className={`flex min-h-[420px] flex-1 flex-col items-center justify-center gap-3 rounded-md border border-white/70 bg-ad-glass p-6 text-center lg:min-h-[calc(100vh-220px)] ${className}`}
+      className={`${shopMainContentFillClass} ${shopHeroOpaqueSurfaceClass} items-center justify-center gap-3 rounded-md border border-white/70 bg-ad-glass p-6 text-center ${className}`}
     >
       <p className="text-sm font-semibold text-gray-800">{message}</p>
       {onRetry ? (
@@ -75,6 +101,20 @@ export function ShopErrorPanel({
   );
 }
 
+export function ShopListFooter({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <footer className={`mt-3 flex items-center justify-between gap-3 pt-2 ${shopHeroFooterTextClass} ${className}`.trim()}>
+      {children}
+    </footer>
+  );
+}
+
 export function ShopListPanel({
   children,
   className = "",
@@ -83,9 +123,7 @@ export function ShopListPanel({
   className?: string;
 }) {
   return (
-    <div
-      className={`flex min-h-[420px] flex-1 flex-col gap-3 overflow-y-auto lg:min-h-[calc(100vh-220px)] ${className}`}
-    >
+    <div className={`${shopMainContentFillClass} gap-3 ${className}`.trim()}>
       {children}
     </div>
   );

@@ -271,6 +271,35 @@
 }
 
 @layer components {
+  /* Hero card: solid surfaces for nested cards (do not alter their text colors). */
+  .shop-hero-card .shop-hero-surface,
+  .shop-hero-card .bg-ad-form-bg,
+  .shop-hero-card .bg-ad-form-required-bg,
+  .shop-hero-card .rounded-md.border.border-gray-200.bg-white,
+  .shop-hero-card .rounded-lg.border.border-gray-200.bg-white,
+  .shop-hero-card .rounded-xl.border.border-gray-200.bg-white,
+  .shop-hero-card .rounded-2xl.border.border-gray-200.bg-white {
+    background: #ffffff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: #e5e7eb;
+  }
+
+  .shop-hero-card .bg-ad-form-bg,
+  .shop-hero-card .bg-ad-form-required-bg {
+    background: var(--color-ad-form-bg);
+    border-color: var(--color-ad-form-border);
+  }
+
+  .shop-hero-card .bg-ad-glass {
+    background: #ffffff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: #e5e7eb;
+  }
+}
+
+@layer components {
   .rounded-md.border.border-gray-200.bg-white,
   .rounded-lg.border.border-gray-200.bg-white,
   .rounded-xl.border.border-gray-200.bg-white,

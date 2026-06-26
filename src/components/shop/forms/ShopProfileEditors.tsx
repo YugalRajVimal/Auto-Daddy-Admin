@@ -41,6 +41,8 @@ import { getCarBrandId, getCarBrandName } from "../../../lib/dummyCarBrands";
 import { getServiceId, getServiceName } from "../../../lib/dummyServices";
 import { parseCitiesApiResponse } from "../../../lib/carOwnerCities";
 import { shopSaveButtonClass } from "./ShopFormPage";
+import { ShopReveal } from "../ShopAnimated";
+import { motion } from "framer-motion";
 
 const checkboxBoxClass =
   "inline-block border border-gray-300 bg-gray-100 px-2 py-0.5 text-xs text-gray-800";
@@ -628,7 +630,7 @@ export function ShopOpenHoursEditor({
 
   return (
     <div className="space-y-4">
-      {showForm ? (
+      <ShopReveal show={showForm}>
         <CompactFormPanel
           footer={
             <ShopHoursFormFooter
@@ -676,9 +678,13 @@ export function ShopOpenHoursEditor({
             </CompactField>
           </CompactFormRow>
         </CompactFormPanel>
-      ) : null}
+      </ShopReveal>
 
-      <div className="overflow-hidden rounded border border-gray-300 bg-white/90 shadow-sm">
+      <motion.div
+        layout
+        transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+        className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+      >
         {WEEK_DAYS.map((day, index) => {
           const entry = schedule[day];
               const isEditingRow = editingDay === day;
@@ -689,7 +695,7 @@ export function ShopOpenHoursEditor({
                 isEditingRow
                   ? "bg-ad-form-required-bg"
                   : index % 2 === 0
-                    ? "bg-gray-100/80"
+                    ? "bg-gray-100"
                     : "bg-white"
               }`}
             >
@@ -713,7 +719,7 @@ export function ShopOpenHoursEditor({
             </div>
           );
         })}
-      </div>
+      </motion.div>
     </div>
   );
 }

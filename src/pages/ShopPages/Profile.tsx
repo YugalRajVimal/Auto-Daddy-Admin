@@ -5,7 +5,6 @@ import { toast } from "react-toastify";
 import DashboardPanelCard from "../../components/COMP";
 import ServiceImage from "../../components/shop/ServiceImage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import ShopProfileHeroPanel from "../../components/shop/ShopProfileHeroPanel";
 import {
   ShopBusinessProfileEditor,
   ShopCarBrandAddEditor,
@@ -15,7 +14,9 @@ import {
   ShopServiceAddEditor,
   type ShopCarCompany,
 } from "../../components/shop/forms/ShopProfileEditors";
-import { ShopContentHeader, ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { ShopReveal } from "../../components/shop/ShopAnimated";
+import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { shopHeroOnImageMutedTextClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
 import {
   addMyCarCompanies,
@@ -71,21 +72,9 @@ function parseCompanies(payload: unknown): ShopCarCompany[] {
   return arr as ShopCarCompany[];
 }
 
-function ProfileSectionHeader({
-  title,
-  action,
-}: {
-  title: string;
-  action?: ReactNode;
-}) {
-  return (
-    <ShopContentHeader
-      title={title}
-      titleClassName="text-lg font-bold text-blue-700 md:text-xl"
-      action={action}
-      className="mb-4"
-    />
-  );
+function ProfileSectionAction({ action }: { action?: ReactNode }) {
+  if (!action) return null;
+  return <div className="mb-4 flex justify-end">{action}</div>;
 }
 
 function AddNewButton({ onClick }: { onClick: () => void }) {
@@ -290,9 +279,7 @@ export default function ShopProfilePage() {
   };
 
   const renderContent = () => {
-    if (loading) return <ShopLoadingPanel />;
-
-    const sectionTitle = SECTION_TITLES[activeId] ?? "Profile";
+    if (loading) return <ShopLoadingPanel className="flex-1" variant="form" />;
 
     switch (activeId) {
       case "personal":
@@ -327,7 +314,7 @@ export default function ShopProfilePage() {
                 <AddNewButton onClick={() => setShowAddBrand(true)} />
               </div>
             ) : null}
-            {showAddBrand && !brandsLoading ? (
+            <ShopReveal show={showAddBrand && !brandsLoading} className="mb-4">
               <ShopCarBrandAddEditor
                 companies={carCompanies}
                 selectedIds={selectedBrands}
@@ -352,11 +339,11 @@ export default function ShopProfilePage() {
                 }}
                 onClose={() => setShowAddBrand(false)}
               />
-            ) : null}
+            </ShopReveal>
             {brandsLoading ? (
-              <ShopLoadingPanel className="min-h-[280px] lg:min-h-[320px]" />
+              <ShopLoadingPanel variant="brand-grid" />
             ) : selectedBrandList.length === 0 ? (
-              <p className="text-center text-sm text-gray-600">
+              <p className={`text-center text-sm ${shopHeroOnImageMutedTextClass}`}>
                 No car brands added yet. Click &ldquo;+ Add New&rdquo; to add one.
               </p>
             ) : (
@@ -370,16 +357,15 @@ export default function ShopProfilePage() {
         );
       case "services":
         return servicesLoading || servicesCatalogLoading ? (
-          <ShopLoadingPanel className="min-h-[280px] lg:min-h-[320px]" />
+          <ShopLoadingPanel variant="service-tile" count={5} />
         ) : (
           <>
-            <ProfileSectionHeader
-              title={`${sectionTitle} - ${getShopTypeLabel(shopType)}`}
+            <ProfileSectionAction
               action={
                 !showAddService ? <AddNewButton onClick={() => setShowAddService(true)} /> : undefined
               }
             />
-            {showAddService ? (
+            <ShopReveal show={showAddService} className="mb-4">
               <ShopServiceAddEditor
                 services={shopTypeServiceCatalog}
                 selectedIds={selectedServiceIds}
@@ -405,9 +391,9 @@ export default function ShopProfilePage() {
                 }}
                 onClose={() => setShowAddService(false)}
               />
-            ) : null}
+            </ShopReveal>
             {selectedServiceList.length === 0 ? (
-              <p className="text-center text-sm text-gray-600">
+              <p className={`text-center text-sm ${shopHeroOnImageMutedTextClass}`}>
                 No services added yet. Click &ldquo;+ Add New&rdquo; to add one.
               </p>
             ) : (
@@ -443,9 +429,9 @@ export default function ShopProfilePage() {
       case "team":
         return (
           <>
-            <ProfileSectionHeader title={sectionTitle} action={<AddNewLink to="/shop/team/new" />} />
+            <ProfileSectionAction action={<AddNewLink to="/shop/team/new" />} />
             {teamMembers.length === 0 ? (
-              <p className="text-center text-sm text-gray-600">No team members yet.</p>
+              <p className={`text-center text-sm ${shopHeroOnImageMutedTextClass}`}>No team members yet.</p>
             ) : (
               <ul className="space-y-3">
                 {teamMembers.map((member) => (
@@ -466,7 +452,7 @@ export default function ShopProfilePage() {
               </ul>
             )}
             <p className="mt-4 text-center">
-              <Link to="/shop/team" className="text-sm font-semibold text-ad-purple hover:underline">
+              <Link to="/shop/team" className="text-sm font-semibold text-white underline hover:text-white/80">
                 Manage team →
               </Link>
             </p>
@@ -479,7 +465,13 @@ export default function ShopProfilePage() {
 
   return (
     <ShopPageShell
-      pageHeading={activeId === "open" ? "" : (SECTION_TITLES[activeId] ?? "Profile")}
+      pageHeading={
+        activeId === "open"
+          ? ""
+          : activeId === "services"
+            ? `${SECTION_TITLES.services} - ${getShopTypeLabel(shopType)}`
+            : (SECTION_TITLES[activeId] ?? "Profile")
+      }
       metaTitle="Profile | AutoDaddy"
       metaDescription="Auto shop owner profile"
       sidebarVariant="nav"
@@ -493,9 +485,7 @@ export default function ShopProfilePage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <ShopProfileHeroPanel>
-        <div className="mx-auto w-full max-w-4xl">{renderContent()}</div>
-      </ShopProfileHeroPanel>
+      {renderContent()}
     </ShopPageShell>
   );
 }

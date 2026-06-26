@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { FiChevronDown } from "react-icons/fi";
 import ShopPageShell from "../../components/shop/ShopPageShell";
+import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
+import { shopSidebarButtonClass } from "../../components/shop/shopSidebarStyles";
 import {
-  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
+  ShopListFooter,
   ShopLoadingPanel,
+  ShopPageContentShell,
 } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopWallet } from "../../hooks/useShopWallet";
@@ -27,14 +30,6 @@ import useAuth from "../../auth/useAuth";
 const PAGE_SIZE = 10;
 
 type WalletView = "paid" | "unpaid" | "expenses" | "banks";
-
-function walletNavBtn(active: boolean) {
-  return `flex w-full items-center justify-between rounded-full px-4 py-2.5 text-sm font-bold shadow-sm transition-colors ${
-    active
-      ? "bg-[#008000] text-white"
-      : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
-  }`;
-}
 
 function displayPhone(phone: string | undefined): string {
   const p = (phone ?? "").trim();
@@ -190,8 +185,8 @@ function WalletPagination({
   onPageChange: (page: number) => void;
 }) {
   return (
-    <footer className="mt-3 flex items-center justify-between gap-3 pt-2">
-      <p className="text-sm font-semibold text-blue-700">{totalEntries} Entries</p>
+    <ShopListFooter>
+      <p>{totalEntries} Entries</p>
       {totalPages > 1 ? (
         <div className="flex items-center gap-1">
           {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
@@ -214,7 +209,7 @@ function WalletPagination({
           })}
         </div>
       ) : null}
-    </footer>
+    </ShopListFooter>
   );
 }
 
@@ -302,24 +297,32 @@ export default function ShopWalletPage() {
           ? "Expenses"
           : "Manage Banks";
 
-  const titleClassName =
-    view === "unpaid"
-      ? "text-lg font-bold text-ad-purple md:text-xl"
-      : "text-lg font-bold text-blue-700 md:text-xl";
 
   return (
     <ShopPageShell
-      title="Wallet"
+      pageHeading={contentTitle}
       metaTitle="Wallet | AutoDaddy"
       metaDescription="Auto shop wallet and invoices"
       searchPlaceholder="Search Customer"
       searchValue={search}
       onSearchChange={setSearch}
+      headerAction={
+        view === "expenses" ? (
+          <button
+            type="button"
+            disabled
+            className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white opacity-60"
+          >
+            + Add New
+          </button>
+        ) : undefined
+      }
       sidebarExtra={
         <div className="flex flex-col gap-3">
           <div>
-            <button
-              type="button"
+            <ShopSidebarButton
+              label="All Invoices"
+              active={view === "paid" || view === "unpaid"}
               onClick={() => {
                 if (view === "paid" || view === "unpaid") {
                   setInvoiceMenuOpen((open) => !open);
@@ -328,63 +331,50 @@ export default function ShopWalletPage() {
                   setInvoiceMenuOpen(true);
                 }
               }}
-              className={walletNavBtn(view === "paid" || view === "unpaid")}
-            >
-              <span>All Invoices</span>
-              <FiChevronDown
-                className={`shrink-0 text-base transition-transform ${invoiceMenuOpen ? "rotate-180" : ""}`}
-                aria-hidden
-              />
-            </button>
+              trailing={
+                <FiChevronDown
+                  className={`shrink-0 text-base transition-transform ${invoiceMenuOpen ? "rotate-180" : ""}`}
+                  aria-hidden
+                />
+              }
+            />
             {invoiceMenuOpen ? (
-              <div className="mt-2 flex flex-col gap-2 pl-1">
+              <div className="mt-2 flex flex-col gap-2 pl-3">
                 <button
                   type="button"
                   onClick={() => selectInvoiceView("paid")}
-                  className={`rounded-full px-4 py-2 text-left text-xs font-bold ${
-                    view === "paid"
-                      ? "bg-[#d4ffd4] text-[#008000]"
-                      : "text-[#008000] hover:bg-[#d4ffd4]/60"
-                  }`}
+                  className={shopSidebarButtonClass(view === "paid", "text-xs")}
                 >
-                  Paid Invoice
+                  <span className="min-w-0 flex-1 text-left">Paid Invoice</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => selectInvoiceView("unpaid")}
-                  className={`rounded-full px-4 py-2 text-left text-xs font-bold ${
-                    view === "unpaid"
-                      ? "bg-[#ffeBD6] text-ad-purple"
-                      : "text-ad-purple hover:bg-[#ffeBD6]/60"
-                  }`}
+                  className={shopSidebarButtonClass(view === "unpaid", "text-xs")}
                 >
-                  Un-Paid Invoice
+                  <span className="min-w-0 flex-1 text-left">Un-Paid Invoice</span>
                 </button>
               </div>
             ) : null}
           </div>
 
-          <button
-            type="button"
+          <ShopSidebarButton
+            label="Expenses"
+            active={view === "expenses"}
             onClick={() => {
               setView("expenses");
               setInvoiceMenuOpen(false);
             }}
-            className={walletNavBtn(view === "expenses")}
-          >
-            Expenses
-          </button>
+          />
 
-          <button
-            type="button"
+          <ShopSidebarButton
+            label="Manage Banks"
+            active={view === "banks"}
             onClick={() => {
               setView("banks");
               setInvoiceMenuOpen(false);
             }}
-            className={walletNavBtn(view === "banks")}
-          >
-            Manage Banks
-          </button>
+          />
         </div>
       }
       onFaqsOpen={() => setFaqsOpen(true)}
@@ -393,33 +383,17 @@ export default function ShopWalletPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
-        <ShopContentHeader
-          title={contentTitle}
-          titleClassName={titleClassName}
-          action={
-            view === "expenses" ? (
-              <button
-                type="button"
-                disabled
-                className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white opacity-60"
-              >
-                + Add New
-              </button>
-            ) : undefined
-          }
-        />
-
+      <ShopPageContentShell>
         {view === "expenses" ? (
           !USE_DUMMY_SHOP_WALLET ? (
-            <ShopEmptyPanel className="min-h-0 flex-1" message="Expenses are not available via API yet." />
+            <ShopEmptyPanel message="Expenses are not available via API yet." />
           ) : showLoading ? (
-            <ShopLoadingPanel className="min-h-0 flex-1" />
+            <ShopLoadingPanel variant="expense-row" count={5} />
           ) : filteredExpenses.length === 0 ? (
-            <ShopEmptyPanel className="min-h-0 flex-1" message="No expenses match your search." />
+            <ShopEmptyPanel message="No expenses match your search." />
           ) : (
             <>
-              <ShopListPanel className="min-h-0 flex-1">
+              <ShopListPanel>
                 {paginatedExpenses.map((row) => (
                   <WalletExpenseRow key={row.id} row={row} countryCode={session?.meta?.countryCode} />
                 ))}
@@ -434,14 +408,14 @@ export default function ShopWalletPage() {
           )
         ) : view === "banks" ? (
           !USE_DUMMY_SHOP_WALLET ? (
-            <ShopEmptyPanel className="min-h-0 flex-1" message="Bank account management is not available yet." />
+            <ShopEmptyPanel message="Bank account management is not available yet." />
           ) : showLoading ? (
-            <ShopLoadingPanel className="min-h-0 flex-1" />
+            <ShopLoadingPanel variant="bank-row" count={4} />
           ) : filteredBanks.length === 0 ? (
-            <ShopEmptyPanel className="min-h-0 flex-1" message="No bank accounts match your search." />
+            <ShopEmptyPanel message="No bank accounts match your search." />
           ) : (
             <>
-              <ShopListPanel className="min-h-0 flex-1">
+              <ShopListPanel>
                 {paginatedBanks.map((row) => (
                   <WalletBankRow key={row.id} row={row} countryCode={session?.meta?.countryCode} />
                 ))}
@@ -455,17 +429,16 @@ export default function ShopWalletPage() {
             </>
           )
         ) : showLoading ? (
-          <ShopLoadingPanel className="min-h-0 flex-1" />
+          <ShopLoadingPanel variant="split-row" count={5} />
         ) : showError ? (
-          <ShopErrorPanel className="min-h-0 flex-1" message={error ?? ""} onRetry={() => void refresh()} />
+          <ShopErrorPanel message={error ?? ""} onRetry={() => void refresh()} />
         ) : filteredList.length === 0 ? (
           <ShopEmptyPanel
-            className="min-h-0 flex-1"
             message={`No ${view === "paid" ? "paid" : "unpaid"} invoices in this category.`}
           />
         ) : (
           <>
-            <ShopListPanel className="min-h-0 flex-1">
+            <ShopListPanel>
               {paginatedList.map((row) => (
                 <WalletInvoiceRow
                   key={row.id}
@@ -484,7 +457,7 @@ export default function ShopWalletPage() {
             />
           </>
         )}
-      </div>
+      </ShopPageContentShell>
     </ShopPageShell>
   );
 }

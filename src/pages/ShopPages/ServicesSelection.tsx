@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopListPanel, ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { ShopListPanel, ShopLoadingPanel, ShopPageContentShell } from "../../components/shop/ShopPanels";
 import { shopSaveButtonClass } from "../../components/shop/forms/ShopFormPage";
 import { useAuth } from "../../auth";
 import { apiMessage, fetchServiceCatalog, updateServiceWeWorkWith } from "../../lib/shopOwnerMutations";
@@ -89,10 +89,11 @@ export default function ShopServicesSelectionPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      {loading ? (
-        <ShopLoadingPanel />
-      ) : (
-        <ShopListPanel>
+      <ShopPageContentShell>
+        {loading ? (
+          <ShopLoadingPanel variant="checkbox-row" count={8} />
+        ) : (
+          <ShopListPanel>
           {catalog.map((item) => (
             <label key={item.id} className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-4 py-3">
               <span className="text-sm font-semibold text-gray-900">{item.name}</span>
@@ -105,7 +106,8 @@ export default function ShopServicesSelectionPage() {
             </label>
           ))}
         </ShopListPanel>
-      )}
+        )}
+      </ShopPageContentShell>
     </ShopPageShell>
   );
 }

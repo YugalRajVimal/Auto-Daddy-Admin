@@ -8,7 +8,7 @@ import {
   compactInputClass,
 } from "../../components/admin/ContentPanel";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopContentHeader, ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { ShopLoadingPanel, ShopPageContentShell } from "../../components/shop/ShopPanels";
 import ShopWebsiteSidebar, {
   type ShopWebsiteSection,
 } from "../../components/shop/ShopWebsiteSidebar";
@@ -78,16 +78,6 @@ const EMPTY_DOMAIN_FORM: DomainForm = {
   existing: true,
 };
 
-function WebsiteSectionHeader({ title }: { title: string }) {
-  return (
-    <ShopContentHeader
-      title={title}
-      titleClassName="text-lg font-bold text-blue-700 md:text-xl"
-      className="mb-4"
-    />
-  );
-}
-
 function GoldCoinIcon() {
   return (
     <span
@@ -156,7 +146,6 @@ function DomainPanel({
 }) {
   return (
     <>
-      <WebsiteSectionHeader title={SECTION_TITLES.domain} />
       <CompactFormPanel
         footer={
           <div className="flex items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
@@ -250,8 +239,6 @@ function PreviewPanel({
 
   return (
     <>
-      <WebsiteSectionHeader title={SECTION_TITLES.preview} />
-
       <div className="relative mb-4 rounded border border-ad-form-border bg-ad-form-bg px-4 py-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <label className={`flex cursor-pointer items-center gap-2 ${checkboxBoxClass}`}>
@@ -292,8 +279,6 @@ function PreviewPanel({
         </div>
       </div>
 
-      <h3 className="mb-3 text-center font-serif text-2xl font-bold text-gray-600">My Website</h3>
-
       <div className="relative min-h-[420px] overflow-hidden rounded border border-ad-form-border bg-ad-form-bg shadow-sm">
         {loading ? (
           <div className="flex min-h-[420px] items-center justify-center">
@@ -319,8 +304,6 @@ function PreviewPanel({
 function SubscriptionPanel({ onSeeInvoice }: { onSeeInvoice: (plan: string) => void }) {
   return (
     <>
-      <WebsiteSectionHeader title={SECTION_TITLES.subscription} />
-
       <div className="mb-5 flex flex-wrap items-center justify-center gap-3 rounded border border-ad-form-border bg-ad-form-bg px-4 py-4 text-center shadow-sm">
         <span className="text-sm font-bold text-[#006600]">Current Plan costs</span>
         <GoldCoinIcon />
@@ -415,7 +398,7 @@ export default function ShopMyWebsitePage() {
 
   return (
     <ShopPageShell
-      title="My Website"
+      pageHeading={SECTION_TITLES[activeSection]}
       metaTitle="My Website | AutoDaddy"
       metaDescription="Manage your auto shop website, domain, and subscription"
       sidebarExtra={
@@ -430,7 +413,7 @@ export default function ShopMyWebsitePage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="min-w-0 flex-1 lg:min-h-[calc(100vh-220px)]">
+      <ShopPageContentShell className="min-w-0">
         {activeSection === "domain" ? (
           <DomainPanel
             form={domainForm}
@@ -440,7 +423,7 @@ export default function ShopMyWebsitePage() {
           />
         ) : activeSection === "preview" ? (
           templatesLoading && templates.length === 0 ? (
-            <ShopLoadingPanel />
+            <ShopLoadingPanel variant="preview-panel" />
           ) : (
             <PreviewPanel
               templates={templates}
@@ -456,7 +439,7 @@ export default function ShopMyWebsitePage() {
         ) : (
           <SubscriptionPanel onSeeInvoice={handleSeeInvoice} />
         )}
-      </div>
+      </ShopPageContentShell>
     </ShopPageShell>
   );
 }

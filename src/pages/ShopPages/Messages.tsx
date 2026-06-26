@@ -5,6 +5,7 @@ import {
   ShopErrorPanel,
   ShopListPanel,
   ShopLoadingPanel,
+  ShopPageContentShell,
   ShopRefreshButton,
 } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
@@ -51,17 +52,17 @@ export default function ShopMessagesPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
+      <ShopPageContentShell>
         {!showNotifications ? (
-          <ShopEmptyPanel className="min-h-0 flex-1" message="No sent messages yet." />
+          <ShopEmptyPanel message="No sent messages yet." />
         ) : loading ? (
-          <ShopLoadingPanel className="min-h-0 flex-1" />
+          <ShopLoadingPanel variant="message-row" count={5} />
         ) : error ? (
-          <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+          <ShopErrorPanel message={error} onRetry={() => void refresh()} />
         ) : items.length === 0 ? (
-          <ShopEmptyPanel className="min-h-0 flex-1" message="No notifications yet." />
+          <ShopEmptyPanel message="No notifications yet." />
         ) : (
-          <ShopListPanel className="min-h-0 flex-1">
+          <ShopListPanel>
             {items.map((item) => (
               <article key={item.id} className="rounded-md bg-[#CCFFCC] px-4 py-3 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -84,7 +85,7 @@ export default function ShopMessagesPage() {
             ) : null}
           </ShopListPanel>
         )}
-      </div>
+      </ShopPageContentShell>
     </ShopPageShell>
   );
 }

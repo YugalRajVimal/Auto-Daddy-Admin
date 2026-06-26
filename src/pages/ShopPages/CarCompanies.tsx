@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopListPanel, ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { ShopListPanel, ShopLoadingPanel, ShopPageContentShell } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
 import { addMyCarCompanies, fetchMainCarCompanies, removeMyCarCompanies } from "../../lib/shopOwnerMutations";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
@@ -72,10 +72,11 @@ export default function ShopCarCompaniesPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      {loading ? (
-        <ShopLoadingPanel />
-      ) : (
-        <ShopListPanel>
+      <ShopPageContentShell>
+        {loading ? (
+          <ShopLoadingPanel variant="checkbox-row" count={8} />
+        ) : (
+          <ShopListPanel>
           {all.map((c) => {
             const id = String(c._id ?? c.id ?? "");
             const name = c.name ?? c.companyName ?? "—";
@@ -94,7 +95,8 @@ export default function ShopCarCompaniesPage() {
             );
           })}
         </ShopListPanel>
-      )}
+        )}
+      </ShopPageContentShell>
     </ShopPageShell>
   );
 }

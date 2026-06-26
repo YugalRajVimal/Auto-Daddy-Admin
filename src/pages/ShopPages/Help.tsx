@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import useAuth from "../../auth/useAuth";
 import ShopPageShell from "../../components/shop/ShopPageShell";
+import { ShopViewTransition } from "../../components/shop/ShopAnimated";
+import { shopHeroCardBodyClass } from "../../components/shop/shopLayoutStyles";
 import {
   ShopEmptyPanel,
   ShopGreenRow,
@@ -169,62 +171,67 @@ export default function ShopHelpPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      {showForm ? (
-        <ShopSupportPanel
-          ticketNo={draftTicketNo}
-          services={services}
-          servicesLoading={servicesLoading}
-          selectedServiceId={resolvedServiceId}
-          onServiceChange={setSelectedServiceId}
-          recording={recording}
-          hasRecording={hasRecording}
-          recorderError={recorderError}
-          onToggleRecording={() => void toggle()}
-          saving={saving}
-          onSave={() => void handleSave()}
-          onCancel={closeForm}
-        />
-      ) : (
-        <div className="flex min-h-[420px] flex-1 flex-col gap-3 lg:min-h-[calc(100vh-220px)]">
-          {filteredTickets.length === 0 ? (
-            <ShopEmptyPanel
-              message={
-                activeId === "resolved"
-                  ? "No resolved tickets yet."
-                  : "No active tickets. Raise a ticket to get help."
-              }
-            />
-          ) : (
-            <ShopListPanel>
-              {filteredTickets.map((ticket) => (
-                <ShopGreenRow
-                  key={ticket.id}
-                  left={
-                    <p className="text-sm font-bold text-white">
-                      #{ticket.ticketNo}
-                    </p>
-                  }
-                  center={
-                    <div>
-                      <p className="text-sm font-bold text-gray-900">{ticket.subject}</p>
-                      <p className="text-xs text-gray-600">{ticket.date}</p>
-                    </div>
-                  }
-                  right={
-                    <p
-                      className={`text-sm font-bold capitalize ${
-                        ticket.status === "resolved" ? "text-gray-600" : "text-[#008000]"
-                      }`}
-                    >
-                      {ticket.status === "resolved" ? "Resolved" : "Active"}
-                    </p>
-                  }
-                />
-              ))}
-            </ShopListPanel>
-          )}
-        </div>
-      )}
+      <ShopViewTransition
+        viewKey={showForm ? "ticket-form" : `tickets-${activeId}`}
+        className={shopHeroCardBodyClass}
+      >
+        {showForm ? (
+          <ShopSupportPanel
+            ticketNo={draftTicketNo}
+            services={services}
+            servicesLoading={servicesLoading}
+            selectedServiceId={resolvedServiceId}
+            onServiceChange={setSelectedServiceId}
+            recording={recording}
+            hasRecording={hasRecording}
+            recorderError={recorderError}
+            onToggleRecording={() => void toggle()}
+            saving={saving}
+            onSave={() => void handleSave()}
+            onCancel={closeForm}
+          />
+        ) : (
+          <div className="flex flex-1 flex-col gap-3">
+            {filteredTickets.length === 0 ? (
+              <ShopEmptyPanel
+                message={
+                  activeId === "resolved"
+                    ? "No resolved tickets yet."
+                    : "No active tickets. Raise a ticket to get help."
+                }
+              />
+            ) : (
+              <ShopListPanel>
+                {filteredTickets.map((ticket) => (
+                  <ShopGreenRow
+                    key={ticket.id}
+                    left={
+                      <p className="text-sm font-bold text-white">
+                        #{ticket.ticketNo}
+                      </p>
+                    }
+                    center={
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{ticket.subject}</p>
+                        <p className="text-xs text-gray-600">{ticket.date}</p>
+                      </div>
+                    }
+                    right={
+                      <p
+                        className={`text-sm font-bold capitalize ${
+                          ticket.status === "resolved" ? "text-gray-600" : "text-[#008000]"
+                        }`}
+                      >
+                        {ticket.status === "resolved" ? "Resolved" : "Active"}
+                      </p>
+                    }
+                  />
+                ))}
+              </ShopListPanel>
+            )}
+          </div>
+        )}
+      </ShopViewTransition>
     </ShopPageShell>
   );
 }

@@ -3,11 +3,11 @@ import { toast } from "react-toastify";
 import ShopDealFormDialog from "../../components/shop/forms/ShopDealFormDialog";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
-  ShopContentHeader,
   ShopEmptyPanel,
   ShopErrorPanel,
   ShopListPanel,
   ShopLoadingPanel,
+  ShopPageContentShell,
 } from "../../components/shop/ShopPanels";
 import useAuth from "../../auth/useAuth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
@@ -19,11 +19,11 @@ import type { ShopDeal } from "../../types/shopOwner";
 
 type DealSectionId = "all" | "service" | "parts" | "salvage";
 
-const DEAL_SECTIONS: { id: DealSectionId; label: string; tone: "green" | "peach" | "blue" }[] = [
-  { id: "all", label: "All deals", tone: "green" },
-  { id: "service", label: "Service Deals", tone: "peach" },
-  { id: "parts", label: "Parts Deal", tone: "peach" },
-  { id: "salvage", label: "Salvages", tone: "blue" },
+const DEAL_SECTIONS: { id: DealSectionId; label: string }[] = [
+  { id: "all", label: "All deals" },
+  { id: "service", label: "Service Deals" },
+  { id: "parts", label: "Parts Deal" },
+  { id: "salvage", label: "Salvages" },
 ];
 
 const SECTION_HEADINGS: Record<DealSectionId, string> = {
@@ -36,33 +36,6 @@ const SECTION_HEADINGS: Record<DealSectionId, string> = {
 function toFilter(id: DealSectionId): DealFilter {
   if (id === "service" || id === "parts") return id;
   return "all";
-}
-
-function dealNavBtn(active: boolean, tone: "green" | "peach" | "blue") {
-  const base =
-    "flex w-full items-center justify-center rounded-full px-4 py-2.5 text-sm font-bold shadow-sm transition-colors";
-
-  if (tone === "green") {
-    return `${base} ${
-      active
-        ? "bg-[#008000] text-white"
-        : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
-    }`;
-  }
-
-  if (tone === "peach") {
-    return `${base} ${
-      active
-        ? "bg-[#FDE4D0] text-ad-purple ring-2 ring-ad-purple/35"
-        : "bg-[#FDE4D0] text-ad-purple hover:bg-[#fce0c8]"
-    }`;
-  }
-
-  return `${base} ${
-    active
-      ? "bg-blue-600 text-white"
-      : "border border-blue-600 bg-white text-blue-600 hover:bg-blue-50"
-  }`;
 }
 
 function displayPhone(phone: string | undefined): string {
@@ -256,7 +229,7 @@ export default function ShopDealsPage() {
 
   return (
     <ShopPageShell
-      title="My Deals"
+      pageHeading={SECTION_HEADINGS[activeId]}
       metaTitle="Deals | AutoDaddy"
       metaDescription="Auto shop deals"
       headerAction={
@@ -268,37 +241,28 @@ export default function ShopDealsPage() {
           + Add New
         </button>
       }
-      sidebarExtra={
-        <div className="flex flex-col gap-3">
-          {DEAL_SECTIONS.map((section) => (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => setActiveId(section.id)}
-              className={dealNavBtn(activeId === section.id, section.tone)}
-            >
-              {section.label}
-            </button>
-          ))}
-        </div>
-      }
+      sidebarItems={DEAL_SECTIONS.map((section) => ({
+        id: section.id,
+        label: section.label,
+        variant: "primary" as const,
+      }))}
+      activeSidebarId={activeId}
+      onSidebarSelect={(id) => setActiveId(id as DealSectionId)}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="flex min-h-[420px] flex-1 flex-col lg:min-h-[calc(100vh-220px)]">
-        <ShopContentHeader title={SECTION_HEADINGS[activeId]} />
-
+      <ShopPageContentShell>
         {loading ? (
-          <ShopLoadingPanel className="min-h-0 flex-1" />
+          <ShopLoadingPanel variant="deal-card" count={4} />
         ) : error ? (
-          <ShopErrorPanel className="min-h-0 flex-1" message={error} onRetry={() => void refresh()} />
+          <ShopErrorPanel message={error} onRetry={() => void refresh()} />
         ) : deals.length === 0 ? (
-          <ShopEmptyPanel className="min-h-0 flex-1" message="No deals in this category." />
+          <ShopEmptyPanel message="No deals in this category." />
         ) : (
-          <ShopListPanel className="min-h-0 flex-1">
+          <ShopListPanel>
             {deals.map((deal) => (
               <DealCard
                 key={dealId(deal)}
@@ -312,7 +276,7 @@ export default function ShopDealsPage() {
             ))}
           </ShopListPanel>
         )}
-      </div>
+      </ShopPageContentShell>
 
       <ShopDealFormDialog
         open={dialogOpen}

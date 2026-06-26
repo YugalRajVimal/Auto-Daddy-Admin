@@ -13,6 +13,7 @@ import { dealId } from "../../../lib/shopOwnerParsers";
 import { useShopServices } from "../../../hooks/useShopServices";
 import type { ShopDeal } from "../../../types/shopOwner";
 import { shopCancelButtonClass, shopSaveButtonClass } from "./ShopFormPage";
+import { ShopDialogMotion } from "../ShopAnimated";
 
 type DealMode = "service" | "parts";
 
@@ -144,12 +145,12 @@ export default function ShopDealFormDialog({ open, mode, deal, onClose, onSaved 
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close" onClick={onClose} />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-200 bg-white p-5 shadow-xl">
+    <ShopDialogMotion
+      open={open}
+      onClose={onClose}
+      panelClassName="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-200 bg-white p-5 shadow-xl"
+    >
         <h2 className="mb-4 text-lg font-bold text-ad-purple">
           {deal ? "Edit" : "Add"} {mode === "parts" ? "Parts" : "Service"} Deal
         </h2>
@@ -194,7 +195,6 @@ export default function ShopDealFormDialog({ open, mode, deal, onClose, onSaved 
             {saving ? "Saving…" : "Save"}
           </button>
         </div>
-      </div>
-    </div>
+    </ShopDialogMotion>
   );
 }
