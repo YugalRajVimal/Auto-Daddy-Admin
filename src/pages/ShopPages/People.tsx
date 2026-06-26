@@ -236,16 +236,10 @@ export default function ShopPeoplePage() {
       title="My Customers"
       metaTitle="People | AutoDaddy"
       metaDescription="Auto shop customers"
-      headerAction={
-        <input
-          id={PEOPLE_SEARCH_INPUT_ID}
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search my customers"
-          className="w-full max-w-xs rounded-full border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 sm:max-w-sm"
-        />
-      }
+      searchPlaceholder="Search my customers"
+      searchValue={search}
+      onSearchChange={setSearch}
+      searchInputId={PEOPLE_SEARCH_INPUT_ID}
       sidebarItems={PEOPLE_SECTIONS}
       activeSidebarId={isSearchForm || formState ? null : "customers"}
       onSidebarSelect={() => showMyCustomers()}
@@ -338,11 +332,10 @@ export default function ShopPeoplePage() {
                             key={pageNumber}
                             type="button"
                             onClick={() => setPage(pageNumber)}
-                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
-                              isActive
+                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${isActive
                                 ? "bg-[#008000] text-white"
                                 : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4fcd4]"
-                            }`}
+                              }`}
                             aria-current={isActive ? "page" : undefined}
                           >
                             {pageNumber}

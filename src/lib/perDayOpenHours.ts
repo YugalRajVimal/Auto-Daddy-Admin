@@ -145,8 +145,36 @@ export function resolvePerDaySchedule(businessProfile: Record<string, unknown> |
   return createDefaultPerDaySchedule();
 }
 
-function shortDayLabel(day: WeekDay) {
+export function shortDayLabel(day: WeekDay) {
   return day.slice(0, 3);
+}
+
+/** Display 24h time as legacy UI text (e.g. `9.00 Am`). */
+export function formatOpenHoursTimeDisplay(time24: string): string {
+  const [hStr, mStr = "0"] = time24.split(":");
+  const hour = Number(hStr);
+  const minute = Number(mStr);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return time24;
+
+  const mm = String(minute).padStart(2, "0");
+  let hour12: number;
+  let ampm: "Am" | "Pm";
+
+  if (hour === 0) {
+    hour12 = 12;
+    ampm = "Am";
+  } else if (hour === 12) {
+    hour12 = 12;
+    ampm = "Pm";
+  } else if (hour > 12) {
+    hour12 = hour - 12;
+    ampm = "Pm";
+  } else {
+    hour12 = hour;
+    ampm = "Am";
+  }
+
+  return `${hour12}.${mm} ${ampm}`;
 }
 
 export function formatPerDayScheduleDisplay(schedule: PerDaySchedule): string {

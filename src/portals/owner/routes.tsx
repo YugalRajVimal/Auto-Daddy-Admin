@@ -1,6 +1,7 @@
 import { Route } from "react-router";
 import OwnerPanelLayout from "../../layout/Owner/OwnerPanelLayout";
 import ShopPanelLayout from "../../layout/Shop/ShopPanelLayout";
+import ShopPageLayout from "../../layout/Shop/ShopPageLayout";
 import OwnerHomePage from "../../pages/OwnerPages/Home";
 import OwnerProfilePage from "../../pages/OwnerPages/Profile";
 import OwnerDealsPage from "../../pages/OwnerPages/Deals";
@@ -48,25 +49,27 @@ export const ownerRoutes = (
 
 export const shopRoutes = (
   <Route element={<ShopPanelLayout />}>
-    <Route index path="/shop" element={<ShopHomePage />} />
-    <Route path="/shop/profile" element={<ShopProfilePage />} />
-    <Route path="/shop/people" element={<ShopPeoplePage />} />
-    <Route path="/shop/people/new" element={<ShopCustomerAddPage />} />
-    <Route path="/shop/people/:id/edit" element={<ShopCustomerEditPage />} />
-    <Route path="/shop/services" element={<ShopServicesPage />} />
-    <Route path="/shop/job-cards" element={<ShopJobCardsPage />} />
-    <Route path="/shop/job-cards/new" element={<ShopJobCardAddPage />} />
-    <Route path="/shop/job-cards/:id/edit" element={<ShopJobCardEditPage />} />
-    <Route path="/shop/wallet" element={<ShopWalletPage />} />
-    <Route path="/shop/messages" element={<ShopMessagesPage />} />
-    <Route path="/shop/my-website" element={<ShopMyWebsitePage />} />
-    <Route path="/shop/reports" element={<ShopReportsPage />} />
-    <Route path="/shop/deals" element={<ShopDealsPage />} />
-    <Route path="/shop/profile/car-companies" element={<ShopCarCompaniesPage />} />
-    <Route path="/shop/profile/services-selection" element={<ShopServicesSelectionPage />} />
-    <Route path="/shop/team" element={<ShopTeamPage />} />
-    <Route path="/shop/team/new" element={<ShopTeamMemberFormPage />} />
-    <Route path="/shop/team/:id/edit" element={<ShopTeamMemberFormPage />} />
-    <Route path="/shop/help" element={<ShopHelpPage />} />
+    <Route element={<ShopPageLayout />}>
+      <Route index path="/shop" element={<ShopHomePage />} />
+      <Route path="/shop/profile" element={<ShopProfilePage />} />
+      <Route path="/shop/people" element={<ShopPeoplePage />} />
+      <Route path="/shop/people/new" element={<ShopCustomerAddPage />} />
+      <Route path="/shop/people/:id/edit" element={<ShopCustomerEditPage />} />
+      <Route path="/shop/services" element={<ShopServicesPage />} />
+      <Route path="/shop/job-cards" element={<ShopJobCardsPage />} />
+      <Route path="/shop/job-cards/new" element={<ShopJobCardAddPage />} />
+      <Route path="/shop/job-cards/:id/edit" element={<ShopJobCardEditPage />} />
+      <Route path="/shop/wallet" element={<ShopWalletPage />} />
+      <Route path="/shop/messages" element={<ShopMessagesPage />} />
+      <Route path="/shop/my-website" element={<ShopMyWebsitePage />} />
+      <Route path="/shop/reports" element={<ShopReportsPage />} />
+      <Route path="/shop/deals" element={<ShopDealsPage />} />
+      <Route path="/shop/profile/car-companies" element={<ShopCarCompaniesPage />} />
+      <Route path="/shop/profile/services-selection" element={<ShopServicesSelectionPage />} />
+      <Route path="/shop/team" element={<ShopTeamPage />} />
+      <Route path="/shop/team/new" element={<ShopTeamMemberFormPage />} />
+      <Route path="/shop/team/:id/edit" element={<ShopTeamMemberFormPage />} />
+      <Route path="/shop/help" element={<ShopHelpPage />} />
+    </Route>
   </Route>
 );

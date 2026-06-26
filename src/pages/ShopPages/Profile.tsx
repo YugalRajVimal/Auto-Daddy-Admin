@@ -3,12 +3,13 @@ import { Link } from "react-router";
 import { FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import DashboardPanelCard from "../../components/COMP";
-import CarBrandLogo from "../../components/shop/CarBrandLogo";
 import ServiceImage from "../../components/shop/ServiceImage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
+import ShopProfileHeroPanel from "../../components/shop/ShopProfileHeroPanel";
 import {
   ShopBusinessProfileEditor,
   ShopCarBrandAddEditor,
+  ShopCarBrandList,
   ShopOpenHoursEditor,
   ShopPersonalProfileEditor,
   ShopServiceAddEditor,
@@ -48,16 +49,15 @@ import { useShopServices } from "../../hooks/useShopServices";
 const PROFILE_SECTIONS = [
   { id: "personal", label: "Personal Profile", variant: "primary" as const },
   { id: "business", label: "Business Profile", variant: "primary" as const },
-  { id: "open", label: "Opening Timings", variant: "primary" as const },
-  { id: "brands", label: "Car Brands", variant: "primary" as const },
-  { id: "services", label: "My Services", variant: "primary" as const },
-  // { id: "team", label: "Team Members", variant: "primary" as const },
+  { id: "open", label: "Shop is Open", variant: "primary" as const },
+  { id: "brands", label: "Car Brand Specialist", variant: "primary" as const },
+  { id: "services", label: "Operational Services", variant: "primary" as const },
 ];
 
 const SECTION_TITLES: Record<string, string> = {
   personal: "Personal Profile",
   business: "Business Profile",
-  open: "Opening Timings",
+  open: "Shop is Open",
   brands: "Car Brand Specialist",
   services: "Operational Services",
   team: "Team Members",
@@ -117,9 +117,6 @@ export default function ShopProfilePage() {
     user,
     business,
     teamMembers,
-    isBusinessActive,
-    updatingActive,
-    setBusinessActive,
     faqsHeading,
     faqsDescription,
     loading,
@@ -300,49 +297,36 @@ export default function ShopProfilePage() {
     switch (activeId) {
       case "personal":
         return (
-          <>
-            <ProfileSectionHeader title={sectionTitle} />
-            <ShopPersonalProfileEditor
-              user={user}
-              city={business?.city}
-              onSaved={() => void refresh()}
-            />
-          </>
+          <ShopPersonalProfileEditor
+            user={user}
+            city={business?.city}
+            onSaved={() => void refresh()}
+          />
         );
       case "business":
         return (
-          <>
-            <ProfileSectionHeader title={sectionTitle} />
-            <ShopBusinessProfileEditor
-              business={business}
-              zipCode={user?.pincode}
-              shopType={user?.shopType ?? business?.shopType}
-              onSaved={() => void refresh()}
-            />
-          </>
+          <ShopBusinessProfileEditor
+            business={business}
+            zipCode={user?.pincode}
+            shopType={user?.shopType ?? business?.shopType}
+            onSaved={() => void refresh()}
+          />
         );
       case "open":
         return (
-          <>
-            <ProfileSectionHeader title={sectionTitle} />
-            <ShopOpenHoursEditor
-              perDayOpenHours={business?.perDayOpenHours}
-              isBusinessActive={isBusinessActive}
-              updatingActive={updatingActive}
-              onActiveChange={(next) => void setBusinessActive(next)}
-              onSaved={() => void refresh()}
-            />
-          </>
+          <ShopOpenHoursEditor
+            perDayOpenHours={business?.perDayOpenHours}
+            onSaved={() => void refresh()}
+          />
         );
       case "brands":
         return (
           <>
-            <ProfileSectionHeader
-              title={sectionTitle}
-              action={
-                !showAddBrand ? <AddNewButton onClick={() => setShowAddBrand(true)} /> : undefined
-              }
-            />
+            {!showAddBrand ? (
+              <div className="mb-4 flex justify-end">
+                <AddNewButton onClick={() => setShowAddBrand(true)} />
+              </div>
+            ) : null}
             {showAddBrand && !brandsLoading ? (
               <ShopCarBrandAddEditor
                 companies={carCompanies}
@@ -376,32 +360,11 @@ export default function ShopProfilePage() {
                 No car brands added yet. Click &ldquo;+ Add New&rdquo; to add one.
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                {selectedBrandList.map((company) => {
-                  const id = getCarBrandId(company);
-                  const name = company.name ?? company.companyName ?? "—";
-                  return (
-                    <DashboardPanelCard key={id} className="relative mb-0 aspect-square">
-                      <div className="flex h-full flex-col justify-between">
-                        <span className="text-center text-xs font-semibold text-gray-800">{name}</span>
-                        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded border border-gray-100 bg-white p-2">
-                          <CarBrandLogo company={company} className="h-full w-full object-contain" />
-                        </div>
-                        <button
-                          type="button"
-                          title={`Remove ${name}`}
-                          aria-label={`Remove ${name}`}
-                          disabled={savingBrand === id}
-                          onClick={() => void removeBrand(company)}
-                          className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm hover:border-red-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
-                        >
-                          <FiX size={14} />
-                        </button>
-                      </div>
-                    </DashboardPanelCard>
-                  );
-                })}
-              </div>
+              <ShopCarBrandList
+                brands={selectedBrandList}
+                savingBrandId={savingBrand}
+                onRemove={(company) => void removeBrand(company)}
+              />
             )}
           </>
         );
@@ -516,19 +479,23 @@ export default function ShopProfilePage() {
 
   return (
     <ShopPageShell
-      title="Profile"
+      pageHeading={activeId === "open" ? "" : (SECTION_TITLES[activeId] ?? "Profile")}
       metaTitle="Profile | AutoDaddy"
       metaDescription="Auto shop owner profile"
+      sidebarVariant="nav"
       sidebarItems={PROFILE_SECTIONS}
       activeSidebarId={activeId}
       onSidebarSelect={setActiveId}
+      contentTopOffset={false}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="min-w-0 flex-1 lg:min-h-[calc(100vh-220px)]">{renderContent()}</div>
+      <ShopProfileHeroPanel>
+        <div className="mx-auto w-full max-w-4xl">{renderContent()}</div>
+      </ShopProfileHeroPanel>
     </ShopPageShell>
   );
 }

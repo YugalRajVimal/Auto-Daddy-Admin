@@ -1,2 +1,6 @@
-export const PORTAL_HOME_HERO_IMAGE =
-  "https://cdn.prod.website-files.com/682bafcf9a7a236122010f96/684aaaa7513a914ea33079fb_67b4a931485b522bb83b2779_Brief%25207b%2520Cars%2520(1).gif";
+/** Good morning coffee mug — shop home background. */
+export const PORTAL_HOME_HERO_IMAGE = "/shop-home-hero.png";
+
+/** Globe on wooden table — shop profile background. */
+export const PORTAL_PROFILE_HERO_IMAGE =
+  "https://static.vecteezy.com/system/resources/thumbnails/075/215/906/small/a-globe-on-a-wooden-table-in-front-of-a-window-photo.jpg";

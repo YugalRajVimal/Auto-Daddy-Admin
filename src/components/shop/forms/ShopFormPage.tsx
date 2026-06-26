@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import PageMeta from "../../common/PageMeta";
-import { PortalPageContent } from "../../admin/PortalPageContent";
-import { ownerPageHeaderClass, ownerPageTitleClass } from "../../owner/OwnerPageShell";
+import { useShopPageChrome } from "../../../context/ShopPageChromeContext";
 
 export function ShopFormPage({
   title,
@@ -15,21 +13,22 @@ export function ShopFormPage({
   backTo: string;
   children: ReactNode;
 }) {
-  return (
-    <PortalPageContent className="px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title={metaTitle} description={title} />
-      <div className={ownerPageHeaderClass}>
-        <h1 className={ownerPageTitleClass}>{title}</h1>
-        <Link
-          to={backTo}
-          className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-ad-purple hover:bg-gray-50"
-        >
-          Back
-        </Link>
-      </div>
-      {children}
-    </PortalPageContent>
-  );
+  useShopPageChrome({
+    pageHeading: title,
+    title,
+    metaTitle,
+    metaDescription: title,
+    headerAction: (
+      <Link
+        to={backTo}
+        className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-ad-purple hover:bg-gray-50"
+      >
+        Back
+      </Link>
+    ),
+  });
+
+  return <>{children}</>;
 }
 
 export const shopSaveButtonClass =

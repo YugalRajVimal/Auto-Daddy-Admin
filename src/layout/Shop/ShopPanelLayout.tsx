@@ -1,8 +1,8 @@
-import { Link, Outlet } from "react-router";
-import PortalShell from "../../components/admin/PortalShell";
+import ShopPortalShell from "../../components/shop/ShopPortalShell";
 import { RequirePortal } from "../../auth/guards/RequirePortal";
 import useAuth from "../../auth/useAuth";
 import { shopPrimaryNav } from "../../config/shopNav";
+import { ShopPageChromeProvider } from "../../context/ShopPageChromeContext";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 
@@ -12,43 +12,29 @@ function ShopLayoutContent() {
   const businessLogoSrc = normalizeMediaUrl(business?.businessLogo ?? null);
   const loginAs = session?.meta?.phone || profile?.phone || "";
 
-  const name = displayName || profile?.name?.trim() || "Auto Shop";
-  const location = city || profile?.city?.trim();
-
-  const headerCenter = (
-    <p className="text-center font-serif text-base text-gray-700 md:text-lg lg:text-xl">
-      {name}
-      {location ? (
-        <>
-          {" - "}
-          <Link to="/shop/profile" className="font-bold text-blue-600 underline">
-            {location}
-          </Link>
-        </>
-      ) : null}
-    </p>
-  );
+  const name = displayName || profile?.name?.trim() || loginAs || "Auto Shop";
+  const location = city || profile?.city?.trim() || business?.city?.trim();
 
   return (
-    <PortalShell
+    <ShopPortalShell
       homePath="/shop"
       profilePath="/shop/profile"
       primaryNav={shopPrimaryNav}
-      loginAs={loginAs}
       brandLogo={{ src: businessLogoSrc, placeholderLabel: "Business logo" }}
-      headerCenter={headerCenter}
+      businessName={name}
+      city={location}
       subscriptionDaysLeft={daysLeft ?? null}
       helpPath="/shop/help"
-    >
-      <Outlet />
-    </PortalShell>
+    />
   );
 }
 
 export default function ShopPanelLayout() {
   return (
     <RequirePortal portal="shop" signInPath="/" unauthorizedPath="/">
-      <ShopLayoutContent />
+      <ShopPageChromeProvider>
+        <ShopLayoutContent />
+      </ShopPageChromeProvider>
     </RequirePortal>
   );
 }

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
+import { FiEdit2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson } from "../../../api/mobileAuth";
 import {
   CompactField,
   CompactFormPanel,
   CompactFormRow,
+  compactFixedFieldWidth,
   compactInputClass,
 } from "../../admin/ContentPanel";
 import { useAuth } from "../../../auth";
@@ -18,15 +20,24 @@ import {
   updateServiceWeWorkWith,
 } from "../../../lib/shopOwnerMutations";
 import {
+  formatOpenHoursTimeDisplay,
   resolvePerDaySchedule,
   serializePerDayOpenHoursForApi,
+  shortDayLabel,
   WEEK_DAYS,
   type PerDaySchedule,
+  type WeekDay,
 } from "../../../lib/perDayOpenHours";
-import { filterServicesByShopType, normalizeShopType, SHOP_TYPE_OPTIONS, type ShopType } from "../../../lib/shopTypes";
+import { filterServicesByShopType, normalizeShopType, type ShopType } from "../../../lib/shopTypes";
 import type { ShopProfileBusiness, ShopProfileUser, ShopServiceCategory } from "../../../types/shopOwner";
 import OpenHoursTimePicker from "./OpenHoursTimePicker";
-import CarBrandLogo from "../CarBrandLogo";
+import CarBrandLogo, {
+  CAR_BRAND_EMBLEM_LOGO_CLASS,
+  CAR_BRAND_EMBLEM_SLOT_CLASS,
+  CAR_BRAND_LIST_LOGO_CLASS,
+  CAR_BRAND_LIST_LOGO_SLOT_CLASS,
+} from "../CarBrandLogo";
+import { getCarBrandId, getCarBrandName } from "../../../lib/dummyCarBrands";
 import { getServiceId, getServiceName } from "../../../lib/dummyServices";
 import { parseCitiesApiResponse } from "../../../lib/carOwnerCities";
 import { shopSaveButtonClass } from "./ShopFormPage";
@@ -56,13 +67,16 @@ function ProfileFormFooter({
   onSave,
   onReset,
   cancelLabel = "Cancel",
+  saveLabel = "Update",
 }: {
   message: string;
   saving: boolean;
   onSave: () => void;
   onReset: () => void;
   cancelLabel?: string;
+  saveLabel?: string;
 }) {
+  const savingLabel = saveLabel === "Save" ? "Saving…" : "Updating…";
   return (
     <ProfileStatusFooter
       message={message}
@@ -74,7 +88,7 @@ function ProfileFormFooter({
             disabled={saving}
             className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-6 py-1.5 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
           >
-            {saving ? "Updating…" : "Update"}
+            {saving ? savingLabel : saveLabel}
           </button>
           <span className="text-xs text-gray-700">
             or{" "}
@@ -112,7 +126,6 @@ export function ShopPersonalProfileEditor({
   const [selectedCity, setSelectedCity] = useState(city ?? "");
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [showUploadImage, setShowUploadImage] = useState(false);
-  const [showEmail, setShowEmail] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const syncFromUser = () => {
@@ -122,7 +135,6 @@ export function ShopPersonalProfileEditor({
     setAddress(user?.address ?? "");
     setPincode(user?.pincode ?? "");
     setSelectedCity(city ?? "");
-    setShowEmail(Boolean(user?.email?.trim()));
     setShowUploadImage(false);
   };
 
@@ -157,17 +169,13 @@ export function ShopPersonalProfileEditor({
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [cityOptions, selectedCity]);
 
-  useEffect(() => {
-    if (user?.email?.trim()) setShowEmail(true);
-  }, [user?.email]);
-
   const handleUpdate = async () => {
     if (!token) return;
     setSaving(true);
     try {
       const res = await updatePersonalProfile(token, {
         name: name.trim(),
-        email: showEmail ? email.trim() : "",
+        email: email.trim(),
         phone: phone.replace(/\D/g, ""),
         countryCode: session?.meta?.countryCode ?? user?.countryCode ?? "+1",
         pincode: pincode.trim(),
@@ -229,11 +237,12 @@ export function ShopPersonalProfileEditor({
               ))}
             </select>
           </CompactField>
-          <CompactField label="Address" className="min-w-[120px] flex-1">
+          <CompactField label="Email" className="min-w-[120px] flex-1">
             <input
+              type="email"
               className={compactInputClass}
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={saving}
             />
           </CompactField>
@@ -260,7 +269,8 @@ export function ShopPersonalProfileEditor({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className={`${checkboxBoxClass} hover:bg-gray-200`}
+                    disabled={saving}
+                    className={`${checkboxBoxClass} hover:bg-gray-200 disabled:opacity-60`}
                   >
                     Choose image
                   </button>
@@ -269,32 +279,7 @@ export function ShopPersonalProfileEditor({
               ) : null}
             </div>
           </div>
-          <div className="min-w-[120px] flex-1">
-            <div className="flex flex-col items-start gap-2">
-              <div className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="shop-personal-show-email"
-                  checked={showEmail}
-                  onChange={(e) => setShowEmail(e.target.checked)}
-                  disabled={saving}
-                  className="h-3.5 w-3.5 accent-ad-green"
-                />
-                <label htmlFor="shop-personal-show-email" className="text-xs font-bold text-ad-green-dark">
-                  Email
-                </label>
-              </div>
-              {showEmail ? (
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={saving}
-                  className={`${compactInputClass} w-full`}
-                />
-              ) : null}
-            </div>
-          </div>
+          <div className="min-w-[120px] flex-1" aria-hidden />
           <div className="min-w-[120px] flex-1" aria-hidden />
           <div className="min-w-[120px] flex-1" aria-hidden />
         </CompactFormRow>
@@ -316,7 +301,6 @@ export function ShopBusinessProfileEditor({
 }) {
   const { token } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const bannerFileInputRef = useRef<HTMLInputElement>(null);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [businessName, setBusinessName] = useState(business?.businessName ?? "");
   const [businessPhone, setBusinessPhone] = useState(business?.businessPhone ?? "");
@@ -330,9 +314,7 @@ export function ShopBusinessProfileEditor({
     normalizeShopType(initialShopType ?? business?.shopType)
   );
   const [showUploadImage, setShowUploadImage] = useState(false);
-  const [showUploadBanner, setShowUploadBanner] = useState(false);
   const [logo, setLogo] = useState<File | null>(null);
-  const [banner, setBanner] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   const syncFromBusiness = () => {
@@ -346,9 +328,7 @@ export function ShopBusinessProfileEditor({
     setTax(business?.gstPercent != null ? String(business.gstPercent) : "");
     setShopType(normalizeShopType(initialShopType ?? business?.shopType));
     setShowUploadImage(false);
-    setShowUploadBanner(false);
     setLogo(null);
-    setBanner(null);
   };
 
   const reset = () => {
@@ -408,7 +388,6 @@ export function ShopBusinessProfileEditor({
         shopType,
       };
       if (logo) fields.businessLogo = logo;
-      if (banner) fields.bannerImage = banner;
       const res = await updateBusinessProfileMultipart(token, fields);
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save.");
@@ -421,40 +400,20 @@ export function ShopBusinessProfileEditor({
     }
   };
 
-  const shopTypeRadios = (
-    <>
-      <span className="text-xs font-bold text-gray-800">Shop Type:</span>
-      {SHOP_TYPE_OPTIONS.map((option) => (
-        <label key={option.value} className="flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-          <input
-            type="radio"
-            name="shop-business-type"
-            value={option.value}
-            checked={shopType === option.value}
-            onChange={() => setShopType(option.value)}
-            disabled={saving}
-            className="h-3.5 w-3.5 accent-ad-green"
-          />
-          {option.label}
-        </label>
-      ))}
-    </>
-  );
-
   return (
-    <>
-      <CompactFormPanel
-        footer={
-          <ProfileFormFooter
-            message="You are updating your business profile"
-            saving={saving}
-            onSave={() => void handleUpdate()}
-            onReset={reset}
-          />
-        }
-      >
+    <CompactFormPanel
+      footer={
+        <ProfileFormFooter
+          message="You are updating your business profile"
+          saving={saving}
+          onSave={() => void handleUpdate()}
+          onReset={reset}
+        />
+      }
+    >
+      <div className="space-y-4">
         <CompactFormRow>
-          <CompactField label="Business Name">
+          <CompactField label="Business Name" className="min-w-[120px] flex-1">
             <input
               className={compactInputClass}
               value={businessName}
@@ -462,7 +421,7 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="Phone">
+          <CompactField label="Business Phone" className="min-w-[120px] flex-1">
             <input
               className={compactInputClass}
               value={businessPhone}
@@ -470,7 +429,7 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="City">
+          <CompactField label="City" className="min-w-[120px] flex-1">
             <select
               className={compactInputClass}
               value={city}
@@ -485,17 +444,7 @@ export function ShopBusinessProfileEditor({
               ))}
             </select>
           </CompactField>
-          <CompactField label="Zip Code">
-            <input
-              className={compactInputClass}
-              value={zip}
-              onChange={(e) => setZip(e.target.value)}
-              disabled={saving}
-            />
-          </CompactField>
-        </CompactFormRow>
-        <CompactFormRow>
-          <CompactField label="Address">
+          <CompactField label="Address" className="min-w-[120px] flex-1">
             <input
               className={compactInputClass}
               value={address}
@@ -503,15 +452,17 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="Business Email">
+        </CompactFormRow>
+        <CompactFormRow>
+          <CompactField label="Zip Code" className="min-w-[120px] flex-1">
             <input
               className={compactInputClass}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={zip}
+              onChange={(e) => setZip(e.target.value)}
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="HST Number">
+          <CompactField label="HST No." className="min-w-[120px] flex-1">
             <input
               className={compactInputClass}
               value={hst}
@@ -519,7 +470,7 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="Tax %">
+          <CompactField label="Tax %" className="min-w-[120px] flex-1">
             <input
               className={compactInputClass}
               value={tax}
@@ -527,9 +478,18 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
+          <CompactField label="E mail" className="min-w-[120px] flex-1">
+            <input
+              type="email"
+              className={compactInputClass}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={saving}
+            />
+          </CompactField>
         </CompactFormRow>
-        <CompactFormRow className="items-start pt-2">
-          <div className="min-w-0 flex-1">
+        <CompactFormRow className="items-start">
+          <div className="min-w-[120px] flex-1">
             <div className="flex flex-col items-start gap-2">
               <div className="inline-flex items-center gap-2">
                 <input
@@ -548,7 +508,8 @@ export function ShopBusinessProfileEditor({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className={`${checkboxBoxClass} hover:bg-gray-200`}
+                  disabled={saving}
+                  className={`${checkboxBoxClass} hover:bg-gray-200 disabled:opacity-60`}
                 >
                   Choose image
                 </button>
@@ -562,158 +523,198 @@ export function ShopBusinessProfileEditor({
               />
             </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-col items-start gap-2">
-              <div className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="shop-business-upload-banner"
-                  checked={showUploadBanner}
-                  onChange={(e) => setShowUploadBanner(e.target.checked)}
-                  disabled={saving}
-                  className="h-3.5 w-3.5 accent-ad-green"
-                />
-                <label htmlFor="shop-business-upload-banner" className="text-xs font-bold text-ad-green-dark">
-                  Upload Banner Image
-                </label>
-              </div>
-              {showUploadBanner ? (
-                <button
-                  type="button"
-                  onClick={() => bannerFileInputRef.current?.click()}
-                  className={`${checkboxBoxClass} hover:bg-gray-200`}
-                >
-                  Choose image
-                </button>
-              ) : null}
-              <input
-                ref={bannerFileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => setBanner(e.target.files?.[0] ?? null)}
-              />
-            </div>
-          </div>
-          <div className="min-w-0 flex-1" aria-hidden />
-          <div className="min-w-0 flex-1" aria-hidden />
+          <div className="min-w-[120px] flex-1" aria-hidden />
+          <div className="min-w-[120px] flex-1" aria-hidden />
+          <div className="min-w-[120px] flex-1" aria-hidden />
         </CompactFormRow>
-        <CompactFormRow className="items-center pt-1">
-          <div className="flex flex-wrap items-center gap-4">{shopTypeRadios}</div>
-        </CompactFormRow>
-      </CompactFormPanel>
-    </>
+      </div>
+    </CompactFormPanel>
+  );
+}
+
+type ShopHoursFormMode = "edit";
+
+function ShopHoursFormFooter({
+  saving,
+  onSave,
+  onCancel,
+}: {
+  saving: boolean;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <ProfileFormFooter
+      message="You are updating your opening timings"
+      saving={saving}
+      saveLabel="Update"
+      onSave={onSave}
+      onReset={onCancel}
+    />
   );
 }
 
 export function ShopOpenHoursEditor({
   perDayOpenHours,
-  isBusinessActive,
-  updatingActive,
-  onActiveChange,
   onSaved,
 }: {
   perDayOpenHours?: string;
-  isBusinessActive?: boolean | null;
-  updatingActive?: boolean;
-  onActiveChange?: (next: boolean) => void;
   onSaved: () => void;
 }) {
   const { token } = useAuth();
   const [schedule, setSchedule] = useState<PerDaySchedule>(() =>
     resolvePerDaySchedule(perDayOpenHours ? { perDayOpenHours } : null)
   );
+  const [formMode, setFormMode] = useState<ShopHoursFormMode | null>(null);
+  const [editingDay, setEditingDay] = useState<WeekDay | null>(null);
+  const [formDay, setFormDay] = useState<WeekDay>("Monday");
+  const [formOpen, setFormOpen] = useState(true);
+  const [formStart, setFormStart] = useState("09:00");
+  const [formEnd, setFormEnd] = useState("20:00");
   const [saving, setSaving] = useState(false);
+
+  const resetFormFields = (day: WeekDay = "Monday") => {
+    const entry = schedule[day];
+    setFormDay(day);
+    setFormOpen(entry.enabled);
+    setFormStart(entry.start);
+    setFormEnd(entry.end);
+  };
 
   useEffect(() => {
     setSchedule(resolvePerDaySchedule(perDayOpenHours ? { perDayOpenHours } : null));
   }, [perDayOpenHours]);
 
-  const handleUpdate = async () => {
+  const openEditForm = (day: WeekDay) => {
+    setEditingDay(day);
+    resetFormFields(day);
+    setFormMode("edit");
+  };
+
+  const closeForm = () => {
+    setEditingDay(null);
+    setFormMode(null);
+  };
+
+  const applyFormToSchedule = (): PerDaySchedule => ({
+    ...schedule,
+    [formDay]: {
+      enabled: formOpen,
+      start: formStart,
+      end: formEnd,
+    },
+  });
+
+  const handleSave = async () => {
     if (!token) return;
+    const nextSchedule = applyFormToSchedule();
     setSaving(true);
     try {
-      const res = await updateBusinessOpenHours(token, serializePerDayOpenHoursForApi(schedule));
+      const res = await updateBusinessOpenHours(token, serializePerDayOpenHoursForApi(nextSchedule));
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save hours.");
         return;
       }
+      setSchedule(nextSchedule);
       toast.success("Hours updated.");
       onSaved();
+      closeForm();
     } finally {
       setSaving(false);
     }
   };
 
-  const reset = () => {
-    setSchedule(resolvePerDaySchedule(perDayOpenHours ? { perDayOpenHours } : null));
-  };
+  const showForm = formMode === "edit";
 
   return (
-    <CompactFormPanel
-      footer={
-        <ProfileFormFooter
-          message="You are updating your opening timings"
-          saving={saving}
-          onSave={() => void handleUpdate()}
-          onReset={reset}
-        />
-      }
-    >
-      {isBusinessActive != null ? (
-        <label className="mb-4 flex items-center gap-3 text-sm font-semibold text-ad-purple">
-          <input
-            type="checkbox"
-            checked={isBusinessActive}
-            disabled={updatingActive}
-            onChange={(e) => onActiveChange?.(e.target.checked)}
-            className="h-5 w-5 accent-ad-purple"
-          />
-          {isBusinessActive ? "Your shop is currently open" : "Your shop is currently closed"}
-        </label>
-      ) : null}
-      <div className="w-full space-y-4">
-        {WEEK_DAYS.map((day) => (
-          <div
-            key={day}
-            className="grid w-full grid-cols-1 items-center gap-5 rounded border border-gray-200 bg-white px-4 py-3 text-sm sm:grid-cols-3 sm:justify-items-start sm:gap-x-8"
-          >
-            <label className="flex w-full items-center justify-start gap-3 font-semibold">
+    <div className="space-y-4">
+      {showForm ? (
+        <CompactFormPanel
+          footer={
+            <ShopHoursFormFooter
+              saving={saving}
+              onSave={() => void handleSave()}
+              onCancel={closeForm}
+            />
+          }
+        >
+          <CompactFormRow>
+            <CompactField label="Day" className={compactFixedFieldWidth}>
               <input
-                type="checkbox"
-                checked={schedule[day].enabled}
+                type="text"
+                readOnly
+                value={shortDayLabel(formDay)}
+                className={`${compactInputClass} bg-gray-50`}
+              />
+            </CompactField>
+            <CompactField label="Status" className={compactFixedFieldWidth}>
+              <select
+                value={formOpen ? "open" : "closed"}
                 disabled={saving}
-                onChange={(e) =>
-                  setSchedule((s) => ({ ...s, [day]: { ...s[day], enabled: e.target.checked } }))
-                }
-                className="h-5 w-5 shrink-0 accent-ad-purple"
-              />
-              <span className="inline-block min-w-[5.75rem] text-left">{day}</span>
-            </label>
-            <div className="flex w-full items-center justify-start gap-2">
-              <span className="w-14 shrink-0 text-xs font-bold text-ad-green-dark">Opening</span>
+                onChange={(e) => setFormOpen(e.target.value === "open")}
+                className={compactInputClass}
+              >
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+              </select>
+            </CompactField>
+            <CompactField label="Opening time" className={compactFixedFieldWidth}>
               <OpenHoursTimePicker
-                id={`${day}-opening`}
-                value={schedule[day].start}
-                disabled={!schedule[day].enabled || saving}
-                className="w-[88px]"
-                onChange={(start) => setSchedule((s) => ({ ...s, [day]: { ...s[day], start } }))}
+                id="shop-hours-opening"
+                value={formStart}
+                disabled={!formOpen || saving}
+                onChange={setFormStart}
               />
-            </div>
-            <div className="flex w-full items-center justify-start gap-2">
-              <span className="w-14 shrink-0 text-xs font-bold text-ad-green-dark">Closing</span>
+            </CompactField>
+            <CompactField label="Closing Time" className={compactFixedFieldWidth}>
               <OpenHoursTimePicker
-                id={`${day}-closing`}
-                value={schedule[day].end}
-                disabled={!schedule[day].enabled || saving}
-                className="w-[88px]"
-                onChange={(end) => setSchedule((s) => ({ ...s, [day]: { ...s[day], end } }))}
+                id="shop-hours-closing"
+                value={formEnd}
+                disabled={!formOpen || saving}
+                onChange={setFormEnd}
               />
+            </CompactField>
+          </CompactFormRow>
+        </CompactFormPanel>
+      ) : null}
+
+      <div className="overflow-hidden rounded border border-gray-300 bg-white/90 shadow-sm">
+        {WEEK_DAYS.map((day, index) => {
+          const entry = schedule[day];
+              const isEditingRow = editingDay === day;
+          return (
+            <div
+              key={day}
+              className={`grid grid-cols-[4rem_1fr_1fr_auto] items-center gap-3 px-4 py-2.5 text-sm sm:grid-cols-[5rem_1fr_1fr_auto] ${
+                isEditingRow
+                  ? "bg-ad-form-required-bg"
+                  : index % 2 === 0
+                    ? "bg-gray-100/80"
+                    : "bg-white"
+              }`}
+            >
+              <span className="font-semibold text-gray-700">{shortDayLabel(day)}</span>
+              <span className={`font-semibold ${entry.enabled ? "text-ad-purple" : "text-gray-500"}`}>
+                {entry.enabled ? "Open" : "Closed"}
+              </span>
+              <span className="text-gray-700">
+                {entry.enabled ? formatOpenHoursTimeDisplay(entry.start) : "—"}
+              </span>
+              <button
+                type="button"
+                title={`Edit ${day}`}
+                aria-label={`Edit ${day}`}
+                disabled={saving}
+                onClick={() => openEditForm(day)}
+                className="flex h-8 w-8 items-center justify-center rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                <FiEdit2 size={14} aria-hidden />
+              </button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
-    </CompactFormPanel>
+    </div>
   );
 }
 
@@ -725,6 +726,117 @@ export type ShopCarCompany = {
   brandLogo?: string | null;
   logoUrl?: string | null;
 };
+
+const CAR_BRANDS_PER_PAGE = 27;
+
+function ShopCarBrandPagination({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex justify-end gap-1 border-t border-gray-200 bg-white px-3 py-2">
+      {Array.from({ length: totalPages }, (_, index) => {
+        const pageNumber = index + 1;
+        const active = pageNumber === page;
+        return (
+          <button
+            key={pageNumber}
+            type="button"
+            onClick={() => onPageChange(pageNumber)}
+            className={`min-w-[1.75rem] rounded border px-2 py-0.5 text-xs font-semibold ${
+              active
+                ? "border-gray-400 bg-white text-gray-900 shadow-sm"
+                : "border-gray-300 bg-gray-50 text-gray-600 hover:bg-white"
+            }`}
+          >
+            {pageNumber}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ShopCarBrandList({
+  brands,
+  savingBrandId,
+  onRemove,
+}: {
+  brands: ShopCarCompany[];
+  savingBrandId?: string | null;
+  onRemove: (company: ShopCarCompany) => void;
+}) {
+  const [page, setPage] = useState(1);
+
+  const sortedBrands = useMemo(
+    () =>
+      [...brands].sort((a, b) =>
+        getCarBrandName(a).localeCompare(getCarBrandName(b), undefined, { sensitivity: "base" })
+      ),
+    [brands]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(sortedBrands.length / CAR_BRANDS_PER_PAGE));
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const pageBrands = sortedBrands.slice((page - 1) * CAR_BRANDS_PER_PAGE, page * CAR_BRANDS_PER_PAGE);
+  const brandRows: ShopCarCompany[][] = [];
+  for (let index = 0; index < pageBrands.length; index += 3) {
+    brandRows.push(pageBrands.slice(index, index + 3));
+  }
+
+  return (
+    <div className="overflow-hidden rounded border border-gray-300 bg-white/90 shadow-sm">
+      {brandRows.map((row, rowIndex) => {
+        const rowTone = rowIndex % 2 === 0 ? "bg-gray-100/80" : "bg-white";
+
+        return (
+          <div key={rowIndex} className={`grid grid-cols-1 sm:grid-cols-3 ${rowTone}`}>
+            {row.map((company) => {
+              const id = getCarBrandId(company);
+              const name = getCarBrandName(company);
+
+              return (
+                <div
+                  key={id}
+                  className="group flex items-center justify-between gap-2 px-3 py-2.5 text-sm text-gray-900"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className={CAR_BRAND_LIST_LOGO_SLOT_CLASS}>
+                      <CarBrandLogo company={company} className={CAR_BRAND_LIST_LOGO_CLASS} />
+                    </div>
+                    <span className="truncate font-medium">{name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    title={`Remove ${name}`}
+                    aria-label={`Remove ${name}`}
+                    disabled={savingBrandId === id}
+                    onClick={() => onRemove(company)}
+                    className="shrink-0 rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 disabled:opacity-60"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+      <ShopCarBrandPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+    </div>
+  );
+}
 
 export function ShopCarBrandAddEditor({
   companies,
@@ -792,14 +904,15 @@ export function ShopCarBrandAddEditor({
         <ProfileFormFooter
           message="You are adding a car brand"
           saving={saving}
+          saveLabel="Save"
           onSave={() => void handleSave()}
           onReset={reset}
           cancelLabel="Cancel"
         />
       }
     >
-      <CompactFormRow className="items-end">
-        <CompactField label="Select Brand Name" className="min-w-[180px] flex-1">
+      <CompactFormRow className="items-start">
+        <CompactField label="Name" className="min-w-[180px] flex-1">
           <select
             className={compactInputClass}
             value={brandId}
@@ -821,11 +934,13 @@ export function ShopCarBrandAddEditor({
           </select>
         </CompactField>
         <CompactField label="Emblem" className="min-w-[180px] flex-1">
-          {brandId ? (
-            <CarBrandLogo company={selected} className="h-20 w-full object-contain" />
-          ) : (
-            <span className="text-xs text-gray-400">Select a brand</span>
-          )}
+          <div className={CAR_BRAND_EMBLEM_SLOT_CLASS}>
+            {brandId ? (
+              <CarBrandLogo company={selected} className={CAR_BRAND_EMBLEM_LOGO_CLASS} />
+            ) : (
+              <span className="text-xs text-gray-400">Select a brand</span>
+            )}
+          </div>
         </CompactField>
       </CompactFormRow>
     </CompactFormPanel>

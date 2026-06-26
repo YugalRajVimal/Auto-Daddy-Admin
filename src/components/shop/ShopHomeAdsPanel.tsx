@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import type { PartsDealerCard } from "../../hooks/usePartsDealers";
 import { DUMMY_SALVAGE_DEALS, type SalvageDeal } from "../../lib/dummySalvageDeals";
 import ShopAdDetailDialog from "./ShopAdDetailDialog";
@@ -18,9 +17,6 @@ type ShopHomeAdsPanelProps = {
   salvageDeals?: SalvageDeal[];
   onPhaseChange?: (phase: ShopAdPhase) => void;
 };
-
-const navButtonClass =
-  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#006600] bg-white text-[#006600] transition-colors hover:bg-[#DFFFD6]";
 
 function curtainClass(index: number, activeIndex: number, leavingIndex: number | null, direction: SlideDirection): string {
   const base = "absolute inset-0";
@@ -163,17 +159,6 @@ export default function ShopHomeAdsPanel({
     }
   }, [items.length, partsDealers.length, phase, salvageDeals.length, startCurtainTransition, switchToParts, switchToSalvage]);
 
-  const goPrevious = useCallback(() => {
-    if (items.length === 0 || transitioningRef.current) return;
-    const current = activeIndexRef.current;
-    const next = (current - 1 + items.length) % items.length;
-    startCurtainTransition(current, next, -1);
-  }, [items.length, startCurtainTransition]);
-
-  const goNext = useCallback(() => {
-    advance();
-  }, [advance]);
-
   useEffect(() => {
     clearCurtainTimer();
     setLeavingIndex(null);
@@ -216,7 +201,17 @@ export default function ShopHomeAdsPanel({
   };
 
   if (loading) {
-    return <p className="text-xs text-gray-500">Loading…</p>;
+    return (
+      <div
+        className="min-h-[360px] w-full animate-pulse space-y-3 rounded-lg border border-gray-200/80 bg-white p-4 shadow-lg"
+        aria-busy="true"
+        aria-label="Loading ads"
+      >
+        <div className="h-40 w-full rounded-lg bg-gray-200" />
+        <div className="h-4 w-3/4 rounded bg-gray-200" />
+        <div className="h-4 w-1/2 rounded bg-gray-200" />
+      </div>
+    );
   }
 
   if (items.length === 0) {
@@ -225,15 +220,14 @@ export default function ShopHomeAdsPanel({
 
   return (
     <>
-      <div className="flex w-full flex-col gap-2">
-        <div
-          className="relative aspect-square w-full overflow-hidden"
+      <div
+          className="relative min-h-[360px] w-full overflow-hidden"
           aria-live="polite"
           aria-atomic="true"
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
-          <div key={phase} className="relative h-full w-full">
+          <div key={phase} className="relative min-h-[360px] w-full">
             {phase === "parts"
               ? partsDealers.map((dealer, index) => (
                   <div
@@ -245,6 +239,9 @@ export default function ShopHomeAdsPanel({
                       name={dealer.name}
                       phone={dealer.phone}
                       imageUrl={dealer.imageUrl}
+                      city={dealer.city}
+                      website={dealer.website}
+                      specialty={dealer.specialty}
                       onClick={() => openPartsDialog(dealer)}
                     />
                   </div>
@@ -260,6 +257,7 @@ export default function ShopHomeAdsPanel({
                       company={deal.company}
                       price={deal.price}
                       imageUrl={deal.imageUrl}
+                      year={deal.year}
                       onClick={() => openSalvageDialog(deal)}
                     />
                   </div>
@@ -283,21 +281,6 @@ export default function ShopHomeAdsPanel({
               ))}
             </div>
           ) : null}
-        </div>
-
-        {hasMultiple ? (
-          <div className="flex items-center justify-center gap-3">
-            <button type="button" onClick={goPrevious} aria-label="Previous ad" className={navButtonClass}>
-              <FiChevronLeft className="text-xl" aria-hidden />
-            </button>
-            <span className="min-w-[3rem] text-center text-xs font-semibold text-[#006600]">
-              {activeIndex + 1} / {items.length}
-            </span>
-            <button type="button" onClick={goNext} aria-label="Next ad" className={navButtonClass}>
-              <FiChevronRight className="text-xl" aria-hidden />
-            </button>
-          </div>
-        ) : null}
       </div>
 
       <ShopAdDetailDialog

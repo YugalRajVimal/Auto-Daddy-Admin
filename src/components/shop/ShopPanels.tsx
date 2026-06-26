@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ShopContentSkeleton } from "../common/Skeleton";
 
 /** Section row inside main content: left heading, right actions. */
 export function ShopContentHeader({
@@ -28,9 +29,11 @@ export function ShopContentHeader({
 export function ShopLoadingPanel({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`flex min-h-[420px] flex-1 items-center justify-center lg:min-h-[calc(100vh-220px)] ${className}`}
+      className={`flex min-h-[420px] flex-1 lg:min-h-[calc(100vh-220px)] ${className}`}
+      aria-busy="true"
+      aria-label="Loading"
     >
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
+      <ShopContentSkeleton className="w-full" />
     </div>
   );
 }

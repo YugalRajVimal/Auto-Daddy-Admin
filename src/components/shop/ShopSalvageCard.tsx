@@ -5,15 +5,20 @@ type ShopSalvageCardProps = {
   company: string;
   price: number;
   imageUrl?: string;
+  year?: string;
   className?: string;
   onClick?: () => void;
 };
+
+const CARD_CLASS =
+  "flex w-full flex-col overflow-hidden rounded-lg border border-gray-200/80 bg-white shadow-md";
 
 export default function ShopSalvageCard({
   partName,
   company,
   price,
   imageUrl,
+  year,
   className = "",
   onClick,
 }: ShopSalvageCardProps) {
@@ -34,24 +39,36 @@ export default function ShopSalvageCard({
             }
           : undefined
       }
-      className={`flex aspect-square w-full flex-col overflow-hidden rounded-sm border border-[#006600] ${
-        onClick ? "cursor-pointer transition-shadow hover:shadow-md" : ""
-      } ${className}`}
+      className={`${CARD_CLASS} ${onClick ? "cursor-pointer transition-shadow hover:shadow-lg" : ""} ${className}`}
     >
-      <div className="relative min-h-0 flex-1 bg-[#DFFFD6]">
+      <div className="relative h-28 w-full overflow-hidden bg-gray-100">
         {hasPhoto ? (
           <img src={imageUrl} alt={partName} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full items-center justify-center px-3">
-            <p className="text-center text-sm font-bold leading-snug text-[#006600]">{partName}</p>
+            <p className="text-center text-xs font-bold leading-snug text-[#008000]">{partName}</p>
           </div>
         )}
+        <span className="absolute left-2 top-2 rounded-full bg-ad-purple/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+          Salvage
+        </span>
       </div>
 
-      <div className="shrink-0 bg-[#008000] px-2 py-2 text-center">
-        <p className="truncate text-sm font-bold text-white">{partName || "—"}</p>
-        <p className="mt-0.5 truncate text-xs font-semibold text-white/95">{company || "—"}</p>
-        <p className="mt-0.5 text-xs font-bold text-[#DFFFD6]">{formatSalvagePrice(price)}</p>
+      <div className="bg-[#008000] px-2.5 py-2 text-center text-xs font-bold leading-snug text-white">
+        {partName || "—"}
+      </div>
+
+      <div className="flex flex-col items-center gap-2 px-2.5 py-2.5">
+        <div className="flex w-full items-center justify-between gap-2 text-xs">
+          <span className="min-w-0 truncate font-semibold text-gray-700">{company || "—"}</span>
+          {year ? <span className="shrink-0 text-[10px] font-medium text-gray-500">{year}</span> : null}
+        </div>
+
+        <span className="w-full rounded-full bg-[#d4ffd4] px-3 py-1.5 text-center text-sm font-bold text-[#008000]">
+          {formatSalvagePrice(price)}
+        </span>
+
+        <p className="text-center text-[10px] font-semibold text-ad-purple">Tap for details</p>
       </div>
     </article>
   );

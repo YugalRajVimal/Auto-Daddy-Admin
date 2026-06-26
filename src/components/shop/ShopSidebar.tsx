@@ -1,6 +1,35 @@
 import type { ReactNode } from "react";
 import PortalSidebarButton from "../admin/PortalSidebarButton";
-import { OwnerSidebarFaqsSlot } from "../owner/OwnerFaqsButton";
+import { shopSidebarButtonClass } from "./shopSidebarStyles";
+
+function ShopSidebarButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "true" : undefined}
+      className={shopSidebarButtonClass(active)}
+    >
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden className="shrink-0">
+        {[6, 10, 14].map((y) => (
+          <g key={y}>
+            <circle cx="4" cy={y} r="1.25" fill="currentColor" />
+            <rect x="7" y={y - 0.75} width="9" height="1.5" rx="0.75" fill="currentColor" />
+          </g>
+        ))}
+      </svg>
+      <span className="min-w-0 flex-1">{label}</span>
+    </button>
+  );
+}
 
 export type ShopSidebarItem = {
   id: string;
@@ -15,66 +44,55 @@ type ShopSidebarProps = {
   items: ShopSidebarItem[];
   activeId?: string | null;
   onSelect?: (id: string) => void;
-  searchPlaceholder?: string;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
   heading?: string;
   headingClassName?: string;
   children?: ReactNode;
   footer?: ReactNode;
-  searchInputId?: string;
-  onFaqsClick?: () => void;
   className?: string;
+  /** Purple/peach pill buttons matching shop mockups. */
+  shopStyle?: boolean;
 };
 
 export default function ShopSidebar({
   items,
   activeId,
   onSelect,
-  searchPlaceholder,
-  searchValue,
-  onSearchChange,
   heading,
   headingClassName = "text-sm font-bold text-gray-600",
   children,
   footer,
-  searchInputId,
-  onFaqsClick,
   className = "",
+  shopStyle = false,
 }: ShopSidebarProps) {
   return (
     <aside className={`${SHOP_SIDEBAR_SHELL_CLASS} ${className}`}>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:pr-0.5">
         {heading ? <h2 className={headingClassName}>{heading}</h2> : null}
 
-        {searchPlaceholder != null ? (
-          <input
-            id={searchInputId}
-            type="search"
-            value={searchValue ?? ""}
-            onChange={(e) => onSearchChange?.(e.target.value)}
-            placeholder={searchPlaceholder}
-            className="w-full rounded-full border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-          />
-        ) : null}
-
         {children}
 
         <div className="flex flex-col gap-3">
-          {items.map((item) => (
-            <PortalSidebarButton
-              key={item.id}
-              label={item.label}
-              active={activeId === item.id}
-              onClick={() => onSelect?.(item.id)}
-            />
-          ))}
+          {items.map((item) =>
+            shopStyle ? (
+              <ShopSidebarButton
+                key={item.id}
+                label={item.label}
+                active={activeId === item.id}
+                onClick={() => onSelect?.(item.id)}
+              />
+            ) : (
+              <PortalSidebarButton
+                key={item.id}
+                label={item.label}
+                active={activeId === item.id}
+                onClick={() => onSelect?.(item.id)}
+              />
+            ),
+          )}
         </div>
 
         {footer}
       </div>
-
-      {onFaqsClick ? <OwnerSidebarFaqsSlot pinned onClick={onFaqsClick} /> : null}
     </aside>
   );
 }
