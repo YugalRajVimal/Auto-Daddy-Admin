@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import ShopServiceSubDialog from "../../components/shop/forms/ShopServiceSubDialog";
+import { ShopViewTransition } from "../../components/shop/ShopAnimated";
 import ServiceImage from "../../components/shop/ServiceImage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
@@ -8,8 +9,8 @@ import {
   ShopListPanel,
   ShopListFooter,
   ShopLoadingPanel,
-  ShopPageContentShell,
 } from "../../components/shop/ShopPanels";
+import { shopHeroCardBodyClass } from "../../components/shop/shopLayoutStyles";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
 import { getDummyMyServices } from "../../lib/dummyServices";
@@ -128,7 +129,7 @@ export default function ShopServicesPage() {
       metaTitle="Services | AutoDaddy"
       metaDescription="Auto shop services"
       headerAction={
-        activeCategory ? (
+        activeCategory && !dialogOpen ? (
           <button
             type="button"
             className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
@@ -153,8 +154,33 @@ export default function ShopServicesPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <ShopPageContentShell>
-        {loading ? (
+      <ShopViewTransition
+        viewKey={
+          dialogOpen
+            ? editIndex != null
+              ? `edit-${editIndex}`
+              : "add"
+            : `list-${activeCategoryId ?? "none"}`
+        }
+        className={shopHeroCardBodyClass}
+      >
+        {dialogOpen && activeCategory ? (
+          <ShopServiceSubDialog
+            category={activeCategory}
+            editIndex={editIndex}
+            hasExistingServices={categories.length > 0 && !usingDummy}
+            demoMode={usingDummy}
+            onDemoSave={(categoryId, subServices) => {
+              setCategories((prev) =>
+                prev.map((category) =>
+                  category.id === categoryId ? { ...category, subServices } : category
+                )
+              );
+            }}
+            onClose={() => setDialogOpen(false)}
+            onSaved={() => handleRefresh()}
+          />
+        ) : loading ? (
           <ShopLoadingPanel variant="media-card" count={5} />
         ) : error && !usingDummy ? (
           <ShopErrorPanel message={error} onRetry={() => void refresh()} />
@@ -209,24 +235,7 @@ export default function ShopServicesPage() {
             )}
           </>
         ) : null}
-      </ShopPageContentShell>
-
-      <ShopServiceSubDialog
-        open={dialogOpen}
-        category={activeCategory}
-        editIndex={editIndex}
-        hasExistingServices={categories.length > 0 && !usingDummy}
-        demoMode={usingDummy}
-        onDemoSave={(categoryId, subServices) => {
-          setCategories((prev) =>
-            prev.map((category) =>
-              category.id === categoryId ? { ...category, subServices } : category
-            )
-          );
-        }}
-        onClose={() => setDialogOpen(false)}
-        onSaved={() => handleRefresh()}
-      />
+      </ShopViewTransition>
     </ShopPageShell>
   );
 }

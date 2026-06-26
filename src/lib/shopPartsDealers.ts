@@ -1,4 +1,4 @@
-import { getJson } from "../api/mobileAuth";
+import { withPartsDealerDummyImages } from "./shopAdDummyImages";
 
 export type PartsDealerCard = {
   name: string;
@@ -9,20 +9,7 @@ export type PartsDealerCard = {
   specialty?: string;
 };
 
-function dealerPlaceholderImage(name: string, index = 0): string {
-  const seed =
-    name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || `dealer-${index}`;
-  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/400/400`;
-}
-
-export function withPlaceholderImages(dealers: PartsDealerCard[]): PartsDealerCard[] {
-  return dealers.map((dealer, index) => ({
-    ...dealer,
-    imageUrl: dealer.imageUrl?.trim() || dealerPlaceholderImage(dealer.name, index),
-  }));
-}
-
-export const FALLBACK_PARTS_DEALERS: PartsDealerCard[] = withPlaceholderImages([
+export const FALLBACK_PARTS_DEALERS: PartsDealerCard[] = withPartsDealerDummyImages([
   {
     name: "Hindustan Agencies",
     phone: "289 763 5476",
@@ -79,8 +66,9 @@ function parseDealersFromPayload(payload: unknown): PartsDealerCard[] {
   return out;
 }
 
-export async function fetchPartsDealers(token: string): Promise<PartsDealerCard[]> {
-  const res = await getJson<unknown>("/api/auto-shop-owner/dashboard-details-new", token);
-  const parsed = res.ok && res.data ? parseDealersFromPayload(res.data) : [];
-  return parsed.length > 0 ? withPlaceholderImages(parsed) : FALLBACK_PARTS_DEALERS;
+/** Resolve sidebar ad dealers from a dashboard API payload (no network). */
+export function resolvePartsDealersFromPayload(payload: unknown): PartsDealerCard[] {
+  const parsed = parseDealersFromPayload(payload);
+  const dealers = parsed.length > 0 ? parsed : FALLBACK_PARTS_DEALERS;
+  return withPartsDealerDummyImages(dealers);
 }

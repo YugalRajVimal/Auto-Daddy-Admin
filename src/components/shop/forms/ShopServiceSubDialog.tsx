@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { compactInputClass } from "../../admin/ContentPanel";
+import DashboardPanelCard from "../../COMP";
 import { useAuth } from "../../../auth";
 import { apiMessage, removeMyServiceSubServices, saveMyServices, updateMyServices } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
-import { shopCancelButtonClass, shopSaveButtonClass } from "./ShopFormPage";
-import { ShopDialogMotion } from "../ShopAnimated";
 
 type ShopServiceSubDialogProps = {
-  open: boolean;
   category: ShopServiceCategory | null;
   editIndex: number | null;
   hasExistingServices: boolean;
@@ -19,7 +17,6 @@ type ShopServiceSubDialogProps = {
 };
 
 export default function ShopServiceSubDialog({
-  open,
   category,
   editIndex,
   hasExistingServices,
@@ -35,7 +32,7 @@ export default function ShopServiceSubDialog({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!open || !category) return;
+    if (!category) return;
     if (editIndex != null && category.subServices[editIndex]) {
       const sub = category.subServices[editIndex];
       setName(sub.name);
@@ -46,7 +43,7 @@ export default function ShopServiceSubDialog({
       setPrice("");
       setDesc("");
     }
-  }, [category, editIndex, open]);
+  }, [category, editIndex]);
 
   const handleSave = async () => {
     if (!category) return;
@@ -121,33 +118,51 @@ export default function ShopServiceSubDialog({
     }
   };
 
+  if (!category) return null;
+
   return (
-    <ShopDialogMotion
-      open={open && Boolean(category)}
-      onClose={onClose}
-      panelClassName="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-xl"
-    >
-        <h2 className="mb-4 text-lg font-bold text-ad-purple">
-          {editIndex != null ? "Edit" : "Add"} Sub-Service — {category?.name}
+    <DashboardPanelCard variant="form" className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-4 border-b border-ad-form-border pb-3">
+        <h2 className="text-lg font-bold text-ad-green-dark">
+          {editIndex != null ? "Edit" : "Add"} Sub-Service — {category.name}
         </h2>
-        <div className="space-y-3">
-          <input className={compactInputClass} placeholder="Name *" value={name} onChange={(e) => setName(e.target.value)} />
-          <input className={compactInputClass} placeholder="Price *" value={price} onChange={(e) => setPrice(e.target.value)} />
-          <textarea className={compactInputClass} placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} />
-        </div>
-        <div className="mt-5 flex justify-between gap-2">
-          {editIndex != null ? (
-            <button type="button" className="text-sm font-semibold text-red-600" disabled={saving} onClick={() => void handleDelete()}>
-              Delete
+      </div>
+
+      <div className="flex flex-1 flex-col space-y-3">
+        <input className={compactInputClass} placeholder="Name *" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className={compactInputClass} placeholder="Price *" value={price} onChange={(e) => setPrice(e.target.value)} />
+        <textarea className={compactInputClass} placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-ad-form-border bg-ad-form-bg px-3 py-2.5">
+        {editIndex != null ? (
+          <button type="button" className="text-sm font-semibold text-red-600" disabled={saving} onClick={() => void handleDelete()}>
+            Delete
+          </button>
+        ) : (
+          <span />
+        )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <span className="text-xs text-gray-700">
+            or{" "}
+            <button
+              type="button"
+              onClick={onClose}
+              className="font-medium text-blue-600 underline hover:text-blue-700"
+            >
+              Cancel
             </button>
-          ) : <span />}
-          <div className="flex gap-2">
-            <button type="button" className={shopCancelButtonClass} onClick={onClose}>Cancel</button>
-            <button type="button" className={shopSaveButtonClass} disabled={saving} onClick={() => void handleSave()}>
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
+          </span>
         </div>
-    </ShopDialogMotion>
+      </div>
+    </DashboardPanelCard>
   );
 }

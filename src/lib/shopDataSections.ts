@@ -12,7 +12,7 @@ export type ShopDataSection =
   | "websiteTemplates";
 
 const PATH_SECTIONS: Record<string, ShopDataSection[]> = {
-  "/shop": ["portal", "partsDealers"],
+  "/shop": ["portal"],
   "/shop/profile": ["portal", "services"],
   "/shop/people": ["customers"],
   "/shop/services": ["services"],

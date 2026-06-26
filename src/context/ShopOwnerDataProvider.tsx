@@ -37,7 +37,7 @@ import {
   parseMyServices,
   parsePayments,
 } from "../lib/shopOwnerParsers";
-import { FALLBACK_PARTS_DEALERS, fetchPartsDealers, type PartsDealerCard } from "../lib/shopPartsDealers";
+import { FALLBACK_PARTS_DEALERS, resolvePartsDealersFromPayload, type PartsDealerCard } from "../lib/shopPartsDealers";
 import { parsePaidWalletPayload, parseUnpaidWalletPayload } from "../lib/shopOwnerWallet";
 import {
   fetchWebsiteTemplates,
@@ -118,7 +118,7 @@ async function fetchSectionData(
         };
       }
       case "partsDealers":
-        return { data: await fetchPartsDealers(token), error: null };
+        return { data: null, error: null };
       case "customers": {
         const res = await fetchMyCustomers(token, buildMyCustomersQuery(DEFAULT_PERIOD));
         if (!res.ok) return { data: [], error: "Could not load customers." };
@@ -210,6 +210,27 @@ export function ShopOwnerDataProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (section === "partsDealers") {
+        setSections((prev) => {
+          if (!options?.force && prev.partsDealers.loaded) return prev;
+          const fromPortal = prev.portal.data?.dashboard;
+          const dealers =
+            fromPortal != null
+              ? resolvePartsDealersFromPayload(fromPortal)
+              : (prev.partsDealers.data ?? FALLBACK_PARTS_DEALERS);
+          return {
+            ...prev,
+            partsDealers: {
+              data: dealers,
+              loading: false,
+              error: null,
+              loaded: true,
+            },
+          };
+        });
+        return;
+      }
+
       let shouldFetch = false;
       let showLoading = false;
 
@@ -237,15 +258,27 @@ export function ShopOwnerDataProvider({ children }: { children: ReactNode }) {
 
       const promise = (async () => {
         const result = await fetchSectionData(section, token);
-        setSections((prev) => ({
-          ...prev,
-          [section]: {
-            data: result.data ?? prev[section].data,
-            loading: false,
-            error: result.error,
-            loaded: true,
-          },
-        }));
+        setSections((prev) => {
+          const next = {
+            ...prev,
+            [section]: {
+              data: result.data ?? prev[section].data,
+              loading: false,
+              error: result.error,
+              loaded: true,
+            },
+          };
+          if (section === "portal" && result.data) {
+            const portalData = result.data as ShopPortalCache;
+            next.partsDealers = {
+              data: resolvePartsDealersFromPayload(portalData.dashboard),
+              loading: false,
+              error: null,
+              loaded: true,
+            };
+          }
+          return next;
+        });
       })();
 
       inflightRef.current[section] = promise;

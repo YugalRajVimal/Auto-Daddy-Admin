@@ -1,3 +1,5 @@
+import { withSalvageDummyImages } from "./shopAdDummyImages";
+
 export type SalvageDeal = {
   id: string;
   partName: string;
@@ -9,11 +11,7 @@ export type SalvageDeal = {
   notes?: string;
 };
 
-function salvageImage(seed: string): string {
-  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/400/400`;
-}
-
-export const DUMMY_SALVAGE_DEALS: SalvageDeal[] = [
+export const DUMMY_SALVAGE_DEALS: SalvageDeal[] = withSalvageDummyImages([
   {
     id: "salvage-1",
     partName: "Front Brake Pads",
@@ -22,7 +20,6 @@ export const DUMMY_SALVAGE_DEALS: SalvageDeal[] = [
     year: "2018–2022",
     condition: "Used — Good",
     notes: "OEM pads from Camry; ~40% pad life remaining.",
-    imageUrl: salvageImage("salvage-brake-pads"),
   },
   {
     id: "salvage-2",
@@ -32,7 +29,6 @@ export const DUMMY_SALVAGE_DEALS: SalvageDeal[] = [
     year: "2016–2020",
     condition: "Tested — Working",
     notes: "Civic 1.5L; bench-tested, includes pulley.",
-    imageUrl: salvageImage("salvage-alternator"),
   },
   {
     id: "salvage-3",
@@ -42,7 +38,6 @@ export const DUMMY_SALVAGE_DEALS: SalvageDeal[] = [
     year: "2019–2023",
     condition: "Used — Fair",
     notes: "F-150 driver side; minor scuff on housing, lens clear.",
-    imageUrl: salvageImage("salvage-headlight"),
   },
   {
     id: "salvage-4",
@@ -52,9 +47,8 @@ export const DUMMY_SALVAGE_DEALS: SalvageDeal[] = [
     year: "2015–2019",
     condition: "Used — Good",
     notes: "Malibu 2.5L; no leaks, flushed and inspected.",
-    imageUrl: salvageImage("salvage-radiator"),
   },
-];
+]);
 
 export function formatSalvagePrice(price: number): string {
   return new Intl.NumberFormat("en-CA", {

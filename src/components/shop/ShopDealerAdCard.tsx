@@ -105,7 +105,7 @@ export default function ShopDealerAdCard({
     >
       <div className="aspect-[4/3] w-full overflow-hidden bg-gray-100">
         {hasPhoto ? (
-          <img src={imageUrl} alt={imageAlt} className="h-full w-full object-cover" />
+          <img src={imageUrl} alt={imageAlt} className="h-full w-full object-cover" loading="lazy" decoding="async" />
         ) : (
           <div className="flex h-full min-h-[140px] items-center justify-center px-3">
             <p className="text-center text-sm font-bold leading-snug text-[#008000]">{title}</p>
