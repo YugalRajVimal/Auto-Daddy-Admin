@@ -2,7 +2,10 @@
 export const shopPortalHorizPaddingClass = "px-3 sm:px-4 md:px-4 lg:px-4 xl:px-4";
 
 /** Uniform inset inside the hero content card (all shop pages except Home). */
-export const shopHeroCardPaddingClass = "p-4 sm:p-8 md:p-14 lg:p-16 xl:p-20";
+export const shopHeroCardPaddingClass = "p-2 sm:p-3 md:p-5 lg:p-6 xl:p-8";
+
+/** Background image inside the shop profile hero card (all shop pages except Home). */
+export const shopHeroCardImageClass = "absolute inset-0 h-full w-full object-cover opacity-75";
 
 /** Fixed main content card — viewport height, no grow; clip and scroll inside. */
 export const shopMainContentHeightClass =

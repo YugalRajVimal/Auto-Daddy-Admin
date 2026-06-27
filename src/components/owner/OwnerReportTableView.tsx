@@ -1,6 +1,13 @@
 import { Fragment, type ReactNode } from "react";
 import { FiPrinter } from "react-icons/fi";
 import {
+  ADMIN_PANEL_TABLE_CLASS,
+  ADMIN_PANEL_TD_CLASS,
+  ADMIN_PANEL_TH_CLASS,
+  ADMIN_PANEL_THEAD_ROW_CLASS,
+  adminPanelRowClass,
+} from "../admin/adminPanelTableStyles";
+import {
   cellValueForHeader,
   formatLongDate,
   formatReportAmount,
@@ -73,13 +80,13 @@ export function OwnerGroupedReportTable({
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className={ADMIN_PANEL_TABLE_CLASS}>
             <thead>
-              <tr className="bg-ad-purple text-white">
+              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
                 {headers.map((header) => (
                   <th
                     key={header}
-                    className={`border border-ad-purple-dark px-3 py-2 font-medium ${
+                    className={`${ADMIN_PANEL_TH_CLASS} ${
                       header === "Amount" ? "text-right" : "text-left"
                     }`}
                   >
@@ -96,12 +103,12 @@ export function OwnerGroupedReportTable({
                       {group.label}
                     </td>
                   </tr>
-                  {group.rows.map((row) => (
-                    <tr key={row.id}>
+                  {group.rows.map((row, rowIdx) => (
+                    <tr key={row.id} className={adminPanelRowClass(rowIdx)}>
                       {headers.map((header) => (
                         <td
                           key={`${row.id}-${header}`}
-                          className={`border border-gray-300 px-3 py-2 ${
+                          className={`${ADMIN_PANEL_TD_CLASS} ${
                             header === "Amount" ? "text-right" : ""
                           } ${header === "Auto Shop" || header === "Vendor" ? "uppercase" : ""}`}
                         >
@@ -156,13 +163,13 @@ export function OwnerFlatReportTable({
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className={ADMIN_PANEL_TABLE_CLASS}>
             <thead>
-              <tr className="bg-ad-purple text-white">
+              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
                 {headers.map((header) => (
                   <th
                     key={header}
-                    className={`border border-ad-purple-dark px-3 py-2 font-medium ${
+                    className={`${ADMIN_PANEL_TH_CLASS} ${
                       header === "Amount" || header === "Rating" ? "text-right" : "text-left"
                     }`}
                   >
@@ -173,11 +180,11 @@ export function OwnerFlatReportTable({
             </thead>
             <tbody>
               {rows.map((row, idx) => (
-                <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                <tr key={row.id} className={adminPanelRowClass(idx)}>
                   {headers.map((header) => (
                     <td
                       key={`${row.id}-${header}`}
-                      className={`border border-gray-300 px-3 py-2 ${
+                      className={`${ADMIN_PANEL_TD_CLASS} ${
                         header === "Amount" || header === "Rating" ? "text-right" : ""
                       }`}
                     >

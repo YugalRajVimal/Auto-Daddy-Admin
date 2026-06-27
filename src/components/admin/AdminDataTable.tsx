@@ -1,24 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-
-// ─── Shared table styles (Auto Shop Owners pattern) ───────────────────────────
-export const adminThStyle: React.CSSProperties = {
-  border: "1px solid #d2d6de",
-  background: "#f9fafc",
-  padding: "9px 12px",
-  textAlign: "left",
-  fontWeight: 700,
-  fontSize: 13,
-  color: "#333",
-  whiteSpace: "nowrap",
-};
-
-export const adminTdStyle: React.CSSProperties = {
-  border: "1px solid #d2d6de",
-  padding: "9px 12px",
-  fontSize: 13,
-  color: "#555",
-  verticalAlign: "middle",
-};
+import {
+  ADMIN_PANEL_TD_CLASS,
+  ADMIN_PANEL_TD_COMPACT_CLASS,
+  ADMIN_PANEL_THEAD_ROW_CLASS,
+  adminPanelRowClass,
+  adminPanelTableClasses,
+} from "./adminPanelTableStyles";
 
 export const adminPageBtn = (active: boolean, disabled: boolean): React.CSSProperties => ({
   border: "1px solid",
@@ -234,6 +221,8 @@ export type AdminDataTableProps<T> = {
   serverPaginated?: boolean;
   totalItemCount?: number;
   showSearch?: boolean;
+  /** Tighter row padding for portal/shop tables */
+  compact?: boolean;
 };
 
 export function AdminDataTable<T>({
@@ -272,7 +261,9 @@ export function AdminDataTable<T>({
   serverPaginated = false,
   totalItemCount,
   showSearch = true,
+  compact = false,
 }: AdminDataTableProps<T>) {
+  const panelTable = adminPanelTableClasses(compact);
   const [internalSearch, setInternalSearch] = useState("");
   const [internalPageSize, setInternalPageSize] = useState(10);
   const [internalPage, setInternalPage] = useState(1);
@@ -505,11 +496,11 @@ export function AdminDataTable<T>({
         )}
 
         {!loading && !error && (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          <div className="overflow-x-auto">
+            <table className={panelTable.table}>
               <thead>
-                <tr>
-                  <th style={adminThStyle}>
+                <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                  <th className={panelTable.thCheckbox}>
                     <input
                       type="checkbox"
                       checked={allPageSel}
@@ -524,14 +515,17 @@ export function AdminDataTable<T>({
                           return next;
                         });
                       }}
+                      className="accent-white"
                     />
                   </th>
                   {activeColumns.map((col) => (
-                    <th key={col.key} style={adminThStyle}>
+                    <th key={col.key} className={panelTable.th}>
                       {col.label}
                     </th>
                   ))}
-                  {renderActions && <th style={adminThStyle}>{actionsColumnLabel}</th>}
+                  {renderActions && (
+                    <th className={panelTable.th}>{actionsColumnLabel}</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -539,7 +533,7 @@ export function AdminDataTable<T>({
                   <tr>
                     <td
                       colSpan={colSpan}
-                      style={{ ...adminTdStyle, textAlign: "center", color: "#aaa", padding: "36px 0" }}
+                      className={`${panelTable.td} ${compact ? "py-5" : "py-9"} text-center text-gray-400`}
                     >
                       {emptyMessage}
                     </td>
@@ -551,19 +545,23 @@ export function AdminDataTable<T>({
                   return (
                     <tr
                       key={id}
-                      style={{ background: selected ? rowHighlightColor : undefined }}
+                      className={selected ? undefined : adminPanelRowClass(idx)}
+                      style={selected ? { background: rowHighlightColor } : undefined}
                     >
-                      <td style={adminTdStyle}>
+                      <td className={panelTable.tdCheckbox}>
                         <input
                           type="checkbox"
                           checked={selected}
                           onChange={() => toggleRow(id)}
+                          className="accent-ad-purple"
                         />
                       </td>
                       {activeColumns.map((col) => (
                         <React.Fragment key={col.key}>{col.render(row, idx)}</React.Fragment>
                       ))}
-                      {renderActions && <td style={adminTdStyle}>{renderActions(row)}</td>}
+                      {renderActions && (
+                        <td className={panelTable.td}>{renderActions(row)}</td>
+                      )}
                     </tr>
                   );
                 })}
@@ -586,11 +584,10 @@ export function AdminDataTable<T>({
             <p style={{ margin: 0, fontSize: 14, color: "#333" }}>
               {itemTotal === 0
                 ? "No entries"
-                : `Showing ${(safePage - 1) * pageSize + 1} to ${Math.min(safePage * pageSize, itemTotal)} of ${itemTotal} entries${
-                    search && totalBeforeFilter !== undefined
-                      ? ` (filtered from ${totalBeforeFilter} total)`
-                      : ""
-                  }`}
+                : `Showing ${(safePage - 1) * pageSize + 1} to ${Math.min(safePage * pageSize, itemTotal)} of ${itemTotal} entries${search && totalBeforeFilter !== undefined
+                  ? ` (filtered from ${totalBeforeFilter} total)`
+                  : ""
+                }`}
             </p>
             <div style={{ display: "flex" }}>
               <button
@@ -631,6 +628,14 @@ export function AdminDataTable<T>({
 }
 
 /** Helper for simple text cells */
-export function tableCell(content: React.ReactNode, style?: React.CSSProperties) {
-  return <td style={{ ...adminTdStyle, ...style }}>{content}</td>;
+export function tableCell(
+  content: React.ReactNode,
+  style?: React.CSSProperties,
+  compact = false,
+) {
+  return (
+    <td className={compact ? ADMIN_PANEL_TD_COMPACT_CLASS : ADMIN_PANEL_TD_CLASS} style={style}>
+      {content}
+    </td>
+  );
 }

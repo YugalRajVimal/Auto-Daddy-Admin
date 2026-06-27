@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link } from "react-router";
-import { FiEdit2, FiX } from "react-icons/fi";
+import { FiEdit2, FiPaperclip, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson } from "../../../api/mobileAuth";
 import {
@@ -8,6 +8,14 @@ import {
   CompactFormPanel,
   CompactFormRow,
 } from "../../admin/ContentPanel";
+import { AdminDataTable, tableCell } from "../../admin/AdminDataTable";
+import {
+  ADMIN_PANEL_THEAD_ROW_CLASS,
+  adminPanelRowClass,
+  adminPanelTableClasses,
+} from "../../admin/adminPanelTableStyles";
+
+const SHOP_TABLE = adminPanelTableClasses(true);
 import { shopCompactInputClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
@@ -42,10 +50,8 @@ import OpenHoursTimePicker from "./OpenHoursTimePicker";
 import CarBrandLogo, {
   CAR_BRAND_EMBLEM_LOGO_CLASS,
   CAR_BRAND_EMBLEM_SLOT_CLASS,
-  CAR_BRAND_LIST_LOGO_CLASS,
-  CAR_BRAND_LIST_LOGO_SLOT_CLASS,
 } from "../CarBrandLogo";
-import { getCarBrandId, getCarBrandName } from "../../../lib/dummyCarBrands";
+import { getCarBrandId, getCarBrandName, resolveCarBrandLogo } from "../../../lib/dummyCarBrands";
 import { getServiceId, getServiceName } from "../../../lib/dummyServices";
 import { parseCitiesApiResponse } from "../../../lib/carOwnerCities";
 import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
@@ -235,10 +241,10 @@ function hasEstablishedBusinessProfile(business?: ShopProfileBusiness, zipCode?:
   const phone = phoneDigits(business?.businessPhone ?? "");
   return Boolean(
     business?.businessName?.trim() &&
-      business?.address?.trim() &&
-      business?.city?.trim() &&
-      phone.length >= 10 &&
-      (zipCode?.trim() || business?.email?.trim())
+    business?.address?.trim() &&
+    business?.city?.trim() &&
+    phone.length >= 10 &&
+    (zipCode?.trim() || business?.email?.trim())
   );
 }
 
@@ -905,52 +911,56 @@ export function ShopOpenHoursEditor({
         transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
         className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
       >
-        <div className="grid grid-cols-[4rem_1fr_1fr_auto] items-stretch border-b border-gray-300 bg-gray-100 text-xs font-bold text-gray-800 sm:grid-cols-[5rem_1fr_1fr_auto]">
-          <span className="border-r border-gray-200 px-4 py-2.5">Day</span>
-          <span className="border-r border-gray-200 px-4 py-2.5">Status</span>
-          <span className="border-r border-gray-200 px-4 py-2.5">Timing</span>
-          <span className="px-4 py-2.5 text-center">Edit</span>
+        <div className="overflow-x-auto">
+          <table className={SHOP_TABLE.table}>
+            <thead>
+              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                <th className={SHOP_TABLE.th}>Day</th>
+                <th className={SHOP_TABLE.th}>Status</th>
+                <th className={SHOP_TABLE.th}>Timing</th>
+                <th className={`${SHOP_TABLE.th} text-center`}>Edit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {WEEK_DAYS.map((day, index) => {
+                const entry = schedule[day];
+                const isEditingRow = editingDay === day;
+                return (
+                  <tr
+                    key={day}
+                    className={
+                      isEditingRow ? "bg-ad-form-required-bg" : adminPanelRowClass(index)
+                    }
+                  >
+                    <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>
+                      {shortDayLabel(day)}
+                    </td>
+                    <td
+                      className={`${SHOP_TABLE.td} font-semibold ${entry.enabled ? "text-ad-purple" : "text-gray-500"}`}
+                    >
+                      {entry.enabled ? "Open" : "Closed"}
+                    </td>
+                    <td className={SHOP_TABLE.td}>
+                      {entry.enabled ? formatOpenHoursRangeDisplay(entry.start, entry.end) : "—"}
+                    </td>
+                    <td className={`${SHOP_TABLE.td} text-center`}>
+                      <button
+                        type="button"
+                        title={`Edit ${day}`}
+                        aria-label={`Edit ${day}`}
+                        disabled={saving}
+                        onClick={() => openEditForm(day)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-black hover:text-ad-purple disabled:opacity-60"
+                      >
+                        <FiEdit2 size={13} aria-hidden />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-        {WEEK_DAYS.map((day, index) => {
-          const entry = schedule[day];
-          const isEditingRow = editingDay === day;
-          return (
-            <div
-              key={day}
-              className={`grid grid-cols-[4rem_1fr_1fr_auto] items-stretch border-b border-gray-200 text-sm last:border-b-0 sm:grid-cols-[5rem_1fr_1fr_auto] ${
-                isEditingRow
-                  ? "bg-ad-form-required-bg"
-                  : index % 2 === 0
-                    ? "bg-gray-100"
-                    : "bg-white"
-              }`}
-            >
-              <span className="border-r border-gray-200 px-4 py-2.5 font-semibold text-gray-700">
-                {shortDayLabel(day)}
-              </span>
-              <span
-                className={`border-r border-gray-200 px-4 py-2.5 font-semibold ${entry.enabled ? "text-ad-purple" : "text-gray-500"}`}
-              >
-                {entry.enabled ? "Open" : "Closed"}
-              </span>
-              <span className="border-r border-gray-200 px-4 py-2.5 text-gray-700">
-                {entry.enabled ? formatOpenHoursRangeDisplay(entry.start, entry.end) : "—"}
-              </span>
-              <div className="flex items-center justify-center px-4 py-2.5">
-                <button
-                  type="button"
-                  title={`Edit ${day}`}
-                  aria-label={`Edit ${day}`}
-                  disabled={saving}
-                  onClick={() => openEditForm(day)}
-                  className="flex h-8 w-8 items-center justify-center rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-                >
-                  <FiEdit2 size={14} aria-hidden />
-                </button>
-              </div>
-            </div>
-          );
-        })}
       </motion.div>
     </div>
   );
@@ -967,41 +977,6 @@ export type ShopCarCompany = {
 
 const CAR_BRANDS_PER_PAGE = 10;
 
-function ShopCarBrandPagination({
-  page,
-  totalPages,
-  onPageChange,
-}: {
-  page: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-}) {
-  if (totalPages <= 1) return null;
-
-  return (
-    <div className="flex justify-end gap-1 border-t border-gray-200 bg-white px-3 py-2">
-      {Array.from({ length: totalPages }, (_, index) => {
-        const pageNumber = index + 1;
-        const active = pageNumber === page;
-        return (
-          <button
-            key={pageNumber}
-            type="button"
-            onClick={() => onPageChange(pageNumber)}
-            className={`min-w-[1.75rem] rounded border px-2 py-0.5 text-xs font-semibold ${
-              active
-                ? "border-gray-400 bg-white text-gray-900 shadow-sm"
-                : "border-gray-300 bg-gray-50 text-gray-600 hover:bg-white"
-            }`}
-          >
-            {pageNumber}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export function ShopCarBrandList({
   brands,
   savingBrandId,
@@ -1011,8 +986,7 @@ export function ShopCarBrandList({
   savingBrandId?: string | null;
   onRemove: (company: ShopCarCompany) => void;
 }) {
-  const [page, setPage] = useState(1);
-
+  const [previewBrand, setPreviewBrand] = useState<ShopCarCompany | null>(null);
   const sortedBrands = useMemo(
     () =>
       [...brands].sort((a, b) =>
@@ -1021,59 +995,101 @@ export function ShopCarBrandList({
     [brands]
   );
 
-  const totalPages = Math.max(1, Math.ceil(sortedBrands.length / CAR_BRANDS_PER_PAGE));
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
-
-  const pageBrands = sortedBrands.slice((page - 1) * CAR_BRANDS_PER_PAGE, page * CAR_BRANDS_PER_PAGE);
+  const tableColumns = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Name of Car Brand",
+        render: (company: ShopCarCompany) =>
+          tableCell(
+            <span className="font-medium text-blue-700">{getCarBrandName(company)}</span>,
+            undefined,
+            true,
+          ),
+        exportValue: (company: ShopCarCompany) => getCarBrandName(company),
+      },
+      {
+        key: "emblem",
+        label: "Amblem",
+        render: (company: ShopCarCompany) => {
+          const name = getCarBrandName(company);
+          return tableCell(
+            <button
+              type="button"
+              title={`View ${name} emblem`}
+              aria-label={`View ${name} emblem`}
+              onClick={() => setPreviewBrand(company)}
+              style={{
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                padding: 0,
+                color: "#2563eb",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              <FiPaperclip size={16} aria-hidden />
+            </button>,
+            undefined,
+            true,
+          );
+        },
+        exportValue: () => "",
+      },
+    ],
+    []
+  );
 
   return (
-    <div className="overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="border-b border-gray-300 px-4 py-2.5 text-left text-xs font-bold text-gray-800">
-              Name of Car Brand
-            </th>
-            <th className="border-b border-gray-300 px-4 py-2.5 text-right text-xs font-bold text-gray-800">
-              Amblem
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {pageBrands.map((company, index) => {
-            const id = getCarBrandId(company);
-            const name = getCarBrandName(company);
-
-            return (
-              <tr key={id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                <td className="border-b border-gray-200 px-4 py-2.5 font-medium text-gray-900">{name}</td>
-                <td className="border-b border-gray-200 px-4 py-2.5">
-                  <div className="flex items-center justify-end gap-3">
-                    <div className={CAR_BRAND_LIST_LOGO_SLOT_CLASS}>
-                      <CarBrandLogo company={company} className={CAR_BRAND_LIST_LOGO_CLASS} alt={`${name} emblem`} />
-                    </div>
-                    <button
-                      type="button"
-                      title={`Remove ${name}`}
-                      aria-label={`Remove ${name}`}
-                      disabled={savingBrandId === id}
-                      onClick={() => onRemove(company)}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-lg font-bold text-red-600 hover:bg-red-50 disabled:opacity-60"
-                    >
-                      <FiX size={16} aria-hidden />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <ShopCarBrandPagination page={page} totalPages={totalPages} onPageChange={setPage} />
-    </div>
+    <>
+      <AdminDataTable
+        items={sortedBrands}
+        columns={tableColumns}
+        getRowId={(company) => getCarBrandId(company)}
+        pageSize={CAR_BRANDS_PER_PAGE}
+        pageSizeOptions={[10, 25, 50]}
+        showStandardToolbar={false}
+        showColSelector={false}
+        showSearch={false}
+        compact
+        exportFilename="car-brands"
+        renderActions={(company) => {
+          const id = getCarBrandId(company);
+          const name = getCarBrandName(company);
+          return (
+            <button
+              type="button"
+              title={`Remove ${name}`}
+              aria-label={`Remove ${name}`}
+              disabled={savingBrandId === id}
+              onClick={() => onRemove(company)}
+              style={{
+                border: "none",
+                background: "transparent",
+                cursor: savingBrandId === id ? "not-allowed" : "pointer",
+                color: "#dc2626",
+                opacity: savingBrandId === id ? 0.6 : 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 4,
+              }}
+            >
+              <FiX size={16} aria-hidden />
+            </button>
+          );
+        }}
+      />
+      {previewBrand ? (
+        <ProfileImagePreviewModal
+          open
+          title={`${getCarBrandName(previewBrand)} emblem`}
+          imageUrl={resolveCarBrandLogo(previewBrand)}
+          onClose={() => setPreviewBrand(null)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -1203,52 +1219,67 @@ export function ShopServiceList({
     [services]
   );
 
-  return (
-    <div className="overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="border-b border-gray-300 px-4 py-2.5 text-left text-xs font-bold text-gray-800">
-              Main Service
-            </th>
-            <th className="border-b border-gray-300 px-4 py-2.5 text-left text-xs font-bold text-gray-800">
-              Match with
-            </th>
-            <th className="border-b border-gray-300 px-4 py-2.5 text-right text-xs font-bold text-gray-800">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedServices.map((service, index) => {
-            const id = getServiceId(service);
-            const name = getServiceName(service);
-            const vendorLabel = getShopTypeLabel(service.shopType);
+  const tableColumns = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Main Service",
+        render: (service: ShopServiceCategory) =>
+          tableCell(
+            <span className="font-medium text-blue-700">{getServiceName(service)}</span>,
+            undefined,
+            true,
+          ),
+        exportValue: (service: ShopServiceCategory) => getServiceName(service),
+      },
+      {
+        key: "shopType",
+        label: "Match with",
+        render: (service: ShopServiceCategory) =>
+          tableCell(getShopTypeLabel(service.shopType), undefined, true),
+        exportValue: (service: ShopServiceCategory) => getShopTypeLabel(service.shopType),
+      },
+    ],
+    []
+  );
 
-            return (
-              <tr key={id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                <td className="border-b border-gray-200 px-4 py-2.5 font-medium text-gray-900">{name}</td>
-                <td className="border-b border-gray-200 px-4 py-2.5 text-gray-800">{vendorLabel}</td>
-                <td className="border-b border-gray-200 px-4 py-2.5">
-                  <div className="flex items-center justify-end">
-                    <button
-                      type="button"
-                      title={`Remove ${name}`}
-                      aria-label={`Remove ${name}`}
-                      disabled={savingServiceId === id}
-                      onClick={() => onRemove(service)}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:opacity-60"
-                    >
-                      <FiX size={16} aria-hidden />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+  return (
+    <AdminDataTable
+      items={sortedServices}
+      columns={tableColumns}
+      getRowId={(service) => getServiceId(service)}
+      showStandardToolbar={false}
+      showColSelector={false}
+      showSearch={false}
+      compact
+      exportFilename="operational-services"
+      renderActions={(service) => {
+        const id = getServiceId(service);
+        const name = getServiceName(service);
+        return (
+          <button
+            type="button"
+            title={`Remove ${name}`}
+            aria-label={`Remove ${name}`}
+            disabled={savingServiceId === id}
+            onClick={() => onRemove(service)}
+            style={{
+              border: "none",
+              background: "transparent",
+              cursor: savingServiceId === id ? "not-allowed" : "pointer",
+              color: "#dc2626",
+              opacity: savingServiceId === id ? 0.6 : 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 4,
+            }}
+          >
+            <FiX size={16} aria-hidden />
+          </button>
+        );
+      }}
+    />
   );
 }
 

@@ -45,10 +45,9 @@ const JOB_CARD_FIELD_GRID = "grid grid-cols-[7.25rem_minmax(0,1fr)] gap-x-2 gap-
 const JOB_CARD_FIELD_LABEL_CLASS =
   "text-xs font-bold text-ad-green-dark leading-tight self-center";
 const TABLE_WRAP_CLASS = "overflow-x-auto rounded border border-gray-300";
-const TABLE_CLASS = "w-full min-w-[720px] border-collapse text-sm";
-const TH_CLASS =
-  "border border-gray-300 bg-gray-100 px-2 py-1.5 text-left text-xs font-bold text-gray-800";
-const TD_CLASS = "border border-gray-300 px-2 py-1.5 align-top";
+const TABLE_CLASS = "w-full min-w-[720px] border-collapse text-xs";
+const TH_CLASS = "border border-ad-purple-dark px-2 py-1 text-xs font-medium text-white";
+const TD_CLASS = "border border-gray-300 px-2 py-1 align-top";
 
 type ServiceLine = {
   id: string;
@@ -289,7 +288,7 @@ function ServiceTableColgroup() {
 function ServiceTableHeader() {
   return (
     <thead>
-      <tr>
+      <tr className="bg-ad-purple text-white">
         <th className={`${TH_CLASS} text-left`}>Service</th>
         <th className={`${TH_CLASS} text-left`}>Sub Service</th>
         <th className={`${TH_CLASS} text-left`}>Description</th>
