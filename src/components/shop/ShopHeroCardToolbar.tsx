@@ -22,7 +22,7 @@ export default function ShopHeroCardToolbar({
   if (!showSearch && !headerAction) return null;
 
   return (
-    <div className="mb-3 flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
       {showSearch ? (
         <input
           id={searchInputId}

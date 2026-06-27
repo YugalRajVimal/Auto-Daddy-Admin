@@ -4,6 +4,7 @@ import { DUMMY_SALVAGE_DEALS, type SalvageDeal } from "../../lib/dummySalvageDea
 import ShopAdDetailDialog from "./ShopAdDetailDialog";
 import ShopDealerCard from "./ShopDealerCard";
 import ShopSalvageCard from "./ShopSalvageCard";
+import { shopMainContentShellClass } from "./shopLayoutStyles";
 
 const ROTATE_MS = 5000;
 const CURTAIN_MS = 550;
@@ -223,13 +224,13 @@ export default function ShopHomeAdsPanel({
   if (loading) {
     return (
       <div
-        className="min-h-[360px] w-full animate-pulse space-y-3 rounded-lg border border-gray-200/80 bg-white p-4 shadow-lg"
+        className={`${shopMainContentShellClass} w-full animate-pulse space-y-3 rounded-lg border border-gray-200/80 bg-white p-4 shadow-lg`}
         aria-busy="true"
         aria-label="Loading ads"
       >
-        <div className="h-40 w-full rounded-lg bg-gray-200" />
-        <div className="h-4 w-3/4 rounded bg-gray-200" />
-        <div className="h-4 w-1/2 rounded bg-gray-200" />
+        <div className="min-h-0 flex-1 rounded-lg bg-gray-200" />
+        <div className="h-4 w-3/4 shrink-0 rounded bg-gray-200" />
+        <div className="h-4 w-1/2 shrink-0 rounded bg-gray-200" />
       </div>
     );
   }
@@ -241,13 +242,13 @@ export default function ShopHomeAdsPanel({
   return (
     <>
       <div
-          className="relative min-h-[360px] w-full overflow-hidden"
+          className={`relative ${shopMainContentShellClass} w-full overflow-hidden`}
           aria-live="polite"
           aria-atomic="true"
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
-          <div key={phase} className="relative min-h-[360px] w-full">
+          <div key={phase} className="relative h-full w-full">
             {phase === "parts"
               ? partsDealers.map((dealer, index) => (
                   <div
@@ -262,6 +263,7 @@ export default function ShopHomeAdsPanel({
                       city={dealer.city}
                       website={dealer.website}
                       specialty={dealer.specialty}
+                      className="h-full"
                       onClick={() => openPartsDialog(dealer)}
                     />
                   </div>
@@ -278,6 +280,7 @@ export default function ShopHomeAdsPanel({
                       price={deal.price}
                       imageUrl={deal.imageUrl}
                       year={deal.year}
+                      className="h-full"
                       onClick={() => openSalvageDialog(deal)}
                     />
                   </div>

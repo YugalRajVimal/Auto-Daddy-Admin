@@ -52,7 +52,6 @@ export default function ShopHomePage() {
       metaTitle="Home | AutoDaddy"
       metaDescription="Auto shop owner home"
       sidebarExtra={sidebarExtra}
-      contentTopOffset={false}
       heroCard={false}
       onFaqsOpen={openFaqs}
       onFaqsClose={closeFaqs}

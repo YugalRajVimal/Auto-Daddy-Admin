@@ -118,7 +118,7 @@ export default function ShopServiceSubDialog({
     <CompactFormPanel
       className="mb-4 shrink-0"
       footer={
-        <div className="flex flex-wrap items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
           <button
             type="button"
             onClick={() => void handleSave()}

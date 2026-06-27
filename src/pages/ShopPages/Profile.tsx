@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "react-toastify";
 import DashboardPanelCard from "../../components/COMP";
@@ -70,11 +70,6 @@ function parseCompanies(payload: unknown): ShopCarCompany[] {
   const data = root.data;
   const arr = Array.isArray(data) ? data : Array.isArray(root.companies) ? root.companies : [];
   return arr as ShopCarCompany[];
-}
-
-function ProfileSectionAction({ action }: { action?: ReactNode }) {
-  if (!action) return null;
-  return <div className="mb-4 flex justify-end">{action}</div>;
 }
 
 function AddNewButton({ onClick }: { onClick: () => void }) {
@@ -243,6 +238,23 @@ export default function ShopProfilePage() {
     [fullServiceCatalog, myServices, selectedServiceIds]
   );
 
+  const headerAction = useMemo(() => {
+    switch (activeId) {
+      case "brands":
+        return showAddBrand ? undefined : (
+          <AddNewButton onClick={() => setShowAddBrand(true)} />
+        );
+      case "services":
+        return showAddService ? undefined : (
+          <AddNewButton onClick={() => setShowAddService(true)} />
+        );
+      case "team":
+        return <AddNewLink to="/shop/team/new" />;
+      default:
+        return undefined;
+    }
+  }, [activeId, showAddBrand, showAddService]);
+
   const removeBrand = async (company: ShopCarCompany) => {
     const id = getCarBrandId(company);
     const name = getCarBrandName(company);
@@ -350,11 +362,6 @@ export default function ShopProfilePage() {
       case "brands":
         return (
           <>
-            {!showAddBrand ? (
-              <div className="mb-4 flex justify-end">
-                <AddNewButton onClick={() => setShowAddBrand(true)} />
-              </div>
-            ) : null}
             <ShopReveal show={showAddBrand && !brandsLoading} className="mb-4">
               <ShopCarBrandAddEditor
                 companies={carCompanies}
@@ -402,11 +409,6 @@ export default function ShopProfilePage() {
         }
         return (
           <>
-            {!showAddService ? (
-              <div className="mb-4 flex justify-end">
-                <AddNewButton onClick={() => setShowAddService(true)} />
-              </div>
-            ) : null}
             <ShopReveal show={showAddService} className="mb-4">
               <ShopServiceAddEditor
                 services={fullServiceCatalog}
@@ -449,7 +451,6 @@ export default function ShopProfilePage() {
       case "team":
         return (
           <>
-            <ProfileSectionAction action={<AddNewLink to="/shop/team/new" />} />
             {teamMembers.length === 0 ? (
               <p className={`text-center text-sm ${shopHeroOnImageMutedTextClass}`}>No team members yet.</p>
             ) : (
@@ -492,7 +493,7 @@ export default function ShopProfilePage() {
       sidebarItems={PROFILE_SECTIONS}
       activeSidebarId={activeId}
       onSidebarSelect={setActiveId}
-      contentTopOffset={false}
+      headerAction={headerAction}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}

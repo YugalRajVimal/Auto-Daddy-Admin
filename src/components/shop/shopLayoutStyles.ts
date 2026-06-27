@@ -1,8 +1,8 @@
 /** Shared horizontal inset so header (profile link → logout) aligns with the page body grid. */
 export const shopPortalHorizPaddingClass = "px-3 sm:px-4 md:px-4 lg:px-4 xl:px-4";
 
-/** Top + horizontal inset inside the hero content card (all shop pages). */
-export const shopHeroCardPaddingClass = "pt-5 px-10 sm:px-14 md:px-16 lg:px-20";
+/** Uniform inset inside the hero content card (all shop pages except Home). */
+export const shopHeroCardPaddingClass = "p-4 sm:p-8 md:p-14 lg:p-16 xl:p-20";
 
 /** Fixed main content card — viewport height, no grow; clip and scroll inside. */
 export const shopMainContentShellClass =
@@ -14,6 +14,12 @@ export const shopHeroCardScrollClass =
 
 /** Inner body inside the hero card (fills scroll area). */
 export const shopHeroCardBodyClass = "flex min-h-0 flex-col";
+
+/** Scroll-area body: at least full height so short page content can sit vertically centered. */
+export const shopHeroCardScrollBodyClass = `${shopHeroCardBodyClass} min-h-full`;
+
+/** Wraps route content; `my-auto` centers short pages vertically inside the scroll body. */
+export const shopHeroCardScrollContentClass = "my-auto w-full min-w-0";
 
 /** Child panels that should fill the remaining space inside the hero card body. */
 export const shopMainContentFillClass = "flex min-h-0 flex-1 flex-col";

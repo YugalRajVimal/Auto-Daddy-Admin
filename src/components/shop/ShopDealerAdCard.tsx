@@ -84,6 +84,8 @@ export default function ShopDealerAdCard({
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
       : null);
 
+  const fillHeight = className.includes("h-full");
+
   return (
     <article
       role={onClick ? "button" : undefined}
@@ -103,19 +105,23 @@ export default function ShopDealerAdCard({
         onClick ? "cursor-pointer transition-shadow hover:shadow-xl" : ""
       } ${className}`}
     >
-      <div className="aspect-[4/3] w-full overflow-hidden bg-gray-100">
+      <div
+        className={`w-full overflow-hidden bg-gray-100 ${
+          fillHeight ? "min-h-0 flex-1" : "aspect-[4/3]"
+        }`}
+      >
         {hasPhoto ? (
           <img src={imageUrl} alt={imageAlt} className="h-full w-full object-cover" loading="lazy" decoding="async" />
         ) : (
-          <div className="flex h-full min-h-[140px] items-center justify-center px-3">
+          <div className={`flex h-full items-center justify-center px-3 ${fillHeight ? "" : "min-h-[140px]"}`}>
             <p className="text-center text-sm font-bold leading-snug text-[#008000]">{title}</p>
           </div>
         )}
       </div>
 
-      <div className="bg-[#008000] px-3 py-2.5 text-center text-sm font-bold text-white">{title}</div>
+      <div className="shrink-0 bg-[#008000] px-3 py-2.5 text-center text-sm font-bold text-white">{title}</div>
 
-      <div className="flex flex-col items-center gap-2.5 bg-white px-3 py-3">
+      <div className="flex shrink-0 flex-col items-center gap-2.5 bg-white px-3 py-3">
         <div className="w-full bg-[#d4ffd4] px-3 py-1.5 text-center text-sm font-bold text-[#008000]">
           {location}
         </div>

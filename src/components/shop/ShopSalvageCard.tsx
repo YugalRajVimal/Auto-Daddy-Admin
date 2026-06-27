@@ -23,6 +23,7 @@ export default function ShopSalvageCard({
   onClick,
 }: ShopSalvageCardProps) {
   const hasPhoto = Boolean(imageUrl?.trim());
+  const fillHeight = className.includes("h-full");
 
   return (
     <article
@@ -41,7 +42,11 @@ export default function ShopSalvageCard({
       }
       className={`${CARD_CLASS} ${onClick ? "cursor-pointer transition-shadow hover:shadow-lg" : ""} ${className}`}
     >
-      <div className="relative h-28 w-full overflow-hidden bg-gray-100">
+      <div
+        className={`relative w-full overflow-hidden bg-gray-100 ${
+          fillHeight ? "min-h-0 flex-1" : "h-28"
+        }`}
+      >
         {hasPhoto ? (
           <img src={imageUrl} alt={partName} className="h-full w-full object-cover" loading="lazy" decoding="async" />
         ) : (
@@ -54,11 +59,11 @@ export default function ShopSalvageCard({
         </span>
       </div>
 
-      <div className="bg-[#008000] px-2.5 py-2 text-center text-xs font-bold leading-snug text-white">
+      <div className="shrink-0 bg-[#008000] px-2.5 py-2 text-center text-xs font-bold leading-snug text-white">
         {partName || "—"}
       </div>
 
-      <div className="flex flex-col items-center gap-2 px-2.5 py-2.5">
+      <div className="flex shrink-0 flex-col items-center gap-2 px-2.5 py-2.5">
         <div className="flex w-full items-center justify-between gap-2 text-xs">
           <span className="min-w-0 truncate font-semibold text-gray-700">{company || "—"}</span>
           {year ? <span className="shrink-0 text-[10px] font-medium text-gray-500">{year}</span> : null}

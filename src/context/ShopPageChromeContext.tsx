@@ -42,7 +42,7 @@ export type ShopPageChromeConfig = {
   sidebarVariant?: "business-card" | "nav";
   /** When false, uses the home hero layout instead of the profile background card. */
   heroCard?: boolean;
-  /** When false, main content starts flush with the sidebar top (e.g. home hero). */
+  /** When false, keeps page content top-aligned inside the hero card instead of vertically centered. */
   contentTopOffset?: boolean;
 };
 

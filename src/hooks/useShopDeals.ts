@@ -1,21 +1,46 @@
-import { useCallback, useEffect, useMemo } from "react";
-import { dealId, useShopOwnerData } from "../context/ShopOwnerDataProvider";
-import { isPartsDeal } from "../lib/shopOwnerParsers";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import useAuth from "../auth/useAuth";
+import { fetchMyDeals } from "../lib/shopOwnerApi";
+import { dealId, isPartsDeal, parseMyDeals } from "../lib/shopOwnerParsers";
+import type { ShopDeal } from "../types/shopOwner";
 
 export type DealFilter = "all" | "service" | "parts";
 
 export function useShopDeals(filter: DealFilter = "all") {
-  const { sections, loadSection, refreshSection } = useShopOwnerData();
-  const state = sections.deals;
-  const deals = state.data ?? [];
-
-  useEffect(() => {
-    void loadSection("deals");
-  }, [loadSection]);
+  const { token } = useAuth();
+  const [deals, setDeals] = useState<ShopDeal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    await refreshSection("deals");
-  }, [refreshSection]);
+    if (!token) {
+      setDeals([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetchMyDeals(token);
+      if (!res.ok) {
+        setError("Could not load deals.");
+        setDeals([]);
+        return;
+      }
+      setDeals(parseMyDeals(res.data));
+    } catch {
+      setError("Network error.");
+      setDeals([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return deals;
@@ -26,8 +51,8 @@ export function useShopDeals(filter: DealFilter = "all") {
   return {
     deals: filtered,
     allDeals: deals,
-    loading: state.loading && !state.loaded,
-    error: state.error,
+    loading,
+    error,
     refresh,
     dealId,
   };

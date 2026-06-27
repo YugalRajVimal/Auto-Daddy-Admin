@@ -62,7 +62,7 @@ export default function ShopPortalShell({
 
   const brandLogoLabel = brandLogo?.placeholderLabel?.trim() || "Business logo";
   const headerLogo = brandLogo ? (
-    <ShopBrandLogo src={brandLogo.src} alt={brandLogoLabel} />
+    <ShopBrandLogo src={brandLogo.src} alt={brandLogoLabel} className="!size-[50px]" />
   ) : null;
 
   useEffect(() => {
@@ -73,12 +73,8 @@ export default function ShopPortalShell({
   return (
     <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
       <header className={`${shopPortalHorizPaddingClass} pt-4 pb-1 md:pt-5`}>
-        <div className="grid grid-cols-[auto_1fr_auto] items-start gap-x-3 gap-y-3">
-          <Link to={homePath} className="row-span-2 shrink-0 self-start">
-            {headerLogo}
-          </Link>
-
-          <div className="min-w-0 flex items-center">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2">
+          <div className="col-start-1 row-start-1 row-span-2 flex w-fit max-w-full min-w-0 flex-col items-center justify-self-start self-center">
             {businessNameLoading ? (
               <span aria-busy="true" aria-label="Loading business name">
                 <Skeleton className="h-7 w-36 rounded sm:h-8 sm:w-44 md:h-9 md:w-52" />
@@ -86,15 +82,23 @@ export default function ShopPortalShell({
             ) : (
               <Link
                 to={homePath}
-                className="min-w-0 truncate font-serif text-lg italic text-gray-500 hover:text-gray-600 sm:text-xl md:text-2xl"
+                className="block min-w-0 max-w-full truncate font-serif text-lg italic text-gray-500 hover:text-gray-600 sm:text-xl md:text-2xl"
               >
                 {businessName || "Your Business"}
               </Link>
             )}
+            {city ? (
+              <Link
+                to={profilePath}
+                className="text-sm font-bold text-blue-600 underline hover:text-blue-700 md:text-base"
+              >
+                {city}
+              </Link>
+            ) : null}
           </div>
 
           <nav
-            className="flex shrink-0 items-center gap-0 self-start [&>*+*]:-ml-px"
+            className="col-start-3 row-start-1 flex shrink-0 items-center gap-0 justify-self-end [&>*+*]:-ml-px"
             aria-label="Account actions"
           >
             {subscriptionDaysLeft != null ? (
@@ -111,22 +115,11 @@ export default function ShopPortalShell({
             </button>
           </nav>
 
-          <div className="col-start-2 row-start-2 min-w-0 justify-self-start self-center">
-            {city ? (
-              <Link
-                to={profilePath}
-                className="text-sm font-bold text-blue-600 underline hover:text-blue-700 md:text-base"
-              >
-                {city}
-              </Link>
-            ) : null}
-          </div>
-
-          <h1 className="pointer-events-none col-start-2 col-end-4 row-start-2 self-center text-center font-serif text-lg font-bold text-gray-600 md:text-xl lg:text-2xl">
+          <h1 className="pointer-events-none col-start-2 row-start-2 self-center text-center font-serif text-lg font-bold text-gray-600 md:text-xl lg:text-2xl">
             {pageHeading}
           </h1>
 
-          <div className="relative z-10 col-start-3 row-start-2 flex justify-end justify-self-end self-center">
+          <div className="relative z-10 col-start-3 row-start-2 flex items-center justify-end gap-3 justify-self-end self-center">
             <button
               type="button"
               className="relative text-blue-600 hover:text-blue-700"
@@ -137,6 +130,11 @@ export default function ShopPortalShell({
                 1
               </span>
             </button>
+            {headerLogo ? (
+              <Link to={homePath} className="shrink-0">
+                {headerLogo}
+              </Link>
+            ) : null}
           </div>
         </div>
       </header>

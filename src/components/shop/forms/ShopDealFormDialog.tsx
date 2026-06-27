@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { compactInputClass } from "../../admin/ContentPanel";
+import {
+  CompactField,
+  CompactFormPanel,
+  CompactFormRow,
+  compactInputClass,
+} from "../../admin/ContentPanel";
 import { useAuth } from "../../../auth";
 import {
   apiMessage,
@@ -12,20 +17,17 @@ import {
 import { dealId } from "../../../lib/shopOwnerParsers";
 import { useShopServices } from "../../../hooks/useShopServices";
 import type { ShopDeal } from "../../../types/shopOwner";
-import { shopCancelButtonClass, shopSaveButtonClass } from "./ShopFormPage";
-import { ShopDialogMotion } from "../ShopAnimated";
 
 type DealMode = "service" | "parts";
 
 type ShopDealFormDialogProps = {
-  open: boolean;
   mode: DealMode;
   deal?: ShopDeal | null;
-  onClose: () => void;
+  onCancel: () => void;
   onSaved: () => void;
 };
 
-export default function ShopDealFormDialog({ open, mode, deal, onClose, onSaved }: ShopDealFormDialogProps) {
+export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: ShopDealFormDialogProps) {
   const { token } = useAuth();
   const { categories } = useShopServices();
   const [serviceId, setServiceId] = useState("");
@@ -55,7 +57,7 @@ export default function ShopDealFormDialog({ open, mode, deal, onClose, onSaved 
   }, [categories]);
 
   useEffect(() => {
-    if (!open || !token || mode !== "parts") return;
+    if (!token || mode !== "parts") return;
     void fetchVehicleTypesAndServices(token).then((res) => {
       if (!res.ok || !res.data || typeof res.data !== "object") return;
       const root = res.data as Record<string, unknown>;
@@ -76,10 +78,9 @@ export default function ShopDealFormDialog({ open, mode, deal, onClose, onSaved 
         })
       );
     });
-  }, [mode, open, token]);
+  }, [mode, token]);
 
   useEffect(() => {
-    if (!open) return;
     setServiceId(deal?.serviceId ?? "");
     setProductName(deal?.productName ?? "");
     setPartName(deal?.partName ?? "");
@@ -88,7 +89,7 @@ export default function ShopDealFormDialog({ open, mode, deal, onClose, onSaved 
     setDescription(deal?.description ?? "");
     setOfferEnd(deal?.offersEndOnDate?.slice(0, 10) ?? "");
     setDealImage(null);
-  }, [deal, open]);
+  }, [deal]);
 
   const selectedVehicle = vehicleCatalog.find((v) => v.id === vehicleId);
 
@@ -139,62 +140,110 @@ export default function ShopDealFormDialog({ open, mode, deal, onClose, onSaved 
       }
       toast.success(apiMessage(res.data) || "Deal saved.");
       onSaved();
-      onClose();
+      onCancel();
     } finally {
       setSaving(false);
     }
   };
 
+  const isEditing = Boolean(deal);
+  const saveLabel = isEditing ? "Update" : "Save";
+  const savingLabel = isEditing ? "Updating…" : "Saving…";
+
   return (
-    <ShopDialogMotion
-      open={open}
-      onClose={onClose}
-      panelClassName="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-200 bg-white p-5 shadow-xl"
+    <CompactFormPanel
+      className="mb-4 shrink-0"
+      footer={
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="inline-flex min-w-[7.5rem] items-center justify-center rounded bg-ad-form-save px-6 py-1.5 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
+          >
+            {saving ? savingLabel : saveLabel}
+          </button>
+          <span className="text-xs text-gray-700">
+            or{" "}
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={saving}
+              className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </span>
+        </div>
+      }
     >
-      <h2 className="mb-4 text-lg font-bold text-ad-purple">
-        {deal ? "Edit" : "Add"} {mode === "parts" ? "Parts" : "Service"} Deal
-      </h2>
-      <div className="space-y-3">
-        {mode === "service" ? (
-          <>
-            <select className={compactInputClass} value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
-              <option value="">Select service</option>
-              {serviceOptions.map((o) => (
-                <option key={`${o.id}-${o.label}`} value={o.id}>{o.label}</option>
-              ))}
-            </select>
-            <input className={compactInputClass} placeholder="Product name" value={productName} onChange={(e) => setProductName(e.target.value)} />
-            <input className={compactInputClass} placeholder="Original price" value={price} onChange={(e) => setPrice(e.target.value)} />
-          </>
-        ) : (
-          <>
-            <input className={compactInputClass} placeholder="Part name" value={partName} onChange={(e) => setPartName(e.target.value)} />
-            <select className={compactInputClass} value={vehicleId} onChange={(e) => { setVehicleId(e.target.value); setVehicleModel(""); setVehicleYear(""); }}>
+      <p className="text-sm font-bold text-ad-purple">
+        {isEditing ? "Edit" : "Add"} {mode === "parts" ? "Parts" : "Service"} Deal
+      </p>
+
+      {mode === "service" ? (
+        <>
+          <CompactFormRow>
+            <CompactField label="Service" required>
+              <select className={compactInputClass} value={serviceId} onChange={(e) => setServiceId(e.target.value)} disabled={saving}>
+                <option value="">Select service</option>
+                {serviceOptions.map((o) => (
+                  <option key={`${o.id}-${o.label}`} value={o.id}>{o.label}</option>
+                ))}
+              </select>
+            </CompactField>
+            <CompactField label="Product name">
+              <input className={compactInputClass} placeholder="Product name" value={productName} onChange={(e) => setProductName(e.target.value)} disabled={saving} />
+            </CompactField>
+            <CompactField label="Original price">
+              <input className={compactInputClass} placeholder="Original price" value={price} onChange={(e) => setPrice(e.target.value)} disabled={saving} />
+            </CompactField>
+          </CompactFormRow>
+        </>
+      ) : (
+        <CompactFormRow>
+          <CompactField label="Part name" required>
+            <input className={compactInputClass} placeholder="Part name" value={partName} onChange={(e) => setPartName(e.target.value)} disabled={saving} />
+          </CompactField>
+          <CompactField label="Vehicle company" required>
+            <select className={compactInputClass} value={vehicleId} onChange={(e) => { setVehicleId(e.target.value); setVehicleModel(""); setVehicleYear(""); }} disabled={saving}>
               <option value="">Vehicle company</option>
               {vehicleCatalog.map((v) => (
                 <option key={v.id} value={v.id}>{v.name}</option>
               ))}
             </select>
-            <select className={compactInputClass} value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)}>
+          </CompactField>
+          <CompactField label="Model" required>
+            <select className={compactInputClass} value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} disabled={saving}>
               <option value="">Model</option>
               {(selectedVehicle?.models ?? []).map((m) => (
                 <option key={m.name} value={m.name}>{m.name}</option>
               ))}
             </select>
-            <input className={compactInputClass} placeholder="Year" value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} />
-          </>
-        )}
-        <input className={compactInputClass} placeholder="Discounted price *" value={discountedPrice} onChange={(e) => setDiscountedPrice(e.target.value)} />
-        <textarea className={compactInputClass} placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-        <input className={compactInputClass} type="date" value={offerEnd} onChange={(e) => setOfferEnd(e.target.value)} />
-        <input type="file" accept="image/*" onChange={(e) => setDealImage(e.target.files?.[0] ?? null)} />
-      </div>
-      <div className="mt-5 flex justify-end gap-2">
-        <button type="button" className={shopCancelButtonClass} onClick={onClose}>Cancel</button>
-        <button type="button" className={shopSaveButtonClass} disabled={saving} onClick={() => void handleSave()}>
-          {saving ? "Saving…" : "Save"}
-        </button>
-      </div>
-    </ShopDialogMotion>
+          </CompactField>
+          <CompactField label="Year" required>
+            <input className={compactInputClass} placeholder="Year" value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} disabled={saving} />
+          </CompactField>
+        </CompactFormRow>
+      )}
+
+      <CompactFormRow>
+        <CompactField label="Discounted price" required>
+          <input className={compactInputClass} placeholder="Discounted price" value={discountedPrice} onChange={(e) => setDiscountedPrice(e.target.value)} disabled={saving} />
+        </CompactField>
+        <CompactField label="Offer ends on">
+          <input className={compactInputClass} type="date" value={offerEnd} onChange={(e) => setOfferEnd(e.target.value)} disabled={saving} />
+        </CompactField>
+        <CompactField label="Deal image" required={!isEditing}>
+          <input type="file" accept="image/*" onChange={(e) => setDealImage(e.target.files?.[0] ?? null)} disabled={saving} />
+        </CompactField>
+      </CompactFormRow>
+
+      <CompactFormRow>
+        <CompactField label="Description" className="min-w-full flex-[1_1_100%]">
+          <textarea className={`${compactInputClass} resize-y`} placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} disabled={saving} />
+        </CompactField>
+      </CompactFormRow>
+    </CompactFormPanel>
   );
 }

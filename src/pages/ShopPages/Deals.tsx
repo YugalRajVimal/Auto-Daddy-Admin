@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import ShopDealFormDialog from "../../components/shop/forms/ShopDealFormDialog";
+import { ShopReveal } from "../../components/shop/ShopAnimated";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopEmptyPanel,
@@ -95,6 +96,7 @@ function DealCard({
   businessName,
   businessPhone,
   deletingId,
+  editing,
   onEdit,
   onDelete,
 }: {
@@ -102,6 +104,7 @@ function DealCard({
   businessName: string;
   businessPhone: string;
   deletingId: string | null;
+  editing?: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -111,7 +114,11 @@ function DealCard({
   const phoneHref = businessPhone ? `tel:${businessPhone.replace(/\s/g, "")}` : undefined;
 
   return (
-    <article className="flex flex-col gap-3 rounded-md border border-[#008000] bg-[#d4fcd4] p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5 sm:py-4">
+    <article
+      className={`flex flex-col gap-3 rounded-md border border-[#008000] bg-[#d4fcd4] p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5 sm:py-4${
+        editing ? " ring-2 ring-inset ring-[#008000]" : ""
+      }`}
+    >
       <div className="flex min-w-0 flex-1 items-center gap-4">
         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-sm border border-gray-300 bg-white">
           {imageUri ? <img src={imageUri} alt="" className="h-full w-full object-cover" /> : null}
@@ -186,8 +193,8 @@ export default function ShopDealsPage() {
   const { faqsHeading, faqsDescription, displayName, businessPhone } = useShopOwnerPortal();
   const [activeId, setActiveId] = useState<DealSectionId>("service");
   const [faqsOpen, setFaqsOpen] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState<"service" | "parts">("service");
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"service" | "parts">("service");
   const [editingDeal, setEditingDeal] = useState<ShopDeal | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { deals: rawDeals, loading, error, refresh } = useShopDeals(toFilter(activeId));
@@ -197,16 +204,26 @@ export default function ShopDealsPage() {
     return rawDeals;
   }, [activeId, rawDeals]);
 
+  useEffect(() => {
+    setFormOpen(false);
+    setEditingDeal(null);
+  }, [activeId]);
+
+  const closeForm = () => {
+    setFormOpen(false);
+    setEditingDeal(null);
+  };
+
   const openCreate = () => {
     setEditingDeal(null);
-    setDialogMode(activeId === "parts" ? "parts" : "service");
-    setDialogOpen(true);
+    setFormMode(activeId === "parts" ? "parts" : "service");
+    setFormOpen(true);
   };
 
   const openEdit = (deal: ShopDeal) => {
     setEditingDeal(deal);
-    setDialogMode(dealMode(deal));
-    setDialogOpen(true);
+    setFormMode(dealMode(deal));
+    setFormOpen(true);
   };
 
   const handleDelete = async (deal: ShopDeal) => {
@@ -233,13 +250,15 @@ export default function ShopDealsPage() {
       metaTitle="Deals | AutoDaddy"
       metaDescription="Auto shop deals"
       headerAction={
-        <button
-          type="button"
-          className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
-          onClick={openCreate}
-        >
-          + Add New
-        </button>
+        !formOpen ? (
+          <button
+            type="button"
+            className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
+            onClick={openCreate}
+          >
+            + Add New
+          </button>
+        ) : undefined
       }
       sidebarItems={DEAL_SECTIONS.map((section) => ({
         id: section.id,
@@ -255,6 +274,15 @@ export default function ShopDealsPage() {
       faqsDescription={faqsDescription}
     >
       <ShopPageContentShell>
+        <ShopReveal show={formOpen}>
+          <ShopDealFormDialog
+            mode={formMode}
+            deal={editingDeal}
+            onCancel={closeForm}
+            onSaved={() => void refresh()}
+          />
+        </ShopReveal>
+
         {loading ? (
           <ShopLoadingPanel variant="deal-card" count={4} />
         ) : error ? (
@@ -270,6 +298,7 @@ export default function ShopDealsPage() {
                 businessName={displayName}
                 businessPhone={businessPhone}
                 deletingId={deletingId}
+                editing={formOpen && editingDeal != null && dealId(editingDeal) === dealId(deal)}
                 onEdit={() => openEdit(deal)}
                 onDelete={() => void handleDelete(deal)}
               />
@@ -277,14 +306,6 @@ export default function ShopDealsPage() {
           </ShopListPanel>
         )}
       </ShopPageContentShell>
-
-      <ShopDealFormDialog
-        open={dialogOpen}
-        mode={dialogMode}
-        deal={editingDeal}
-        onClose={() => setDialogOpen(false)}
-        onSaved={() => void refresh()}
-      />
     </ShopPageShell>
   );
 }

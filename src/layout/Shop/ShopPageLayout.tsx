@@ -5,7 +5,12 @@ import ShopBusinessProfileCard from "../../components/shop/ShopBusinessProfileCa
 import ShopHeroCardToolbar from "../../components/shop/ShopHeroCardToolbar";
 import ShopPrimaryNav from "../../components/shop/ShopPrimaryNav";
 import ShopProfileHeroPanel from "../../components/shop/ShopProfileHeroPanel";
-import { shopHeroCardBodyClass, shopHeroCardScrollClass, shopPortalHorizPaddingClass } from "../../components/shop/shopLayoutStyles";
+import {
+  shopHeroCardScrollBodyClass,
+  shopHeroCardScrollClass,
+  shopHeroCardScrollContentClass,
+  shopPortalHorizPaddingClass,
+} from "../../components/shop/shopLayoutStyles";
 import ShopSidebar from "../../components/shop/ShopSidebar";
 import { shopPrimaryNav } from "../../config/shopNav";
 import {
@@ -48,21 +53,21 @@ export default function ShopPageLayout() {
 
   const pageContent = useHeroCard ? (
     <ShopProfileHeroPanel>
-      <div className="flex h-full min-h-0 w-full flex-col">
+      <div className="flex h-full min-h-0 w-full flex-col gap-3">
         {showToolbar ? (
-          <div className="shrink-0">
-            <ShopHeroCardToolbar
-              searchInputId={chrome.searchInputId}
-              searchPlaceholder={chrome.searchPlaceholder}
-              searchValue={chrome.searchValue}
-              onSearchChange={chrome.onSearchChange}
-              headerAction={chrome.headerAction}
-            />
-          </div>
+          <ShopHeroCardToolbar
+            searchInputId={chrome.searchInputId}
+            searchPlaceholder={chrome.searchPlaceholder}
+            searchValue={chrome.searchValue}
+            onSearchChange={chrome.onSearchChange}
+            headerAction={chrome.headerAction}
+          />
         ) : null}
         <div className={shopHeroCardScrollClass}>
-          <div className={`${shopHeroCardBodyClass} min-h-full`}>
-            <Outlet />
+          <div className={shopHeroCardScrollBodyClass}>
+            <div className={shopHeroCardScrollContentClass}>
+              <Outlet />
+            </div>
           </div>
         </div>
       </div>
@@ -73,7 +78,7 @@ export default function ShopPageLayout() {
 
   return (
     <PortalPageContent
-      className={`flex min-h-0 flex-1 flex-col overflow-hidden py-3 md:py-4 ${shopPortalHorizPaddingClass}`}
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden py-2 sm:py-3 md:py-4 ${shopPortalHorizPaddingClass}`}
     >
       <PageMeta title={metaTitle} description={metaDescription} />
 
