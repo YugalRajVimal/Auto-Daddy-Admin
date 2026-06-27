@@ -83,17 +83,23 @@ export default function ShopPageLayout() {
       <PageMeta title={metaTitle} description={metaDescription} />
 
       <div className={shopPageBodyGridClass}>
+        {chrome.sidebarHeader ? (
+          <div className="order-1 flex w-full items-center justify-center lg:col-start-1 lg:row-start-1 lg:self-center">
+            {chrome.sidebarHeader}
+          </div>
+        ) : null}
+
         <ShopPrimaryNav
           homePath="/shop"
           primaryNav={shopPrimaryNav}
-          className="order-1 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:justify-self-stretch"
+          className={`${chrome.sidebarHeader ? "order-2 lg:self-center" : "order-1"} lg:order-1 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:justify-self-stretch`}
         />
 
-        <div className="order-2 lg:col-start-1 lg:row-start-2 lg:self-start">
+        <div className="order-3 lg:order-2 lg:col-start-1 lg:row-start-2 lg:self-start">
           {sidebarCell}
         </div>
 
-        <div className="order-3 flex min-h-0 min-w-0 flex-col overflow-hidden lg:col-start-2 lg:row-start-2">
+        <div className="order-4 flex min-h-0 min-w-0 flex-col overflow-hidden lg:order-3 lg:col-start-2 lg:row-start-2">
           {pageContent}
         </div>
       </div>

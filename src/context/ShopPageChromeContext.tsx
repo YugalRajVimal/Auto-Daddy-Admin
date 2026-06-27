@@ -28,6 +28,8 @@ export type ShopPageChromeConfig = {
   sidebarHeading?: string;
   sidebarHeadingClassName?: string;
   sidebarExtra?: ReactNode;
+  /** Top-left slot above sidebar content (home grid menu). */
+  sidebarHeader?: ReactNode;
   sidebarFooter?: ReactNode;
   searchInputId?: string;
   faqsOpen?: boolean;
@@ -103,6 +105,7 @@ function isSameChromeConfig(prev: ShopPageChromeConfig, next: ShopPageChromeConf
     prev.sidebarHeading === next.sidebarHeading &&
     prev.sidebarHeadingClassName === next.sidebarHeadingClassName &&
     prev.sidebarExtra === next.sidebarExtra &&
+    prev.sidebarHeader === next.sidebarHeader &&
     prev.sidebarFooter === next.sidebarFooter &&
     prev.searchInputId === next.searchInputId &&
     prev.faqsOpen === next.faqsOpen &&

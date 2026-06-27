@@ -2,22 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { PartsDealerCard } from "../../hooks/usePartsDealers";
 import { openPartsDealerLink } from "../../lib/shopPartsDealers";
 import ShopDealerCard from "./ShopDealerCard";
+import { shopMainContentHeightClass } from "./shopLayoutStyles";
 
 const ROTATE_MS = 5000;
 const CURTAIN_MS = 550;
-
-const AD_MENU_BUTTON_IMAGE =
-  "https://download.logo.wine/logo/Windows_7/Windows_7-Logo.wine.png";
-
-const adMenuButtonClass =
-  "flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-xl transition-opacity hover:opacity-80";
 
 type SlideDirection = 1 | -1;
 
 type ShopHomeAdsPanelProps = {
   partsDealers: PartsDealerCard[];
   loading?: boolean;
-  onMenuClick?: () => void;
   /** Pauses carousel rotation while a hero overlay is shown (e.g. menu). */
   detailOpen?: boolean;
 };
@@ -41,38 +35,24 @@ function curtainClass(index: number, activeIndex: number, leavingIndex: number |
   return `${base} pointer-events-none z-0 opacity-0`;
 }
 
-function ShopAdMenuButton({ onClick }: { onClick?: () => void }) {
+function ShopAdPanelShell({ children }: { children: ReactNode }) {
   return (
-    <button type="button" aria-label="Ad menu" className={adMenuButtonClass} onClick={onClick}>
-      <img
-        src={AD_MENU_BUTTON_IMAGE}
-        alt=""
-        className="h-14 w-14 object-contain"
-        loading="lazy"
-        decoding="async"
-        aria-hidden
-      />
-    </button>
+    <div className={`flex min-h-0 w-full flex-col overflow-hidden ${shopMainContentHeightClass}`}>
+      {children}
+    </div>
   );
 }
 
-function ShopAdPanelShell({ children }: { children: ReactNode }) {
-  return <div className="flex w-full flex-col">{children}</div>;
-}
-
-function ShopAdMenuSlot({ children }: { children: ReactNode }) {
-  return <div className="flex shrink-0 justify-center py-2">{children}</div>;
-}
 function ShopAdCardSkeleton() {
   return (
     <div
-      className="w-full animate-pulse overflow-hidden rounded-lg border border-gray-200/80 bg-white shadow-lg"
+      className="flex h-full w-full animate-pulse flex-col overflow-hidden rounded-lg border border-gray-200/80 bg-white shadow-lg"
       aria-busy="true"
       aria-label="Loading ads"
     >
-      <div className="aspect-[3/4] bg-gray-200" />
-      <div className="h-9 bg-[#008000]/70" />
-      <div className="space-y-2 px-3 py-3">
+      <div className="min-h-0 flex-1 bg-gray-200" />
+      <div className="h-9 shrink-0 bg-[#008000]/70" />
+      <div className="shrink-0 space-y-2 px-3 py-3">
         <div className="h-7 rounded bg-[#d4ffd4]" />
         <div className="flex justify-center gap-3">
           <div className="h-5 w-5 rounded-full bg-gray-200" />
@@ -88,7 +68,6 @@ function ShopAdCardSkeleton() {
 export default function ShopHomeAdsPanel({
   partsDealers,
   loading,
-  onMenuClick,
   detailOpen = false,
 }: ShopHomeAdsPanelProps) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -176,10 +155,9 @@ export default function ShopHomeAdsPanel({
   if (loading) {
     return (
       <ShopAdPanelShell>
-        <ShopAdCardSkeleton />
-        <ShopAdMenuSlot>
-          <ShopAdMenuButton onClick={onMenuClick} />
-        </ShopAdMenuSlot>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <ShopAdCardSkeleton />
+        </div>
       </ShopAdPanelShell>
     );
   }
@@ -191,24 +169,13 @@ export default function ShopHomeAdsPanel({
   return (
     <ShopAdPanelShell>
       <div
-        className="relative w-full shrink-0"
+        className="relative min-h-0 flex-1 overflow-hidden"
         aria-live="polite"
         aria-atomic="true"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <div className="pointer-events-none invisible" aria-hidden="true">
-          <ShopDealerCard
-            name={activeDealer.name}
-            phone={activeDealer.phone}
-            imageUrl={activeDealer.imageUrl}
-            city={activeDealer.city}
-            website={activeDealer.website}
-            specialty={activeDealer.specialty}
-          />
-        </div>
-
-        <div className="absolute inset-0 overflow-hidden rounded-lg">
+        <div className="relative h-full w-full">
           {partsDealers.map((dealer, index) => (
             <div
               key={`${dealer.name}-${index}`}
@@ -222,6 +189,7 @@ export default function ShopHomeAdsPanel({
                 city={dealer.city}
                 website={dealer.website}
                 specialty={dealer.specialty}
+                className="h-full"
                 onClick={() => handleAdClick(dealer)}
               />
             </div>
@@ -233,18 +201,15 @@ export default function ShopHomeAdsPanel({
             {partsDealers.map((dealer, index) => (
               <span
                 key={`dot-${dealer.name}-${index}`}
-                className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${index === activeIndex ? "bg-white" : "bg-white/45"
-                  }`}
+                className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
+                  index === activeIndex ? "bg-white" : "bg-white/45"
+                }`}
                 aria-hidden
               />
             ))}
           </div>
         ) : null}
       </div>
-
-      <ShopAdMenuSlot>
-        <ShopAdMenuButton onClick={onMenuClick} />
-      </ShopAdMenuSlot>
     </ShopAdPanelShell>
   );
 }
