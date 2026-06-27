@@ -141,8 +141,8 @@ export default function ShopServiceSubDialog({
         </div>
       }
     >
-      <CompactFormRow>
-        <CompactField label="Sub- Category" required className="min-w-[140px] flex-[1.2]">
+      <CompactFormRow columns={4}>
+        <CompactField label="Sub- Category" required>
           <input
             className={shopCompactInputClass}
             value={name}
@@ -150,7 +150,7 @@ export default function ShopServiceSubDialog({
             disabled={saving}
           />
         </CompactField>
-        <CompactField label="Description" className="min-w-[180px] flex-[2]">
+        <CompactField label="Description">
           <textarea
             className={shopCompactTextareaClass}
             value={desc}
@@ -159,7 +159,7 @@ export default function ShopServiceSubDialog({
             disabled={saving}
           />
         </CompactField>
-        <CompactField label="Unit Price" required className="w-[90px] shrink-0 flex-none sm:w-[100px]">
+        <CompactField label="Unit Price" required>
           <input
             className={shopCompactInputClass}
             value={price}
@@ -168,7 +168,7 @@ export default function ShopServiceSubDialog({
             disabled={saving}
           />
         </CompactField>
-        <CompactField label="Qty" className="w-[70px] shrink-0 flex-none sm:w-[80px]">
+        <CompactField label="Qty">
           <input
             className={shopCompactInputClass}
             value={qty}
@@ -179,8 +179,8 @@ export default function ShopServiceSubDialog({
         </CompactField>
       </CompactFormRow>
 
-      <CompactFormRow className="items-start">
-        <div className="min-w-[140px] flex-[1.2]">
+      <CompactFormRow className="items-start" columns={4}>
+        <div className="min-w-0 w-full">
           <div className="flex flex-col items-start gap-2">
             <div className="inline-flex items-center gap-2">
               <input
