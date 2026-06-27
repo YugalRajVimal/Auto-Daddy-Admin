@@ -5,6 +5,7 @@ import { PORTAL_HOME_HERO_IMAGE } from "../../lib/portalHeroImage";
 import { Skeleton } from "../common/Skeleton";
 import { ThoughtOfTheDayCard } from "../portal/ThoughtOfTheDayCard";
 import ShopAdDetailContent from "./ShopAdDetailContent";
+import ShopMenuDetailContent from "./ShopMenuDetailContent";
 import { shopHeroOpaqueSurfaceClass, shopMainContentShellClass } from "./shopLayoutStyles";
 
 type ShopHeroPanelProps = {
@@ -13,7 +14,9 @@ type ShopHeroPanelProps = {
   className?: string;
   partsDealer?: PartsDealerCard | null;
   salvageDeal?: SalvageDeal | null;
+  menuOpen?: boolean;
   onAdClose?: () => void;
+  onMenuClose?: () => void;
 };
 
 export default function ShopHeroPanel({
@@ -22,18 +25,22 @@ export default function ShopHeroPanel({
   className = "",
   partsDealer,
   salvageDeal,
+  menuOpen = false,
   onAdClose,
+  onMenuClose,
 }: ShopHeroPanelProps) {
   const showingAd = partsDealer != null || salvageDeal != null;
+  const showingOverlay = showingAd || menuOpen;
+  const handleOverlayClose = showingAd ? onAdClose : onMenuClose;
 
   useEffect(() => {
-    if (!showingAd || !onAdClose) return;
+    if (!showingOverlay || !handleOverlayClose) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onAdClose();
+      if (event.key === "Escape") handleOverlayClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [showingAd, onAdClose]);
+  }, [showingOverlay, handleOverlayClose]);
 
   return (
     <div className={`relative overflow-hidden ${shopMainContentShellClass} ${className}`}>
@@ -54,16 +61,20 @@ export default function ShopHeroPanel({
             className="absolute inset-0 h-full w-full object-cover"
           />
 
-          {showingAd ? (
+          {showingOverlay ? (
             <div className="absolute inset-0 z-10 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
               <div
-                className={`${shopHeroOpaqueSurfaceClass} max-h-full w-full max-w-lg overflow-y-auto rounded-lg border border-white/70 bg-ad-glass p-5 shadow-lg`}
+                className={`${shopHeroOpaqueSurfaceClass} max-h-full w-full max-w-lg overflow-y-auto rounded-lg border border-gray-200 bg-white p-5 shadow-lg`}
               >
-                <ShopAdDetailContent
-                  partsDealer={partsDealer}
-                  salvageDeal={salvageDeal}
-                  onClose={onAdClose}
-                />
+                {showingAd ? (
+                  <ShopAdDetailContent
+                    partsDealer={partsDealer}
+                    salvageDeal={salvageDeal}
+                    onClose={onAdClose}
+                  />
+                ) : (
+                  <ShopMenuDetailContent onClose={onMenuClose} />
+                )}
               </div>
             </div>
           ) : thoughtOfTheDay ? (

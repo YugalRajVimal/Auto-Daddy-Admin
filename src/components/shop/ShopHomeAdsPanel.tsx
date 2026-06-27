@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { GridIcon } from "../../icons";
 import type { PartsDealerCard } from "../../hooks/usePartsDealers";
-import ShopAdDetailDialog from "./ShopAdDetailDialog";
+import { openPartsDealerLink } from "../../lib/shopPartsDealers";
 import ShopDealerCard from "./ShopDealerCard";
 
 const ROTATE_MS = 5000;
@@ -15,9 +15,8 @@ type SlideDirection = 1 | -1;
 type ShopHomeAdsPanelProps = {
   partsDealers: PartsDealerCard[];
   loading?: boolean;
-  onPartsDealerSelect?: (dealer: PartsDealerCard) => void;
   onMenuClick?: () => void;
-  /** Pauses carousel rotation while ad detail is shown elsewhere (e.g. hero card). */
+  /** Pauses carousel rotation while a hero overlay is shown (e.g. menu). */
   detailOpen?: boolean;
 };
 
@@ -82,18 +81,14 @@ function ShopAdCardSkeleton() {
 export default function ShopHomeAdsPanel({
   partsDealers,
   loading,
-  onPartsDealerSelect,
   onMenuClick,
   detailOpen = false,
 }: ShopHomeAdsPanelProps) {
-  const useExternalDetail = onPartsDealerSelect != null;
   const [activeIndex, setActiveIndex] = useState(0);
   const [leavingIndex, setLeavingIndex] = useState<number | null>(null);
   const [direction, setDirection] = useState<SlideDirection>(1);
   const [timerKey, setTimerKey] = useState(0);
   const [hovered, setHovered] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedPartsDealer, setSelectedPartsDealer] = useState<PartsDealerCard | null>(null);
   const curtainTimerRef = useRef<number | null>(null);
   const transitioningRef = useRef(false);
   const activeIndexRef = useRef(0);
@@ -158,7 +153,7 @@ export default function ShopHomeAdsPanel({
 
   useEffect(() => () => clearCurtainTimer(), [clearCurtainTimer]);
 
-  const paused = hovered || dialogOpen || detailOpen || leavingIndex !== null;
+  const paused = hovered || detailOpen || leavingIndex !== null;
 
   useEffect(() => {
     if (loading || paused || partsDealers.length === 0) return;
@@ -167,18 +162,8 @@ export default function ShopHomeAdsPanel({
     return () => window.clearInterval(timer);
   }, [advance, paused, partsDealers.length, loading, timerKey]);
 
-  const openPartsDialog = (dealer: PartsDealerCard) => {
-    if (onPartsDealerSelect) {
-      onPartsDealerSelect(dealer);
-      return;
-    }
-    setSelectedPartsDealer(dealer);
-    setDialogOpen(true);
-  };
-
-  const closeDialog = () => {
-    setDialogOpen(false);
-    setSelectedPartsDealer(null);
+  const handleAdClick = (dealer: PartsDealerCard) => {
+    openPartsDealerLink(dealer);
   };
 
   if (loading) {
@@ -188,7 +173,7 @@ export default function ShopHomeAdsPanel({
           <ShopAdCardSkeleton />
         </div>
         <ShopAdMenuSlot>
-          <ShopAdMenuButton />
+          <ShopAdMenuButton onClick={onMenuClick} />
         </ShopAdMenuSlot>
       </ShopAdPanelShell>
     );
@@ -199,15 +184,14 @@ export default function ShopHomeAdsPanel({
   }
 
   return (
-    <>
-      <ShopAdPanelShell>
-        <div
-          className="relative w-full shrink-0"
-          aria-live="polite"
-          aria-atomic="true"
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-        >
+    <ShopAdPanelShell>
+      <div
+        className="relative w-full shrink-0"
+        aria-live="polite"
+        aria-atomic="true"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
           <div className="pointer-events-none invisible" aria-hidden="true">
             <ShopDealerCard
               name={activeDealer.name}
@@ -234,7 +218,7 @@ export default function ShopHomeAdsPanel({
                   website={dealer.website}
                   specialty={dealer.specialty}
                   className="h-full"
-                  onClick={() => openPartsDialog(dealer)}
+                  onClick={() => handleAdClick(dealer)}
                 />
               </div>
             ))}
@@ -255,18 +239,9 @@ export default function ShopHomeAdsPanel({
           ) : null}
         </div>
 
-        <ShopAdMenuSlot>
-          <ShopAdMenuButton onClick={onMenuClick} />
-        </ShopAdMenuSlot>
-      </ShopAdPanelShell>
-
-      {useExternalDetail ? null : (
-        <ShopAdDetailDialog
-          open={dialogOpen}
-          onClose={closeDialog}
-          partsDealer={selectedPartsDealer}
-        />
-      )}
-    </>
+      <ShopAdMenuSlot>
+        <ShopAdMenuButton onClick={onMenuClick} />
+      </ShopAdMenuSlot>
+    </ShopAdPanelShell>
   );
 }

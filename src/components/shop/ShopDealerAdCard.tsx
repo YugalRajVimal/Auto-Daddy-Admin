@@ -128,7 +128,7 @@ export default function ShopDealerAdCard({
           {location}
         </div>
 
-        <div className="flex w-full flex-wrap items-center justify-center gap-2.5 sm:gap-3">
+        <div className="flex w-full flex-wrap items-center justify-center gap-6 sm:gap-8">
           <AdIconButton
             href={phoneDigits ? `tel:${phoneDigits}` : null}
             label="Call"

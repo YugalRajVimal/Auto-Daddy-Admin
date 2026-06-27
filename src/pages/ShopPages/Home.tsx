@@ -2,21 +2,21 @@ import { useCallback, useMemo, useState } from "react";
 import ShopHeroPanel from "../../components/shop/ShopHeroPanel";
 import ShopHomeAdsPanel from "../../components/shop/ShopHomeAdsPanel";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { usePartsDealers, type PartsDealerCard } from "../../hooks/usePartsDealers";
+import { usePartsDealers } from "../../hooks/usePartsDealers";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 
 export default function ShopHomePage() {
   const { thoughtOfTheDay, faqsHeading, faqsDescription, loading } = useShopOwnerPortal();
   const { dealers, loading: dealersLoading } = usePartsDealers();
   const [faqsOpen, setFaqsOpen] = useState(false);
-  const [selectedPartsDealer, setSelectedPartsDealer] = useState<PartsDealerCard | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  const closeAdDetail = useCallback(() => {
-    setSelectedPartsDealer(null);
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
   }, []);
 
-  const handlePartsDealerSelect = useCallback((dealer: PartsDealerCard) => {
-    setSelectedPartsDealer(dealer);
+  const handleMenuClick = useCallback(() => {
+    setMenuOpen(true);
   }, []);
 
   const openFaqs = useCallback(() => setFaqsOpen(true), []);
@@ -27,11 +27,11 @@ export default function ShopHomePage() {
       <ShopHomeAdsPanel
         partsDealers={dealers}
         loading={dealersLoading}
-        onPartsDealerSelect={handlePartsDealerSelect}
-        detailOpen={selectedPartsDealer != null}
+        onMenuClick={handleMenuClick}
+        detailOpen={menuOpen}
       />
     ),
-    [dealers, dealersLoading, handlePartsDealerSelect, selectedPartsDealer],
+    [dealers, dealersLoading, handleMenuClick, menuOpen],
   );
 
   return (
@@ -51,8 +51,8 @@ export default function ShopHomePage() {
       <ShopHeroPanel
         thoughtOfTheDay={thoughtOfTheDay}
         loading={loading}
-        partsDealer={selectedPartsDealer}
-        onAdClose={closeAdDetail}
+        menuOpen={menuOpen}
+        onMenuClose={closeMenu}
       />
     </ShopPageShell>
   );
