@@ -11,7 +11,12 @@ import {
 } from "../../components/admin/ContentPanel";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopViewTransition } from "../../components/shop/ShopAnimated";
-import { shopCompactInputClass, shopHeroCardBodyClass, shopHeroOpaqueSurfaceClass } from "../../components/shop/shopLayoutStyles";
+import {
+  shopCompactInputClass,
+  shopCompactReadOnlyClass,
+  shopHeroCardBodyClass,
+  shopHeroOpaqueSurfaceClass,
+} from "../../components/shop/shopLayoutStyles";
 import {
   ShopEmptyPanel,
   ShopErrorPanel,
@@ -557,7 +562,7 @@ function CustomerInfoView({
           ].map(([label, value]) => (
             <div key={label}>
               <p className="mb-1 text-xs font-bold text-[#008000]">{label}</p>
-              <div className="min-h-[30px] rounded border border-gray-400 bg-gray-100 px-2 py-1.5 text-sm">
+              <div className={shopCompactReadOnlyClass}>
                 {value}
               </div>
             </div>
@@ -581,7 +586,7 @@ function CustomerInfoView({
               ].map(([label, value]) => (
                 <div key={label}>
                   <p className="mb-1 text-xs font-bold text-[#008000]">{label}</p>
-                  <div className="min-h-[30px] rounded border border-gray-400 bg-gray-100 px-2 py-1.5 text-sm">
+                  <div className={shopCompactReadOnlyClass}>
                     {value}
                   </div>
                 </div>
@@ -847,7 +852,11 @@ export default function ShopPeoplePage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <ShopViewTransition viewKey={viewKey} className={shopHeroCardBodyClass}>
+      <ShopViewTransition
+        viewKey={viewKey}
+        className={shopHeroCardBodyClass}
+        focusOnReveal={section === "add-new" || detailView?.kind === "add-to-list"}
+      >
         {detailView?.kind === "add-to-list" ? (
           <>
             <AddToListForm

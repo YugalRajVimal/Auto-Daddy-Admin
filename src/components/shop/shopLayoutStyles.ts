@@ -42,6 +42,18 @@ export const shopHeroOpaqueSurfaceClass = "shop-hero-surface";
 export const shopHeroCardSearchClass =
   "w-full max-w-xs rounded-full border border-gray-300 bg-white/90 px-4 py-2 text-sm text-gray-800 shadow-sm placeholder:text-gray-500 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 sm:max-w-sm";
 
-/** Slightly shorter inputs for shop edit/update form cards. */
+/** Shorter inputs for shop add/edit form cards. */
 export const shopCompactInputClass =
-  "w-full min-h-[26px] border border-gray-400 bg-white px-2 py-1 text-sm leading-snug focus:border-blue-500 focus:outline-none";
+  "shop-compact-input w-full h-[22px] box-border border border-gray-400 bg-white px-2 py-0 text-sm leading-tight focus:border-blue-500 focus:outline-none";
+
+/** Multiline fields in shop form cards. */
+export const shopCompactTextareaClass =
+  "shop-compact-input w-full min-h-[22px] border border-gray-400 bg-white px-2 py-0.5 text-sm leading-tight focus:border-blue-500 focus:outline-none resize-y";
+
+/** Read-only value cells matching compact input height. */
+export const shopCompactReadOnlyClass =
+  "min-h-[22px] rounded border border-gray-400 bg-gray-100 px-2 py-0.5 text-sm leading-tight";
+
+/** Compact file picker for shop forms. */
+export const shopCompactFileInputClass =
+  "block w-full text-xs leading-tight text-gray-700 file:mr-2 file:h-[22px] file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-0 file:text-xs file:font-semibold file:text-gray-700";

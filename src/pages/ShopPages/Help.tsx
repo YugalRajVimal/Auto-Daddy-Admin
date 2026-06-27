@@ -174,6 +174,7 @@ export default function ShopHelpPage() {
       <ShopViewTransition
         viewKey={showForm ? "ticket-form" : `tickets-${activeId}`}
         className={shopHeroCardBodyClass}
+        focusOnReveal={showForm}
       >
         {showForm ? (
           <ShopSupportPanel

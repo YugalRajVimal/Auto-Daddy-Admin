@@ -27,7 +27,7 @@ function AdIconButton({
   accent?: boolean;
   onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
-  const icon = <Icon size={20} strokeWidth={2} aria-hidden />;
+  const icon = <Icon className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2} aria-hidden />;
 
   if (!href) {
     return (
@@ -114,21 +114,21 @@ export default function ShopDealerAdCard({
           <img src={imageUrl} alt={imageAlt} className="h-full w-full object-cover" loading="lazy" decoding="async" />
         ) : (
           <div className={`flex h-full items-center justify-center px-3 ${fillHeight ? "" : "min-h-[180px]"}`}>
-            <p className="text-center text-sm font-bold leading-snug text-[#008000]">{title}</p>
+            <p className="text-center text-xs font-bold leading-snug text-[#008000] sm:text-sm">{title}</p>
           </div>
         )}
       </div>
 
-      <div className="shrink-0 bg-[#008000] px-2 py-2 text-center text-xs font-bold text-white sm:px-3 sm:py-2.5 sm:text-sm">
+      <div className="shrink-0 bg-[#008000] px-2 py-1.5 text-center text-[10px] font-bold leading-tight text-white sm:px-3 sm:py-2.5 sm:text-xs lg:text-[10px] xl:text-xs">
         {title}
       </div>
 
-      <div className="flex shrink-0 flex-col items-center gap-2 bg-white px-2 py-2.5 sm:gap-2.5 sm:px-3 sm:py-3">
-        <div className="w-full bg-[#d4ffd4] px-2 py-1 text-center text-xs font-bold text-[#008000] sm:px-3 sm:py-1.5 sm:text-sm">
+      <div className="flex shrink-0 flex-col items-center gap-1.5 bg-white px-2 py-2 sm:gap-2.5 sm:px-3 sm:py-3">
+        <div className="w-full bg-[#d4ffd4] px-2 py-1 text-center text-[10px] font-bold leading-tight text-[#008000] sm:px-3 sm:py-1.5 sm:text-xs lg:text-[10px] xl:text-xs">
           {location}
         </div>
 
-        <div className="flex w-full flex-wrap items-center justify-center gap-6 sm:gap-8">
+        <div className="flex w-full flex-wrap items-center justify-center gap-4 sm:gap-8">
           <AdIconButton
             href={phoneDigits ? `tel:${phoneDigits}` : null}
             label="Call"
@@ -150,7 +150,7 @@ export default function ShopDealerAdCard({
           />
         </div>
 
-        <div className="w-full border border-gray-300 bg-white px-2 py-1.5 text-center text-[11px] font-semibold leading-snug text-[#008000] sm:px-3 sm:py-2 sm:text-xs">
+        <div className="w-full border border-gray-300 bg-white px-2 py-1 text-center text-[9px] font-semibold leading-snug text-[#008000] sm:px-3 sm:py-2 sm:text-[11px] lg:text-[9px] xl:text-[11px]">
           {tagline}
         </div>
       </div>

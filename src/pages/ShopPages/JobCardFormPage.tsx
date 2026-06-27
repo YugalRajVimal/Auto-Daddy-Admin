@@ -7,7 +7,7 @@ import {
   CompactFormPanel,
   CompactFormRow,
 } from "../../components/admin/ContentPanel";
-import { shopCompactInputClass } from "../../components/shop/shopLayoutStyles";
+import { shopCompactFileInputClass, shopCompactInputClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
 import { buildMyCustomersQuery, fetchMyCustomers } from "../../lib/shopOwnerApi";
 import {
@@ -272,6 +272,7 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
   return (
     <ShopFormPage title={title} metaTitle={`${title} | AutoDaddy`} backTo="/shop/job-cards">
       <CompactFormPanel
+        focusOnMount
         footer={
           <CompactFormFooter
             actionLabel={submitting ? "Saving…" : isEdit ? "Update Job Card" : "Create Job Card"}

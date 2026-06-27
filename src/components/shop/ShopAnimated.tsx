@@ -1,7 +1,34 @@
 import { AnimatePresence, motion } from "framer-motion";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 
 const ease = [0.4, 0, 0.2, 1] as const;
+
+export const FORM_REVEAL_FOCUS_DELAY_MS = 300;
+
+export function focusFormRevealContainer(container: HTMLElement | null) {
+  if (!container) return;
+  container.scrollIntoView({ behavior: "smooth", block: "start" });
+  const field = container.querySelector<HTMLElement>(
+    'input:not([type="hidden"]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled])'
+  );
+  field?.focus({ preventScroll: true });
+}
+
+export function useFormRevealFocus(
+  active: boolean,
+  ref: RefObject<HTMLElement | null>,
+  delayMs = FORM_REVEAL_FOCUS_DELAY_MS
+) {
+  useEffect(() => {
+    if (!active) return;
+
+    const timer = window.setTimeout(() => {
+      focusFormRevealContainer(ref.current);
+    }, delayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [active, delayMs, ref]);
+}
 
 /** Smooth expand/collapse for inline panels revealed by Add/Edit actions. */
 export function ShopReveal({
@@ -13,10 +40,14 @@ export function ShopReveal({
   children: ReactNode;
   className?: string;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useFormRevealFocus(show, containerRef);
+
   return (
     <AnimatePresence initial={false}>
       {show ? (
         <motion.div
+          ref={containerRef}
           key="reveal"
           layout
           initial={{ opacity: 0, height: 0 }}
@@ -44,14 +75,21 @@ export function ShopViewTransition({
   viewKey,
   children,
   className = "",
+  focusOnReveal = false,
 }: {
   viewKey: string;
   children: ReactNode;
   className?: string;
+  /** Scroll the new view into focus when it appears (e.g. add/edit form views). */
+  focusOnReveal?: boolean;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useFormRevealFocus(focusOnReveal, containerRef);
+
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
+        ref={containerRef}
         key={viewKey}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -77,6 +115,9 @@ export function ShopDialogMotion({
   children: ReactNode;
   panelClassName?: string;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFormRevealFocus(open, panelRef, 220);
+
   return (
     <AnimatePresence>
       {open ? (
@@ -100,6 +141,7 @@ export function ShopDialogMotion({
             exit={{ opacity: 0 }}
           />
           <motion.div
+            ref={panelRef}
             className={`relative z-10 ${panelClassName}`}
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}

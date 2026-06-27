@@ -7,7 +7,7 @@ import {
   CompactFormPanel,
   CompactFormRow,
 } from "../../components/admin/ContentPanel";
-import { shopCompactInputClass } from "../../components/shop/shopLayoutStyles";
+import { shopCompactFileInputClass, shopCompactInputClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
 import { apiMessage, createTeamMember, fetchTeamMembers, updateTeamMember } from "../../lib/shopOwnerMutations";
 import { formatPhoneDisplay, phoneDigits } from "../../lib/phoneFormat";
@@ -104,6 +104,7 @@ export default function ShopTeamMemberFormPage() {
       backTo="/shop/team"
     >
       <CompactFormPanel
+        focusOnMount
         footer={
           <CompactFormFooter
             actionLabel={submitting ? "Saving…" : "Save"}
@@ -130,7 +131,7 @@ export default function ShopTeamMemberFormPage() {
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="Photo">
-            <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+            <input type="file" accept="image/*" className={shopCompactFileInputClass} onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
           </CompactField>
           <CompactField label="Active">
             <label className="flex items-center gap-2 text-sm">

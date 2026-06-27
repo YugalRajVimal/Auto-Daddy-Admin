@@ -1,6 +1,6 @@
 import { FiPause } from "react-icons/fi";
 import DashboardPanelCard from "../COMP";
-import { compactInputClass } from "../admin/ContentPanel";
+import { shopCompactInputClass } from "./shopLayoutStyles";
 
 const INTRO =
   "Autodaddy is providing better solution to its user promptly. Any question that help to improve system would be respected. Only help of collaborative efforts makes the system strong.";
@@ -58,7 +58,7 @@ export default function ShopSupportPanel({
               value={selectedServiceId}
               onChange={(e) => onServiceChange(e.target.value)}
               disabled={servicesLoading || services.length === 0}
-              className={`${compactInputClass} disabled:opacity-60`}
+              className={`${shopCompactInputClass} disabled:opacity-60`}
             >
               <option value="">{servicesLoading ? "Loading…" : "Subject"}</option>
               {services.map((s) => (

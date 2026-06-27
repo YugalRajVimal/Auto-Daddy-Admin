@@ -197,6 +197,19 @@ export function updatePersonalProfile(
   return putJson<ApiEnvelope>("/api/auto-shop-owner/edit-profile", body, token);
 }
 
+export function updatePersonalProfileMultipart(
+  token: string,
+  fields: Record<string, string | File>
+) {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(fields)) {
+    if (v == null) continue;
+    if (v instanceof File) fd.append(k, v);
+    else fd.append(k, String(v));
+  }
+  return putFormData<ApiEnvelope>("/api/auto-shop-owner/edit-profile", fd, token);
+}
+
 export function updateBusinessProfileMultipart(token: string, fields: Record<string, string | File | boolean>) {
   const fd = new FormData();
   for (const [k, v] of Object.entries(fields)) {

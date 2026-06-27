@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link } from "react-router";
 import { FiEdit2, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
@@ -7,7 +7,6 @@ import {
   CompactField,
   CompactFormPanel,
   CompactFormRow,
-  compactFixedFieldWidth,
 } from "../../admin/ContentPanel";
 import { shopCompactInputClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
@@ -18,13 +17,15 @@ import {
   updateBusinessOpenHours,
   updateBusinessProfileMultipart,
   updatePersonalProfile,
+  updatePersonalProfileMultipart,
   updateServiceWeWorkWith,
 } from "../../../lib/shopOwnerMutations";
 import {
-  formatOpenHoursTimeDisplay,
-  resolvePerDaySchedule,
+  formatOpenHoursRangeDisplay,
+  resolveShopOpenHoursSchedule,
   serializePerDayOpenHoursForApi,
   shortDayLabel,
+  USE_DUMMY_SHOP_OPEN_HOURS,
   WEEK_DAYS,
   type PerDaySchedule,
   type WeekDay,
@@ -47,12 +48,164 @@ import CarBrandLogo, {
 import { getCarBrandId, getCarBrandName } from "../../../lib/dummyCarBrands";
 import { getServiceId, getServiceName } from "../../../lib/dummyServices";
 import { parseCitiesApiResponse } from "../../../lib/carOwnerCities";
+import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
 import { shopSaveButtonClass } from "./ShopFormPage";
 import { ShopReveal } from "../ShopAnimated";
 import { motion } from "framer-motion";
 
 const checkboxBoxClass =
   "inline-block border border-gray-300 bg-gray-100 px-2 py-0.5 text-xs text-gray-800";
+
+function ProfileImagePreviewModal({
+  open,
+  title,
+  imageUrl,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  imageUrl: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-h-[90vh] max-w-[min(90vw,480px)] rounded border border-gray-300 bg-white p-4 shadow-lg"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-sm text-white hover:bg-gray-900"
+          aria-label="Close"
+        >
+          ×
+        </button>
+        <p className="mb-3 text-center text-sm font-semibold text-ad-green-dark">{title}</p>
+        <img src={imageUrl} alt={title} className="mx-auto max-h-[70vh] max-w-full object-contain" />
+      </div>
+    </div>
+  );
+}
+
+function ProfileImageUploadField({
+  id,
+  label,
+  imageUrl,
+  saving,
+  showUploadImage,
+  onToggleUpload,
+  onChooseClick,
+  fileInputRef,
+  onFileChange,
+  previewTitle,
+}: {
+  id: string;
+  label: string;
+  imageUrl: string | null;
+  saving: boolean;
+  showUploadImage: boolean;
+  onToggleUpload: (next: boolean) => void;
+  onChooseClick: () => void;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  onFileChange: (file: File | null) => void;
+  previewTitle: string;
+}) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const hasImage = Boolean(imageUrl);
+
+  return (
+    <>
+      <div className="flex flex-col items-start gap-2">
+        {hasImage ? (
+          <>
+            <p className="text-xs font-bold text-ad-green-dark">{label}</p>
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              disabled={saving}
+              className="h-14 w-14 overflow-hidden rounded border border-gray-300 bg-gray-100 hover:opacity-90 disabled:opacity-60"
+              title={`View ${previewTitle}`}
+              aria-label={`View ${previewTitle}`}
+            >
+              <img src={imageUrl!} alt={label} className="h-full w-full object-cover" />
+            </button>
+            <button
+              type="button"
+              onClick={onChooseClick}
+              disabled={saving}
+              className="text-xs font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+            >
+              Change image
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+            />
+          </>
+        ) : (
+          <>
+            <div className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                id={id}
+                checked={showUploadImage}
+                onChange={(event) => onToggleUpload(event.target.checked)}
+                disabled={saving}
+                className="h-3.5 w-3.5 accent-ad-green"
+              />
+              <label htmlFor={id} className="text-xs font-bold text-ad-green-dark">
+                {label}
+              </label>
+            </div>
+            {showUploadImage ? (
+              <button
+                type="button"
+                onClick={onChooseClick}
+                disabled={saving}
+                className={`${checkboxBoxClass} hover:bg-gray-200 disabled:opacity-60`}
+              >
+                Choose image
+              </button>
+            ) : null}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+            />
+          </>
+        )}
+      </div>
+      {imageUrl ? (
+        <ProfileImagePreviewModal
+          open={previewOpen}
+          title={previewTitle}
+          imageUrl={imageUrl}
+          onClose={() => setPreviewOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
 
 function ProfileStatusFooter({
   message,
@@ -68,6 +221,24 @@ function ProfileStatusFooter({
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5">{actions}</div>
     </div>
+  );
+}
+
+function hasEstablishedPersonalProfile(user?: ShopProfileUser, city?: string): boolean {
+  const phone = phoneDigits(user?.phone ?? "");
+  return Boolean(
+    user?.email?.trim() && phone.length >= 10 && (city?.trim() || user?.pincode?.trim())
+  );
+}
+
+function hasEstablishedBusinessProfile(business?: ShopProfileBusiness, zipCode?: string): boolean {
+  const phone = phoneDigits(business?.businessPhone ?? "");
+  return Boolean(
+    business?.businessName?.trim() &&
+      business?.address?.trim() &&
+      business?.city?.trim() &&
+      phone.length >= 10 &&
+      (zipCode?.trim() || business?.email?.trim())
   );
 }
 
@@ -136,7 +307,33 @@ export function ShopPersonalProfileEditor({
   const [selectedCity, setSelectedCity] = useState(city ?? "");
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [showUploadImage, setShowUploadImage] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedOnce, setSavedOnce] = useState(false);
+
+  const savedProfilePhotoUrl = useMemo(
+    () => normalizeMediaUrl(user?.profilePhoto ?? null),
+    [user?.profilePhoto]
+  );
+
+  const profileImageUrl = profilePhotoPreview ?? savedProfilePhotoUrl;
+
+  useEffect(() => {
+    if (!profilePhoto) {
+      setProfilePhotoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(profilePhoto);
+    setProfilePhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [profilePhoto]);
+
+  const isUpdating = useMemo(() => {
+    if (savedOnce) return true;
+    if (session?.meta?.isProfileComplete === true) return true;
+    return hasEstablishedPersonalProfile(user, city);
+  }, [savedOnce, session?.meta?.isProfileComplete, user, city]);
 
   const syncFromUser = () => {
     setName(user?.name ?? "");
@@ -146,6 +343,7 @@ export function ShopPersonalProfileEditor({
     setPincode(user?.pincode ?? "");
     setSelectedCity(city ?? "");
     setShowUploadImage(false);
+    setProfilePhoto(null);
   };
 
   const reset = () => {
@@ -154,7 +352,7 @@ export function ShopPersonalProfileEditor({
 
   useEffect(() => {
     syncFromUser();
-  }, [user?.name, user?.email, user?.phone, user?.address, user?.pincode, city]);
+  }, [user?.name, user?.email, user?.phone, user?.address, user?.pincode, user?.profilePhoto, city]);
 
   useEffect(() => {
     if (!token) return;
@@ -183,7 +381,7 @@ export function ShopPersonalProfileEditor({
     if (!token) return;
     setSaving(true);
     try {
-      const res = await updatePersonalProfile(token, {
+      const fields = {
         name: name.trim(),
         email: email.trim(),
         phone: phoneDigits(phone),
@@ -191,12 +389,17 @@ export function ShopPersonalProfileEditor({
         pincode: pincode.trim(),
         address: address.trim(),
         city: selectedCity.trim(),
-      });
+      };
+      const res = profilePhoto
+        ? await updatePersonalProfileMultipart(token, { ...fields, profilePhoto })
+        : await updatePersonalProfile(token, fields);
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save.");
         return;
       }
-      toast.success("Profile updated.");
+      setProfilePhoto(null);
+      if (!isUpdating) setSavedOnce(true);
+      toast.success(isUpdating ? "Profile updated." : "Profile saved.");
       onSaved();
     } finally {
       setSaving(false);
@@ -207,8 +410,13 @@ export function ShopPersonalProfileEditor({
     <CompactFormPanel
       footer={
         <ProfileFormFooter
-          message="You are updating your personal profile"
+          message={
+            isUpdating
+              ? "You are updating your personal profile"
+              : "You are saving your personal profile"
+          }
           saving={saving}
+          saveLabel={isUpdating ? "Update" : "Save"}
           onSave={() => void handleUpdate()}
           onReset={reset}
         />
@@ -216,7 +424,7 @@ export function ShopPersonalProfileEditor({
     >
       <div className="space-y-4">
         <CompactFormRow>
-          <CompactField label="Name" className="min-w-[120px] flex-1">
+          <CompactField label="Name">
             <input
               className={shopCompactInputClass}
               value={name}
@@ -224,7 +432,7 @@ export function ShopPersonalProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="Phone" className="min-w-[120px] flex-1">
+          <CompactField label="Phone">
             <input
               className={shopCompactInputClass}
               value={formatPhoneDisplay(phone)}
@@ -232,7 +440,7 @@ export function ShopPersonalProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="City" className="min-w-[120px] flex-1">
+          <CompactField label="City">
             <select
               className={shopCompactInputClass}
               value={selectedCity}
@@ -247,7 +455,7 @@ export function ShopPersonalProfileEditor({
               ))}
             </select>
           </CompactField>
-          <CompactField label="Email" className="min-w-[120px] flex-1">
+          <CompactField label="Email">
             <input
               type="email"
               className={shopCompactInputClass}
@@ -258,40 +466,24 @@ export function ShopPersonalProfileEditor({
           </CompactField>
         </CompactFormRow>
 
-        <CompactFormRow className="items-start">
-          <div className="min-w-[120px] flex-1">
-            <div className="flex flex-col items-start gap-2">
-              <div className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="shop-personal-upload-image"
-                  checked={showUploadImage}
-                  onChange={(e) => setShowUploadImage(e.target.checked)}
-                  disabled={saving}
-                  className="h-3.5 w-3.5 accent-ad-green"
-                />
-                <label htmlFor="shop-personal-upload-image" className="text-xs font-bold text-ad-green-dark">
-                  Upload Image
-                </label>
-              </div>
-              {showUploadImage ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={saving}
-                    className={`${checkboxBoxClass} hover:bg-gray-200 disabled:opacity-60`}
-                  >
-                    Choose image
-                  </button>
-                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" />
-                </>
-              ) : null}
-            </div>
+        <CompactFormRow className="items-start" columns={4}>
+          <div className="min-w-0 w-full">
+            <ProfileImageUploadField
+              id="shop-personal-upload-image"
+              label="Upload Image"
+              previewTitle="Profile image"
+              imageUrl={profileImageUrl}
+              saving={saving}
+              showUploadImage={showUploadImage}
+              onToggleUpload={setShowUploadImage}
+              onChooseClick={() => fileInputRef.current?.click()}
+              fileInputRef={fileInputRef}
+              onFileChange={(file) => {
+                setProfilePhoto(file);
+                if (file) setShowUploadImage(true);
+              }}
+            />
           </div>
-          <div className="min-w-[120px] flex-1" aria-hidden />
-          <div className="min-w-[120px] flex-1" aria-hidden />
-          <div className="min-w-[120px] flex-1" aria-hidden />
         </CompactFormRow>
       </div>
     </CompactFormPanel>
@@ -309,7 +501,7 @@ export function ShopBusinessProfileEditor({
   shopType?: string;
   onSaved: () => void;
 }) {
-  const { token } = useAuth();
+  const { token, session } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [businessName, setBusinessName] = useState(business?.businessName ?? "");
@@ -325,7 +517,32 @@ export function ShopBusinessProfileEditor({
   );
   const [showUploadImage, setShowUploadImage] = useState(false);
   const [logo, setLogo] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedOnce, setSavedOnce] = useState(false);
+
+  const savedLogoUrl = useMemo(
+    () => normalizeMediaUrl(business?.businessLogo ?? null),
+    [business?.businessLogo]
+  );
+
+  const logoImageUrl = logoPreview ?? savedLogoUrl;
+
+  useEffect(() => {
+    if (!logo) {
+      setLogoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(logo);
+    setLogoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [logo]);
+
+  const isUpdating = useMemo(() => {
+    if (savedOnce) return true;
+    if (session?.meta?.isAutoShopBusinessProfileComplete === true) return true;
+    return hasEstablishedBusinessProfile(business, zipCode);
+  }, [savedOnce, session?.meta?.isAutoShopBusinessProfileComplete, business, zipCode]);
 
   const syncFromBusiness = () => {
     setBusinessName(business?.businessName ?? "");
@@ -356,6 +573,7 @@ export function ShopBusinessProfileEditor({
     business?.hstNumber,
     business?.gstPercent,
     business?.shopType,
+    business?.businessLogo,
     initialShopType,
     zipCode,
   ]);
@@ -403,7 +621,9 @@ export function ShopBusinessProfileEditor({
         toast.error(apiMessage(res.data) || "Could not save.");
         return;
       }
-      toast.success("Business profile updated.");
+      setLogo(null);
+      if (!isUpdating) setSavedOnce(true);
+      toast.success(isUpdating ? "Business profile updated." : "Business profile saved.");
       onSaved();
     } finally {
       setSaving(false);
@@ -414,8 +634,13 @@ export function ShopBusinessProfileEditor({
     <CompactFormPanel
       footer={
         <ProfileFormFooter
-          message="You are updating your business profile"
+          message={
+            isUpdating
+              ? "You are updating your business profile"
+              : "You are saving your business profile"
+          }
           saving={saving}
+          saveLabel={isUpdating ? "Update" : "Save"}
           onSave={() => void handleUpdate()}
           onReset={reset}
         />
@@ -423,7 +648,7 @@ export function ShopBusinessProfileEditor({
     >
       <div className="space-y-4">
         <CompactFormRow>
-          <CompactField label="Business Name" className="min-w-[120px] flex-1">
+          <CompactField label="Business Name">
             <input
               className={shopCompactInputClass}
               value={businessName}
@@ -431,7 +656,7 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="Business Phone" className="min-w-[120px] flex-1">
+          <CompactField label="Business Phone">
             <input
               className={shopCompactInputClass}
               value={formatPhoneDisplay(businessPhone)}
@@ -439,7 +664,7 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="City" className="min-w-[120px] flex-1">
+          <CompactField label="City">
             <select
               className={shopCompactInputClass}
               value={city}
@@ -454,7 +679,7 @@ export function ShopBusinessProfileEditor({
               ))}
             </select>
           </CompactField>
-          <CompactField label="Address" className="min-w-[120px] flex-1">
+          <CompactField label="Address">
             <input
               className={shopCompactInputClass}
               value={address}
@@ -464,7 +689,7 @@ export function ShopBusinessProfileEditor({
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
-          <CompactField label="Zip Code" className="min-w-[120px] flex-1">
+          <CompactField label="Zip Code">
             <input
               className={shopCompactInputClass}
               value={zip}
@@ -472,7 +697,7 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="HST No." className="min-w-[120px] flex-1">
+          <CompactField label="HST No.">
             <input
               className={shopCompactInputClass}
               value={hst}
@@ -480,7 +705,7 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="Tax %" className="min-w-[120px] flex-1">
+          <CompactField label="Tax %">
             <input
               className={shopCompactInputClass}
               value={tax}
@@ -488,7 +713,7 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="E mail" className="min-w-[120px] flex-1">
+          <CompactField label="E mail">
             <input
               type="email"
               className={shopCompactInputClass}
@@ -498,44 +723,24 @@ export function ShopBusinessProfileEditor({
             />
           </CompactField>
         </CompactFormRow>
-        <CompactFormRow className="items-start">
-          <div className="min-w-[120px] flex-1">
-            <div className="flex flex-col items-start gap-2">
-              <div className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="shop-business-upload-image"
-                  checked={showUploadImage}
-                  onChange={(e) => setShowUploadImage(e.target.checked)}
-                  disabled={saving}
-                  className="h-3.5 w-3.5 accent-ad-green"
-                />
-                <label htmlFor="shop-business-upload-image" className="text-xs font-bold text-ad-green-dark">
-                  Upload Logo
-                </label>
-              </div>
-              {showUploadImage ? (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={saving}
-                  className={`${checkboxBoxClass} hover:bg-gray-200 disabled:opacity-60`}
-                >
-                  Choose image
-                </button>
-              ) : null}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
-              />
-            </div>
+        <CompactFormRow className="items-start" columns={4}>
+          <div className="min-w-0 w-full">
+            <ProfileImageUploadField
+              id="shop-business-upload-image"
+              label="Upload Logo"
+              previewTitle="Business logo"
+              imageUrl={logoImageUrl}
+              saving={saving}
+              showUploadImage={showUploadImage}
+              onToggleUpload={setShowUploadImage}
+              onChooseClick={() => fileInputRef.current?.click()}
+              fileInputRef={fileInputRef}
+              onFileChange={(file) => {
+                setLogo(file);
+                if (file) setShowUploadImage(true);
+              }}
+            />
           </div>
-          <div className="min-w-[120px] flex-1" aria-hidden />
-          <div className="min-w-[120px] flex-1" aria-hidden />
-          <div className="min-w-[120px] flex-1" aria-hidden />
         </CompactFormRow>
       </div>
     </CompactFormPanel>
@@ -573,7 +778,7 @@ export function ShopOpenHoursEditor({
 }) {
   const { token } = useAuth();
   const [schedule, setSchedule] = useState<PerDaySchedule>(() =>
-    resolvePerDaySchedule(perDayOpenHours ? { perDayOpenHours } : null)
+    resolveShopOpenHoursSchedule(perDayOpenHours)
   );
   const [formMode, setFormMode] = useState<ShopHoursFormMode | null>(null);
   const [editingDay, setEditingDay] = useState<WeekDay | null>(null);
@@ -592,7 +797,8 @@ export function ShopOpenHoursEditor({
   };
 
   useEffect(() => {
-    setSchedule(resolvePerDaySchedule(perDayOpenHours ? { perDayOpenHours } : null));
+    if (USE_DUMMY_SHOP_OPEN_HOURS) return;
+    setSchedule(resolveShopOpenHoursSchedule(perDayOpenHours));
   }, [perDayOpenHours]);
 
   const openEditForm = (day: WeekDay) => {
@@ -616,8 +822,14 @@ export function ShopOpenHoursEditor({
   });
 
   const handleSave = async () => {
-    if (!token) return;
     const nextSchedule = applyFormToSchedule();
+    if (USE_DUMMY_SHOP_OPEN_HOURS) {
+      setSchedule(nextSchedule);
+      toast.success("Hours updated.");
+      closeForm();
+      return;
+    }
+    if (!token) return;
     setSaving(true);
     try {
       const res = await updateBusinessOpenHours(token, serializePerDayOpenHoursForApi(nextSchedule));
@@ -649,7 +861,7 @@ export function ShopOpenHoursEditor({
           }
         >
           <CompactFormRow>
-            <CompactField label="Day" className={compactFixedFieldWidth}>
+            <CompactField label="Day">
               <input
                 type="text"
                 readOnly
@@ -657,7 +869,7 @@ export function ShopOpenHoursEditor({
                 className={`${shopCompactInputClass} bg-gray-50`}
               />
             </CompactField>
-            <CompactField label="Status" className={compactFixedFieldWidth}>
+            <CompactField label="Status">
               <select
                 value={formOpen ? "open" : "closed"}
                 disabled={saving}
@@ -668,7 +880,7 @@ export function ShopOpenHoursEditor({
                 <option value="closed">Closed</option>
               </select>
             </CompactField>
-            <CompactField label="Opening time" className={compactFixedFieldWidth}>
+            <CompactField label="Opening time">
               <OpenHoursTimePicker
                 id="shop-hours-opening"
                 value={formStart}
@@ -676,7 +888,7 @@ export function ShopOpenHoursEditor({
                 onChange={setFormStart}
               />
             </CompactField>
-            <CompactField label="Closing Time" className={compactFixedFieldWidth}>
+            <CompactField label="Closing Time">
               <OpenHoursTimePicker
                 id="shop-hours-closing"
                 value={formEnd}
@@ -693,13 +905,19 @@ export function ShopOpenHoursEditor({
         transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
         className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
       >
+        <div className="grid grid-cols-[4rem_1fr_1fr_auto] items-stretch border-b border-gray-300 bg-gray-100 text-xs font-bold text-gray-800 sm:grid-cols-[5rem_1fr_1fr_auto]">
+          <span className="border-r border-gray-200 px-4 py-2.5">Day</span>
+          <span className="border-r border-gray-200 px-4 py-2.5">Status</span>
+          <span className="border-r border-gray-200 px-4 py-2.5">Timing</span>
+          <span className="px-4 py-2.5 text-center">Edit</span>
+        </div>
         {WEEK_DAYS.map((day, index) => {
           const entry = schedule[day];
-              const isEditingRow = editingDay === day;
+          const isEditingRow = editingDay === day;
           return (
             <div
               key={day}
-              className={`grid grid-cols-[4rem_1fr_1fr_auto] items-center gap-3 px-4 py-2.5 text-sm sm:grid-cols-[5rem_1fr_1fr_auto] ${
+              className={`grid grid-cols-[4rem_1fr_1fr_auto] items-stretch border-b border-gray-200 text-sm last:border-b-0 sm:grid-cols-[5rem_1fr_1fr_auto] ${
                 isEditingRow
                   ? "bg-ad-form-required-bg"
                   : index % 2 === 0
@@ -707,23 +925,29 @@ export function ShopOpenHoursEditor({
                     : "bg-white"
               }`}
             >
-              <span className="font-semibold text-gray-700">{shortDayLabel(day)}</span>
-              <span className={`font-semibold ${entry.enabled ? "text-ad-purple" : "text-gray-500"}`}>
+              <span className="border-r border-gray-200 px-4 py-2.5 font-semibold text-gray-700">
+                {shortDayLabel(day)}
+              </span>
+              <span
+                className={`border-r border-gray-200 px-4 py-2.5 font-semibold ${entry.enabled ? "text-ad-purple" : "text-gray-500"}`}
+              >
                 {entry.enabled ? "Open" : "Closed"}
               </span>
-              <span className="text-gray-700">
-                {entry.enabled ? formatOpenHoursTimeDisplay(entry.start) : "—"}
+              <span className="border-r border-gray-200 px-4 py-2.5 text-gray-700">
+                {entry.enabled ? formatOpenHoursRangeDisplay(entry.start, entry.end) : "—"}
               </span>
-              <button
-                type="button"
-                title={`Edit ${day}`}
-                aria-label={`Edit ${day}`}
-                disabled={saving}
-                onClick={() => openEditForm(day)}
-                className="flex h-8 w-8 items-center justify-center rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-              >
-                <FiEdit2 size={14} aria-hidden />
-              </button>
+              <div className="flex items-center justify-center px-4 py-2.5">
+                <button
+                  type="button"
+                  title={`Edit ${day}`}
+                  aria-label={`Edit ${day}`}
+                  disabled={saving}
+                  onClick={() => openEditForm(day)}
+                  className="flex h-8 w-8 items-center justify-center rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                >
+                  <FiEdit2 size={14} aria-hidden />
+                </button>
+              </div>
             </div>
           );
         })}
@@ -927,7 +1151,7 @@ export function ShopCarBrandAddEditor({
       }
     >
       <CompactFormRow className="items-start">
-        <CompactField label="Name" className="min-w-[180px] flex-1">
+        <CompactField label="Name">
           <select
             className={shopCompactInputClass}
             value={brandId}
@@ -948,7 +1172,7 @@ export function ShopCarBrandAddEditor({
             })}
           </select>
         </CompactField>
-        <CompactField label="Amblem" className="min-w-[180px] flex-1">
+        <CompactField label="Amblem">
           <div className={CAR_BRAND_EMBLEM_SLOT_CLASS}>
             {brandId ? (
               <CarBrandLogo company={selected} className={CAR_BRAND_EMBLEM_LOGO_CLASS} />
@@ -1137,7 +1361,7 @@ export function ShopServiceAddEditor({
       }
     >
       <CompactFormRow className="items-end">
-        <CompactField label="Main Service" className="min-w-[180px] flex-1">
+        <CompactField label="Main Service">
           <select
             className={shopCompactInputClass}
             value={serviceId}
@@ -1160,7 +1384,7 @@ export function ShopServiceAddEditor({
             })}
           </select>
         </CompactField>
-        <CompactField label="Vendor Type" className="min-w-[180px] flex-1">
+        <CompactField label="Vendor Type">
           <select
             className={shopCompactInputClass}
             value={vendorType}

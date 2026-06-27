@@ -218,6 +218,7 @@ export default function ShopCustomerForm({
   return (
     <ShopFormPage title={title} metaTitle={`${title} | AutoDaddy`} backTo={backTo}>
       <CompactFormPanel
+        focusOnMount
         footer={
           <CompactFormFooter
             actionLabel={submitting ? "Saving…" : "Save"}

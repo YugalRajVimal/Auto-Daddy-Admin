@@ -6,6 +6,7 @@ import { FiArrowRight, FiPlus, FiUpload, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useAuth from "../../auth/useAuth";
 import DashboardPanelCard from "../COMP";
+import { useFormRevealFocus } from "../shop/ShopAnimated";
 import { JobCardFormSkeleton } from "../common/JobCardFormSkeleton";
 import { shopCompactInputClass } from "../shop/shopLayoutStyles";
 import { useShopOwnerCallingCode } from "../../hooks/useShopOwnerCallingCode";
@@ -344,6 +345,8 @@ export default function JobCardForm({
   const lineIdRef = useRef(1);
   const blockIdRef = useRef(1);
   const vehiclePhotoInputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFormRevealFocus(active, panelRef);
 
   const mkBlockId = () => {
     blockIdRef.current += 1;
@@ -714,7 +717,8 @@ export default function JobCardForm({
   if (!active) return null;
 
   return (
-    <DashboardPanelCard variant="form" className="flex min-h-0 flex-1 flex-col">
+    <div ref={panelRef} className="flex min-h-0 flex-1 flex-col">
+      <DashboardPanelCard variant="form" className="flex min-h-0 flex-1 flex-col">
       <div className="mb-4 border-b border-ad-form-border pb-3">
         <h2 className="text-lg font-bold text-ad-green-dark">
           {formMode === "add" ? "New Job Card" : "Edit Job Card"}
@@ -1120,5 +1124,6 @@ export default function JobCardForm({
         </div>
       </div>
     </DashboardPanelCard>
+    </div>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FiEdit2, FiPaperclip, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import ShopServiceSubDialog from "../../components/shop/forms/ShopServiceSubDialog";
-import { ShopViewTransition } from "../../components/shop/ShopAnimated";
+import { ShopReveal, ShopViewTransition } from "../../components/shop/ShopAnimated";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopEmptyPanel,
@@ -312,7 +312,7 @@ export default function ShopServicesPage() {
           />
         ) : activeCategory ? (
           <>
-            {formOpen ? (
+            <ShopReveal show={formOpen} className="mb-4">
               <ShopServiceSubDialog
                 category={activeCategory}
                 editIndex={editIndex}
@@ -328,7 +328,7 @@ export default function ShopServicesPage() {
                 onCancel={closeForm}
                 onSaved={() => handleRefresh()}
               />
-            ) : null}
+            </ShopReveal>
 
             <SubServiceTable
               subs={subs}

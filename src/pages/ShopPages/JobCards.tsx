@@ -179,6 +179,7 @@ export default function ShopJobCardsPage() {
       <ShopViewTransition
         viewKey={view === "form" ? `form-${formMode}-${editJobCardId ?? "new"}` : "list"}
         className={shopHeroCardBodyClass}
+        focusOnReveal={view === "form"}
       >
         {view === "form" ? (
           <JobCardForm

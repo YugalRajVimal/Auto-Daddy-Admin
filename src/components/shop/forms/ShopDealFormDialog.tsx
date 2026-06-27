@@ -5,7 +5,7 @@ import {
   CompactFormPanel,
   CompactFormRow,
 } from "../../admin/ContentPanel";
-import { shopCompactInputClass } from "../shopLayoutStyles";
+import { shopCompactInputClass, shopCompactTextareaClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import {
   apiMessage,
@@ -241,7 +241,7 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
 
       <CompactFormRow>
         <CompactField label="Description" className="min-w-full flex-[1_1_100%]">
-          <textarea className={`${shopCompactInputClass} resize-y`} placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} disabled={saving} />
+          <textarea className={shopCompactTextareaClass} placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} disabled={saving} />
         </CompactField>
       </CompactFormRow>
     </CompactFormPanel>

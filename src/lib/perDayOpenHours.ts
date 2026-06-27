@@ -35,6 +35,25 @@ export function createDefaultPerDaySchedule(): PerDaySchedule {
   }, {} as PerDaySchedule);
 }
 
+/** Demo schedule until per-day open hours API is reliable. */
+export const USE_DUMMY_SHOP_OPEN_HOURS = true;
+
+export function createDummyPerDaySchedule(): PerDaySchedule {
+  const schedule = createDefaultPerDaySchedule();
+  for (const day of ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] as WeekDay[]) {
+    schedule[day] = { enabled: true, start: "09:00", end: "20:00" };
+  }
+  schedule.Saturday = { enabled: true, start: "09:00", end: "18:00" };
+  return schedule;
+}
+
+export function resolveShopOpenHoursSchedule(perDayOpenHours?: string | null): PerDaySchedule {
+  if (USE_DUMMY_SHOP_OPEN_HOURS) {
+    return createDummyPerDaySchedule();
+  }
+  return resolvePerDaySchedule(perDayOpenHours ? { perDayOpenHours } : null);
+}
+
 function splitLegacyOpenHours(openHours: string | null | undefined) {
   const fallback = { start: "08:00", end: "20:00" };
   if (!openHours || !openHours.includes("-")) {
@@ -175,6 +194,10 @@ export function formatOpenHoursTimeDisplay(time24: string): string {
   }
 
   return `${hour12}.${mm} ${ampm}`;
+}
+
+export function formatOpenHoursRangeDisplay(start: string, end: string): string {
+  return `${formatOpenHoursTimeDisplay(start)} - ${formatOpenHoursTimeDisplay(end)}`;
 }
 
 export function formatPerDayScheduleDisplay(schedule: PerDaySchedule): string {
