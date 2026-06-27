@@ -4,8 +4,8 @@ import {
   CompactField,
   CompactFormPanel,
   CompactFormRow,
-  compactInputClass,
 } from "../../admin/ContentPanel";
+import { shopCompactInputClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import {
   apiMessage,
@@ -185,7 +185,7 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
         <>
           <CompactFormRow>
             <CompactField label="Service" required>
-              <select className={compactInputClass} value={serviceId} onChange={(e) => setServiceId(e.target.value)} disabled={saving}>
+              <select className={shopCompactInputClass} value={serviceId} onChange={(e) => setServiceId(e.target.value)} disabled={saving}>
                 <option value="">Select service</option>
                 {serviceOptions.map((o) => (
                   <option key={`${o.id}-${o.label}`} value={o.id}>{o.label}</option>
@@ -193,20 +193,20 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
               </select>
             </CompactField>
             <CompactField label="Product name">
-              <input className={compactInputClass} placeholder="Product name" value={productName} onChange={(e) => setProductName(e.target.value)} disabled={saving} />
+              <input className={shopCompactInputClass} placeholder="Product name" value={productName} onChange={(e) => setProductName(e.target.value)} disabled={saving} />
             </CompactField>
             <CompactField label="Original price">
-              <input className={compactInputClass} placeholder="Original price" value={price} onChange={(e) => setPrice(e.target.value)} disabled={saving} />
+              <input className={shopCompactInputClass} placeholder="Original price" value={price} onChange={(e) => setPrice(e.target.value)} disabled={saving} />
             </CompactField>
           </CompactFormRow>
         </>
       ) : (
         <CompactFormRow>
           <CompactField label="Part name" required>
-            <input className={compactInputClass} placeholder="Part name" value={partName} onChange={(e) => setPartName(e.target.value)} disabled={saving} />
+            <input className={shopCompactInputClass} placeholder="Part name" value={partName} onChange={(e) => setPartName(e.target.value)} disabled={saving} />
           </CompactField>
           <CompactField label="Vehicle company" required>
-            <select className={compactInputClass} value={vehicleId} onChange={(e) => { setVehicleId(e.target.value); setVehicleModel(""); setVehicleYear(""); }} disabled={saving}>
+            <select className={shopCompactInputClass} value={vehicleId} onChange={(e) => { setVehicleId(e.target.value); setVehicleModel(""); setVehicleYear(""); }} disabled={saving}>
               <option value="">Vehicle company</option>
               {vehicleCatalog.map((v) => (
                 <option key={v.id} value={v.id}>{v.name}</option>
@@ -214,7 +214,7 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
             </select>
           </CompactField>
           <CompactField label="Model" required>
-            <select className={compactInputClass} value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} disabled={saving}>
+            <select className={shopCompactInputClass} value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} disabled={saving}>
               <option value="">Model</option>
               {(selectedVehicle?.models ?? []).map((m) => (
                 <option key={m.name} value={m.name}>{m.name}</option>
@@ -222,17 +222,17 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
             </select>
           </CompactField>
           <CompactField label="Year" required>
-            <input className={compactInputClass} placeholder="Year" value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} disabled={saving} />
+            <input className={shopCompactInputClass} placeholder="Year" value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} disabled={saving} />
           </CompactField>
         </CompactFormRow>
       )}
 
       <CompactFormRow>
         <CompactField label="Discounted price" required>
-          <input className={compactInputClass} placeholder="Discounted price" value={discountedPrice} onChange={(e) => setDiscountedPrice(e.target.value)} disabled={saving} />
+          <input className={shopCompactInputClass} placeholder="Discounted price" value={discountedPrice} onChange={(e) => setDiscountedPrice(e.target.value)} disabled={saving} />
         </CompactField>
         <CompactField label="Offer ends on">
-          <input className={compactInputClass} type="date" value={offerEnd} onChange={(e) => setOfferEnd(e.target.value)} disabled={saving} />
+          <input className={shopCompactInputClass} type="date" value={offerEnd} onChange={(e) => setOfferEnd(e.target.value)} disabled={saving} />
         </CompactField>
         <CompactField label="Deal image" required={!isEditing}>
           <input type="file" accept="image/*" onChange={(e) => setDealImage(e.target.files?.[0] ?? null)} disabled={saving} />
@@ -241,7 +241,7 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
 
       <CompactFormRow>
         <CompactField label="Description" className="min-w-full flex-[1_1_100%]">
-          <textarea className={`${compactInputClass} resize-y`} placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} disabled={saving} />
+          <textarea className={`${shopCompactInputClass} resize-y`} placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} disabled={saving} />
         </CompactField>
       </CompactFormRow>
     </CompactFormPanel>

@@ -5,8 +5,8 @@ import {
   CompactFormPanel,
   CompactFormRow,
   compactFixedFieldWidth,
-  compactInputClass,
 } from "../../components/admin/ContentPanel";
+import { shopCompactInputClass } from "../../components/shop/shopLayoutStyles";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopLoadingPanel, ShopPageContentShell } from "../../components/shop/ShopPanels";
 import ShopWebsiteSidebar, {
@@ -265,7 +265,7 @@ function DomainPanel({
               type="text"
               value={form.domainName}
               onChange={(e) => onChange({ ...form, domainName: e.target.value })}
-              className={compactInputClass}
+              className={shopCompactInputClass}
             />
           </CompactField>
           <CompactField label="Expiry Date" className={compactFixedFieldWidth}>
@@ -273,14 +273,14 @@ function DomainPanel({
               type="date"
               value={form.expiryDate}
               onChange={(e) => onChange({ ...form, expiryDate: e.target.value })}
-              className={compactInputClass}
+              className={shopCompactInputClass}
             />
           </CompactField>
           <CompactField label="Provider" className={compactFixedFieldWidth}>
             <select
               value={form.provider}
               onChange={(e) => onChange({ ...form, provider: e.target.value })}
-              className={compactInputClass}
+              className={shopCompactInputClass}
             >
               {PROVIDER_OPTIONS.map((opt) => (
                 <option key={opt.value || "empty"} value={opt.value}>
@@ -344,7 +344,7 @@ function PreviewPanel({
             value={selectedId}
             onChange={(e) => onSelect(e.target.value)}
             disabled={loading || templates.length === 0}
-            className={`min-w-[220px] flex-1 ${compactInputClass}`}
+            className={`min-w-[220px] flex-1 ${shopCompactInputClass}`}
           >
             {loading ? (
               <option value="">Loading…</option>

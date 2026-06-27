@@ -6,11 +6,12 @@ import {
   CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
-  compactInputClass,
 } from "../../admin/ContentPanel";
+import { shopCompactInputClass } from "../shopLayoutStyles";
 import OwnerCityPicker from "../../owner/OwnerCityPicker";
 import { getJson } from "../../../api/mobileAuth";
 import { useAuth } from "../../../auth";
+import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
 import {
   addCarOwnerToMyCustomers,
   apiMessage,
@@ -68,7 +69,7 @@ export default function ShopCustomerForm({
 
   const [name, setName] = useState(customer?.name ?? "");
   const [email, setEmail] = useState(customer?.email ?? "");
-  const [phone, setPhone] = useState(customer?.phone ?? "");
+  const [phone, setPhone] = useState(phoneDigits(customer?.phone ?? ""));
   const [pincode, setPincode] = useState(customer?.pincode ?? "");
   const [address, setAddress] = useState(customer?.address ?? "");
   const [city, setCity] = useState(customer?.city ?? "");
@@ -114,7 +115,7 @@ export default function ShopCustomerForm({
   const validate = (): string | null => {
     if (!name.trim()) return "Name is required.";
     if (!email.trim() || !isValidEmail(email)) return "Valid email is required.";
-    if (!/^\d{10}$/.test(phone.replace(/\D/g, ""))) return "Phone must be 10 digits.";
+    if (phoneDigits(phone).length !== 10) return "Phone must be 10 digits.";
     if (!pincode.trim()) return "Postal code is required.";
     for (const v of vehicles) {
       if (!v.licensePlateNo.trim() || !v.vehicleName.trim() || !v.model.trim() || !v.year.trim()) {
@@ -157,7 +158,7 @@ export default function ShopCustomerForm({
             name: name.trim(),
             email: email.trim(),
             countryCode,
-            phone: phone.replace(/\D/g, ""),
+            phone: phoneDigits(phone),
             pincode: pincode.trim(),
             address: address.trim(),
             city: city.trim(),
@@ -192,7 +193,7 @@ export default function ShopCustomerForm({
             name: name.trim(),
             email: email.trim(),
             countryCode,
-            phone: phone.replace(/\D/g, ""),
+            phone: phoneDigits(phone),
             pincode: pincode.trim(),
             address: address.trim(),
             city: city.trim(),
@@ -227,31 +228,31 @@ export default function ShopCustomerForm({
       >
         <CompactFormRow>
           <CompactField label="Full Name" required>
-            <input className={compactInputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={20} />
+            <input className={shopCompactInputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={20} />
           </CompactField>
           <CompactField label="Email" required>
-            <input className={compactInputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input className={shopCompactInputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="Phone" required>
-            <input className={compactInputClass} value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} />
+            <input className={shopCompactInputClass} value={formatPhoneDisplay(phone)} onChange={(e) => setPhone(phoneDigits(e.target.value))} />
           </CompactField>
           <CompactField label="Postal Code" required>
-            <input className={compactInputClass} value={pincode} onChange={(e) => setPincode(e.target.value)} />
+            <input className={shopCompactInputClass} value={pincode} onChange={(e) => setPincode(e.target.value)} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="City">
             <div className="flex gap-2">
-              <input className={compactInputClass} value={city} readOnly placeholder="Choose city" />
+              <input className={shopCompactInputClass} value={city} readOnly placeholder="Choose city" />
               <button type="button" className={shopCancelButtonClass} onClick={() => setCityPickerOpen(true)}>
                 Pick
               </button>
             </div>
           </CompactField>
           <CompactField label="Address">
-            <input className={compactInputClass} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={50} />
+            <input className={shopCompactInputClass} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={50} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
@@ -276,7 +277,7 @@ export default function ShopCustomerForm({
               <CompactFormRow>
                 <CompactField label="License Plate" required>
                   <input
-                    className={compactInputClass}
+                    className={shopCompactInputClass}
                     value={v.licensePlateNo}
                     onChange={(e) => updateVehicle(index, { licensePlateNo: e.target.value })}
                     maxLength={14}
@@ -284,7 +285,7 @@ export default function ShopCustomerForm({
                 </CompactField>
                 <CompactField label="VIN">
                   <input
-                    className={compactInputClass}
+                    className={shopCompactInputClass}
                     value={v.vinNo ?? ""}
                     onChange={(e) => updateVehicle(index, { vinNo: e.target.value })}
                     maxLength={17}
@@ -294,7 +295,7 @@ export default function ShopCustomerForm({
               <CompactFormRow>
                 <CompactField label="Make" required>
                   <select
-                    className={compactInputClass}
+                    className={shopCompactInputClass}
                     value={v.vehicleName}
                     onChange={(e) => updateVehicle(index, { vehicleName: e.target.value, model: "", year: "" })}
                   >
@@ -308,7 +309,7 @@ export default function ShopCustomerForm({
                 </CompactField>
                 <CompactField label="Model" required>
                   <select
-                    className={compactInputClass}
+                    className={shopCompactInputClass}
                     value={v.model}
                     onChange={(e) => updateVehicle(index, { model: e.target.value, year: "" })}
                   >
@@ -322,7 +323,7 @@ export default function ShopCustomerForm({
                 </CompactField>
                 <CompactField label="Year" required>
                   <select
-                    className={compactInputClass}
+                    className={shopCompactInputClass}
                     value={v.year}
                     onChange={(e) => updateVehicle(index, { year: e.target.value })}
                   >
@@ -338,7 +339,7 @@ export default function ShopCustomerForm({
               <CompactFormRow>
                 <CompactField label="Odometer">
                   <input
-                    className={compactInputClass}
+                    className={shopCompactInputClass}
                     value={v.odometerReading ?? ""}
                     onChange={(e) => updateVehicle(index, { odometerReading: e.target.value })}
                   />

@@ -4,8 +4,8 @@ import {
   CompactField,
   CompactFormPanel,
   CompactFormRow,
-  compactInputClass,
 } from "../../admin/ContentPanel";
+import { shopCompactInputClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { apiMessage, saveMyServices, updateMyServices } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
@@ -144,7 +144,7 @@ export default function ShopServiceSubDialog({
       <CompactFormRow>
         <CompactField label="Sub- Category" required className="min-w-[140px] flex-[1.2]">
           <input
-            className={compactInputClass}
+            className={shopCompactInputClass}
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={saving}
@@ -152,7 +152,7 @@ export default function ShopServiceSubDialog({
         </CompactField>
         <CompactField label="Description" className="min-w-[180px] flex-[2]">
           <textarea
-            className={`${compactInputClass} resize-y`}
+            className={`${shopCompactInputClass} resize-y`}
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             rows={1}
@@ -161,7 +161,7 @@ export default function ShopServiceSubDialog({
         </CompactField>
         <CompactField label="Unit Price" required className="w-[90px] shrink-0 flex-none sm:w-[100px]">
           <input
-            className={compactInputClass}
+            className={shopCompactInputClass}
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             inputMode="decimal"
@@ -170,7 +170,7 @@ export default function ShopServiceSubDialog({
         </CompactField>
         <CompactField label="Qty" className="w-[70px] shrink-0 flex-none sm:w-[80px]">
           <input
-            className={compactInputClass}
+            className={shopCompactInputClass}
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             inputMode="numeric"

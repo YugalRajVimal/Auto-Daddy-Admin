@@ -8,11 +8,10 @@ import {
   CompactFormPanel,
   CompactFormRow,
   compactFixedFieldWidth,
-  compactInputClass,
 } from "../../components/admin/ContentPanel";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopViewTransition } from "../../components/shop/ShopAnimated";
-import { shopHeroCardBodyClass, shopHeroOpaqueSurfaceClass } from "../../components/shop/shopLayoutStyles";
+import { shopCompactInputClass, shopHeroCardBodyClass, shopHeroOpaqueSurfaceClass } from "../../components/shop/shopLayoutStyles";
 import {
   ShopEmptyPanel,
   ShopErrorPanel,
@@ -32,6 +31,7 @@ import {
 } from "../../lib/shopOwnerMutations";
 import { searchCarOwners } from "../../lib/shopOwnerApi";
 import { parseCitiesApiResponse } from "../../lib/carOwnerCities";
+import { formatPhoneDisplay, formatPhoneLabel, phoneDigits } from "../../lib/phoneFormat";
 import { parseMyCustomers } from "../../lib/shopOwnerParsers";
 import type { CustomerVehicle, MyCustomer } from "../../types/shopOwner";
 
@@ -54,17 +54,6 @@ function customerId(c: MyCustomer) {
   return c.carOwnerId ?? c.id ?? c._id ?? "";
 }
 
-function phoneDigits(phone?: string) {
-  return (phone ?? "").replace(/\D/g, "");
-}
-
-function displayPhone(phone?: string) {
-  const digits = phoneDigits(phone);
-  if (digits.length === 10) {
-    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-  }
-  return (phone ?? "").trim() || "—";
-}
 
 function vehicleCount(customer: MyCustomer) {
   return customer.vehicles?.length ?? 0;
@@ -160,7 +149,7 @@ function CustomerAddPrompt({
       <article className="flex items-center justify-between gap-3 rounded-md border border-[#008000]/40 bg-[#ffe8d6]/95 px-4 py-3 sm:px-5 sm:py-4">
         <div className="min-w-0">
           <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
-          <p className="text-sm font-semibold text-blue-700">{displayPhone(customer.phone)}</p>
+          <p className="text-sm font-semibold text-blue-700">{formatPhoneLabel(customer.phone)}</p>
         </div>
         {inMyList ? (
           <p className="shrink-0 text-center text-sm font-bold text-[#008000]">already added to my customers</p>
@@ -202,7 +191,7 @@ function StripedCustomerRow({
       <div className="min-w-0">
         <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
         {customer.phone ? (
-          <span className="text-sm font-semibold text-blue-700">{displayPhone(customer.phone)}</span>
+          <span className="text-sm font-semibold text-blue-700">{formatPhoneLabel(customer.phone)}</span>
         ) : null}
       </div>
       <VehiclesColumn count={vehicleCount(customer)} />
@@ -226,7 +215,7 @@ function MyListCustomerCard({
       <div className="min-w-0">
         <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
         {customer.phone ? (
-          <span className="text-sm font-semibold text-blue-700">{displayPhone(customer.phone)}</span>
+          <span className="text-sm font-semibold text-blue-700">{formatPhoneLabel(customer.phone)}</span>
         ) : null}
       </div>
       <VehiclesColumn count={vehicleCount(customer)} />
@@ -248,7 +237,7 @@ function MyListCustomerDetail({
       <article className="flex items-center justify-between gap-4 rounded-md border border-[#008000] bg-[#d4fcd4] px-4 py-3 sm:px-6 sm:py-4">
         <div className="min-w-0">
           <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
-          <p className="text-sm font-semibold text-blue-700">{displayPhone(customer.phone)}</p>
+          <p className="text-sm font-semibold text-blue-700">{formatPhoneLabel(customer.phone)}</p>
         </div>
         <VehiclesColumn count={vehicleCount(customer)} />
       </article>
@@ -373,7 +362,6 @@ function AddNewCustomerForm({
       footer={
         <CompactFormFooter
           message="* Add new customer in system."
-          messageCenter
           actionLabel={submitting ? "Saving…" : "Save"}
           onSave={() => void handleSave()}
           onCancel={onCancel}
@@ -388,23 +376,23 @@ function AddNewCustomerForm({
       <CompactFormRow className="justify-center">
         <CompactField label="Name" required className={compactFixedFieldWidth}>
           <input
-            className={compactInputClass}
+            className={shopCompactInputClass}
             value={name}
             onChange={(e) => setName(e.target.value.slice(0, 20))}
           />
         </CompactField>
         <CompactField label="Phone" required className={compactFixedFieldWidth}>
           <input
-            className={compactInputClass}
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            className={shopCompactInputClass}
+            value={formatPhoneDisplay(phone)}
+            onChange={(e) => setPhone(phoneDigits(e.target.value))}
           />
         </CompactField>
         <CompactField label="City" required className={compactFixedFieldWidth}>
           <select
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            className={compactInputClass}
+            className={shopCompactInputClass}
           >
             <option value="">Select city</option>
             {citySelectOptions.map((cityName) => (
@@ -493,7 +481,6 @@ function AddToListForm({
       footer={
         <CompactFormFooter
           message="* Add customer in your customer list"
-          messageCenter
           actionLabel={submitting ? "Adding…" : "+ Add"}
           onSave={() => void handleAdd()}
           onCancel={onCancel}
@@ -515,17 +502,17 @@ function AddToListForm({
       ) : null}
       <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
         <CompactField label="Name" className={compactFixedFieldWidth}>
-          <input className={`${compactInputClass} bg-gray-100`} value={name} readOnly />
+          <input className={`${shopCompactInputClass} bg-gray-100`} value={name} readOnly />
         </CompactField>
         <CompactField label="Phone" className={compactFixedFieldWidth}>
-          <input className={`${compactInputClass} bg-gray-100`} value={displayPhone(phone)} readOnly />
+          <input className={`${shopCompactInputClass} bg-gray-100`} value={formatPhoneLabel(phone)} readOnly />
         </CompactField>
         <CompactField label="City" className={compactFixedFieldWidth}>
-          <input className={`${compactInputClass} bg-gray-100`} value={city} readOnly />
+          <input className={`${shopCompactInputClass} bg-gray-100`} value={city} readOnly />
         </CompactField>
         <CompactField label="Email" className={compactFixedFieldWidth}>
           <input
-            className={compactInputClass}
+            className={shopCompactInputClass}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -564,7 +551,7 @@ function CustomerInfoView({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
             ["Name", customer.name ?? "—"],
-            ["Phone", displayPhone(customer.phone)],
+            ["Phone", formatPhoneLabel(customer.phone)],
             ["City", customer.city?.trim() || "—"],
             ["Email", customer.email?.trim() || "—"],
           ].map(([label, value]) => (
@@ -952,7 +939,7 @@ export default function ShopPeoplePage() {
                         >
                           <div className="min-w-0">
                             <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
-                            <p className="text-sm font-semibold text-blue-700">{displayPhone(customer.phone)}</p>
+                            <p className="text-sm font-semibold text-blue-700">{formatPhoneLabel(customer.phone)}</p>
                           </div>
                           <VehiclesColumn count={vehicleCount(customer)} />
                         </button>

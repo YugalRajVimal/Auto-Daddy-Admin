@@ -6,10 +6,11 @@ import {
   CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
-  compactInputClass,
 } from "../../components/admin/ContentPanel";
+import { shopCompactInputClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
 import { apiMessage, createTeamMember, fetchTeamMembers, updateTeamMember } from "../../lib/shopOwnerMutations";
+import { formatPhoneDisplay, phoneDigits } from "../../lib/phoneFormat";
 import { ShopFormPage } from "../../components/shop/forms/ShopFormPage";
 
 function parseMembers(payload: unknown) {
@@ -48,7 +49,7 @@ export default function ShopTeamMemberFormPage() {
       if (member) {
         setName(String(member.name ?? ""));
         setEmail(String(member.email ?? ""));
-        setPhone(String(member.phone ?? ""));
+        setPhone(phoneDigits(String(member.phone ?? "")));
         setDesignation(String(member.designation ?? ""));
         setIsActive(member.isActive !== false);
       }
@@ -58,7 +59,7 @@ export default function ShopTeamMemberFormPage() {
 
   const handleSave = async () => {
     if (!token) return;
-    if (!name.trim() || !phone.trim() || !designation.trim()) {
+    if (!name.trim() || phoneDigits(phone).length !== 10 || !designation.trim()) {
       toast.error("Name, phone, and designation are required.");
       return;
     }
@@ -67,7 +68,7 @@ export default function ShopTeamMemberFormPage() {
       const payload = {
         name: name.trim(),
         email: email.trim(),
-        phone: phone.replace(/\D/g, "").slice(0, 10),
+        phone: phoneDigits(phone),
         designation: designation.trim(),
         isActive,
         teamMemberPhoto: photo,
@@ -113,18 +114,18 @@ export default function ShopTeamMemberFormPage() {
       >
         <CompactFormRow>
           <CompactField label="Name" required>
-            <input className={compactInputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={20} />
+            <input className={shopCompactInputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={20} />
           </CompactField>
           <CompactField label="Designation" required>
-            <input className={compactInputClass} value={designation} onChange={(e) => setDesignation(e.target.value)} maxLength={30} />
+            <input className={shopCompactInputClass} value={designation} onChange={(e) => setDesignation(e.target.value)} maxLength={30} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="Phone" required>
-            <input className={compactInputClass} value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} />
+            <input className={shopCompactInputClass} value={formatPhoneDisplay(phone)} onChange={(e) => setPhone(phoneDigits(e.target.value))} />
           </CompactField>
           <CompactField label="Email">
-            <input className={compactInputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input className={shopCompactInputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>

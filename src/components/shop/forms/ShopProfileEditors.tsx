@@ -8,9 +8,10 @@ import {
   CompactFormPanel,
   CompactFormRow,
   compactFixedFieldWidth,
-  compactInputClass,
 } from "../../admin/ContentPanel";
+import { shopCompactInputClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
+import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
 import {
   addMyCarCompanies,
   apiMessage,
@@ -61,10 +62,11 @@ function ProfileStatusFooter({
   actions: ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
-      <div />
-      <span className="text-center text-xs font-serif italic text-gray-800">{message}</span>
-      <div className="flex justify-end">{actions}</div>
+    <div className="flex flex-wrap items-stretch justify-between gap-2 border-t border-ad-form-border bg-ad-form-bg">
+      <div className="flex min-w-[180px] flex-1 items-center bg-ad-form-required-bg px-3 py-2.5 text-xs font-serif italic text-gray-800">
+        {message}
+      </div>
+      <div className="flex items-center gap-2 px-3 py-2.5">{actions}</div>
     </div>
   );
 }
@@ -128,7 +130,7 @@ export function ShopPersonalProfileEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
-  const [phone, setPhone] = useState(user?.phone ?? "");
+  const [phone, setPhone] = useState(phoneDigits(user?.phone ?? ""));
   const [address, setAddress] = useState(user?.address ?? "");
   const [pincode, setPincode] = useState(user?.pincode ?? "");
   const [selectedCity, setSelectedCity] = useState(city ?? "");
@@ -139,7 +141,7 @@ export function ShopPersonalProfileEditor({
   const syncFromUser = () => {
     setName(user?.name ?? "");
     setEmail(user?.email ?? "");
-    setPhone(user?.phone ?? "");
+    setPhone(phoneDigits(user?.phone ?? ""));
     setAddress(user?.address ?? "");
     setPincode(user?.pincode ?? "");
     setSelectedCity(city ?? "");
@@ -184,7 +186,7 @@ export function ShopPersonalProfileEditor({
       const res = await updatePersonalProfile(token, {
         name: name.trim(),
         email: email.trim(),
-        phone: phone.replace(/\D/g, ""),
+        phone: phoneDigits(phone),
         countryCode: session?.meta?.countryCode ?? user?.countryCode ?? "+1",
         pincode: pincode.trim(),
         address: address.trim(),
@@ -216,7 +218,7 @@ export function ShopPersonalProfileEditor({
         <CompactFormRow>
           <CompactField label="Name" className="min-w-[120px] flex-1">
             <input
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={saving}
@@ -224,15 +226,15 @@ export function ShopPersonalProfileEditor({
           </CompactField>
           <CompactField label="Phone" className="min-w-[120px] flex-1">
             <input
-              className={compactInputClass}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              className={shopCompactInputClass}
+              value={formatPhoneDisplay(phone)}
+              onChange={(e) => setPhone(phoneDigits(e.target.value))}
               disabled={saving}
             />
           </CompactField>
           <CompactField label="City" className="min-w-[120px] flex-1">
             <select
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
               disabled={saving}
@@ -248,7 +250,7 @@ export function ShopPersonalProfileEditor({
           <CompactField label="Email" className="min-w-[120px] flex-1">
             <input
               type="email"
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={saving}
@@ -311,7 +313,7 @@ export function ShopBusinessProfileEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [businessName, setBusinessName] = useState(business?.businessName ?? "");
-  const [businessPhone, setBusinessPhone] = useState(business?.businessPhone ?? "");
+  const [businessPhone, setBusinessPhone] = useState(phoneDigits(business?.businessPhone ?? ""));
   const [city, setCity] = useState(business?.city ?? "");
   const [zip, setZip] = useState(zipCode ?? "");
   const [address, setAddress] = useState(business?.address ?? "");
@@ -327,7 +329,7 @@ export function ShopBusinessProfileEditor({
 
   const syncFromBusiness = () => {
     setBusinessName(business?.businessName ?? "");
-    setBusinessPhone(business?.businessPhone ?? "");
+    setBusinessPhone(phoneDigits(business?.businessPhone ?? ""));
     setCity(business?.city ?? "");
     setZip(zipCode ?? "");
     setAddress(business?.address ?? "");
@@ -387,7 +389,7 @@ export function ShopBusinessProfileEditor({
     try {
       const fields: Record<string, string | File> = {
         businessName: businessName.trim(),
-        businessPhone: businessPhone.replace(/\D/g, ""),
+        businessPhone: phoneDigits(businessPhone),
         city: city.trim(),
         businessAddress: address.trim(),
         businessEmail: email.trim(),
@@ -423,7 +425,7 @@ export function ShopBusinessProfileEditor({
         <CompactFormRow>
           <CompactField label="Business Name" className="min-w-[120px] flex-1">
             <input
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               disabled={saving}
@@ -431,15 +433,15 @@ export function ShopBusinessProfileEditor({
           </CompactField>
           <CompactField label="Business Phone" className="min-w-[120px] flex-1">
             <input
-              className={compactInputClass}
-              value={businessPhone}
-              onChange={(e) => setBusinessPhone(e.target.value)}
+              className={shopCompactInputClass}
+              value={formatPhoneDisplay(businessPhone)}
+              onChange={(e) => setBusinessPhone(phoneDigits(e.target.value))}
               disabled={saving}
             />
           </CompactField>
           <CompactField label="City" className="min-w-[120px] flex-1">
             <select
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={city}
               onChange={(e) => setCity(e.target.value)}
               disabled={saving}
@@ -454,7 +456,7 @@ export function ShopBusinessProfileEditor({
           </CompactField>
           <CompactField label="Address" className="min-w-[120px] flex-1">
             <input
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               disabled={saving}
@@ -464,7 +466,7 @@ export function ShopBusinessProfileEditor({
         <CompactFormRow>
           <CompactField label="Zip Code" className="min-w-[120px] flex-1">
             <input
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={zip}
               onChange={(e) => setZip(e.target.value)}
               disabled={saving}
@@ -472,7 +474,7 @@ export function ShopBusinessProfileEditor({
           </CompactField>
           <CompactField label="HST No." className="min-w-[120px] flex-1">
             <input
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={hst}
               onChange={(e) => setHst(e.target.value)}
               disabled={saving}
@@ -480,7 +482,7 @@ export function ShopBusinessProfileEditor({
           </CompactField>
           <CompactField label="Tax %" className="min-w-[120px] flex-1">
             <input
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={tax}
               onChange={(e) => setTax(e.target.value)}
               disabled={saving}
@@ -489,7 +491,7 @@ export function ShopBusinessProfileEditor({
           <CompactField label="E mail" className="min-w-[120px] flex-1">
             <input
               type="email"
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={saving}
@@ -652,7 +654,7 @@ export function ShopOpenHoursEditor({
                 type="text"
                 readOnly
                 value={shortDayLabel(formDay)}
-                className={`${compactInputClass} bg-gray-50`}
+                className={`${shopCompactInputClass} bg-gray-50`}
               />
             </CompactField>
             <CompactField label="Status" className={compactFixedFieldWidth}>
@@ -660,7 +662,7 @@ export function ShopOpenHoursEditor({
                 value={formOpen ? "open" : "closed"}
                 disabled={saving}
                 onChange={(e) => setFormOpen(e.target.value === "open")}
-                className={compactInputClass}
+                className={shopCompactInputClass}
               >
                 <option value="open">Open</option>
                 <option value="closed">Closed</option>
@@ -927,7 +929,7 @@ export function ShopCarBrandAddEditor({
       <CompactFormRow className="items-start">
         <CompactField label="Name" className="min-w-[180px] flex-1">
           <select
-            className={compactInputClass}
+            className={shopCompactInputClass}
             value={brandId}
             onChange={(e) => setBrandId(e.target.value)}
             disabled={available.length === 0}
@@ -1137,7 +1139,7 @@ export function ShopServiceAddEditor({
       <CompactFormRow className="items-end">
         <CompactField label="Main Service" className="min-w-[180px] flex-1">
           <select
-            className={compactInputClass}
+            className={shopCompactInputClass}
             value={serviceId}
             onChange={(e) => setServiceId(e.target.value)}
             disabled={!isEditing && available.length === 0}
@@ -1160,7 +1162,7 @@ export function ShopServiceAddEditor({
         </CompactField>
         <CompactField label="Vendor Type" className="min-w-[180px] flex-1">
           <select
-            className={compactInputClass}
+            className={shopCompactInputClass}
             value={vendorType}
             onChange={(e) => handleVendorTypeChange(normalizeShopType(e.target.value))}
           >

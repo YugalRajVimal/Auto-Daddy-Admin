@@ -7,7 +7,7 @@ import { toast } from "react-toastify";
 import useAuth from "../../auth/useAuth";
 import DashboardPanelCard from "../COMP";
 import { JobCardFormSkeleton } from "../common/JobCardFormSkeleton";
-import { compactInputClass } from "../admin/ContentPanel";
+import { shopCompactInputClass } from "../shop/shopLayoutStyles";
 import { useShopOwnerCallingCode } from "../../hooks/useShopOwnerCallingCode";
 import { formatCurrencyAmount } from "../../lib/currency";
 import { extractMediaPath, normalizeMediaUrl } from "../../lib/mediaUrl";
@@ -23,7 +23,7 @@ import {
 
 const MAX_VEHICLE_PHOTOS = MAX_JOB_CARD_VEHICLE_PHOTOS;
 const PLACEHOLDER_JOB_CARD_NO = "J00027";
-const formCellInputClass = compactInputClass;
+const formCellInputClass = shopCompactInputClass;
 
 const DEFAULT_FORM = {
   customerId: "",

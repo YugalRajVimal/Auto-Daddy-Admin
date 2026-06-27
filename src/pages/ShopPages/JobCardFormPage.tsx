@@ -6,8 +6,8 @@ import {
   CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
-  compactInputClass,
 } from "../../components/admin/ContentPanel";
+import { shopCompactInputClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
 import { buildMyCustomersQuery, fetchMyCustomers } from "../../lib/shopOwnerApi";
 import {
@@ -283,7 +283,7 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
         <CompactFormRow>
           <CompactField label="Customer" required>
             <select
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={customerId}
               onChange={(e) => {
                 setCustomerId(e.target.value);
@@ -304,7 +304,7 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
           </CompactField>
           <CompactField label="Vehicle" required>
             <select
-              className={compactInputClass}
+              className={shopCompactInputClass}
               value={vehicleIdVal}
               onChange={(e) => setVehicleIdVal(e.target.value)}
               disabled={isEdit}
@@ -323,20 +323,20 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="ODO IN">
-            <input className={compactInputClass} value={odomIn} onChange={(e) => setOdomIn(e.target.value)} />
+            <input className={shopCompactInputClass} value={odomIn} onChange={(e) => setOdomIn(e.target.value)} />
           </CompactField>
           <CompactField label="ODO OUT">
-            <input className={compactInputClass} value={odomOut} onChange={(e) => setOdomOut(e.target.value)} />
+            <input className={shopCompactInputClass} value={odomOut} onChange={(e) => setOdomOut(e.target.value)} />
           </CompactField>
           <CompactField label="Discount">
-            <input className={compactInputClass} value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            <input className={shopCompactInputClass} value={discount} onChange={(e) => setDiscount(e.target.value)} />
           </CompactField>
         </CompactFormRow>
 
         <div className="border-t border-gray-300 pt-4">
           <CompactField label="Add service line">
             <select
-              className={compactInputClass}
+              className={shopCompactInputClass}
               defaultValue=""
               onChange={(e) => {
                 addLine(e.target.value);
@@ -359,7 +359,7 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
               >
                 <p className="text-xs font-semibold text-ad-purple sm:col-span-5">{line.name}</p>
                 <input
-                  className={compactInputClass}
+                  className={shopCompactInputClass}
                   placeholder="Qty"
                   value={line.qty}
                   onChange={(e) =>
@@ -367,7 +367,7 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
                   }
                 />
                 <input
-                  className={compactInputClass}
+                  className={shopCompactInputClass}
                   placeholder="Unit price"
                   value={line.unitPrice}
                   onChange={(e) =>
@@ -375,7 +375,7 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
                   }
                 />
                 <input
-                  className={compactInputClass}
+                  className={shopCompactInputClass}
                   placeholder="Labour"
                   value={line.labour}
                   onChange={(e) =>

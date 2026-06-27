@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import flatpickr from "flatpickr";
 import "flatpickr/dist/flatpickr.css";
-import { compactInputClass } from "../../admin/ContentPanel";
+import { shopCompactInputClass } from "../shopLayoutStyles";
 import { CalenderIcon } from "../../../icons";
 
 function timeStringToDate(time: string): Date {
@@ -76,7 +76,7 @@ export default function OpenHoursTimePicker({
         readOnly
         disabled={disabled}
         defaultValue={value}
-        className={`${compactInputClass} w-full cursor-pointer pr-8 disabled:cursor-not-allowed disabled:bg-gray-100`}
+        className={`${shopCompactInputClass} w-full cursor-pointer pr-8 disabled:cursor-not-allowed disabled:bg-gray-100`}
       />
       <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-gray-500">
         <CalenderIcon className="size-4" />
