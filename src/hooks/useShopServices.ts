@@ -16,6 +16,7 @@ export function useShopServices() {
   return {
     categories: state.data ?? [],
     loading: state.loading && !state.loaded,
+    loaded: state.loaded,
     error: state.error,
     refresh,
   };

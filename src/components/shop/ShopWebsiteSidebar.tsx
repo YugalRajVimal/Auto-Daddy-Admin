@@ -9,7 +9,7 @@ type ShopWebsiteSidebarProps = {
 
 const SECTIONS: { id: ShopWebsiteSection; label: string }[] = [
   { id: "domain", label: "Domain" },
-  { id: "preview", label: "Website Preview" },
+  { id: "preview", label: "My Website" },
   { id: "subscription", label: "Subscription" },
 ];
 

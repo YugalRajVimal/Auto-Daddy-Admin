@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "react-toastify";
 import {
   CompactField,
@@ -35,30 +35,22 @@ const PROVIDER_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-const STANDARD_FEATURES = [
-  "Professional Website",
-  "Software + Mobile App",
-  "Unlimited Job Cards",
-  "Tab a Job Card to Invoice",
-  "Trash to Cash (Salvages)",
-  "Promotion Deals Marketplace",
-  "Customer Alerts for Next due Service",
-  "Digital Presence Local to across Canada",
-  "One Website Revision",
+type SubscriptionPlanChoice = "yearly" | "biweekly" | "premium";
+
+const FREMIUM_FEATURES: { label: string; note?: string }[] = [
+  { label: "Website", note: "for 365 days" },
+  { label: "Free Software", note: "for 365 days" },
+  { label: "Job Cards", note: "Unlimited" },
+  { label: "Promotional Deals", note: "Service deals" },
+  { label: "Digital Presence", note: "Local & National" },
 ];
 
-const PROFESSIONAL_FEATURES = [
-  "Professional Website",
-  "Professional E-mail",
-  "Unlimited Job Cards",
-  "Tab a Job Card to Invoice",
-  "Software + Mobile App",
-  "Expense management",
-  "Trash to Cash (Salvages)",
-  "Marketplace for Deal Promotion",
-  "Customer Alerts for Next due Service",
-  "Safety Tips of the day",
-  "Digital Presence Local to across Canada",
+const PREMIUM_FEATURES: { label: string; note?: string; accent?: boolean }[] = [
+  { label: "Fremium +", accent: true },
+  {
+    label: "Trash to cash",
+    note: "Market place for sale of Salvage stocks across Canada",
+  },
 ];
 
 const checkboxBoxClass =
@@ -89,47 +81,145 @@ function GoldCoinIcon() {
   );
 }
 
-function PlanFeatureList({ items }: { items: string[] }) {
+function AccessFeatureList({
+  items,
+}: {
+  items: { label: string; note?: string; accent?: boolean }[];
+}) {
   return (
-    <ul className="space-y-2 px-4 py-3">
+    <ul className="space-y-2">
       {items.map((item) => (
-        <li key={item} className="flex items-start gap-2 text-sm font-semibold text-gray-900">
-          <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-[#006600] bg-white text-[10px] font-bold text-[#006600]">
-            ✓
-          </span>
-          <span>{item}</span>
+        <li key={item.label} className="text-sm font-semibold text-gray-900">
+          <span className="text-gray-800">* </span>
+          <span className={item.accent ? "text-[#006600]" : "text-gray-900"}>{item.label}</span>
+          {item.note ? (
+            <span className="ml-1 text-xs font-medium text-blue-600">({item.note})</span>
+          ) : null}
         </li>
       ))}
     </ul>
   );
 }
 
-function SubscriptionPlanCard({
-  title,
-  features,
-  onSeeInvoice,
+function PlanRadioOption({
+  name,
+  value,
+  checked,
+  onChange,
+  children,
+  price,
 }: {
-  title: string;
-  features: string[];
-  onSeeInvoice: () => void;
+  name: string;
+  value: SubscriptionPlanChoice;
+  checked: boolean;
+  onChange: (value: SubscriptionPlanChoice) => void;
+  children: ReactNode;
+  price: string;
 }) {
   return (
-    <article className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-[#006600]/30 shadow-sm">
-      <header className="bg-[#008000] px-4 py-3 text-center text-white">
-        <h3 className="text-base font-bold">{title}</h3>
-        <p className="text-xs font-semibold opacity-90">Includes</p>
-      </header>
-      <div className="flex-1 bg-[#d4fcd4]">
-        <PlanFeatureList items={features} />
+    <label
+      className={`flex cursor-pointer items-start gap-3 rounded-lg border bg-white px-3 py-2.5 shadow-sm transition-colors ${
+        checked ? "border-ad-purple ring-1 ring-ad-purple/30" : "border-gray-200 hover:border-gray-300"
+      }`}
+    >
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        onChange={() => onChange(value)}
+        className="mt-1 h-4 w-4 shrink-0 accent-ad-purple"
+      />
+      <div className="min-w-0 flex-1">{children}</div>
+      {price ? <span className="shrink-0 text-sm font-bold text-gray-900">{price}</span> : null}
+    </label>
+  );
+}
+
+function SubscriptionPanel() {
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanChoice>("yearly");
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-center shadow-sm">
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span className="text-sm font-bold text-[#006600]">Current Plan</span>
+          <GoldCoinIcon />
+          <span className="text-sm font-bold text-[#006600]">
+            a day payment for 365 accumulative days
+          </span>
+        </div>
       </div>
-      <button
-        type="button"
-        onClick={onSeeInvoice}
-        className="bg-[#cccccc] px-4 py-2.5 text-center text-sm font-bold text-gray-800 hover:bg-[#bdbdbd]"
-      >
-        See Invoice &gt;&gt;
-      </button>
-    </article>
+
+      <section className="overflow-hidden rounded-lg border border-gray-300 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-stretch">
+          <div className="flex-1 bg-white px-4 py-4 lg:min-w-[45%]">
+            <h3 className="mb-3 text-base font-bold text-ad-purple">Fremium access</h3>
+            <AccessFeatureList items={FREMIUM_FEATURES} />
+          </div>
+          <div className="flex flex-1 flex-col gap-3 bg-[#d4fcd4] px-4 py-4">
+            <PlanRadioOption
+              name="subscription-plan"
+              value="yearly"
+              checked={selectedPlan === "yearly"}
+              onChange={setSelectedPlan}
+              price="$ 365"
+            >
+              <p className="text-sm font-semibold text-blue-600">$ 1/- a day for 365 days</p>
+            </PlanRadioOption>
+            <PlanRadioOption
+              name="subscription-plan"
+              value="biweekly"
+              checked={selectedPlan === "biweekly"}
+              onChange={setSelectedPlan}
+              price="$ 115"
+            >
+              <p className="text-xs font-semibold leading-snug text-blue-600">
+                $ 1/- a day for 14 days with 25 void cheques of $ 15 each
+              </p>
+              <p className="mt-0.5 text-[11px] font-medium text-gray-800">
+                + $ 100 (refundable deposit)
+              </p>
+            </PlanRadioOption>
+          </div>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-lg border border-gray-300 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-stretch">
+          <div className="flex-1 bg-[#ececec] px-4 py-4 lg:min-w-[45%]">
+            <h3 className="mb-3 text-base font-bold text-ad-purple">Premium access</h3>
+            <AccessFeatureList items={PREMIUM_FEATURES} />
+          </div>
+          <div className="flex flex-1 flex-col bg-[#fde8d8] px-4 py-4">
+            <PlanRadioOption
+              name="subscription-plan"
+              value="premium"
+              checked={selectedPlan === "premium"}
+              onChange={setSelectedPlan}
+              price=""
+            >
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-semibold text-blue-600">Yearly payment plan +</p>
+                  <span className="shrink-0 text-sm font-bold text-gray-900">$ 365</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs font-medium text-gray-800">
+                    Marketplace access for autodaddy customers
+                  </p>
+                  <span className="shrink-0 text-sm font-bold text-gray-900">$ 100</span>
+                </div>
+              </div>
+            </PlanRadioOption>
+            <div className="mt-3 flex items-center justify-between rounded-md bg-[#cccccc] px-3 py-2">
+              <span className="text-sm font-semibold text-gray-800">Total</span>
+              <span className="text-base font-bold text-gray-900">$ 465</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -301,31 +391,6 @@ function PreviewPanel({
   );
 }
 
-function SubscriptionPanel({ onSeeInvoice }: { onSeeInvoice: (plan: string) => void }) {
-  return (
-    <>
-      <div className="mb-5 flex flex-wrap items-center justify-center gap-3 rounded border border-ad-form-border bg-ad-form-bg px-4 py-4 text-center shadow-sm">
-        <span className="text-sm font-bold text-[#006600]">Current Plan costs</span>
-        <GoldCoinIcon />
-        <span className="text-sm font-bold text-[#006600]">a day for Yearly Plan</span>
-      </div>
-
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
-        <SubscriptionPlanCard
-          title="Standard Plan"
-          features={STANDARD_FEATURES}
-          onSeeInvoice={() => onSeeInvoice("Standard Plan")}
-        />
-        <SubscriptionPlanCard
-          title="Professional Plan"
-          features={PROFESSIONAL_FEATURES}
-          onSeeInvoice={() => onSeeInvoice("Professional Plan")}
-        />
-      </div>
-    </>
-  );
-}
-
 export default function ShopMyWebsitePage() {
   const { token } = useAuth();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
@@ -392,10 +457,6 @@ export default function ShopMyWebsitePage() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const handleSeeInvoice = (plan: string) => {
-    toast.info(`${plan} invoice details coming soon.`);
-  };
-
   return (
     <ShopPageShell
       pageHeading={SECTION_TITLES[activeSection]}
@@ -437,7 +498,7 @@ export default function ShopMyWebsitePage() {
             />
           )
         ) : (
-          <SubscriptionPanel onSeeInvoice={handleSeeInvoice} />
+          <SubscriptionPanel />
         )}
       </ShopPageContentShell>
     </ShopPageShell>

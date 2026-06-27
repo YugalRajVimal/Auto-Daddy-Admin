@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import { FiEdit2 } from "react-icons/fi";
+import { FiEdit2, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson } from "../../../api/mobileAuth";
 import {
@@ -28,7 +28,13 @@ import {
   type PerDaySchedule,
   type WeekDay,
 } from "../../../lib/perDayOpenHours";
-import { filterServicesByShopType, normalizeShopType, type ShopType } from "../../../lib/shopTypes";
+import {
+  filterServicesByShopType,
+  getShopTypeLabel,
+  normalizeShopType,
+  SHOP_TYPE_OPTIONS,
+  type ShopType,
+} from "../../../lib/shopTypes";
 import type { ShopProfileBusiness, ShopProfileUser, ShopServiceCategory } from "../../../types/shopOwner";
 import OpenHoursTimePicker from "./OpenHoursTimePicker";
 import CarBrandLogo, {
@@ -733,7 +739,7 @@ export type ShopCarCompany = {
   logoUrl?: string | null;
 };
 
-const CAR_BRANDS_PER_PAGE = 27;
+const CAR_BRANDS_PER_PAGE = 10;
 
 function ShopCarBrandPagination({
   page,
@@ -796,49 +802,50 @@ export function ShopCarBrandList({
   }, [page, totalPages]);
 
   const pageBrands = sortedBrands.slice((page - 1) * CAR_BRANDS_PER_PAGE, page * CAR_BRANDS_PER_PAGE);
-  const brandRows: ShopCarCompany[][] = [];
-  for (let index = 0; index < pageBrands.length; index += 3) {
-    brandRows.push(pageBrands.slice(index, index + 3));
-  }
 
   return (
-    <div className="overflow-hidden rounded border border-gray-300 bg-white/90 shadow-sm">
-      {brandRows.map((row, rowIndex) => {
-        const rowTone = rowIndex % 2 === 0 ? "bg-gray-100/80" : "bg-white";
+    <div className="overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border-b border-gray-300 px-4 py-2.5 text-left text-xs font-bold text-gray-800">
+              Name of Car Brand
+            </th>
+            <th className="border-b border-gray-300 px-4 py-2.5 text-right text-xs font-bold text-gray-800">
+              Amblem
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {pageBrands.map((company, index) => {
+            const id = getCarBrandId(company);
+            const name = getCarBrandName(company);
 
-        return (
-          <div key={rowIndex} className={`grid grid-cols-1 sm:grid-cols-3 ${rowTone}`}>
-            {row.map((company) => {
-              const id = getCarBrandId(company);
-              const name = getCarBrandName(company);
-
-              return (
-                <div
-                  key={id}
-                  className="group flex items-center justify-between gap-2 px-3 py-2.5 text-sm text-gray-900"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
+            return (
+              <tr key={id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                <td className="border-b border-gray-200 px-4 py-2.5 font-medium text-gray-900">{name}</td>
+                <td className="border-b border-gray-200 px-4 py-2.5">
+                  <div className="flex items-center justify-end gap-3">
                     <div className={CAR_BRAND_LIST_LOGO_SLOT_CLASS}>
-                      <CarBrandLogo company={company} className={CAR_BRAND_LIST_LOGO_CLASS} />
+                      <CarBrandLogo company={company} className={CAR_BRAND_LIST_LOGO_CLASS} alt={`${name} emblem`} />
                     </div>
-                    <span className="truncate font-medium">{name}</span>
+                    <button
+                      type="button"
+                      title={`Remove ${name}`}
+                      aria-label={`Remove ${name}`}
+                      disabled={savingBrandId === id}
+                      onClick={() => onRemove(company)}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-lg font-bold text-red-600 hover:bg-red-50 disabled:opacity-60"
+                    >
+                      <FiX size={16} aria-hidden />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    title={`Remove ${name}`}
-                    aria-label={`Remove ${name}`}
-                    disabled={savingBrandId === id}
-                    onClick={() => onRemove(company)}
-                    className="shrink-0 rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 disabled:opacity-60"
-                  >
-                    ×
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
       <ShopCarBrandPagination page={page} totalPages={totalPages} onPageChange={setPage} />
     </div>
   );
@@ -939,7 +946,7 @@ export function ShopCarBrandAddEditor({
             })}
           </select>
         </CompactField>
-        <CompactField label="Emblem" className="min-w-[180px] flex-1">
+        <CompactField label="Amblem" className="min-w-[180px] flex-1">
           <div className={CAR_BRAND_EMBLEM_SLOT_CLASS}>
             {brandId ? (
               <CarBrandLogo company={selected} className={CAR_BRAND_EMBLEM_LOGO_CLASS} />
@@ -953,10 +960,77 @@ export function ShopCarBrandAddEditor({
   );
 }
 
+export function ShopServiceList({
+  services,
+  savingServiceId,
+  onRemove,
+}: {
+  services: ShopServiceCategory[];
+  savingServiceId?: string | null;
+  onRemove: (service: ShopServiceCategory) => void;
+}) {
+  const sortedServices = useMemo(
+    () =>
+      [...services].sort((a, b) =>
+        getServiceName(a).localeCompare(getServiceName(b), undefined, { sensitivity: "base" })
+      ),
+    [services]
+  );
+
+  return (
+    <div className="overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border-b border-gray-300 px-4 py-2.5 text-left text-xs font-bold text-gray-800">
+              Main Service
+            </th>
+            <th className="border-b border-gray-300 px-4 py-2.5 text-left text-xs font-bold text-gray-800">
+              Match with
+            </th>
+            <th className="border-b border-gray-300 px-4 py-2.5 text-right text-xs font-bold text-gray-800">
+              <span className="sr-only">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedServices.map((service, index) => {
+            const id = getServiceId(service);
+            const name = getServiceName(service);
+            const vendorLabel = getShopTypeLabel(service.shopType);
+
+            return (
+              <tr key={id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                <td className="border-b border-gray-200 px-4 py-2.5 font-medium text-gray-900">{name}</td>
+                <td className="border-b border-gray-200 px-4 py-2.5 text-gray-800">{vendorLabel}</td>
+                <td className="border-b border-gray-200 px-4 py-2.5">
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      title={`Remove ${name}`}
+                      aria-label={`Remove ${name}`}
+                      disabled={savingServiceId === id}
+                      onClick={() => onRemove(service)}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:opacity-60"
+                    >
+                      <FiX size={16} aria-hidden />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function ShopServiceAddEditor({
   services,
   selectedIds,
   shopType,
+  editingId,
   onSaved,
   onClose,
   onSaveService,
@@ -964,22 +1038,46 @@ export function ShopServiceAddEditor({
   services: ShopServiceCategory[];
   selectedIds: Set<string>;
   shopType?: string | null;
+  editingId?: string | null;
   onSaved: (id: string) => void;
   onClose?: () => void;
   /** When set, handles save locally. Return true if handled, false to fall through to API. */
-  onSaveService?: (id: string) => Promise<boolean> | boolean;
+  onSaveService?: (id: string, replacesId?: string) => Promise<boolean> | boolean;
 }) {
   const { token } = useAuth();
-  const shopTypeFiltered = filterServicesByShopType(services, normalizeShopType(shopType));
+  const defaultVendorType = normalizeShopType(shopType);
+  const [vendorType, setVendorType] = useState<ShopType>(defaultVendorType);
+  const shopTypeFiltered = filterServicesByShopType(services, vendorType);
   const available = shopTypeFiltered.filter((service) => {
     const id = getServiceId(service);
-    return id && !selectedIds.has(id);
+    return id && (!selectedIds.has(id) || id === editingId);
   });
-  const [serviceId, setServiceId] = useState("");
+  const [serviceId, setServiceId] = useState(editingId ?? "");
   const [saving, setSaving] = useState(false);
+  const isEditing = Boolean(editingId);
+
+  useEffect(() => {
+    if (editingId) {
+      const editing = services.find((service) => getServiceId(service) === editingId);
+      setVendorType(normalizeShopType(editing?.shopType ?? shopType));
+      setServiceId(editingId);
+      return;
+    }
+    setVendorType(defaultVendorType);
+    setServiceId("");
+  }, [defaultVendorType, editingId, services, shopType]);
+
+  const handleVendorTypeChange = (nextType: ShopType) => {
+    setVendorType(nextType);
+    const stillAvailable = filterServicesByShopType(services, nextType).some(
+      (service) => getServiceId(service) === serviceId
+    );
+    if (!stillAvailable) setServiceId("");
+  };
 
   const handleCancel = () => {
     setServiceId("");
+    setVendorType(defaultVendorType);
     onClose?.();
   };
 
@@ -988,24 +1086,33 @@ export function ShopServiceAddEditor({
       toast.error("Please select a service.");
       return;
     }
+    if (isEditing && serviceId === editingId) {
+      handleCancel();
+      return;
+    }
+
+    const nextIds = isEditing
+      ? [...selectedIds].filter((id) => id !== editingId).concat(serviceId)
+      : [...selectedIds, serviceId];
+
     setSaving(true);
     try {
       if (onSaveService) {
-        const handled = await onSaveService(serviceId);
+        const handled = await onSaveService(serviceId, editingId ?? undefined);
         if (handled) {
-          toast.success("Service added.");
+          toast.success(isEditing ? "Service updated." : "Service added.");
           setServiceId("");
           onSaved(serviceId);
           return;
         }
       }
       if (!token) return;
-      const res = await updateServiceWeWorkWith(token, [...selectedIds, serviceId]);
+      const res = await updateServiceWeWorkWith(token, nextIds);
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save.");
         return;
       }
-      toast.success("Service added.");
+      toast.success(isEditing ? "Service updated." : "Service added.");
       setServiceId("");
       onSaved(serviceId);
     } finally {
@@ -1018,8 +1125,9 @@ export function ShopServiceAddEditor({
       className="mb-4"
       footer={
         <ProfileFormFooter
-          message="You are adding a service"
+          message={isEditing ? "You are updating a service" : "You are adding a service"}
           saving={saving}
+          saveLabel={isEditing ? "Update" : "Save"}
           onSave={() => void handleSave()}
           onReset={handleCancel}
           cancelLabel="Cancel"
@@ -1027,15 +1135,17 @@ export function ShopServiceAddEditor({
       }
     >
       <CompactFormRow className="items-end">
-        <CompactField label="Select Service Name" className="min-w-[180px] flex-1">
+        <CompactField label="Main Service" className="min-w-[180px] flex-1">
           <select
             className={compactInputClass}
             value={serviceId}
             onChange={(e) => setServiceId(e.target.value)}
-            disabled={available.length === 0}
+            disabled={!isEditing && available.length === 0}
           >
             <option value="">
-              {available.length === 0 ? "All services already added" : "Select service"}
+              {!isEditing && available.length === 0
+                ? "All services already added"
+                : "Select service"}
             </option>
             {available.map((service) => {
               const id = getServiceId(service);
@@ -1046,6 +1156,19 @@ export function ShopServiceAddEditor({
                 </option>
               );
             })}
+          </select>
+        </CompactField>
+        <CompactField label="Vendor Type" className="min-w-[180px] flex-1">
+          <select
+            className={compactInputClass}
+            value={vendorType}
+            onChange={(e) => handleVendorTypeChange(normalizeShopType(e.target.value))}
+          >
+            {SHOP_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </CompactField>
       </CompactFormRow>

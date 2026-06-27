@@ -1,8 +1,8 @@
 /** Shared horizontal inset so header (profile link → logout) aligns with the page body grid. */
 export const shopPortalHorizPaddingClass = "px-3 sm:px-4 md:px-4 lg:px-4 xl:px-4";
 
-/** Horizontal + vertical padding inside the hero content card. */
-export const shopHeroCardPaddingClass = "px-2 py-2.5 sm:px-3 sm:py-3";
+/** Top + horizontal inset inside the hero content card (all shop pages). */
+export const shopHeroCardPaddingClass = "pt-5 px-10 sm:px-14 md:px-16 lg:px-20";
 
 /** Fixed main content card — viewport height, no grow; clip and scroll inside. */
 export const shopMainContentShellClass =

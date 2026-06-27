@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import { FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import DashboardPanelCard from "../../components/COMP";
-import ServiceImage from "../../components/shop/ServiceImage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopBusinessProfileEditor,
@@ -12,6 +10,7 @@ import {
   ShopOpenHoursEditor,
   ShopPersonalProfileEditor,
   ShopServiceAddEditor,
+  ShopServiceList,
   type ShopCarCompany,
 } from "../../components/shop/forms/ShopProfileEditors";
 import { ShopReveal } from "../../components/shop/ShopAnimated";
@@ -25,6 +24,8 @@ import {
   removeMyCarCompanies,
   updateServiceWeWorkWith,
 } from "../../lib/shopOwnerMutations";
+import { fetchMyServices } from "../../lib/shopOwnerApi";
+import { parseMyServices } from "../../lib/shopOwnerParsers";
 import {
   buildSelectedBrandIds,
   getCarBrandId,
@@ -42,10 +43,9 @@ import {
   parseServiceCatalog,
   resolveProfileSelectedServices,
 } from "../../lib/dummyServices";
-import { filterServicesByShopType, getShopTypeLabel, normalizeShopType } from "../../lib/shopTypes";
+import { normalizeShopType } from "../../lib/shopTypes";
 import type { ShopServiceCategory } from "../../types/shopOwner";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
-import { useShopServices } from "../../hooks/useShopServices";
 
 const PROFILE_SECTIONS = [
   { id: "personal", label: "Personal Profile", variant: "primary" as const },
@@ -111,8 +111,6 @@ export default function ShopProfilePage() {
     loading,
     refresh,
   } = useShopOwnerPortal();
-  const { categories: apiServiceCategories, loading: servicesLoading, refresh: refreshServices } =
-    useShopServices();
   const [activeId, setActiveId] = useState("personal");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [carCompanies, setCarCompanies] = useState<ShopCarCompany[]>([]);
@@ -122,12 +120,24 @@ export default function ShopProfilePage() {
   const [showAddBrand, setShowAddBrand] = useState(false);
   const [usingDummyBrands, setUsingDummyBrands] = useState(false);
   const [fullServiceCatalog, setFullServiceCatalog] = useState<ShopServiceCategory[]>([]);
+  const [myServices, setMyServices] = useState<ShopServiceCategory[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
   const [servicesCatalogLoading, setServicesCatalogLoading] = useState(false);
   const [usingDummyServices, setUsingDummyServices] = useState(false);
+  const [myServicesLoading, setMyServicesLoading] = useState(false);
   const [savingService, setSavingService] = useState<string | null>(null);
   const [showAddService, setShowAddService] = useState(false);
-  const servicesTabInitRef = useRef(false);
+
+  const refreshMyServices = async () => {
+    if (!token) return;
+    const res = await fetchMyServices(token);
+    const list = res.ok ? parseMyServices(res.data) : [];
+    setMyServices(list);
+    setUsingDummyServices(false);
+    setSelectedServiceIds(
+      list.length > 0 ? new Set(list.map((service) => getServiceId(service))) : new Set()
+    );
+  };
 
   useEffect(() => {
     if (activeId !== "brands") return;
@@ -171,35 +181,66 @@ export default function ShopProfilePage() {
       return;
     }
 
-    void fetchServiceCatalog(token).then((res) => {
-      const apiList = res.ok ? parseServiceCatalog(res.data) : [];
-      applyCatalog(apiList);
-    });
+    void fetchServiceCatalog(token)
+      .then((res) => {
+        const apiList = res.ok ? parseServiceCatalog(res.data) : [];
+        applyCatalog(apiList);
+      })
+      .catch(() => {
+        applyCatalog([]);
+      });
   }, [activeId, token]);
 
   useEffect(() => {
     if (activeId !== "services") {
-      servicesTabInitRef.current = false;
+      setShowAddService(false);
+      setMyServicesLoading(false);
       return;
     }
-    if (servicesLoading || servicesCatalogLoading) return;
-    if (servicesTabInitRef.current) return;
+    if (servicesCatalogLoading) return;
 
-    setUsingDummyServices(apiServiceCategories.length === 0);
-    setSelectedServiceIds(getInitialProfileServiceIds(apiServiceCategories));
-    servicesTabInitRef.current = true;
-  }, [activeId, apiServiceCategories, servicesLoading, servicesCatalogLoading]);
+    const applyMyServices = (list: ShopServiceCategory[], allowDummy: boolean) => {
+      setMyServices(list);
+      if (list.length > 0) {
+        setUsingDummyServices(false);
+        setSelectedServiceIds(new Set(list.map((service) => getServiceId(service))));
+      } else if (allowDummy) {
+        setUsingDummyServices(true);
+        setSelectedServiceIds(getInitialProfileServiceIds([]));
+      } else {
+        setUsingDummyServices(false);
+        setSelectedServiceIds(new Set());
+      }
+      setMyServicesLoading(false);
+    };
+
+    if (!token) {
+      applyMyServices([], true);
+      return;
+    }
+
+    setMyServicesLoading(true);
+    let cancelled = false;
+    void fetchMyServices(token)
+      .then((res) => {
+        if (cancelled) return;
+        applyMyServices(res.ok ? parseMyServices(res.data) : [], false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        applyMyServices([], false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId, servicesCatalogLoading, token]);
 
   const selectedBrandList = getSelectedCarBrands(carCompanies, selectedBrands);
   const shopType = normalizeShopType(user?.shopType ?? business?.shopType);
-  const shopTypeServiceCatalog = useMemo(
-    () => filterServicesByShopType(fullServiceCatalog, shopType),
-    [fullServiceCatalog, shopType]
-  );
   const selectedServiceList = useMemo(
-    () =>
-      resolveProfileSelectedServices(shopTypeServiceCatalog, apiServiceCategories, selectedServiceIds),
-    [shopTypeServiceCatalog, apiServiceCategories, selectedServiceIds]
+    () => resolveProfileSelectedServices(fullServiceCatalog, myServices, selectedServiceIds),
+    [fullServiceCatalog, myServices, selectedServiceIds]
   );
 
   const removeBrand = async (company: ShopCarCompany) => {
@@ -232,7 +273,7 @@ export default function ShopProfilePage() {
         return;
       }
       setSelectedServiceIds(new Set(remaining));
-      void refreshServices();
+      void refreshMyServices();
     } finally {
       setSavingService(null);
     }
@@ -356,73 +397,52 @@ export default function ShopProfilePage() {
           </>
         );
       case "services":
-        return servicesLoading || servicesCatalogLoading ? (
-          <ShopLoadingPanel variant="service-tile" count={5} />
-        ) : (
+        if (servicesCatalogLoading) {
+          return <ShopLoadingPanel variant="operational-services" />;
+        }
+        return (
           <>
-            <ProfileSectionAction
-              action={
-                !showAddService ? <AddNewButton onClick={() => setShowAddService(true)} /> : undefined
-              }
-            />
+            {!showAddService ? (
+              <div className="mb-4 flex justify-end">
+                <AddNewButton onClick={() => setShowAddService(true)} />
+              </div>
+            ) : null}
             <ShopReveal show={showAddService} className="mb-4">
               <ShopServiceAddEditor
-                services={shopTypeServiceCatalog}
+                services={fullServiceCatalog}
                 selectedIds={selectedServiceIds}
                 shopType={shopType}
-                onSaveService={
-                  usingDummyServices
-                    ? (id) => {
-                      setSelectedServiceIds((prev) => new Set([...prev, id]));
-                      return true;
-                    }
-                    : (id) => {
-                      if (!isDummyServiceId(id)) return false;
-                      setSelectedServiceIds((prev) => new Set([...prev, id]));
-                      return true;
-                    }
-                }
-                onSaved={(id) => {
-                  if (!usingDummyServices) {
+                onSaveService={(id) => {
+                  if (usingDummyServices || isDummyServiceId(id)) {
                     setSelectedServiceIds((prev) => new Set([...prev, id]));
-                    void refreshServices();
+                    return true;
+                  }
+                  if (!isDummyServiceId(id)) return false;
+                  setSelectedServiceIds((prev) => new Set([...prev, id]));
+                  return true;
+                }}
+                onSaved={(id) => {
+                  if (!usingDummyServices && !isDummyServiceId(id)) {
+                    setSelectedServiceIds((prev) => new Set([...prev, id]));
+                    void refreshMyServices();
                   }
                   setShowAddService(false);
                 }}
                 onClose={() => setShowAddService(false)}
               />
             </ShopReveal>
-            {selectedServiceList.length === 0 ? (
+            {myServicesLoading ? (
+              <ShopLoadingPanel variant="profile-table" className="mt-4" />
+            ) : selectedServiceList.length === 0 ? (
               <p className={`text-center text-sm ${shopHeroOnImageMutedTextClass}`}>
                 No services added yet. Click &ldquo;+ Add New&rdquo; to add one.
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                {selectedServiceList.map((category) => {
-                  const id = getServiceId(category);
-                  const name = getServiceName(category);
-                  return (
-                    <DashboardPanelCard key={id} className="relative mb-0 aspect-square">
-                      <div className="flex h-full flex-col justify-between">
-                        <span className="text-center text-xs font-semibold text-gray-800">{name}</span>
-                        <div className="flex flex-1 items-center justify-center overflow-hidden rounded border border-gray-100 bg-white">
-                          <ServiceImage category={category} className="h-full w-full object-cover" />
-                        </div>
-                        <button
-                          type="button"
-                          title={`Remove ${name}`}
-                          aria-label={`Remove ${name}`}
-                          disabled={savingService === id}
-                          onClick={() => void removeService(category)}
-                          className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm hover:border-red-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
-                        >
-                          <FiX size={14} />
-                        </button>
-                      </div>
-                    </DashboardPanelCard>
-                  );
-                })}
-              </div>
+              <ShopServiceList
+                services={selectedServiceList}
+                savingServiceId={savingService}
+                onRemove={(category) => void removeService(category)}
+              />
             )}
           </>
         );
@@ -465,11 +485,7 @@ export default function ShopProfilePage() {
 
   return (
     <ShopPageShell
-      pageHeading={
-        activeId === "services"
-          ? `${SECTION_TITLES.services} - ${getShopTypeLabel(shopType)}`
-          : (SECTION_TITLES[activeId] ?? "Profile")
-      }
+      pageHeading={SECTION_TITLES[activeId] ?? "Profile"}
       metaTitle="Profile | AutoDaddy"
       metaDescription="Auto shop owner profile"
       sidebarVariant="nav"

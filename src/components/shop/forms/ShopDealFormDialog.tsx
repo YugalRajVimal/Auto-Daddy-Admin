@@ -67,10 +67,10 @@ export default function ShopDealFormDialog({ open, mode, deal, onClose, onSaved 
           const name = String(o.company ?? o.name ?? "");
           const models = Array.isArray(o.models)
             ? (o.models as Array<Record<string, unknown>>).map((m) => ({
-                id: String(m.id ?? ""),
-                name: String(m.model ?? m.name ?? ""),
-                year: m.year != null ? String(m.year) : undefined,
-              }))
+              id: String(m.id ?? ""),
+              name: String(m.model ?? m.name ?? ""),
+              year: m.year != null ? String(m.year) : undefined,
+            }))
             : [];
           return { id, name, models };
         })
@@ -151,50 +151,50 @@ export default function ShopDealFormDialog({ open, mode, deal, onClose, onSaved 
       onClose={onClose}
       panelClassName="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-200 bg-white p-5 shadow-xl"
     >
-        <h2 className="mb-4 text-lg font-bold text-ad-purple">
-          {deal ? "Edit" : "Add"} {mode === "parts" ? "Parts" : "Service"} Deal
-        </h2>
-        <div className="space-y-3">
-          {mode === "service" ? (
-            <>
-              <select className={compactInputClass} value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
-                <option value="">Select service</option>
-                {serviceOptions.map((o) => (
-                  <option key={`${o.id}-${o.label}`} value={o.id}>{o.label}</option>
-                ))}
-              </select>
-              <input className={compactInputClass} placeholder="Product name" value={productName} onChange={(e) => setProductName(e.target.value)} />
-              <input className={compactInputClass} placeholder="Original price" value={price} onChange={(e) => setPrice(e.target.value)} />
-            </>
-          ) : (
-            <>
-              <input className={compactInputClass} placeholder="Part name" value={partName} onChange={(e) => setPartName(e.target.value)} />
-              <select className={compactInputClass} value={vehicleId} onChange={(e) => { setVehicleId(e.target.value); setVehicleModel(""); setVehicleYear(""); }}>
-                <option value="">Vehicle company</option>
-                {vehicleCatalog.map((v) => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-              </select>
-              <select className={compactInputClass} value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)}>
-                <option value="">Model</option>
-                {(selectedVehicle?.models ?? []).map((m) => (
-                  <option key={m.name} value={m.name}>{m.name}</option>
-                ))}
-              </select>
-              <input className={compactInputClass} placeholder="Year" value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} />
-            </>
-          )}
-          <input className={compactInputClass} placeholder="Discounted price *" value={discountedPrice} onChange={(e) => setDiscountedPrice(e.target.value)} />
-          <textarea className={compactInputClass} placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-          <input className={compactInputClass} type="date" value={offerEnd} onChange={(e) => setOfferEnd(e.target.value)} />
-          <input type="file" accept="image/*" onChange={(e) => setDealImage(e.target.files?.[0] ?? null)} />
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <button type="button" className={shopCancelButtonClass} onClick={onClose}>Cancel</button>
-          <button type="button" className={shopSaveButtonClass} disabled={saving} onClick={() => void handleSave()}>
-            {saving ? "Saving…" : "Save"}
-          </button>
-        </div>
+      <h2 className="mb-4 text-lg font-bold text-ad-purple">
+        {deal ? "Edit" : "Add"} {mode === "parts" ? "Parts" : "Service"} Deal
+      </h2>
+      <div className="space-y-3">
+        {mode === "service" ? (
+          <>
+            <select className={compactInputClass} value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
+              <option value="">Select service</option>
+              {serviceOptions.map((o) => (
+                <option key={`${o.id}-${o.label}`} value={o.id}>{o.label}</option>
+              ))}
+            </select>
+            <input className={compactInputClass} placeholder="Product name" value={productName} onChange={(e) => setProductName(e.target.value)} />
+            <input className={compactInputClass} placeholder="Original price" value={price} onChange={(e) => setPrice(e.target.value)} />
+          </>
+        ) : (
+          <>
+            <input className={compactInputClass} placeholder="Part name" value={partName} onChange={(e) => setPartName(e.target.value)} />
+            <select className={compactInputClass} value={vehicleId} onChange={(e) => { setVehicleId(e.target.value); setVehicleModel(""); setVehicleYear(""); }}>
+              <option value="">Vehicle company</option>
+              {vehicleCatalog.map((v) => (
+                <option key={v.id} value={v.id}>{v.name}</option>
+              ))}
+            </select>
+            <select className={compactInputClass} value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)}>
+              <option value="">Model</option>
+              {(selectedVehicle?.models ?? []).map((m) => (
+                <option key={m.name} value={m.name}>{m.name}</option>
+              ))}
+            </select>
+            <input className={compactInputClass} placeholder="Year" value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} />
+          </>
+        )}
+        <input className={compactInputClass} placeholder="Discounted price *" value={discountedPrice} onChange={(e) => setDiscountedPrice(e.target.value)} />
+        <textarea className={compactInputClass} placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+        <input className={compactInputClass} type="date" value={offerEnd} onChange={(e) => setOfferEnd(e.target.value)} />
+        <input type="file" accept="image/*" onChange={(e) => setDealImage(e.target.files?.[0] ?? null)} />
+      </div>
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" className={shopCancelButtonClass} onClick={onClose}>Cancel</button>
+        <button type="button" className={shopSaveButtonClass} disabled={saving} onClick={() => void handleSave()}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
     </ShopDialogMotion>
   );
 }
