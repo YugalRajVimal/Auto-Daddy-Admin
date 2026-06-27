@@ -41,7 +41,6 @@ export default function ShopHomePage() {
       metaDescription="Auto shop owner home"
       sidebarExtra={sidebarExtra}
       heroCard={false}
-      sidebarStretch
       onFaqsOpen={openFaqs}
       onFaqsClose={closeFaqs}
       faqsOpen={faqsOpen}

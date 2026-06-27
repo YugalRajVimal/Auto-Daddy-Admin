@@ -29,7 +29,6 @@ export default function ShopPageLayout() {
   const metaDescription = chrome.metaDescription ?? DEFAULT_SHOP_PAGE_CHROME.metaDescription!;
   const showBusinessCard = chrome.sidebarVariant === "business-card";
   const useHeroCard = chrome.heroCard !== false;
-  const sidebarStretch = chrome.sidebarStretch === true;
   const showSearch = chrome.searchPlaceholder != null;
   const showToolbar = showSearch || chrome.headerAction;
 
@@ -46,7 +45,7 @@ export default function ShopPageLayout() {
       loading={chrome.sidebarLoading}
       skeletonCount={chrome.sidebarSkeletonCount}
       shopStyle
-      className={sidebarStretch ? "lg:!h-full lg:!min-h-0 lg:!max-h-none" : "lg:!h-auto lg:!max-h-none"}
+      className="lg:!h-auto lg:!max-h-none"
     >
       {chrome.sidebarExtra}
     </ShopSidebar>
@@ -90,11 +89,7 @@ export default function ShopPageLayout() {
           className="order-1 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:justify-self-stretch"
         />
 
-        <div
-          className={`order-2 lg:col-start-1 lg:row-start-2 ${
-            sidebarStretch ? "flex min-h-0 flex-col lg:self-stretch" : "lg:self-start"
-          }`}
-        >
+        <div className="order-2 lg:col-start-1 lg:row-start-2 lg:self-start">
           {sidebarCell}
         </div>
 

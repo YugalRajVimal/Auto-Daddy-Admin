@@ -107,13 +107,13 @@ export default function ShopDealerAdCard({
     >
       <div
         className={`w-full shrink-0 overflow-hidden bg-gray-100 ${
-          fillHeight ? "min-h-[88px] flex-1" : "aspect-[4/3]"
+          fillHeight ? "min-h-[140px] flex-1" : "aspect-[3/4]"
         }`}
       >
         {hasPhoto ? (
           <img src={imageUrl} alt={imageAlt} className="h-full w-full object-cover" loading="lazy" decoding="async" />
         ) : (
-          <div className={`flex h-full items-center justify-center px-3 ${fillHeight ? "" : "min-h-[140px]"}`}>
+          <div className={`flex h-full items-center justify-center px-3 ${fillHeight ? "" : "min-h-[180px]"}`}>
             <p className="text-center text-sm font-bold leading-snug text-[#008000]">{title}</p>
           </div>
         )}

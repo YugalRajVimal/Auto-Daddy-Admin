@@ -8,6 +8,14 @@ export const shopHeroCardPaddingClass = "p-4 sm:p-8 md:p-14 lg:p-16 xl:p-20";
 export const shopMainContentShellClass =
   "flex h-[calc(100vh-11rem)] max-h-[calc(100vh-11rem)] min-h-[420px] w-full flex-col overflow-hidden rounded-lg lg:h-[calc(100vh-220px)] lg:max-h-[calc(100vh-220px)]";
 
+/** Max height for sidebar ad block aligned with the home hero card. */
+export const shopMainContentMaxHeightClass =
+  "max-h-[calc(100vh-11rem)] lg:max-h-[calc(100vh-220px)]";
+
+/** Height for sidebar ad block aligned with the home hero card. */
+export const shopMainContentHeightClass =
+  "h-[calc(100vh-11rem)] max-h-[calc(100vh-11rem)] lg:h-[calc(100vh-220px)] lg:max-h-[calc(100vh-220px)]";
+
 /** Scrollable region below the hero card toolbar (scroll works, scrollbar hidden). */
 export const shopHeroCardScrollClass =
   "no-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto";
