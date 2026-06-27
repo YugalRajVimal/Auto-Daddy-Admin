@@ -23,7 +23,12 @@ function AdIconButton({
 }: {
   href?: string | null;
   label: string;
-  icon: ComponentType<{ size?: number; strokeWidth?: number; "aria-hidden"?: boolean }>;
+  icon: ComponentType<{
+    className?: string;
+    size?: number;
+    strokeWidth?: number;
+    "aria-hidden"?: boolean;
+  }>;
   accent?: boolean;
   onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {

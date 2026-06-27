@@ -1049,6 +1049,15 @@ span.flatpickr-weekday,
   @apply max-w-[10rem];
 }
 
+select.shop-compact-input {
+  @apply min-h-0;
+}
+
+input.shop-compact-input[type="date"],
+input.shop-compact-input[type="time"] {
+  @apply min-h-0 appearance-none;
+}
+
 @keyframes shop-ad-curtain-enter-up {
   from {
     transform: translateY(100%);

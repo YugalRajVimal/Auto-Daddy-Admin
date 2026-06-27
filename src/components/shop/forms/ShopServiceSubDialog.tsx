@@ -5,7 +5,7 @@ import {
   CompactFormPanel,
   CompactFormRow,
 } from "../../admin/ContentPanel";
-import { shopCompactInputClass } from "../shopLayoutStyles";
+import { shopCompactInputClass, shopCompactTextareaClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { apiMessage, saveMyServices, updateMyServices } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
@@ -152,7 +152,7 @@ export default function ShopServiceSubDialog({
         </CompactField>
         <CompactField label="Description" className="min-w-[180px] flex-[2]">
           <textarea
-            className={`${shopCompactInputClass} resize-y`}
+            className={shopCompactTextareaClass}
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             rows={1}

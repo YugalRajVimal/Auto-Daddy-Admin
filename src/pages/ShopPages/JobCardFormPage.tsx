@@ -401,6 +401,7 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
               type="file"
               accept="image/*"
               multiple
+              className={shopCompactFileInputClass}
               onChange={(e) => setPhotos(Array.from(e.target.files ?? []).slice(0, MAX_JOB_CARD_VEHICLE_PHOTOS))}
             />
           </CompactField>

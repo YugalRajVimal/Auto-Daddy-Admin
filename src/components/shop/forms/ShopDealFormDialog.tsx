@@ -5,7 +5,7 @@ import {
   CompactFormPanel,
   CompactFormRow,
 } from "../../admin/ContentPanel";
-import { shopCompactInputClass, shopCompactTextareaClass } from "../shopLayoutStyles";
+import { shopCompactFileInputClass, shopCompactInputClass, shopCompactTextareaClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import {
   apiMessage,
@@ -235,7 +235,7 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
           <input className={shopCompactInputClass} type="date" value={offerEnd} onChange={(e) => setOfferEnd(e.target.value)} disabled={saving} />
         </CompactField>
         <CompactField label="Deal image" required={!isEditing}>
-          <input type="file" accept="image/*" onChange={(e) => setDealImage(e.target.files?.[0] ?? null)} disabled={saving} />
+          <input type="file" accept="image/*" className={shopCompactFileInputClass} onChange={(e) => setDealImage(e.target.files?.[0] ?? null)} disabled={saving} />
         </CompactField>
       </CompactFormRow>
 

@@ -7,7 +7,7 @@ import {
   CompactFormPanel,
   CompactFormRow,
 } from "../../admin/ContentPanel";
-import { shopCompactInputClass } from "../shopLayoutStyles";
+import { shopCompactFileInputClass, shopCompactInputClass } from "../shopLayoutStyles";
 import OwnerCityPicker from "../../owner/OwnerCityPicker";
 import { getJson } from "../../../api/mobileAuth";
 import { useAuth } from "../../../auth";
@@ -258,7 +258,7 @@ export default function ShopCustomerForm({
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="Profile Photo">
-            <input type="file" accept="image/*" onChange={(e) => setProfilePhoto(e.target.files?.[0] ?? null)} />
+            <input type="file" accept="image/*" className={shopCompactFileInputClass} onChange={(e) => setProfilePhoto(e.target.files?.[0] ?? null)} />
           </CompactField>
         </CompactFormRow>
 
@@ -349,6 +349,7 @@ export default function ShopCustomerForm({
                   <input
                     type="file"
                     accept="image/*"
+                    className={shopCompactFileInputClass}
                     onChange={(e) => updateVehicle(index, { vehicleImage: e.target.files?.[0] ?? null })}
                   />
                 </CompactField>
