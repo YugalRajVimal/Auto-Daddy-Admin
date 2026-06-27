@@ -430,9 +430,9 @@ function AddToListForm({
 }) {
   const { token, session } = useAuth();
   const countryCode = session?.meta?.countryCode ?? "+1";
-  const [name, setName] = useState(customer.name ?? "");
-  const [phone, setPhone] = useState(customer.phone ?? "");
-  const [city, setCity] = useState(customer.city ?? "");
+  const name = customer.name ?? "";
+  const phone = customer.phone ?? "";
+  const city = customer.city ?? "";
   const [email, setEmail] = useState(customer.email ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -939,7 +939,6 @@ export default function ShopPeoplePage() {
               <>
                 <ShopListPanel>
                   {paginatedCustomers.map((customer, index) => {
-                    const id = customerId(customer);
                     const rowIndex = (safePage - 1) * PAGE_SIZE + index;
                     const rowKey = customerRowKey(customer, String(rowIndex));
 
