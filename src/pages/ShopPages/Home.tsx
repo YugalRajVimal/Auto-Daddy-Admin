@@ -4,30 +4,19 @@ import ShopHomeAdsPanel from "../../components/shop/ShopHomeAdsPanel";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { usePartsDealers, type PartsDealerCard } from "../../hooks/usePartsDealers";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
-import type { SalvageDeal } from "../../lib/dummySalvageDeals";
 
 export default function ShopHomePage() {
   const { thoughtOfTheDay, faqsHeading, faqsDescription, loading } = useShopOwnerPortal();
   const { dealers, loading: dealersLoading } = usePartsDealers();
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [selectedPartsDealer, setSelectedPartsDealer] = useState<PartsDealerCard | null>(null);
-  const [selectedSalvageDeal, setSelectedSalvageDeal] = useState<SalvageDeal | null>(null);
-
-  const adDetailOpen = selectedPartsDealer != null || selectedSalvageDeal != null;
 
   const closeAdDetail = useCallback(() => {
     setSelectedPartsDealer(null);
-    setSelectedSalvageDeal(null);
   }, []);
 
   const handlePartsDealerSelect = useCallback((dealer: PartsDealerCard) => {
-    setSelectedSalvageDeal(null);
     setSelectedPartsDealer(dealer);
-  }, []);
-
-  const handleSalvageDealSelect = useCallback((deal: SalvageDeal) => {
-    setSelectedPartsDealer(null);
-    setSelectedSalvageDeal(deal);
   }, []);
 
   const openFaqs = useCallback(() => setFaqsOpen(true), []);
@@ -39,11 +28,10 @@ export default function ShopHomePage() {
         partsDealers={dealers}
         loading={dealersLoading}
         onPartsDealerSelect={handlePartsDealerSelect}
-        onSalvageDealSelect={handleSalvageDealSelect}
-        detailOpen={adDetailOpen}
+        detailOpen={selectedPartsDealer != null}
       />
     ),
-    [dealers, dealersLoading, handlePartsDealerSelect, handleSalvageDealSelect, adDetailOpen],
+    [dealers, dealersLoading, handlePartsDealerSelect, selectedPartsDealer],
   );
 
   return (
@@ -53,6 +41,7 @@ export default function ShopHomePage() {
       metaDescription="Auto shop owner home"
       sidebarExtra={sidebarExtra}
       heroCard={false}
+      sidebarStretch
       onFaqsOpen={openFaqs}
       onFaqsClose={closeFaqs}
       faqsOpen={faqsOpen}
@@ -63,7 +52,6 @@ export default function ShopHomePage() {
         thoughtOfTheDay={thoughtOfTheDay}
         loading={loading}
         partsDealer={selectedPartsDealer}
-        salvageDeal={selectedSalvageDeal}
         onAdClose={closeAdDetail}
       />
     </ShopPageShell>

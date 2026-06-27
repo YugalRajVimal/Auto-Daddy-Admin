@@ -120,12 +120,12 @@ export default function ShopSidebar({
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:pr-0.5">
         {heading ? <h2 className={headingClassName}>{heading}</h2> : null}
 
-        {children}
+        {children ? <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div> : null}
 
         {loading ? (
           <ShopSidebarButtonsSkeleton count={skeletonCount} />
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex shrink-0 flex-col gap-3">
             {items.map((item) =>
               shopStyle ? (
                 <ShopSidebarButton

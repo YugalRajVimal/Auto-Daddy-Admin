@@ -42,6 +42,8 @@ export type ShopPageChromeConfig = {
   sidebarVariant?: "business-card" | "nav";
   /** When false, uses the home hero layout instead of the profile background card. */
   heroCard?: boolean;
+  /** When true, sidebar column stretches to match the main content height (home ads + menu). */
+  sidebarStretch?: boolean;
   /** When false, keeps page content top-aligned inside the hero card instead of vertically centered. */
   contentTopOffset?: boolean;
 };
@@ -112,6 +114,7 @@ function isSameChromeConfig(prev: ShopPageChromeConfig, next: ShopPageChromeConf
     prev.pageHeading === next.pageHeading &&
     prev.sidebarVariant === next.sidebarVariant &&
     prev.heroCard === next.heroCard &&
+    prev.sidebarStretch === next.sidebarStretch &&
     prev.contentTopOffset === next.contentTopOffset
   );
 }

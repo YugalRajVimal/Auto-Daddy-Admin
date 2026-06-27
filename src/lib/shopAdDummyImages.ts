@@ -11,30 +11,6 @@ function svgDataUri(svg: string): string {
   return `data:image/svg+xml,${encodeURIComponent(svg.trim())}`;
 }
 
-function partsDealerDummySvg(title: string, subtitle: string, from: string, to: string): string {
-  const safeTitle = escapeXml(title);
-  const safeSubtitle = escapeXml(subtitle);
-  return svgDataUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img">
-      <defs>
-        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="${from}" />
-          <stop offset="100%" stop-color="${to}" />
-        </linearGradient>
-      </defs>
-      <rect width="400" height="300" fill="url(#bg)" />
-      <rect x="28" y="36" width="344" height="168" rx="16" fill="rgba(255,255,255,0.14)" />
-      <circle cx="120" cy="120" r="34" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="8" />
-      <circle cx="120" cy="120" r="12" fill="rgba(255,255,255,0.9)" />
-      <rect x="188" y="88" width="148" height="18" rx="9" fill="rgba(255,255,255,0.85)" />
-      <rect x="188" y="118" width="112" height="14" rx="7" fill="rgba(255,255,255,0.55)" />
-      <rect x="188" y="142" width="132" height="14" rx="7" fill="rgba(255,255,255,0.45)" />
-      <text x="200" y="238" text-anchor="middle" fill="#ffffff" font-family="system-ui,sans-serif" font-size="22" font-weight="700">${safeTitle}</text>
-      <text x="200" y="264" text-anchor="middle" fill="rgba(255,255,255,0.88)" font-family="system-ui,sans-serif" font-size="14" font-weight="600">${safeSubtitle}</text>
-    </svg>
-  `);
-}
-
 function salvageDummySvg(partName: string, company: string, from: string, to: string): string {
   const safePart = escapeXml(partName);
   const safeCompany = escapeXml(company);
@@ -61,9 +37,10 @@ function salvageDummySvg(partName: string, company: string, from: string, to: st
 }
 
 const PARTS_DEALER_DUMMY_IMAGES = [
-  partsDealerDummySvg("Auto Parts", "Warehouse stock", "#0b6e4f", "#008000"),
-  partsDealerDummySvg("Spares Depot", "OEM & aftermarket", "#1d4ed8", "#2563eb"),
-  partsDealerDummySvg("Supply Center", "Fast local delivery", "#7c3aed", "#9b308d"),
+  "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?q=80&w=400&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=400&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?q=80&w=400&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1542362567-b07e54358753?q=80&w=400&auto=format&fit=crop",
 ] as const;
 
 const SALVAGE_DUMMY_IMAGES = [

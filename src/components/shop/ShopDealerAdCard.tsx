@@ -103,11 +103,11 @@ export default function ShopDealerAdCard({
       }
       className={`flex w-full flex-col overflow-hidden rounded-lg border border-gray-200/80 bg-white shadow-lg ${
         onClick ? "cursor-pointer transition-shadow hover:shadow-xl" : ""
-      } ${className}`}
+      } ${fillHeight ? "h-full min-h-0" : ""} ${className}`}
     >
       <div
-        className={`w-full overflow-hidden bg-gray-100 ${
-          fillHeight ? "min-h-0 flex-1" : "aspect-[4/3]"
+        className={`w-full shrink-0 overflow-hidden bg-gray-100 ${
+          fillHeight ? "min-h-[88px] flex-1" : "aspect-[4/3]"
         }`}
       >
         {hasPhoto ? (
@@ -119,14 +119,16 @@ export default function ShopDealerAdCard({
         )}
       </div>
 
-      <div className="shrink-0 bg-[#008000] px-3 py-2.5 text-center text-sm font-bold text-white">{title}</div>
+      <div className="shrink-0 bg-[#008000] px-2 py-2 text-center text-xs font-bold text-white sm:px-3 sm:py-2.5 sm:text-sm">
+        {title}
+      </div>
 
-      <div className="flex shrink-0 flex-col items-center gap-2.5 bg-white px-3 py-3">
-        <div className="w-full bg-[#d4ffd4] px-3 py-1.5 text-center text-sm font-bold text-[#008000]">
+      <div className="flex shrink-0 flex-col items-center gap-2 bg-white px-2 py-2.5 sm:gap-2.5 sm:px-3 sm:py-3">
+        <div className="w-full bg-[#d4ffd4] px-2 py-1 text-center text-xs font-bold text-[#008000] sm:px-3 sm:py-1.5 sm:text-sm">
           {location}
         </div>
 
-        <div className="flex w-full flex-wrap items-center justify-center gap-3">
+        <div className="flex w-full flex-wrap items-center justify-center gap-2.5 sm:gap-3">
           <AdIconButton
             href={phoneDigits ? `tel:${phoneDigits}` : null}
             label="Call"
@@ -148,7 +150,7 @@ export default function ShopDealerAdCard({
           />
         </div>
 
-        <div className="w-full border border-gray-300 bg-white px-3 py-2 text-center text-xs font-semibold text-[#008000]">
+        <div className="w-full border border-gray-300 bg-white px-2 py-1.5 text-center text-[11px] font-semibold leading-snug text-[#008000] sm:px-3 sm:py-2 sm:text-xs">
           {tagline}
         </div>
       </div>

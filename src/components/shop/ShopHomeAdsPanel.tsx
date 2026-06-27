@@ -1,24 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { GridIcon } from "../../icons";
 import type { PartsDealerCard } from "../../hooks/usePartsDealers";
-import { DUMMY_SALVAGE_DEALS, type SalvageDeal } from "../../lib/dummySalvageDeals";
 import ShopAdDetailDialog from "./ShopAdDetailDialog";
 import ShopDealerCard from "./ShopDealerCard";
-import ShopSalvageCard from "./ShopSalvageCard";
-import { shopMainContentShellClass } from "./shopLayoutStyles";
 
 const ROTATE_MS = 5000;
 const CURTAIN_MS = 550;
 
-export type ShopAdPhase = "parts" | "salvage";
+const adMenuButtonClass =
+  "flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#006600] bg-white text-[#006600] shadow-sm transition-colors hover:bg-[#DFFFD6]";
+
 type SlideDirection = 1 | -1;
 
 type ShopHomeAdsPanelProps = {
   partsDealers: PartsDealerCard[];
   loading?: boolean;
-  salvageDeals?: SalvageDeal[];
-  onPhaseChange?: (phase: ShopAdPhase) => void;
   onPartsDealerSelect?: (dealer: PartsDealerCard) => void;
-  onSalvageDealSelect?: (deal: SalvageDeal) => void;
+  onMenuClick?: () => void;
   /** Pauses carousel rotation while ad detail is shown elsewhere (e.g. hero card). */
   detailOpen?: boolean;
 };
@@ -42,17 +40,53 @@ function curtainClass(index: number, activeIndex: number, leavingIndex: number |
   return `${base} pointer-events-none z-0 opacity-0`;
 }
 
+function ShopAdMenuButton({ onClick }: { onClick?: () => void }) {
+  return (
+    <button type="button" aria-label="Ad menu" className={adMenuButtonClass} onClick={onClick}>
+      <GridIcon className="h-8 w-8" aria-hidden />
+    </button>
+  );
+}
+
+function ShopAdPanelShell({ children }: { children: ReactNode }) {
+  return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
+}
+
+function ShopAdMenuSlot({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center py-3">{children}</div>
+  );
+}
+function ShopAdCardSkeleton() {
+  return (
+    <div
+      className="w-full animate-pulse overflow-hidden rounded-lg border border-gray-200/80 bg-white shadow-lg"
+      aria-busy="true"
+      aria-label="Loading ads"
+    >
+      <div className="aspect-[4/3] bg-gray-200" />
+      <div className="h-9 bg-[#008000]/70" />
+      <div className="space-y-2 px-3 py-3">
+        <div className="h-7 rounded bg-[#d4ffd4]" />
+        <div className="flex justify-center gap-3">
+          <div className="h-5 w-5 rounded-full bg-gray-200" />
+          <div className="h-5 w-5 rounded-full bg-gray-200" />
+          <div className="h-5 w-5 rounded-full bg-gray-200" />
+        </div>
+        <div className="h-8 rounded border border-gray-200 bg-gray-100" />
+      </div>
+    </div>
+  );
+}
+
 export default function ShopHomeAdsPanel({
   partsDealers,
   loading,
-  salvageDeals = DUMMY_SALVAGE_DEALS,
-  onPhaseChange,
   onPartsDealerSelect,
-  onSalvageDealSelect,
+  onMenuClick,
   detailOpen = false,
 }: ShopHomeAdsPanelProps) {
-  const useExternalDetail = onPartsDealerSelect != null || onSalvageDealSelect != null;
-  const [phase, setPhase] = useState<ShopAdPhase>("parts");
+  const useExternalDetail = onPartsDealerSelect != null;
   const [activeIndex, setActiveIndex] = useState(0);
   const [leavingIndex, setLeavingIndex] = useState<number | null>(null);
   const [direction, setDirection] = useState<SlideDirection>(1);
@@ -60,17 +94,12 @@ export default function ShopHomeAdsPanel({
   const [hovered, setHovered] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedPartsDealer, setSelectedPartsDealer] = useState<PartsDealerCard | null>(null);
-  const [selectedSalvageDeal, setSelectedSalvageDeal] = useState<SalvageDeal | null>(null);
-  const [visitedParts, setVisitedParts] = useState<Set<number>>(() => new Set());
-  const [visitedSalvage, setVisitedSalvage] = useState<Set<number>>(() => new Set());
   const curtainTimerRef = useRef<number | null>(null);
   const transitioningRef = useRef(false);
   const activeIndexRef = useRef(0);
-  const visitedPartsRef = useRef(visitedParts);
-  const visitedSalvageRef = useRef(visitedSalvage);
 
-  const items = phase === "parts" ? partsDealers : salvageDeals;
-  const hasMultiple = items.length > 1;
+  const hasMultiple = partsDealers.length > 1;
+  const activeDealer = partsDealers[activeIndex];
   const partsDealersKey = useMemo(
     () => partsDealers.map((dealer) => dealer.name).join("\0"),
     [partsDealers],
@@ -80,14 +109,6 @@ export default function ShopHomeAdsPanel({
     activeIndexRef.current = activeIndex;
   }, [activeIndex]);
 
-  useEffect(() => {
-    visitedPartsRef.current = visitedParts;
-  }, [visitedParts]);
-
-  useEffect(() => {
-    visitedSalvageRef.current = visitedSalvage;
-  }, [visitedSalvage]);
-
   const clearCurtainTimer = useCallback(() => {
     if (curtainTimerRef.current !== null) {
       window.clearTimeout(curtainTimerRef.current);
@@ -95,29 +116,6 @@ export default function ShopHomeAdsPanel({
     }
     transitioningRef.current = false;
   }, []);
-
-  const switchToParts = useCallback(() => {
-    clearCurtainTimer();
-    setLeavingIndex(null);
-    setPhase("parts");
-    setActiveIndex(0);
-    setDirection(1);
-    setVisitedParts(new Set());
-    setVisitedSalvage(new Set());
-    setTimerKey((key) => key + 1);
-    onPhaseChange?.("parts");
-  }, [clearCurtainTimer, onPhaseChange]);
-
-  const switchToSalvage = useCallback(() => {
-    clearCurtainTimer();
-    setLeavingIndex(null);
-    setPhase("salvage");
-    setActiveIndex(0);
-    setDirection(1);
-    setVisitedSalvage(new Set());
-    setTimerKey((key) => key + 1);
-    onPhaseChange?.("salvage");
-  }, [clearCurtainTimer, onPhaseChange]);
 
   const startCurtainTransition = useCallback(
     (current: number, next: number, dir: SlideDirection) => {
@@ -140,162 +138,113 @@ export default function ShopHomeAdsPanel({
   );
 
   const advance = useCallback(() => {
-    if (items.length === 0 || transitioningRef.current) return;
+    if (partsDealers.length === 0 || transitioningRef.current) return;
 
     const current = activeIndexRef.current;
-    const next = (current + 1) % items.length;
-
-    if (phase === "parts" && partsDealers.length > 0) {
-      const updated = new Set(visitedPartsRef.current);
-      updated.add(current);
-      visitedPartsRef.current = updated;
-      setVisitedParts(updated);
-      if (updated.size >= partsDealers.length && next === 0) {
-        switchToSalvage();
-        return;
-      }
-    }
-
-    if (phase === "salvage" && salvageDeals.length > 0) {
-      const updated = new Set(visitedSalvageRef.current);
-      updated.add(current);
-      visitedSalvageRef.current = updated;
-      setVisitedSalvage(updated);
-      if (updated.size >= salvageDeals.length && next === 0) {
-        switchToParts();
-        return;
-      }
-    }
+    const next = (current + 1) % partsDealers.length;
 
     if (current !== next) {
       startCurtainTransition(current, next, 1);
     }
-  }, [items.length, partsDealers.length, phase, salvageDeals.length, startCurtainTransition, switchToParts, switchToSalvage]);
+  }, [partsDealers.length, startCurtainTransition]);
 
   useEffect(() => {
     clearCurtainTimer();
     setLeavingIndex(null);
-    setPhase("parts");
     setActiveIndex(0);
     setDirection(1);
-    setVisitedParts(new Set());
-    setVisitedSalvage(new Set());
     setTimerKey((key) => key + 1);
-    onPhaseChange?.("parts");
-  }, [clearCurtainTimer, partsDealersKey, onPhaseChange]);
+  }, [clearCurtainTimer, partsDealersKey]);
 
   useEffect(() => () => clearCurtainTimer(), [clearCurtainTimer]);
 
   const paused = hovered || dialogOpen || detailOpen || leavingIndex !== null;
 
   useEffect(() => {
-    if (loading || paused || items.length === 0) return;
+    if (loading || paused || partsDealers.length === 0) return;
 
     const timer = window.setInterval(advance, ROTATE_MS);
     return () => window.clearInterval(timer);
-  }, [advance, paused, items.length, loading, timerKey]);
+  }, [advance, paused, partsDealers.length, loading, timerKey]);
 
   const openPartsDialog = (dealer: PartsDealerCard) => {
     if (onPartsDealerSelect) {
       onPartsDealerSelect(dealer);
       return;
     }
-    setSelectedSalvageDeal(null);
     setSelectedPartsDealer(dealer);
-    setDialogOpen(true);
-  };
-
-  const openSalvageDialog = (deal: SalvageDeal) => {
-    if (onSalvageDealSelect) {
-      onSalvageDealSelect(deal);
-      return;
-    }
-    setSelectedPartsDealer(null);
-    setSelectedSalvageDeal(deal);
     setDialogOpen(true);
   };
 
   const closeDialog = () => {
     setDialogOpen(false);
     setSelectedPartsDealer(null);
-    setSelectedSalvageDeal(null);
   };
 
   if (loading) {
     return (
-      <div
-        className={`${shopMainContentShellClass} w-full animate-pulse space-y-3 rounded-lg border border-gray-200/80 bg-white p-4 shadow-lg`}
-        aria-busy="true"
-        aria-label="Loading ads"
-      >
-        <div className="min-h-0 flex-1 rounded-lg bg-gray-200" />
-        <div className="h-4 w-3/4 shrink-0 rounded bg-gray-200" />
-        <div className="h-4 w-1/2 shrink-0 rounded bg-gray-200" />
-      </div>
+      <ShopAdPanelShell>
+        <div className="shrink-0">
+          <ShopAdCardSkeleton />
+        </div>
+        <ShopAdMenuSlot>
+          <ShopAdMenuButton />
+        </ShopAdMenuSlot>
+      </ShopAdPanelShell>
     );
   }
 
-  if (items.length === 0) {
+  if (partsDealers.length === 0 || !activeDealer) {
     return null;
   }
 
   return (
     <>
-      <div
-          className={`relative ${shopMainContentShellClass} w-full overflow-hidden`}
+      <ShopAdPanelShell>
+        <div
+          className="relative w-full shrink-0"
           aria-live="polite"
           aria-atomic="true"
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
-          <div key={phase} className="relative h-full w-full">
-            {phase === "parts"
-              ? partsDealers.map((dealer, index) => (
-                  <div
-                    key={`${dealer.name}-${index}`}
-                    className={curtainClass(index, activeIndex, leavingIndex, direction)}
-                    aria-hidden={index !== activeIndex}
-                  >
-                    <ShopDealerCard
-                      name={dealer.name}
-                      phone={dealer.phone}
-                      imageUrl={dealer.imageUrl}
-                      city={dealer.city}
-                      website={dealer.website}
-                      specialty={dealer.specialty}
-                      className="h-full"
-                      onClick={() => openPartsDialog(dealer)}
-                    />
-                  </div>
-                ))
-              : salvageDeals.map((deal, index) => (
-                  <div
-                    key={deal.id}
-                    className={curtainClass(index, activeIndex, leavingIndex, direction)}
-                    aria-hidden={index !== activeIndex}
-                  >
-                    <ShopSalvageCard
-                      partName={deal.partName}
-                      company={deal.company}
-                      price={deal.price}
-                      imageUrl={deal.imageUrl}
-                      year={deal.year}
-                      className="h-full"
-                      onClick={() => openSalvageDialog(deal)}
-                    />
-                  </div>
-                ))}
+          <div className="pointer-events-none invisible" aria-hidden="true">
+            <ShopDealerCard
+              name={activeDealer.name}
+              phone={activeDealer.phone}
+              imageUrl={activeDealer.imageUrl}
+              city={activeDealer.city}
+              website={activeDealer.website}
+              specialty={activeDealer.specialty}
+            />
+          </div>
+
+          <div className="absolute inset-0 overflow-hidden rounded-lg">
+            {partsDealers.map((dealer, index) => (
+              <div
+                key={`${dealer.name}-${index}`}
+                className={curtainClass(index, activeIndex, leavingIndex, direction)}
+                aria-hidden={index !== activeIndex}
+              >
+                <ShopDealerCard
+                  name={dealer.name}
+                  phone={dealer.phone}
+                  imageUrl={dealer.imageUrl}
+                  city={dealer.city}
+                  website={dealer.website}
+                  specialty={dealer.specialty}
+                  className="h-full"
+                  onClick={() => openPartsDialog(dealer)}
+                />
+              </div>
+            ))}
           </div>
 
           {hasMultiple ? (
             <div className="pointer-events-none absolute left-0 right-0 top-2 z-30 flex justify-center gap-1.5">
-              {items.map((item, index) => (
+              {partsDealers.map((dealer, index) => (
                 <span
-                  key={
-                    phase === "parts"
-                      ? `dot-${(item as PartsDealerCard).name}-${index}`
-                      : (item as SalvageDeal).id
-                  }
+                  key={`dot-${dealer.name}-${index}`}
                   className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
                     index === activeIndex ? "bg-white" : "bg-white/45"
                   }`}
@@ -304,14 +253,18 @@ export default function ShopHomeAdsPanel({
               ))}
             </div>
           ) : null}
-      </div>
+        </div>
+
+        <ShopAdMenuSlot>
+          <ShopAdMenuButton onClick={onMenuClick} />
+        </ShopAdMenuSlot>
+      </ShopAdPanelShell>
 
       {useExternalDetail ? null : (
         <ShopAdDetailDialog
           open={dialogOpen}
           onClose={closeDialog}
           partsDealer={selectedPartsDealer}
-          salvageDeal={selectedSalvageDeal}
         />
       )}
     </>
