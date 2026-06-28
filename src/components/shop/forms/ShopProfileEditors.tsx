@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router";
-import { FiEdit2, FiPaperclip, FiX } from "react-icons/fi";
+import { FiEdit2, FiPaperclip, FiTrash2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson } from "../../../api/mobileAuth";
 import {
@@ -8,7 +9,6 @@ import {
   CompactFormPanel,
   CompactFormRow,
 } from "../../admin/ContentPanel";
-import { AdminDataTable, tableCell } from "../../admin/AdminDataTable";
 import {
   ADMIN_PANEL_THEAD_ROW_CLASS,
   adminPanelRowClass,
@@ -16,7 +16,7 @@ import {
 } from "../../admin/adminPanelTableStyles";
 
 const SHOP_TABLE = adminPanelTableClasses(true);
-import { shopCompactInputClass } from "../shopLayoutStyles";
+import { shopCompactInputClass, shopProfileEditingRowClass, shopProfileFormPanelClass, shopProfileFormPanelFooterClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
 import {
@@ -52,7 +52,7 @@ import CarBrandLogo, {
   CAR_BRAND_EMBLEM_LOGO_CLASS,
   CAR_BRAND_EMBLEM_SLOT_CLASS,
 } from "../CarBrandLogo";
-import { getCarBrandId, getCarBrandName, resolveCarBrandLogo } from "../../../lib/dummyCarBrands";
+import { getCarBrandId, getCarBrandName } from "../../../lib/dummyCarBrands";
 import { getServiceId, getServiceName } from "../../../lib/dummyServices";
 import { parseCitiesApiResponse } from "../../../lib/carOwnerCities";
 import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
@@ -225,7 +225,7 @@ function ProfileStatusFooter({
   actions: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-4 py-1">
+    <div className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}>
       <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
         {message}
       </div>
@@ -418,6 +418,7 @@ export function ShopPersonalProfileEditor({
 
   return (
     <CompactFormPanel
+      className={shopProfileFormPanelClass}
       footer={
         <ProfileFormFooter
           message={
@@ -642,6 +643,7 @@ export function ShopBusinessProfileEditor({
 
   return (
     <CompactFormPanel
+      className={shopProfileFormPanelClass}
       footer={
         <ProfileFormFooter
           message={
@@ -963,7 +965,7 @@ export function ShopOpenHoursEditor({
       ) : null}
       <ShopReveal show={showForm}>
         <CompactFormPanel
-          className="!mb-0 shadow-none"
+          className={shopProfileFormPanelClass}
           showBottomBorder={false}
           footer={
             <ShopHoursFormFooter
@@ -1069,7 +1071,7 @@ export function ShopOpenHoursEditor({
                   <tr
                     key={day}
                     className={
-                      isEditingRow ? "bg-ad-form-required-bg" : adminPanelRowClass(index)
+                      isEditingRow ? shopProfileEditingRowClass : adminPanelRowClass(index)
                     }
                   >
                     <td className={SHOP_TABLE.tdCheckbox}>
@@ -1132,7 +1134,81 @@ export type ShopCarCompany = {
   logoUrl?: string | null;
 };
 
-const CAR_BRANDS_PER_PAGE = 10;
+const CAR_BRAND_EMBLEM_TOOLTIP_SIZE_PX = 50;
+const CAR_BRAND_EMBLEM_TOOLTIP_GAP_PX = 4;
+
+function CarBrandEmblemTooltip({ company }: { company: ShopCarCompany }) {
+  const name = getCarBrandName(company);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    setCoords({
+      top: Math.max(
+        8,
+        rect.top - CAR_BRAND_EMBLEM_TOOLTIP_SIZE_PX - CAR_BRAND_EMBLEM_TOOLTIP_GAP_PX
+      ),
+      left: rect.left + rect.width / 2,
+    });
+  }, []);
+
+  const showTooltip = () => {
+    updatePosition();
+    setOpen(true);
+  };
+
+  const hideTooltip = () => setOpen(false);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open, updatePosition]);
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        onFocus={showTooltip}
+        onBlur={hideTooltip}
+        className="inline-flex h-7 w-7 cursor-default items-center justify-center rounded text-blue-600 hover:text-ad-purple"
+        aria-label={`${name} emblem`}
+        tabIndex={0}
+      >
+        <FiPaperclip size={13} aria-hidden />
+      </span>
+      {open
+        ? createPortal(
+            <div
+              role="tooltip"
+              className="pointer-events-none fixed z-[10000] -translate-x-1/2"
+              style={{ top: coords.top, left: coords.left }}
+            >
+              <div className="flex size-[50px] items-center justify-center overflow-hidden rounded border border-gray-300 bg-white shadow-lg">
+                <CarBrandLogo
+                  company={company}
+                  className="h-[50px] w-[50px] object-contain"
+                  alt={`${name} emblem`}
+                />
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+    </>
+  );
+}
 
 export function ShopCarBrandList({
   brands,
@@ -1143,7 +1219,6 @@ export function ShopCarBrandList({
   savingBrandId?: string | null;
   onRemove: (company: ShopCarCompany) => void;
 }) {
-  const [previewBrand, setPreviewBrand] = useState<ShopCarCompany | null>(null);
   const sortedBrands = useMemo(
     () =>
       [...brands].sort((a, b) =>
@@ -1151,102 +1226,57 @@ export function ShopCarBrandList({
       ),
     [brands]
   );
-
-  const tableColumns = useMemo(
-    () => [
-      {
-        key: "name",
-        label: "Name of Car Brand",
-        render: (company: ShopCarCompany) =>
-          tableCell(
-            <span className="font-medium text-blue-700">{getCarBrandName(company)}</span>,
-            undefined,
-            true,
-          ),
-        exportValue: (company: ShopCarCompany) => getCarBrandName(company),
-      },
-      {
-        key: "emblem",
-        label: "Amblem",
-        render: (company: ShopCarCompany) => {
-          const name = getCarBrandName(company);
-          return tableCell(
-            <button
-              type="button"
-              title={`View ${name} emblem`}
-              aria-label={`View ${name} emblem`}
-              onClick={() => setPreviewBrand(company)}
-              style={{
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                padding: 0,
-                color: "#2563eb",
-                display: "inline-flex",
-                alignItems: "center",
-              }}
-            >
-              <FiPaperclip size={16} aria-hidden />
-            </button>,
-            undefined,
-            true,
-          );
-        },
-        exportValue: () => "",
-      },
-    ],
-    []
-  );
+  const actionHeadClass = SHOP_TABLE.th.replace("text-left", "text-center");
 
   return (
-    <>
-      <AdminDataTable
-        items={sortedBrands}
-        columns={tableColumns}
-        getRowId={(company) => getCarBrandId(company)}
-        pageSize={CAR_BRANDS_PER_PAGE}
-        pageSizeOptions={[10, 25, 50]}
-        showStandardToolbar={false}
-        showColSelector={false}
-        showSearch={false}
-        compact
-        exportFilename="car-brands"
-        renderActions={(company) => {
-          const id = getCarBrandId(company);
-          const name = getCarBrandName(company);
-          return (
-            <button
-              type="button"
-              title={`Remove ${name}`}
-              aria-label={`Remove ${name}`}
-              disabled={savingBrandId === id}
-              onClick={() => onRemove(company)}
-              style={{
-                border: "none",
-                background: "transparent",
-                cursor: savingBrandId === id ? "not-allowed" : "pointer",
-                color: "#dc2626",
-                opacity: savingBrandId === id ? 0.6 : 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 4,
-              }}
-            >
-              <FiX size={16} aria-hidden />
-            </button>
-          );
-        }}
-      />
-      {previewBrand ? (
-        <ProfileImagePreviewModal
-          open
-          title={`${getCarBrandName(previewBrand)} emblem`}
-          imageUrl={resolveCarBrandLogo(previewBrand)}
-          onClose={() => setPreviewBrand(null)}
-        />
-      ) : null}
-    </>
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+      className="shop-hero-surface rounded border border-gray-300 bg-white shadow-sm"
+    >
+      <div className="overflow-x-auto">
+        <table className={SHOP_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE.th}>Name of Car Brand</th>
+              <th className={actionHeadClass}>Amblem</th>
+              <th className={actionHeadClass}>Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedBrands.map((company, index) => {
+              const id = getCarBrandId(company);
+              const name = getCarBrandName(company);
+              const isSaving = savingBrandId === id;
+              return (
+                <tr key={id} className={adminPanelRowClass(index)}>
+                  <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{name}</td>
+                  <td className={SHOP_TABLE.td}>
+                    <div className="flex justify-center">
+                      <CarBrandEmblemTooltip company={company} />
+                    </div>
+                  </td>
+                  <td className={SHOP_TABLE.td}>
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        title={`Delete ${name}`}
+                        aria-label={`Delete ${name}`}
+                        disabled={isSaving}
+                        onClick={() => onRemove(company)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-red-600 hover:text-red-800 disabled:opacity-60"
+                      >
+                        <FiTrash2 size={13} aria-hidden />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
   );
 }
 
@@ -1311,7 +1341,8 @@ export function ShopCarBrandAddEditor({
 
   return (
     <CompactFormPanel
-      className="mb-4"
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
       footer={
         <ProfileFormFooter
           message="You are adding a car brand"
@@ -1359,14 +1390,35 @@ export function ShopCarBrandAddEditor({
   );
 }
 
+function todayISODate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatServiceTableDate(service: ShopServiceCategory): string {
+  const raw = service.createdAt ?? service.updatedAt;
+  if (raw && raw.length >= 10) return raw.slice(0, 10);
+  return todayISODate();
+}
+
+function getServiceStatusLabel(service: ShopServiceCategory): string {
+  return service.isActive === false ? "Inactive" : "Active";
+}
+
+export type ShopServiceFormMeta = {
+  createdAt: string;
+  isActive: boolean;
+};
+
 export function ShopServiceList({
   services,
   savingServiceId,
-  onRemove,
+  editingServiceId,
+  onEdit,
 }: {
   services: ShopServiceCategory[];
   savingServiceId?: string | null;
-  onRemove: (service: ShopServiceCategory) => void;
+  editingServiceId?: string | null;
+  onEdit: (service: ShopServiceCategory) => void;
 }) {
   const sortedServices = useMemo(
     () =>
@@ -1375,74 +1427,83 @@ export function ShopServiceList({
       ),
     [services]
   );
-
-  const tableColumns = useMemo(
-    () => [
-      {
-        key: "name",
-        label: "Main Service",
-        render: (service: ShopServiceCategory) =>
-          tableCell(
-            <span className="font-medium text-blue-700">{getServiceName(service)}</span>,
-            undefined,
-            true,
-          ),
-        exportValue: (service: ShopServiceCategory) => getServiceName(service),
-      },
-      {
-        key: "shopType",
-        label: "Match with",
-        render: (service: ShopServiceCategory) =>
-          tableCell(getShopTypeLabel(service.shopType), undefined, true),
-        exportValue: (service: ShopServiceCategory) => getShopTypeLabel(service.shopType),
-      },
-    ],
-    []
-  );
+  const editHeadClass = `${SHOP_TABLE.th} text-center`;
 
   return (
-    <AdminDataTable
-      items={sortedServices}
-      columns={tableColumns}
-      getRowId={(service) => getServiceId(service)}
-      showStandardToolbar={false}
-      showColSelector={false}
-      showSearch={false}
-      compact
-      exportFilename="operational-services"
-      renderActions={(service) => {
-        const id = getServiceId(service);
-        const name = getServiceName(service);
-        return (
-          <button
-            type="button"
-            title={`Remove ${name}`}
-            aria-label={`Remove ${name}`}
-            disabled={savingServiceId === id}
-            onClick={() => onRemove(service)}
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: savingServiceId === id ? "not-allowed" : "pointer",
-              color: "#dc2626",
-              opacity: savingServiceId === id ? 0.6 : 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 4,
-            }}
-          >
-            <FiX size={16} aria-hidden />
-          </button>
-        );
-      }}
-    />
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+      className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+    >
+      <div className="overflow-x-auto">
+        <table className={SHOP_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE.th}>Name of Service</th>
+              <th className={SHOP_TABLE.th}>Vendor Type</th>
+              <th className={SHOP_TABLE.th}>Date</th>
+              <th className={SHOP_TABLE.th}>Status</th>
+              <th className={editHeadClass}>Edit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedServices.map((service, index) => {
+              const id = getServiceId(service);
+              const name = getServiceName(service);
+              const isEditingRow = editingServiceId === id;
+              const isInactive = service.isActive === false;
+              const isSaving = savingServiceId === id;
+              return (
+                <tr
+                  key={id}
+                  className={
+                    isEditingRow ? shopProfileEditingRowClass : adminPanelRowClass(index)
+                  }
+                >
+                  <td
+                    className={`${SHOP_TABLE.td} font-semibold ${isInactive ? "text-ad-purple" : "text-blue-700"}`}
+                  >
+                    {name}
+                  </td>
+                  <td
+                    className={`${SHOP_TABLE.td} font-semibold ${isInactive ? "text-ad-purple" : "text-gray-800"}`}
+                  >
+                    {getShopTypeLabel(service.shopType)}
+                  </td>
+                  <td className={`${SHOP_TABLE.td} ${isInactive ? "text-ad-purple" : ""}`}>
+                    {formatServiceTableDate(service)}
+                  </td>
+                  <td
+                    className={`${SHOP_TABLE.td} font-semibold ${isInactive ? "text-ad-purple" : ""}`}
+                  >
+                    {getServiceStatusLabel(service)}
+                  </td>
+                  <td className={`${SHOP_TABLE.td} text-center`}>
+                    <button
+                      type="button"
+                      title={`Edit ${name}`}
+                      aria-label={`Edit ${name}`}
+                      disabled={isSaving}
+                      onClick={() => onEdit(service)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple disabled:opacity-60"
+                    >
+                      <FiEdit2 size={13} aria-hidden />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
   );
 }
 
 export function ShopServiceAddEditor({
   services,
   selectedIds,
+  selectedServices,
   shopType,
   editingId,
   onSaved,
@@ -1451,12 +1512,17 @@ export function ShopServiceAddEditor({
 }: {
   services: ShopServiceCategory[];
   selectedIds: Set<string>;
+  selectedServices?: ShopServiceCategory[];
   shopType?: string | null;
   editingId?: string | null;
   onSaved: (id: string) => void;
   onClose?: () => void;
   /** When set, handles save locally. Return true if handled, false to fall through to API. */
-  onSaveService?: (id: string, replacesId?: string) => Promise<boolean> | boolean;
+  onSaveService?: (
+    id: string,
+    replacesId?: string,
+    meta?: ShopServiceFormMeta
+  ) => Promise<boolean> | boolean;
 }) {
   const { token } = useAuth();
   const defaultVendorType = normalizeShopType(shopType);
@@ -1467,19 +1533,33 @@ export function ShopServiceAddEditor({
     return id && (!selectedIds.has(id) || id === editingId);
   });
   const [serviceId, setServiceId] = useState(editingId ?? "");
+  const [serviceDate, setServiceDate] = useState(todayISODate());
+  const [serviceActive, setServiceActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const isEditing = Boolean(editingId);
 
+  const resetFormFields = (nextServiceId = "", nextDate = todayISODate(), nextActive = true) => {
+    setServiceId(nextServiceId);
+    setServiceDate(nextDate);
+    setServiceActive(nextActive);
+  };
+
   useEffect(() => {
     if (editingId) {
-      const editing = services.find((service) => getServiceId(service) === editingId);
+      const editing =
+        selectedServices?.find((service) => getServiceId(service) === editingId) ??
+        services.find((service) => getServiceId(service) === editingId);
       setVendorType(normalizeShopType(editing?.shopType ?? shopType));
-      setServiceId(editingId);
+      resetFormFields(
+        editingId,
+        formatServiceTableDate(editing ?? { id: editingId, subServices: [] }),
+        editing?.isActive !== false
+      );
       return;
     }
     setVendorType(defaultVendorType);
-    setServiceId("");
-  }, [defaultVendorType, editingId, services, shopType]);
+    resetFormFields();
+  }, [defaultVendorType, editingId, selectedServices, services, shopType]);
 
   const handleVendorTypeChange = (nextType: ShopType) => {
     setVendorType(nextType);
@@ -1490,7 +1570,7 @@ export function ShopServiceAddEditor({
   };
 
   const handleCancel = () => {
-    setServiceId("");
+    resetFormFields();
     setVendorType(defaultVendorType);
     onClose?.();
   };
@@ -1500,8 +1580,29 @@ export function ShopServiceAddEditor({
       toast.error("Please select a service.");
       return;
     }
+
+    const meta: ShopServiceFormMeta = {
+      createdAt: serviceDate,
+      isActive: serviceActive,
+    };
+
     if (isEditing && serviceId === editingId) {
-      handleCancel();
+      setSaving(true);
+      try {
+        if (onSaveService) {
+          const handled = await onSaveService(serviceId, undefined, meta);
+          if (handled) {
+            toast.success("Service updated.");
+            onSaved(serviceId);
+            return;
+          }
+        }
+        if (!token) return;
+        toast.success("Service updated.");
+        onSaved(serviceId);
+      } finally {
+        setSaving(false);
+      }
       return;
     }
 
@@ -1512,10 +1613,10 @@ export function ShopServiceAddEditor({
     setSaving(true);
     try {
       if (onSaveService) {
-        const handled = await onSaveService(serviceId, editingId ?? undefined);
+        const handled = await onSaveService(serviceId, editingId ?? undefined, meta);
         if (handled) {
           toast.success(isEditing ? "Service updated." : "Service added.");
-          setServiceId("");
+          resetFormFields();
           onSaved(serviceId);
           return;
         }
@@ -1527,7 +1628,7 @@ export function ShopServiceAddEditor({
         return;
       }
       toast.success(isEditing ? "Service updated." : "Service added.");
-      setServiceId("");
+      resetFormFields();
       onSaved(serviceId);
     } finally {
       setSaving(false);
@@ -1536,7 +1637,8 @@ export function ShopServiceAddEditor({
 
   return (
     <CompactFormPanel
-      className="mb-4"
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
       footer={
         <ProfileFormFooter
           message={isEditing ? "You are updating a service" : "You are adding a service"}
@@ -1549,12 +1651,21 @@ export function ShopServiceAddEditor({
       }
     >
       <CompactFormRow className="items-end">
-        <CompactField label="Main Service">
+        <CompactField label="Date">
+          <input
+            type="date"
+            className={shopCompactInputClass}
+            value={serviceDate}
+            disabled={saving}
+            onChange={(e) => setServiceDate(e.target.value)}
+          />
+        </CompactField>
+        <CompactField label="Name of Service">
           <select
             className={shopCompactInputClass}
             value={serviceId}
             onChange={(e) => setServiceId(e.target.value)}
-            disabled={!isEditing && available.length === 0}
+            disabled={saving || (!isEditing && available.length === 0)}
           >
             <option value="">
               {!isEditing && available.length === 0
@@ -1572,10 +1683,11 @@ export function ShopServiceAddEditor({
             })}
           </select>
         </CompactField>
-        <CompactField label="Vendor Type">
+        <CompactField label="Match Vendor Type">
           <select
             className={shopCompactInputClass}
             value={vendorType}
+            disabled={saving}
             onChange={(e) => handleVendorTypeChange(normalizeShopType(e.target.value))}
           >
             {SHOP_TYPE_OPTIONS.map((option) => (
@@ -1583,6 +1695,17 @@ export function ShopServiceAddEditor({
                 {option.label}
               </option>
             ))}
+          </select>
+        </CompactField>
+        <CompactField label="Status">
+          <select
+            className={shopCompactInputClass}
+            value={serviceActive ? "active" : "inactive"}
+            disabled={saving}
+            onChange={(e) => setServiceActive(e.target.value === "active")}
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </CompactField>
       </CompactFormRow>

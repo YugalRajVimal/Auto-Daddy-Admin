@@ -215,6 +215,15 @@ export function parseMyServices(payload: unknown): ShopServiceCategory[] {
       id,
       name: s(o.name) ?? (nested ? s(nested.name) : undefined),
       desc: s(o.desc) ?? s(o.description) ?? (nested ? s(nested.desc) : undefined),
+      shopType: s(o.shopType) ?? (nested ? s(nested.shopType) : undefined),
+      createdAt: s(o.createdAt) ?? (nested ? s(nested.createdAt) : undefined),
+      updatedAt: s(o.updatedAt) ?? (nested ? s(nested.updatedAt) : undefined),
+      isActive:
+        typeof o.isActive === "boolean"
+          ? o.isActive
+          : nested && typeof nested.isActive === "boolean"
+            ? nested.isActive
+            : undefined,
       subServices,
     });
   }

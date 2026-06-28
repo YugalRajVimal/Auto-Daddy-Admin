@@ -173,20 +173,28 @@ export function ShopServiceTileSkeleton() {
   );
 }
 
-/** Profile table — car brands (2 cols) or operational services (3 cols). */
-export function ShopProfileTableSkeleton({ columns = 2, rows = 3 }: { columns?: 2 | 3; rows?: number }) {
+/** Profile table — car brands (2 cols), operational services (5 cols), or legacy (3 cols). */
+export function ShopProfileTableSkeleton({ columns = 2, rows = 3 }: { columns?: 2 | 3 | 5; rows?: number }) {
   const headerCols =
-    columns === 3
-      ? "grid-cols-[1fr_1fr_auto]"
-      : "grid-cols-[1fr_auto]";
+    columns === 5
+      ? "grid-cols-[1fr_1fr_1fr_1fr_auto]"
+      : columns === 3
+        ? "grid-cols-[1fr_1fr_auto]"
+        : "grid-cols-[1fr_auto]";
   const rowCols = headerCols;
 
   return (
     <div className="overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
       <div className={`grid ${headerCols} gap-4 border-b border-gray-300 bg-gray-100 px-4 py-2.5`}>
         <Skeleton className="h-3.5 w-28 rounded" />
-        <Skeleton className="h-3.5 w-24 rounded" />
-        {columns === 3 ? <Skeleton className="ml-auto h-3.5 w-12 rounded" /> : null}
+        {columns >= 3 ? <Skeleton className="h-3.5 w-24 rounded" /> : null}
+        {columns >= 5 ? (
+          <>
+            <Skeleton className="h-3.5 w-20 rounded" />
+            <Skeleton className="h-3.5 w-16 rounded" />
+          </>
+        ) : null}
+        {columns >= 3 ? <Skeleton className="ml-auto h-3.5 w-12 rounded" /> : null}
       </div>
       {Array.from({ length: rows }, (_, index) => (
         <div
@@ -196,10 +204,15 @@ export function ShopProfileTableSkeleton({ columns = 2, rows = 3 }: { columns?: 
           }`}
         >
           <Skeleton className="h-3.5 w-24 rounded" />
-          {columns === 3 ? <Skeleton className="h-3.5 w-28 rounded" /> : null}
+          {columns >= 3 ? <Skeleton className="h-3.5 w-28 rounded" /> : null}
+          {columns >= 5 ? (
+            <>
+              <Skeleton className="h-3.5 w-20 rounded" />
+              <Skeleton className="h-3.5 w-16 rounded" />
+            </>
+          ) : null}
           <div className="flex items-center justify-end gap-2">
-            {columns === 3 ? <Skeleton className="h-7 w-7 rounded" /> : <Skeleton className="h-8 w-12 rounded" />}
-            <Skeleton className="h-7 w-7 rounded" />
+            {columns === 3 ? <Skeleton className="h-7 w-7 rounded" /> : <Skeleton className="h-7 w-7 rounded" />}
           </div>
         </div>
       ))}
@@ -219,24 +232,32 @@ export function ShopOperationalServicesSkeleton() {
       <div className="relative rounded border border-ad-form-border bg-ad-form-bg shadow-sm">
         <div className="space-y-4 px-4 py-4">
           <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
-            <div className="min-w-[180px] flex-1 space-y-2">
-              <Skeleton className="h-3 w-24 rounded" />
+            <div className="min-w-[140px] flex-1 space-y-2">
+              <Skeleton className="h-3 w-12 rounded" />
               <Skeleton className="h-9 w-full rounded-md border border-gray-200 bg-white" />
             </div>
             <div className="min-w-[180px] flex-1 space-y-2">
-              <Skeleton className="h-3 w-24 rounded" />
+              <Skeleton className="h-3 w-28 rounded" />
+              <Skeleton className="h-9 w-full rounded-md border border-gray-200 bg-white" />
+            </div>
+            <div className="min-w-[180px] flex-1 space-y-2">
+              <Skeleton className="h-3 w-32 rounded" />
+              <Skeleton className="h-9 w-full rounded-md border border-gray-200 bg-white" />
+            </div>
+            <div className="min-w-[140px] flex-1 space-y-2">
+              <Skeleton className="h-3 w-16 rounded" />
               <Skeleton className="h-9 w-full rounded-md border border-gray-200 bg-white" />
             </div>
           </div>
         </div>
-        <div className="border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+        <div className="border-t border-ad-purple bg-[#FDE4D0] px-3 py-2.5">
           <div className="flex items-center justify-end gap-2">
             <Skeleton className="h-8 w-24 rounded" />
             <Skeleton className="h-4 w-16 rounded" />
           </div>
         </div>
       </div>
-      <ShopProfileTableSkeleton columns={3} rows={3} />
+      <ShopProfileTableSkeleton columns={5} rows={3} />
     </div>
   );
 }

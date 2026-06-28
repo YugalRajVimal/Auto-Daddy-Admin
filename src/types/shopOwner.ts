@@ -74,6 +74,9 @@ export type ShopServiceCategory = {
   name?: string;
   desc?: string;
   shopType?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  isActive?: boolean;
   subServices: { id?: string; name: string; desc: string; price: number }[];
 };
 

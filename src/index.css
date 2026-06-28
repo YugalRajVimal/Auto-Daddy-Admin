@@ -291,6 +291,12 @@
     border-color: var(--color-ad-form-border);
   }
 
+  .shop-hero-card .shop-profile-form-panel-footer,
+  .shop-hero-card .shop-profile-editing-row {
+    background: #fde4d0;
+    border-color: var(--color-ad-purple);
+  }
+
   .shop-hero-card .bg-ad-glass {
     background: #ffffff;
     backdrop-filter: none;

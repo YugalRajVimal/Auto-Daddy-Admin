@@ -101,3 +101,13 @@ export const shopCompactReadOnlyClass =
 /** Compact file picker for shop forms. */
 export const shopCompactFileInputClass =
   "block w-full text-xs leading-tight text-gray-700 file:mr-2 file:h-[26px] file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-0 file:text-xs file:font-semibold file:text-gray-700";
+
+/** Profile add/edit form card body — default form panel styling. */
+export const shopProfileFormPanelClass = "!mb-0 shadow-none";
+
+/** Profile add/edit form footer strip — matches unselected sidebar nav pill tone. */
+export const shopProfileFormPanelFooterClass =
+  "shop-profile-form-panel-footer border-t border-ad-purple bg-[#FDE4D0]";
+
+/** Highlight for the table row currently being edited in profile sections. */
+export const shopProfileEditingRowClass = "shop-profile-editing-row bg-[#FDE4D0]";
