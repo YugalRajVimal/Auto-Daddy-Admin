@@ -142,9 +142,8 @@ function WalletInvoiceRow({
         <p className="mt-0.5 text-sm font-bold leading-tight text-blue-700">{bill.id}</p>
       </div>
       <div
-        className={`flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-5 ${
-          isPaid ? "bg-[#c6efce]" : "bg-[#ffeBD6]"
-        }`}
+        className={`flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-5 ${isPaid ? "bg-[#c6efce]" : "bg-[#ffeBD6]"
+          }`}
       >
         <div className="min-w-0 shrink-0 sm:max-w-[34%]">
           <p className="truncate text-sm font-bold text-[#008000]">{row.customerName ?? "—"}</p>
@@ -196,11 +195,10 @@ function WalletPagination({
                 key={pageNumber}
                 type="button"
                 onClick={() => onPageChange(pageNumber)}
-                className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
-                  isActive
+                className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${isActive
                     ? "bg-[#008000] text-white"
                     : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
-                }`}
+                  }`}
                 aria-current={isActive ? "page" : undefined}
               >
                 {pageNumber}

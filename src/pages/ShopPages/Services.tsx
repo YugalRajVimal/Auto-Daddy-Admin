@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FiEdit2, FiPaperclip, FiX } from "react-icons/fi";
+import { motion } from "framer-motion";
 import { toast } from "react-toastify";
-import { AdminDataTable, tableCell } from "../../components/admin/AdminDataTable";
-import ShopServiceSubDialog from "../../components/shop/forms/ShopServiceSubDialog";
-import { ShopReveal, ShopViewTransition } from "../../components/shop/ShopAnimated";
-import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
-  ShopEmptyPanel,
-  ShopErrorPanel,
-  ShopLoadingPanel,
-} from "../../components/shop/ShopPanels";
-import { shopHeroCardBodyClass } from "../../components/shop/shopLayoutStyles";
+  ADMIN_PANEL_THEAD_ROW_CLASS,
+  adminPanelRowClass,
+  adminPanelTableClasses,
+  type AdminPanelTableClasses,
+} from "../../components/admin/adminPanelTableStyles";
+import ShopServiceSubDialog from "../../components/shop/forms/ShopServiceSubDialog";
+import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
+import { ShopReveal } from "../../components/shop/ShopAnimated";
+import ShopPageShell from "../../components/shop/ShopPageShell";
+import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
+import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
@@ -18,132 +21,144 @@ import { getDummyMyServices } from "../../lib/dummyServices";
 import { apiMessage, removeMyServiceSubServices } from "../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../types/shopOwner";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
+const SERVICES_SEARCH_INPUT_ID = "shop-services-sub-search";
 
-type IndexedSubService = ShopServiceCategory["subServices"][number] & { _index: number };
+const SHOP_TABLE_BASE = adminPanelTableClasses(true);
+const SHOP_TABLE: AdminPanelTableClasses = {
+  ...SHOP_TABLE_BASE,
+  th: SHOP_TABLE_BASE.th.replace("px-2", "px-4"),
+  thCheckbox: SHOP_TABLE_BASE.thCheckbox.replace("px-2", "px-4"),
+  td: SHOP_TABLE_BASE.td.replace("px-2", "px-4"),
+  tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
+};
+
+type SubService = ShopServiceCategory["subServices"][number];
 
 function formatPrice(price: number): string {
   return price % 1 === 0 ? price.toFixed(0) : price.toFixed(2);
 }
 
-function editingRowStyle(isEditing: boolean): CSSProperties | undefined {
-  return isEditing ? { background: "#d4fcd4" } : undefined;
+function AddNewButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={shopAddNewButtonClass}>
+      + Add New
+    </button>
+  );
+}
+
+function ServicesSearchBar({
+  value,
+  onChange,
+  inputId,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  inputId: string;
+}) {
+  return (
+    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-end gap-2 border-b border-gray-300 bg-[#d1d5db] px-2 py-1.5 sm:gap-3">
+      <label htmlFor={inputId} className="text-sm font-semibold text-gray-700">
+        Search
+      </label>
+      <input
+        id={inputId}
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-[26px] w-full max-w-xs border border-gray-400 bg-white px-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none sm:max-w-sm"
+      />
+    </div>
+  );
+}
+
+function matchesSubServiceSearch(sub: SubService, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [sub.name, sub.desc, formatPrice(sub.price)]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
 }
 
 function SubServiceTable({
-  subs,
-  safePage,
-  editingIndex,
+  rows,
   deletingIndex,
   onEdit,
   onDelete,
-  onPageChange,
 }: {
-  subs: ShopServiceCategory["subServices"];
-  safePage: number;
-  editingIndex: number | null;
+  rows: { sub: SubService; originalIndex: number }[];
   deletingIndex: number | null;
-  onEdit: (index: number) => void;
-  onDelete: (index: number) => void;
-  onPageChange: (page: number) => void;
+  onEdit: (originalIndex: number) => void;
+  onDelete: (originalIndex: number) => void;
 }) {
-  const indexedSubs = useMemo<IndexedSubService[]>(
-    () => subs.map((sub, index) => ({ ...sub, _index: index })),
-    [subs],
-  );
-
-  const tableColumns = useMemo(
-    () => [
-      {
-        key: "name",
-        label: "Sub - Category",
-        render: (sub: IndexedSubService) =>
-          tableCell(
-            <span className="font-semibold text-blue-700">{sub.name}</span>,
-            editingRowStyle(editingIndex === sub._index),
-            true,
-          ),
-        exportValue: (sub: IndexedSubService) => sub.name,
-      },
-      {
-        key: "desc",
-        label: "Discription",
-        render: (sub: IndexedSubService) =>
-          tableCell(sub.desc || "—", editingRowStyle(editingIndex === sub._index), true),
-        exportValue: (sub: IndexedSubService) => sub.desc || "—",
-      },
-      {
-        key: "price",
-        label: "Price",
-        render: (sub: IndexedSubService) =>
-          tableCell(
-            <span style={{ fontWeight: 600 }}>$ {formatPrice(sub.price)}</span>,
-            editingRowStyle(editingIndex === sub._index),
-            true,
-          ),
-        exportValue: (sub: IndexedSubService) => formatPrice(sub.price),
-      },
-    ],
-    [editingIndex],
-  );
+  const actionHeadClass = `${SHOP_TABLE.th} text-center`;
 
   return (
-    <AdminDataTable
-      items={indexedSubs}
-      columns={tableColumns}
-      getRowId={(sub) => sub.id ?? `${sub.name}-${sub._index}`}
-      emptyMessage="No sub-services yet."
-      pageSize={PAGE_SIZE}
-      pageSizeOptions={[5, 10, 25]}
-      currentPage={safePage}
-      onCurrentPageChange={onPageChange}
-      showStandardToolbar={false}
-      showColSelector={false}
-      showSearch={false}
-      compact
-      exportFilename="sub-services"
-      renderActions={(sub) => {
-        const isDeleting = deletingIndex === sub._index;
-        return (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
-            <button
-              type="button"
-              title="Attachment"
-              aria-label={`View attachment for ${sub.name}`}
-              style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4, color: "#555" }}
-            >
-              <FiPaperclip size={16} />
-            </button>
-            <button
-              type="button"
-              title="Edit"
-              aria-label={`Edit ${sub.name}`}
-              onClick={() => onEdit(sub._index)}
-              style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4, color: "#6b21a8" }}
-            >
-              <FiEdit2 size={16} />
-            </button>
-            <button
-              type="button"
-              title="Delete"
-              aria-label={`Delete ${sub.name}`}
-              disabled={isDeleting}
-              onClick={() => onDelete(sub._index)}
-              style={{
-                border: "none",
-                background: "transparent",
-                cursor: isDeleting ? "not-allowed" : "pointer",
-                padding: 4,
-                color: "#dc2626",
-                opacity: isDeleting ? 0.5 : 1,
-              }}
-            >
-              <FiX size={18} />
-            </button>
-          </div>
-        );
-      }}
-    />
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+      className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+    >
+      <div className="overflow-x-auto">
+        <table className={SHOP_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE.th}>Sub - Category</th>
+              <th className={SHOP_TABLE.th}>Description</th>
+              <th className={SHOP_TABLE.th}>Price</th>
+              <th className={actionHeadClass}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ sub, originalIndex }, index) => {
+              const isDeleting = deletingIndex === originalIndex;
+              return (
+                <tr key={sub.id ?? `${sub.name}-${originalIndex}`} className={adminPanelRowClass(index)}>
+                  <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{sub.name}</td>
+                  <td className={SHOP_TABLE.td}>{sub.desc?.trim() || "—"}</td>
+                  <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                    $ {formatPrice(sub.price)}
+                  </td>
+                  <td className={`${SHOP_TABLE.td} text-center`}>
+                    <div className="inline-flex items-center justify-center gap-0.5">
+                      <button
+                        type="button"
+                        title={`View attachment for ${sub.name}`}
+                        aria-label={`View attachment for ${sub.name}`}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
+                      >
+                        <FiPaperclip size={13} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        title={`Edit ${sub.name}`}
+                        aria-label={`Edit ${sub.name}`}
+                        onClick={() => onEdit(originalIndex)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
+                      >
+                        <FiEdit2 size={13} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        title={`Delete ${sub.name}`}
+                        aria-label={`Delete ${sub.name}`}
+                        disabled={isDeleting}
+                        onClick={() => onDelete(originalIndex)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-red-600 hover:text-red-700 disabled:opacity-50"
+                      >
+                        <FiX size={14} aria-hidden />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
   );
 }
 
@@ -155,6 +170,7 @@ export default function ShopServicesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const { categories: apiCategories, loading, error, refresh } = useShopServices();
   const [categories, setCategories] = useState<ShopServiceCategory[]>([]);
@@ -182,9 +198,20 @@ export default function ShopServicesPage() {
   const activeCategory: ShopServiceCategory | null =
     categories.find((c) => c.id === activeCategoryId) ?? categories[0] ?? null;
 
-  const subs = activeCategory?.subServices ?? [];
-  const totalPages = Math.max(1, Math.ceil(subs.length / PAGE_SIZE));
+  const allSubs = activeCategory?.subServices ?? [];
+
+  const filteredSubs = useMemo(() => {
+    const q = search.trim();
+    if (!q) return allSubs;
+    return allSubs.filter((sub) => matchesSubServiceSearch(sub, q));
+  }, [allSubs, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredSubs.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
+  const paginatedSubs = useMemo(
+    () => filteredSubs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filteredSubs, safePage],
+  );
 
   useEffect(() => {
     if (categories.length > 0 && !categories.some((c) => c.id === activeCategoryId)) {
@@ -196,7 +223,12 @@ export default function ShopServicesPage() {
     setPage(1);
     setFormOpen(false);
     setEditIndex(null);
+    setSearch("");
   }, [activeCategoryId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -217,7 +249,12 @@ export default function ShopServicesPage() {
   const openEditForm = (index: number) => {
     setEditIndex(index);
     setFormOpen(true);
-    setPage(Math.floor(index / PAGE_SIZE) + 1);
+    const filteredIndex = filteredSubs.findIndex(
+      (sub) => sub === allSubs[index],
+    );
+    if (filteredIndex >= 0) {
+      setPage(Math.floor(filteredIndex / PAGE_SIZE) + 1);
+    }
   };
 
   const handleDelete = async (index: number) => {
@@ -255,24 +292,36 @@ export default function ShopServicesPage() {
     }
   };
 
+  const paginatedRows = useMemo(
+    () =>
+      paginatedSubs.map((sub) => ({
+        sub,
+        originalIndex: allSubs.findIndex(
+          (candidate) => candidate.id === sub.id && candidate.name === sub.name,
+        ),
+      })),
+    [paginatedSubs, allSubs],
+  );
+
+  const emptyMessage =
+    allSubs.length === 0
+      ? "No sub-services yet."
+      : search.trim()
+        ? "No sub-services match your search."
+        : "No sub-services yet.";
+
+  const showAddNewAction = activeCategory != null && !formOpen;
+
   return (
     <ShopPageShell
+      title="Services"
       pageHeading={activeCategory?.name ?? "My Services"}
       metaTitle="Services | AutoDaddy"
       metaDescription="Auto shop services"
-      headerAction={
-        activeCategory && !formOpen ? (
-          <button
-            type="button"
-            className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white hover:bg-[#006600]"
-            onClick={openAddForm}
-          >
-            + Add New
-          </button>
-        ) : undefined
-      }
-      sidebarLoading={loading}
-      sidebarSkeletonCount={5}
+      sidebarVariant="nav"
+      heroBackgroundImage={false}
+      contentTopOffset
+      heroCardFlush
       sidebarItems={categories.map((cat) => ({
         id: cat.id,
         label: cat.name ?? "Category",
@@ -286,21 +335,30 @@ export default function ShopServicesPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <ShopViewTransition
-        viewKey={`${activeCategoryId ?? "none"}-${formOpen ? (editIndex ?? "add") : "list"}`}
-        className={`${shopHeroCardBodyClass} gap-4`}
-      >
+      <div className="space-y-1">
         {loading ? (
-          <ShopLoadingPanel variant="media-card" count={5} />
+          <ShopListSkeleton variant="profile-table" className="w-full" />
         ) : error && !usingDummy ? (
           <ShopErrorPanel message={error} onRetry={() => void refresh()} />
         ) : categories.length === 0 ? (
-          <ShopEmptyPanel
-            message="No service categories yet. Select services from Profile → Operational Services."
-          />
+          <p className="text-center text-sm text-gray-600">
+            No service categories yet. Select services from Profile → Operational Services.
+          </p>
         ) : activeCategory ? (
           <>
-            <ShopReveal show={formOpen} className="mb-4">
+            <ServicesSearchBar
+              value={search}
+              onChange={setSearch}
+              inputId={SERVICES_SEARCH_INPUT_ID}
+            />
+
+            {showAddNewAction ? (
+              <div className="flex min-h-[2rem] items-center justify-end gap-2">
+                <AddNewButton onClick={openAddForm} />
+              </div>
+            ) : null}
+
+            <ShopReveal show={formOpen}>
               <ShopServiceSubDialog
                 category={activeCategory}
                 editIndex={editIndex}
@@ -318,18 +376,47 @@ export default function ShopServicesPage() {
               />
             </ShopReveal>
 
-            <SubServiceTable
-              subs={subs}
-              safePage={safePage}
-              editingIndex={formOpen ? editIndex : null}
-              deletingIndex={deletingIndex}
-              onEdit={openEditForm}
-              onDelete={(index) => void handleDelete(index)}
-              onPageChange={setPage}
-            />
+            {filteredSubs.length === 0 && !formOpen ? (
+              <p className="text-center text-sm text-gray-600">{emptyMessage}</p>
+            ) : filteredSubs.length > 0 ? (
+              <>
+                <SubServiceTable
+                  rows={paginatedRows}
+                  deletingIndex={deletingIndex}
+                  onEdit={openEditForm}
+                  onDelete={(index) => void handleDelete(index)}
+                />
+
+                <ShopListFooter className="text-sm font-semibold text-gray-600">
+                  <p>{filteredSubs.length} Entries</p>
+                  {totalPages > 1 ? (
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
+                        const isActive = pageNumber === safePage;
+                        return (
+                          <button
+                            key={pageNumber}
+                            type="button"
+                            onClick={() => setPage(pageNumber)}
+                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
+                              isActive
+                                ? "bg-gray-500 text-white"
+                                : "border border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                            }`}
+                            aria-current={isActive ? "page" : undefined}
+                          >
+                            {pageNumber}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </ShopListFooter>
+              </>
+            ) : null}
           </>
         ) : null}
-      </ShopViewTransition>
+      </div>
     </ShopPageShell>
   );
 }

@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
-import { FiEdit2 } from "react-icons/fi";
+import { FiEdit2, FiPaperclip } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { getJson } from "../../api/mobileAuth";
 import {
   CompactField,
-  CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
   compactFixedFieldWidth,
+  ContentPanel,
 } from "../../components/admin/ContentPanel";
 import {
   ADMIN_PANEL_THEAD_ROW_CLASS,
@@ -22,8 +23,8 @@ import { ShopReveal } from "../../components/shop/ShopAnimated";
 import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import {
   shopCompactInputClass,
-  shopCompactReadOnlyClass,
   shopProfileFormPanelClass,
+  shopProfileFormPanelFooterClass,
 } from "../../components/shop/shopLayoutStyles";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import {
@@ -33,7 +34,6 @@ import {
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopCustomers } from "../../hooks/useShopCustomers";
-import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import {
   addCarOwnerToMyCustomers,
   apiMessage,
@@ -43,6 +43,7 @@ import {
 import { searchCarOwners } from "../../lib/shopOwnerApi";
 import { parseCitiesApiResponse } from "../../lib/carOwnerCities";
 import { formatPhoneDisplay, formatPhoneLabel, phoneDigits } from "../../lib/phoneFormat";
+import { resolveCarBrandLogo } from "../../lib/dummyCarBrands";
 import { parseMyCustomers } from "../../lib/shopOwnerParsers";
 import type { CustomerVehicle, MyCustomer } from "../../types/shopOwner";
 
@@ -50,7 +51,8 @@ type PeopleSection = "customers" | "my-list" | "approval";
 
 type DetailView =
   | { kind: "add-to-list"; customer: MyCustomer }
-  | { kind: "customer-info"; customer: MyCustomer; vehicleIndex: number };
+  | { kind: "customer-info"; customer: MyCustomer; vehicleIndex: number }
+  | { kind: "vehicle-list"; customer: MyCustomer };
 
 const PEOPLE_SECTIONS = [
   { id: "customers", label: "Customers", variant: "primary" as const },
@@ -76,17 +78,10 @@ const SHOP_TABLE: AdminPanelTableClasses = {
   tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
 };
 
-const shopBulkButtonClass =
-  "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
-
 const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
 
 function customerTableRowKey(customer: MyCustomer, index: number) {
   return customerId(customer) || `row-${index}`;
-}
-
-function vehicleTableRowKey(vehicle: CustomerVehicle, index: number) {
-  return vehicle._id ?? vehicle.vId ?? `${vehicle.licensePlateNo ?? "vehicle"}-${index}`;
 }
 
 function AddNewButton({ onClick }: { onClick: () => void }) {
@@ -94,6 +89,63 @@ function AddNewButton({ onClick }: { onClick: () => void }) {
     <button type="button" onClick={onClick} className={shopAddNewButtonClass}>
       + Add New
     </button>
+  );
+}
+
+function PeopleFormFooter({
+  message,
+  saving = false,
+  saveLabel,
+  savingLabel,
+  onSave,
+  onCancel,
+  cancelLabel = "Cancel",
+}: {
+  message: string;
+  saving?: boolean;
+  saveLabel: string;
+  savingLabel?: string;
+  onSave: () => void;
+  onCancel: () => void;
+  cancelLabel?: string;
+}) {
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
+    >
+      <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
+        {message}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
+        >
+          {saving ? (savingLabel ?? "Saving…") : saveLabel}
+        </button>
+        <span className="text-xs text-gray-700">
+          or{" "}
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+          >
+            {cancelLabel}
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function PeopleFormError({ message }: { message: string }) {
+  return (
+    <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+      {message}
+    </div>
   );
 }
 
@@ -126,15 +178,41 @@ function customerId(c: MyCustomer) {
   return c.carOwnerId ?? c.id ?? c._id ?? "";
 }
 
+function mapCustomerVehiclesForUpdate(customer: MyCustomer) {
+  return (customer.vehicles ?? []).map((v) => ({
+    ...(v.vId ?? v._id ? { vId: v.vId ?? v._id } : {}),
+    licensePlateNo: v.licensePlateNo?.trim() ?? "",
+    vinNo: v.vinNo?.trim(),
+    vehicleName: v.vehicleName?.trim() ?? "",
+    model: v.model?.trim() ?? "",
+    year: v.year?.trim() ?? "",
+    odometerReading: v.odometerReading?.trim(),
+  }));
+}
+
 
 function vehicleCount(customer: MyCustomer) {
   return customer.vehicles?.length ?? 0;
 }
 
-function vehicleLabel(v: CustomerVehicle) {
-  const make = v.vehicleName?.trim() || "—";
-  const model = v.model?.trim();
-  return model ? `${make} - ${model}` : make;
+function vehicleRowKey(vehicle: CustomerVehicle, index: number) {
+  return vehicle.vId ?? vehicle._id ?? `vehicle-${index}`;
+}
+
+function vehicleMakeName(vehicle: CustomerVehicle) {
+  return vehicle.vehicleName?.trim() || "—";
+}
+
+function vehicleModelLabel(vehicle: CustomerVehicle) {
+  const model = vehicle.model?.trim();
+  const year = vehicle.year?.trim();
+  if (model && year) return `${model} - ${year}`;
+  return model || year || vehicleMakeName(vehicle);
+}
+
+function vehicleFieldValue(value?: string | null) {
+  const trimmed = value?.trim();
+  return trimmed || "—";
 }
 
 function isPendingApproval(customer: MyCustomer): boolean {
@@ -170,29 +248,202 @@ function matchesMyCustomerSearch(customer: MyCustomer, query: string): boolean {
   return haystack.includes(q);
 }
 
-function customerProfileSrc(customer: MyCustomer): string | null {
-  const raw =
-    (customer as MyCustomer & { profilePhoto?: string; profileImage?: string }).profilePhoto ??
-    (customer as MyCustomer & { profilePhoto?: string; profileImage?: string }).profileImage;
-  return raw ? normalizeMediaUrl(raw) : null;
-}
-
 function StatusBanner({ message }: { message: string }) {
   return (
     <p className="mt-3 text-center text-sm font-semibold text-blue-700">{message}</p>
   );
 }
 
+const CUSTOMER_EMAIL_TOOLTIP_GAP_PX = 12;
+
+function CustomerEmailClip({ email }: { email?: string | null }) {
+  const label = email?.trim() || "No email on file";
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  const updatePosition = useCallback((clientX: number, clientY: number) => {
+    setCoords({
+      top: clientY,
+      left: clientX - CUSTOMER_EMAIL_TOOLTIP_GAP_PX,
+    });
+  }, []);
+
+  const showTooltip = (event: React.MouseEvent<HTMLSpanElement>) => {
+    updatePosition(event.clientX, event.clientY);
+    setOpen(true);
+  };
+
+  const moveTooltip = (event: React.MouseEvent<HTMLSpanElement>) => {
+    updatePosition(event.clientX, event.clientY);
+  };
+
+  const showFocusTooltip = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    updatePosition(rect.left, rect.top + rect.height / 2);
+    setOpen(true);
+  };
+
+  const hideTooltip = () => setOpen(false);
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        onMouseEnter={showTooltip}
+        onMouseMove={moveTooltip}
+        onMouseLeave={hideTooltip}
+        onFocus={showFocusTooltip}
+        onBlur={hideTooltip}
+        className="inline-flex h-7 w-7 cursor-default items-center justify-center rounded text-blue-600 hover:text-ad-purple"
+        aria-label={`Email: ${label}`}
+        tabIndex={0}
+      >
+        <FiPaperclip size={13} aria-hidden />
+      </span>
+      {open
+        ? createPortal(
+          <div
+            role="tooltip"
+            className="pointer-events-none fixed z-[10000] -translate-x-full -translate-y-1/2 whitespace-nowrap rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-800 shadow-sm"
+            style={{ top: coords.top, left: coords.left }}
+          >
+            {label}
+          </div>,
+          document.body
+        )
+        : null}
+    </>
+  );
+}
+
+function VehicleInfoField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 flex-1">
+      <p className="mb-1 text-[11px] font-bold text-gray-700">{label}</p>
+      <div className="min-h-[26px] truncate rounded border border-gray-300 bg-gray-200/90 px-2 py-0.5 text-sm font-semibold leading-[26px] text-gray-900">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function VehicleInfoCard({
+  vehicle,
+  onGoToJobCard,
+  onCancel,
+}: {
+  vehicle: CustomerVehicle;
+  onGoToJobCard: () => void;
+  onCancel: () => void;
+}) {
+  const makeName = vehicleMakeName(vehicle);
+  const makeLogo = resolveCarBrandLogo(
+    makeName !== "—" ? { companyName: makeName } : null,
+  );
+
+  return (
+    <article className="overflow-hidden rounded-lg border border-gray-300/80 bg-white shadow-sm">
+      <div className="flex flex-col gap-4 p-3 sm:p-4 lg:flex-row lg:items-stretch">
+        <div className="mx-auto w-full max-w-[108px] shrink-0 self-start lg:mx-0">
+          <div className="overflow-hidden rounded-t-md border border-gray-300 bg-[#1a1a1a]">
+            <div className="flex h-[52px] items-center justify-center px-2">
+              <img src={makeLogo} alt="" className="max-h-9 max-w-[72px] object-contain" />
+            </div>
+          </div>
+          <div className="rounded-b-md border border-t-0 border-gray-300 bg-white px-2 py-2 text-center">
+            <p className="text-sm font-bold uppercase leading-tight tracking-wide text-gray-900">
+              {vehicleModelLabel(vehicle)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-nowrap">
+            <VehicleInfoField label="License Plate" value={vehicleFieldValue(vehicle.licensePlateNo)} />
+            <VehicleInfoField label="VIN" value={vehicleFieldValue(vehicle.vinNo)} />
+            <VehicleInfoField label="Current odo" value={vehicleFieldValue(vehicle.odometerReading)} />
+            <VehicleInfoField label="Due service" value={vehicleFieldValue(vehicle.dueOdometerReading)} />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onGoToJobCard}
+              className="inline-flex min-w-[9rem] items-center justify-center rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95"
+            >
+              Go to Job Card
+            </button>
+            <span className="text-xs text-gray-700">
+              or{" "}
+              <button
+                type="button"
+                onClick={onCancel}
+                className="font-medium text-blue-600 underline hover:text-blue-700"
+              >
+                Cancel
+              </button>
+            </span>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CustomerVehicleListView({
+  customer,
+  onCancel,
+  onGoToJobCard,
+  onAddVehicle,
+}: {
+  customer: MyCustomer;
+  onCancel: () => void;
+  onGoToJobCard: (vehicleIndex: number) => void;
+  onAddVehicle: () => void;
+}) {
+  const vehicles = customer.vehicles ?? [];
+
+  return (
+    <ContentPanel title="Vehicle info" className="!mb-0 shadow-none">
+      {vehicles.length === 0 ? (
+        <p className="text-center text-sm text-gray-600">No vehicles on file for this customer.</p>
+      ) : (
+        <div className="space-y-3">
+          {vehicles.map((vehicle, index) => (
+            <VehicleInfoCard
+              key={vehicleRowKey(vehicle, index)}
+              vehicle={vehicle}
+              onGoToJobCard={() => onGoToJobCard(index)}
+              onCancel={onCancel}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="mt-5 flex justify-center">
+        <button type="button" onClick={onAddVehicle} className={shopAddNewButtonClass}>
+          + Add New
+        </button>
+      </div>
+    </ContentPanel>
+  );
+}
+
 function CustomerListTable({
   customers,
-  onSelect,
+  onEdit,
+  onShowVehicles,
   showCity = false,
   selectedIds,
   onToggleRow,
   onTogglePage,
 }: {
   customers: MyCustomer[];
-  onSelect: (customer: MyCustomer) => void;
+  onEdit: (customer: MyCustomer) => void;
+  onShowVehicles: (customer: MyCustomer) => void;
   showCity?: boolean;
   selectedIds: Set<string>;
   onToggleRow: (id: string) => void;
@@ -235,7 +486,7 @@ function CustomerListTable({
               <th className={SHOP_TABLE.th}>Phone</th>
               {showCity ? <th className={SHOP_TABLE.th}>City</th> : null}
               <th className={SHOP_TABLE.th}>Vehicles</th>
-              <th className={actionHeadClass}>View</th>
+              <th className={actionHeadClass}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -261,18 +512,34 @@ function CustomerListTable({
                     <td className={SHOP_TABLE.td}>{customer.city?.trim() || "—"}</td>
                   ) : null}
                   <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
-                    {vehicleCount(customer)}
+                    {(() => {
+                      const count = vehicleCount(customer);
+                      if (count === 0) return "0";
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => onShowVehicles(customer)}
+                          className="font-semibold text-blue-600 underline hover:text-blue-700"
+                          aria-label={`View ${count} vehicle${count === 1 ? "" : "s"} for ${name}`}
+                        >
+                          {count}
+                        </button>
+                      );
+                    })()}
                   </td>
                   <td className={`${SHOP_TABLE.td} text-center`}>
-                    <button
-                      type="button"
-                      title={`View ${name}`}
-                      aria-label={`View ${name}`}
-                      onClick={() => onSelect(customer)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
-                    >
-                      <FiEdit2 size={13} aria-hidden />
-                    </button>
+                    <div className="inline-flex items-center justify-center gap-0.5">
+                      <CustomerEmailClip email={customer.email} />
+                      <button
+                        type="button"
+                        title={`Edit ${name}`}
+                        aria-label={`Edit ${name}`}
+                        onClick={() => onEdit(customer)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
+                      >
+                        <FiEdit2 size={13} aria-hidden />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -281,247 +548,6 @@ function CustomerListTable({
         </table>
       </div>
     </motion.div>
-  );
-}
-
-function CustomerAddPrompt({
-  customer,
-  inMyList,
-  adding,
-  onAdd,
-}: {
-  customer: MyCustomer;
-  inMyList: boolean;
-  adding: boolean;
-  onAdd: () => void;
-}) {
-  const [selected, setSelected] = useState(false);
-  const name = customer.name ?? "—";
-
-  return (
-    <div className="space-y-3">
-      <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className={SHOP_TABLE.table}>
-            <thead>
-              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-                <th className={SHOP_TABLE.thCheckbox}>
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={(e) => setSelected(e.target.checked)}
-                    aria-label={`Select ${name}`}
-                    className={SHOP_TABLE_CHECKBOX_CLASS}
-                  />
-                </th>
-                <th className={SHOP_TABLE.th}>Name</th>
-                <th className={SHOP_TABLE.th}>Phone</th>
-                <th className={SHOP_TABLE.th}>Vehicles</th>
-                <th className={`${SHOP_TABLE.th} text-center`}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-white">
-                <td className={SHOP_TABLE.tdCheckbox}>
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={(e) => setSelected(e.target.checked)}
-                    aria-label={`Select ${name}`}
-                    className={SHOP_TABLE_CHECKBOX_CLASS}
-                  />
-                </td>
-                <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{name}</td>
-                <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
-                  {formatPhoneLabel(customer.phone)}
-                </td>
-                <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
-                  {vehicleCount(customer)}
-                </td>
-                <td className={`${SHOP_TABLE.td} text-center`}>
-                  {inMyList ? (
-                    <span className="text-xs font-semibold text-ad-green-dark">In your list</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={onAdd}
-                      disabled={adding}
-                      className={`${shopBulkButtonClass} disabled:opacity-60`}
-                    >
-                      {adding ? "Adding…" : "+ Add"}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {!inMyList ? (
-        <StatusBanner message="Customer is not in your customer list. Proceed to add button." />
-      ) : null}
-    </div>
-  );
-}
-
-function MyListCustomerDetail({
-  customer,
-  onVehicleSelect,
-}: {
-  customer: MyCustomer;
-  onVehicleSelect: (vehicleIndex: number) => void;
-}) {
-  const vehicles = customer.vehicles ?? [];
-  const actionHeadClass = `${SHOP_TABLE.th} text-center`;
-  const customerName = customer.name ?? "—";
-  const [customerSelected, setCustomerSelected] = useState(false);
-  const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<string>>(() => new Set());
-  const vehicleSelectAllRef = useRef<HTMLInputElement>(null);
-  const vehicleRowKeys = vehicles.map((vehicle, index) => vehicleTableRowKey(vehicle, index));
-  const allVehiclesSelected =
-    vehicles.length > 0 && vehicleRowKeys.every((id) => selectedVehicleIds.has(id));
-  const someVehiclesSelected = vehicleRowKeys.some((id) => selectedVehicleIds.has(id));
-
-  useEffect(() => {
-    if (vehicleSelectAllRef.current) {
-      vehicleSelectAllRef.current.indeterminate = someVehiclesSelected && !allVehiclesSelected;
-    }
-  }, [someVehiclesSelected, allVehiclesSelected]);
-
-  const toggleVehicle = (id: string) => {
-    setSelectedVehicleIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAllVehicles = (checked: boolean) => {
-    setSelectedVehicleIds((prev) => {
-      const next = new Set(prev);
-      for (const id of vehicleRowKeys) {
-        if (checked) next.add(id);
-        else next.delete(id);
-      }
-      return next;
-    });
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className={SHOP_TABLE.table}>
-            <thead>
-              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-                <th className={SHOP_TABLE.thCheckbox}>
-                  <input
-                    type="checkbox"
-                    checked={customerSelected}
-                    onChange={(e) => setCustomerSelected(e.target.checked)}
-                    aria-label={`Select ${customerName}`}
-                    className={SHOP_TABLE_CHECKBOX_CLASS}
-                  />
-                </th>
-                <th className={SHOP_TABLE.th}>Name</th>
-                <th className={SHOP_TABLE.th}>Phone</th>
-                <th className={SHOP_TABLE.th}>City</th>
-                <th className={SHOP_TABLE.th}>Vehicles</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-white">
-                <td className={SHOP_TABLE.tdCheckbox}>
-                  <input
-                    type="checkbox"
-                    checked={customerSelected}
-                    onChange={(e) => setCustomerSelected(e.target.checked)}
-                    aria-label={`Select ${customerName}`}
-                    className={SHOP_TABLE_CHECKBOX_CLASS}
-                  />
-                </td>
-                <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{customerName}</td>
-                <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
-                  {formatPhoneLabel(customer.phone)}
-                </td>
-                <td className={SHOP_TABLE.td}>{customer.city?.trim() || "—"}</td>
-                <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
-                  {vehicleCount(customer)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {vehicles.length === 0 ? (
-        <p className="text-center text-sm text-gray-600">No vehicles on file.</p>
-      ) : (
-        <motion.div
-          layout
-          transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
-          className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
-        >
-          <div className="overflow-x-auto">
-            <table className={SHOP_TABLE.table}>
-              <thead>
-                <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-                  <th className={SHOP_TABLE.thCheckbox}>
-                    <input
-                      ref={vehicleSelectAllRef}
-                      type="checkbox"
-                      checked={allVehiclesSelected}
-                      onChange={(e) => toggleAllVehicles(e.target.checked)}
-                      aria-label="Select all vehicles"
-                      className={SHOP_TABLE_CHECKBOX_CLASS}
-                    />
-                  </th>
-                  <th className={SHOP_TABLE.th}>Vehicle</th>
-                  <th className={SHOP_TABLE.th}>License Plate</th>
-                  <th className={actionHeadClass}>View</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vehicles.map((vehicle, index) => {
-                  const rowKey = vehicleRowKeys[index];
-                  return (
-                  <tr key={rowKey} className={adminPanelRowClass(index)}>
-                    <td className={SHOP_TABLE.tdCheckbox}>
-                      <input
-                        type="checkbox"
-                        checked={selectedVehicleIds.has(rowKey)}
-                        onChange={() => toggleVehicle(rowKey)}
-                        aria-label={`Select ${vehicleLabel(vehicle)}`}
-                        className={SHOP_TABLE_CHECKBOX_CLASS}
-                      />
-                    </td>
-                    <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
-                      {vehicleLabel(vehicle)}
-                    </td>
-                    <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>
-                      {vehicle.licensePlateNo?.trim() || "—"}
-                    </td>
-                    <td className={`${SHOP_TABLE.td} text-center`}>
-                      <button
-                        type="button"
-                        title="View vehicle details"
-                        aria-label="View vehicle details"
-                        onClick={() => onVehicleSelect(index)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
-                      >
-                        <FiEdit2 size={13} aria-hidden />
-                      </button>
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-      )}
-    </div>
   );
 }
 
@@ -538,6 +564,7 @@ function AddNewCustomerForm({
   const countryCode = session?.meta?.countryCode ?? "+1";
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [city, setCity] = useState(defaultCity);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -590,7 +617,7 @@ function AddNewCustomerForm({
     try {
       const res = await onboardCarOwner(token, {
         name: name.trim(),
-        email: "",
+        email: email.trim(),
         countryCode,
         phone: phoneDigits(phone),
         pincode: "",
@@ -616,22 +643,20 @@ function AddNewCustomerForm({
 
   return (
     <CompactFormPanel
-      className={`w-full ${shopProfileFormPanelClass}`}
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
       footer={
-        <CompactFormFooter
-          message="* Add new customer in system."
-          actionLabel={submitting ? "Saving…" : "Save"}
+        <PeopleFormFooter
+          message="You are adding a new customer"
+          saving={submitting}
+          saveLabel="Save"
           onSave={() => void handleSave()}
           onCancel={onCancel}
         />
       }
     >
-      {error ? (
-        <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-          {error}
-        </div>
-      ) : null}
-      <CompactFormRow className="justify-center">
+      {error ? <PeopleFormError message={error} /> : null}
+      <CompactFormRow className="items-end">
         <CompactField label="Name" required className={compactFixedFieldWidth}>
           <input
             className={shopCompactInputClass}
@@ -660,6 +685,188 @@ function AddNewCustomerForm({
             ))}
           </select>
         </CompactField>
+        <CompactField label="Email" className={compactFixedFieldWidth}>
+          <input
+            className={shopCompactInputClass}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </CompactField>
+      </CompactFormRow>
+    </CompactFormPanel>
+  );
+}
+
+function EditCustomerForm({
+  customer,
+  defaultCity,
+  addToListAfterSave = false,
+  onCancel,
+  onSaved,
+}: {
+  customer: MyCustomer;
+  defaultCity: string;
+  addToListAfterSave?: boolean;
+  onCancel: () => void;
+  onSaved: (message: string) => void;
+}) {
+  const { token, session } = useAuth();
+  const countryCode = session?.meta?.countryCode ?? "+1";
+  const id = customerId(customer);
+  const [name, setName] = useState(customer.name ?? "");
+  const [phone, setPhone] = useState(phoneDigits(customer.phone ?? ""));
+  const [email, setEmail] = useState(customer.email ?? "");
+  const [city, setCity] = useState(customer.city?.trim() || defaultCity);
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(customer.name ?? "");
+    setPhone(phoneDigits(customer.phone ?? ""));
+    setEmail(customer.email ?? "");
+    setCity(customer.city?.trim() || defaultCity);
+  }, [customer, defaultCity]);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    void getJson<unknown>("/api/user/cities?page=1", token).then((res) => {
+      if (cancelled) return;
+      if (res.ok) {
+        setCityOptions(parseCitiesApiResponse(res.data).map((c) => c.name));
+      } else {
+        setCityOptions([]);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const citySelectOptions = useMemo(() => {
+    const names = new Set(cityOptions);
+    if (defaultCity.trim()) names.add(defaultCity.trim());
+    if (city.trim()) names.add(city.trim());
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [cityOptions, city, defaultCity]);
+
+  const handleSave = async () => {
+    if (!token || !id) {
+      setError("Missing customer id.");
+      return;
+    }
+    if (!name.trim()) {
+      setError("Name is required.");
+      return;
+    }
+    if (phoneDigits(phone).length !== 10) {
+      setError("Phone must be 10 digits.");
+      return;
+    }
+    if (!city.trim()) {
+      setError("City is required.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await updateMyCustomer(token, {
+        carOwnerId: id,
+        name: name.trim(),
+        email: email.trim(),
+        countryCode,
+        phone: phoneDigits(phone),
+        pincode: customer.pincode?.trim() ?? "",
+        address: customer.address?.trim() ?? "",
+        city: city.trim(),
+        vehicles: mapCustomerVehiclesForUpdate(customer),
+      });
+      if (!res.ok) {
+        setError(apiMessage(res.data) || "Could not update customer.");
+        return;
+      }
+
+      if (addToListAfterSave) {
+        const addRes = await addCarOwnerToMyCustomers(token, id);
+        if (!addRes.ok) {
+          setError(apiMessage(addRes.data) || "Could not add customer to your list.");
+          return;
+        }
+        onSaved(
+          apiMessage(addRes.data) ||
+          "Notification sent for approval. Pl. wait or contact with Customer",
+        );
+        return;
+      }
+
+      onSaved(apiMessage(res.data) || "Customer updated.");
+    } catch {
+      setError("Network error.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <CompactFormPanel
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
+      footer={
+        <PeopleFormFooter
+          message={
+            addToListAfterSave
+              ? "You are editing a customer before adding to your list"
+              : "You are editing a customer"
+          }
+          saving={submitting}
+          saveLabel={addToListAfterSave ? "+ Add" : "Save"}
+          savingLabel={addToListAfterSave ? "Adding…" : "Saving…"}
+          onSave={() => void handleSave()}
+          onCancel={onCancel}
+        />
+      }
+    >
+      {error ? <PeopleFormError message={error} /> : null}
+      <CompactFormRow className="items-end">
+        <CompactField label="Name" required className={compactFixedFieldWidth}>
+          <input
+            className={shopCompactInputClass}
+            value={name}
+            onChange={(e) => setName(e.target.value.slice(0, 20))}
+          />
+        </CompactField>
+        <CompactField label="Phone" required className={compactFixedFieldWidth}>
+          <input
+            className={shopCompactInputClass}
+            value={formatPhoneDisplay(phone)}
+            onChange={(e) => setPhone(phoneDigits(e.target.value))}
+          />
+        </CompactField>
+        <CompactField label="City" required className={compactFixedFieldWidth}>
+          <select
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            className={shopCompactInputClass}
+          >
+            <option value="">Select city</option>
+            {citySelectOptions.map((cityName) => (
+              <option key={cityName} value={cityName}>
+                {cityName}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+        <CompactField label="Email" className={compactFixedFieldWidth}>
+          <input
+            className={shopCompactInputClass}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </CompactField>
       </CompactFormRow>
     </CompactFormPanel>
   );
@@ -682,7 +889,6 @@ function AddToListForm({
   const [email, setEmail] = useState(customer.email ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const profileSrc = customerProfileSrc(customer);
   const id = customerId(customer);
 
   const handleAdd = async () => {
@@ -702,15 +908,7 @@ function AddToListForm({
         pincode: customer.pincode?.trim() ?? "",
         address: customer.address?.trim() ?? "",
         city: city.trim(),
-        vehicles: (customer.vehicles ?? []).map((v) => ({
-          ...(v.vId ?? v._id ? { vId: v.vId ?? v._id } : {}),
-          licensePlateNo: v.licensePlateNo?.trim() ?? "",
-          vinNo: v.vinNo?.trim(),
-          vehicleName: v.vehicleName?.trim() ?? "",
-          model: v.model?.trim() ?? "",
-          year: v.year?.trim() ?? "",
-          odometerReading: v.odometerReading?.trim(),
-        })),
+        vehicles: mapCustomerVehiclesForUpdate(customer),
       });
       if (!res.ok) {
         setError(apiMessage(res.data) || "Could not update customer.");
@@ -737,34 +935,29 @@ function AddToListForm({
   return (
     <CompactFormPanel
       className={shopProfileFormPanelClass}
+      showBottomBorder={false}
       footer={
-        <CompactFormFooter
-          message="* Add customer in your customer list"
-          actionLabel={submitting ? "Adding…" : "+ Add"}
+        <PeopleFormFooter
+          message="You are adding a customer to your list"
+          saving={submitting}
+          saveLabel="+ Add"
+          savingLabel="Adding…"
           onSave={() => void handleAdd()}
           onCancel={onCancel}
         />
       }
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <h2 className="text-lg font-bold text-ad-green-dark">Add visible customer in your list</h2>
-        {profileSrc ? (
-          <img src={profileSrc} alt="" className="h-12 w-12 rounded-sm border border-gray-300 object-cover" />
-        ) : (
-          <div className="h-12 w-12 rounded-sm border border-gray-300 bg-gray-200" aria-hidden />
-        )}
-      </div>
-      {error ? (
-        <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-          {error}
-        </div>
-      ) : null}
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
+      {error ? <PeopleFormError message={error} /> : null}
+      <CompactFormRow className="items-end">
         <CompactField label="Name" className={compactFixedFieldWidth}>
           <input className={`${shopCompactInputClass} bg-gray-100`} value={name} readOnly />
         </CompactField>
         <CompactField label="Phone" className={compactFixedFieldWidth}>
-          <input className={`${shopCompactInputClass} bg-gray-100`} value={formatPhoneLabel(phone)} readOnly />
+          <input
+            className={`${shopCompactInputClass} bg-gray-100`}
+            value={formatPhoneLabel(phone)}
+            readOnly
+          />
         </CompactField>
         <CompactField label="City" className={compactFixedFieldWidth}>
           <input className={`${shopCompactInputClass} bg-gray-100`} value={city} readOnly />
@@ -777,7 +970,7 @@ function AddToListForm({
             onChange={(e) => setEmail(e.target.value)}
           />
         </CompactField>
-      </div>
+      </CompactFormRow>
     </CompactFormPanel>
   );
 }
@@ -794,65 +987,85 @@ function CustomerInfoView({
   onGoToJobCard: () => void;
 }) {
   const vehicle = customer.vehicles?.[vehicleIndex];
-  const profileSrc = customerProfileSrc(customer);
 
   return (
     <CompactFormPanel
       className={shopProfileFormPanelClass}
       showBottomBorder={false}
       footer={
-        <CompactFormFooter
-          message="* Customer and vehicle details."
-          actionLabel="Go to Job Card"
+        <PeopleFormFooter
+          message="Customer and vehicle details"
+          saveLabel="Go to Job Card"
           onSave={onGoToJobCard}
           onCancel={onCancel}
         />
       }
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <h2 className="text-lg font-bold text-ad-green-dark">Customer info</h2>
-        {profileSrc ? (
-          <img src={profileSrc} alt="" className="h-14 w-14 rounded-sm border border-gray-300 object-cover" />
-        ) : (
-          <div className="h-14 w-14 rounded-sm border border-gray-300 bg-gray-200" aria-hidden />
-        )}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          ["Name", customer.name ?? "—"],
-          ["Phone", formatPhoneLabel(customer.phone)],
-          ["City", customer.city?.trim() || "—"],
-          ["Email", customer.email?.trim() || "—"],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <p className="mb-1 text-xs font-bold text-ad-green-dark">{label}</p>
-            <div className={shopCompactReadOnlyClass}>{value}</div>
-          </div>
-        ))}
-      </div>
+      <CompactFormRow className="items-end">
+        <CompactField label="Name" className={compactFixedFieldWidth}>
+          <input className={`${shopCompactInputClass} bg-gray-100`} value={customer.name ?? "—"} readOnly />
+        </CompactField>
+        <CompactField label="Phone" className={compactFixedFieldWidth}>
+          <input
+            className={`${shopCompactInputClass} bg-gray-100`}
+            value={formatPhoneLabel(customer.phone)}
+            readOnly
+          />
+        </CompactField>
+        <CompactField label="City" className={compactFixedFieldWidth}>
+          <input
+            className={`${shopCompactInputClass} bg-gray-100`}
+            value={customer.city?.trim() || "—"}
+            readOnly
+          />
+        </CompactField>
+        <CompactField label="Email" className={compactFixedFieldWidth}>
+          <input
+            className={`${shopCompactInputClass} bg-gray-100`}
+            value={customer.email?.trim() || "—"}
+            readOnly
+          />
+        </CompactField>
+      </CompactFormRow>
 
       {vehicle ? (
-        <div className="mt-4 border-t border-gray-200 pt-4">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded border border-gray-300 bg-gray-50 text-xs font-bold uppercase text-gray-600">
-              {(vehicle.vehicleName ?? "Car").slice(0, 3)}
-            </div>
-            <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                ["Car Model", [vehicle.model, vehicle.year].filter(Boolean).join(" - ") || "—"],
-                ["License Plate", vehicle.licensePlateNo?.trim() || "—"],
-                ["VIN", vehicle.vinNo?.trim() || "—"],
-                ["Current odo", vehicle.odometerReading?.trim() || "—"],
-                ["Due service", vehicle.dueOdometerReading?.trim() || "—"],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <p className="mb-1 text-xs font-bold text-ad-green-dark">{label}</p>
-                  <div className={shopCompactReadOnlyClass}>{value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <CompactFormRow className="mt-4 items-end">
+          <CompactField label="Car Model" className={compactFixedFieldWidth}>
+            <input
+              className={`${shopCompactInputClass} bg-gray-100`}
+              value={[vehicle.model, vehicle.year].filter(Boolean).join(" - ") || "—"}
+              readOnly
+            />
+          </CompactField>
+          <CompactField label="License Plate" className={compactFixedFieldWidth}>
+            <input
+              className={`${shopCompactInputClass} bg-gray-100`}
+              value={vehicle.licensePlateNo?.trim() || "—"}
+              readOnly
+            />
+          </CompactField>
+          <CompactField label="VIN" className={compactFixedFieldWidth}>
+            <input
+              className={`${shopCompactInputClass} bg-gray-100`}
+              value={vehicle.vinNo?.trim() || "—"}
+              readOnly
+            />
+          </CompactField>
+          <CompactField label="Current odo" className={compactFixedFieldWidth}>
+            <input
+              className={`${shopCompactInputClass} bg-gray-100`}
+              value={vehicle.odometerReading?.trim() || "—"}
+              readOnly
+            />
+          </CompactField>
+          <CompactField label="Due service" className={compactFixedFieldWidth}>
+            <input
+              className={`${shopCompactInputClass} bg-gray-100`}
+              value={vehicle.dueOdometerReading?.trim() || "—"}
+              readOnly
+            />
+          </CompactField>
+        </CompactFormRow>
       ) : null}
     </CompactFormPanel>
   );
@@ -869,8 +1082,7 @@ export default function ShopPeoplePage() {
   const [page, setPage] = useState(1);
   const [searchHits, setSearchHits] = useState<MyCustomer[]>([]);
   const [searching, setSearching] = useState(false);
-  const [addingId, setAddingId] = useState<string | null>(null);
-  const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<MyCustomer | null>(null);
   const [detailView, setDetailView] = useState<DetailView | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(() => new Set());
@@ -921,45 +1133,16 @@ export default function ShopPeoplePage() {
     [listCustomers, safePage],
   );
 
-  const customerRowKey = useCallback((customer: MyCustomer, fallback: string) => {
-    return customerId(customer) || customer.name || fallback;
-  }, []);
-
-  const selectedCustomer = useMemo(() => {
-    if (!selectedCustomerKey || section !== "customers") return null;
-    for (let i = 0; i < paginatedCustomers.length; i++) {
-      const customer = paginatedCustomers[i];
-      const rowIndex = (safePage - 1) * PAGE_SIZE + i;
-      if (customerRowKey(customer, String(rowIndex)) === selectedCustomerKey) {
-        return customer;
-      }
-    }
-    return null;
-  }, [selectedCustomerKey, section, paginatedCustomers, safePage, customerRowKey]);
-
-  const selectedMyListCustomer = useMemo(() => {
-    if (!selectedCustomerKey || !isListedSection) return null;
-    for (let i = 0; i < listCustomers.length; i++) {
-      const customer = listCustomers[i];
-      if (customerRowKey(customer, String(i)) === selectedCustomerKey) {
-        return customer;
-      }
-    }
-    return null;
-  }, [selectedCustomerKey, isListedSection, listCustomers, customerRowKey]);
-
   useEffect(() => {
     setPage(1);
-  }, [search, section, detailView]);
+  }, [search, section, detailView, editingCustomer]);
 
   useEffect(() => {
     setSelectedCustomerIds(new Set());
   }, [search, section]);
 
   useEffect(() => {
-    if (section === "customers") {
-      setSelectedCustomerKey(null);
-    }
+    setEditingCustomer(null);
   }, [search, section, page]);
 
   useEffect(() => {
@@ -971,15 +1154,14 @@ export default function ShopPeoplePage() {
     if (digits.length === 10) {
       const match = listCustomers.find((c) => phoneDigits(c.phone) === digits);
       if (match) {
-        const idx = listCustomers.indexOf(match);
-        setSelectedCustomerKey(customerRowKey(match, String(idx)));
+        setEditingCustomer(match);
       }
       return;
     }
     if (listCustomers.length === 1) {
-      setSelectedCustomerKey(customerRowKey(listCustomers[0], String(0)));
+      setEditingCustomer(listCustomers[0]);
     }
-  }, [search, isListedSection, listCustomers, customerRowKey]);
+  }, [search, isListedSection, listCustomers]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -1024,7 +1206,7 @@ export default function ShopPeoplePage() {
     setSearch("");
     setSearchHits([]);
     setStatusMessage(null);
-    setSelectedCustomerKey(null);
+    setEditingCustomer(null);
     resetDetail();
   };
 
@@ -1041,12 +1223,6 @@ export default function ShopPeoplePage() {
     [myCustomers, myIdSet],
   );
 
-  const handleAddToListOpen = (customer: MyCustomer) => {
-    setShowAddForm(false);
-    setDetailView({ kind: "add-to-list", customer });
-    setStatusMessage(null);
-  };
-
   const handleAddToListSaved = async (message: string) => {
     setStatusMessage(message);
     setDetailView(null);
@@ -1062,19 +1238,21 @@ export default function ShopPeoplePage() {
     await refresh();
   };
 
-  const handleAddExisting = async (customer: MyCustomer) => {
-    const id = customerId(customer);
-    if (!id || !token) return;
-    if (myIdSet.has(id)) {
-      toast.info("Customer is already in your list.");
+  const handleEditSaved = async (message: string) => {
+    const addingFromDirectory =
+      section === "customers" &&
+      editingCustomer != null &&
+      !isInMyList(editingCustomer);
+    setStatusMessage(message);
+    setEditingCustomer(null);
+    if (addingFromDirectory) {
+      toast.success("Customer added to your list.");
+      await refresh();
+      setSection("approval");
       return;
     }
-    setAddingId(id);
-    try {
-      handleAddToListOpen(customer);
-    } finally {
-      setAddingId(null);
-    }
+    toast.success("Customer updated.");
+    await refresh();
   };
 
   const emptyMessage =
@@ -1093,14 +1271,27 @@ export default function ShopPeoplePage() {
     section !== "approval" &&
     !detailView &&
     !showAddForm &&
-    !selectedCustomer &&
-    !selectedMyListCustomer;
+    !editingCustomer;
 
-  const handleTableSelect = (customer: MyCustomer) => {
+  const handleEditCustomer = (customer: MyCustomer) => {
     setShowAddForm(false);
-    const idx = paginatedCustomers.indexOf(customer);
-    const rowIndex = idx >= 0 ? (safePage - 1) * PAGE_SIZE + idx : 0;
-    setSelectedCustomerKey(customerRowKey(customer, String(rowIndex)));
+    setDetailView(null);
+    setStatusMessage(null);
+    setEditingCustomer(customer);
+  };
+
+  const handleShowVehicles = (customer: MyCustomer) => {
+    setShowAddForm(false);
+    setEditingCustomer(null);
+    setStatusMessage(null);
+    setDetailView({ kind: "vehicle-list", customer });
+  };
+
+  const handleAddVehicleFromList = () => {
+    if (detailView?.kind !== "vehicle-list") return;
+    const customer = detailView.customer;
+    resetDetail();
+    setEditingCustomer(customer);
   };
 
   const toggleCustomerSelection = (id: string) => {
@@ -1159,6 +1350,13 @@ export default function ShopPeoplePage() {
             onCancel={resetDetail}
             onGoToJobCard={() => navigate("/shop/job-cards")}
           />
+        ) : detailView?.kind === "vehicle-list" ? (
+          <CustomerVehicleListView
+            customer={detailView.customer}
+            onCancel={resetDetail}
+            onGoToJobCard={() => navigate("/shop/job-cards")}
+            onAddVehicle={handleAddVehicleFromList}
+          />
         ) : showList ? (
           <>
             <PeopleSearchBar
@@ -1185,6 +1383,23 @@ export default function ShopPeoplePage() {
               {statusMessage && showAddForm ? <StatusBanner message={statusMessage} /> : null}
             </ShopReveal>
 
+            <ShopReveal show={editingCustomer != null}>
+              {editingCustomer ? (
+                <EditCustomerForm
+                  key={customerId(editingCustomer) || editingCustomer.phone}
+                  customer={editingCustomer}
+                  defaultCity={shopCity}
+                  addToListAfterSave={section === "customers" && !isInMyList(editingCustomer)}
+                  onCancel={() => {
+                    setEditingCustomer(null);
+                    setStatusMessage(null);
+                  }}
+                  onSaved={(message) => void handleEditSaved(message)}
+                />
+              ) : null}
+              {statusMessage && editingCustomer ? <StatusBanner message={statusMessage} /> : null}
+            </ShopReveal>
+
             {listLoading && isListedSection && !isDirectorySearch ? (
               <ShopListSkeleton variant="profile-table" className="w-full" />
             ) : listError && isListedSection && !isDirectorySearch ? (
@@ -1193,39 +1408,12 @@ export default function ShopPeoplePage() {
               <p className="text-center text-sm text-gray-600">Searching…</p>
             ) : listCustomers.length === 0 && !showAddForm ? (
               <p className="text-center text-sm text-gray-600">{emptyMessage}</p>
-            ) : section === "customers" && selectedCustomer ? (
-              <>
-                <button type="button" onClick={() => setSelectedCustomerKey(null)} className={shopBulkButtonClass}>
-                  ← Back to list
-                </button>
-                <CustomerAddPrompt
-                  customer={selectedCustomer}
-                  inMyList={isInMyList(selectedCustomer)}
-                  adding={addingId === customerId(selectedCustomer)}
-                  onAdd={() => handleAddExisting(selectedCustomer)}
-                />
-              </>
-            ) : isListedSection && selectedMyListCustomer ? (
-              <>
-                <button type="button" onClick={() => setSelectedCustomerKey(null)} className={shopBulkButtonClass}>
-                  ← Back to list
-                </button>
-                <MyListCustomerDetail
-                  customer={selectedMyListCustomer}
-                  onVehicleSelect={(vehicleIndex) =>
-                    setDetailView({
-                      kind: "customer-info",
-                      customer: selectedMyListCustomer,
-                      vehicleIndex,
-                    })
-                  }
-                />
-              </>
             ) : listCustomers.length > 0 ? (
               <>
                 <CustomerListTable
                   customers={paginatedCustomers}
-                  onSelect={handleTableSelect}
+                  onEdit={handleEditCustomer}
+                  onShowVehicles={handleShowVehicles}
                   showCity={isListedSection}
                   selectedIds={selectedCustomerIds}
                   onToggleRow={toggleCustomerSelection}

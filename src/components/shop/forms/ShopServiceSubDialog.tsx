@@ -5,7 +5,11 @@ import {
   CompactFormPanel,
   CompactFormRow,
 } from "../../admin/ContentPanel";
-import { shopCompactInputClass } from "../shopLayoutStyles";
+import {
+  shopCompactInputClass,
+  shopProfileFormPanelClass,
+  shopProfileFormPanelFooterClass,
+} from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { apiMessage, saveMyServices, updateMyServices } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
@@ -114,30 +118,42 @@ export default function ShopServiceSubDialog({
   const saveLabel = isEditing ? "Update" : "Save";
   const savingLabel = isEditing ? "Updating…" : "Saving…";
 
+  const footerMessage = isEditing
+    ? "You are editing a sub-service"
+    : "You are adding a new sub-service";
+
   return (
     <CompactFormPanel
-      className="mb-4 shrink-0"
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
       footer={
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="inline-flex min-w-[7.5rem] items-center justify-center rounded bg-ad-form-save px-6 py-1.5 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
-          >
-            {saving ? savingLabel : saveLabel}
-          </button>
-          <span className="text-xs text-gray-700">
-            or{" "}
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
+        >
+          <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
+            {footerMessage}
+          </div>
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => void handleSave()}
               disabled={saving}
-              className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+              className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
             >
-              Cancel
+              {saving ? savingLabel : saveLabel}
             </button>
-          </span>
+            <span className="text-xs text-gray-700">
+              or{" "}
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={saving}
+                className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </span>
+          </div>
         </div>
       }
     >

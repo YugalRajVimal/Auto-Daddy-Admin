@@ -222,11 +222,10 @@ export default function ShopJobCardsPage() {
                             key={pageNumber}
                             type="button"
                             onClick={() => setPage(pageNumber)}
-                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
-                              isActive
+                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${isActive
                                 ? "bg-[#008000] text-white"
                                 : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
-                            }`}
+                              }`}
                             aria-current={isActive ? "page" : undefined}
                           >
                             {pageNumber}
