@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { FiEdit2 } from "react-icons/fi";
+import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { getJson } from "../../api/mobileAuth";
 import {
@@ -9,19 +11,23 @@ import {
   CompactFormRow,
   compactFixedFieldWidth,
 } from "../../components/admin/ContentPanel";
+import {
+  ADMIN_PANEL_THEAD_ROW_CLASS,
+  adminPanelRowClass,
+  adminPanelTableClasses,
+  type AdminPanelTableClasses,
+} from "../../components/admin/adminPanelTableStyles";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopViewTransition } from "../../components/shop/ShopAnimated";
+import { ShopReveal } from "../../components/shop/ShopAnimated";
+import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import {
   shopCompactInputClass,
   shopCompactReadOnlyClass,
-  shopHeroCardBodyClass,
-  shopHeroOpaqueSurfaceClass,
+  shopProfileFormPanelClass,
 } from "../../components/shop/shopLayoutStyles";
 import {
-  ShopEmptyPanel,
   ShopErrorPanel,
   ShopListFooter,
-  ShopListPanel,
   ShopLoadingPanel,
 } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
@@ -40,7 +46,7 @@ import { formatPhoneDisplay, formatPhoneLabel, phoneDigits } from "../../lib/pho
 import { parseMyCustomers } from "../../lib/shopOwnerParsers";
 import type { CustomerVehicle, MyCustomer } from "../../types/shopOwner";
 
-type PeopleSection = "customers" | "add-new" | "my-list";
+type PeopleSection = "customers" | "my-list";
 
 type DetailView =
   | { kind: "add-to-list"; customer: MyCustomer }
@@ -48,12 +54,31 @@ type DetailView =
 
 const PEOPLE_SECTIONS = [
   { id: "customers", label: "Customers", variant: "primary" as const },
-  { id: "add-new", label: "Add New", variant: "primary" as const },
   { id: "my-list", label: "My Customer List", variant: "primary" as const },
 ];
 
 const PEOPLE_SEARCH_INPUT_ID = "shop-people-customer-search";
 const PAGE_SIZE = 10;
+
+const SHOP_TABLE_BASE = adminPanelTableClasses(true);
+const SHOP_TABLE: AdminPanelTableClasses = {
+  ...SHOP_TABLE_BASE,
+  th: SHOP_TABLE_BASE.th.replace("px-2", "px-4"),
+  thCheckbox: SHOP_TABLE_BASE.thCheckbox.replace("px-2", "px-4"),
+  td: SHOP_TABLE_BASE.td.replace("px-2", "px-4"),
+  tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
+};
+
+const shopBulkButtonClass =
+  "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
+
+function AddNewButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={shopAddNewButtonClass}>
+      + Add New
+    </button>
+  );
+}
 
 function customerId(c: MyCustomer) {
   return c.carOwnerId ?? c.id ?? c._id ?? "";
@@ -101,40 +126,71 @@ function customerProfileSrc(customer: MyCustomer): string | null {
 
 function StatusBanner({ message }: { message: string }) {
   return (
-    <div
-      className={`mt-4 rounded-md border border-white/70 bg-white/95 px-4 py-3 text-center text-sm font-semibold text-blue-700 ${shopHeroOpaqueSurfaceClass}`}
-    >
-      {message}
-    </div>
+    <p className="mt-3 text-center text-sm font-semibold text-blue-700">{message}</p>
   );
 }
 
-function VehiclesColumn({
-  count,
-  onClick,
+function CustomerListTable({
+  customers,
+  onSelect,
+  showCity = false,
 }: {
-  count: number;
-  onClick?: () => void;
+  customers: MyCustomer[];
+  onSelect: (customer: MyCustomer) => void;
+  showCity?: boolean;
 }) {
-  const body = (
-    <>
-      <p className="text-sm font-semibold text-[#008000]">Vehicles</p>
-      <p className="text-lg font-bold text-blue-700 underline decoration-blue-700">{count}</p>
-    </>
-  );
-
-  if (!onClick) {
-    return <div className="shrink-0 text-right">{body}</div>;
-  }
+  const actionHeadClass = `${SHOP_TABLE.th} text-center`;
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="shrink-0 rounded text-right hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008000]"
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+      className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
     >
-      {body}
-    </button>
+      <div className="overflow-x-auto">
+        <table className={SHOP_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE.th}>Name</th>
+              <th className={SHOP_TABLE.th}>Phone</th>
+              {showCity ? <th className={SHOP_TABLE.th}>City</th> : null}
+              <th className={SHOP_TABLE.th}>Vehicles</th>
+              <th className={actionHeadClass}>View</th>
+            </tr>
+          </thead>
+          <tbody>
+            {customers.map((customer, index) => {
+              const name = customer.name ?? "—";
+              return (
+                <tr key={customerId(customer) || `${name}-${index}`} className={adminPanelRowClass(index)}>
+                  <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{name}</td>
+                  <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                    {customer.phone ? formatPhoneLabel(customer.phone) : "—"}
+                  </td>
+                  {showCity ? (
+                    <td className={SHOP_TABLE.td}>{customer.city?.trim() || "—"}</td>
+                  ) : null}
+                  <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                    {vehicleCount(customer)}
+                  </td>
+                  <td className={`${SHOP_TABLE.td} text-center`}>
+                    <button
+                      type="button"
+                      title={`View ${name}`}
+                      aria-label={`View ${name}`}
+                      onClick={() => onSelect(customer)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
+                    >
+                      <FiEdit2 size={13} aria-hidden />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
   );
 }
 
@@ -151,80 +207,49 @@ function CustomerAddPrompt({
 }) {
   return (
     <div className="space-y-3">
-      <article className="flex items-center justify-between gap-3 rounded-md border border-[#008000]/40 bg-[#ffe8d6]/95 px-4 py-3 sm:px-5 sm:py-4">
-        <div className="min-w-0">
-          <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
-          <p className="text-sm font-semibold text-blue-700">{formatPhoneLabel(customer.phone)}</p>
+      <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className={SHOP_TABLE.table}>
+            <thead>
+              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                <th className={SHOP_TABLE.th}>Name</th>
+                <th className={SHOP_TABLE.th}>Phone</th>
+                <th className={SHOP_TABLE.th}>Vehicles</th>
+                <th className={`${SHOP_TABLE.th} text-center`}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="bg-white">
+                <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{customer.name ?? "—"}</td>
+                <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                  {formatPhoneLabel(customer.phone)}
+                </td>
+                <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                  {vehicleCount(customer)}
+                </td>
+                <td className={`${SHOP_TABLE.td} text-center`}>
+                  {inMyList ? (
+                    <span className="text-xs font-semibold text-ad-green-dark">In your list</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onAdd}
+                      disabled={adding}
+                      className={`${shopBulkButtonClass} disabled:opacity-60`}
+                    >
+                      {adding ? "Adding…" : "+ Add"}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        {inMyList ? (
-          <p className="shrink-0 text-center text-sm font-bold text-[#008000]">already added to my customers</p>
-        ) : (
-          <button
-            type="button"
-            onClick={onAdd}
-            disabled={adding}
-            className="shrink-0 text-sm font-bold text-ad-purple hover:underline disabled:opacity-60"
-          >
-            {adding ? "Adding…" : "+ Add"}
-          </button>
-        )}
-        <VehiclesColumn count={vehicleCount(customer)} />
-      </article>
+      </div>
       {!inMyList ? (
-        <StatusBanner message="Customer is not in your customer List. Proceed to add button" />
+        <StatusBanner message="Customer is not in your customer list. Proceed to add button." />
       ) : null}
     </div>
-  );
-}
-
-function StripedCustomerRow({
-  customer,
-  index,
-  onSelect,
-}: {
-  customer: MyCustomer;
-  index: number;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`flex w-full items-center justify-between gap-4 px-4 py-3 text-left sm:px-6 ${index % 2 === 0 ? "bg-gray-100/90" : "bg-white/90"
-        } ${shopHeroOpaqueSurfaceClass} hover:brightness-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008000]`}
-    >
-      <div className="min-w-0">
-        <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
-        {customer.phone ? (
-          <span className="text-sm font-semibold text-blue-700">{formatPhoneLabel(customer.phone)}</span>
-        ) : null}
-      </div>
-      <VehiclesColumn count={vehicleCount(customer)} />
-    </button>
-  );
-}
-
-function MyListCustomerCard({
-  customer,
-  onSelect,
-}: {
-  customer: MyCustomer;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`flex w-full items-center justify-between gap-4 rounded-md border border-[#008000] bg-[#d4fcd4] p-3 text-left sm:px-5 sm:py-4 hover:brightness-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008000]`}
-    >
-      <div className="min-w-0">
-        <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
-        {customer.phone ? (
-          <span className="text-sm font-semibold text-blue-700">{formatPhoneLabel(customer.phone)}</span>
-        ) : null}
-      </div>
-      <VehiclesColumn count={vehicleCount(customer)} />
-    </button>
   );
 }
 
@@ -236,37 +261,80 @@ function MyListCustomerDetail({
   onVehicleSelect: (vehicleIndex: number) => void;
 }) {
   const vehicles = customer.vehicles ?? [];
+  const actionHeadClass = `${SHOP_TABLE.th} text-center`;
 
   return (
-    <div className="w-full space-y-3">
-      <article className="flex items-center justify-between gap-4 rounded-md border border-[#008000] bg-[#d4fcd4] px-4 py-3 sm:px-6 sm:py-4">
-        <div className="min-w-0">
-          <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
-          <p className="text-sm font-semibold text-blue-700">{formatPhoneLabel(customer.phone)}</p>
+    <div className="space-y-3">
+      <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className={SHOP_TABLE.table}>
+            <thead>
+              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                <th className={SHOP_TABLE.th}>Name</th>
+                <th className={SHOP_TABLE.th}>Phone</th>
+                <th className={SHOP_TABLE.th}>City</th>
+                <th className={SHOP_TABLE.th}>Vehicles</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="bg-white">
+                <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{customer.name ?? "—"}</td>
+                <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                  {formatPhoneLabel(customer.phone)}
+                </td>
+                <td className={SHOP_TABLE.td}>{customer.city?.trim() || "—"}</td>
+                <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                  {vehicleCount(customer)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <VehiclesColumn count={vehicleCount(customer)} />
-      </article>
+      </div>
 
       {vehicles.length === 0 ? (
-        <div
-          className={`rounded-md px-4 py-3 text-center text-sm text-gray-600 ${shopHeroOpaqueSurfaceClass} bg-white/95`}
-        >
-          No vehicles on file.
-        </div>
+        <p className="text-center text-sm text-gray-600">No vehicles on file.</p>
       ) : (
-        vehicles.map((vehicle, index) => (
-          <button
-            key={vehicle._id ?? vehicle.vId ?? `${vehicle.licensePlateNo}-${index}`}
-            type="button"
-            onClick={() => onVehicleSelect(index)}
-            className={`flex w-full items-center justify-between gap-4 rounded-md px-4 py-3 text-left sm:px-6 ${shopHeroOpaqueSurfaceClass} bg-white/95 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008000]`}
-          >
-            <span className="text-sm font-semibold text-gray-800">{vehicleLabel(vehicle)}</span>
-            <span className="text-sm font-bold text-blue-700 underline">
-              {vehicle.licensePlateNo?.trim() || "—"}
-            </span>
-          </button>
-        ))
+        <motion.div
+          layout
+          transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+          className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+        >
+          <div className="overflow-x-auto">
+            <table className={SHOP_TABLE.table}>
+              <thead>
+                <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                  <th className={SHOP_TABLE.th}>Vehicle</th>
+                  <th className={SHOP_TABLE.th}>License Plate</th>
+                  <th className={actionHeadClass}>View</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vehicles.map((vehicle, index) => (
+                  <tr key={vehicle._id ?? vehicle.vId ?? `${vehicle.licensePlateNo}-${index}`} className={adminPanelRowClass(index)}>
+                    <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                      {vehicleLabel(vehicle)}
+                    </td>
+                    <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>
+                      {vehicle.licensePlateNo?.trim() || "—"}
+                    </td>
+                    <td className={`${SHOP_TABLE.td} text-center`}>
+                      <button
+                        type="button"
+                        title="View vehicle details"
+                        aria-label="View vehicle details"
+                        onClick={() => onVehicleSelect(index)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
+                      >
+                        <FiEdit2 size={13} aria-hidden />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
       )}
     </div>
   );
@@ -363,7 +431,7 @@ function AddNewCustomerForm({
 
   return (
     <CompactFormPanel
-      className="w-full"
+      className={`w-full ${shopProfileFormPanelClass}`}
       footer={
         <CompactFormFooter
           message="* Add new customer in system."
@@ -483,6 +551,7 @@ function AddToListForm({
 
   return (
     <CompactFormPanel
+      className={shopProfileFormPanelClass}
       footer={
         <CompactFormFooter
           message="* Add customer in your customer list"
@@ -493,7 +562,7 @@ function AddToListForm({
       }
     >
       <div className="mb-4 flex items-start justify-between gap-3">
-        <h2 className="text-lg font-bold text-ad-green-dark">Add visible customer in your List</h2>
+        <h2 className="text-lg font-bold text-ad-green-dark">Add visible customer in your list</h2>
         {profileSrc ? (
           <img src={profileSrc} alt="" className="h-12 w-12 rounded-sm border border-gray-300 object-cover" />
         ) : (
@@ -543,35 +612,42 @@ function CustomerInfoView({
   const profileSrc = customerProfileSrc(customer);
 
   return (
-    <div className="space-y-0 overflow-hidden rounded-md border border-[#008000] shadow-sm">
-      <div className="relative bg-[#d4fcd4] px-4 py-4 sm:px-6">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <h2 className="text-lg font-bold text-[#008000]">Customer info</h2>
-          {profileSrc ? (
-            <img src={profileSrc} alt="" className="h-14 w-14 rounded-sm border border-gray-300 object-cover" />
-          ) : (
-            <div className="h-14 w-14 rounded-sm border border-gray-300 bg-white" aria-hidden />
-          )}
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            ["Name", customer.name ?? "—"],
-            ["Phone", formatPhoneLabel(customer.phone)],
-            ["City", customer.city?.trim() || "—"],
-            ["Email", customer.email?.trim() || "—"],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <p className="mb-1 text-xs font-bold text-[#008000]">{label}</p>
-              <div className={shopCompactReadOnlyClass}>
-                {value}
-              </div>
-            </div>
-          ))}
-        </div>
+    <CompactFormPanel
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
+      footer={
+        <CompactFormFooter
+          message="* Customer and vehicle details."
+          actionLabel="Go to Job Card"
+          onSave={onGoToJobCard}
+          onCancel={onCancel}
+        />
+      }
+    >
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <h2 className="text-lg font-bold text-ad-green-dark">Customer info</h2>
+        {profileSrc ? (
+          <img src={profileSrc} alt="" className="h-14 w-14 rounded-sm border border-gray-300 object-cover" />
+        ) : (
+          <div className="h-14 w-14 rounded-sm border border-gray-300 bg-gray-200" aria-hidden />
+        )}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          ["Name", customer.name ?? "—"],
+          ["Phone", formatPhoneLabel(customer.phone)],
+          ["City", customer.city?.trim() || "—"],
+          ["Email", customer.email?.trim() || "—"],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <p className="mb-1 text-xs font-bold text-ad-green-dark">{label}</p>
+            <div className={shopCompactReadOnlyClass}>{value}</div>
+          </div>
+        ))}
       </div>
 
       {vehicle ? (
-        <div className="bg-white px-4 py-4 sm:px-6">
+        <div className="mt-4 border-t border-gray-200 pt-4">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded border border-gray-300 bg-gray-50 text-xs font-bold uppercase text-gray-600">
               {(vehicle.vehicleName ?? "Car").slice(0, 3)}
@@ -585,33 +661,15 @@ function CustomerInfoView({
                 ["Due service", vehicle.dueOdometerReading?.trim() || "—"],
               ].map(([label, value]) => (
                 <div key={label}>
-                  <p className="mb-1 text-xs font-bold text-[#008000]">{label}</p>
-                  <div className={shopCompactReadOnlyClass}>
-                    {value}
-                  </div>
+                  <p className="mb-1 text-xs font-bold text-ad-green-dark">{label}</p>
+                  <div className={shopCompactReadOnlyClass}>{value}</div>
                 </div>
               ))}
             </div>
           </div>
-          <div className="flex items-center justify-end gap-4">
-            <button
-              type="button"
-              onClick={onGoToJobCard}
-              className="rounded bg-[#008000] px-5 py-1.5 text-sm font-bold text-white hover:brightness-95"
-            >
-              Go to Job Card
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="text-sm font-semibold text-ad-purple hover:underline"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
       ) : null}
-    </div>
+    </CompactFormPanel>
   );
 }
 
@@ -620,6 +678,7 @@ export default function ShopPeoplePage() {
   const { token } = useAuth();
   const { faqsHeading, faqsDescription, city: shopCity } = useShopOwnerPortal();
   const [section, setSection] = useState<PeopleSection>("customers");
+  const [showAddForm, setShowAddForm] = useState(false);
   const [search, setSearch] = useState("");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -647,7 +706,7 @@ export default function ShopPeoplePage() {
   }, [myCustomers]);
 
   const isDirectorySearch = section === "customers" && search.trim().length > 0;
-  const showSearch = section !== "add-new" && !detailView;
+  const showSearch = !detailView;
 
   const listCustomers = useMemo(() => {
     if (section === "customers") {
@@ -764,6 +823,7 @@ export default function ShopPeoplePage() {
   const selectSection = (id: string) => {
     const next = id as PeopleSection;
     setSection(next);
+    setShowAddForm(false);
     setSearch("");
     setSearchHits([]);
     setStatusMessage(null);
@@ -785,6 +845,7 @@ export default function ShopPeoplePage() {
   );
 
   const handleAddToListOpen = (customer: MyCustomer) => {
+    setShowAddForm(false);
     setDetailView({ kind: "add-to-list", customer });
     setStatusMessage(null);
   };
@@ -799,6 +860,7 @@ export default function ShopPeoplePage() {
 
   const handleAddNewSaved = async (message: string) => {
     setStatusMessage(message);
+    setShowAddForm(false);
     toast.success("Customer saved.");
     await refresh();
   };
@@ -827,11 +889,21 @@ export default function ShopPeoplePage() {
         : "No customers yet."
       : "No customers in your list yet.";
 
-  const viewKey = detailView
-    ? detailView.kind === "add-to-list"
-      ? `add-to-list-${customerId(detailView.customer)}`
-      : `customer-info-${customerId(detailView.customer)}-${detailView.vehicleIndex}`
-    : section;
+  const showList = !detailView && !showAddForm;
+  const showAddNewAction =
+    !detailView && !showAddForm && !selectedCustomer && !selectedMyListCustomer;
+
+  const headerAction = useMemo(
+    () => (showAddNewAction ? <AddNewButton onClick={() => setShowAddForm(true)} /> : undefined),
+    [showAddNewAction],
+  );
+
+  const handleTableSelect = (customer: MyCustomer) => {
+    setShowAddForm(false);
+    const idx = paginatedCustomers.indexOf(customer);
+    const rowIndex = idx >= 0 ? (safePage - 1) * PAGE_SIZE + idx : 0;
+    setSelectedCustomerKey(customerRowKey(customer, String(rowIndex)));
+  };
 
   return (
     <ShopPageShell
@@ -843,20 +915,33 @@ export default function ShopPeoplePage() {
       searchValue={search}
       onSearchChange={setSearch}
       searchInputId={PEOPLE_SEARCH_INPUT_ID}
+      sidebarVariant="nav"
       sidebarItems={PEOPLE_SECTIONS}
       activeSidebarId={detailView ? null : section}
       onSidebarSelect={selectSection}
+      headerAction={headerAction}
+      heroBackgroundImage={false}
+      contentTopOffset
+      heroCardFlush
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <ShopViewTransition
-        viewKey={viewKey}
-        className={shopHeroCardBodyClass}
-        focusOnReveal={section === "add-new" || detailView?.kind === "add-to-list"}
-      >
+      <div className="space-y-1">
+        <ShopReveal show={showAddForm}>
+          <AddNewCustomerForm
+            defaultCity={shopCity}
+            onCancel={() => {
+              setShowAddForm(false);
+              setStatusMessage(null);
+            }}
+            onSaved={(message) => void handleAddNewSaved(message)}
+          />
+          {statusMessage && showAddForm ? <StatusBanner message={statusMessage} /> : null}
+        </ShopReveal>
+
         {detailView?.kind === "add-to-list" ? (
           <>
             <AddToListForm
@@ -873,139 +958,80 @@ export default function ShopPeoplePage() {
             onCancel={resetDetail}
             onGoToJobCard={() => navigate("/shop/job-cards")}
           />
-        ) : section === "add-new" ? (
-          <div className="mx-auto flex w-full max-w-3xl flex-col">
-            <AddNewCustomerForm
-              defaultCity={shopCity}
-              onCancel={() => selectSection("customers")}
-              onSaved={(message) => void handleAddNewSaved(message)}
-            />
-            {statusMessage ? <StatusBanner message={statusMessage} /> : null}
-          </div>
-        ) : listLoading && !isDirectorySearch ? (
-          <ShopLoadingPanel
-            variant={section === "my-list" ? "customer-card" : "split-row"}
-            count={5}
-          />
-        ) : listError && !isDirectorySearch ? (
-          <ShopErrorPanel message={listError} onRetry={() => void refresh()} />
-        ) : (
-          <>
-            {section === "customers" && isDirectorySearch && searching && searchHits.length === 0 ? (
-              <ShopEmptyPanel message="Searching…" />
-            ) : listCustomers.length === 0 ? (
-              <ShopEmptyPanel message={emptyMessage} />
-            ) : section === "customers" && selectedCustomer ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCustomerKey(null)}
-                  className={`mb-3 w-full rounded-md px-3 py-1.5 text-left text-xs font-semibold text-ad-purple hover:underline ${shopHeroOpaqueSurfaceClass}`}
-                >
-                  ← Back to list
-                </button>
-                <CustomerAddPrompt
-                  customer={selectedCustomer}
-                  inMyList={isInMyList(selectedCustomer)}
-                  adding={addingId === customerId(selectedCustomer)}
-                  onAdd={() => handleAddExisting(selectedCustomer)}
-                />
-              </>
-            ) : section === "my-list" && selectedMyListCustomer ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCustomerKey(null)}
-                  className={`mb-3 w-full rounded-md px-3 py-1.5 text-left text-xs font-semibold text-ad-purple hover:underline ${shopHeroOpaqueSurfaceClass}`}
-                >
-                  ← Back to list
-                </button>
-                <MyListCustomerDetail
-                  customer={selectedMyListCustomer}
-                  onVehicleSelect={(vehicleIndex) =>
-                    setDetailView({
-                      kind: "customer-info",
-                      customer: selectedMyListCustomer,
-                      vehicleIndex,
-                    })
-                  }
-                />
-              </>
-            ) : (
-              <>
-                <ShopListPanel>
-                  {paginatedCustomers.map((customer, index) => {
-                    const rowIndex = (safePage - 1) * PAGE_SIZE + index;
-                    const rowKey = customerRowKey(customer, String(rowIndex));
+        ) : showList ? (
+          listLoading && !isDirectorySearch ? (
+            <ShopLoadingPanel variant="profile-table" />
+          ) : listError && !isDirectorySearch ? (
+            <ShopErrorPanel message={listError} onRetry={() => void refresh()} />
+          ) : section === "customers" && isDirectorySearch && searching && searchHits.length === 0 ? (
+            <p className="text-center text-sm text-gray-600">Searching…</p>
+          ) : listCustomers.length === 0 ? (
+            <p className="text-center text-sm text-gray-600">{emptyMessage}</p>
+          ) : section === "customers" && selectedCustomer ? (
+            <>
+              <button type="button" onClick={() => setSelectedCustomerKey(null)} className={shopBulkButtonClass}>
+                ← Back to list
+              </button>
+              <CustomerAddPrompt
+                customer={selectedCustomer}
+                inMyList={isInMyList(selectedCustomer)}
+                adding={addingId === customerId(selectedCustomer)}
+                onAdd={() => handleAddExisting(selectedCustomer)}
+              />
+            </>
+          ) : section === "my-list" && selectedMyListCustomer ? (
+            <>
+              <button type="button" onClick={() => setSelectedCustomerKey(null)} className={shopBulkButtonClass}>
+                ← Back to list
+              </button>
+              <MyListCustomerDetail
+                customer={selectedMyListCustomer}
+                onVehicleSelect={(vehicleIndex) =>
+                  setDetailView({
+                    kind: "customer-info",
+                    customer: selectedMyListCustomer,
+                    vehicleIndex,
+                  })
+                }
+              />
+            </>
+          ) : (
+            <>
+              <CustomerListTable
+                customers={paginatedCustomers}
+                onSelect={handleTableSelect}
+                showCity={section === "my-list"}
+              />
 
-                    if (section === "customers" && isDirectorySearch) {
+              <ShopListFooter className="text-sm font-semibold text-gray-600">
+                <p>{listCustomers.length} Entries</p>
+                {totalPages > 1 ? (
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
+                      const isActive = pageNumber === safePage;
                       return (
                         <button
-                          key={rowKey}
+                          key={pageNumber}
                           type="button"
-                          onClick={() => setSelectedCustomerKey(rowKey)}
-                          className={`flex w-full items-center justify-between gap-4 rounded-md px-4 py-3 text-left sm:px-5 sm:py-4 bg-[#ffe8d6]/80 hover:bg-[#ffe8d6]/95 ${shopHeroOpaqueSurfaceClass} focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008000]`}
+                          onClick={() => setPage(pageNumber)}
+                          className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
+                            isActive
+                              ? "bg-gray-500 text-white"
+                              : "border border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                          }`}
+                          aria-current={isActive ? "page" : undefined}
                         >
-                          <div className="min-w-0">
-                            <p className="text-base font-bold text-[#008000]">{customer.name ?? "—"}</p>
-                            <p className="text-sm font-semibold text-blue-700">{formatPhoneLabel(customer.phone)}</p>
-                          </div>
-                          <VehiclesColumn count={vehicleCount(customer)} />
+                          {pageNumber}
                         </button>
                       );
-                    }
-
-                    if (section === "my-list") {
-                      const listKey = customerRowKey(customer, String(rowIndex));
-                      return (
-                        <MyListCustomerCard
-                          key={listKey}
-                          customer={customer}
-                          onSelect={() => setSelectedCustomerKey(listKey)}
-                        />
-                      );
-                    }
-
-                    return (
-                      <StripedCustomerRow
-                        key={rowKey}
-                        customer={customer}
-                        index={rowIndex}
-                        onSelect={() => setSelectedCustomerKey(rowKey)}
-                      />
-                    );
-                  })}
-                </ShopListPanel>
-
-                <ShopListFooter>
-                  <p>{listCustomers.length} Entries</p>
-                  {totalPages > 1 ? (
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
-                        const isActive = pageNumber === safePage;
-                        return (
-                          <button
-                            key={pageNumber}
-                            type="button"
-                            onClick={() => setPage(pageNumber)}
-                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${isActive
-                                ? "bg-gray-500 text-white"
-                                : "border border-gray-400 bg-white/90 text-gray-700 hover:bg-gray-100"
-                              }`}
-                            aria-current={isActive ? "page" : undefined}
-                          >
-                            {pageNumber}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </ShopListFooter>
-              </>
-            )}
-          </>
-        )}
-      </ShopViewTransition>
+                    })}
+                  </div>
+                ) : null}
+              </ShopListFooter>
+            </>
+          )
+        ) : null}
+      </div>
     </ShopPageShell>
   );
 }
