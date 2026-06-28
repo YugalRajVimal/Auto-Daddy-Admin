@@ -245,10 +245,6 @@ export default function ShopProfilePage() {
 
   const headerAction = useMemo(() => {
     switch (activeId) {
-      case "open":
-        return showAddHours ? undefined : (
-          <AddNewButton onClick={() => setShowAddHours(true)} />
-        );
       case "brands":
         return showAddBrand ? undefined : (
           <AddNewButton onClick={() => setShowAddBrand(true)} />
@@ -262,7 +258,7 @@ export default function ShopProfilePage() {
       default:
         return undefined;
     }
-  }, [activeId, showAddBrand, showAddService, showAddHours]);
+  }, [activeId, showAddBrand, showAddService]);
 
   const removeBrand = async (company: ShopCarCompany) => {
     const id = getCarBrandId(company);
@@ -363,12 +359,19 @@ export default function ShopProfilePage() {
         );
       case "open":
         return (
-          <ShopOpenHoursEditor
-            perDayOpenHours={business?.perDayOpenHours}
-            onSaved={() => void refresh()}
-            showAddForm={showAddHours}
-            onAddFormClose={() => setShowAddHours(false)}
-          />
+          <>
+            {!showAddHours ? (
+              <div className="mb-1 flex justify-end">
+                <AddNewButton onClick={() => setShowAddHours(true)} />
+              </div>
+            ) : null}
+            <ShopOpenHoursEditor
+              perDayOpenHours={business?.perDayOpenHours}
+              onSaved={() => void refresh()}
+              showAddForm={showAddHours}
+              onAddFormClose={() => setShowAddHours(false)}
+            />
+          </>
         );
       case "brands":
         return (
