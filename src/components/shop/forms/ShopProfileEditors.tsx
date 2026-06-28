@@ -13,9 +13,17 @@ import {
   ADMIN_PANEL_THEAD_ROW_CLASS,
   adminPanelRowClass,
   adminPanelTableClasses,
+  type AdminPanelTableClasses,
 } from "../../admin/adminPanelTableStyles";
 
-const SHOP_TABLE = adminPanelTableClasses(true);
+const SHOP_TABLE_BASE = adminPanelTableClasses(true);
+const SHOP_TABLE: AdminPanelTableClasses = {
+  ...SHOP_TABLE_BASE,
+  th: SHOP_TABLE_BASE.th.replace("px-2", "px-4"),
+  thCheckbox: SHOP_TABLE_BASE.thCheckbox.replace("px-2", "px-4"),
+  td: SHOP_TABLE_BASE.td.replace("px-2", "px-4"),
+  tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
+};
 import { shopCompactInputClass, shopProfileEditingRowClass, shopProfileFormPanelClass, shopProfileFormPanelFooterClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
@@ -58,6 +66,7 @@ import { parseCitiesApiResponse } from "../../../lib/carOwnerCities";
 import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
 import { shopSaveButtonClass } from "./ShopFormPage";
 import { ShopReveal } from "../ShopAnimated";
+import { ShopLoadingPanel } from "../ShopPanels";
 import { motion } from "framer-motion";
 
 const checkboxBoxClass =
@@ -1191,27 +1200,27 @@ function CarBrandEmblemTooltip({ company }: { company: ShopCarCompany }) {
       </span>
       {open
         ? createPortal(
+          <div
+            role="tooltip"
+            className="pointer-events-none fixed z-[10000] -translate-x-1/2"
+            style={{ top: coords.top, left: coords.left }}
+          >
             <div
-              role="tooltip"
-              className="pointer-events-none fixed z-[10000] -translate-x-1/2"
-              style={{ top: coords.top, left: coords.left }}
+              className="flex items-center justify-center overflow-hidden rounded border border-gray-300 bg-white shadow-lg"
+              style={{
+                height: CAR_BRAND_EMBLEM_TOOLTIP_HEIGHT_PX,
+                width: CAR_BRAND_EMBLEM_TOOLTIP_WIDTH_PX,
+              }}
             >
-              <div
-                className="flex items-center justify-center overflow-hidden rounded border border-gray-300 bg-white shadow-lg"
-                style={{
-                  height: CAR_BRAND_EMBLEM_TOOLTIP_HEIGHT_PX,
-                  width: CAR_BRAND_EMBLEM_TOOLTIP_WIDTH_PX,
-                }}
-              >
-                <CarBrandLogo
-                  company={company}
-                  className="h-full w-full object-contain"
-                  alt={`${name} emblem`}
-                />
-              </div>
-            </div>,
-            document.body
-          )
+              <CarBrandLogo
+                company={company}
+                className="h-full w-full object-contain"
+                alt={`${name} emblem`}
+              />
+            </div>
+          </div>,
+          document.body
+        )
         : null}
     </>
   );
@@ -1271,9 +1280,10 @@ export function ShopCarBrandList({
                         aria-label={`Delete ${name}`}
                         disabled={isSaving}
                         onClick={() => onRemove(company)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-red-600 hover:text-red-800 disabled:opacity-60"
+                        className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs font-semibold text-ad-purple-dark hover:text-ad-purple disabled:opacity-60"
                       >
                         <FiTrash2 size={13} aria-hidden />
+                        <span>Delete</span>
                       </button>
                     </div>
                   </td>
@@ -1361,8 +1371,15 @@ export function ShopCarBrandAddEditor({
         />
       }
     >
-      <div className="flex justify-center">
-        <CompactFormRow className="w-auto flex flex-nowrap items-start gap-x-6">
+      <CompactFormRow className="grid-cols-3 items-stretch">
+        <div className="flex min-w-0 items-center justify-center">
+          <img
+            src="/logo.png"
+            alt="AutoDaddy"
+            className="h-14 w-auto object-contain"
+          />
+        </div>
+        <div className="flex min-w-0 items-start justify-center">
           <CompactField label="Name" className="w-40 sm:w-48">
             <select
               className={shopCompactInputClass}
@@ -1384,6 +1401,8 @@ export function ShopCarBrandAddEditor({
               })}
             </select>
           </CompactField>
+        </div>
+        <div className="flex min-w-0 items-start justify-center">
           <CompactField label="Amblem" className="w-auto shrink-0">
             <div className={CAR_BRAND_EMBLEM_ADD_SLOT_CLASS}>
               {brandId ? (
@@ -1395,8 +1414,8 @@ export function ShopCarBrandAddEditor({
               )}
             </div>
           </CompactField>
-        </CompactFormRow>
-      </div>
+        </div>
+      </CompactFormRow>
     </CompactFormPanel>
   );
 }
@@ -1422,13 +1441,19 @@ export type ShopServiceFormMeta = {
 
 export function ShopServiceList({
   services,
+  checkedIds,
   savingServiceId,
   editingServiceId,
+  onToggleChecked,
+  onToggleAllChecked,
   onEdit,
 }: {
   services: ShopServiceCategory[];
+  checkedIds: Set<string>;
   savingServiceId?: string | null;
   editingServiceId?: string | null;
+  onToggleChecked: (id: string) => void;
+  onToggleAllChecked: () => void;
   onEdit: (service: ShopServiceCategory) => void;
 }) {
   const sortedServices = useMemo(
@@ -1439,6 +1464,20 @@ export function ShopServiceList({
     [services]
   );
   const editHeadClass = `${SHOP_TABLE.th} text-center`;
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const visibleIds = useMemo(
+    () => sortedServices.map((service) => getServiceId(service)),
+    [sortedServices]
+  );
+  const allServicesChecked =
+    visibleIds.length > 0 && visibleIds.every((id) => checkedIds.has(id));
+  const someServicesChecked = checkedIds.size > 0 && !allServicesChecked;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someServicesChecked;
+    }
+  }, [someServicesChecked]);
 
   return (
     <motion.div
@@ -1450,6 +1489,16 @@ export function ShopServiceList({
         <table className={SHOP_TABLE.table}>
           <thead>
             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE.thCheckbox}>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allServicesChecked}
+                  onChange={onToggleAllChecked}
+                  aria-label="Select all services"
+                  className="h-3.5 w-3.5 accent-ad-purple"
+                />
+              </th>
               <th className={SHOP_TABLE.th}>Name of Service</th>
               <th className={SHOP_TABLE.th}>Vendor Type</th>
               <th className={SHOP_TABLE.th}>Date</th>
@@ -1471,6 +1520,16 @@ export function ShopServiceList({
                     isEditingRow ? shopProfileEditingRowClass : adminPanelRowClass(index)
                   }
                 >
+                  <td className={SHOP_TABLE.tdCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={checkedIds.has(id)}
+                      onChange={() => onToggleChecked(id)}
+                      aria-label={`Select ${name}`}
+                      disabled={isSaving}
+                      className="h-3.5 w-3.5 accent-ad-purple disabled:opacity-60"
+                    />
+                  </td>
                   <td
                     className={`${SHOP_TABLE.td} font-semibold ${isInactive ? "text-ad-purple" : "text-blue-700"}`}
                   >
@@ -1721,6 +1780,127 @@ export function ShopServiceAddEditor({
         </CompactField>
       </CompactFormRow>
     </CompactFormPanel>
+  );
+}
+
+export function ShopOperationalServicesEditor({
+  loading = false,
+  services,
+  fullServiceCatalog,
+  selectedIds,
+  shopType,
+  editingId,
+  showAddForm = false,
+  onAddFormClose,
+  onSaveService,
+  onSaved,
+  onCloseForm,
+  onEdit,
+  onRemoveSelected,
+  headerAction,
+}: {
+  loading?: boolean;
+  services: ShopServiceCategory[];
+  fullServiceCatalog: ShopServiceCategory[];
+  selectedIds: Set<string>;
+  shopType?: string | null;
+  editingId?: string | null;
+  showAddForm?: boolean;
+  onAddFormClose?: () => void;
+  onSaveService?: (
+    id: string,
+    replacesId?: string,
+    meta?: ShopServiceFormMeta
+  ) => Promise<boolean> | boolean;
+  onSaved: (id: string) => void;
+  onCloseForm?: () => void;
+  onEdit: (service: ShopServiceCategory) => void;
+  onRemoveSelected: (ids: Set<string>) => Promise<boolean>;
+  headerAction?: ReactNode;
+}) {
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+
+  const showForm = showAddForm || editingId !== null;
+  const hasBulkSelection = selectedRows.size > 0;
+
+  const toggleRow = (id: string) => {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllRows = () => {
+    setSelectedRows((prev) => {
+      const allIds = services.map((service) => getServiceId(service));
+      const allChecked = allIds.length > 0 && allIds.every((id) => prev.has(id));
+      return allChecked ? new Set() : new Set(allIds);
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRows.size === 0) return;
+    setSaving(true);
+    try {
+      const removed = await onRemoveSelected(selectedRows);
+      if (removed) setSelectedRows(new Set());
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      {!showForm ? (
+        <div className="flex min-h-[2rem] items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleBulkDelete()}
+              disabled={!hasBulkSelection || saving}
+              className={shopHoursBulkButtonClass}
+            >
+              Delete
+            </button>
+          </div>
+          {headerAction ? <div className="flex shrink-0 items-center">{headerAction}</div> : null}
+        </div>
+      ) : null}
+      <ShopReveal show={showForm}>
+        <ShopServiceAddEditor
+          services={fullServiceCatalog}
+          selectedServices={services}
+          selectedIds={selectedIds}
+          shopType={shopType}
+          editingId={editingId}
+          onSaveService={onSaveService}
+          onSaved={onSaved}
+          onClose={() => {
+            onCloseForm?.();
+            onAddFormClose?.();
+          }}
+        />
+      </ShopReveal>
+      {loading ? (
+        <ShopLoadingPanel variant="profile-table" className="mt-4" />
+      ) : services.length === 0 ? (
+        <p className="text-center text-sm text-gray-600">
+          No services added yet. Click &ldquo;+ Add New&rdquo; to add one.
+        </p>
+      ) : (
+        <ShopServiceList
+          services={services}
+          checkedIds={selectedRows}
+          editingServiceId={editingId}
+          onToggleChecked={toggleRow}
+          onToggleAllChecked={toggleAllRows}
+          onEdit={onEdit}
+        />
+      )}
+    </div>
   );
 }
 
