@@ -67,8 +67,8 @@ const SECTION_TITLES: Record<string, string> = {
 };
 
 const FLUSH_HERO_SECTIONS = new Set(["open", "brands", "services"]);
-const CENTERED_HERO_SECTIONS = new Set(["personal", "business"]);
-const FLUSH_PADDING_SECTIONS = new Set([...FLUSH_HERO_SECTIONS, ...CENTERED_HERO_SECTIONS]);
+const TRANSPARENT_HERO_SECTIONS = new Set(["personal", "business"]);
+const TOP_ALIGNED_SECTIONS = new Set([...FLUSH_HERO_SECTIONS, ...TRANSPARENT_HERO_SECTIONS]);
 
 function ProfileHeroFormSection({
   children,
@@ -578,8 +578,9 @@ export default function ShopProfilePage() {
       onSidebarSelect={setActiveId}
       headerAction={headerAction}
       heroBackgroundImage={false}
-      contentTopOffset={FLUSH_HERO_SECTIONS.has(activeId)}
-      heroCardFlush={FLUSH_PADDING_SECTIONS.has(activeId)}
+      contentTopOffset={TOP_ALIGNED_SECTIONS.has(activeId)}
+      heroCardFlush={FLUSH_HERO_SECTIONS.has(activeId)}
+      heroCardTransparent={TRANSPARENT_HERO_SECTIONS.has(activeId)}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
