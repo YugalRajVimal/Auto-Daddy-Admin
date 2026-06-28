@@ -30,7 +30,7 @@ import {
 } from "../../../lib/shopOwnerMutations";
 import {
   formatOpenHoursTimeTable,
-  getOpenHoursTableRows,
+  nextWeekdayDateISO,
   resolveShopOpenHoursSchedule,
   serializePerDayOpenHoursForApi,
   shortDayLabel,
@@ -62,6 +62,9 @@ import { motion } from "framer-motion";
 
 const checkboxBoxClass =
   "inline-block border border-gray-300 bg-gray-100 px-2 py-0.5 text-xs text-gray-800";
+
+const shopHoursBulkButtonClass =
+  "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
 
 function ProfileImagePreviewModal({
   open,
@@ -787,11 +790,13 @@ export function ShopOpenHoursEditor({
   onSaved,
   showAddForm = false,
   onAddFormClose,
+  headerAction,
 }: {
   perDayOpenHours?: string;
   onSaved: () => void;
   showAddForm?: boolean;
   onAddFormClose?: () => void;
+  headerAction?: ReactNode;
 }) {
   const { token } = useAuth();
   const [schedule, setSchedule] = useState<PerDaySchedule>(() =>
@@ -804,18 +809,17 @@ export function ShopOpenHoursEditor({
   const [formStart, setFormStart] = useState("09:00");
   const [formEnd, setFormEnd] = useState("20:00");
   const [saving, setSaving] = useState(false);
-  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [selectedDays, setSelectedDays] = useState<Set<WeekDay>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const tableRows = useMemo(() => getOpenHoursTableRows(), []);
-  const allRowsSelected = tableRows.every((row) => selectedRowIds.has(row.id));
-  const someRowsSelected = selectedRowIds.size > 0 && !allRowsSelected;
+  const allDaysSelected = WEEK_DAYS.every((day) => selectedDays.has(day));
+  const someDaysSelected = selectedDays.size > 0 && !allDaysSelected;
 
   useEffect(() => {
     if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = someRowsSelected;
+      selectAllRef.current.indeterminate = someDaysSelected;
     }
-  }, [someRowsSelected]);
+  }, [someDaysSelected]);
 
   const resetFormFields = (day: WeekDay = "Monday") => {
     const entry = schedule[day];
@@ -884,25 +888,79 @@ export function ShopOpenHoursEditor({
     }
   };
 
-  const toggleRowSelection = (rowId: string) => {
-    setSelectedRowIds((prev) => {
+  const toggleDaySelection = (day: WeekDay) => {
+    setSelectedDays((prev) => {
       const next = new Set(prev);
-      if (next.has(rowId)) next.delete(rowId);
-      else next.add(rowId);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
       return next;
     });
   };
 
-  const toggleAllRows = () => {
-    setSelectedRowIds(
-      allRowsSelected ? new Set() : new Set(tableRows.map((row) => row.id))
-    );
+  const toggleAllDays = () => {
+    setSelectedDays(allDaysSelected ? new Set() : new Set(WEEK_DAYS));
+  };
+
+  const applyBulkStatus = async (open: boolean) => {
+    if (selectedDays.size === 0) return;
+
+    const nextSchedule = { ...schedule };
+    for (const day of selectedDays) {
+      nextSchedule[day] = { ...nextSchedule[day], enabled: open };
+    }
+
+    if (USE_DUMMY_SHOP_OPEN_HOURS) {
+      setSchedule(nextSchedule);
+      toast.success(open ? "Selected days opened." : "Selected days closed.");
+      setSelectedDays(new Set());
+      return;
+    }
+
+    if (!token) return;
+    setSaving(true);
+    try {
+      const res = await updateBusinessOpenHours(token, serializePerDayOpenHoursForApi(nextSchedule));
+      if (!res.ok) {
+        toast.error(apiMessage(res.data) || "Could not save hours.");
+        return;
+      }
+      setSchedule(nextSchedule);
+      toast.success(open ? "Selected days opened." : "Selected days closed.");
+      onSaved();
+      setSelectedDays(new Set());
+    } finally {
+      setSaving(false);
+    }
   };
 
   const showForm = formMode === "add" || formMode === "edit";
+  const hasBulkSelection = selectedDays.size > 0;
 
   return (
     <div className="space-y-1">
+      {!showForm ? (
+        <div className="flex min-h-[2rem] items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void applyBulkStatus(true)}
+              disabled={!hasBulkSelection || saving}
+              className={shopHoursBulkButtonClass}
+            >
+              Open All
+            </button>
+            <button
+              type="button"
+              onClick={() => void applyBulkStatus(false)}
+              disabled={!hasBulkSelection || saving}
+              className={shopHoursBulkButtonClass}
+            >
+              Close All
+            </button>
+          </div>
+          {headerAction ? <div className="flex shrink-0 items-center">{headerAction}</div> : null}
+        </div>
+      ) : null}
       <ShopReveal show={showForm}>
         <CompactFormPanel
           className="!mb-0 shadow-none"
@@ -988,8 +1046,8 @@ export function ShopOpenHoursEditor({
                   <input
                     ref={selectAllRef}
                     type="checkbox"
-                    checked={allRowsSelected}
-                    onChange={toggleAllRows}
+                    checked={allDaysSelected}
+                    onChange={toggleAllDays}
                     aria-label="Select all days"
                     className="h-3.5 w-3.5 accent-ad-purple"
                   />
@@ -1003,13 +1061,13 @@ export function ShopOpenHoursEditor({
               </tr>
             </thead>
             <tbody>
-              {tableRows.map((row, index) => {
-                const entry = schedule[row.day];
-                const isEditingRow = editingDay === row.day;
+              {WEEK_DAYS.map((day, index) => {
+                const entry = schedule[day];
+                const isEditingRow = editingDay === day;
                 const isClosed = !entry.enabled;
                 return (
                   <tr
-                    key={row.id}
+                    key={day}
                     className={
                       isEditingRow ? "bg-ad-form-required-bg" : adminPanelRowClass(index)
                     }
@@ -1017,21 +1075,21 @@ export function ShopOpenHoursEditor({
                     <td className={SHOP_TABLE.tdCheckbox}>
                       <input
                         type="checkbox"
-                        checked={selectedRowIds.has(row.id)}
-                        onChange={() => toggleRowSelection(row.id)}
-                        aria-label={`Select ${row.day} ${row.dateISO}`}
+                        checked={selectedDays.has(day)}
+                        onChange={() => toggleDaySelection(day)}
+                        aria-label={`Select ${day}`}
                         className="h-3.5 w-3.5 accent-ad-purple"
                       />
                     </td>
                     <td
                       className={`${SHOP_TABLE.td} font-semibold ${isClosed ? "text-ad-purple" : "text-blue-700"}`}
                     >
-                      {row.dateISO}
+                      {nextWeekdayDateISO(day)}
                     </td>
                     <td
                       className={`${SHOP_TABLE.td} font-semibold ${isClosed ? "text-ad-purple" : "text-gray-800"}`}
                     >
-                      {shortDayLabel(row.day)}
+                      {shortDayLabel(day)}
                     </td>
                     <td className={`${SHOP_TABLE.td} ${isClosed ? "text-ad-purple" : ""}`}>
                       {entry.enabled ? formatOpenHoursTimeTable(entry.start) : "—"}
@@ -1045,10 +1103,10 @@ export function ShopOpenHoursEditor({
                     <td className={`${SHOP_TABLE.td} text-center`}>
                       <button
                         type="button"
-                        title={`Edit ${row.day}`}
-                        aria-label={`Edit ${row.day}`}
+                        title={`Edit ${day}`}
+                        aria-label={`Edit ${day}`}
                         disabled={saving}
-                        onClick={() => openEditForm(row.day)}
+                        onClick={() => openEditForm(day)}
                         className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple disabled:opacity-60"
                       >
                         <FiEdit2 size={13} aria-hidden />

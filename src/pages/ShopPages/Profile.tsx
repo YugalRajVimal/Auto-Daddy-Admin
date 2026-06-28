@@ -353,19 +353,15 @@ export default function ShopProfilePage() {
         );
       case "open":
         return (
-          <div className="space-y-1">
-            {!showAddHours ? (
-              <div className="flex justify-end">
-                <AddNewButton onClick={() => setShowAddHours(true)} />
-              </div>
-            ) : null}
-            <ShopOpenHoursEditor
-              perDayOpenHours={business?.perDayOpenHours}
-              onSaved={() => void refresh()}
-              showAddForm={showAddHours}
-              onAddFormClose={() => setShowAddHours(false)}
-            />
-          </div>
+          <ShopOpenHoursEditor
+            perDayOpenHours={business?.perDayOpenHours}
+            onSaved={() => void refresh()}
+            showAddForm={showAddHours}
+            onAddFormClose={() => setShowAddHours(false)}
+            headerAction={
+              !showAddHours ? <AddNewButton onClick={() => setShowAddHours(true)} /> : undefined
+            }
+          />
         );
       case "brands":
         return (

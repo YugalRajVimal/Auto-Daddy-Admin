@@ -38,15 +38,6 @@ export function createDefaultPerDaySchedule(): PerDaySchedule {
 /** Demo schedule until per-day open hours API is reliable. */
 export const USE_DUMMY_SHOP_OPEN_HOURS = true;
 
-/** Number of rows shown in the shop open-hours table while dummy mode is on. */
-export const DUMMY_OPEN_HOURS_TABLE_ROW_COUNT = 10;
-
-export type OpenHoursTableRow = {
-  id: string;
-  dateISO: string;
-  day: WeekDay;
-};
-
 export function createDummyPerDaySchedule(): PerDaySchedule {
   const schedule = createDefaultPerDaySchedule();
   for (const day of ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] as WeekDay[]) {
@@ -227,47 +218,6 @@ export function nextWeekdayDateISO(day: WeekDay): string {
   const next = new Date(today);
   next.setDate(today.getDate() + diff);
   return next.toISOString().slice(0, 10);
-}
-
-function dateISOFromLocalDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-export function getDummyOpenHoursTableRows(
-  count = DUMMY_OPEN_HOURS_TABLE_ROW_COUNT,
-  startDate: Date = new Date()
-): OpenHoursTableRow[] {
-  const rows: OpenHoursTableRow[] = [];
-  const cursor = new Date(startDate);
-  cursor.setHours(12, 0, 0, 0);
-
-  for (let index = 0; index < count; index += 1) {
-    const date = new Date(cursor);
-    date.setDate(cursor.getDate() + index);
-    const day = WEEK_DAYS[(date.getDay() + 6) % 7];
-    const dateISO = dateISOFromLocalDate(date);
-    rows.push({ id: dateISO, dateISO, day });
-  }
-
-  return rows;
-}
-
-export function getWeekdayOpenHoursTableRows(): OpenHoursTableRow[] {
-  return WEEK_DAYS.map((day) => ({
-    id: day,
-    dateISO: nextWeekdayDateISO(day),
-    day,
-  }));
-}
-
-export function getOpenHoursTableRows(): OpenHoursTableRow[] {
-  if (USE_DUMMY_SHOP_OPEN_HOURS) {
-    return getDummyOpenHoursTableRows();
-  }
-  return getWeekdayOpenHoursTableRows();
 }
 
 export function formatOpenHoursRangeDisplay(start: string, end: string): string {
