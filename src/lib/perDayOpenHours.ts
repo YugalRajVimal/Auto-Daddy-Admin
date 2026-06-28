@@ -168,7 +168,6 @@ export function shortDayLabel(day: WeekDay) {
   return day.slice(0, 3);
 }
 
-/** Display 24h time as legacy UI text (e.g. `9.00 Am`). */
 export function formatOpenHoursTimeDisplay(time24: string): string {
   const [hStr, mStr = "0"] = time24.split(":");
   const hour = Number(hStr);
@@ -194,6 +193,31 @@ export function formatOpenHoursTimeDisplay(time24: string): string {
   }
 
   return `${hour12}.${mm} ${ampm}`;
+}
+
+/** Table column time (e.g. `9.00`). */
+export function formatOpenHoursTimeTable(time24: string): string {
+  const [hStr, mStr = "0"] = time24.split(":");
+  const hour = Number(hStr);
+  const minute = Number(mStr);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return time24;
+
+  const mm = String(minute).padStart(2, "0");
+  let hour12 = hour % 12;
+  if (hour12 === 0) hour12 = 12;
+  return `${hour12}.${mm}`;
+}
+
+/** Next calendar date for a weekday, formatted `YYYY-MM-DD`. */
+export function nextWeekdayDateISO(day: WeekDay): string {
+  const targetIndex = WEEK_DAYS.indexOf(day);
+  const today = new Date();
+  const todayIndex = (today.getDay() + 6) % 7;
+  let diff = targetIndex - todayIndex;
+  if (diff < 0) diff += 7;
+  const next = new Date(today);
+  next.setDate(today.getDate() + diff);
+  return next.toISOString().slice(0, 10);
 }
 
 export function formatOpenHoursRangeDisplay(start: string, end: string): string {

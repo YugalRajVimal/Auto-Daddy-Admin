@@ -19,11 +19,10 @@ const DashboardPanelCard = ({
 
   return (
     <div
-      className={`relative w-full shadow-sm ${
-        isForm
+      className={`relative w-full shadow-sm ${isForm
           ? "rounded border border-ad-form-border bg-ad-form-bg px-4 py-4 md:px-5 md:py-5"
           : "rounded-lg border border-gray-200 bg-white px-3.5 py-2.5"
-      } ${className}`}
+        } ${className}`}
       style={{
         zIndex: 50,
         marginBottom: DASHBOARD_PANEL_SHADOW_HEIGHT,

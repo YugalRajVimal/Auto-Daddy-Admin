@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { PORTAL_PROFILE_HERO_IMAGE } from "../../lib/portalHeroImage";
 import {
+  shopHeroCardFlushPaddingClass,
   shopHeroCardImageClass,
   shopHeroCardPaddingClass,
   shopMainContentShellClass,
@@ -12,21 +13,38 @@ const layoutEase = [0.4, 0, 0.2, 1] as const;
 type ShopProfileHeroPanelProps = {
   children: ReactNode;
   className?: string;
+  /** When false, renders a plain white card without the decorative background image. */
+  showBackgroundImage?: boolean;
+  /** Plain card without background image; light border, modest padding, transparent fill. */
+  flush?: boolean;
 };
 
-export default function ShopProfileHeroPanel({ children, className = "" }: ShopProfileHeroPanelProps) {
+export default function ShopProfileHeroPanel({
+  children,
+  className = "",
+  showBackgroundImage = true,
+  flush = false,
+}: ShopProfileHeroPanelProps) {
+  const shellClass = flush
+    ? "border border-gray-200 bg-transparent"
+    : "border border-gray-300 bg-white";
+
   return (
     <motion.div
       layout
       transition={{ layout: { duration: 0.28, ease: layoutEase } }}
-      className={`shop-hero-card relative overflow-hidden bg-white ${shopMainContentShellClass} ${className}`}
+      className={`shop-hero-card relative overflow-hidden ${shellClass} ${shopMainContentShellClass} ${className}`}
     >
-      <img
-        src={PORTAL_PROFILE_HERO_IMAGE}
-        alt=""
-        className={shopHeroCardImageClass}
-      />
-      <div className={`relative z-10 flex h-full min-h-0 flex-col overflow-hidden ${shopHeroCardPaddingClass}`}>
+      {showBackgroundImage && !flush ? (
+        <img
+          src={PORTAL_PROFILE_HERO_IMAGE}
+          alt=""
+          className={shopHeroCardImageClass}
+        />
+      ) : null}
+      <div
+        className={`relative z-10 flex h-full min-h-0 flex-col overflow-hidden ${flush ? shopHeroCardFlushPaddingClass : shopHeroCardPaddingClass}`}
+      >
         {children}
       </div>
     </motion.div>

@@ -122,6 +122,7 @@ export default function ShopProfilePage() {
   const [myServicesLoading, setMyServicesLoading] = useState(false);
   const [savingService, setSavingService] = useState<string | null>(null);
   const [showAddService, setShowAddService] = useState(false);
+  const [showAddHours, setShowAddHours] = useState(false);
 
   const refreshMyServices = async () => {
     if (!token) return;
@@ -238,8 +239,16 @@ export default function ShopProfilePage() {
     [fullServiceCatalog, myServices, selectedServiceIds]
   );
 
+  useEffect(() => {
+    setShowAddHours(false);
+  }, [activeId]);
+
   const headerAction = useMemo(() => {
     switch (activeId) {
+      case "open":
+        return showAddHours ? undefined : (
+          <AddNewButton onClick={() => setShowAddHours(true)} />
+        );
       case "brands":
         return showAddBrand ? undefined : (
           <AddNewButton onClick={() => setShowAddBrand(true)} />
@@ -253,7 +262,7 @@ export default function ShopProfilePage() {
       default:
         return undefined;
     }
-  }, [activeId, showAddBrand, showAddService]);
+  }, [activeId, showAddBrand, showAddService, showAddHours]);
 
   const removeBrand = async (company: ShopCarCompany) => {
     const id = getCarBrandId(company);
@@ -357,6 +366,8 @@ export default function ShopProfilePage() {
           <ShopOpenHoursEditor
             perDayOpenHours={business?.perDayOpenHours}
             onSaved={() => void refresh()}
+            showAddForm={showAddHours}
+            onAddFormClose={() => setShowAddHours(false)}
           />
         );
       case "brands":
@@ -494,6 +505,10 @@ export default function ShopProfilePage() {
       activeSidebarId={activeId}
       onSidebarSelect={setActiveId}
       headerAction={headerAction}
+      heroBackgroundImage={activeId === "open" ? false : undefined}
+      contentTopOffset={activeId === "open"}
+      heroCardFlush={activeId === "open"}
+      heroCardToolbarAlways={activeId === "open"}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}

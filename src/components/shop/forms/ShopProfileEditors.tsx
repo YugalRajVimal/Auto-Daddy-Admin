@@ -29,7 +29,8 @@ import {
   updateServiceWeWorkWith,
 } from "../../../lib/shopOwnerMutations";
 import {
-  formatOpenHoursRangeDisplay,
+  formatOpenHoursTimeTable,
+  nextWeekdayDateISO,
   resolveShopOpenHoursSchedule,
   serializePerDayOpenHoursForApi,
   shortDayLabel,
@@ -221,11 +222,11 @@ function ProfileStatusFooter({
   actions: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-stretch justify-between gap-2 border-t border-ad-form-border bg-ad-form-bg">
-      <div className="flex min-w-[180px] flex-1 items-center bg-ad-form-required-bg px-3 py-2.5 text-xs font-serif italic text-gray-800">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+      <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
         {message}
       </div>
-      <div className="flex items-center gap-2 px-3 py-2.5">{actions}</div>
+      <div className="flex items-center gap-2">{actions}</div>
     </div>
   );
 }
@@ -753,22 +754,28 @@ export function ShopBusinessProfileEditor({
   );
 }
 
-type ShopHoursFormMode = "edit";
+type ShopHoursFormMode = "add" | "edit";
 
 function ShopHoursFormFooter({
+  mode,
   saving,
   onSave,
   onCancel,
 }: {
+  mode: ShopHoursFormMode;
   saving: boolean;
   onSave: () => void;
   onCancel: () => void;
 }) {
   return (
     <ProfileFormFooter
-      message="You are updating your opening timings"
+      message={
+        mode === "add"
+          ? "You are creating the daily working schedule of your Workshop"
+          : "You are updating your opening timings"
+      }
       saving={saving}
-      saveLabel="Update"
+      saveLabel={mode === "add" ? "Save" : "Update"}
       onSave={onSave}
       onReset={onCancel}
     />
@@ -778,9 +785,13 @@ function ShopHoursFormFooter({
 export function ShopOpenHoursEditor({
   perDayOpenHours,
   onSaved,
+  showAddForm = false,
+  onAddFormClose,
 }: {
   perDayOpenHours?: string;
   onSaved: () => void;
+  showAddForm?: boolean;
+  onAddFormClose?: () => void;
 }) {
   const { token } = useAuth();
   const [schedule, setSchedule] = useState<PerDaySchedule>(() =>
@@ -793,6 +804,7 @@ export function ShopOpenHoursEditor({
   const [formStart, setFormStart] = useState("09:00");
   const [formEnd, setFormEnd] = useState("20:00");
   const [saving, setSaving] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<Set<WeekDay>>(new Set());
 
   const resetFormFields = (day: WeekDay = "Monday") => {
     const entry = schedule[day];
@@ -807,6 +819,13 @@ export function ShopOpenHoursEditor({
     setSchedule(resolveShopOpenHoursSchedule(perDayOpenHours));
   }, [perDayOpenHours]);
 
+  useEffect(() => {
+    if (!showAddForm) return;
+    setEditingDay(null);
+    resetFormFields("Monday");
+    setFormMode("add");
+  }, [showAddForm]);
+
   const openEditForm = (day: WeekDay) => {
     setEditingDay(day);
     resetFormFields(day);
@@ -814,8 +833,10 @@ export function ShopOpenHoursEditor({
   };
 
   const closeForm = () => {
+    const wasAdd = formMode === "add";
     setEditingDay(null);
     setFormMode(null);
+    if (wasAdd) onAddFormClose?.();
   };
 
   const applyFormToSchedule = (): PerDaySchedule => ({
@@ -852,14 +873,26 @@ export function ShopOpenHoursEditor({
     }
   };
 
-  const showForm = formMode === "edit";
+  const toggleDaySelection = (day: WeekDay) => {
+    setSelectedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return next;
+    });
+  };
+
+  const showForm = formMode === "add" || formMode === "edit";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-1">
       <ShopReveal show={showForm}>
         <CompactFormPanel
+          className="!mb-0 shadow-none"
+          showBottomBorder={false}
           footer={
             <ShopHoursFormFooter
+              mode={formMode === "edit" ? "edit" : "add"}
               saving={saving}
               onSave={() => void handleSave()}
               onCancel={closeForm}
@@ -868,23 +901,31 @@ export function ShopOpenHoursEditor({
         >
           <CompactFormRow>
             <CompactField label="Day">
-              <input
-                type="text"
-                readOnly
-                value={shortDayLabel(formDay)}
-                className={`${shopCompactInputClass} bg-gray-50`}
-              />
-            </CompactField>
-            <CompactField label="Status">
-              <select
-                value={formOpen ? "open" : "closed"}
-                disabled={saving}
-                onChange={(e) => setFormOpen(e.target.value === "open")}
-                className={shopCompactInputClass}
-              >
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
-              </select>
+              {formMode === "edit" ? (
+                <input
+                  type="text"
+                  readOnly
+                  value={shortDayLabel(formDay)}
+                  className={`${shopCompactInputClass} bg-gray-50`}
+                />
+              ) : (
+                <select
+                  value={formDay}
+                  disabled={saving}
+                  onChange={(e) => {
+                    const day = e.target.value as WeekDay;
+                    setFormDay(day);
+                    resetFormFields(day);
+                  }}
+                  className={shopCompactInputClass}
+                >
+                  {WEEK_DAYS.map((day) => (
+                    <option key={day} value={day}>
+                      {shortDayLabel(day)}
+                    </option>
+                  ))}
+                </select>
+              )}
             </CompactField>
             <CompactField label="Opening time">
               <OpenHoursTimePicker
@@ -902,6 +943,17 @@ export function ShopOpenHoursEditor({
                 onChange={setFormEnd}
               />
             </CompactField>
+            <CompactField label="Status">
+              <select
+                value={formOpen ? "open" : "closed"}
+                disabled={saving}
+                onChange={(e) => setFormOpen(e.target.value === "open")}
+                className={shopCompactInputClass}
+              >
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+              </select>
+            </CompactField>
           </CompactFormRow>
         </CompactFormPanel>
       </ShopReveal>
@@ -915,9 +967,14 @@ export function ShopOpenHoursEditor({
           <table className={SHOP_TABLE.table}>
             <thead>
               <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                <th className={SHOP_TABLE.thCheckbox}>
+                  <span className="sr-only">Select</span>
+                </th>
+                <th className={SHOP_TABLE.th}>Date</th>
                 <th className={SHOP_TABLE.th}>Day</th>
+                <th className={SHOP_TABLE.th}>Open</th>
+                <th className={SHOP_TABLE.th}>Close</th>
                 <th className={SHOP_TABLE.th}>Status</th>
-                <th className={SHOP_TABLE.th}>Timing</th>
                 <th className={`${SHOP_TABLE.th} text-center`}>Edit</th>
               </tr>
             </thead>
@@ -932,16 +989,31 @@ export function ShopOpenHoursEditor({
                       isEditingRow ? "bg-ad-form-required-bg" : adminPanelRowClass(index)
                     }
                   >
+                    <td className={SHOP_TABLE.tdCheckbox}>
+                      <input
+                        type="checkbox"
+                        checked={selectedDays.has(day)}
+                        onChange={() => toggleDaySelection(day)}
+                        aria-label={`Select ${day}`}
+                        className="h-3.5 w-3.5 accent-ad-purple"
+                      />
+                    </td>
                     <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>
+                      {nextWeekdayDateISO(day)}
+                    </td>
+                    <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
                       {shortDayLabel(day)}
+                    </td>
+                    <td className={SHOP_TABLE.td}>
+                      {entry.enabled ? formatOpenHoursTimeTable(entry.start) : "—"}
+                    </td>
+                    <td className={SHOP_TABLE.td}>
+                      {entry.enabled ? formatOpenHoursTimeTable(entry.end) : "—"}
                     </td>
                     <td
                       className={`${SHOP_TABLE.td} font-semibold ${entry.enabled ? "text-ad-purple" : "text-gray-500"}`}
                     >
                       {entry.enabled ? "Open" : "Closed"}
-                    </td>
-                    <td className={SHOP_TABLE.td}>
-                      {entry.enabled ? formatOpenHoursRangeDisplay(entry.start, entry.end) : "—"}
                     </td>
                     <td className={`${SHOP_TABLE.td} text-center`}>
                       <button
@@ -950,7 +1022,7 @@ export function ShopOpenHoursEditor({
                         aria-label={`Edit ${day}`}
                         disabled={saving}
                         onClick={() => openEditForm(day)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-black hover:text-ad-purple disabled:opacity-60"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple disabled:opacity-60"
                       >
                         <FiEdit2 size={13} aria-hidden />
                       </button>
@@ -958,6 +1030,17 @@ export function ShopOpenHoursEditor({
                   </tr>
                 );
               })}
+              <tr className="bg-gray-100">
+                <td className={SHOP_TABLE.tdCheckbox}>
+                  <input
+                    type="checkbox"
+                    disabled
+                    aria-hidden
+                    className="h-3.5 w-3.5 accent-ad-purple opacity-40"
+                  />
+                </td>
+                <td className={SHOP_TABLE.td} colSpan={6} />
+              </tr>
             </tbody>
           </table>
         </div>

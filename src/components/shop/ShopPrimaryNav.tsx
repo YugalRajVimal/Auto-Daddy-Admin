@@ -25,12 +25,12 @@ export default function ShopPrimaryNav({
 
   return (
     <nav className={`min-w-0 w-full ${className}`.trim()} aria-label="Shop sections">
-      <ul className="flex w-full flex-col gap-2 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-1 lg:py-2.5">
+      <ul className="flex h-full w-full flex-col gap-2 py-1 lg:flex-row lg:items-center lg:justify-between lg:gap-1 lg:py-0">
         {primaryNav.map((item) => {
           const isActive = activePrimary?.name === item.name;
           const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
-          const linkClass = `block whitespace-nowrap px-1 text-base font-semibold text-ad-purple transition-colors md:text-lg ${
-            isActive ? "underline underline-offset-4 decoration-2" : "hover:underline"
+          const linkClass = `block whitespace-nowrap px-1 text-base font-semibold leading-none text-ad-purple transition-colors md:text-lg ${
+            isActive ? "underline underline-offset-2 decoration-2" : "hover:underline"
           }`;
           return (
             <li key={item.name} className="min-w-0 shrink-0">

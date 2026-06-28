@@ -9,7 +9,13 @@ import {
   shopHeroCardScrollBodyClass,
   shopHeroCardScrollClass,
   shopHeroCardScrollContentClass,
+  shopHeroCardScrollContentTopClass,
+  shopNavRowNavClass,
+  shopNavRowSlotClass,
+  shopPageBodyGridClass,
+  shopPortalBottomPaddingClass,
   shopPortalHorizPaddingClass,
+  shopPortalTopPaddingClass,
 } from "../../components/shop/shopLayoutStyles";
 import ShopSidebar from "../../components/shop/ShopSidebar";
 import { shopPrimaryNav } from "../../config/shopNav";
@@ -17,10 +23,6 @@ import {
   DEFAULT_SHOP_PAGE_CHROME,
   useShopPageChromeContext,
 } from "../../context/ShopPageChromeContext";
-
-/** Row 1: [empty | nav]. Row 2: [sidebar | main content card]. */
-export const shopPageBodyGridClass =
-  "grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)] lg:items-stretch lg:gap-x-5 lg:gap-y-3 xl:grid-cols-[260px_minmax(0,1fr)]";
 
 export default function ShopPageLayout() {
   const { chrome } = useShopPageChromeContext();
@@ -30,7 +32,7 @@ export default function ShopPageLayout() {
   const showBusinessCard = chrome.sidebarVariant === "business-card";
   const useHeroCard = chrome.heroCard !== false;
   const showSearch = chrome.searchPlaceholder != null;
-  const showToolbar = showSearch || chrome.headerAction;
+  const showToolbar = showSearch || chrome.headerAction || chrome.heroCardToolbarAlways;
 
   const sidebarCell = showBusinessCard ? (
     <ShopBusinessProfileCard />
@@ -51,9 +53,16 @@ export default function ShopPageLayout() {
     </ShopSidebar>
   );
 
+  const scrollContentClass = chrome.contentTopOffset
+    ? shopHeroCardScrollContentTopClass
+    : shopHeroCardScrollContentClass;
+
   const pageContent = useHeroCard ? (
-    <ShopProfileHeroPanel>
-      <div className="flex h-full min-h-0 w-full flex-col gap-3">
+    <ShopProfileHeroPanel
+      showBackgroundImage={chrome.heroBackgroundImage !== false}
+      flush={chrome.heroCardFlush === true}
+    >
+      <div className={`flex h-full min-h-0 w-full flex-col ${chrome.heroCardFlush ? "gap-0" : "gap-3"}`}>
         {showToolbar ? (
           <ShopHeroCardToolbar
             searchInputId={chrome.searchInputId}
@@ -61,11 +70,12 @@ export default function ShopPageLayout() {
             searchValue={chrome.searchValue}
             onSearchChange={chrome.onSearchChange}
             headerAction={chrome.headerAction}
+            alwaysShow={chrome.heroCardToolbarAlways}
           />
         ) : null}
         <div className={shopHeroCardScrollClass}>
           <div className={shopHeroCardScrollBodyClass}>
-            <div className={shopHeroCardScrollContentClass}>
+            <div className={scrollContentClass}>
               <Outlet />
             </div>
           </div>
@@ -78,21 +88,23 @@ export default function ShopPageLayout() {
 
   return (
     <PortalPageContent
-      className={`flex min-h-0 flex-1 flex-col overflow-hidden py-2 sm:py-3 md:py-4 ${shopPortalHorizPaddingClass}`}
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden ${shopPortalTopPaddingClass} ${shopPortalBottomPaddingClass} ${shopPortalHorizPaddingClass}`}
     >
       <PageMeta title={metaTitle} description={metaDescription} />
 
       <div className={shopPageBodyGridClass}>
-        {chrome.sidebarHeader ? (
-          <div className="order-1 flex w-full items-center justify-center lg:col-start-1 lg:row-start-1 lg:self-center">
-            {chrome.sidebarHeader}
-          </div>
-        ) : null}
+        <div
+          className={`order-1 lg:col-start-1 lg:row-start-1 lg:self-center ${shopNavRowSlotClass}`}
+        >
+          {chrome.sidebarHeader ?? (
+            <span className="hidden lg:block lg:size-10" aria-hidden />
+          )}
+        </div>
 
         <ShopPrimaryNav
           homePath="/shop"
           primaryNav={shopPrimaryNav}
-          className={`${chrome.sidebarHeader ? "order-2 lg:self-center" : "order-1"} lg:order-1 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:justify-self-stretch`}
+          className={`order-2 lg:order-1 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:justify-self-stretch lg:self-center ${shopNavRowNavClass}`}
         />
 
         <div className="order-3 lg:order-2 lg:col-start-1 lg:row-start-2 lg:self-start">

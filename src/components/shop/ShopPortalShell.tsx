@@ -7,7 +7,7 @@ import { Skeleton } from "../common/Skeleton";
 import { useShopPageChromeContext } from "../../context/ShopPageChromeContext";
 import type { PortalBrandLogo } from "../admin/PortalShell";
 import ShopBrandLogo from "./ShopBrandLogo";
-import { shopPortalHorizPaddingClass } from "./shopLayoutStyles";
+import { shopNavVerticalGapClass, shopPortalHorizPaddingClass } from "./shopLayoutStyles";
 
 function isPathActive(pathname: string, path: string, homePath: string) {
   if (path === homePath) return pathname === homePath;
@@ -62,8 +62,11 @@ export default function ShopPortalShell({
 
   const brandLogoLabel = brandLogo?.placeholderLabel?.trim() || "Business logo";
   const headerLogo = brandLogo ? (
-    <ShopBrandLogo src={brandLogo.src} alt={brandLogoLabel} className="!size-[50px]" />
+    <ShopBrandLogo src={brandLogo.src} alt={brandLogoLabel} className="!size-[42px]" />
   ) : null;
+
+  /** Matches vertical rhythm between header rows and header → primary nav. */
+  const headerStackGapClass = shopNavVerticalGapClass;
 
   useEffect(() => {
     document.body.style.overflow = "";
@@ -72,9 +75,9 @@ export default function ShopPortalShell({
 
   return (
     <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
-      <header className={`${shopPortalHorizPaddingClass} pt-4 pb-1 md:pt-5`}>
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2">
-          <div className="col-start-1 row-start-1 row-span-2 flex w-fit max-w-full min-w-0 flex-col items-center justify-self-start self-center">
+      <header className={`${shopPortalHorizPaddingClass} pt-0 pb-0`}>
+        <div className={`grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 ${headerStackGapClass}`}>
+          <div className="col-start-1 row-start-1 row-span-2 flex w-fit max-w-full min-w-0 flex-col items-center justify-self-start self-center pt-1">
             {businessNameLoading ? (
               <span aria-busy="true" aria-label="Loading business name">
                 <Skeleton className="h-7 w-36 rounded sm:h-8 sm:w-44 md:h-9 md:w-52" />
@@ -97,45 +100,49 @@ export default function ShopPortalShell({
             ) : null}
           </div>
 
-          <nav
-            className="col-start-3 row-start-1 flex shrink-0 items-center gap-0 justify-self-end [&>*+*]:-ml-px"
-            aria-label="Account actions"
+          <div
+            className={`col-start-3 row-start-1 row-span-2 flex flex-col items-end justify-self-end self-start ${headerStackGapClass}`}
           >
-            {subscriptionDaysLeft != null ? (
-              <span className={utilityLinkClass}>{subscriptionDaysLeft} Days Left</span>
-            ) : null}
-            <Link
-              to={helpPath ?? "#"}
-              className={helpPath && onHelpNav ? helpLinkActiveClass : utilityLinkClass}
+            <nav
+              className="flex shrink-0 items-start gap-0 [&>*+*]:-ml-px"
+              aria-label="Account actions"
             >
-              Help
-            </Link>
-            <button type="button" onClick={handleLogout} className={utilityLinkClass}>
-              Log out
-            </button>
-          </nav>
+              {subscriptionDaysLeft != null ? (
+                <span className={utilityLinkClass}>{subscriptionDaysLeft} Days Left</span>
+              ) : null}
+              <Link
+                to={helpPath ?? "#"}
+                className={helpPath && onHelpNav ? helpLinkActiveClass : utilityLinkClass}
+              >
+                Help
+              </Link>
+              <button type="button" onClick={handleLogout} className={utilityLinkClass}>
+                Log out
+              </button>
+            </nav>
 
-          <h1 className="pointer-events-none col-start-2 row-start-2 self-center text-center font-serif text-lg font-bold text-gray-600 md:text-xl lg:text-2xl">
+            <div className="relative z-10 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                className="relative text-blue-600 hover:text-blue-700"
+                aria-label="Notifications"
+              >
+                <FiBell size={22} strokeWidth={1.75} />
+                <span className="absolute -right-1.5 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold leading-none text-white">
+                  1
+                </span>
+              </button>
+              {headerLogo ? (
+                <Link to={homePath} className="shrink-0">
+                  {headerLogo}
+                </Link>
+              ) : null}
+            </div>
+          </div>
+
+          <h1 className="pointer-events-none col-span-3 col-start-1 row-start-2 z-0 flex h-[42px] w-full items-center justify-center self-end text-center font-serif text-lg font-bold leading-tight text-gray-600 md:text-xl lg:text-2xl">
             {pageHeading}
           </h1>
-
-          <div className="relative z-10 col-start-3 row-start-2 flex items-center justify-end gap-3 justify-self-end self-center">
-            <button
-              type="button"
-              className="relative text-blue-600 hover:text-blue-700"
-              aria-label="Notifications"
-            >
-              <FiBell size={26} strokeWidth={1.75} />
-              <span className="absolute -right-1.5 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold leading-none text-white">
-                1
-              </span>
-            </button>
-            {headerLogo ? (
-              <Link to={homePath} className="shrink-0">
-                {headerLogo}
-              </Link>
-            ) : null}
-          </div>
         </div>
       </header>
 

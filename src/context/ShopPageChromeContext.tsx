@@ -44,10 +44,16 @@ export type ShopPageChromeConfig = {
   sidebarVariant?: "business-card" | "nav";
   /** When false, uses the home hero layout instead of the profile background card. */
   heroCard?: boolean;
+  /** When false, omits the decorative background image inside the profile hero card. */
+  heroBackgroundImage?: boolean;
   /** When true, sidebar column stretches to match the main content height (home ads + menu). */
   sidebarStretch?: boolean;
-  /** When false, keeps page content top-aligned inside the hero card instead of vertically centered. */
+  /** When true, keeps page content top-aligned inside the hero card instead of vertically centered. */
   contentTopOffset?: boolean;
+  /** When true, plain hero card with light border, modest padding, transparent fill, and no background image. */
+  heroCardFlush?: boolean;
+  /** When true, always shows the grey toolbar strip above hero card content. */
+  heroCardToolbarAlways?: boolean;
 };
 
 export const DEFAULT_SHOP_PAGE_CHROME: ShopPageChromeConfig = {
@@ -117,8 +123,11 @@ function isSameChromeConfig(prev: ShopPageChromeConfig, next: ShopPageChromeConf
     prev.pageHeading === next.pageHeading &&
     prev.sidebarVariant === next.sidebarVariant &&
     prev.heroCard === next.heroCard &&
+    prev.heroBackgroundImage === next.heroBackgroundImage &&
     prev.sidebarStretch === next.sidebarStretch &&
-    prev.contentTopOffset === next.contentTopOffset
+    prev.contentTopOffset === next.contentTopOffset &&
+    prev.heroCardFlush === next.heroCardFlush &&
+    prev.heroCardToolbarAlways === next.heroCardToolbarAlways
   );
 }
 

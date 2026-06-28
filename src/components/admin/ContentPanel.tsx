@@ -93,12 +93,15 @@ export function CompactFormPanel({
   footer,
   className = "",
   focusOnMount = false,
+  showBottomBorder = true,
 }: {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
   /** Scroll into view and focus the first field when the panel mounts. */
   focusOnMount?: boolean;
+  /** When false, omits the decorative curved bottom border/shadow. */
+  showBottomBorder?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   useFormRevealFocus(focusOnMount, panelRef);
@@ -110,7 +113,7 @@ export function CompactFormPanel({
     >
       <div className="min-h-[96px] space-y-4 px-4 py-4">{children}</div>
       {footer}
-      <PanelBottomBorder />
+      {showBottomBorder ? <PanelBottomBorder /> : null}
     </div>
   );
 }
