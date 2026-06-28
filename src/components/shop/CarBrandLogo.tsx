@@ -2,12 +2,18 @@ import { useEffect, useState } from "react";
 import type { ShopCarCompany } from "./forms/ShopProfileEditors";
 import { getCarBrandName, resolveCarBrandLogo } from "../../lib/dummyCarBrands";
 
-/** Logo size for the emblem field in add-brand forms. */
-export const CAR_BRAND_EMBLEM_LOGO_CLASS = "h-14 w-14 object-contain";
+/** Landscape emblem frame (3:2), matches list row logo slots. */
+export const CAR_BRAND_EMBLEM_ASPECT_CLASS = "aspect-[3/2]";
 
-/** Reserved emblem area — keeps the add-brand card height stable before/after selection. */
-export const CAR_BRAND_EMBLEM_SLOT_CLASS =
-  "flex h-14 w-full items-center";
+/** Reserved emblem area — fixed 3:2 rectangle; keeps add-brand card height stable. */
+export const CAR_BRAND_EMBLEM_SLOT_CLASS = `flex h-14 w-auto shrink-0 items-center justify-center overflow-hidden ${CAR_BRAND_EMBLEM_ASPECT_CLASS}`;
+
+/** Bordered emblem slot on the add-brand card. */
+export const CAR_BRAND_EMBLEM_ADD_SLOT_CLASS =
+  `${CAR_BRAND_EMBLEM_SLOT_CLASS} rounded border border-gray-300 bg-white`;
+
+/** Logo fills the emblem slot in add-brand forms. */
+export const CAR_BRAND_EMBLEM_LOGO_CLASS = "h-full w-full object-contain";
 
 /** Compact logo slot for grid/list rows. */
 export const CAR_BRAND_LIST_LOGO_SLOT_CLASS =

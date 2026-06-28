@@ -107,7 +107,7 @@ export const shopProfileFormPanelClass = "!mb-0 shadow-none";
 
 /** Profile add/edit form footer strip — matches unselected sidebar nav pill tone. */
 export const shopProfileFormPanelFooterClass =
-  "shop-profile-form-panel-footer border-t border-ad-purple bg-[#FDE4D0]";
+  "shop-profile-form-panel-footer bg-[#FDE4D0]";
 
 /** Highlight for the table row currently being edited in profile sections. */
 export const shopProfileEditingRowClass = "shop-profile-editing-row bg-[#FDE4D0]";

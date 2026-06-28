@@ -49,8 +49,8 @@ import {
 import type { ShopProfileBusiness, ShopProfileUser, ShopServiceCategory } from "../../../types/shopOwner";
 import OpenHoursTimePicker from "./OpenHoursTimePicker";
 import CarBrandLogo, {
+  CAR_BRAND_EMBLEM_ADD_SLOT_CLASS,
   CAR_BRAND_EMBLEM_LOGO_CLASS,
-  CAR_BRAND_EMBLEM_SLOT_CLASS,
 } from "../CarBrandLogo";
 import { getCarBrandId, getCarBrandName } from "../../../lib/dummyCarBrands";
 import { getServiceId, getServiceName } from "../../../lib/dummyServices";
@@ -1134,7 +1134,8 @@ export type ShopCarCompany = {
   logoUrl?: string | null;
 };
 
-const CAR_BRAND_EMBLEM_TOOLTIP_SIZE_PX = 50;
+const CAR_BRAND_EMBLEM_TOOLTIP_HEIGHT_PX = 50;
+const CAR_BRAND_EMBLEM_TOOLTIP_WIDTH_PX = 75;
 const CAR_BRAND_EMBLEM_TOOLTIP_GAP_PX = 4;
 
 function CarBrandEmblemTooltip({ company }: { company: ShopCarCompany }) {
@@ -1150,7 +1151,7 @@ function CarBrandEmblemTooltip({ company }: { company: ShopCarCompany }) {
     setCoords({
       top: Math.max(
         8,
-        rect.top - CAR_BRAND_EMBLEM_TOOLTIP_SIZE_PX - CAR_BRAND_EMBLEM_TOOLTIP_GAP_PX
+        rect.top - CAR_BRAND_EMBLEM_TOOLTIP_HEIGHT_PX - CAR_BRAND_EMBLEM_TOOLTIP_GAP_PX
       ),
       left: rect.left + rect.width / 2,
     });
@@ -1195,10 +1196,16 @@ function CarBrandEmblemTooltip({ company }: { company: ShopCarCompany }) {
               className="pointer-events-none fixed z-[10000] -translate-x-1/2"
               style={{ top: coords.top, left: coords.left }}
             >
-              <div className="flex size-[50px] items-center justify-center overflow-hidden rounded border border-gray-300 bg-white shadow-lg">
+              <div
+                className="flex items-center justify-center overflow-hidden rounded border border-gray-300 bg-white shadow-lg"
+                style={{
+                  height: CAR_BRAND_EMBLEM_TOOLTIP_HEIGHT_PX,
+                  width: CAR_BRAND_EMBLEM_TOOLTIP_WIDTH_PX,
+                }}
+              >
                 <CarBrandLogo
                   company={company}
-                  className="h-[50px] w-[50px] object-contain"
+                  className="h-full w-full object-contain"
                   alt={`${name} emblem`}
                 />
               </div>
@@ -1354,38 +1361,42 @@ export function ShopCarBrandAddEditor({
         />
       }
     >
-      <CompactFormRow className="items-start">
-        <CompactField label="Name">
-          <select
-            className={shopCompactInputClass}
-            value={brandId}
-            onChange={(e) => setBrandId(e.target.value)}
-            disabled={available.length === 0}
-          >
-            <option value="">
-              {available.length === 0 ? "All brands already added" : "Select brand"}
-            </option>
-            {available.map((company) => {
-              const id = String(company._id ?? company.id ?? "");
-              const name = company.name ?? company.companyName ?? "—";
-              return (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              );
-            })}
-          </select>
-        </CompactField>
-        <CompactField label="Amblem">
-          <div className={CAR_BRAND_EMBLEM_SLOT_CLASS}>
-            {brandId ? (
-              <CarBrandLogo company={selected} className={CAR_BRAND_EMBLEM_LOGO_CLASS} />
-            ) : (
-              <span className="text-xs text-gray-400">Select a brand</span>
-            )}
-          </div>
-        </CompactField>
-      </CompactFormRow>
+      <div className="flex justify-center">
+        <CompactFormRow className="w-auto flex flex-nowrap items-start gap-x-6">
+          <CompactField label="Name" className="w-40 sm:w-48">
+            <select
+              className={shopCompactInputClass}
+              value={brandId}
+              onChange={(e) => setBrandId(e.target.value)}
+              disabled={available.length === 0}
+            >
+              <option value="">
+                {available.length === 0 ? "All brands already added" : "Select brand"}
+              </option>
+              {available.map((company) => {
+                const id = String(company._id ?? company.id ?? "");
+                const name = company.name ?? company.companyName ?? "—";
+                return (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                );
+              })}
+            </select>
+          </CompactField>
+          <CompactField label="Amblem" className="w-auto shrink-0">
+            <div className={CAR_BRAND_EMBLEM_ADD_SLOT_CLASS}>
+              {brandId ? (
+                <CarBrandLogo company={selected} className={CAR_BRAND_EMBLEM_LOGO_CLASS} />
+              ) : (
+                <span className="text-xs text-gray-400" aria-hidden>
+                  —
+                </span>
+              )}
+            </div>
+          </CompactField>
+        </CompactFormRow>
+      </div>
     </CompactFormPanel>
   );
 }
