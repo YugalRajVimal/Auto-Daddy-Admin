@@ -17,6 +17,8 @@ type ShopProfileHeroPanelProps = {
   showBackgroundImage?: boolean;
   /** Plain card without background image; modest padding, transparent fill. */
   flush?: boolean;
+  /** Transparent shell fill while keeping border/background image behaviour. */
+  transparent?: boolean;
 };
 
 export default function ShopProfileHeroPanel({
@@ -24,8 +26,9 @@ export default function ShopProfileHeroPanel({
   className = "",
   showBackgroundImage = true,
   flush = false,
+  transparent = false,
 }: ShopProfileHeroPanelProps) {
-  const shellClass = flush
+  const shellClass = flush || transparent
     ? "border border-gray-400 bg-transparent"
     : "border border-gray-300 bg-white";
 

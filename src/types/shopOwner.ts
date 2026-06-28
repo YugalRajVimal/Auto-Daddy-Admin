@@ -79,7 +79,7 @@ export type ShopServiceCategory = {
   createdAt?: string;
   updatedAt?: string;
   isActive?: boolean;
-  subServices: { id?: string; name: string; desc: string; price: number }[];
+  subServices: { id?: string; name: string; desc: string; price: number; qty?: number; tax?: number }[];
 };
 
 export type DashboardIncomeBreakdown = {

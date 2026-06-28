@@ -24,7 +24,12 @@ const SHOP_TABLE: AdminPanelTableClasses = {
   td: SHOP_TABLE_BASE.td.replace("px-2", "px-4"),
   tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
 };
-import { shopCompactInputClass, shopProfileEditingRowClass, shopProfileFormPanelClass, shopProfileFormPanelFooterClass } from "../shopLayoutStyles";
+import {
+  shopCompactInputClass,
+  shopProfileEditingRowClass,
+  shopProfileFormPanelClass,
+  shopProfileFormPanelFooterClass,
+} from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
 import {
@@ -74,6 +79,10 @@ const checkboxBoxClass =
 
 const shopHoursBulkButtonClass =
   "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
+
+/** Business profile — phone/city/HST/tax equal; address/email equal (wider); full row width. */
+const BUSINESS_PROFILE_FIELD_GRID =
+  "grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(0,2.2fr)]";
 
 function ProfileImagePreviewModal({
   open,
@@ -428,6 +437,7 @@ export function ShopPersonalProfileEditor({
   return (
     <CompactFormPanel
       className={shopProfileFormPanelClass}
+      showBottomBorder={false}
       footer={
         <ProfileFormFooter
           message={
@@ -653,6 +663,7 @@ export function ShopBusinessProfileEditor({
   return (
     <CompactFormPanel
       className={shopProfileFormPanelClass}
+      showBottomBorder={false}
       footer={
         <ProfileFormFooter
           message={
@@ -668,7 +679,7 @@ export function ShopBusinessProfileEditor({
       }
     >
       <div className="space-y-4">
-        <CompactFormRow>
+        <CompactFormRow className={BUSINESS_PROFILE_FIELD_GRID}>
           <CompactField label="Business Name">
             <input
               className={shopCompactInputClass}
@@ -709,7 +720,7 @@ export function ShopBusinessProfileEditor({
             />
           </CompactField>
         </CompactFormRow>
-        <CompactFormRow>
+        <CompactFormRow className={BUSINESS_PROFILE_FIELD_GRID}>
           <CompactField label="Zip Code">
             <input
               className={shopCompactInputClass}

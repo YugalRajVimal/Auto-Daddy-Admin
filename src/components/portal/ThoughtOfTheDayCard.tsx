@@ -6,13 +6,22 @@ const TORN_PAPER_CLIP =
 type ThoughtOfTheDayCardProps = {
   text: string;
   className?: string;
+  /** `hero` — anchored to the home hero panel; `inline` — flows below page content. */
+  placement?: "hero" | "inline";
 };
 
-export function ThoughtOfTheDayCard({ text, className = "" }: ThoughtOfTheDayCardProps) {
+export function ThoughtOfTheDayCard({
+  text,
+  className = "",
+  placement = "hero",
+}: ThoughtOfTheDayCardProps) {
+  const wrapperClass =
+    placement === "inline"
+      ? "pointer-events-none relative z-10 mt-6 flex w-full justify-center px-6"
+      : "pointer-events-none absolute inset-x-0 bottom-[16%] z-10 flex justify-center px-6 sm:bottom-[18%]";
+
   return (
-    <div
-      className={`pointer-events-none absolute inset-x-0 bottom-[16%] z-10 flex justify-center px-6 sm:bottom-[18%] ${className}`}
-    >
+    <div className={`${wrapperClass} ${className}`}>
       <div
         className="max-w-lg rotate-[-1.5deg] border border-gray-200/80 bg-white/95 px-8 py-5 shadow-lg"
         style={{ clipPath: TORN_PAPER_CLIP }}

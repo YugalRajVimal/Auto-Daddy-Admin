@@ -61,6 +61,7 @@ export default function ShopPageLayout() {
     <ShopProfileHeroPanel
       showBackgroundImage={chrome.heroBackgroundImage !== false}
       flush={chrome.heroCardFlush === true}
+      transparent={chrome.heroCardTransparent === true}
     >
       <div className={`flex h-full min-h-0 w-full flex-col ${chrome.heroCardFlush ? "gap-1" : "gap-3"}`}>
         {showToolbar ? (

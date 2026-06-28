@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import {
   CompactField,
@@ -13,9 +13,6 @@ import {
 import { useAuth } from "../../../auth";
 import { apiMessage, saveMyServices, updateMyServices } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
-
-const checkboxBoxClass =
-  "inline-block border border-gray-300 bg-gray-100 px-2 py-0.5 text-xs text-gray-800";
 
 type ShopServiceSubDialogProps = {
   category: ShopServiceCategory | null;
@@ -37,13 +34,11 @@ export default function ShopServiceSubDialog({
   onSaved,
 }: ShopServiceSubDialogProps) {
   const { token } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [qty, setQty] = useState("1");
+  const [tax, setTax] = useState("13");
   const [desc, setDesc] = useState("");
-  const [showUploadImage, setShowUploadImage] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -53,34 +48,42 @@ export default function ShopServiceSubDialog({
       setName(sub.name);
       setPrice(String(sub.price));
       setDesc(sub.desc);
-      setQty("1");
+      setQty(String(sub.qty != null && sub.qty > 0 ? sub.qty : 1));
+      setTax(sub.tax != null ? String(sub.tax) : "13");
     } else {
       setName("");
       setPrice("");
       setDesc("");
       setQty("1");
+      setTax("13");
     }
-    setShowUploadImage(false);
-    setImageFile(null);
   }, [category, editIndex]);
 
   const handleSave = async () => {
     if (!category) return;
     if (!name.trim()) {
-      toast.error("Sub-category name is required.");
+      toast.error("Category name is required.");
       return;
     }
     const priceNum = parseFloat(price);
     if (!Number.isFinite(priceNum)) {
-      toast.error("Enter a valid unit price.");
+      toast.error("Enter a valid unit cost.");
       return;
     }
+    const qtyNum = parseFloat(qty);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      toast.error("Enter a valid quantity.");
+      return;
+    }
+    const taxNum = parseFloat(tax);
     const nextSubs = [...category.subServices];
     const entry = {
       id: editIndex != null ? nextSubs[editIndex]?.id : undefined,
       name: name.trim(),
       desc: desc.trim(),
       price: priceNum,
+      qty: qtyNum,
+      ...(Number.isFinite(taxNum) ? { tax: taxNum } : {}),
     };
     if (editIndex != null) nextSubs[editIndex] = entry;
     else nextSubs.push(entry);
@@ -120,7 +123,7 @@ export default function ShopServiceSubDialog({
 
   const footerMessage = isEditing
     ? "You are editing a sub-service"
-    : "You are adding a new sub-service";
+    : "You are creating the Category of Service list";
 
   return (
     <CompactFormPanel
@@ -157,8 +160,8 @@ export default function ShopServiceSubDialog({
         </div>
       }
     >
-      <CompactFormRow columns={4} className="items-start">
-        <CompactField label="Sub- Category" required>
+      <CompactFormRow className="flex-nowrap items-end gap-x-3 overflow-x-auto">
+        <CompactField label="Name Category" required className="w-[10.5rem] shrink-0">
           <input
             className={shopCompactInputClass}
             value={name}
@@ -166,7 +169,7 @@ export default function ShopServiceSubDialog({
             disabled={saving}
           />
         </CompactField>
-        <CompactField label="Description">
+        <CompactField label="Description" className="min-w-[12rem] flex-1">
           <textarea
             className={`${shopCompactInputClass} resize-none overflow-hidden`}
             value={desc}
@@ -175,7 +178,7 @@ export default function ShopServiceSubDialog({
             disabled={saving}
           />
         </CompactField>
-        <CompactField label="Unit Price" required>
+        <CompactField label="Unit Cost" required className="w-[4.5rem] shrink-0">
           <input
             className={shopCompactInputClass}
             value={price}
@@ -184,7 +187,7 @@ export default function ShopServiceSubDialog({
             disabled={saving}
           />
         </CompactField>
-        <CompactField label="Qty">
+        <CompactField label="Qty" className="w-[3.5rem] shrink-0">
           <input
             className={shopCompactInputClass}
             value={qty}
@@ -193,48 +196,18 @@ export default function ShopServiceSubDialog({
             disabled={saving}
           />
         </CompactField>
-      </CompactFormRow>
-
-      <CompactFormRow className="items-start" columns={4}>
-        <div className="min-w-0 w-full">
-          <div className="flex flex-col items-start gap-2">
-            <div className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="shop-sub-service-upload-image"
-                checked={showUploadImage}
-                onChange={(e) => setShowUploadImage(e.target.checked)}
-                disabled={saving}
-                className="h-3.5 w-3.5 accent-ad-green"
-              />
-              <label htmlFor="shop-sub-service-upload-image" className="text-xs font-bold text-ad-green-dark">
-                Upload Image
-              </label>
-            </div>
-            {showUploadImage ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={saving}
-                  className={`${checkboxBoxClass} hover:bg-gray-200 disabled:opacity-60`}
-                >
-                  Upload Image
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-                />
-                {imageFile ? (
-                  <span className="text-xs text-gray-600">{imageFile.name}</span>
-                ) : null}
-              </>
-            ) : null}
+        <CompactField label="Tax" className="w-[4.75rem] shrink-0">
+          <div className="flex items-center gap-0.5">
+            <input
+              className={`${shopCompactInputClass} min-w-0 flex-1`}
+              value={tax}
+              onChange={(e) => setTax(e.target.value)}
+              inputMode="decimal"
+              disabled={saving}
+            />
+            <span className="shrink-0 text-xs font-semibold text-gray-700">%</span>
           </div>
-        </div>
+        </CompactField>
       </CompactFormRow>
     </CompactFormPanel>
   );

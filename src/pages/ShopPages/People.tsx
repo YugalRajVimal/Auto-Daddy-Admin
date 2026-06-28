@@ -38,14 +38,17 @@ import {
   addCarOwnerToMyCustomers,
   apiMessage,
   onboardCarOwner,
+  removeCarOwnerFromMyCustomers,
   updateMyCustomer,
   type CustomerVehiclePayload,
 } from "../../lib/shopOwnerMutations";
-import { searchCarOwners } from "../../lib/shopOwnerApi";
 import { parseCitiesApiResponse } from "../../lib/carOwnerCities";
 import { formatPhoneDisplay, formatPhoneLabel, phoneDigits } from "../../lib/phoneFormat";
 import { resolveCarBrandLogo } from "../../lib/dummyCarBrands";
-import { parseMyCustomers } from "../../lib/shopOwnerParsers";
+import {
+  DUMMY_SHOP_CUSTOMERS,
+  USE_DUMMY_SHOP_CUSTOMERS,
+} from "../../lib/dummyShopCustomers";
 import type { CustomerVehicle, MyCustomer } from "../../types/shopOwner";
 
 type PeopleSection = "customers" | "my-list" | "approval";
@@ -78,6 +81,14 @@ const SHOP_TABLE: AdminPanelTableClasses = {
   td: SHOP_TABLE_BASE.td.replace("px-2", "px-4"),
   tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
 };
+
+const SHOP_TABLE_HEAD_TH_CLASS = `${SHOP_TABLE.th} h-9 py-0 align-middle`;
+const SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS = `${SHOP_TABLE.thCheckbox} h-9 py-0 align-middle`;
+const SHOP_TABLE_BODY_TD_CLASS = `${SHOP_TABLE.td} h-9 py-0 align-middle whitespace-nowrap`;
+const SHOP_TABLE_BODY_TD_CHECKBOX_CLASS = `${SHOP_TABLE.tdCheckbox} h-9 py-0 align-middle`;
+
+const SHOP_PEOPLE_BULK_DELETE_BUTTON_CLASS =
+  "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
 
 const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
 
@@ -154,23 +165,30 @@ function PeopleSearchBar({
   value,
   onChange,
   inputId,
+  leading,
+  trailing,
 }: {
   value: string;
   onChange: (value: string) => void;
   inputId: string;
+  leading?: React.ReactNode;
+  trailing?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-end gap-2 border-b border-gray-300 bg-[#d1d5db] px-2 py-1.5 sm:gap-3">
-      <label htmlFor={inputId} className="text-sm font-semibold text-gray-700">
-        Search
-      </label>
-      <input
-        id={inputId}
-        type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-[26px] w-full max-w-xs border border-gray-400 bg-white px-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none sm:max-w-sm"
-      />
+    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 py-1.5 sm:gap-3">
+      <div className="flex items-center gap-2">{leading}</div>
+      <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <input
+          id={inputId}
+          type="search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Search"
+          aria-label="Search"
+          className="h-[26px] min-w-[9rem] border border-gray-400 bg-white px-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none"
+        />
+        {trailing}
+      </div>
     </div>
   );
 }
@@ -273,6 +291,24 @@ function isPendingApproval(customer: MyCustomer): boolean {
     return false;
   }
   return !customer.linkedAt?.trim();
+}
+
+function customerListDate(customer: MyCustomer): string {
+  const raw =
+    customer.addedToShopAt ?? customer.linkedAt ?? customer.addedAt ?? customer.createdAt;
+  if (!raw?.trim()) return "—";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw.trim();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function approvalStatusLabel(customer: MyCustomer): string {
+  const status = (customer.status ?? customer.linkStatus ?? "").trim();
+  if (status) return status;
+  return isPendingApproval(customer) ? "Pending" : "Approved";
 }
 
 function matchesMyCustomerSearch(customer: MyCustomer, query: string): boolean {
@@ -748,7 +784,7 @@ function CustomerListTable({
   onTogglePage: (ids: string[], checked: boolean) => void;
 }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
-  const actionHeadClass = `${SHOP_TABLE.th} text-center`;
+  const actionHeadClass = `${SHOP_TABLE_HEAD_TH_CLASS} text-center`;
   const pageRowKeys = customers.map((customer, index) => customerTableRowKey(customer, index));
   const allPageSelected =
     customers.length > 0 && pageRowKeys.every((id) => selectedIds.has(id));
@@ -770,7 +806,7 @@ function CustomerListTable({
         <table className={SHOP_TABLE.table}>
           <thead>
             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-              <th className={SHOP_TABLE.thCheckbox}>
+              <th className={SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS}>
                 <input
                   ref={selectAllRef}
                   type="checkbox"
@@ -780,10 +816,10 @@ function CustomerListTable({
                   className={SHOP_TABLE_CHECKBOX_CLASS}
                 />
               </th>
-              <th className={SHOP_TABLE.th}>Name</th>
-              <th className={SHOP_TABLE.th}>Phone</th>
-              {showCity ? <th className={SHOP_TABLE.th}>City</th> : null}
-              <th className={SHOP_TABLE.th}>Vehicles</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Name</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Phone</th>
+              {showCity ? <th className={SHOP_TABLE_HEAD_TH_CLASS}>City</th> : null}
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Vehicles</th>
               <th className={actionHeadClass}>Actions</th>
             </tr>
           </thead>
@@ -793,7 +829,7 @@ function CustomerListTable({
               const rowKey = pageRowKeys[index];
               return (
                 <tr key={rowKey} className={adminPanelRowClass(index)}>
-                  <td className={SHOP_TABLE.tdCheckbox}>
+                  <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(rowKey)}
@@ -802,14 +838,14 @@ function CustomerListTable({
                       className={SHOP_TABLE_CHECKBOX_CLASS}
                     />
                   </td>
-                  <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{name}</td>
-                  <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>{name}</td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
                     {customer.phone ? formatPhoneLabel(customer.phone) : "—"}
                   </td>
                   {showCity ? (
-                    <td className={SHOP_TABLE.td}>{customer.city?.trim() || "—"}</td>
+                    <td className={SHOP_TABLE_BODY_TD_CLASS}>{customer.city?.trim() || "—"}</td>
                   ) : null}
-                  <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
                     {(() => {
                       const count = vehicleCount(customer);
                       if (count === 0) return "0";
@@ -825,8 +861,8 @@ function CustomerListTable({
                       );
                     })()}
                   </td>
-                  <td className={`${SHOP_TABLE.td} text-center`}>
-                    <div className="inline-flex items-center justify-center gap-0.5">
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
+                    <div className="inline-flex h-7 items-center justify-center gap-0.5">
                       <CustomerEmailClip email={customer.email} />
                       <button
                         type="button"
@@ -838,6 +874,103 @@ function CustomerListTable({
                         <FiEdit2 size={13} aria-hidden />
                       </button>
                     </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
+  );
+}
+
+function ApprovalCustomerListTable({
+  customers,
+  onEdit,
+  selectedIds,
+  onToggleRow,
+  onTogglePage,
+}: {
+  customers: MyCustomer[];
+  onEdit: (customer: MyCustomer) => void;
+  selectedIds: Set<string>;
+  onToggleRow: (id: string) => void;
+  onTogglePage: (ids: string[], checked: boolean) => void;
+}) {
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const pageRowKeys = customers.map((customer, index) => customerTableRowKey(customer, index));
+  const allPageSelected =
+    customers.length > 0 && pageRowKeys.every((id) => selectedIds.has(id));
+  const somePageSelected = pageRowKeys.some((id) => selectedIds.has(id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+    }
+  }, [somePageSelected, allPageSelected]);
+
+  return (
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+      className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+    >
+      <div className="overflow-x-auto">
+        <table className={SHOP_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS}>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={(e) => onTogglePage(pageRowKeys, e.target.checked)}
+                  aria-label="Select all customers on this page"
+                  className={SHOP_TABLE_CHECKBOX_CLASS}
+                />
+              </th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Phone</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Name Customer</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>City</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Approval</th>
+            </tr>
+          </thead>
+          <tbody>
+            {customers.map((customer, index) => {
+              const name = customer.name ?? "—";
+              const rowKey = pageRowKeys[index];
+              const phoneLabel = customer.phone ? formatPhoneLabel(customer.phone) : "—";
+              return (
+                <tr key={rowKey} className={adminPanelRowClass(index)}>
+                  <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(rowKey)}
+                      onChange={() => onToggleRow(rowKey)}
+                      aria-label={`Select ${name}`}
+                      className={SHOP_TABLE_CHECKBOX_CLASS}
+                    />
+                  </td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                    {customer.phone ? (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(customer)}
+                        className="font-semibold text-blue-700 underline hover:text-blue-800"
+                      >
+                        {phoneLabel}
+                      </button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>{name}</td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>{customer.city?.trim() || "—"}</td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>{customerListDate(customer)}</td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+                    {approvalStatusLabel(customer)}
                   </td>
                 </tr>
               );
@@ -1369,6 +1502,32 @@ function CustomerInfoView({
   );
 }
 
+function usesDummyCustomers(section: PeopleSection): boolean {
+  return USE_DUMMY_SHOP_CUSTOMERS && (section === "customers" || section === "approval");
+}
+
+function customersMatchingSelection(
+  selectedIds: Set<string>,
+  listCustomers: MyCustomer[],
+  paginatedCustomers: MyCustomer[],
+): MyCustomer[] {
+  const found = new Map<string, MyCustomer>();
+  for (const customer of listCustomers) {
+    const id = customerId(customer);
+    if (id && selectedIds.has(id)) {
+      found.set(id, customer);
+    }
+  }
+  for (let index = 0; index < paginatedCustomers.length; index++) {
+    const customer = paginatedCustomers[index];
+    const key = customerTableRowKey(customer, index);
+    if (selectedIds.has(key)) {
+      found.set(key, customer);
+    }
+  }
+  return [...found.values()];
+}
+
 export default function ShopPeoplePage() {
   const navigate = useNavigate();
   const { token } = useAuth();
@@ -1378,12 +1537,12 @@ export default function ShopPeoplePage() {
   const [search, setSearch] = useState("");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [searchHits, setSearchHits] = useState<MyCustomer[]>([]);
-  const [searching, setSearching] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<MyCustomer | null>(null);
   const [detailView, setDetailView] = useState<DetailView | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(() => new Set());
+  const [dummyCustomers, setDummyCustomers] = useState(DUMMY_SHOP_CUSTOMERS);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const {
     customers: myCustomers,
@@ -1401,28 +1560,27 @@ export default function ShopPeoplePage() {
     return ids;
   }, [myCustomers]);
 
-  const isDirectorySearch = section === "customers" && search.trim().length > 0;
-  const isListedSection = section === "my-list" || section === "approval";
+  const customersSource = usesDummyCustomers(section) ? dummyCustomers : myCustomers;
 
   const listCustomers = useMemo(() => {
+    const q = search.trim();
+    const filterSearch = (customers: MyCustomer[]) =>
+      q ? customers.filter((customer) => matchesMyCustomerSearch(customer, q)) : customers;
+
     if (section === "customers") {
-      if (isDirectorySearch) return searchHits;
-      return [];
+      return filterSearch(customersSource);
     }
     if (section === "my-list") {
-      const q = search.trim();
-      const approved = myCustomers.filter((customer) => !isPendingApproval(customer));
-      if (!q) return approved;
-      return approved.filter((customer) => matchesMyCustomerSearch(customer, q));
+      return filterSearch(myCustomers.filter((customer) => !isPendingApproval(customer)));
     }
     if (section === "approval") {
-      const q = search.trim();
-      const pending = myCustomers.filter(isPendingApproval);
-      if (!q) return pending;
-      return pending.filter((customer) => matchesMyCustomerSearch(customer, q));
+      return filterSearch(customersSource.filter(isPendingApproval));
     }
     return [];
-  }, [section, isDirectorySearch, searchHits, myCustomers, search]);
+  }, [section, customersSource, myCustomers, search]);
+
+  const showListLoading = listLoading && !usesDummyCustomers(section);
+  const showListError = listError && !usesDummyCustomers(section);
 
   const totalPages = Math.max(1, Math.ceil(listCustomers.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -1444,7 +1602,6 @@ export default function ShopPeoplePage() {
   }, [search, section, page]);
 
   useEffect(() => {
-    if (!isListedSection) return;
     const q = search.trim();
     if (!q) return;
 
@@ -1459,39 +1616,11 @@ export default function ShopPeoplePage() {
     if (listCustomers.length === 1) {
       setEditingCustomer(listCustomers[0]);
     }
-  }, [search, isListedSection, listCustomers]);
+  }, [search, listCustomers]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
-
-  useEffect(() => {
-    if (section !== "customers" || !search.trim() || !token) {
-      setSearchHits([]);
-      setSearching(false);
-      return;
-    }
-
-    const handle = window.setTimeout(() => {
-      void (async () => {
-        setSearching(true);
-        try {
-          const res = await searchCarOwners(token, search.trim());
-          if (!res.ok) {
-            setSearchHits([]);
-            return;
-          }
-          setSearchHits(parseMyCustomers(res.data));
-        } catch {
-          setSearchHits([]);
-        } finally {
-          setSearching(false);
-        }
-      })();
-    }, 400);
-
-    return () => window.clearTimeout(handle);
-  }, [search, section, token]);
 
   const resetDetail = () => {
     setDetailView(null);
@@ -1502,7 +1631,6 @@ export default function ShopPeoplePage() {
     setSection(next);
     setShowAddForm(false);
     setSearch("");
-    setSearchHits([]);
     setStatusMessage(null);
     setEditingCustomer(null);
     resetDetail();
@@ -1555,18 +1683,14 @@ export default function ShopPeoplePage() {
 
   const emptyMessage =
     section === "customers"
-      ? isDirectorySearch
-        ? searching
-          ? "Searching…"
-          : "No customers found."
-        : "Search to find customers in the directory."
+      ? "No customers yet."
       : section === "approval"
         ? "No customers awaiting approval."
         : "No customers in your list yet.";
 
   const showList = !detailView;
   const showAddNewAction =
-    section !== "approval" &&
+    section === "customers" &&
     !detailView &&
     !showAddForm &&
     !editingCustomer;
@@ -1622,6 +1746,70 @@ export default function ShopPeoplePage() {
     });
   };
 
+  const hasBulkSelection = selectedCustomerIds.size > 0;
+
+  const handleBulkDelete = async () => {
+    if (!hasBulkSelection || bulkDeleting) return;
+
+    const selectedCustomers = customersMatchingSelection(
+      selectedCustomerIds,
+      listCustomers,
+      paginatedCustomers,
+    );
+    if (selectedCustomers.length === 0) return;
+
+    const count = selectedCustomers.length;
+    if (!window.confirm(`Delete ${count} selected customer${count === 1 ? "" : "s"}?`)) return;
+
+    setBulkDeleting(true);
+    try {
+      if (usesDummyCustomers(section)) {
+        const idsToRemove = new Set(
+          selectedCustomers.map((customer) => customerId(customer)).filter(Boolean),
+        );
+        setDummyCustomers((prev) => prev.filter((customer) => !idsToRemove.has(customerId(customer))));
+        setSelectedCustomerIds(new Set());
+        if (editingCustomer && idsToRemove.has(customerId(editingCustomer))) {
+          setEditingCustomer(null);
+        }
+        toast.success(`Deleted ${count} customer${count === 1 ? "" : "s"}.`);
+        return;
+      }
+
+      if (!token) return;
+
+      let failed = 0;
+      for (const customer of selectedCustomers) {
+        const id = customerId(customer);
+        if (!id) {
+          failed += 1;
+          continue;
+        }
+        const res = await removeCarOwnerFromMyCustomers(token, id);
+        if (!res.ok) failed += 1;
+      }
+
+      await refresh();
+      setSelectedCustomerIds(new Set());
+      const removedIds = new Set(
+        selectedCustomers.map((customer) => customerId(customer)).filter(Boolean),
+      );
+      if (editingCustomer && removedIds.has(customerId(editingCustomer))) {
+        setEditingCustomer(null);
+      }
+
+      if (failed > 0) {
+        toast.error(`Could not delete ${failed} customer${failed === 1 ? "" : "s"}.`);
+      } else {
+        toast.success(`Deleted ${count} customer${count === 1 ? "" : "s"}.`);
+      }
+    } catch {
+      toast.error("Network error.");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <ShopPageShell
       title="Customers"
@@ -1671,13 +1859,22 @@ export default function ShopPeoplePage() {
               value={search}
               onChange={setSearch}
               inputId={PEOPLE_SEARCH_INPUT_ID}
+              leading={
+                <button
+                  type="button"
+                  onClick={() => void handleBulkDelete()}
+                  disabled={!hasBulkSelection || bulkDeleting}
+                  className={SHOP_PEOPLE_BULK_DELETE_BUTTON_CLASS}
+                >
+                  {bulkDeleting ? "Deleting…" : "Delete"}
+                </button>
+              }
+              trailing={
+                showAddNewAction ? (
+                  <AddNewButton onClick={() => setShowAddForm(true)} />
+                ) : null
+              }
             />
-
-            {!showAddForm && showAddNewAction ? (
-              <div className="flex min-h-[2rem] items-center justify-end gap-2">
-                <AddNewButton onClick={() => setShowAddForm(true)} />
-              </div>
-            ) : null}
 
             <ShopReveal show={showAddForm}>
               <AddNewCustomerForm
@@ -1708,25 +1905,33 @@ export default function ShopPeoplePage() {
               {statusMessage && editingCustomer ? <StatusBanner message={statusMessage} /> : null}
             </ShopReveal>
 
-            {listLoading && isListedSection && !isDirectorySearch ? (
+            {showListLoading ? (
               <ShopListSkeleton variant="profile-table" className="w-full" />
-            ) : listError && isListedSection && !isDirectorySearch ? (
+            ) : showListError ? (
               <ShopErrorPanel message={listError} onRetry={() => void refresh()} />
-            ) : section === "customers" && isDirectorySearch && searching && searchHits.length === 0 ? (
-              <p className="text-center text-sm text-gray-600">Searching…</p>
             ) : listCustomers.length === 0 && !showAddForm ? (
               <p className="text-center text-sm text-gray-600">{emptyMessage}</p>
             ) : listCustomers.length > 0 ? (
               <>
-                <CustomerListTable
-                  customers={paginatedCustomers}
-                  onEdit={handleEditCustomer}
-                  onShowVehicles={handleShowVehicles}
-                  showCity={isListedSection}
-                  selectedIds={selectedCustomerIds}
-                  onToggleRow={toggleCustomerSelection}
-                  onTogglePage={toggleCustomerPageSelection}
-                />
+                {section === "approval" ? (
+                  <ApprovalCustomerListTable
+                    customers={paginatedCustomers}
+                    onEdit={handleEditCustomer}
+                    selectedIds={selectedCustomerIds}
+                    onToggleRow={toggleCustomerSelection}
+                    onTogglePage={toggleCustomerPageSelection}
+                  />
+                ) : (
+                  <CustomerListTable
+                    customers={paginatedCustomers}
+                    onEdit={handleEditCustomer}
+                    onShowVehicles={handleShowVehicles}
+                    showCity
+                    selectedIds={selectedCustomerIds}
+                    onToggleRow={toggleCustomerSelection}
+                    onTogglePage={toggleCustomerPageSelection}
+                  />
+                )}
 
                 <ShopListFooter className="text-sm font-semibold text-gray-600">
                   <p>{listCustomers.length} Entries</p>

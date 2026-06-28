@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { toast } from "react-toastify";
 import DashboardPanelCard from "../../components/COMP";
+import { ThoughtOfTheDayCard } from "../../components/portal/ThoughtOfTheDayCard";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopBusinessProfileEditor,
@@ -66,6 +67,25 @@ const SECTION_TITLES: Record<string, string> = {
 };
 
 const FLUSH_HERO_SECTIONS = new Set(["open", "brands", "services"]);
+const CENTERED_HERO_SECTIONS = new Set(["personal", "business"]);
+const FLUSH_PADDING_SECTIONS = new Set([...FLUSH_HERO_SECTIONS, ...CENTERED_HERO_SECTIONS]);
+
+function ProfileHeroFormSection({
+  children,
+  thoughtOfTheDay,
+}: {
+  children: ReactNode;
+  thoughtOfTheDay?: string;
+}) {
+  return (
+    <div className="w-full min-w-0">
+      {children}
+      {thoughtOfTheDay ? (
+        <ThoughtOfTheDayCard text={thoughtOfTheDay} placement="inline" />
+      ) : null}
+    </div>
+  );
+}
 
 function parseCompanies(payload: unknown): ShopCarCompany[] {
   if (!payload || typeof payload !== "object") return [];
@@ -99,6 +119,7 @@ export default function ShopProfilePage() {
     teamMembers,
     faqsHeading,
     faqsDescription,
+    thoughtOfTheDay,
     loading,
     refresh,
   } = useShopOwnerPortal();
@@ -364,20 +385,24 @@ export default function ShopProfilePage() {
     switch (activeId) {
       case "personal":
         return (
-          <ShopPersonalProfileEditor
-            user={user}
-            city={business?.city}
-            onSaved={() => void refresh()}
-          />
+          <ProfileHeroFormSection thoughtOfTheDay={thoughtOfTheDay}>
+            <ShopPersonalProfileEditor
+              user={user}
+              city={business?.city}
+              onSaved={() => void refresh()}
+            />
+          </ProfileHeroFormSection>
         );
       case "business":
         return (
-          <ShopBusinessProfileEditor
-            business={business}
-            zipCode={user?.pincode}
-            shopType={user?.shopType ?? business?.shopType}
-            onSaved={() => void refresh()}
-          />
+          <ProfileHeroFormSection thoughtOfTheDay={thoughtOfTheDay}>
+            <ShopBusinessProfileEditor
+              business={business}
+              zipCode={user?.pincode}
+              shopType={user?.shopType ?? business?.shopType}
+              onSaved={() => void refresh()}
+            />
+          </ProfileHeroFormSection>
         );
       case "open":
         return (
@@ -552,9 +577,9 @@ export default function ShopProfilePage() {
       activeSidebarId={activeId}
       onSidebarSelect={setActiveId}
       headerAction={headerAction}
-      heroBackgroundImage={FLUSH_HERO_SECTIONS.has(activeId) ? false : undefined}
+      heroBackgroundImage={false}
       contentTopOffset={FLUSH_HERO_SECTIONS.has(activeId)}
-      heroCardFlush={FLUSH_HERO_SECTIONS.has(activeId)}
+      heroCardFlush={FLUSH_PADDING_SECTIONS.has(activeId)}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}

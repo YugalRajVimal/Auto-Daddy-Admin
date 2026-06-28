@@ -52,6 +52,8 @@ export type ShopPageChromeConfig = {
   contentTopOffset?: boolean;
   /** When true, plain hero card with light border, modest padding, transparent fill, and no background image. */
   heroCardFlush?: boolean;
+  /** When true, hero card shell uses a transparent fill (e.g. personal/business profile over the image). */
+  heroCardTransparent?: boolean;
   /** When true, always shows the grey toolbar strip above hero card content. */
   heroCardToolbarAlways?: boolean;
 };
@@ -127,6 +129,7 @@ function isSameChromeConfig(prev: ShopPageChromeConfig, next: ShopPageChromeConf
     prev.sidebarStretch === next.sidebarStretch &&
     prev.contentTopOffset === next.contentTopOffset &&
     prev.heroCardFlush === next.heroCardFlush &&
+    prev.heroCardTransparent === next.heroCardTransparent &&
     prev.heroCardToolbarAlways === next.heroCardToolbarAlways
   );
 }

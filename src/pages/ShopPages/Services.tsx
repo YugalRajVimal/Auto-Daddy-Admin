@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { FiEdit2, FiPaperclip, FiX } from "react-icons/fi";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FiEdit2 } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import {
@@ -18,11 +18,10 @@ import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
 import { getDummyMyServices } from "../../lib/dummyServices";
-import { apiMessage, removeMyServiceSubServices } from "../../lib/shopOwnerMutations";
+import { apiMessage, updateMyServices } from "../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../types/shopOwner";
 
 const PAGE_SIZE = 10;
-const SERVICES_SEARCH_INPUT_ID = "shop-services-sub-search";
 
 const SHOP_TABLE_BASE = adminPanelTableClasses(true);
 const SHOP_TABLE: AdminPanelTableClasses = {
@@ -33,10 +32,29 @@ const SHOP_TABLE: AdminPanelTableClasses = {
   tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
 };
 
+const shopHoursBulkButtonClass =
+  "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
+
 type SubService = ShopServiceCategory["subServices"][number];
 
-function formatPrice(price: number): string {
+function formatUnitCost(price: number): string {
   return price % 1 === 0 ? price.toFixed(0) : price.toFixed(2);
+}
+
+function getSubQty(sub: SubService): number {
+  return sub.qty != null && sub.qty > 0 ? sub.qty : 1;
+}
+
+function getSubAmount(sub: SubService): number {
+  return sub.price * getSubQty(sub);
+}
+
+function formatAmount(amount: number): string {
+  return amount % 1 === 0 ? amount.toFixed(0) : amount.toFixed(2);
+}
+
+function getSubRowId(sub: SubService, index: number): string {
+  return sub.id ?? `${sub.name}-${index}`;
 }
 
 function AddNewButton({ onClick }: { onClick: () => void }) {
@@ -47,53 +65,31 @@ function AddNewButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function ServicesSearchBar({
-  value,
-  onChange,
-  inputId,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  inputId: string;
-}) {
-  return (
-    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-end gap-2 border-b border-gray-300 bg-[#d1d5db] px-2 py-1.5 sm:gap-3">
-      <label htmlFor={inputId} className="text-sm font-semibold text-gray-700">
-        Search
-      </label>
-      <input
-        id={inputId}
-        type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-[26px] w-full max-w-xs border border-gray-400 bg-white px-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none sm:max-w-sm"
-      />
-    </div>
-  );
-}
-
-function matchesSubServiceSearch(sub: SubService, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  const haystack = [sub.name, sub.desc, formatPrice(sub.price)]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(q);
-}
-
 function SubServiceTable({
   rows,
-  deletingIndex,
+  allRowIds,
+  checkedIds,
+  onToggleChecked,
+  onToggleAllChecked,
   onEdit,
-  onDelete,
 }: {
   rows: { sub: SubService; originalIndex: number }[];
-  deletingIndex: number | null;
+  allRowIds: string[];
+  checkedIds: Set<string>;
+  onToggleChecked: (id: string) => void;
+  onToggleAllChecked: () => void;
   onEdit: (originalIndex: number) => void;
-  onDelete: (originalIndex: number) => void;
 }) {
-  const actionHeadClass = `${SHOP_TABLE.th} text-center`;
+  const editHeadClass = `${SHOP_TABLE.th} text-center`;
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const allRowsChecked = allRowIds.length > 0 && allRowIds.every((id) => checkedIds.has(id));
+  const someRowsChecked = checkedIds.size > 0 && !allRowsChecked;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someRowsChecked;
+    }
+  }, [someRowsChecked]);
 
   return (
     <motion.div
@@ -105,52 +101,59 @@ function SubServiceTable({
         <table className={SHOP_TABLE.table}>
           <thead>
             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-              <th className={SHOP_TABLE.th}>Sub - Category</th>
+              <th className={SHOP_TABLE.thCheckbox}>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allRowsChecked}
+                  onChange={onToggleAllChecked}
+                  aria-label="Select all sub-services"
+                  className="h-3.5 w-3.5 accent-ad-purple"
+                />
+              </th>
+              <th className={SHOP_TABLE.th}>Category</th>
               <th className={SHOP_TABLE.th}>Description</th>
-              <th className={SHOP_TABLE.th}>Price</th>
-              <th className={actionHeadClass}>Actions</th>
+              <th className={SHOP_TABLE.th}>Unit Cost</th>
+              <th className={SHOP_TABLE.th}>Qty</th>
+              <th className={SHOP_TABLE.th}>Amount</th>
+              <th className={editHeadClass}>Edit</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(({ sub, originalIndex }, index) => {
-              const isDeleting = deletingIndex === originalIndex;
+              const rowId = getSubRowId(sub, originalIndex);
+              const qty = getSubQty(sub);
+              const amount = getSubAmount(sub);
               return (
-                <tr key={sub.id ?? `${sub.name}-${originalIndex}`} className={adminPanelRowClass(index)}>
+                <tr key={rowId} className={adminPanelRowClass(index)}>
+                  <td className={SHOP_TABLE.tdCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={checkedIds.has(rowId)}
+                      onChange={() => onToggleChecked(rowId)}
+                      aria-label={`Select ${sub.name}`}
+                      className="h-3.5 w-3.5 accent-ad-purple"
+                    />
+                  </td>
                   <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{sub.name}</td>
                   <td className={SHOP_TABLE.td}>{sub.desc?.trim() || "—"}</td>
                   <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
-                    $ {formatPrice(sub.price)}
+                    {formatUnitCost(sub.price)}
+                  </td>
+                  <td className={SHOP_TABLE.td}>{qty}</td>
+                  <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>
+                    {formatAmount(amount)}
                   </td>
                   <td className={`${SHOP_TABLE.td} text-center`}>
-                    <div className="inline-flex items-center justify-center gap-0.5">
-                      <button
-                        type="button"
-                        title={`View attachment for ${sub.name}`}
-                        aria-label={`View attachment for ${sub.name}`}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
-                      >
-                        <FiPaperclip size={13} aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        title={`Edit ${sub.name}`}
-                        aria-label={`Edit ${sub.name}`}
-                        onClick={() => onEdit(originalIndex)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
-                      >
-                        <FiEdit2 size={13} aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        title={`Delete ${sub.name}`}
-                        aria-label={`Delete ${sub.name}`}
-                        disabled={isDeleting}
-                        onClick={() => onDelete(originalIndex)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-red-600 hover:text-red-700 disabled:opacity-50"
-                      >
-                        <FiX size={14} aria-hidden />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      title={`Edit ${sub.name}`}
+                      aria-label={`Edit ${sub.name}`}
+                      onClick={() => onEdit(originalIndex)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
+                    >
+                      <FiEdit2 size={13} aria-hidden />
+                    </button>
                   </td>
                 </tr>
               );
@@ -169,8 +172,8 @@ export default function ShopServicesPage() {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
-  const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [page, setPage] = useState(1);
   const { categories: apiCategories, loading, error, refresh } = useShopServices();
   const [categories, setCategories] = useState<ShopServiceCategory[]>([]);
@@ -200,17 +203,16 @@ export default function ShopServicesPage() {
 
   const allSubs = activeCategory?.subServices ?? [];
 
-  const filteredSubs = useMemo(() => {
-    const q = search.trim();
-    if (!q) return allSubs;
-    return allSubs.filter((sub) => matchesSubServiceSearch(sub, q));
-  }, [allSubs, search]);
+  const allRowIds = useMemo(
+    () => allSubs.map((sub, index) => getSubRowId(sub, index)),
+    [allSubs],
+  );
 
-  const totalPages = Math.max(1, Math.ceil(filteredSubs.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(allSubs.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paginatedSubs = useMemo(
-    () => filteredSubs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [filteredSubs, safePage],
+    () => allSubs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [allSubs, safePage],
   );
 
   useEffect(() => {
@@ -223,12 +225,8 @@ export default function ShopServicesPage() {
     setPage(1);
     setFormOpen(false);
     setEditIndex(null);
-    setSearch("");
+    setSelectedRows(new Set());
   }, [activeCategoryId]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -249,46 +247,63 @@ export default function ShopServicesPage() {
   const openEditForm = (index: number) => {
     setEditIndex(index);
     setFormOpen(true);
-    const filteredIndex = filteredSubs.findIndex(
-      (sub) => sub === allSubs[index],
-    );
-    if (filteredIndex >= 0) {
-      setPage(Math.floor(filteredIndex / PAGE_SIZE) + 1);
-    }
+    setPage(Math.floor(index / PAGE_SIZE) + 1);
   };
 
-  const handleDelete = async (index: number) => {
-    if (!activeCategory) return;
-    const sub = activeCategory.subServices[index];
-    if (!sub) return;
-    if (!window.confirm(`Delete "${sub.name}"?`)) return;
+  const toggleRow = (id: string) => {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllRows = () => {
+    setSelectedRows((prev) => {
+      const allChecked = allRowIds.length > 0 && allRowIds.every((id) => prev.has(id));
+      return allChecked ? new Set() : new Set(allRowIds);
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (!activeCategory || selectedRows.size === 0) return;
+    if (!window.confirm(`Delete ${selectedRows.size} selected sub-service(s)?`)) return;
+
+    const remaining = activeCategory.subServices.filter(
+      (sub, index) => !selectedRows.has(getSubRowId(sub, index)),
+    );
 
     if (usingDummy) {
       setCategories((prev) =>
         prev.map((category) =>
-          category.id === activeCategory.id
-            ? { ...category, subServices: category.subServices.filter((_, i) => i !== index) }
-            : category,
+          category.id === activeCategory.id ? { ...category, subServices: remaining } : category,
         ),
       );
       toast.success("Deleted.");
-      if (editIndex === index) closeForm();
+      if (editIndex != null && selectedRows.has(getSubRowId(activeCategory.subServices[editIndex], editIndex))) {
+        closeForm();
+      }
+      setSelectedRows(new Set());
       return;
     }
 
     if (!token) return;
-    setDeletingIndex(index);
+    setBulkDeleting(true);
     try {
-      const res = await removeMyServiceSubServices(token, activeCategory.id, sub.name);
+      const res = await updateMyServices(token, [{ id: activeCategory.id, subServices: remaining }]);
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not delete.");
         return;
       }
       toast.success("Deleted.");
-      if (editIndex === index) closeForm();
+      if (editIndex != null && selectedRows.has(getSubRowId(activeCategory.subServices[editIndex], editIndex))) {
+        closeForm();
+      }
+      setSelectedRows(new Set());
       handleRefresh();
     } finally {
-      setDeletingIndex(null);
+      setBulkDeleting(false);
     }
   };
 
@@ -303,14 +318,8 @@ export default function ShopServicesPage() {
     [paginatedSubs, allSubs],
   );
 
-  const emptyMessage =
-    allSubs.length === 0
-      ? "No sub-services yet."
-      : search.trim()
-        ? "No sub-services match your search."
-        : "No sub-services yet.";
-
-  const showAddNewAction = activeCategory != null && !formOpen;
+  const hasBulkSelection = selectedRows.size > 0;
+  const showToolbar = activeCategory != null && !formOpen;
 
   return (
     <ShopPageShell
@@ -346,14 +355,18 @@ export default function ShopServicesPage() {
           </p>
         ) : activeCategory ? (
           <>
-            <ServicesSearchBar
-              value={search}
-              onChange={setSearch}
-              inputId={SERVICES_SEARCH_INPUT_ID}
-            />
-
-            {showAddNewAction ? (
-              <div className="flex min-h-[2rem] items-center justify-end gap-2">
+            {showToolbar ? (
+              <div className="flex min-h-[2rem] items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkDelete()}
+                    disabled={!hasBulkSelection || bulkDeleting}
+                    className={shopHoursBulkButtonClass}
+                  >
+                    Delete
+                  </button>
+                </div>
                 <AddNewButton onClick={openAddForm} />
               </div>
             ) : null}
@@ -376,19 +389,21 @@ export default function ShopServicesPage() {
               />
             </ShopReveal>
 
-            {filteredSubs.length === 0 && !formOpen ? (
-              <p className="text-center text-sm text-gray-600">{emptyMessage}</p>
-            ) : filteredSubs.length > 0 ? (
+            {allSubs.length === 0 && !formOpen ? (
+              <p className="text-center text-sm text-gray-600">No sub-services yet.</p>
+            ) : allSubs.length > 0 ? (
               <>
                 <SubServiceTable
                   rows={paginatedRows}
-                  deletingIndex={deletingIndex}
+                  allRowIds={allRowIds}
+                  checkedIds={selectedRows}
+                  onToggleChecked={toggleRow}
+                  onToggleAllChecked={toggleAllRows}
                   onEdit={openEditForm}
-                  onDelete={(index) => void handleDelete(index)}
                 />
 
                 <ShopListFooter className="text-sm font-semibold text-gray-600">
-                  <p>{filteredSubs.length} Entries</p>
+                  <p>{allSubs.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
