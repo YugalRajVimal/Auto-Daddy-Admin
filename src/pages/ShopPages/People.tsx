@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type HTMLAttributes } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import { FiEdit2, FiPaperclip } from "react-icons/fi";
@@ -39,6 +39,7 @@ import {
   apiMessage,
   onboardCarOwner,
   updateMyCustomer,
+  type CustomerVehiclePayload,
 } from "../../lib/shopOwnerMutations";
 import { searchCarOwners } from "../../lib/shopOwnerApi";
 import { parseCitiesApiResponse } from "../../lib/carOwnerCities";
@@ -178,7 +179,33 @@ function customerId(c: MyCustomer) {
   return c.carOwnerId ?? c.id ?? c._id ?? "";
 }
 
-function mapCustomerVehiclesForUpdate(customer: MyCustomer) {
+type CarCompanyCatalogItem = {
+  companyName: string;
+  models: Array<{ modelName: string; years: Array<string | number> }>;
+};
+
+type VehicleDraft = CustomerVehiclePayload & { dueOdometerReading?: string };
+
+const VEHICLE_YEAR_MAX = new Date().getFullYear() + 1;
+
+function emptyVehicleDraft(): VehicleDraft {
+  return {
+    licensePlateNo: "",
+    vinNo: "",
+    vehicleName: "",
+    model: "",
+    year: "",
+    odometerReading: "",
+    dueOdometerReading: "",
+  };
+}
+
+function isValidVehicleYear(value: string) {
+  const year = Number(value);
+  return /^\d{4}$/.test(value) && year >= 1900 && year <= VEHICLE_YEAR_MAX;
+}
+
+function mapCustomerVehiclesForUpdate(customer: MyCustomer): CustomerVehiclePayload[] {
   return (customer.vehicles ?? []).map((v) => ({
     ...(v.vId ?? v._id ? { vId: v.vId ?? v._id } : {}),
     licensePlateNo: v.licensePlateNo?.trim() ?? "",
@@ -188,6 +215,28 @@ function mapCustomerVehiclesForUpdate(customer: MyCustomer) {
     year: v.year?.trim() ?? "",
     odometerReading: v.odometerReading?.trim(),
   }));
+}
+
+function vehicleDraftToPayload(draft: VehicleDraft): CustomerVehiclePayload {
+  return {
+    licensePlateNo: draft.licensePlateNo.trim().slice(0, 14),
+    vinNo: draft.vinNo?.trim() || undefined,
+    vehicleName: draft.vehicleName.trim(),
+    model: draft.model.trim(),
+    year: draft.year.trim(),
+    odometerReading: draft.odometerReading?.trim() || undefined,
+  };
+}
+
+function validateVehicleDraft(draft: VehicleDraft): string | null {
+  if (!draft.licensePlateNo.trim()) return "License plate is required.";
+  if (!draft.vehicleName.trim()) return "Make is required.";
+  if (!draft.model.trim()) return "Model is required.";
+  if (!draft.year.trim() || !isValidVehicleYear(draft.year.trim())) return "Enter a valid vehicle year.";
+  if (draft.vinNo?.trim() && draft.vinNo.trim().length !== 17) {
+    return "VIN must be exactly 17 characters when provided.";
+  }
+  return null;
 }
 
 
@@ -330,6 +379,34 @@ function VehicleInfoField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function VehicleInfoInputField({
+  label,
+  value,
+  onChange,
+  maxLength,
+  inputMode,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  maxLength?: number;
+  inputMode?: HTMLAttributes<HTMLInputElement>["inputMode"];
+}) {
+  return (
+    <div className="min-w-0 flex-1">
+      <p className="mb-1 text-[11px] font-bold text-gray-700">{label}</p>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        maxLength={maxLength}
+        inputMode={inputMode}
+        className="min-h-[26px] w-full rounded border border-gray-300 bg-gray-100 px-2 py-0.5 text-sm font-semibold text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none"
+      />
+    </div>
+  );
+}
+
 function VehicleInfoCard({
   vehicle,
   onGoToJobCard,
@@ -393,22 +470,231 @@ function VehicleInfoCard({
   );
 }
 
+function AddVehicleCard({
+  customer,
+  onCancel,
+  onSaved,
+}: {
+  customer: MyCustomer;
+  onCancel: () => void;
+  onSaved: (vehicle: CustomerVehicle) => void;
+}) {
+  const { token, session } = useAuth();
+  const countryCode = session?.meta?.countryCode ?? "+1";
+  const [draft, setDraft] = useState<VehicleDraft>(emptyVehicleDraft);
+  const [companies, setCompanies] = useState<CarCompanyCatalogItem[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    void getJson<{ data?: CarCompanyCatalogItem[] }>("/api/user/car-companies", token).then((res) => {
+      if (res.ok && Array.isArray(res.data?.data)) setCompanies(res.data.data);
+    });
+  }, [token]);
+
+  const modelOptions = useMemo(() => {
+    const company = companies.find((c) => c.companyName === draft.vehicleName);
+    return company?.models ?? [];
+  }, [companies, draft.vehicleName]);
+
+  const yearOptions = useMemo(() => {
+    const model = modelOptions.find((m) => m.modelName === draft.model);
+    return (model?.years ?? []).map(String);
+  }, [modelOptions, draft.model]);
+
+  const makeLogo = resolveCarBrandLogo(
+    draft.vehicleName.trim() ? { companyName: draft.vehicleName.trim() } : null,
+  );
+
+  const patchDraft = (patch: Partial<VehicleDraft>) => {
+    setDraft((prev) => ({ ...prev, ...patch }));
+    setError(null);
+  };
+
+  const handleSave = async () => {
+    if (!token) return;
+    const id = customerId(customer);
+    if (!id) {
+      setError("Missing customer id.");
+      return;
+    }
+
+    const validationError = validateVehicleDraft(draft);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const vehicles = [...mapCustomerVehiclesForUpdate(customer), vehicleDraftToPayload(draft)];
+      const res = await updateMyCustomer(token, {
+        carOwnerId: id,
+        name: customer.name?.trim() ?? "",
+        email: customer.email?.trim() ?? "",
+        countryCode,
+        phone: phoneDigits(customer.phone ?? ""),
+        pincode: customer.pincode?.trim() ?? "",
+        address: customer.address?.trim() ?? "",
+        city: customer.city?.trim() ?? "",
+        vehicles,
+      });
+      if (!res.ok) {
+        setError(apiMessage(res.data) || "Could not add vehicle.");
+        return;
+      }
+      toast.success(apiMessage(res.data) || "Vehicle added.");
+      onSaved({
+        licensePlateNo: draft.licensePlateNo.trim(),
+        vinNo: draft.vinNo?.trim(),
+        vehicleName: draft.vehicleName.trim(),
+        model: draft.model.trim(),
+        year: draft.year.trim(),
+        odometerReading: draft.odometerReading?.trim(),
+        dueOdometerReading: draft.dueOdometerReading?.trim(),
+      });
+    } catch {
+      setError("Network error.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <article className="overflow-hidden rounded-lg border-2 border-dashed border-ad-green-dark/40 bg-white shadow-sm">
+      <div className="border-b border-ad-green-dark/20 bg-ad-green-light/40 px-3 py-1.5 text-center text-xs font-bold uppercase tracking-wide text-ad-green-dark">
+        Add vehicle
+      </div>
+      <div className="flex flex-col gap-4 p-3 sm:p-4 lg:flex-row lg:items-stretch">
+        <div className="mx-auto w-full max-w-[108px] shrink-0 self-start lg:mx-0">
+          <div className="overflow-hidden rounded-t-md border border-gray-300 bg-[#1a1a1a]">
+            <div className="flex h-[52px] items-center justify-center px-2">
+              <img src={makeLogo} alt="" className="max-h-9 max-w-[72px] object-contain" />
+            </div>
+          </div>
+          <div className="space-y-1 rounded-b-md border border-t-0 border-gray-300 bg-white p-1.5">
+            <select
+              value={draft.vehicleName}
+              onChange={(e) => patchDraft({ vehicleName: e.target.value, model: "", year: "" })}
+              className={`${shopCompactInputClass} text-xs font-bold`}
+            >
+              <option value="">Make</option>
+              {companies.map((company) => (
+                <option key={company.companyName} value={company.companyName}>
+                  {company.companyName}
+                </option>
+              ))}
+            </select>
+            <select
+              value={draft.model}
+              onChange={(e) => patchDraft({ model: e.target.value, year: "" })}
+              disabled={!draft.vehicleName}
+              className={`${shopCompactInputClass} text-xs font-bold disabled:opacity-60`}
+            >
+              <option value="">Model</option>
+              {modelOptions.map((model) => (
+                <option key={model.modelName} value={model.modelName}>
+                  {model.modelName}
+                </option>
+              ))}
+            </select>
+            <select
+              value={draft.year}
+              onChange={(e) => patchDraft({ year: e.target.value })}
+              disabled={!draft.model}
+              className={`${shopCompactInputClass} text-xs font-bold disabled:opacity-60`}
+            >
+              <option value="">Year</option>
+              {yearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
+          {error ? <PeopleFormError message={error} /> : null}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-nowrap">
+            <VehicleInfoInputField
+              label="License Plate"
+              value={draft.licensePlateNo}
+              onChange={(licensePlateNo) => patchDraft({ licensePlateNo })}
+              maxLength={14}
+            />
+            <VehicleInfoInputField
+              label="VIN"
+              value={draft.vinNo ?? ""}
+              onChange={(vinNo) => patchDraft({ vinNo })}
+              maxLength={17}
+            />
+            <VehicleInfoInputField
+              label="Current odo"
+              value={draft.odometerReading ?? ""}
+              onChange={(odometerReading) => patchDraft({ odometerReading })}
+              inputMode="numeric"
+            />
+            <VehicleInfoInputField
+              label="Due service"
+              value={draft.dueOdometerReading ?? ""}
+              onChange={(dueOdometerReading) => patchDraft({ dueOdometerReading })}
+              inputMode="numeric"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="inline-flex min-w-[9rem] items-center justify-center rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <span className="text-xs text-gray-700">
+              or{" "}
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={saving}
+                className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </span>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function CustomerVehicleListView({
   customer,
   onCancel,
   onGoToJobCard,
-  onAddVehicle,
+  onVehicleSaved,
 }: {
   customer: MyCustomer;
   onCancel: () => void;
   onGoToJobCard: (vehicleIndex: number) => void;
-  onAddVehicle: () => void;
+  onVehicleSaved: (vehicle: CustomerVehicle) => void;
 }) {
+  const [showAddCard, setShowAddCard] = useState(false);
   const vehicles = customer.vehicles ?? [];
+
+  const handleVehicleSaved = (vehicle: CustomerVehicle) => {
+    setShowAddCard(false);
+    onVehicleSaved(vehicle);
+  };
 
   return (
     <ContentPanel title="Vehicle info" className="!mb-0 shadow-none">
-      {vehicles.length === 0 ? (
+      {vehicles.length === 0 && !showAddCard ? (
         <p className="text-center text-sm text-gray-600">No vehicles on file for this customer.</p>
       ) : (
         <div className="space-y-3">
@@ -423,11 +709,23 @@ function CustomerVehicleListView({
         </div>
       )}
 
-      <div className="mt-5 flex justify-center">
-        <button type="button" onClick={onAddVehicle} className={shopAddNewButtonClass}>
-          + Add New
-        </button>
-      </div>
+      {showAddCard ? (
+        <div className={vehicles.length > 0 ? "mt-3" : ""}>
+          <AddVehicleCard
+            customer={customer}
+            onCancel={() => setShowAddCard(false)}
+            onSaved={handleVehicleSaved}
+          />
+        </div>
+      ) : null}
+
+      {!showAddCard ? (
+        <div className="mt-5 flex justify-center">
+          <button type="button" onClick={() => setShowAddCard(true)} className={shopAddNewButtonClass}>
+            + Add New
+          </button>
+        </div>
+      ) : null}
     </ContentPanel>
   );
 }
@@ -1287,12 +1585,22 @@ export default function ShopPeoplePage() {
     setDetailView({ kind: "vehicle-list", customer });
   };
 
-  const handleAddVehicleFromList = () => {
-    if (detailView?.kind !== "vehicle-list") return;
-    const customer = detailView.customer;
-    resetDetail();
-    setEditingCustomer(customer);
-  };
+  const handleVehicleSaved = useCallback(
+    async (addedVehicle: CustomerVehicle) => {
+      setDetailView((current) => {
+        if (current?.kind !== "vehicle-list") return current;
+        return {
+          kind: "vehicle-list",
+          customer: {
+            ...current.customer,
+            vehicles: [...(current.customer.vehicles ?? []), addedVehicle],
+          },
+        };
+      });
+      await refresh();
+    },
+    [refresh],
+  );
 
   const toggleCustomerSelection = (id: string) => {
     setSelectedCustomerIds((prev) => {
@@ -1355,7 +1663,7 @@ export default function ShopPeoplePage() {
             customer={detailView.customer}
             onCancel={resetDetail}
             onGoToJobCard={() => navigate("/shop/job-cards")}
-            onAddVehicle={handleAddVehicleFromList}
+            onVehicleSaved={(vehicle) => void handleVehicleSaved(vehicle)}
           />
         ) : showList ? (
           <>
