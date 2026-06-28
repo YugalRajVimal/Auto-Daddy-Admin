@@ -4,6 +4,7 @@ import { ShopViewTransition } from "../../components/shop/ShopAnimated";
 import { shopHeroCardBodyClass } from "../../components/shop/shopLayoutStyles";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
+import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
 import {
   ShopEmptyPanel,
   ShopErrorPanel,
@@ -161,7 +162,7 @@ export default function ShopJobCardsPage() {
       searchValue={search}
       onSearchChange={setSearch}
       sidebarExtra={
-        <div className="flex flex-col gap-3">
+        <div className={shopSidebarButtonStackClass}>
           <ShopSidebarButton label="Job Card List" active={view === "list"} onClick={showList} />
           <ShopSidebarButton
             label="Create New Job Card"

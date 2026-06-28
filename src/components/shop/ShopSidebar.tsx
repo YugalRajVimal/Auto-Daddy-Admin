@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import PortalSidebarButton from "../admin/PortalSidebarButton";
 import { Skeleton } from "../common/Skeleton";
-import { shopSidebarButtonClass } from "./shopSidebarStyles";
+import { shopSidebarButtonClass, shopSidebarButtonStackClass } from "./shopSidebarStyles";
 
 function ShopSidebarListIcon() {
   return (
@@ -72,7 +72,7 @@ export function ShopSidebarButtonsSkeleton({
 }) {
   return (
     <div
-      className={`flex flex-col gap-2 ${className}`.trim()}
+      className={`${shopSidebarButtonStackClass} ${className}`.trim()}
       aria-busy="true"
       aria-label="Loading navigation"
     >
@@ -117,7 +117,7 @@ export default function ShopSidebar({
 }: ShopSidebarProps) {
   return (
     <aside className={`${SHOP_SIDEBAR_SHELL_CLASS} ${className}`}>
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto lg:pr-0.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:pr-0.5">
         {heading ? <h2 className={headingClassName}>{heading}</h2> : null}
 
         {children ? <div className="min-w-0">{children}</div> : null}
@@ -125,7 +125,7 @@ export default function ShopSidebar({
         {loading ? (
           <ShopSidebarButtonsSkeleton count={skeletonCount} />
         ) : (
-          <div className="flex shrink-0 flex-col gap-2">
+          <div className={shopSidebarButtonStackClass}>
             {items.map((item) =>
               shopStyle ? (
                 <ShopSidebarButton

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FiChevronDown } from "react-icons/fi";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
-import { shopSidebarButtonClass } from "../../components/shop/shopSidebarStyles";
+import { shopSidebarButtonClass, shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
 import {
   ShopEmptyPanel,
   ShopErrorPanel,
@@ -318,7 +318,7 @@ export default function ShopWalletPage() {
         ) : undefined
       }
       sidebarExtra={
-        <div className="flex flex-col gap-3">
+        <div className={shopSidebarButtonStackClass}>
           <div>
             <ShopSidebarButton
               label="All Invoices"
@@ -339,7 +339,7 @@ export default function ShopWalletPage() {
               }
             />
             {invoiceMenuOpen ? (
-              <div className="mt-2 flex flex-col gap-2 pl-3">
+              <div className={`mt-2 pl-3 ${shopSidebarButtonStackClass}`}>
                 <button
                   type="button"
                   onClick={() => selectInvoiceView("paid")}

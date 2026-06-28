@@ -1,3 +1,6 @@
+/** Vertical stack spacing for left sidebar nav pills. */
+export const shopSidebarButtonStackClass = "flex flex-col gap-4";
+
 export function shopSidebarButtonClass(active?: boolean, className = "") {
   const base =
     "flex w-full items-center gap-2 rounded-l-full rounded-r-none px-3 py-1.5 text-left text-sm font-bold transition-colors duration-150";

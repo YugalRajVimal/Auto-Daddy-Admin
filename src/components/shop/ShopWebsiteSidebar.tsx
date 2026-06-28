@@ -1,4 +1,5 @@
 import { ShopSidebarButton } from "./ShopSidebar";
+import { shopSidebarButtonStackClass } from "./shopSidebarStyles";
 
 export type ShopWebsiteSection = "domain" | "preview" | "subscription";
 
@@ -18,7 +19,7 @@ export default function ShopWebsiteSidebar({
   onSectionChange,
 }: ShopWebsiteSidebarProps) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className={shopSidebarButtonStackClass}>
       {SECTIONS.map(({ id, label }) => (
         <ShopSidebarButton
           key={id}

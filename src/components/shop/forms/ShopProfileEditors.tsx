@@ -30,7 +30,7 @@ import {
 } from "../../../lib/shopOwnerMutations";
 import {
   formatOpenHoursTimeTable,
-  nextWeekdayDateISO,
+  getOpenHoursTableRows,
   resolveShopOpenHoursSchedule,
   serializePerDayOpenHoursForApi,
   shortDayLabel,
@@ -804,17 +804,18 @@ export function ShopOpenHoursEditor({
   const [formStart, setFormStart] = useState("09:00");
   const [formEnd, setFormEnd] = useState("20:00");
   const [saving, setSaving] = useState(false);
-  const [selectedDays, setSelectedDays] = useState<Set<WeekDay>>(new Set());
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const allDaysSelected = WEEK_DAYS.every((day) => selectedDays.has(day));
-  const someDaysSelected = selectedDays.size > 0 && !allDaysSelected;
+  const tableRows = useMemo(() => getOpenHoursTableRows(), []);
+  const allRowsSelected = tableRows.every((row) => selectedRowIds.has(row.id));
+  const someRowsSelected = selectedRowIds.size > 0 && !allRowsSelected;
 
   useEffect(() => {
     if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = someDaysSelected;
+      selectAllRef.current.indeterminate = someRowsSelected;
     }
-  }, [someDaysSelected]);
+  }, [someRowsSelected]);
 
   const resetFormFields = (day: WeekDay = "Monday") => {
     const entry = schedule[day];
@@ -883,17 +884,19 @@ export function ShopOpenHoursEditor({
     }
   };
 
-  const toggleDaySelection = (day: WeekDay) => {
-    setSelectedDays((prev) => {
+  const toggleRowSelection = (rowId: string) => {
+    setSelectedRowIds((prev) => {
       const next = new Set(prev);
-      if (next.has(day)) next.delete(day);
-      else next.add(day);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
       return next;
     });
   };
 
-  const toggleAllDays = () => {
-    setSelectedDays(allDaysSelected ? new Set() : new Set(WEEK_DAYS));
+  const toggleAllRows = () => {
+    setSelectedRowIds(
+      allRowsSelected ? new Set() : new Set(tableRows.map((row) => row.id))
+    );
   };
 
   const showForm = formMode === "add" || formMode === "edit";
@@ -985,8 +988,8 @@ export function ShopOpenHoursEditor({
                   <input
                     ref={selectAllRef}
                     type="checkbox"
-                    checked={allDaysSelected}
-                    onChange={toggleAllDays}
+                    checked={allRowsSelected}
+                    onChange={toggleAllRows}
                     aria-label="Select all days"
                     className="h-3.5 w-3.5 accent-ad-purple"
                   />
@@ -1000,12 +1003,13 @@ export function ShopOpenHoursEditor({
               </tr>
             </thead>
             <tbody>
-              {WEEK_DAYS.map((day, index) => {
-                const entry = schedule[day];
-                const isEditingRow = editingDay === day;
+              {tableRows.map((row, index) => {
+                const entry = schedule[row.day];
+                const isEditingRow = editingDay === row.day;
+                const isClosed = !entry.enabled;
                 return (
                   <tr
-                    key={day}
+                    key={row.id}
                     className={
                       isEditingRow ? "bg-ad-form-required-bg" : adminPanelRowClass(index)
                     }
@@ -1013,36 +1017,38 @@ export function ShopOpenHoursEditor({
                     <td className={SHOP_TABLE.tdCheckbox}>
                       <input
                         type="checkbox"
-                        checked={selectedDays.has(day)}
-                        onChange={() => toggleDaySelection(day)}
-                        aria-label={`Select ${day}`}
+                        checked={selectedRowIds.has(row.id)}
+                        onChange={() => toggleRowSelection(row.id)}
+                        aria-label={`Select ${row.day} ${row.dateISO}`}
                         className="h-3.5 w-3.5 accent-ad-purple"
                       />
                     </td>
-                    <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>
-                      {nextWeekdayDateISO(day)}
-                    </td>
-                    <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
-                      {shortDayLabel(day)}
-                    </td>
-                    <td className={SHOP_TABLE.td}>
-                      {entry.enabled ? formatOpenHoursTimeTable(entry.start) : "—"}
-                    </td>
-                    <td className={SHOP_TABLE.td}>
-                      {entry.enabled ? formatOpenHoursTimeTable(entry.end) : "—"}
+                    <td
+                      className={`${SHOP_TABLE.td} font-semibold ${isClosed ? "text-ad-purple" : "text-blue-700"}`}
+                    >
+                      {row.dateISO}
                     </td>
                     <td
-                      className={`${SHOP_TABLE.td} font-semibold ${entry.enabled ? "text-ad-purple" : "text-gray-500"}`}
+                      className={`${SHOP_TABLE.td} font-semibold ${isClosed ? "text-ad-purple" : "text-gray-800"}`}
                     >
+                      {shortDayLabel(row.day)}
+                    </td>
+                    <td className={`${SHOP_TABLE.td} ${isClosed ? "text-ad-purple" : ""}`}>
+                      {entry.enabled ? formatOpenHoursTimeTable(entry.start) : "—"}
+                    </td>
+                    <td className={`${SHOP_TABLE.td} ${isClosed ? "text-ad-purple" : ""}`}>
+                      {entry.enabled ? formatOpenHoursTimeTable(entry.end) : "—"}
+                    </td>
+                    <td className={`${SHOP_TABLE.td} font-semibold ${isClosed ? "text-ad-purple" : ""}`}>
                       {entry.enabled ? "Open" : "Closed"}
                     </td>
                     <td className={`${SHOP_TABLE.td} text-center`}>
                       <button
                         type="button"
-                        title={`Edit ${day}`}
-                        aria-label={`Edit ${day}`}
+                        title={`Edit ${row.day}`}
+                        aria-label={`Edit ${row.day}`}
                         disabled={saving}
-                        onClick={() => openEditForm(day)}
+                        onClick={() => openEditForm(row.day)}
                         className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple disabled:opacity-60"
                       >
                         <FiEdit2 size={13} aria-hidden />
