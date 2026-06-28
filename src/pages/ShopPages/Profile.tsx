@@ -505,7 +505,6 @@ export default function ShopProfilePage() {
       heroBackgroundImage={activeId === "open" ? false : undefined}
       contentTopOffset={activeId === "open"}
       heroCardFlush={activeId === "open"}
-      heroCardToolbarAlways={activeId === "open"}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}

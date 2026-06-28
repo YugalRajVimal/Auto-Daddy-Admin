@@ -805,6 +805,16 @@ export function ShopOpenHoursEditor({
   const [formEnd, setFormEnd] = useState("20:00");
   const [saving, setSaving] = useState(false);
   const [selectedDays, setSelectedDays] = useState<Set<WeekDay>>(new Set());
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const allDaysSelected = WEEK_DAYS.every((day) => selectedDays.has(day));
+  const someDaysSelected = selectedDays.size > 0 && !allDaysSelected;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someDaysSelected;
+    }
+  }, [someDaysSelected]);
 
   const resetFormFields = (day: WeekDay = "Monday") => {
     const entry = schedule[day];
@@ -880,6 +890,10 @@ export function ShopOpenHoursEditor({
       else next.add(day);
       return next;
     });
+  };
+
+  const toggleAllDays = () => {
+    setSelectedDays(allDaysSelected ? new Set() : new Set(WEEK_DAYS));
   };
 
   const showForm = formMode === "add" || formMode === "edit";
@@ -968,7 +982,14 @@ export function ShopOpenHoursEditor({
             <thead>
               <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
                 <th className={SHOP_TABLE.thCheckbox}>
-                  <span className="sr-only">Select</span>
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allDaysSelected}
+                    onChange={toggleAllDays}
+                    aria-label="Select all days"
+                    className="h-3.5 w-3.5 accent-ad-purple"
+                  />
                 </th>
                 <th className={SHOP_TABLE.th}>Date</th>
                 <th className={SHOP_TABLE.th}>Day</th>
@@ -1030,17 +1051,6 @@ export function ShopOpenHoursEditor({
                   </tr>
                 );
               })}
-              <tr className="bg-gray-100">
-                <td className={SHOP_TABLE.tdCheckbox}>
-                  <input
-                    type="checkbox"
-                    disabled
-                    aria-hidden
-                    className="h-3.5 w-3.5 accent-ad-purple opacity-40"
-                  />
-                </td>
-                <td className={SHOP_TABLE.td} colSpan={6} />
-              </tr>
             </tbody>
           </table>
         </div>
