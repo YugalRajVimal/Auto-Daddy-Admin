@@ -1,24 +1,43 @@
 import { useEffect, useMemo, useState } from "react";
+import { FiEdit2 } from "react-icons/fi";
+import { motion } from "framer-motion";
 import JobCardForm from "../../components/JobCard/JobCardForm";
-import { ShopViewTransition } from "../../components/shop/ShopAnimated";
-import { shopHeroCardBodyClass } from "../../components/shop/shopLayoutStyles";
-import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
-import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
 import {
-  ShopEmptyPanel,
-  ShopErrorPanel,
-  ShopListPanel,
-  ShopListFooter,
-  ShopLoadingPanel,
-} from "../../components/shop/ShopPanels";
+  ADMIN_PANEL_THEAD_ROW_CLASS,
+  adminPanelRowClass,
+  adminPanelTableClasses,
+  type AdminPanelTableClasses,
+} from "../../components/admin/adminPanelTableStyles";
+import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
+import ShopPageShell from "../../components/shop/ShopPageShell";
+import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
+import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopJobCards } from "../../hooks/useShopJobCards";
 import { formatCurrencyAmount } from "../../lib/currency";
+import { formatPhoneLabel } from "../../lib/phoneFormat";
 import useAuth from "../../auth/useAuth";
 import type { JobCardListRow } from "../../lib/shopOwnerJobCards";
 
 const PAGE_SIZE = 10;
+const JOB_CARDS_SEARCH_INPUT_ID = "shop-job-cards-search";
+
+const JOB_CARD_SECTIONS = [
+  { id: "list", label: "Job Card List", variant: "primary" as const },
+  { id: "create", label: "Create New Job Card", variant: "primary" as const },
+];
+
+const SHOP_TABLE_BASE = adminPanelTableClasses(true);
+const SHOP_TABLE: AdminPanelTableClasses = {
+  ...SHOP_TABLE_BASE,
+  th: SHOP_TABLE_BASE.th.replace("px-2", "px-4"),
+  thCheckbox: SHOP_TABLE_BASE.thCheckbox.replace("px-2", "px-4"),
+  td: SHOP_TABLE_BASE.td.replace("px-2", "px-4"),
+  tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
+};
+
+const SHOP_TABLE_HEAD_TH_CLASS = `${SHOP_TABLE.th} h-9 py-0 align-middle`;
+const SHOP_TABLE_BODY_TD_CLASS = `${SHOP_TABLE.td} h-9 py-0 align-middle whitespace-nowrap`;
 
 function displayJobId(jobNo: string | undefined): string {
   const raw = (jobNo ?? "").trim().replace(/^#/, "");
@@ -31,20 +50,10 @@ function displayJobId(jobNo: string | undefined): string {
   return `J ${stripped}`;
 }
 
-function displayPhone(phone: string | undefined): string {
-  const p = (phone ?? "").trim();
-  if (!p) return "—";
-  const digits = p.replace(/\D/g, "");
-  if (digits.length === 10) {
-    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-  }
-  if (digits.length === 11 && digits.startsWith("1")) {
-    return `${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
-  }
-  return p;
-}
-
-function formatJobPrice(total: number | string | undefined, countryCode: string | null | undefined): string {
+function formatJobPrice(
+  total: number | string | undefined,
+  countryCode: string | null | undefined,
+): string {
   const formatted = formatCurrencyAmount(total, countryCode, { fallback: "—" });
   if (formatted === "—") return formatted;
   const match = /^([^\d]+)(.+)$/.exec(formatted);
@@ -54,56 +63,111 @@ function formatJobPrice(total: number | string | undefined, countryCode: string 
   return formatted;
 }
 
-function JobCardRow({
-  jc,
-  countryCode,
-  onSelect,
+function AddNewButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={shopAddNewButtonClass}>
+      + Add New
+    </button>
+  );
+}
+
+function JobCardsSearchBar({
+  value,
+  onChange,
+  trailing,
 }: {
-  jc: JobCardListRow;
-  countryCode: string | null | undefined;
-  onSelect: () => void;
+  value: string;
+  onChange: (value: string) => void;
+  trailing?: React.ReactNode;
 }) {
   return (
-    <article
-      role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      className="flex cursor-pointer items-stretch rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008000]"
+    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 py-1.5 sm:gap-3">
+      <div className="flex items-center gap-2" />
+      <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <input
+          id={JOB_CARDS_SEARCH_INPUT_ID}
+          type="search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Search"
+          aria-label="Search"
+          className="h-[26px] min-w-[9rem] border border-gray-400 bg-white px-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none"
+        />
+        {trailing}
+      </div>
+    </div>
+  );
+}
+
+function JobCardListTable({
+  rows,
+  countryCode,
+  onEdit,
+}: {
+  rows: JobCardListRow[];
+  countryCode: string | null | undefined;
+  onEdit: (jobCard: JobCardListRow) => void;
+}) {
+  const editHeadClass = `${SHOP_TABLE_HEAD_TH_CLASS} text-center`;
+
+  return (
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+      className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
     >
-      <div className="flex w-[76px] shrink-0 flex-col items-center justify-center border border-gray-400 bg-white px-2 py-3 text-center sm:w-[88px]">
-        <p className="text-[11px] font-semibold leading-tight text-gray-800">Job no.</p>
-        <p className="mt-0.5 text-sm font-bold leading-tight text-blue-700">{displayJobId(jc.jobNo)}</p>
+      <div className="overflow-x-auto">
+        <table className={SHOP_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Job No.</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Customer</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Phone</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Plate</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Total</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
+              <th className={editHeadClass}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((jc, index) => {
+              const customerName = jc.customerName?.trim() || "—";
+              return (
+                <tr key={jc.id} className={adminPanelRowClass(index)}>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+                    {displayJobId(jc.jobNo)}
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+                    {customerName}
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                    {formatPhoneLabel(jc.phone)}
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                    {jc.vehiclePlate?.trim() || "—"}
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                    {formatJobPrice(jc.total, countryCode)}
+                  </td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>{jc.date ?? "—"}</td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
+                    <button
+                      type="button"
+                      title={`Edit job ${displayJobId(jc.jobNo)}`}
+                      aria-label={`Edit job ${displayJobId(jc.jobNo)}`}
+                      onClick={() => onEdit(jc)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
+                    >
+                      <FiEdit2 size={13} aria-hidden />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-      <div className="flex min-w-0 flex-1 items-center justify-between gap-2 bg-[#d4ffd4] px-3 py-3 sm:gap-4 sm:px-5">
-        <div className="min-w-0 shrink-0 sm:max-w-[34%]">
-          <p className="truncate text-sm font-bold text-[#008000]">{jc.customerName ?? "—"}</p>
-          {jc.phone ? (
-            <a
-              href={`tel:${jc.phone.replace(/\s/g, "")}`}
-              className="text-sm font-semibold text-blue-700 hover:underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {displayPhone(jc.phone)}
-            </a>
-          ) : (
-            <p className="text-sm font-semibold text-blue-700">—</p>
-          )}
-        </div>
-        <p className="min-w-0 flex-1 truncate text-center text-lg font-bold tracking-wide text-gray-900 sm:text-xl">
-          {jc.vehiclePlate?.trim() || "—"}
-        </p>
-        <div className="shrink-0 text-right sm:max-w-[28%]">
-          <p className="text-sm font-bold text-[#008000]">{formatJobPrice(jc.total, countryCode)}</p>
-          <p className="text-sm font-semibold text-blue-700">{jc.date ?? "—"}</p>
-        </div>
-      </div>
-    </article>
+    </motion.div>
   );
 }
 
@@ -125,6 +189,16 @@ export default function ShopJobCardsPage() {
     () => cards.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
     [cards, safePage],
   );
+
+  const pageHeading =
+    view === "form" && formMode === "add"
+      ? "Create New Job Card"
+      : view === "form" && formMode === "edit"
+        ? "Edit Job Card"
+        : "Job Card List";
+
+  const activeSidebarId =
+    view === "list" ? "list" : view === "form" && formMode === "add" ? "create" : null;
 
   useEffect(() => {
     setPage(1);
@@ -153,35 +227,31 @@ export default function ShopJobCardsPage() {
     setEditJobCardId(null);
   };
 
+  const selectSection = (id: string) => {
+    if (id === "list") showList();
+    else if (id === "create") openNewJobCard();
+  };
+
   return (
     <ShopPageShell
       title="Job Cards"
+      pageHeading={pageHeading}
       metaTitle="Job Cards | AutoDaddy"
       metaDescription="Auto shop job cards"
-      searchPlaceholder="Search Customer"
-      searchValue={search}
-      onSearchChange={setSearch}
-      sidebarExtra={
-        <div className={shopSidebarButtonStackClass}>
-          <ShopSidebarButton label="Job Card List" active={view === "list"} onClick={showList} />
-          <ShopSidebarButton
-            label="Create New Job Card"
-            active={view === "form" && formMode === "add"}
-            onClick={openNewJobCard}
-          />
-        </div>
-      }
+      sidebarVariant="nav"
+      sidebarItems={JOB_CARD_SECTIONS}
+      activeSidebarId={activeSidebarId}
+      onSidebarSelect={selectSection}
+      heroBackgroundImage={false}
+      contentTopOffset
+      heroCardFlush
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <ShopViewTransition
-        viewKey={view === "form" ? `form-${formMode}-${editJobCardId ?? "new"}` : "list"}
-        className={shopHeroCardBodyClass}
-        focusOnReveal={view === "form"}
-      >
+      <div className="space-y-1">
         {view === "form" ? (
           <JobCardForm
             active
@@ -192,26 +262,27 @@ export default function ShopJobCardsPage() {
           />
         ) : (
           <>
+            <JobCardsSearchBar
+              value={search}
+              onChange={setSearch}
+              trailing={<AddNewButton onClick={openNewJobCard} />}
+            />
+
             {loading ? (
-              <ShopLoadingPanel variant="split-row" count={5} />
+              <ShopListSkeleton variant="profile-table" className="w-full" />
             ) : error ? (
               <ShopErrorPanel message={error} onRetry={() => void refresh()} />
             ) : cards.length === 0 ? (
-              <ShopEmptyPanel message="No job cards yet." />
+              <p className="text-center text-sm text-gray-600">No job cards yet.</p>
             ) : (
               <>
-                <ShopListPanel>
-                  {paginatedList.map((jc) => (
-                    <JobCardRow
-                      key={jc.id}
-                      jc={jc}
-                      countryCode={session?.meta?.countryCode}
-                      onSelect={() => openJobCard(jc)}
-                    />
-                  ))}
-                </ShopListPanel>
+                <JobCardListTable
+                  rows={paginatedList}
+                  countryCode={session?.meta?.countryCode}
+                  onEdit={openJobCard}
+                />
 
-                <ShopListFooter>
+                <ShopListFooter className="text-sm font-semibold text-gray-600">
                   <p>{cards.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">
@@ -222,10 +293,11 @@ export default function ShopJobCardsPage() {
                             key={pageNumber}
                             type="button"
                             onClick={() => setPage(pageNumber)}
-                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${isActive
-                                ? "bg-[#008000] text-white"
-                                : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
-                              }`}
+                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
+                              isActive
+                                ? "bg-gray-500 text-white"
+                                : "border border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                            }`}
                             aria-current={isActive ? "page" : undefined}
                           >
                             {pageNumber}
@@ -239,7 +311,7 @@ export default function ShopJobCardsPage() {
             )}
           </>
         )}
-      </ShopViewTransition>
+      </div>
     </ShopPageShell>
   );
 }
