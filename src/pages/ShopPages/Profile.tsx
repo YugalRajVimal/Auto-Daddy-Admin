@@ -579,8 +579,7 @@ export default function ShopProfilePage() {
       headerAction={headerAction}
       heroBackgroundImage={false}
       contentTopOffset={TOP_ALIGNED_SECTIONS.has(activeId)}
-      heroCardFlush={FLUSH_HERO_SECTIONS.has(activeId)}
-      heroCardTransparent={TRANSPARENT_HERO_SECTIONS.has(activeId)}
+      heroCardFlush={TOP_ALIGNED_SECTIONS.has(activeId)}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
