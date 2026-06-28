@@ -36,3 +36,6 @@ export const shopSaveButtonClass =
 
 export const shopCancelButtonClass =
   "rounded-md border border-gray-300 bg-white px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50";
+
+export const shopAddNewButtonClass =
+  "rounded bg-ad-form-save px-3 py-1.5 text-xs font-bold text-white hover:brightness-95";

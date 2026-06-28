@@ -62,7 +62,7 @@ export default function ShopPageLayout() {
       showBackgroundImage={chrome.heroBackgroundImage !== false}
       flush={chrome.heroCardFlush === true}
     >
-      <div className={`flex h-full min-h-0 w-full flex-col ${chrome.heroCardFlush ? "gap-0" : "gap-3"}`}>
+      <div className={`flex h-full min-h-0 w-full flex-col ${chrome.heroCardFlush ? "gap-1" : "gap-3"}`}>
         {showToolbar ? (
           <ShopHeroCardToolbar
             searchInputId={chrome.searchInputId}

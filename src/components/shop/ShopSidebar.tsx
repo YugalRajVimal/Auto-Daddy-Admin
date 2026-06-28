@@ -5,7 +5,7 @@ import { shopSidebarButtonClass } from "./shopSidebarStyles";
 
 function ShopSidebarListIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden className="shrink-0">
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden className="shrink-0">
       {[5, 9, 13, 17].map((y) => (
         <g key={y}>
           <circle cx="4" cy={y} r="1.25" fill="currentColor" />
@@ -57,8 +57,8 @@ export function ShopSidebarButtonSkeleton({ className = "" }: { className?: stri
       className={shopSidebarButtonClass(false, `pointer-events-none animate-pulse ${className}`)}
       aria-hidden="true"
     >
-      <Skeleton className="h-5 w-5 shrink-0 rounded-full bg-[#f5cce8]" pulse={false} />
-      <Skeleton className="h-3.5 min-w-0 flex-1 rounded bg-[#f5cce8]" pulse={false} />
+      <Skeleton className="h-4 w-4 shrink-0 rounded-full bg-[#f5cce8]" pulse={false} />
+      <Skeleton className="h-3 min-w-0 flex-1 rounded bg-[#f5cce8]" pulse={false} />
     </div>
   );
 }
@@ -72,7 +72,7 @@ export function ShopSidebarButtonsSkeleton({
 }) {
   return (
     <div
-      className={`flex flex-col gap-3 ${className}`.trim()}
+      className={`flex flex-col gap-2 ${className}`.trim()}
       aria-busy="true"
       aria-label="Loading navigation"
     >
@@ -117,7 +117,7 @@ export default function ShopSidebar({
 }: ShopSidebarProps) {
   return (
     <aside className={`${SHOP_SIDEBAR_SHELL_CLASS} ${className}`}>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:pr-0.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto lg:pr-0.5">
         {heading ? <h2 className={headingClassName}>{heading}</h2> : null}
 
         {children ? <div className="min-w-0">{children}</div> : null}
@@ -125,7 +125,7 @@ export default function ShopSidebar({
         {loading ? (
           <ShopSidebarButtonsSkeleton count={skeletonCount} />
         ) : (
-          <div className="flex shrink-0 flex-col gap-3">
+          <div className="flex shrink-0 flex-col gap-2">
             {items.map((item) =>
               shopStyle ? (
                 <ShopSidebarButton

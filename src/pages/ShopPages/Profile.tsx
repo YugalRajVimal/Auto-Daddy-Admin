@@ -13,6 +13,7 @@ import {
   ShopServiceList,
   type ShopCarCompany,
 } from "../../components/shop/forms/ShopProfileEditors";
+import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import { ShopReveal } from "../../components/shop/ShopAnimated";
 import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
 import { shopHeroOnImageMutedTextClass } from "../../components/shop/shopLayoutStyles";
@@ -74,11 +75,7 @@ function parseCompanies(payload: unknown): ShopCarCompany[] {
 
 function AddNewButton({ onClick }: { onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-md bg-[#008000] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#006600]"
-    >
+    <button type="button" onClick={onClick} className={shopAddNewButtonClass}>
       + Add New
     </button>
   );
@@ -86,10 +83,7 @@ function AddNewButton({ onClick }: { onClick: () => void }) {
 
 function AddNewLink({ to }: { to: string }) {
   return (
-    <Link
-      to={to}
-      className="rounded-md bg-[#008000] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#006600]"
-    >
+    <Link to={to} className={shopAddNewButtonClass}>
       + Add New
     </Link>
   );
@@ -359,9 +353,9 @@ export default function ShopProfilePage() {
         );
       case "open":
         return (
-          <>
+          <div className="space-y-1">
             {!showAddHours ? (
-              <div className="mb-1 flex justify-end">
+              <div className="flex justify-end">
                 <AddNewButton onClick={() => setShowAddHours(true)} />
               </div>
             ) : null}
@@ -371,7 +365,7 @@ export default function ShopProfilePage() {
               showAddForm={showAddHours}
               onAddFormClose={() => setShowAddHours(false)}
             />
-          </>
+          </div>
         );
       case "brands":
         return (

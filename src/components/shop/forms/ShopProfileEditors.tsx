@@ -222,7 +222,7 @@ function ProfileStatusFooter({
   actions: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-4 py-1">
       <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
         {message}
       </div>
@@ -274,7 +274,7 @@ function ProfileFormFooter({
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-6 py-1.5 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
+            className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
           >
             {saving ? savingLabel : saveLabel}
           </button>
