@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { FiEdit2 } from "react-icons/fi";
 import { motion } from "framer-motion";
@@ -78,6 +78,16 @@ const SHOP_TABLE: AdminPanelTableClasses = {
 
 const shopBulkButtonClass =
   "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
+
+const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
+
+function customerTableRowKey(customer: MyCustomer, index: number) {
+  return customerId(customer) || `row-${index}`;
+}
+
+function vehicleTableRowKey(vehicle: CustomerVehicle, index: number) {
+  return vehicle._id ?? vehicle.vId ?? `${vehicle.licensePlateNo ?? "vehicle"}-${index}`;
+}
 
 function AddNewButton({ onClick }: { onClick: () => void }) {
   return (
@@ -177,12 +187,29 @@ function CustomerListTable({
   customers,
   onSelect,
   showCity = false,
+  selectedIds,
+  onToggleRow,
+  onTogglePage,
 }: {
   customers: MyCustomer[];
   onSelect: (customer: MyCustomer) => void;
   showCity?: boolean;
+  selectedIds: Set<string>;
+  onToggleRow: (id: string) => void;
+  onTogglePage: (ids: string[], checked: boolean) => void;
 }) {
+  const selectAllRef = useRef<HTMLInputElement>(null);
   const actionHeadClass = `${SHOP_TABLE.th} text-center`;
+  const pageRowKeys = customers.map((customer, index) => customerTableRowKey(customer, index));
+  const allPageSelected =
+    customers.length > 0 && pageRowKeys.every((id) => selectedIds.has(id));
+  const somePageSelected = pageRowKeys.some((id) => selectedIds.has(id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+    }
+  }, [somePageSelected, allPageSelected]);
 
   return (
     <motion.div
@@ -194,6 +221,16 @@ function CustomerListTable({
         <table className={SHOP_TABLE.table}>
           <thead>
             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE.thCheckbox}>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={(e) => onTogglePage(pageRowKeys, e.target.checked)}
+                  aria-label="Select all customers on this page"
+                  className={SHOP_TABLE_CHECKBOX_CLASS}
+                />
+              </th>
               <th className={SHOP_TABLE.th}>Name</th>
               <th className={SHOP_TABLE.th}>Phone</th>
               {showCity ? <th className={SHOP_TABLE.th}>City</th> : null}
@@ -204,8 +241,18 @@ function CustomerListTable({
           <tbody>
             {customers.map((customer, index) => {
               const name = customer.name ?? "—";
+              const rowKey = pageRowKeys[index];
               return (
-                <tr key={customerId(customer) || `${name}-${index}`} className={adminPanelRowClass(index)}>
+                <tr key={rowKey} className={adminPanelRowClass(index)}>
+                  <td className={SHOP_TABLE.tdCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(rowKey)}
+                      onChange={() => onToggleRow(rowKey)}
+                      aria-label={`Select ${name}`}
+                      className={SHOP_TABLE_CHECKBOX_CLASS}
+                    />
+                  </td>
                   <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{name}</td>
                   <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
                     {customer.phone ? formatPhoneLabel(customer.phone) : "—"}
@@ -248,6 +295,9 @@ function CustomerAddPrompt({
   adding: boolean;
   onAdd: () => void;
 }) {
+  const [selected, setSelected] = useState(false);
+  const name = customer.name ?? "—";
+
   return (
     <div className="space-y-3">
       <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
@@ -255,6 +305,15 @@ function CustomerAddPrompt({
           <table className={SHOP_TABLE.table}>
             <thead>
               <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                <th className={SHOP_TABLE.thCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={(e) => setSelected(e.target.checked)}
+                    aria-label={`Select ${name}`}
+                    className={SHOP_TABLE_CHECKBOX_CLASS}
+                  />
+                </th>
                 <th className={SHOP_TABLE.th}>Name</th>
                 <th className={SHOP_TABLE.th}>Phone</th>
                 <th className={SHOP_TABLE.th}>Vehicles</th>
@@ -263,7 +322,16 @@ function CustomerAddPrompt({
             </thead>
             <tbody>
               <tr className="bg-white">
-                <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{customer.name ?? "—"}</td>
+                <td className={SHOP_TABLE.tdCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={(e) => setSelected(e.target.checked)}
+                    aria-label={`Select ${name}`}
+                    className={SHOP_TABLE_CHECKBOX_CLASS}
+                  />
+                </td>
+                <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{name}</td>
                 <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
                   {formatPhoneLabel(customer.phone)}
                 </td>
@@ -305,6 +373,40 @@ function MyListCustomerDetail({
 }) {
   const vehicles = customer.vehicles ?? [];
   const actionHeadClass = `${SHOP_TABLE.th} text-center`;
+  const customerName = customer.name ?? "—";
+  const [customerSelected, setCustomerSelected] = useState(false);
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<string>>(() => new Set());
+  const vehicleSelectAllRef = useRef<HTMLInputElement>(null);
+  const vehicleRowKeys = vehicles.map((vehicle, index) => vehicleTableRowKey(vehicle, index));
+  const allVehiclesSelected =
+    vehicles.length > 0 && vehicleRowKeys.every((id) => selectedVehicleIds.has(id));
+  const someVehiclesSelected = vehicleRowKeys.some((id) => selectedVehicleIds.has(id));
+
+  useEffect(() => {
+    if (vehicleSelectAllRef.current) {
+      vehicleSelectAllRef.current.indeterminate = someVehiclesSelected && !allVehiclesSelected;
+    }
+  }, [someVehiclesSelected, allVehiclesSelected]);
+
+  const toggleVehicle = (id: string) => {
+    setSelectedVehicleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllVehicles = (checked: boolean) => {
+    setSelectedVehicleIds((prev) => {
+      const next = new Set(prev);
+      for (const id of vehicleRowKeys) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-3">
@@ -313,6 +415,15 @@ function MyListCustomerDetail({
           <table className={SHOP_TABLE.table}>
             <thead>
               <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                <th className={SHOP_TABLE.thCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={customerSelected}
+                    onChange={(e) => setCustomerSelected(e.target.checked)}
+                    aria-label={`Select ${customerName}`}
+                    className={SHOP_TABLE_CHECKBOX_CLASS}
+                  />
+                </th>
                 <th className={SHOP_TABLE.th}>Name</th>
                 <th className={SHOP_TABLE.th}>Phone</th>
                 <th className={SHOP_TABLE.th}>City</th>
@@ -321,7 +432,16 @@ function MyListCustomerDetail({
             </thead>
             <tbody>
               <tr className="bg-white">
-                <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{customer.name ?? "—"}</td>
+                <td className={SHOP_TABLE.tdCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={customerSelected}
+                    onChange={(e) => setCustomerSelected(e.target.checked)}
+                    aria-label={`Select ${customerName}`}
+                    className={SHOP_TABLE_CHECKBOX_CLASS}
+                  />
+                </td>
+                <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{customerName}</td>
                 <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
                   {formatPhoneLabel(customer.phone)}
                 </td>
@@ -347,14 +467,35 @@ function MyListCustomerDetail({
             <table className={SHOP_TABLE.table}>
               <thead>
                 <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                  <th className={SHOP_TABLE.thCheckbox}>
+                    <input
+                      ref={vehicleSelectAllRef}
+                      type="checkbox"
+                      checked={allVehiclesSelected}
+                      onChange={(e) => toggleAllVehicles(e.target.checked)}
+                      aria-label="Select all vehicles"
+                      className={SHOP_TABLE_CHECKBOX_CLASS}
+                    />
+                  </th>
                   <th className={SHOP_TABLE.th}>Vehicle</th>
                   <th className={SHOP_TABLE.th}>License Plate</th>
                   <th className={actionHeadClass}>View</th>
                 </tr>
               </thead>
               <tbody>
-                {vehicles.map((vehicle, index) => (
-                  <tr key={vehicle._id ?? vehicle.vId ?? `${vehicle.licensePlateNo}-${index}`} className={adminPanelRowClass(index)}>
+                {vehicles.map((vehicle, index) => {
+                  const rowKey = vehicleRowKeys[index];
+                  return (
+                  <tr key={rowKey} className={adminPanelRowClass(index)}>
+                    <td className={SHOP_TABLE.tdCheckbox}>
+                      <input
+                        type="checkbox"
+                        checked={selectedVehicleIds.has(rowKey)}
+                        onChange={() => toggleVehicle(rowKey)}
+                        aria-label={`Select ${vehicleLabel(vehicle)}`}
+                        className={SHOP_TABLE_CHECKBOX_CLASS}
+                      />
+                    </td>
                     <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
                       {vehicleLabel(vehicle)}
                     </td>
@@ -373,7 +514,8 @@ function MyListCustomerDetail({
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -731,6 +873,7 @@ export default function ShopPeoplePage() {
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [detailView, setDetailView] = useState<DetailView | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(() => new Set());
 
   const {
     customers: myCustomers,
@@ -808,6 +951,10 @@ export default function ShopPeoplePage() {
   useEffect(() => {
     setPage(1);
   }, [search, section, detailView]);
+
+  useEffect(() => {
+    setSelectedCustomerIds(new Set());
+  }, [search, section]);
 
   useEffect(() => {
     if (section === "customers") {
@@ -956,6 +1103,26 @@ export default function ShopPeoplePage() {
     setSelectedCustomerKey(customerRowKey(customer, String(rowIndex)));
   };
 
+  const toggleCustomerSelection = (id: string) => {
+    setSelectedCustomerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCustomerPageSelection = (ids: string[], checked: boolean) => {
+    setSelectedCustomerIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
   return (
     <ShopPageShell
       title="Customers"
@@ -970,7 +1137,7 @@ export default function ShopPeoplePage() {
       contentTopOffset
       heroCardFlush
       onFaqsOpen={() => setFaqsOpen(true)}
-      onFaqsClose={() => setFaqsClose(false)}
+      onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
@@ -1060,6 +1227,9 @@ export default function ShopPeoplePage() {
                   customers={paginatedCustomers}
                   onSelect={handleTableSelect}
                   showCity={isListedSection}
+                  selectedIds={selectedCustomerIds}
+                  onToggleRow={toggleCustomerSelection}
+                  onTogglePage={toggleCustomerPageSelection}
                 />
 
                 <ShopListFooter className="text-sm font-semibold text-gray-600">
