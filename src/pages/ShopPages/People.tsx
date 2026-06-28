@@ -25,10 +25,10 @@ import {
   shopCompactReadOnlyClass,
   shopProfileFormPanelClass,
 } from "../../components/shop/shopLayoutStyles";
+import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import {
   ShopErrorPanel,
   ShopListFooter,
-  ShopLoadingPanel,
 } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
@@ -46,7 +46,7 @@ import { formatPhoneDisplay, formatPhoneLabel, phoneDigits } from "../../lib/pho
 import { parseMyCustomers } from "../../lib/shopOwnerParsers";
 import type { CustomerVehicle, MyCustomer } from "../../types/shopOwner";
 
-type PeopleSection = "customers" | "my-list";
+type PeopleSection = "customers" | "my-list" | "approval";
 
 type DetailView =
   | { kind: "add-to-list"; customer: MyCustomer }
@@ -55,7 +55,14 @@ type DetailView =
 const PEOPLE_SECTIONS = [
   { id: "customers", label: "Customers", variant: "primary" as const },
   { id: "my-list", label: "My Customer List", variant: "primary" as const },
+  { id: "approval", label: "Approval", variant: "primary" as const },
 ];
+
+const SECTION_HEADINGS: Record<PeopleSection, string> = {
+  customers: "Customers",
+  "my-list": "My Customer List",
+  approval: "Approval",
+};
 
 const PEOPLE_SEARCH_INPUT_ID = "shop-people-customer-search";
 const PAGE_SIZE = 10;
@@ -80,6 +87,31 @@ function AddNewButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+function PeopleSearchBar({
+  value,
+  onChange,
+  inputId,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  inputId: string;
+}) {
+  return (
+    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-end gap-2 border-b border-gray-300 bg-[#d1d5db] px-2 py-1.5 sm:gap-3">
+      <label htmlFor={inputId} className="text-sm font-semibold text-gray-700">
+        Search
+      </label>
+      <input
+        id={inputId}
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-[26px] w-full max-w-xs border border-gray-400 bg-white px-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none sm:max-w-sm"
+      />
+    </div>
+  );
+}
+
 function customerId(c: MyCustomer) {
   return c.carOwnerId ?? c.id ?? c._id ?? "";
 }
@@ -93,6 +125,17 @@ function vehicleLabel(v: CustomerVehicle) {
   const make = v.vehicleName?.trim() || "—";
   const model = v.model?.trim();
   return model ? `${make} - ${model}` : make;
+}
+
+function isPendingApproval(customer: MyCustomer): boolean {
+  const status = (customer.status ?? customer.linkStatus ?? "").trim().toLowerCase();
+  if (status.includes("pending") || status.includes("approval") || status === "sent") {
+    return true;
+  }
+  if (status.includes("approved") || status === "active" || status.includes("linked")) {
+    return false;
+  }
+  return !customer.linkedAt?.trim();
 }
 
 function matchesMyCustomerSearch(customer: MyCustomer, query: string): boolean {
@@ -706,17 +749,24 @@ export default function ShopPeoplePage() {
   }, [myCustomers]);
 
   const isDirectorySearch = section === "customers" && search.trim().length > 0;
-  const showSearch = !detailView;
+  const isListedSection = section === "my-list" || section === "approval";
 
   const listCustomers = useMemo(() => {
     if (section === "customers") {
       if (isDirectorySearch) return searchHits;
-      return myCustomers;
+      return [];
     }
     if (section === "my-list") {
       const q = search.trim();
-      if (!q) return myCustomers;
-      return myCustomers.filter((customer) => matchesMyCustomerSearch(customer, q));
+      const approved = myCustomers.filter((customer) => !isPendingApproval(customer));
+      if (!q) return approved;
+      return approved.filter((customer) => matchesMyCustomerSearch(customer, q));
+    }
+    if (section === "approval") {
+      const q = search.trim();
+      const pending = myCustomers.filter(isPendingApproval);
+      if (!q) return pending;
+      return pending.filter((customer) => matchesMyCustomerSearch(customer, q));
     }
     return [];
   }, [section, isDirectorySearch, searchHits, myCustomers, search]);
@@ -745,7 +795,7 @@ export default function ShopPeoplePage() {
   }, [selectedCustomerKey, section, paginatedCustomers, safePage, customerRowKey]);
 
   const selectedMyListCustomer = useMemo(() => {
-    if (!selectedCustomerKey || section !== "my-list") return null;
+    if (!selectedCustomerKey || !isListedSection) return null;
     for (let i = 0; i < listCustomers.length; i++) {
       const customer = listCustomers[i];
       if (customerRowKey(customer, String(i)) === selectedCustomerKey) {
@@ -753,7 +803,7 @@ export default function ShopPeoplePage() {
       }
     }
     return null;
-  }, [selectedCustomerKey, section, listCustomers, customerRowKey]);
+  }, [selectedCustomerKey, isListedSection, listCustomers, customerRowKey]);
 
   useEffect(() => {
     setPage(1);
@@ -766,7 +816,7 @@ export default function ShopPeoplePage() {
   }, [search, section, page]);
 
   useEffect(() => {
-    if (section !== "my-list") return;
+    if (!isListedSection) return;
     const q = search.trim();
     if (!q) return;
 
@@ -782,7 +832,7 @@ export default function ShopPeoplePage() {
     if (listCustomers.length === 1) {
       setSelectedCustomerKey(customerRowKey(listCustomers[0], String(0)));
     }
-  }, [search, section, listCustomers, customerRowKey]);
+  }, [search, isListedSection, listCustomers, customerRowKey]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -855,7 +905,7 @@ export default function ShopPeoplePage() {
     setDetailView(null);
     toast.success("Customer added to your list.");
     await refresh();
-    setSection("my-list");
+    setSection("approval");
   };
 
   const handleAddNewSaved = async (message: string) => {
@@ -886,17 +936,18 @@ export default function ShopPeoplePage() {
         ? searching
           ? "Searching…"
           : "No customers found."
-        : "No customers yet."
-      : "No customers in your list yet.";
+        : "Search to find customers in the directory."
+      : section === "approval"
+        ? "No customers awaiting approval."
+        : "No customers in your list yet.";
 
-  const showList = !detailView && !showAddForm;
+  const showList = !detailView;
   const showAddNewAction =
-    !detailView && !showAddForm && !selectedCustomer && !selectedMyListCustomer;
-
-  const headerAction = useMemo(
-    () => (showAddNewAction ? <AddNewButton onClick={() => setShowAddForm(true)} /> : undefined),
-    [showAddNewAction],
-  );
+    section !== "approval" &&
+    !detailView &&
+    !showAddForm &&
+    !selectedCustomer &&
+    !selectedMyListCustomer;
 
   const handleTableSelect = (customer: MyCustomer) => {
     setShowAddForm(false);
@@ -908,40 +959,23 @@ export default function ShopPeoplePage() {
   return (
     <ShopPageShell
       title="Customers"
-      pageHeading="Customers"
+      pageHeading={SECTION_HEADINGS[section]}
       metaTitle="Customers | AutoDaddy"
       metaDescription="Auto shop customers"
-      searchPlaceholder={showSearch ? "Search" : undefined}
-      searchValue={search}
-      onSearchChange={setSearch}
-      searchInputId={PEOPLE_SEARCH_INPUT_ID}
       sidebarVariant="nav"
       sidebarItems={PEOPLE_SECTIONS}
       activeSidebarId={detailView ? null : section}
       onSidebarSelect={selectSection}
-      headerAction={headerAction}
       heroBackgroundImage={false}
       contentTopOffset
       heroCardFlush
       onFaqsOpen={() => setFaqsOpen(true)}
-      onFaqsClose={() => setFaqsOpen(false)}
+      onFaqsClose={() => setFaqsClose(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
       <div className="space-y-1">
-        <ShopReveal show={showAddForm}>
-          <AddNewCustomerForm
-            defaultCity={shopCity}
-            onCancel={() => {
-              setShowAddForm(false);
-              setStatusMessage(null);
-            }}
-            onSaved={(message) => void handleAddNewSaved(message)}
-          />
-          {statusMessage && showAddForm ? <StatusBanner message={statusMessage} /> : null}
-        </ShopReveal>
-
         {detailView?.kind === "add-to-list" ? (
           <>
             <AddToListForm
@@ -959,77 +993,103 @@ export default function ShopPeoplePage() {
             onGoToJobCard={() => navigate("/shop/job-cards")}
           />
         ) : showList ? (
-          listLoading && !isDirectorySearch ? (
-            <ShopLoadingPanel variant="profile-table" />
-          ) : listError && !isDirectorySearch ? (
-            <ShopErrorPanel message={listError} onRetry={() => void refresh()} />
-          ) : section === "customers" && isDirectorySearch && searching && searchHits.length === 0 ? (
-            <p className="text-center text-sm text-gray-600">Searching…</p>
-          ) : listCustomers.length === 0 ? (
-            <p className="text-center text-sm text-gray-600">{emptyMessage}</p>
-          ) : section === "customers" && selectedCustomer ? (
-            <>
-              <button type="button" onClick={() => setSelectedCustomerKey(null)} className={shopBulkButtonClass}>
-                ← Back to list
-              </button>
-              <CustomerAddPrompt
-                customer={selectedCustomer}
-                inMyList={isInMyList(selectedCustomer)}
-                adding={addingId === customerId(selectedCustomer)}
-                onAdd={() => handleAddExisting(selectedCustomer)}
-              />
-            </>
-          ) : section === "my-list" && selectedMyListCustomer ? (
-            <>
-              <button type="button" onClick={() => setSelectedCustomerKey(null)} className={shopBulkButtonClass}>
-                ← Back to list
-              </button>
-              <MyListCustomerDetail
-                customer={selectedMyListCustomer}
-                onVehicleSelect={(vehicleIndex) =>
-                  setDetailView({
-                    kind: "customer-info",
-                    customer: selectedMyListCustomer,
-                    vehicleIndex,
-                  })
-                }
-              />
-            </>
-          ) : (
-            <>
-              <CustomerListTable
-                customers={paginatedCustomers}
-                onSelect={handleTableSelect}
-                showCity={section === "my-list"}
-              />
+          <>
+            <PeopleSearchBar
+              value={search}
+              onChange={setSearch}
+              inputId={PEOPLE_SEARCH_INPUT_ID}
+            />
 
-              <ShopListFooter className="text-sm font-semibold text-gray-600">
-                <p>{listCustomers.length} Entries</p>
-                {totalPages > 1 ? (
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
-                      const isActive = pageNumber === safePage;
-                      return (
-                        <button
-                          key={pageNumber}
-                          type="button"
-                          onClick={() => setPage(pageNumber)}
-                          className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
-                            isActive
-                              ? "bg-gray-500 text-white"
-                              : "border border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-                          }`}
-                          aria-current={isActive ? "page" : undefined}
-                        >
-                          {pageNumber}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </ShopListFooter>
-            </>
-          )
+            {!showAddForm && showAddNewAction ? (
+              <div className="flex min-h-[2rem] items-center justify-end gap-2">
+                <AddNewButton onClick={() => setShowAddForm(true)} />
+              </div>
+            ) : null}
+
+            <ShopReveal show={showAddForm}>
+              <AddNewCustomerForm
+                defaultCity={shopCity}
+                onCancel={() => {
+                  setShowAddForm(false);
+                  setStatusMessage(null);
+                }}
+                onSaved={(message) => void handleAddNewSaved(message)}
+              />
+              {statusMessage && showAddForm ? <StatusBanner message={statusMessage} /> : null}
+            </ShopReveal>
+
+            {listLoading && isListedSection && !isDirectorySearch ? (
+              <ShopListSkeleton variant="profile-table" className="w-full" />
+            ) : listError && isListedSection && !isDirectorySearch ? (
+              <ShopErrorPanel message={listError} onRetry={() => void refresh()} />
+            ) : section === "customers" && isDirectorySearch && searching && searchHits.length === 0 ? (
+              <p className="text-center text-sm text-gray-600">Searching…</p>
+            ) : listCustomers.length === 0 && !showAddForm ? (
+              <p className="text-center text-sm text-gray-600">{emptyMessage}</p>
+            ) : section === "customers" && selectedCustomer ? (
+              <>
+                <button type="button" onClick={() => setSelectedCustomerKey(null)} className={shopBulkButtonClass}>
+                  ← Back to list
+                </button>
+                <CustomerAddPrompt
+                  customer={selectedCustomer}
+                  inMyList={isInMyList(selectedCustomer)}
+                  adding={addingId === customerId(selectedCustomer)}
+                  onAdd={() => handleAddExisting(selectedCustomer)}
+                />
+              </>
+            ) : isListedSection && selectedMyListCustomer ? (
+              <>
+                <button type="button" onClick={() => setSelectedCustomerKey(null)} className={shopBulkButtonClass}>
+                  ← Back to list
+                </button>
+                <MyListCustomerDetail
+                  customer={selectedMyListCustomer}
+                  onVehicleSelect={(vehicleIndex) =>
+                    setDetailView({
+                      kind: "customer-info",
+                      customer: selectedMyListCustomer,
+                      vehicleIndex,
+                    })
+                  }
+                />
+              </>
+            ) : listCustomers.length > 0 ? (
+              <>
+                <CustomerListTable
+                  customers={paginatedCustomers}
+                  onSelect={handleTableSelect}
+                  showCity={isListedSection}
+                />
+
+                <ShopListFooter className="text-sm font-semibold text-gray-600">
+                  <p>{listCustomers.length} Entries</p>
+                  {totalPages > 1 ? (
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
+                        const isActive = pageNumber === safePage;
+                        return (
+                          <button
+                            key={pageNumber}
+                            type="button"
+                            onClick={() => setPage(pageNumber)}
+                            className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
+                              isActive
+                                ? "bg-gray-500 text-white"
+                                : "border border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                            }`}
+                            aria-current={isActive ? "page" : undefined}
+                          >
+                            {pageNumber}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </ShopListFooter>
+              </>
+            ) : null}
+          </>
         ) : null}
       </div>
     </ShopPageShell>

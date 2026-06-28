@@ -202,13 +202,12 @@ export function ShopOwnerDataProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
   const [sections, setSections] = useState(createInitialSections);
   const inflightRef = useRef<Partial<Record<ShopDataSection, Promise<void>>>>({});
+  const sectionsRef = useRef(sections);
+  sectionsRef.current = sections;
 
   const runSectionFetch = useCallback(
     async (section: ShopDataSection, options?: { silent?: boolean; force?: boolean }) => {
-      if (!token) {
-        setSections(createInitialSections());
-        return;
-      }
+      if (!token) return;
 
       if (section === "partsDealers") {
         setSections((prev) => {
@@ -231,24 +230,16 @@ export function ShopOwnerDataProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      let shouldFetch = false;
-      let showLoading = false;
+      const existing = sectionsRef.current[section];
+      if (!options?.force && existing.loaded) return;
 
-      setSections((prev) => {
-        const existing = prev[section];
-        if (!options?.force && existing.loaded) {
-          return prev;
-        }
-        shouldFetch = true;
-        showLoading = !existing.loaded && !options?.silent;
-        if (!showLoading) return prev;
-        return {
+      const showLoading = !existing.loaded && !options?.silent;
+      if (showLoading) {
+        setSections((prev) => ({
           ...prev,
-          [section]: { ...existing, loading: true, error: null },
-        };
-      });
-
-      if (!shouldFetch) return;
+          [section]: { ...prev[section], loading: true, error: null },
+        }));
+      }
 
       const existingPromise = inflightRef.current[section];
       if (existingPromise) {
@@ -257,28 +248,40 @@ export function ShopOwnerDataProvider({ children }: { children: ReactNode }) {
       }
 
       const promise = (async () => {
-        const result = await fetchSectionData(section, token);
-        setSections((prev) => {
-          const next = {
+        try {
+          const result = await fetchSectionData(section, token);
+          setSections((prev) => {
+            const next = {
+              ...prev,
+              [section]: {
+                data: result.data ?? prev[section].data,
+                loading: false,
+                error: result.error,
+                loaded: true,
+              },
+            };
+            if (section === "portal" && result.data) {
+              const portalData = result.data as ShopPortalCache;
+              next.partsDealers = {
+                data: resolvePartsDealersFromPayload(portalData.dashboard),
+                loading: false,
+                error: null,
+                loaded: true,
+              };
+            }
+            return next;
+          });
+        } catch {
+          setSections((prev) => ({
             ...prev,
             [section]: {
-              data: result.data ?? prev[section].data,
+              ...prev[section],
               loading: false,
-              error: result.error,
+              error: "Network error.",
               loaded: true,
             },
-          };
-          if (section === "portal" && result.data) {
-            const portalData = result.data as ShopPortalCache;
-            next.partsDealers = {
-              data: resolvePartsDealersFromPayload(portalData.dashboard),
-              loading: false,
-              error: null,
-              loaded: true,
-            };
-          }
-          return next;
-        });
+          }));
+        }
       })();
 
       inflightRef.current[section] = promise;

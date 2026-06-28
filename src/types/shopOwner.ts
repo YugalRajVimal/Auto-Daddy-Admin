@@ -34,6 +34,8 @@ export type MyCustomer = {
   addedToShopAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  status?: string;
+  linkStatus?: string;
 };
 
 export type ShopDeal = {

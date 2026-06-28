@@ -95,6 +95,8 @@ function toCustomer(raw: unknown): MyCustomer | null {
     addedToShopAt: s(o.addedToShopAt),
     createdAt: s(o.createdAt),
     updatedAt: s(o.updatedAt),
+    status: s(o.status) ?? s(o.approvalStatus),
+    linkStatus: s(o.linkStatus),
   };
 }
 
