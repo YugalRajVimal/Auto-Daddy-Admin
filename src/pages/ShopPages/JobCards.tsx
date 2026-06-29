@@ -3,6 +3,8 @@ import { FiEdit2 } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import JobCardForm from "../../components/JobCard/JobCardForm";
+import ShopJobCardEstimateView from "../../components/JobCard/ShopJobCardEstimateView";
+import { pickJobNoFromListRow } from "../../components/JobCard/shopJobCardEstimate";
 import {
   ADMIN_PANEL_THEAD_ROW_CLASS,
   adminPanelRowClass,
@@ -10,6 +12,7 @@ import {
   type AdminPanelTableClasses,
 } from "../../components/admin/adminPanelTableStyles";
 import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
+import { ShopReveal } from "../../components/shop/ShopAnimated";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
@@ -17,17 +20,22 @@ import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopJobCards } from "../../hooks/useShopJobCards";
 import { useShopWallet } from "../../hooks/useShopWallet";
 import { formatCurrencyAmount } from "../../lib/currency";
-import { formatPhoneLabel } from "../../lib/phoneFormat";
+import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import {
   deleteJobCard,
   markJobCardPaymentInvoice,
   resendJobCardNotification,
 } from "../../lib/shopOwnerMutations";
-import { isJobCardPending, type JobCardListRow } from "../../lib/shopOwnerJobCards";
+import {
+  isJobCardPending,
+  jobCardStatusLabel,
+  type JobCardListRow,
+} from "../../lib/shopOwnerJobCards";
 import { getWalletLedgerTab } from "../../lib/shopOwnerWallet";
 import useAuth from "../../auth/useAuth";
 
 type JobCardSection = "my-list" | "approvals" | "convert-invoice" | "paid";
+type JobCardView = "list" | "form" | "detail";
 
 const PAGE_SIZE = 10;
 const JOB_CARDS_SEARCH_INPUT_ID = "shop-job-cards-search";
@@ -68,8 +76,8 @@ const SHOP_TABLE_BODY_TD_CLASS = `${SHOP_TABLE.td} h-9 py-0 align-middle whitesp
 const SHOP_TABLE_BODY_TD_CHECKBOX_CLASS = `${SHOP_TABLE.tdCheckbox} h-9 py-0 align-middle`;
 const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
 
-const JOB_CARD_BULK_ACTION_CLASS =
-  "rounded border border-gray-500 bg-gray-500 px-3 py-1 text-xs font-bold text-white hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50";
+const SHOP_JOB_CARD_BULK_BUTTON_CLASS =
+  "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
 
 function displayJobId(jobNo: string | undefined): string {
   const raw = (jobNo ?? "").trim().replace(/^#/, "");
@@ -86,13 +94,7 @@ function formatJobPrice(
   total: number | string | undefined,
   countryCode: string | null | undefined,
 ): string {
-  const formatted = formatCurrencyAmount(total, countryCode, { fallback: "—" });
-  if (formatted === "—") return formatted;
-  const match = /^([^\d]+)(.+)$/.exec(formatted);
-  if (match) {
-    return `${match[1].trim()} ${match[2].trim()}`;
-  }
-  return formatted;
+  return formatCurrencyAmount(total, countryCode, { fallback: "—", includeSign: false });
 }
 
 function matchesJobCardSearch(row: JobCardListRow, query: string): boolean {
@@ -124,64 +126,21 @@ function AddNewButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function JobCardsBulkToolbar({
-  disabled,
-  busy,
-  onArchive,
-  onDelete,
-  onCopy,
-  onPrint,
-  onSend,
-  onConvertToInvoice,
-}: {
-  disabled: boolean;
-  busy?: boolean;
-  onArchive: () => void;
-  onDelete: () => void;
-  onCopy: () => void;
-  onPrint: () => void;
-  onSend: () => void;
-  onConvertToInvoice: () => void;
-}) {
-  const actionDisabled = disabled || busy;
-  return (
-    <div className="flex min-h-9 flex-wrap items-center gap-2 py-1">
-      {(
-        [
-          ["Archive", onArchive],
-          ["Delete", onDelete],
-          ["Copy", onCopy],
-          ["Print", onPrint],
-          ["Send", onSend],
-          ["Convert to Invoice", onConvertToInvoice],
-        ] as const
-      ).map(([label, onClick]) => (
-        <button
-          key={label}
-          type="button"
-          disabled={actionDisabled}
-          onClick={onClick}
-          className={JOB_CARD_BULK_ACTION_CLASS}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function JobCardsSearchBar({
   value,
   onChange,
+  leading,
   trailing,
 }: {
   value: string;
   onChange: (value: string) => void;
+  leading?: React.ReactNode;
   trailing?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 sm:gap-3">
-      <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 sm:ml-auto">
+    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 py-1.5 sm:gap-3">
+      <div className="flex flex-wrap items-center gap-2">{leading}</div>
+      <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
         <input
           id={JOB_CARDS_SEARCH_INPUT_ID}
           type="search"
@@ -208,16 +167,20 @@ function JobCardListTable({
   rows,
   countryCode,
   onEdit,
+  onView,
   selectedIds,
   onToggleRow,
   onTogglePage,
+  showStatus = false,
 }: {
   rows: JobCardListRow[];
   countryCode: string | null | undefined;
   onEdit: (jobCard: JobCardListRow) => void;
+  onView: (jobCard: JobCardListRow) => void;
   selectedIds: Set<string>;
   onToggleRow: (id: string) => void;
   onTogglePage: (ids: string[], checked: boolean) => void;
+  showStatus?: boolean;
 }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
   const editHeadClass = `${SHOP_TABLE_HEAD_TH_CLASS} text-center`;
@@ -257,7 +220,7 @@ function JobCardListTable({
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Plate</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Total</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
-              <th className={editHeadClass}>Actions</th>
+              <th className={editHeadClass}>{showStatus ? "Status" : "Actions"}</th>
             </tr>
           </thead>
           <tbody>
@@ -274,14 +237,23 @@ function JobCardListTable({
                       className={SHOP_TABLE_CHECKBOX_CLASS}
                     />
                   </td>
-                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
-                    {displayJobId(jc.jobNo)}
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                    <button
+                      type="button"
+                      onClick={() => onView(jc)}
+                      className="font-semibold text-blue-700 underline hover:text-blue-800"
+                    >
+                      {displayJobId(jc.jobNo)}
+                    </button>
                   </td>
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
                     {customerName}
                   </td>
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
-                    {formatPhoneLabel(jc.phone)}
+                    {formatPhoneWithCountryCode(
+                      jc.phone,
+                      jc.phoneCountryCode ?? countryCode,
+                    )}
                   </td>
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
                     {jc.vehiclePlate?.trim() || "—"}
@@ -291,15 +263,19 @@ function JobCardListTable({
                   </td>
                   <td className={SHOP_TABLE_BODY_TD_CLASS}>{jc.date ?? "—"}</td>
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
-                    <button
-                      type="button"
-                      title={`Edit job ${displayJobId(jc.jobNo)}`}
-                      aria-label={`Edit job ${displayJobId(jc.jobNo)}`}
-                      onClick={() => onEdit(jc)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
-                    >
-                      <FiEdit2 size={13} aria-hidden />
-                    </button>
+                    {showStatus ? (
+                      <span className="font-semibold text-blue-700">{jobCardStatusLabel(jc)}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        title={`Edit job ${displayJobId(jc.jobNo)}`}
+                        aria-label={`Edit job ${displayJobId(jc.jobNo)}`}
+                        onClick={() => onEdit(jc)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
+                      >
+                        <FiEdit2 size={13} aria-hidden />
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
@@ -318,9 +294,11 @@ export default function ShopJobCardsPage() {
   const [search, setSearch] = useState("");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [view, setView] = useState<"list" | "form">("list");
+  const [view, setView] = useState<JobCardView>("list");
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
   const [editJobCardId, setEditJobCardId] = useState<string | null>(null);
+  const [detailJobCardId, setDetailJobCardId] = useState<string | null>(null);
+  const [detailListRow, setDetailListRow] = useState<JobCardListRow | null>(null);
   const [selectedJobCardIds, setSelectedJobCardIds] = useState<Set<string>>(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const {
@@ -370,7 +348,9 @@ export default function ShopJobCardsPage() {
   );
 
   const pageHeading =
-    view === "form" && formMode === "add"
+    view === "detail"
+      ? "Job Card"
+      : view === "form" && formMode === "add"
       ? "Create New Job Card"
       : view === "form" && formMode === "edit"
         ? "Edit Job Card"
@@ -491,25 +471,6 @@ export default function ShopJobCardsPage() {
     }
   };
 
-  const handleBulkArchive = () => {
-    if (!hasBulkSelection) return;
-    toast.info("Archive is not available yet.");
-  };
-
-  const handleBulkCopy = () => {
-    if (!hasBulkSelection) return;
-    const text = selectedJobCards
-      .map(
-        (row) =>
-          `${displayJobId(row.jobNo)}\t${row.customerName ?? ""}\t${row.phone ?? ""}\t${row.vehiclePlate ?? ""}`,
-      )
-      .join("\n");
-    void navigator.clipboard.writeText(text).then(
-      () => toast.success(`Copied ${selectedJobCards.length} job card${selectedJobCards.length === 1 ? "" : "s"}.`),
-      () => toast.error("Could not copy to clipboard."),
-    );
-  };
-
   const handleBulkPrint = () => {
     if (!hasBulkSelection) return;
     window.print();
@@ -518,6 +479,12 @@ export default function ShopJobCardsPage() {
   const refresh = () => {
     void refreshJobCards();
     void refreshWallet();
+  };
+
+  const openJobCardDetail = (jc: JobCardListRow) => {
+    setDetailJobCardId(jc.id);
+    setDetailListRow(jc);
+    setView("detail");
   };
 
   const openJobCard = (jc: JobCardListRow) => {
@@ -535,6 +502,24 @@ export default function ShopJobCardsPage() {
   const showList = () => {
     setView("list");
     setEditJobCardId(null);
+    setDetailJobCardId(null);
+    setDetailListRow(null);
+  };
+
+  const handleJobCardSaved = (jobCardId?: string, jobCardNo?: string) => {
+    void refresh();
+    if (jobCardId) {
+      setDetailJobCardId(jobCardId);
+      setDetailListRow(
+        jobCardNo?.trim()
+          ? { id: jobCardId, raw: { jobNo: jobCardNo.trim() }, jobNo: jobCardNo.trim() }
+          : { id: jobCardId, raw: {} },
+      );
+      setEditJobCardId(null);
+      setView("detail");
+      return;
+    }
+    showList();
   };
 
   const selectSection = (id: string) => {
@@ -564,19 +549,69 @@ export default function ShopJobCardsPage() {
       faqsDescription={faqsDescription}
     >
       <div className="space-y-1">
-        {view === "form" ? (
+        <ShopReveal show={view === "form"}>
           <JobCardForm
-            active
+            active={view === "form"}
             mode={formMode}
             jobCardId={editJobCardId}
             onCancel={showList}
-            onSaved={() => void refresh()}
+            onSaved={handleJobCardSaved}
           />
-        ) : (
+        </ShopReveal>
+
+        <ShopReveal show={view === "detail" && detailJobCardId != null}>
+          {detailJobCardId ? (
+            <ShopJobCardEstimateView
+              key={detailJobCardId}
+              jobCardId={detailJobCardId}
+              listRow={detailListRow}
+              jobNoHint={detailListRow ? pickJobNoFromListRow(detailListRow) ?? null : null}
+              onBack={showList}
+            />
+          ) : null}
+        </ShopReveal>
+
+        {view === "list" ? (
           <>
             <JobCardsSearchBar
               value={search}
               onChange={setSearch}
+              leading={
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkDelete()}
+                    disabled={!hasBulkSelection || bulkBusy}
+                    className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkPrint}
+                    disabled={!hasBulkSelection || bulkBusy}
+                    className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
+                  >
+                    Print
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkSend()}
+                    disabled={!hasBulkSelection || bulkBusy}
+                    className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
+                  >
+                    Send
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkConvertToInvoice()}
+                    disabled={!hasBulkSelection || bulkBusy}
+                    className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
+                  >
+                    Convert to Invoice
+                  </button>
+                </>
+              }
               trailing={
                 section === "my-list" ? <AddNewButton onClick={openNewJobCard} /> : null
               }
@@ -590,24 +625,15 @@ export default function ShopJobCardsPage() {
               <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES[section]}</p>
             ) : (
               <>
-                <JobCardsBulkToolbar
-                  disabled={!hasBulkSelection}
-                  busy={bulkBusy}
-                  onArchive={handleBulkArchive}
-                  onDelete={() => void handleBulkDelete()}
-                  onCopy={handleBulkCopy}
-                  onPrint={handleBulkPrint}
-                  onSend={() => void handleBulkSend()}
-                  onConvertToInvoice={() => void handleBulkConvertToInvoice()}
-                />
-
                 <JobCardListTable
                   rows={paginatedList}
                   countryCode={session?.meta?.countryCode}
                   onEdit={openJobCard}
+                  onView={openJobCardDetail}
                   selectedIds={selectedJobCardIds}
                   onToggleRow={toggleJobCardSelection}
                   onTogglePage={toggleJobCardPageSelection}
+                  showStatus={section === "approvals"}
                 />
 
                 <ShopListFooter className="text-sm font-semibold text-gray-600">
@@ -638,7 +664,7 @@ export default function ShopJobCardsPage() {
               </>
             )}
           </>
-        )}
+        ) : null}
       </div>
     </ShopPageShell>
   );

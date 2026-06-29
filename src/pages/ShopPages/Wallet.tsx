@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown } from "react-icons/fi";
+import { motion } from "framer-motion";
+import {
+  ADMIN_PANEL_THEAD_ROW_CLASS,
+  adminPanelRowClass,
+  adminPanelTableClasses,
+  type AdminPanelTableClasses,
+} from "../../components/admin/adminPanelTableStyles";
+import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
 import { shopSidebarButtonClass, shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
-import {
-  ShopEmptyPanel,
-  ShopErrorPanel,
-  ShopListPanel,
-  ShopListFooter,
-  ShopLoadingPanel,
-  ShopPageContentShell,
-} from "../../components/shop/ShopPanels";
+import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
+import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopWallet } from "../../hooks/useShopWallet";
 import { formatCurrencyAmount } from "../../lib/currency";
@@ -23,44 +25,65 @@ import {
   type ShopWalletBankRow,
   type ShopWalletExpenseRow,
 } from "../../lib/dummyShopWallet";
+import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import { getWalletLedgerTab, shortJobBadgeCode } from "../../lib/shopOwnerWallet";
 import type { JobCardListRow } from "../../lib/shopOwnerJobCards";
 import useAuth from "../../auth/useAuth";
 
 const PAGE_SIZE = 10;
+const WALLET_SEARCH_INPUT_ID = "shop-wallet-search";
 
 type WalletView = "paid" | "unpaid" | "expenses" | "banks";
 
-function displayPhone(phone: string | undefined): string {
-  const p = (phone ?? "").trim();
-  if (!p) return "—";
-  const digits = p.replace(/\D/g, "");
-  if (digits.length === 10) {
-    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-  }
-  if (digits.length === 11 && digits.startsWith("1")) {
-    return `${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
-  }
-  return p;
+const SECTION_HEADINGS: Record<WalletView, string> = {
+  paid: "Paid Invoice",
+  unpaid: "Un-Paid Invoice",
+  expenses: "Expenses",
+  banks: "Manage Banks",
+};
+
+const EMPTY_MESSAGES: Record<WalletView, string> = {
+  paid: "No paid invoices in this category.",
+  unpaid: "No unpaid invoices in this category.",
+  expenses: "No expenses match your search.",
+  banks: "No bank accounts match your search.",
+};
+
+const UNAVAILABLE_MESSAGES: Partial<Record<WalletView, string>> = {
+  expenses: "Expenses are not available via API yet.",
+  banks: "Bank account management is not available yet.",
+};
+
+const SHOP_TABLE_BASE = adminPanelTableClasses(true);
+const SHOP_TABLE: AdminPanelTableClasses = {
+  ...SHOP_TABLE_BASE,
+  th: SHOP_TABLE_BASE.th.replace("px-2", "px-4"),
+  thCheckbox: SHOP_TABLE_BASE.thCheckbox.replace("px-2", "px-4"),
+  td: SHOP_TABLE_BASE.td.replace("px-2", "px-4"),
+  tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
+};
+
+const SHOP_TABLE_HEAD_TH_CLASS = `${SHOP_TABLE.th} h-9 py-0 align-middle`;
+const SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS = `${SHOP_TABLE.thCheckbox} h-9 py-0 align-middle`;
+const SHOP_TABLE_BODY_TD_CLASS = `${SHOP_TABLE.td} h-9 py-0 align-middle whitespace-nowrap`;
+const SHOP_TABLE_BODY_TD_CHECKBOX_CLASS = `${SHOP_TABLE.tdCheckbox} h-9 py-0 align-middle`;
+const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
+
+function formatWalletPrice(
+  total: number | string | undefined,
+  countryCode: string | null | undefined,
+): string {
+  return formatCurrencyAmount(total, countryCode, { fallback: "—", includeSign: false });
 }
 
-function formatWalletPrice(total: number | string | undefined, countryCode: string | null | undefined): string {
-  const formatted = formatCurrencyAmount(total, countryCode, { fallback: "—" });
-  if (formatted === "—") return formatted;
-  const match = /^([^\d]+)(.+)$/.exec(formatted);
-  if (match) {
-    return `${match[1].trim()} ${match[2].trim()}`;
-  }
-  return formatted;
-}
-
-function displayBillId(row: JobCardListRow, isPaid: boolean): { label: string; id: string } {
+function displayBillId(row: JobCardListRow, isPaid: boolean): string {
   const code = shortJobBadgeCode(row.jobNo);
+  if (code === "—") return "—";
   const ledger = getWalletLedgerTab(row.raw);
   if (isPaid || ledger === "invoice") {
-    return { label: "Bill no.", id: code === "—" ? "—" : `B ${code}` };
+    return `B ${code}`;
   }
-  return { label: "Job no.", id: code === "—" ? "—" : `J ${code}` };
+  return `J ${code}`;
 }
 
 function matchesSearch(row: JobCardListRow, query: string): boolean {
@@ -79,100 +102,7 @@ function matchesExpenseSearch(row: ShopWalletExpenseRow, query: string): boolean
   return [row.name, row.category, row.date].join(" ").toLowerCase().includes(q);
 }
 
-function WalletExpenseRow({
-  row,
-  countryCode,
-}: {
-  row: ShopWalletExpenseRow;
-  countryCode: string | null | undefined;
-}) {
-  return (
-    <article className="flex items-center justify-between gap-4 rounded-md bg-[#d9ffd9] px-4 py-3 sm:px-6">
-      <p className="shrink-0 text-sm font-semibold text-blue-700">{row.date}</p>
-      <p className="min-w-0 flex-1 truncate text-sm font-bold text-[#008000]">{row.name}</p>
-      <p className="hidden min-w-0 truncate text-sm font-semibold text-[#008000] sm:block sm:max-w-[28%]">
-        {row.category}
-      </p>
-      <p className="shrink-0 text-sm font-bold text-[#008000]">
-        {formatWalletPrice(row.amount, countryCode)}
-      </p>
-    </article>
-  );
-}
-
-function WalletBankRow({
-  row,
-  countryCode,
-}: {
-  row: ShopWalletBankRow;
-  countryCode: string | null | undefined;
-}) {
-  return (
-    <article className="flex items-center justify-between gap-4 rounded-md border border-[#008000] bg-[#d4ffd4] px-4 py-3 sm:px-6">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold text-[#008000]">{row.label}</p>
-        <p className="truncate text-sm text-gray-800">{row.accountName}</p>
-        <p className="text-xs font-semibold text-blue-700">{row.accountNumber}</p>
-      </div>
-      <div className="shrink-0 text-right">
-        <p className="text-sm font-bold text-[#008000]">{formatWalletPrice(row.balance, countryCode)}</p>
-        {row.assignToInvoice ? (
-          <p className="text-xs font-semibold text-ad-purple">Assigned to invoice</p>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
-function WalletInvoiceRow({
-  row,
-  isPaid,
-  countryCode,
-}: {
-  row: JobCardListRow;
-  isPaid: boolean;
-  countryCode: string | null | undefined;
-}) {
-  const bill = displayBillId(row, isPaid);
-
-  return (
-    <article className="flex items-stretch rounded-sm">
-      <div className="flex w-[76px] shrink-0 flex-col items-center justify-center border border-[#008000] bg-white px-2 py-3 text-center sm:w-[88px]">
-        <p className="text-[11px] font-semibold leading-tight text-gray-800">{bill.label}</p>
-        <p className="mt-0.5 text-sm font-bold leading-tight text-blue-700">{bill.id}</p>
-      </div>
-      <div
-        className={`flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-5 ${isPaid ? "bg-[#c6efce]" : "bg-[#ffeBD6]"
-          }`}
-      >
-        <div className="min-w-0 shrink-0 sm:max-w-[34%]">
-          <p className="truncate text-sm font-bold text-[#008000]">{row.customerName ?? "—"}</p>
-          {row.phone ? (
-            <a
-              href={`tel:${row.phone.replace(/\s/g, "")}`}
-              className="text-sm font-semibold text-blue-700 hover:underline"
-            >
-              {displayPhone(row.phone)}
-            </a>
-          ) : (
-            <p className="text-sm font-semibold text-blue-700">—</p>
-          )}
-        </div>
-        <p className="min-w-0 flex-1 truncate text-center text-lg font-bold tracking-wide text-gray-900 sm:text-xl">
-          {row.vehiclePlate?.trim() || "—"}
-        </p>
-        <div className="shrink-0 text-right sm:max-w-[28%]">
-          <p className={`text-sm font-bold ${isPaid ? "text-[#008000]" : "text-ad-purple"}`}>
-            {formatWalletPrice(row.total, countryCode)}
-          </p>
-          <p className="text-sm font-semibold text-blue-700">{row.date ?? "—"}</p>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function WalletPagination({
+function WalletListFooter({
   totalEntries,
   page,
   totalPages,
@@ -184,7 +114,7 @@ function WalletPagination({
   onPageChange: (page: number) => void;
 }) {
   return (
-    <ShopListFooter>
+    <ShopListFooter className="text-sm font-semibold text-gray-600">
       <p>{totalEntries} Entries</p>
       {totalPages > 1 ? (
         <div className="flex items-center gap-1">
@@ -195,10 +125,11 @@ function WalletPagination({
                 key={pageNumber}
                 type="button"
                 onClick={() => onPageChange(pageNumber)}
-                className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${isActive
-                    ? "bg-[#008000] text-white"
-                    : "border border-[#008000] bg-white text-[#008000] hover:bg-[#d4ffd4]"
-                  }`}
+                className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
+                  isActive
+                    ? "bg-gray-500 text-white"
+                    : "border border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                }`}
                 aria-current={isActive ? "page" : undefined}
               >
                 {pageNumber}
@@ -211,6 +142,306 @@ function WalletPagination({
   );
 }
 
+function WalletSearchBar({
+  value,
+  onChange,
+  trailing,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 py-1.5 sm:gap-3">
+      <div className="flex flex-wrap items-center gap-2" />
+      <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <input
+          id={WALLET_SEARCH_INPUT_ID}
+          type="search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Search"
+          aria-label="Search"
+          className="h-[26px] min-w-[9rem] border border-gray-400 bg-white px-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none"
+        />
+        {trailing}
+      </div>
+    </div>
+  );
+}
+
+function WalletInvoiceTable({
+  rows,
+  isPaid,
+  countryCode,
+  selectedIds,
+  onToggleRow,
+  onTogglePage,
+}: {
+  rows: JobCardListRow[];
+  isPaid: boolean;
+  countryCode: string | null | undefined;
+  selectedIds: Set<string>;
+  onToggleRow: (id: string) => void;
+  onTogglePage: (ids: string[], checked: boolean) => void;
+}) {
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const idHeader = isPaid ? "Bill No." : "Job No.";
+  const pageRowIds = rows.map((row) => row.id);
+  const allPageSelected = rows.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+    }
+  }, [somePageSelected, allPageSelected]);
+
+  return (
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+      className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+    >
+      <div className="overflow-x-auto">
+        <table className={SHOP_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS}>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={(e) => onTogglePage(pageRowIds, e.target.checked)}
+                  aria-label="Select all invoices on this page"
+                  className={SHOP_TABLE_CHECKBOX_CLASS}
+                />
+              </th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>{idHeader}</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Customer</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Phone</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Plate</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Total</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => {
+              const customerName = row.customerName?.trim() || "—";
+              return (
+                <tr key={row.id} className={adminPanelRowClass(index)}>
+                  <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(row.id)}
+                      onChange={() => onToggleRow(row.id)}
+                      aria-label={`Select ${displayBillId(row, isPaid)}`}
+                      className={SHOP_TABLE_CHECKBOX_CLASS}
+                    />
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+                    {displayBillId(row, isPaid)}
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+                    {customerName}
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                    {formatPhoneWithCountryCode(
+                      row.phone,
+                      row.phoneCountryCode ?? countryCode,
+                    )}
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                    {row.vehiclePlate?.trim() || "—"}
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                    {formatWalletPrice(row.total, countryCode)}
+                  </td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>{row.date ?? "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
+  );
+}
+
+function WalletExpenseTable({
+  rows,
+  countryCode,
+  selectedIds,
+  onToggleRow,
+  onTogglePage,
+}: {
+  rows: ShopWalletExpenseRow[];
+  countryCode: string | null | undefined;
+  selectedIds: Set<string>;
+  onToggleRow: (id: string) => void;
+  onTogglePage: (ids: string[], checked: boolean) => void;
+}) {
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const pageRowIds = rows.map((row) => row.id);
+  const allPageSelected = rows.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+    }
+  }, [somePageSelected, allPageSelected]);
+
+  return (
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+      className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+    >
+      <div className="overflow-x-auto">
+        <table className={SHOP_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS}>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={(e) => onTogglePage(pageRowIds, e.target.checked)}
+                  aria-label="Select all expenses on this page"
+                  className={SHOP_TABLE_CHECKBOX_CLASS}
+                />
+              </th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Name</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Category</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={row.id} className={adminPanelRowClass(index)}>
+                <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(row.id)}
+                    onChange={() => onToggleRow(row.id)}
+                    aria-label={`Select expense ${row.name}`}
+                    className={SHOP_TABLE_CHECKBOX_CLASS}
+                  />
+                </td>
+                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+                  {row.date}
+                </td>
+                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                  {row.name}
+                </td>
+                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                  {row.category}
+                </td>
+                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                  {formatWalletPrice(row.amount, countryCode)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
+  );
+}
+
+function WalletBankTable({
+  rows,
+  countryCode,
+  selectedIds,
+  onToggleRow,
+  onTogglePage,
+}: {
+  rows: ShopWalletBankRow[];
+  countryCode: string | null | undefined;
+  selectedIds: Set<string>;
+  onToggleRow: (id: string) => void;
+  onTogglePage: (ids: string[], checked: boolean) => void;
+}) {
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const pageRowIds = rows.map((row) => row.id);
+  const allPageSelected = rows.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+    }
+  }, [somePageSelected, allPageSelected]);
+
+  return (
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+      className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+    >
+      <div className="overflow-x-auto">
+        <table className={SHOP_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS}>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={(e) => onTogglePage(pageRowIds, e.target.checked)}
+                  aria-label="Select all bank accounts on this page"
+                  className={SHOP_TABLE_CHECKBOX_CLASS}
+                />
+              </th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Label</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Account Name</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Account Number</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Balance</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={row.id} className={adminPanelRowClass(index)}>
+                <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(row.id)}
+                    onChange={() => onToggleRow(row.id)}
+                    aria-label={`Select bank account ${row.label}`}
+                    className={SHOP_TABLE_CHECKBOX_CLASS}
+                  />
+                </td>
+                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+                  {row.label}
+                </td>
+                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                  {row.accountName}
+                </td>
+                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+                  {row.accountNumber}
+                </td>
+                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                  {formatWalletPrice(row.balance, countryCode)}
+                </td>
+                <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                  {row.assignToInvoice ? (
+                    <span className="font-semibold text-ad-purple">Assigned to invoice</span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function ShopWalletPage() {
   const { session } = useAuth();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
@@ -219,6 +450,7 @@ export default function ShopWalletPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [faqsOpen, setFaqsOpen] = useState(false);
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set());
   const { paid: apiPaid, unpaid: apiUnpaid, loading, error, refresh } = useShopWallet();
 
   const paid = USE_DUMMY_SHOP_WALLET ? DUMMY_PAID_INVOICES : apiPaid;
@@ -276,45 +508,132 @@ export default function ShopWalletPage() {
   }, [search, view]);
 
   useEffect(() => {
+    setSelectedRowIds(new Set());
+  }, [search, view, page]);
+
+  useEffect(() => {
     if (page > activeTotalPages) {
       setPage(activeTotalPages);
     }
   }, [page, activeTotalPages]);
+
+  const toggleRowSelection = (id: string) => {
+    setSelectedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const togglePageSelection = (ids: string[], checked: boolean) => {
+    setSelectedRowIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
 
   const selectInvoiceView = (next: "paid" | "unpaid") => {
     setView(next);
     setInvoiceMenuOpen(true);
   };
 
-  const contentTitle =
-    view === "paid"
-      ? "Paid Invoice"
-      : view === "unpaid"
-        ? "Un-Paid Invoice"
-        : view === "expenses"
-          ? "Expenses"
-          : "Manage Banks";
+  const selectionProps = {
+    selectedIds: selectedRowIds,
+    onToggleRow: toggleRowSelection,
+    onTogglePage: togglePageSelection,
+  };
 
+  const unavailableMessage = !USE_DUMMY_SHOP_WALLET ? UNAVAILABLE_MESSAGES[view] : undefined;
+
+  const renderListContent = () => {
+    if (unavailableMessage) {
+      return <p className="text-center text-sm text-gray-600">{unavailableMessage}</p>;
+    }
+
+    if (showLoading) {
+      return <ShopListSkeleton variant="profile-table" className="w-full" />;
+    }
+
+    if (showError && (view === "paid" || view === "unpaid")) {
+      return <ShopErrorPanel message={error ?? ""} onRetry={() => void refresh()} />;
+    }
+
+    if (view === "expenses") {
+      if (filteredExpenses.length === 0) {
+        return <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES.expenses}</p>;
+      }
+      return (
+        <>
+          <WalletExpenseTable
+            rows={paginatedExpenses}
+            countryCode={session?.meta?.countryCode}
+            {...selectionProps}
+          />
+          <WalletListFooter
+            totalEntries={activeEntryCount}
+            page={safePage}
+            totalPages={activeTotalPages}
+            onPageChange={setPage}
+          />
+        </>
+      );
+    }
+
+    if (view === "banks") {
+      if (filteredBanks.length === 0) {
+        return <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES.banks}</p>;
+      }
+      return (
+        <>
+          <WalletBankTable
+            rows={paginatedBanks}
+            countryCode={session?.meta?.countryCode}
+            {...selectionProps}
+          />
+          <WalletListFooter
+            totalEntries={activeEntryCount}
+            page={safePage}
+            totalPages={activeTotalPages}
+            onPageChange={setPage}
+          />
+        </>
+      );
+    }
+
+    if (filteredList.length === 0) {
+      return <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES[view]}</p>;
+    }
+
+    return (
+      <>
+        <WalletInvoiceTable
+          rows={paginatedList}
+          isPaid={view === "paid"}
+          countryCode={session?.meta?.countryCode}
+          {...selectionProps}
+        />
+        <WalletListFooter
+          totalEntries={activeEntryCount}
+          page={safePage}
+          totalPages={activeTotalPages}
+          onPageChange={setPage}
+        />
+      </>
+    );
+  };
 
   return (
     <ShopPageShell
-      pageHeading={contentTitle}
+      title="Wallet"
+      pageHeading={SECTION_HEADINGS[view]}
       metaTitle="Wallet | AutoDaddy"
       metaDescription="Auto shop wallet and invoices"
-      searchPlaceholder="Search Customer"
-      searchValue={search}
-      onSearchChange={setSearch}
-      headerAction={
-        view === "expenses" ? (
-          <button
-            type="button"
-            disabled
-            className="shrink-0 rounded-md bg-[#008000] px-4 py-2 text-sm font-bold text-white opacity-60"
-          >
-            + Add New
-          </button>
-        ) : undefined
-      }
+      sidebarVariant="nav"
       sidebarExtra={
         <div className={shopSidebarButtonStackClass}>
           <div>
@@ -375,87 +694,29 @@ export default function ShopWalletPage() {
           />
         </div>
       }
+      heroBackgroundImage={false}
+      contentTopOffset
+      heroCardFlush
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <ShopPageContentShell>
-        {view === "expenses" ? (
-          !USE_DUMMY_SHOP_WALLET ? (
-            <ShopEmptyPanel message="Expenses are not available via API yet." />
-          ) : showLoading ? (
-            <ShopLoadingPanel variant="expense-row" count={5} />
-          ) : filteredExpenses.length === 0 ? (
-            <ShopEmptyPanel message="No expenses match your search." />
-          ) : (
-            <>
-              <ShopListPanel>
-                {paginatedExpenses.map((row) => (
-                  <WalletExpenseRow key={row.id} row={row} countryCode={session?.meta?.countryCode} />
-                ))}
-              </ShopListPanel>
-              <WalletPagination
-                totalEntries={activeEntryCount}
-                page={safePage}
-                totalPages={activeTotalPages}
-                onPageChange={setPage}
-              />
-            </>
-          )
-        ) : view === "banks" ? (
-          !USE_DUMMY_SHOP_WALLET ? (
-            <ShopEmptyPanel message="Bank account management is not available yet." />
-          ) : showLoading ? (
-            <ShopLoadingPanel variant="bank-row" count={4} />
-          ) : filteredBanks.length === 0 ? (
-            <ShopEmptyPanel message="No bank accounts match your search." />
-          ) : (
-            <>
-              <ShopListPanel>
-                {paginatedBanks.map((row) => (
-                  <WalletBankRow key={row.id} row={row} countryCode={session?.meta?.countryCode} />
-                ))}
-              </ShopListPanel>
-              <WalletPagination
-                totalEntries={activeEntryCount}
-                page={safePage}
-                totalPages={activeTotalPages}
-                onPageChange={setPage}
-              />
-            </>
-          )
-        ) : showLoading ? (
-          <ShopLoadingPanel variant="split-row" count={5} />
-        ) : showError ? (
-          <ShopErrorPanel message={error ?? ""} onRetry={() => void refresh()} />
-        ) : filteredList.length === 0 ? (
-          <ShopEmptyPanel
-            message={`No ${view === "paid" ? "paid" : "unpaid"} invoices in this category.`}
-          />
-        ) : (
-          <>
-            <ShopListPanel>
-              {paginatedList.map((row) => (
-                <WalletInvoiceRow
-                  key={row.id}
-                  row={row}
-                  isPaid={view === "paid"}
-                  countryCode={session?.meta?.countryCode}
-                />
-              ))}
-            </ShopListPanel>
-
-            <WalletPagination
-              totalEntries={activeEntryCount}
-              page={safePage}
-              totalPages={activeTotalPages}
-              onPageChange={setPage}
-            />
-          </>
-        )}
-      </ShopPageContentShell>
+      <div className="space-y-1">
+        <WalletSearchBar
+          value={search}
+          onChange={setSearch}
+          trailing={
+            view === "expenses" ? (
+              <button type="button" disabled className={`${shopAddNewButtonClass} opacity-60`}>
+                + Add New
+              </button>
+            ) : null
+          }
+        />
+        {renderListContent()}
+      </div>
     </ShopPageShell>
   );
 }

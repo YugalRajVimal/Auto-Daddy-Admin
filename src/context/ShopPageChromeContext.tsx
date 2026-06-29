@@ -50,6 +50,8 @@ export type ShopPageChromeConfig = {
   sidebarStretch?: boolean;
   /** When true, keeps page content top-aligned inside the hero card instead of vertically centered. */
   contentTopOffset?: boolean;
+  /** When true, route content stretches to fill the hero card scroll area (e.g. full-height preview). */
+  contentFillHeight?: boolean;
   /** When true, plain hero card with light border, modest padding, transparent fill, and no background image. */
   heroCardFlush?: boolean;
   /** When true, hero card shell uses a transparent fill (e.g. personal/business profile over the image). */
@@ -128,6 +130,7 @@ function isSameChromeConfig(prev: ShopPageChromeConfig, next: ShopPageChromeConf
     prev.heroBackgroundImage === next.heroBackgroundImage &&
     prev.sidebarStretch === next.sidebarStretch &&
     prev.contentTopOffset === next.contentTopOffset &&
+    prev.contentFillHeight === next.contentFillHeight &&
     prev.heroCardFlush === next.heroCardFlush &&
     prev.heroCardTransparent === next.heroCardTransparent &&
     prev.heroCardToolbarAlways === next.heroCardToolbarAlways

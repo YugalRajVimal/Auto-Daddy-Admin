@@ -27,20 +27,21 @@ function getCurrencyConfig(countryCode: string | null | undefined): CurrencyConf
 export function formatCurrencyAmount(
   amount: number | string | null | undefined,
   countryCode: string | null | undefined,
-  options: { fallback?: string } = {}
+  options: { fallback?: string; includeSign?: boolean } = {}
 ): string {
   const parsed = parseNumericAmount(amount);
   if (parsed == null) return options.fallback ?? "—";
   const { sign, locale } = getCurrencyConfig(countryCode);
   const minimumFractionDigits = Number.isInteger(parsed) ? 0 : 2;
   const maximumFractionDigits = Number.isInteger(parsed) ? 0 : 2;
+  const includeSign = options.includeSign !== false;
   try {
     const formatted = new Intl.NumberFormat(locale, {
       minimumFractionDigits,
       maximumFractionDigits,
     }).format(parsed);
-    return `${sign}${formatted}`;
+    return includeSign ? `${sign}${formatted}` : formatted;
   } catch {
-    return `${sign}${parsed.toLocaleString()}`;
+    return includeSign ? `${sign}${parsed.toLocaleString()}` : parsed.toLocaleString();
   }
 }

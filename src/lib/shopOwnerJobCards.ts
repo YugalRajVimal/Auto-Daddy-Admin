@@ -17,6 +17,7 @@ export type JobCardListRow = {
   odometerCurrent?: string;
   odometerDue?: string;
   phone?: string;
+  phoneCountryCode?: string;
   date?: string;
   /** Job workflow status (e.g. Pending, Approved) */
   status?: string;
@@ -233,7 +234,13 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     s(o.ownerName) ??
     (customer ? s(customer.name) : undefined);
   const jobNo =
-    s(o.jobCardNumber) ?? s(o.jobNo) ?? s(o.jobNumber) ?? s(o.jobCode) ?? s(o.displayJobNo);
+    s(o.jobCardNumber) ??
+    s(o.jobNo) ??
+    s(o.jobNumber) ??
+    s(o.jobCode) ??
+    s(o.displayJobNo) ??
+    s(o.jobCardNo) ??
+    s(o.invoiceNumber);
   const vehiclePlate =
     s(o.licensePlateNo) ??
     s(o.registration) ??
@@ -246,6 +253,10 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     s(o.vehicleMakeModel) ??
     (modelPart && model2 ? `${modelPart} ${model2}`.trim() : modelPart ?? model2);
   const phone = pickCustomerPhone(o, customer);
+  const phoneCountryCode =
+    s(o.customerCountryCode) ??
+    s(o.countryCode) ??
+    (customer ? s(customer.countryCode) : undefined);
   const odometerCurrent =
     s(o.odometerReading) ??
     s(o.currentOdometerReading) ??
@@ -279,6 +290,7 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     odometerCurrent,
     odometerDue,
     phone,
+    phoneCountryCode,
     date,
     status,
     paymentStatus,
@@ -299,6 +311,20 @@ export function isJobCardPending(row: JobCardListRow): boolean {
     return s === "pending";
   }
   return false;
+}
+
+const JOB_CARD_BUCKET_LABELS: Record<JobCardListBucket, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  autoRejected: "Auto Rejected",
+};
+
+export function jobCardStatusLabel(row: JobCardListRow): string {
+  const status = (row.status ?? "").trim();
+  if (status) return status;
+  if (row.listBucket) return JOB_CARD_BUCKET_LABELS[row.listBucket];
+  return isJobCardPending(row) ? "Pending" : "—";
 }
 
 export function parseJobCardsFromPagePayload(payload: unknown): JobCardListRow[] {

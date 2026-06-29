@@ -10,6 +10,7 @@ import {
   shopHeroCardScrollClass,
   shopHeroCardScrollContentClass,
   shopHeroCardScrollContentTopClass,
+  shopMainContentFillClass,
   shopNavRowNavClass,
   shopNavRowSlotClass,
   shopPageBodyGridClass,
@@ -53,9 +54,19 @@ export default function ShopPageLayout() {
     </ShopSidebar>
   );
 
-  const scrollContentClass = chrome.contentTopOffset
-    ? shopHeroCardScrollContentTopClass
-    : shopHeroCardScrollContentClass;
+  const scrollRegionClass = chrome.contentFillHeight
+    ? "no-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden"
+    : shopHeroCardScrollClass;
+
+  const scrollBodyClass = chrome.contentFillHeight
+    ? "flex h-full min-h-0 flex-1 flex-col"
+    : shopHeroCardScrollBodyClass;
+
+  const scrollContentClass = chrome.contentFillHeight
+    ? `${shopHeroCardScrollContentTopClass} ${shopMainContentFillClass} h-full min-h-0`
+    : chrome.contentTopOffset
+      ? shopHeroCardScrollContentTopClass
+      : shopHeroCardScrollContentClass;
 
   const pageContent = useHeroCard ? (
     <ShopProfileHeroPanel
@@ -74,8 +85,8 @@ export default function ShopPageLayout() {
             alwaysShow={chrome.heroCardToolbarAlways}
           />
         ) : null}
-        <div className={shopHeroCardScrollClass}>
-          <div className={shopHeroCardScrollBodyClass}>
+        <div className={scrollRegionClass}>
+          <div className={scrollBodyClass}>
             <div className={scrollContentClass}>
               <Outlet />
             </div>

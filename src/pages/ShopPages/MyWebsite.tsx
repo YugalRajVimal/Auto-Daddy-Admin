@@ -6,12 +6,14 @@ import {
   CompactFormRow,
   compactFixedFieldWidth,
 } from "../../components/admin/ContentPanel";
-import { shopCompactInputClass } from "../../components/shop/shopLayoutStyles";
+import {
+  shopCompactInputClass,
+  shopHeroOpaqueSurfaceClass,
+  shopProfileFormPanelClass,
+  shopProfileFormPanelFooterClass,
+} from "../../components/shop/shopLayoutStyles";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopLoadingPanel, ShopPageContentShell } from "../../components/shop/ShopPanels";
-import ShopWebsiteSidebar, {
-  type ShopWebsiteSection,
-} from "../../components/shop/ShopWebsiteSidebar";
+import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import {
@@ -19,6 +21,14 @@ import {
   parseWebsiteTemplatesResponse,
   type WebsiteTemplate,
 } from "../../lib/shopOwnerWebsiteApi";
+
+type ShopWebsiteSection = "domain" | "preview" | "subscription";
+
+const WEBSITE_SECTIONS = [
+  { id: "domain", label: "Domain Name", variant: "primary" as const },
+  { id: "preview", label: "Selected Web - Temp", variant: "primary" as const },
+  { id: "subscription", label: "Subscription", variant: "primary" as const },
+];
 
 const SECTION_TITLES: Record<ShopWebsiteSection, string> = {
   domain: "Domain Name",
@@ -56,6 +66,56 @@ const PREMIUM_FEATURES: { label: string; note?: string; accent?: boolean }[] = [
 const checkboxBoxClass =
   "inline-block border border-gray-300 bg-gray-100 px-2 py-0.5 text-xs text-gray-800";
 
+const websiteFormSaveButtonClass =
+  "inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60";
+
+function WebsiteFormFooter({
+  message,
+  saving = false,
+  saveLabel,
+  onSave,
+  onCancel,
+  cancelLabel = "Reset",
+}: {
+  message: string;
+  saving?: boolean;
+  saveLabel: string;
+  onSave: () => void;
+  onCancel: () => void;
+  cancelLabel?: string;
+}) {
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
+    >
+      <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
+        {message}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className={websiteFormSaveButtonClass}
+        >
+          {saving ? "Saving…" : saveLabel}
+        </button>
+        <span className="text-xs text-gray-700">
+          or{" "}
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+          >
+            {cancelLabel}
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 type DomainForm = {
   domainName: string;
   expiryDate: string;
@@ -73,7 +133,7 @@ const EMPTY_DOMAIN_FORM: DomainForm = {
 function GoldCoinIcon() {
   return (
     <span
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[#D4A017] bg-[#F5C542] text-sm font-black text-[#7C5E10] shadow-sm"
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-[#D4A017] bg-gradient-to-b from-[#FFE566] to-[#F5C542] text-sm font-black text-[#7C5E10] shadow-sm ring-2 ring-[#D4A017]/20"
       aria-hidden
     >
       $1
@@ -87,14 +147,18 @@ function AccessFeatureList({
   items: { label: string; note?: string; accent?: boolean }[];
 }) {
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-2.5">
       {items.map((item) => (
-        <li key={item.label} className="text-sm font-semibold text-gray-900">
-          <span className="text-gray-800">* </span>
-          <span className={item.accent ? "text-[#006600]" : "text-gray-900"}>{item.label}</span>
-          {item.note ? (
-            <span className="ml-1 text-xs font-medium text-blue-600">({item.note})</span>
-          ) : null}
+        <li key={item.label} className="flex gap-2 text-sm leading-snug">
+          <span className="mt-0.5 shrink-0 font-semibold text-ad-purple">*</span>
+          <span className="min-w-0">
+            <span className={`font-semibold ${item.accent ? "text-[#006600]" : "text-gray-900"}`}>
+              {item.label}
+            </span>
+            {item.note ? (
+              <span className="ml-1 text-xs font-medium text-blue-600">({item.note})</span>
+            ) : null}
+          </span>
         </li>
       ))}
     </ul>
@@ -118,8 +182,10 @@ function PlanRadioOption({
 }) {
   return (
     <label
-      className={`flex cursor-pointer items-start gap-3 rounded-lg border bg-white px-3 py-2.5 shadow-sm transition-colors ${
-        checked ? "border-ad-purple ring-1 ring-ad-purple/30" : "border-gray-200 hover:border-gray-300"
+      className={`flex cursor-pointer items-start gap-3 rounded-md border px-3.5 py-3 transition-colors ${
+        checked
+          ? "border-ad-purple bg-white ring-1 ring-ad-purple/25"
+          : "border-gray-200 bg-white/95 hover:border-ad-purple/35 hover:bg-white"
       }`}
     >
       <input
@@ -131,8 +197,42 @@ function PlanRadioOption({
         className="mt-1 h-4 w-4 shrink-0 accent-ad-purple"
       />
       <div className="min-w-0 flex-1">{children}</div>
-      {price ? <span className="shrink-0 text-sm font-bold text-gray-900">{price}</span> : null}
+      {price ? (
+        <span className="shrink-0 rounded bg-gray-100 px-2 py-0.5 text-sm font-bold text-gray-900">
+          {price}
+        </span>
+      ) : null}
     </label>
+  );
+}
+
+function SubscriptionPlanCard({
+  title,
+  features,
+  featuresMuted,
+  children,
+}: {
+  title: string;
+  features: { label: string; note?: string; accent?: boolean }[];
+  featuresMuted?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className={`overflow-hidden rounded-lg border border-gray-200 ${shopHeroOpaqueSurfaceClass} bg-white`}
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:divide-x lg:divide-gray-200">
+        <div className={`p-4 sm:p-5 ${featuresMuted ? "bg-gray-50/90" : "bg-white"}`}>
+          <h3 className="mb-4 border-b border-gray-100 pb-2 text-base font-bold text-ad-purple">
+            {title}
+          </h3>
+          <AccessFeatureList items={features} />
+        </div>
+        <div className={`flex flex-col gap-3 p-4 sm:p-5 ${shopProfileFormPanelFooterClass}`}>
+          {children}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -140,85 +240,77 @@ function SubscriptionPanel() {
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanChoice>("yearly");
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-center shadow-sm">
-        <div className="flex flex-wrap items-center justify-center gap-2">
+    <div className="space-y-3">
+      <div
+        className={`rounded-lg border border-gray-200 px-4 py-4 sm:px-5 ${shopProfileFormPanelFooterClass}`}
+      >
+        <div className="flex flex-wrap items-center justify-center gap-3">
           <span className="text-sm font-bold text-[#006600]">Current Plan</span>
           <GoldCoinIcon />
-          <span className="text-sm font-bold text-[#006600]">
+          <span className="text-center text-sm font-bold leading-snug text-[#006600] sm:text-left">
             a day payment for 365 accumulative days
           </span>
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-lg border border-gray-300 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-stretch">
-          <div className="flex-1 bg-white px-4 py-4 lg:min-w-[45%]">
-            <h3 className="mb-3 text-base font-bold text-ad-purple">Fremium access</h3>
-            <AccessFeatureList items={FREMIUM_FEATURES} />
-          </div>
-          <div className="flex flex-1 flex-col gap-3 bg-[#d4fcd4] px-4 py-4">
-            <PlanRadioOption
-              name="subscription-plan"
-              value="yearly"
-              checked={selectedPlan === "yearly"}
-              onChange={setSelectedPlan}
-              price="$ 365"
-            >
-              <p className="text-sm font-semibold text-blue-600">$ 1/- a day for 365 days</p>
-            </PlanRadioOption>
-            <PlanRadioOption
-              name="subscription-plan"
-              value="biweekly"
-              checked={selectedPlan === "biweekly"}
-              onChange={setSelectedPlan}
-              price="$ 115"
-            >
-              <p className="text-xs font-semibold leading-snug text-blue-600">
-                $ 1/- a day for 14 days with 25 void cheques of $ 15 each
-              </p>
-              <p className="mt-0.5 text-[11px] font-medium text-gray-800">
-                + $ 100 (refundable deposit)
-              </p>
-            </PlanRadioOption>
-          </div>
-        </div>
-      </section>
+      <SubscriptionPlanCard title="Fremium access" features={FREMIUM_FEATURES}>
+        <PlanRadioOption
+          name="subscription-plan"
+          value="yearly"
+          checked={selectedPlan === "yearly"}
+          onChange={setSelectedPlan}
+          price="$ 365"
+        >
+          <p className="text-sm font-semibold text-blue-600">$ 1/- a day for 365 days</p>
+        </PlanRadioOption>
+        <PlanRadioOption
+          name="subscription-plan"
+          value="biweekly"
+          checked={selectedPlan === "biweekly"}
+          onChange={setSelectedPlan}
+          price="$ 115"
+        >
+          <p className="text-xs font-semibold leading-snug text-blue-600">
+            $ 1/- a day for 14 days with 25 void cheques of $ 15 each
+          </p>
+          <p className="mt-0.5 text-[11px] font-medium text-gray-800">
+            + $ 100 (refundable deposit)
+          </p>
+        </PlanRadioOption>
+      </SubscriptionPlanCard>
 
-      <section className="overflow-hidden rounded-lg border border-gray-300 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-stretch">
-          <div className="flex-1 bg-[#ececec] px-4 py-4 lg:min-w-[45%]">
-            <h3 className="mb-3 text-base font-bold text-ad-purple">Premium access</h3>
-            <AccessFeatureList items={PREMIUM_FEATURES} />
-          </div>
-          <div className="flex flex-1 flex-col bg-[#fde8d8] px-4 py-4">
-            <PlanRadioOption
-              name="subscription-plan"
-              value="premium"
-              checked={selectedPlan === "premium"}
-              onChange={setSelectedPlan}
-              price=""
-            >
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold text-blue-600">Yearly payment plan +</p>
-                  <span className="shrink-0 text-sm font-bold text-gray-900">$ 365</span>
-                </div>
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-medium text-gray-800">
-                    Marketplace access for autodaddy customers
-                  </p>
-                  <span className="shrink-0 text-sm font-bold text-gray-900">$ 100</span>
-                </div>
-              </div>
-            </PlanRadioOption>
-            <div className="mt-3 flex items-center justify-between rounded-md bg-[#cccccc] px-3 py-2">
-              <span className="text-sm font-semibold text-gray-800">Total</span>
-              <span className="text-base font-bold text-gray-900">$ 465</span>
+      <SubscriptionPlanCard
+        title="Premium access"
+        features={PREMIUM_FEATURES}
+        featuresMuted
+      >
+        <PlanRadioOption
+          name="subscription-plan"
+          value="premium"
+          checked={selectedPlan === "premium"}
+          onChange={setSelectedPlan}
+          price=""
+        >
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-semibold text-blue-600">Yearly payment plan +</p>
+              <span className="shrink-0 text-sm font-bold text-gray-900">$ 365</span>
+            </div>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs font-medium text-gray-800">
+                Marketplace access for autodaddy customers
+              </p>
+              <span className="shrink-0 text-sm font-bold text-gray-900">$ 100</span>
             </div>
           </div>
+        </PlanRadioOption>
+        <div
+          className={`flex items-center justify-between rounded-md border border-gray-200/80 px-3 py-2.5 ${shopProfileFormPanelFooterClass}`}
+        >
+          <span className="text-sm font-semibold text-gray-800">Total</span>
+          <span className="text-base font-bold text-gray-900">$ 465</span>
         </div>
-      </section>
+      </SubscriptionPlanCard>
     </div>
   );
 }
@@ -235,30 +327,18 @@ function DomainPanel({
   onReset: () => void;
 }) {
   return (
-    <>
-      <CompactFormPanel
-        footer={
-          <div className="flex items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
-            <button
-              type="button"
-              onClick={onSave}
-              className="inline-flex items-center gap-1.5 rounded bg-[#008000] px-4 py-1 text-sm font-bold text-white hover:bg-[#006600]"
-            >
-              Save
-            </button>
-            <span className="text-xs text-gray-700">
-              or{" "}
-              <button
-                type="button"
-                onClick={onReset}
-                className="font-medium text-blue-600 underline hover:text-blue-700"
-              >
-                Reset
-              </button>
-            </span>
-          </div>
-        }
-      >
+    <CompactFormPanel
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
+      footer={
+        <WebsiteFormFooter
+          message="You are saving your domain details"
+          saveLabel="Save"
+          onSave={onSave}
+          onCancel={onReset}
+        />
+      }
+    >
         <CompactFormRow>
           <CompactField label="Domain Name" className={compactFixedFieldWidth}>
             <input
@@ -296,13 +376,12 @@ function DomainPanel({
               type="checkbox"
               checked={form.existing}
               onChange={(e) => onChange({ ...form, existing: e.target.checked })}
-              className="h-3.5 w-3.5 accent-[#008000]"
+              className="h-3.5 w-3.5 accent-ad-purple"
             />
             Existing
           </label>
         </CompactFormRow>
-      </CompactFormPanel>
-    </>
+    </CompactFormPanel>
   );
 }
 
@@ -328,66 +407,62 @@ function PreviewPanel({
   const previewUrl = (selected?.templateLink ?? "").trim();
 
   return (
-    <>
-      <div className="relative mb-4 rounded border border-ad-form-border bg-ad-form-bg px-4 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className={`flex cursor-pointer items-center gap-2 ${checkboxBoxClass}`}>
-            <input
-              type="checkbox"
-              checked={previewEnabled}
-              onChange={(e) => onTogglePreview(e.target.checked)}
-              className="h-3.5 w-3.5 accent-[#008000]"
-            />
-            Selected
-          </label>
-          <select
-            value={selectedId}
-            onChange={(e) => onSelect(e.target.value)}
-            disabled={loading || templates.length === 0}
-            className={`min-w-[220px] flex-1 ${shopCompactInputClass}`}
-          >
-            {loading ? (
-              <option value="">Loading…</option>
-            ) : templates.length === 0 ? (
-              <option value="">No templates available</option>
-            ) : (
-              templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))
-            )}
-          </select>
-          <button
-            type="button"
-            onClick={onPreview}
-            disabled={!previewEnabled || !previewUrl}
-            className="rounded bg-[#008000] px-5 py-1.5 text-sm font-bold text-white hover:bg-[#006600] disabled:opacity-50"
-          >
-            Preview
-          </button>
-        </div>
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+      <div className="flex min-h-[2rem] shrink-0 flex-wrap items-center justify-end gap-3">
+        <label className={`flex cursor-pointer items-center gap-2 ${checkboxBoxClass}`}>
+          <input
+            type="checkbox"
+            checked={previewEnabled}
+            onChange={(e) => onTogglePreview(e.target.checked)}
+            className="h-3.5 w-3.5 accent-ad-purple"
+          />
+          Selected
+        </label>
+        <select
+          value={selectedId}
+          onChange={(e) => onSelect(e.target.value)}
+          disabled={loading || templates.length === 0}
+          className={`min-w-[220px] flex-1 ${shopCompactInputClass}`}
+        >
+          {loading ? (
+            <option value="">Loading…</option>
+          ) : templates.length === 0 ? (
+            <option value="">No templates available</option>
+          ) : (
+            templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))
+          )}
+        </select>
+        <button
+          type="button"
+          onClick={onPreview}
+          disabled={!previewEnabled || !previewUrl}
+          className={`${websiteFormSaveButtonClass} min-w-[9rem]`}
+        >
+          Preview
+        </button>
       </div>
 
-      <div className="relative min-h-[420px] overflow-hidden rounded border border-ad-form-border bg-ad-form-bg shadow-sm">
+      <div className="relative min-h-0 overflow-hidden rounded border border-gray-200 bg-white">
         {loading ? (
-          <div className="flex min-h-[420px] items-center justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
-          </div>
+          <ShopLoadingPanel variant="preview-panel" className="h-full" />
         ) : !previewEnabled || !previewUrl ? (
-          <div className="flex min-h-[420px] items-center justify-center p-6 text-center text-sm font-semibold text-gray-600">
+          <p className="flex h-full items-center justify-center p-6 text-center text-sm text-gray-600">
             Select a website template and click Preview to see your site here.
-          </div>
+          </p>
         ) : (
           <iframe
             title="Website preview"
             src={previewUrl}
-            className="h-[min(560px,calc(100vh-320px))] w-full border-0 bg-white"
+            className="absolute inset-0 h-full w-full border-0 bg-white"
             sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
           />
         )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -457,50 +532,64 @@ export default function ShopMyWebsitePage() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  return (
-    <ShopPageShell
-      pageHeading={SECTION_TITLES[activeSection]}
-      metaTitle="My Website | AutoDaddy"
-      metaDescription="Manage your auto shop website, domain, and subscription"
-      sidebarExtra={
-        <ShopWebsiteSidebar
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-        />
-      }
-      onFaqsOpen={() => setFaqsOpen(true)}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsOpen={faqsOpen}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
-    >
-      <ShopPageContentShell className="min-w-0">
-        {activeSection === "domain" ? (
+  const renderContent = () => {
+    switch (activeSection) {
+      case "domain":
+        return (
           <DomainPanel
             form={domainForm}
             onChange={setDomainForm}
             onSave={handleDomainSave}
             onReset={handleDomainReset}
           />
-        ) : activeSection === "preview" ? (
-          templatesLoading && templates.length === 0 ? (
-            <ShopLoadingPanel variant="preview-panel" />
-          ) : (
-            <PreviewPanel
-              templates={templates}
-              loading={templatesLoading}
-              selectedId={selectedTemplateId}
-              onSelect={setSelectedTemplateId}
-              selected={selectedTemplate}
-              previewEnabled={previewEnabled}
-              onTogglePreview={setPreviewEnabled}
-              onPreview={handlePreview}
-            />
-          )
-        ) : (
-          <SubscriptionPanel />
-        )}
-      </ShopPageContentShell>
+        );
+      case "preview":
+        if (templatesLoading && templates.length === 0) {
+          return (
+            <div className="h-full min-h-0">
+              <ShopLoadingPanel variant="preview-panel" className="h-full" />
+            </div>
+          );
+        }
+        return (
+          <PreviewPanel
+            templates={templates}
+            loading={templatesLoading}
+            selectedId={selectedTemplateId}
+            onSelect={setSelectedTemplateId}
+            selected={selectedTemplate}
+            previewEnabled={previewEnabled}
+            onTogglePreview={setPreviewEnabled}
+            onPreview={handlePreview}
+          />
+        );
+      case "subscription":
+        return <SubscriptionPanel />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <ShopPageShell
+      pageHeading={SECTION_TITLES[activeSection]}
+      metaTitle="My Website | AutoDaddy"
+      metaDescription="Manage your auto shop website, domain, and subscription"
+      sidebarVariant="nav"
+      sidebarItems={WEBSITE_SECTIONS}
+      activeSidebarId={activeSection}
+      onSidebarSelect={(id) => setActiveSection(id as ShopWebsiteSection)}
+      heroBackgroundImage={false}
+      contentTopOffset
+      contentFillHeight={activeSection === "preview"}
+      heroCardFlush
+      onFaqsOpen={() => setFaqsOpen(true)}
+      onFaqsClose={() => setFaqsOpen(false)}
+      faqsOpen={faqsOpen}
+      faqsHeading={faqsHeading}
+      faqsDescription={faqsDescription}
+    >
+      {renderContent()}
     </ShopPageShell>
   );
 }

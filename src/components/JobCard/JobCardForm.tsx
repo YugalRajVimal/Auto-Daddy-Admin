@@ -5,9 +5,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FiPlus, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useAuth from "../../auth/useAuth";
-import { useFormRevealFocus } from "../shop/ShopAnimated";
+import { CompactFormPanel } from "../admin/ContentPanel";
 import { JobCardFormSkeleton } from "../common/JobCardFormSkeleton";
-import { shopCompactInputClass } from "../shop/shopLayoutStyles";
+import {
+  shopCompactInputClass,
+  shopProfileFormPanelClass,
+  shopProfileFormPanelFooterClass,
+} from "../shop/shopLayoutStyles";
 import { useShopOwnerCallingCode } from "../../hooks/useShopOwnerCallingCode";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { formatCurrencyAmount } from "../../lib/currency";
@@ -17,6 +21,7 @@ import {
   ADMIN_PANEL_THEAD_ROW_CLASS,
   adminPanelTableClasses,
 } from "../admin/adminPanelTableStyles";
+import { extractSavedJobCardId, pickJobNoFromRecord } from "./shopJobCardEstimate";
 import {
   fetchJobCardByIdForForm,
   fetchJobCardFormData,
@@ -138,7 +143,8 @@ function buildLabourTechnicalRemarks(chargeStr: string, discountStr: string, cou
   const other = String(discountStr ?? "").trim();
   const otherAmt = parseNumberFromText(other);
   if (c <= 0 && !other) return "";
-  const fmt = (x: number) => formatCurrencyAmount(x, countryCode, { fallback: "" });
+  const fmt = (x: number) =>
+    formatCurrencyAmount(x, countryCode, { fallback: "", includeSign: false });
   const parts: string[] = [];
   if (c > 0) parts.push(fmt(c));
   if (other) parts.push(otherAmt > 0 ? `Discount: ${fmt(otherAmt)}` : `Discount: ${other}`);
@@ -308,7 +314,7 @@ type JobCardFormProps = {
   mode?: "add" | "edit";
   jobCardId?: string | null;
   onCancel: () => void;
-  onSaved?: () => void;
+  onSaved?: (jobCardId?: string, jobCardNo?: string) => void;
 };
 
 export default function JobCardForm({
@@ -321,7 +327,8 @@ export default function JobCardForm({
   const { token } = useAuth();
   const callingCode = useShopOwnerCallingCode();
   const { city: shopCity, business } = useShopOwnerPortal();
-  const formatMoney = (x: number) => formatCurrencyAmount(x, callingCode, { fallback: "" });
+  const formatMoney = (x: number) =>
+    formatCurrencyAmount(x, callingCode, { fallback: "", includeSign: false });
   const currencyLabel = callingCode === "+91" ? "INR" : "CAD";
 
   const [formMode, setFormMode] = useState(modeProp);
@@ -341,8 +348,6 @@ export default function JobCardForm({
   const [vehiclePhotoFiles, setVehiclePhotoFiles] = useState<File[]>([]);
   const [keptVehiclePhotoUrls, setKeptVehiclePhotoUrls] = useState<string[]>([]);
   const lineIdRef = useRef(1);
-  const panelRef = useRef<HTMLDivElement>(null);
-  useFormRevealFocus(active, panelRef);
 
   const mkLineId = () => {
     lineIdRef.current += 1;
@@ -403,16 +408,9 @@ export default function JobCardForm({
     return sum;
   }, [activeLines]);
 
-  const labourSubTotal = useMemo(() => {
-    let sum = 0;
-    for (const line of activeLines) {
-      sum += parseNumberFromText(line.labourCostStr);
-    }
-    return sum;
-  }, [activeLines]);
-
+  const labourAmount = parseNumberFromText(form.labourCharge);
   const discountAmount = parseNumberFromText(form.discount);
-  const grandTotal = partsSubTotal + labourSubTotal - discountAmount;
+  const grandTotal = partsSubTotal + labourAmount - discountAmount;
   const hstNumber = business?.hstNumber?.trim() || "—";
 
   function resetForm() {
@@ -523,6 +521,16 @@ export default function JobCardForm({
             const jobPhone = phoneDigits((job.customerId as { phone?: string }).phone);
             if (jobPhone) setCustomerPhone(jobPhone);
           }
+          const cats = normalizeServiceCategories(data.myServices);
+          const loadedLines = apiServiceBlocksToLines(services as unknown[], cats);
+          let labourCharge = String(job.labourCharge ?? "");
+          if (!parseNumberFromText(labourCharge)) {
+            const fromLines = loadedLines.reduce(
+              (sum, line) => sum + parseNumberFromText(line.labourCostStr),
+              0,
+            );
+            if (fromLines > 0) labourCharge = String(fromLines);
+          }
           setForm({
             customerId: loadedCustomerId,
             vehicleId: String(
@@ -542,7 +550,7 @@ export default function JobCardForm({
               ? (job.vehiclePhotos as string[])
               : [],
             technicalRemarks: String(job.technicalRemarks || ""),
-            labourCharge: String(job.labourCharge ?? ""),
+            labourCharge,
             discount: String(job.otherCharges ?? job.labourDuration ?? ""),
           });
           setVehiclePhotoFiles([]);
@@ -553,8 +561,6 @@ export default function JobCardForm({
                   .filter(Boolean)
               : [],
           );
-          const cats = normalizeServiceCategories(data.myServices);
-          const loadedLines = apiServiceBlocksToLines(services as unknown[], cats);
           setServiceLines(loadedLines.length > 0 ? loadedLines : [emptyTableLine(mkLineId())]);
           setEditId(jobCardId);
         }
@@ -601,13 +607,13 @@ export default function JobCardForm({
       return;
     }
     try {
-      const tech = buildLabourTechnicalRemarks(String(labourSubTotal), form.discount, callingCode);
-      await saveJobCard(token, {
+      const tech = buildLabourTechnicalRemarks(form.labourCharge, form.discount, callingCode);
+      const res = await saveJobCard(token, {
         jobCardId: formMode === "edit" ? editId ?? undefined : undefined,
         form: {
           ...form,
           services,
-          labourCharge: "0",
+          labourCharge: form.labourCharge || "0",
           labourDuration: "0",
           issueDescription: "Walk-in / scheduled service",
           serviceType: "Repair",
@@ -618,9 +624,11 @@ export default function JobCardForm({
         existingVehiclePhotoUrls: keptVehiclePhotoUrls,
       });
       toast.success(formMode === "edit" ? "Job card updated." : "Job card created.");
+      const savedJob = resolveJobCardFromApiResponse(res.data);
+      const savedId = extractSavedJobCardId(res.data, editId);
+      const savedNo = savedJob ? pickJobNoFromRecord(savedJob) : undefined;
       resetForm();
-      onSaved?.();
-      onCancel();
+      onSaved?.(savedId, savedNo);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Error saving job card");
     }
@@ -676,16 +684,66 @@ export default function JobCardForm({
   const customerVehicles = formSelectedCustomer?.myVehicles ?? [];
   const showVehiclePicker = customerVehicles.length > 1;
 
-  return (
-    <div ref={panelRef} className="flex min-h-0 flex-1 flex-col">
-      <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
-        {dataError && !dataLoading ? (
-          <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            {dataError}
-          </div>
-        ) : null}
+  const footerMessage =
+    saveError ??
+    (formMode === "edit" ? "You are editing a job card" : "You are creating a new job card");
+  const saveDisabled =
+    formLoading ||
+    editPrefillLoading ||
+    dataLoading ||
+    categoriesWithSubs.length === 0;
 
-        <form id="job-card-form" onSubmit={(e) => void handleSave(e)} className="p-3 sm:p-4">
+  return (
+    <CompactFormPanel
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
+      focusOnMount={active}
+      footer={
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
+        >
+          <div
+            className={`flex min-w-[180px] flex-1 items-center text-xs font-serif italic ${
+              saveError ? "text-red-700" : "text-gray-800"
+            }`}
+          >
+            {footerMessage}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              form="job-card-form"
+              disabled={saveDisabled}
+              className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
+            >
+              {formLoading
+                ? "Saving..."
+                : editPrefillLoading || dataLoading
+                  ? "Loading…"
+                  : "Save"}
+            </button>
+            <span className="text-xs text-gray-700">
+              or{" "}
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={formLoading || editPrefillLoading}
+                className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </span>
+          </div>
+        </div>
+      }
+    >
+      {dataError && !dataLoading ? (
+        <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {dataError}
+        </div>
+      ) : null}
+
+      <form id="job-card-form" onSubmit={(e) => void handleSave(e)}>
           {dataLoading || editPrefillLoading ? (
             <JobCardFormSkeleton />
           ) : (
@@ -949,7 +1007,16 @@ export default function JobCardForm({
                     </div>
                     <div className="flex items-center justify-between gap-4 py-1">
                       <span className="font-semibold text-gray-800">Labour</span>
-                      <span className="font-semibold tabular-nums">{formatMoney(labourSubTotal)}</span>
+                      <input
+                        value={form.labourCharge}
+                        disabled={formLoading}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, labourCharge: e.target.value }))
+                        }
+                        inputMode="decimal"
+                        placeholder="0"
+                        className={`${formCellInputClass} w-16 max-w-[4.5rem] text-right tabular-nums`}
+                      />
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-4 border-t border-gray-300 pt-2">
                       <span className="text-base font-bold text-gray-900">Total {currencyLabel}</span>
@@ -959,42 +1026,11 @@ export default function JobCardForm({
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <button
-                      type="submit"
-                      disabled={
-                        formLoading ||
-                        editPrefillLoading ||
-                        dataLoading ||
-                        categoriesWithSubs.length === 0
-                      }
-                      className="inline-flex min-w-[7.5rem] items-center justify-center rounded bg-ad-form-save px-8 py-2 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
-                    >
-                      {formLoading
-                        ? "Saving..."
-                        : editPrefillLoading || dataLoading
-                          ? "Loading…"
-                          : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCancel}
-                      disabled={formLoading || editPrefillLoading}
-                      className="text-xs font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
-                    >
-                      Cancel
-                    </button>
-                  </div>
                 </div>
               </div>
-
-              {saveError ? (
-                <div className="mt-3 text-xs text-red-700">{saveError}</div>
-              ) : null}
             </>
           )}
-        </form>
-      </div>
-    </div>
+      </form>
+    </CompactFormPanel>
   );
 }
