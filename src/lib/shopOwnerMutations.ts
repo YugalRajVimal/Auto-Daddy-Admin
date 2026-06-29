@@ -335,6 +335,14 @@ export function resendJobCardNotification(token: string, jobCardId: string) {
   );
 }
 
+export function markJobCardPaymentInvoice(token: string, jobCardId: string) {
+  return postJson<ApiEnvelope>(
+    "/api/auto-shop-owner/job-cards/mark-payment-invoice",
+    { jobCardId },
+    token
+  );
+}
+
 export function fetchTeamMembers(token: string) {
   return getJson<unknown>("/api/auto-shop-owner/team-members", token);
 }

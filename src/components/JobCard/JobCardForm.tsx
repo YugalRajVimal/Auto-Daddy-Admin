@@ -1,17 +1,22 @@
 /**
- * Inline New/Edit Job Card form — shown inside DashboardPanelCard (COMP.tsx), not a modal.
+ * Inline New/Edit Job Card form — shown inside the shop job cards page.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiArrowRight, FiPlus, FiUpload, FiX } from "react-icons/fi";
+import { FiPlus, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useAuth from "../../auth/useAuth";
-import DashboardPanelCard from "../COMP";
 import { useFormRevealFocus } from "../shop/ShopAnimated";
 import { JobCardFormSkeleton } from "../common/JobCardFormSkeleton";
 import { shopCompactInputClass } from "../shop/shopLayoutStyles";
 import { useShopOwnerCallingCode } from "../../hooks/useShopOwnerCallingCode";
+import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { formatCurrencyAmount } from "../../lib/currency";
-import { extractMediaPath, normalizeMediaUrl } from "../../lib/mediaUrl";
+import { formatPhoneDisplay, phoneDigits } from "../../lib/phoneFormat";
+import { extractMediaPath } from "../../lib/mediaUrl";
+import {
+  ADMIN_PANEL_THEAD_ROW_CLASS,
+  adminPanelTableClasses,
+} from "../admin/adminPanelTableStyles";
 import {
   fetchJobCardByIdForForm,
   fetchJobCardFormData,
@@ -23,7 +28,6 @@ import {
 } from "../../lib/shopOwnerJobCardsApi";
 
 const MAX_VEHICLE_PHOTOS = MAX_JOB_CARD_VEHICLE_PHOTOS;
-const PLACEHOLDER_JOB_CARD_NO = "J00027";
 const formCellInputClass = shopCompactInputClass;
 
 const DEFAULT_FORM = {
@@ -41,13 +45,16 @@ const DEFAULT_FORM = {
   discount: "",
 };
 
-const JOB_CARD_FIELD_GRID = "grid grid-cols-[7.25rem_minmax(0,1fr)] gap-x-2 gap-y-1.5";
-const JOB_CARD_FIELD_LABEL_CLASS =
-  "text-xs font-bold text-ad-green-dark leading-tight self-center";
-const TABLE_WRAP_CLASS = "overflow-x-auto rounded border border-gray-300";
-const TABLE_CLASS = "w-full min-w-[720px] border-collapse text-xs";
-const TH_CLASS = "border border-ad-purple-dark px-2 py-1 text-xs font-medium text-white";
-const TD_CLASS = "border border-gray-300 px-2 py-1 align-top";
+const JOB_CARD_TABLE = adminPanelTableClasses(true);
+const JOB_CARD_TABLE_HEAD_TH_CLASS = `${JOB_CARD_TABLE.th} h-9 py-0 align-middle`;
+const JOB_CARD_TABLE_BODY_TD_CLASS = `${JOB_CARD_TABLE.td} h-9 py-0 align-middle`;
+
+const META_LABEL_CLASS = "text-sm font-bold text-gray-900";
+const META_LABEL_CELL_CLASS = `${META_LABEL_CLASS} w-[8.5rem] shrink-0 text-left`;
+const META_FIELD_CELL_CLASS = "w-[14rem] max-w-full shrink-0";
+const META_VALUE_CLASS = `${formCellInputClass} ${META_FIELD_CELL_CLASS}`;
+const META_ROW_GRID_CLASS =
+  "grid w-fit max-w-full grid-cols-[8.5rem_14rem] items-center gap-x-3 gap-y-2";
 
 type ServiceLine = {
   id: string;
@@ -59,8 +66,6 @@ type ServiceLine = {
   priceStr: string;
   included?: boolean;
 };
-
-type ServiceBlock = { id: string; catId: string };
 
 type ServiceCategory = {
   id: string;
@@ -88,21 +93,25 @@ function vehicleOdometerPlaceholders(vehicle: JobCardFormCustomer["myVehicles"][
   return { in: inVal, out: String(Number.isFinite(n) ? n + 500 : 500) };
 }
 
-function JobCardFormField({
-  label,
-  labelClassName,
-  children,
-}: {
-  label: string;
-  labelClassName?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={JOB_CARD_FIELD_GRID}>
-      <label className={labelClassName ?? JOB_CARD_FIELD_LABEL_CLASS}>{label}</label>
-      <div className="min-w-0">{children}</div>
-    </div>
-  );
+function displayJobCardNo(jobNo: string | undefined): string {
+  const raw = (jobNo ?? "").trim().replace(/^#/, "");
+  if (!raw) return "J # ——";
+  const stripped = raw.replace(/^job\s*#?\s*/i, "").trim();
+  if (!stripped) return "J # ——";
+  if (/^j/i.test(stripped)) {
+    return stripped.replace(/^j/i, "J # ");
+  }
+  return `J # ${stripped}`;
+}
+
+function customerLocationLabel(customer: JobCardFormCustomer | null, shopCity: string): string {
+  const city = customer?.city?.trim() || shopCity.trim();
+  return city || "—";
+}
+
+function vehiclePlateLabel(vehicle: JobCardFormCustomer["myVehicles"][number] | null): string {
+  if (!vehicle) return "—";
+  return vehicle.licensePlateNo?.trim() || vehicle.regNo?.trim() || "—";
 }
 
 function vehicleDisplayTitle(vehicle: JobCardFormCustomer["myVehicles"][number] | null) {
@@ -230,8 +239,16 @@ function serviceLinesToBlocks(lines: ServiceLine[], categories: ServiceCategory[
   return [...map.entries()].map(([service, subServices]) => ({ service, subServices }));
 }
 
-function emptyServiceBlock(id: string): ServiceBlock {
-  return { id, catId: "" };
+function emptyTableLine(id: string): ServiceLine {
+  return {
+    id,
+    subKey: "",
+    desc: "",
+    unitPriceStr: "",
+    qtyStr: "1",
+    labourCostStr: "0",
+    priceStr: "0",
+  };
 }
 
 function defaultLineForSub(catId: string, subIdx: number, sub: { desc?: string; price?: number }) {
@@ -254,7 +271,7 @@ function isLineActive(line: ServiceLine) {
   return true;
 }
 
-function collectLinesForSave(serviceLines: ServiceLine[], manualLines: ServiceLine[]) {
+function collectLinesForSave(serviceLines: ServiceLine[]) {
   const seen = new Set<string>();
   const out: ServiceLine[] = [];
   for (const line of serviceLines) {
@@ -262,49 +279,30 @@ function collectLinesForSave(serviceLines: ServiceLine[], manualLines: ServiceLi
     seen.add(line.subKey);
     out.push(line);
   }
-  for (const line of manualLines) {
-    if (!isLineActive(line) || seen.has(line.subKey)) continue;
-    seen.add(line.subKey);
-    out.push(line);
-  }
   return out;
-}
-
-function ServiceTableColgroup() {
-  return (
-    <colgroup>
-      <col style={{ width: "18%" }} />
-      <col style={{ width: "14%" }} />
-      <col style={{ width: "28%" }} />
-      <col style={{ width: "10%" }} />
-      <col style={{ width: "8%" }} />
-      <col style={{ width: "10%" }} />
-      <col style={{ width: "10%" }} />
-      <col style={{ width: "6%" }} />
-    </colgroup>
-  );
-}
-
-function ServiceTableHeader() {
-  return (
-    <thead>
-      <tr className="bg-ad-purple text-white">
-        <th className={`${TH_CLASS} text-left`}>Service</th>
-        <th className={`${TH_CLASS} text-left`}>Sub Service</th>
-        <th className={`${TH_CLASS} text-left`}>Description</th>
-        <th className={`${TH_CLASS} text-right`}>Unit price</th>
-        <th className={`${TH_CLASS} text-center`}>Qty</th>
-        <th className={`${TH_CLASS} text-right`}>Labour cost</th>
-        <th className={`${TH_CLASS} text-right`}>Price</th>
-        <th className={`${TH_CLASS} text-center`}>Incl.</th>
-      </tr>
-    </thead>
-  );
 }
 
 function pickJobId(job: Record<string, unknown>) {
   const raw = job._id ?? job.id ?? job.jobCardId;
   return typeof raw === "string" && raw ? raw : "";
+}
+
+function pickJobNo(job: Record<string, unknown>) {
+  const raw =
+    job.jobCardNumber ?? job.jobNo ?? job.jobNumber ?? job.jobCode ?? job.displayJobNo;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : "";
+}
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function findCustomerByPhone(
+  customers: JobCardFormCustomer[],
+  digits: string,
+): JobCardFormCustomer | null {
+  if (digits.length !== 10) return null;
+  return customers.find((customer) => phoneDigits(customer.phone) === digits) ?? null;
 }
 
 type JobCardFormProps = {
@@ -324,7 +322,9 @@ export default function JobCardForm({
 }: JobCardFormProps) {
   const { token } = useAuth();
   const callingCode = useShopOwnerCallingCode();
+  const { city: shopCity, business } = useShopOwnerPortal();
   const formatMoney = (x: number) => formatCurrencyAmount(x, callingCode, { fallback: "" });
+  const currencyLabel = callingCode === "+91" ? "INR" : "CAD";
 
   const [formMode, setFormMode] = useState(modeProp);
   const [formLoading, setFormLoading] = useState(false);
@@ -332,46 +332,24 @@ export default function JobCardForm({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState({ ...DEFAULT_FORM });
   const [editId, setEditId] = useState<string | null>(null);
+  const [displayJobNo, setDisplayJobNo] = useState("");
+  const [serviceDate, setServiceDate] = useState(todayIsoDate);
   const [myCustomers, setMyCustomers] = useState<JobCardFormCustomer[]>([]);
   const [myServices, setMyServices] = useState<ServiceCategory[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [serviceLines, setServiceLines] = useState<ServiceLine[]>([]);
-  const [serviceBlocks, setServiceBlocks] = useState<ServiceBlock[]>([]);
-  const [manualLines] = useState<ServiceLine[]>([]);
+  const [customerPhone, setCustomerPhone] = useState("");
   const [vehiclePhotoFiles, setVehiclePhotoFiles] = useState<File[]>([]);
   const [keptVehiclePhotoUrls, setKeptVehiclePhotoUrls] = useState<string[]>([]);
   const lineIdRef = useRef(1);
-  const blockIdRef = useRef(1);
-  const vehiclePhotoInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   useFormRevealFocus(active, panelRef);
-
-  const mkBlockId = () => {
-    blockIdRef.current += 1;
-    return `svc-block-${blockIdRef.current}`;
-  };
 
   const mkLineId = () => {
     lineIdRef.current += 1;
     return `svc-line-${lineIdRef.current}`;
   };
-
-  const newPhotoPreviews = useMemo(
-    () => vehiclePhotoFiles.map((file) => ({ file, url: URL.createObjectURL(file) })),
-    [vehiclePhotoFiles],
-  );
-
-  useEffect(() => {
-    return () => {
-      for (const p of newPhotoPreviews) {
-        URL.revokeObjectURL(p.url);
-      }
-    };
-  }, [newPhotoPreviews]);
-
-  const totalPhotoCount = keptVehiclePhotoUrls.length + vehiclePhotoFiles.length;
-  const canAddMorePhotos = totalPhotoCount < MAX_VEHICLE_PHOTOS;
 
   const formSelectedCustomer = useMemo(() => {
     if (!form.customerId) return null;
@@ -398,30 +376,26 @@ export default function JobCardForm({
     [normalizedCategories],
   );
 
-  const canAddAnotherServiceBlock = useMemo(() => {
-    if (serviceBlocks.length === 0) return false;
-    if (serviceBlocks.length >= categoriesWithSubs.length) return false;
-    return serviceBlocks.every((b) => Boolean(b.catId));
-  }, [serviceBlocks, categoriesWithSubs.length]);
+  const categoryOptions = useMemo(() => {
+    const opts: Array<{ value: string; label: string }> = [];
+    for (const cat of categoriesWithSubs) {
+      cat.subServices.forEach((sub, subIdx) => {
+        opts.push({
+          value: subServiceKey(cat.id, subIdx),
+          label:
+            cat.subServices.length > 1
+              ? `${cat.name ?? "Category"} — ${sub.name}`
+              : (cat.name ?? sub.name ?? "Category"),
+        });
+      });
+    }
+    return opts;
+  }, [categoriesWithSubs]);
 
-  const linesBySubKey = useMemo(() => {
-    const map = new Map<string, ServiceLine>();
-    for (const line of serviceLines) {
-      if (line.subKey) map.set(line.subKey, line);
-    }
-    return map;
-  }, [serviceLines]);
-
-  const activeLines = useMemo(() => {
-    const map = new Map<string, ServiceLine>();
-    for (const line of serviceLines) {
-      if (isLineActive(line)) map.set(line.subKey, line);
-    }
-    for (const line of manualLines) {
-      if (isLineActive(line) && !map.has(line.subKey)) map.set(line.subKey, line);
-    }
-    return [...map.values()];
-  }, [serviceLines, manualLines]);
+  const activeLines = useMemo(
+    () => serviceLines.filter(isLineActive),
+    [serviceLines],
+  );
 
   const partsSubTotal = useMemo(() => {
     let sum = 0;
@@ -441,18 +415,38 @@ export default function JobCardForm({
 
   const discountAmount = parseNumberFromText(form.discount);
   const grandTotal = partsSubTotal + labourSubTotal - discountAmount;
+  const hstNumber = business?.hstNumber?.trim() || "—";
 
   function resetForm() {
     setForm({ ...DEFAULT_FORM });
     setEditId(null);
+    setDisplayJobNo("");
+    setServiceDate(todayIsoDate());
+    setCustomerPhone("");
     setEditPrefillLoading(false);
     setSaveError(null);
     lineIdRef.current = 1;
-    blockIdRef.current = 1;
-    setServiceBlocks([emptyServiceBlock(mkBlockId())]);
-    setServiceLines([]);
+    setServiceLines([emptyTableLine(mkLineId())]);
     setVehiclePhotoFiles([]);
     setKeptVehiclePhotoUrls([]);
+  }
+
+  function applyCustomerPhoneLookup(digits: string) {
+    const match = findCustomerByPhone(myCustomers, digits);
+    setForm((f) => ({
+      ...f,
+      customerId: match?._id ?? "",
+      vehicleId: match ? "" : "",
+      odometerReading: "",
+      dueOdometerReading: "",
+    }));
+  }
+
+  function handleCustomerPhoneChange(raw: string) {
+    if (formMode === "edit") return;
+    const digits = phoneDigits(raw);
+    setCustomerPhone(digits);
+    applyCustomerPhoneLookup(digits);
   }
 
   function handleCancel() {
@@ -460,6 +454,29 @@ export default function JobCardForm({
     resetForm();
     onCancel();
   }
+
+  useEffect(() => {
+    if (formMode !== "add" || !formSelectedCustomer) return;
+    const vehicles = formSelectedCustomer.myVehicles || [];
+    if (vehicles.length === 1 && vehicles[0]._id && !form.vehicleId) {
+      setForm((f) => ({ ...f, vehicleId: vehicles[0]._id ?? "" }));
+    }
+  }, [formMode, formSelectedCustomer, form.vehicleId]);
+
+  useEffect(() => {
+    if (!formSelectedVehicle || form.odometerReading) return;
+    const inVal = formSelectedVehicle.odometerReading;
+    const dueVal = formSelectedVehicle.dueOdometerReading;
+    if (inVal != null && String(inVal).trim()) {
+      setForm((f) => ({
+        ...f,
+        odometerReading: String(inVal).replace(/\D/g, ""),
+        dueOdometerReading:
+          f.dueOdometerReading ||
+          (dueVal != null && String(dueVal).trim() ? String(dueVal).replace(/\D/g, "") : ""),
+      }));
+    }
+  }, [formSelectedVehicle, form.odometerReading]);
 
   useEffect(() => {
     if (!active || !token) return;
@@ -482,14 +499,34 @@ export default function JobCardForm({
 
           const services = normalizeJobCardServiceBlocks(job);
           setEditId(pickJobId(job));
+          setDisplayJobNo(pickJobNo(job));
+          setServiceDate(
+            String(job.serviceDate ?? job.jobDate ?? job.date ?? "").slice(0, 10) || todayIsoDate(),
+          );
+          const loadedCustomerId = String(
+            (typeof job.customerId === "object"
+              ? (job.customerId as { _id?: string })._id
+              : job.customerId) ||
+              (job.customer as { _id?: string } | undefined)?._id ||
+              "",
+          );
+          const loadedCustomer =
+            data.myCustomers.find((customer) => customer._id === loadedCustomerId) ??
+            (typeof job.customerId === "object"
+              ? data.myCustomers.find(
+                  (customer) =>
+                    phoneDigits(customer.phone) ===
+                    phoneDigits((job.customerId as { phone?: string }).phone),
+                )
+              : null);
+          if (loadedCustomer?.phone) {
+            setCustomerPhone(phoneDigits(loadedCustomer.phone));
+          } else if (typeof job.customerId === "object") {
+            const jobPhone = phoneDigits((job.customerId as { phone?: string }).phone);
+            if (jobPhone) setCustomerPhone(jobPhone);
+          }
           setForm({
-            customerId: String(
-              (typeof job.customerId === "object"
-                ? (job.customerId as { _id?: string })._id
-                : job.customerId) ||
-                (job.customer as { _id?: string } | undefined)?._id ||
-                "",
-            ),
+            customerId: loadedCustomerId,
             vehicleId: String(
               (typeof job.vehicleId === "object"
                 ? (job.vehicleId as { _id?: string })._id
@@ -519,16 +556,8 @@ export default function JobCardForm({
               : [],
           );
           const cats = normalizeServiceCategories(data.myServices);
-          const blocksFromJob: ServiceBlock[] = [];
-          for (const block of services as Array<{ service?: string }>) {
-            const catId = String(block.service || "").trim();
-            if (!catId || !cats.find((c) => c.id === catId)) continue;
-            blocksFromJob.push({ id: mkBlockId(), catId });
-          }
-          setServiceBlocks(
-            blocksFromJob.length > 0 ? blocksFromJob : [emptyServiceBlock(mkBlockId())],
-          );
-          setServiceLines(apiServiceBlocksToLines(services as unknown[], cats));
+          const loadedLines = apiServiceBlocksToLines(services as unknown[], cats);
+          setServiceLines(loadedLines.length > 0 ? loadedLines : [emptyTableLine(mkLineId())]);
           setEditId(jobCardId);
         }
       } catch (e) {
@@ -546,37 +575,30 @@ export default function JobCardForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, modeProp, jobCardId, token]);
 
-  function handleVehiclePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files || []);
-    e.target.value = "";
-    if (!picked.length) return;
-    const room = MAX_VEHICLE_PHOTOS - totalPhotoCount;
-    if (room <= 0) {
-      setSaveError(`Maximum ${MAX_VEHICLE_PHOTOS} images allowed.`);
-      return;
-    }
-    setSaveError(null);
-    setVehiclePhotoFiles((prev) => [...prev, ...picked.slice(0, room)]);
-  }
-
-  function removeNewVehiclePhoto(index: number) {
-    setVehiclePhotoFiles((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function removeExistingVehiclePhoto(index: number) {
-    setKeptVehiclePhotoUrls((prev) => prev.filter((_, i) => i !== index));
-  }
-
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
     setFormLoading(true);
     setSaveError(null);
     const categories = normalizeServiceCategories(myServices);
-    const linesToSave = collectLinesForSave(serviceLines, manualLines);
+    const linesToSave = collectLinesForSave(serviceLines);
     const services = serviceLinesToBlocks(linesToSave, categories);
+    if (!form.customerId) {
+      setSaveError(
+        customerPhone.length === 10
+          ? "No customer found for this phone number."
+          : "Enter the customer's 10-digit phone number.",
+      );
+      setFormLoading(false);
+      return;
+    }
+    if (!form.vehicleId) {
+      setSaveError("Select a vehicle for this customer.");
+      setFormLoading(false);
+      return;
+    }
     if (services.length === 0) {
-      setSaveError("Select at least one sub-service (included).");
+      setSaveError("Add at least one line item with a category.");
       setFormLoading(false);
       return;
     }
@@ -607,68 +629,42 @@ export default function JobCardForm({
     setFormLoading(false);
   }
 
-  function setServiceBlockCategory(blockId: string, catId: string) {
-    setServiceBlocks((prev) => {
-      const oldCatId = prev.find((b) => b.id === blockId)?.catId ?? "";
-      const next = prev.map((b) => (b.id === blockId ? { ...b, catId } : b));
-      if (oldCatId && oldCatId !== catId) {
-        const stillUsed = next.some((b) => b.catId === oldCatId);
-        if (!stillUsed) {
-          setServiceLines((lines) =>
-            lines.filter((l) => {
-              const parsed = l.subKey ? parseSubServiceKey(l.subKey) : null;
-              return parsed?.catId !== oldCatId;
-            }),
-          );
-        }
-      }
-      return next;
-    });
+  function addTableLine() {
+    setServiceLines((prev) => [...prev, emptyTableLine(mkLineId())]);
+  }
 
-    if (!catId) return;
-    const cat = normalizedCategories.find((c) => c.id === catId);
-    if (!cat?.subServices?.length) return;
-
+  function removeTableLine(lineId: string) {
     setServiceLines((prev) => {
-      const withoutCat = prev.filter((l) => {
-        const parsed = l.subKey ? parseSubServiceKey(l.subKey) : null;
-        return parsed?.catId !== catId;
-      });
-      const existingKeys = new Set(withoutCat.map((l) => l.subKey));
-      const additions: ServiceLine[] = [];
-      cat.subServices.forEach((sub, subIdx) => {
-        const key = subServiceKey(catId, subIdx);
-        if (existingKeys.has(key)) return;
-        additions.push({ id: mkLineId(), ...defaultLineForSub(catId, subIdx, sub) });
-      });
-      return [...withoutCat, ...additions];
+      const next = prev.filter((line) => line.id !== lineId);
+      return next.length > 0 ? next : [emptyTableLine(mkLineId())];
     });
   }
 
-  function addServiceBlock() {
-    setServiceBlocks((prev) => [...prev, emptyServiceBlock(mkBlockId())]);
-  }
-
-  function toggleIncludeSubService(catId: string, subIdx: number) {
-    const key = subServiceKey(catId, subIdx);
-    const cat = normalizedCategories.find((c) => c.id === catId);
-    const sub = cat?.subServices?.[subIdx];
+  function setLineCategory(lineId: string, subKey: string) {
+    if (!subKey) {
+      updateServiceLine(lineId, {
+        subKey: "",
+        desc: "",
+        unitPriceStr: "",
+        qtyStr: "1",
+        labourCostStr: "0",
+        priceStr: "0",
+      });
+      return;
+    }
+    const parsed = parseSubServiceKey(subKey);
+    if (!parsed) return;
+    const cat = normalizedCategories.find((c) => c.id === parsed.catId);
+    const sub = cat?.subServices?.[parsed.subIdx];
     if (!sub) return;
-
-    setServiceLines((prev) => {
-      const existing = prev.find((l) => l.subKey === key);
-      if (existing) {
-        return prev.filter((l) => l.id !== existing.id);
-      }
-      return [...prev, { id: mkLineId(), ...defaultLineForSub(catId, subIdx, sub) }];
-    });
+    updateServiceLine(lineId, { id: lineId, ...defaultLineForSub(parsed.catId, parsed.subIdx, sub) });
   }
 
   function updateServiceLine(lineId: string, patch: Partial<ServiceLine>) {
     setServiceLines((prev) =>
-      prev.map((l) => {
-        if (l.id !== lineId) return l;
-        const next = { ...l, ...patch };
+      prev.map((line) => {
+        if (line.id !== lineId) return line;
+        const next = { ...line, ...patch };
         if ("unitPriceStr" in patch || "qtyStr" in patch || "labourCostStr" in patch) {
           next.priceStr = priceStrFromLine(next);
         }
@@ -677,452 +673,330 @@ export default function JobCardForm({
     );
   }
 
-  function renderNumericCell(
-    lineId: string,
-    field: "unitPrice" | "labourCost" | "price",
-    line: ServiceLine | undefined,
-    included: boolean,
-    { readOnly = false } = {},
-  ) {
-    const fieldKey = `${field}Str` as keyof ServiceLine;
-    const display = readOnly
-      ? included && line
-        ? calcLinePrice(line).toFixed(2)
-        : "0"
-      : included
-        ? String(line?.[fieldKey] ?? "")
-        : "";
-    return (
-      <input
-        readOnly={readOnly}
-        value={display}
-        disabled={formLoading || (!readOnly && !included)}
-        tabIndex={readOnly ? -1 : undefined}
-        onChange={
-          readOnly
-            ? undefined
-            : (ev) => {
-                if (!lineId) return;
-                updateServiceLine(lineId, { [fieldKey]: ev.target.value } as Partial<ServiceLine>);
-              }
-        }
-        inputMode="decimal"
-        placeholder="0"
-        className={`${formCellInputClass} job-card-numeric-input text-right ${readOnly ? "cursor-default bg-[#f5f5f5]" : ""} ${!included ? "opacity-50" : ""}`}
-      />
-    );
-  }
-
   if (!active) return null;
+
+  const customerVehicles = formSelectedCustomer?.myVehicles ?? [];
+  const showVehiclePicker = customerVehicles.length > 1;
 
   return (
     <div ref={panelRef} className="flex min-h-0 flex-1 flex-col">
-      <DashboardPanelCard variant="form" className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-4 border-b border-ad-form-border pb-3">
-        <h2 className="text-lg font-bold text-ad-green-dark">
-          {formMode === "add" ? "New Job Card" : "Edit Job Card"}
-        </h2>
-        <p className="mt-1 text-sm font-semibold text-ad-green">{PLACEHOLDER_JOB_CARD_NO}</p>
-      </div>
+      <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
+        {dataError && !dataLoading ? (
+          <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {dataError}
+          </div>
+        ) : null}
 
-      {dataError && !dataLoading ? (
-        <div className="mb-3 rounded bg-[#fff3e0] px-4 py-3 text-sm text-[#c0392b]">{dataError}</div>
-      ) : null}
+        <form id="job-card-form" onSubmit={(e) => void handleSave(e)} className="p-3 sm:p-4">
+          {dataLoading || editPrefillLoading ? (
+            <JobCardFormSkeleton />
+          ) : (
+            <>
+              <div className="mb-4 border-b border-gray-300 pb-4">
+                <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-x-12">
+                  <div className={META_ROW_GRID_CLASS}>
+                    <span className={META_LABEL_CELL_CLASS}>Customer info</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      disabled={formMode === "edit"}
+                      value={formatPhoneDisplay(customerPhone)}
+                      onChange={(e) => handleCustomerPhoneChange(e.target.value)}
+                      placeholder="705 991 3785"
+                      aria-label="Customer phone number"
+                      className={META_VALUE_CLASS}
+                    />
 
-      <form id="job-card-form" onSubmit={(e) => void handleSave(e)} className="min-h-0 flex-1">
-        {dataLoading || editPrefillLoading ? (
-          <JobCardFormSkeleton />
-        ) : (
-          <>
-            <div className="mb-5 grid grid-cols-1 gap-x-6 gap-y-3 md:grid-cols-2">
-              <JobCardFormField label="Customer">
-                <select
-                  disabled={formMode === "edit"}
-                  value={form.customerId}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      customerId: e.target.value,
-                      vehicleId: "",
-                      ...(formMode === "add"
-                        ? { odometerReading: "", dueOdometerReading: "" }
-                        : {}),
-                    }))
-                  }
-                  className={`${formCellInputClass} w-full`}
-                >
-                  <option value="">Select customer</option>
-                  {myCustomers.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name} – {c.phone}
-                    </option>
-                  ))}
-                </select>
-              </JobCardFormField>
+                    {customerPhone.length === 10 && !formSelectedCustomer ? (
+                      <>
+                        <span aria-hidden />
+                        <p className="text-xs font-semibold text-red-700">
+                          No customer found for this phone number.
+                        </p>
+                      </>
+                    ) : null}
 
-              <JobCardFormField label="Date">
-                <input
-                  readOnly
-                  value={new Date().toLocaleDateString("en-GB")}
-                  className={`${formCellInputClass} job-card-date-input bg-[#f5f5f5]`}
-                />
-              </JobCardFormField>
+                    {formSelectedCustomer ? (
+                      <>
+                        <span aria-hidden />
+                        <div className="space-y-0.5 text-sm font-semibold text-gray-900">
+                          <p>{formSelectedCustomer.name ?? "—"}</p>
+                          <p>{customerLocationLabel(formSelectedCustomer, shopCity)}</p>
+                          <p className="font-bold">{vehiclePlateLabel(formSelectedVehicle)}</p>
+                        </div>
+                      </>
+                    ) : customerPhone.length > 0 && customerPhone.length < 10 ? (
+                      <>
+                        <span aria-hidden />
+                        <p className="text-xs text-gray-600">
+                          Enter 10 digits to look up the customer.
+                        </p>
+                      </>
+                    ) : null}
 
-              <JobCardFormField label="Vehicle">
-                <select
-                  disabled={!form.customerId || formMode === "edit"}
-                  value={form.vehicleId}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      vehicleId: e.target.value,
-                      ...(formMode === "add"
-                        ? { odometerReading: "", dueOdometerReading: "" }
-                        : {}),
-                    }))
-                  }
-                  className={`${formCellInputClass} w-full`}
-                >
-                  <option value="">Select vehicle</option>
-                  {(formSelectedCustomer?.myVehicles || []).map((v) => (
-                    <option key={v._id} value={v._id}>
-                      {vehicleDisplayTitle(v) || "Vehicle"} (
-                      {v.licensePlateNo || v.regNo || v.vinNo || v.vin || "—"})
-                    </option>
-                  ))}
-                </select>
-              </JobCardFormField>
+                    {showVehiclePicker ? (
+                      <>
+                        <span aria-hidden />
+                        <select
+                          disabled={!form.customerId || formMode === "edit"}
+                          value={form.vehicleId}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              vehicleId: e.target.value,
+                              ...(formMode === "add"
+                                ? { odometerReading: "", dueOdometerReading: "" }
+                                : {}),
+                            }))
+                          }
+                          className={META_VALUE_CLASS}
+                          aria-label="Vehicle"
+                        >
+                          <option value="">Select vehicle</option>
+                          {customerVehicles.map((vehicle) => (
+                            <option key={vehicle._id} value={vehicle._id}>
+                              {vehicleDisplayTitle(vehicle) || "Vehicle"} (
+                              {vehicle.licensePlateNo || vehicle.regNo || "—"})
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    ) : null}
 
-              <JobCardFormField label="Odometer">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={form.odometerReading}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        odometerReading: e.target.value.replace(/\D/g, ""),
-                      }))
-                    }
-                    placeholder={odometerPlaceholders.in}
-                    aria-label="Odometer in"
-                    className={`${formCellInputClass} job-card-odo-input text-blue-700`}
-                  />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={form.dueOdometerReading}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        dueOdometerReading: e.target.value.replace(/\D/g, ""),
-                      }))
-                    }
-                    placeholder={odometerPlaceholders.out}
-                    aria-label="Odometer out"
-                    className={`${formCellInputClass} job-card-odo-input text-[#c0392b]`}
-                  />
+                    <div className="sr-only" aria-hidden>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={form.odometerReading}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            odometerReading: e.target.value.replace(/\D/g, ""),
+                          }))
+                        }
+                        placeholder={odometerPlaceholders.in}
+                        tabIndex={-1}
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={form.dueOdometerReading}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            dueOdometerReading: e.target.value.replace(/\D/g, ""),
+                          }))
+                        }
+                        placeholder={odometerPlaceholders.out}
+                        tabIndex={-1}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={`${META_ROW_GRID_CLASS} lg:justify-self-end`}>
+                    <span className={META_LABEL_CELL_CLASS}>Job Card No.</span>
+                    <input
+                      readOnly
+                      value={displayJobCardNo(displayJobNo)}
+                      className={`${META_VALUE_CLASS} bg-gray-100`}
+                    />
+                    <span className={META_LABEL_CELL_CLASS}>Date</span>
+                    <input
+                      type="date"
+                      value={serviceDate}
+                      onChange={(e) => setServiceDate(e.target.value)}
+                      className={META_VALUE_CLASS}
+                    />
+                    <span className={META_LABEL_CELL_CLASS}>HST</span>
+                    <input
+                      readOnly
+                      value={hstNumber}
+                      className={`${META_VALUE_CLASS} bg-gray-100`}
+                    />
+                  </div>
                 </div>
-              </JobCardFormField>
-            </div>
+              </div>
 
-            <div className="mb-3 space-y-4">
-              {categoriesWithSubs.length === 0 ? (
-                <div className={TABLE_WRAP_CLASS}>
-                  <div className="p-4 text-center text-sm text-gray-600">
+              <div className="mb-3">
+                {categoriesWithSubs.length === 0 ? (
+                  <div className="rounded border border-gray-300 p-4 text-center text-sm text-gray-600">
                     No services configured. Add sub-services under My Services first.
                   </div>
-                </div>
-              ) : (
-                <div>
-                  <p className="mb-1.5 text-xs font-bold text-blue-700">Service breakdown</p>
-                  <p className="mb-2 text-[11px] text-gray-500">
-                    Select a service to list all sub-services on the rows below (included as Y).
-                  </p>
-                  <div className={TABLE_WRAP_CLASS}>
-                    <table className={TABLE_CLASS}>
-                      <ServiceTableColgroup />
-                      <ServiceTableHeader />
-                      <tbody>
-                        {(serviceBlocks.length > 0
-                          ? serviceBlocks
-                          : [emptyServiceBlock("fallback")]
-                        ).flatMap((block) => {
-                          const cat = block.catId
-                            ? categoriesWithSubs.find((c) => c.id === block.catId)
-                            : null;
-                          const usedCatIds = new Set(
-                            serviceBlocks
-                              .filter((b) => b.id !== block.id && b.catId)
-                              .map((b) => b.catId),
-                          );
-                          const serviceSelect = (
-                            <select
-                              value={block.catId}
-                              disabled={formLoading}
-                              onChange={(e) => setServiceBlockCategory(block.id, e.target.value)}
-                              className={`${formCellInputClass} w-full min-w-0`}
-                            >
-                              <option value="">Select service</option>
-                              {categoriesWithSubs.map((c) => (
-                                <option
-                                  key={c.id}
-                                  value={c.id}
-                                  disabled={usedCatIds.has(c.id)}
-                                >
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
-                          );
-                          if (!cat) {
-                            return [
-                              <tr key={block.id}>
-                                <td className={`${TD_CLASS} align-top`}>{serviceSelect}</td>
-                                <td colSpan={6} className={TD_CLASS} aria-hidden />
-                                <td className={TD_CLASS} aria-hidden />
-                              </tr>,
-                            ];
-                          }
-                          if (cat.subServices.length === 0) {
-                            return [
-                              <tr key={block.id}>
-                                <td className={`${TD_CLASS} align-top`}>{serviceSelect}</td>
-                                <td colSpan={6} className={`${TD_CLASS} text-xs text-gray-500`}>
-                                  No sub-services for this service.
-                                </td>
-                                <td className={TD_CLASS} aria-hidden />
-                              </tr>,
-                            ];
-                          }
-                          return cat.subServices.map((sub, subIdx) => {
-                            const key = subServiceKey(cat.id, subIdx);
-                            const line = linesBySubKey.get(key);
-                            const included = Boolean(line);
-                            const lineId = line?.id ?? "";
-                            return (
-                              <tr key={`${block.id}-${key}`}>
-                                <td className={`${TD_CLASS} align-top font-semibold text-[#333]`}>
-                                  {cat.name}
-                                </td>
-                                <td className={`${TD_CLASS} align-top font-semibold text-[#333]`}>
-                                  {sub.name}
-                                </td>
-                                <td className={TD_CLASS}>
-                                  <input
-                                    value={line?.desc ?? sub.desc ?? ""}
-                                    disabled={formLoading || !included}
-                                    onChange={(e) => {
-                                      if (!lineId) return;
-                                      updateServiceLine(lineId, { desc: e.target.value });
-                                    }}
-                                    placeholder="Description"
-                                    className={`${formCellInputClass} ${!included ? "opacity-50" : ""}`}
-                                  />
-                                </td>
-                                <td className={`${TD_CLASS} align-top text-right`}>
-                                  {renderNumericCell(lineId, "unitPrice", line, included)}
-                                </td>
-                                <td className={`${TD_CLASS} align-top text-center`}>
-                                  <input
-                                    value={included ? (line?.qtyStr ?? "1") : ""}
-                                    disabled={formLoading || !included}
-                                    onChange={(e) => {
-                                      if (!lineId) return;
-                                      updateServiceLine(lineId, { qtyStr: e.target.value });
-                                    }}
-                                    inputMode="decimal"
-                                    placeholder="1"
-                                    className={`${formCellInputClass} job-card-qty-input text-center ${!included ? "opacity-50" : ""}`}
-                                  />
-                                </td>
-                                <td className={`${TD_CLASS} align-top text-right`}>
-                                  {renderNumericCell(lineId, "labourCost", line, included)}
-                                </td>
-                                <td className={`${TD_CLASS} align-top text-right`}>
-                                  {renderNumericCell(lineId, "price", line, included, {
-                                    readOnly: true,
-                                  })}
-                                </td>
-                                <td className={`${TD_CLASS} align-top text-center`}>
-                                  <button
-                                    type="button"
-                                    title={
-                                      included
-                                        ? "Included — click to exclude"
-                                        : "Excluded — click to include"
-                                    }
-                                    disabled={formLoading}
-                                    onClick={() => toggleIncludeSubService(cat.id, subIdx)}
-                                    className={`job-card-incl-btn ${included ? "job-card-incl-btn-on" : "job-card-incl-btn-off"}`}
-                                  >
-                                    {included ? "Y" : "X"}
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={formLoading || !canAddAnotherServiceBlock}
-                    onClick={addServiceBlock}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-ad-purple hover:bg-gray-50 disabled:opacity-60"
-                  >
-                    <FiPlus size={14} aria-hidden />
-                    Add service
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="mb-4 grid grid-cols-1 gap-5 lg:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-800">
-                  Upload images
-                </label>
-                <p className="mb-2 text-[11px] text-gray-500">
-                  Up to {MAX_VEHICLE_PHOTOS} photos ({totalPhotoCount}/{MAX_VEHICLE_PHOTOS}{" "}
-                  selected)
-                </p>
-                <input
-                  ref={vehiclePhotoInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="sr-only"
-                  disabled={formLoading || !canAddMorePhotos}
-                  onChange={handleVehiclePhotoSelect}
-                />
-                <button
-                  type="button"
-                  disabled={formLoading || !canAddMorePhotos}
-                  onClick={() => vehiclePhotoInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-ad-purple hover:bg-gray-50 disabled:opacity-60"
-                >
-                  <FiUpload size={14} aria-hidden />
-                  Choose images
-                </button>
-                {totalPhotoCount > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {keptVehiclePhotoUrls.map((photo, i) => {
-                      const src = normalizeMediaUrl(photo);
-                      if (!src) return null;
-                      return (
-                        <div key={`saved-${i}`} className="group relative">
-                          <img
-                            src={src}
-                            alt={`Saved ${i + 1}`}
-                            className="h-14 w-[4.5rem] rounded border border-gray-300 object-cover"
-                          />
-                          <button
-                            type="button"
-                            title="Remove"
-                            disabled={formLoading}
-                            onClick={() => removeExistingVehiclePhoto(i)}
-                            className="absolute -top-1.5 -right-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-0 bg-[#c0392b] text-white shadow"
-                          >
-                            <FiX size={12} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                    {newPhotoPreviews.map((preview, i) => (
-                      <div key={`new-${preview.file.name}-${i}`} className="group relative">
-                        <img
-                          src={preview.url}
-                          alt={preview.file.name}
-                          className="h-14 w-[4.5rem] rounded border border-gray-300 object-cover"
-                        />
-                        <button
-                          type="button"
-                          title="Remove"
-                          disabled={formLoading}
-                          onClick={() => removeNewVehiclePhoto(i)}
-                          className="absolute -top-1.5 -right-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-0 bg-[#c0392b] text-white shadow"
-                        >
-                          <FiX size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
                 ) : (
-                  <p className="mt-2 text-[11px] text-gray-500">No images yet.</p>
+                  <>
+                    <div className="overflow-x-auto rounded border border-gray-300 bg-white">
+                      <table className={JOB_CARD_TABLE.table}>
+                        <thead>
+                          <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                            <th className={JOB_CARD_TABLE_HEAD_TH_CLASS}>Category</th>
+                            <th className={JOB_CARD_TABLE_HEAD_TH_CLASS}>Description</th>
+                            <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} text-right`}>Unit Cost</th>
+                            <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} text-center`}>Qty</th>
+                            <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} text-right`}>Amount</th>
+                            <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} w-10`} aria-label="Remove" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {serviceLines.map((line, index) => (
+                            <tr key={line.id} className={index % 2 === 1 ? "bg-gray-100" : "bg-white"}>
+                              <td className={JOB_CARD_TABLE_BODY_TD_CLASS}>
+                                <select
+                                  value={line.subKey}
+                                  disabled={formLoading}
+                                  onChange={(e) => setLineCategory(line.id, e.target.value)}
+                                  className={`${formCellInputClass} min-w-[9rem]`}
+                                >
+                                  <option value="">Select Category</option>
+                                  {categoryOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className={JOB_CARD_TABLE_BODY_TD_CLASS}>
+                                <input
+                                  value={line.desc}
+                                  disabled={formLoading || !line.subKey}
+                                  onChange={(e) =>
+                                    updateServiceLine(line.id, { desc: e.target.value })
+                                  }
+                                  placeholder="Description"
+                                  className={formCellInputClass}
+                                />
+                              </td>
+                              <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} text-right`}>
+                                <input
+                                  value={line.unitPriceStr}
+                                  disabled={formLoading || !line.subKey}
+                                  onChange={(e) =>
+                                    updateServiceLine(line.id, { unitPriceStr: e.target.value })
+                                  }
+                                  inputMode="decimal"
+                                  placeholder="0"
+                                  className={`${formCellInputClass} text-right`}
+                                />
+                              </td>
+                              <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} text-center`}>
+                                <input
+                                  value={line.qtyStr}
+                                  disabled={formLoading || !line.subKey}
+                                  onChange={(e) =>
+                                    updateServiceLine(line.id, { qtyStr: e.target.value })
+                                  }
+                                  inputMode="decimal"
+                                  placeholder="1"
+                                  className={`${formCellInputClass} mx-auto w-14 text-center`}
+                                />
+                              </td>
+                              <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} text-right`}>
+                                <input
+                                  readOnly
+                                  value={
+                                    line.subKey
+                                      ? (
+                                          parseNumberFromText(line.unitPriceStr) *
+                                          parseNumberFromText(line.qtyStr)
+                                        ).toFixed(2)
+                                      : ""
+                                  }
+                                  className={`${formCellInputClass} bg-gray-100 text-right`}
+                                />
+                              </td>
+                              <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} text-center`}>
+                                <button
+                                  type="button"
+                                  title="Remove line"
+                                  disabled={formLoading}
+                                  onClick={() => removeTableLine(line.id)}
+                                  className="inline-flex h-7 w-7 items-center justify-center text-lg font-bold text-red-600 hover:text-red-700"
+                                >
+                                  <FiX size={16} aria-hidden />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={formLoading}
+                      onClick={addTableLine}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded border border-gray-400 bg-gray-200 px-3 py-1 text-xs font-bold text-gray-800 hover:bg-gray-300 disabled:opacity-60"
+                    >
+                      <FiPlus size={13} aria-hidden />
+                      Add Line
+                    </button>
+                  </>
                 )}
               </div>
 
-              <div className="flex flex-col items-stretch gap-2 text-sm lg:items-end">
-                <div className="flex justify-between gap-8 py-1 lg:w-[min(100%,320px)]">
-                  <span className="font-semibold text-gray-800">Subtotal</span>
-                  <span className="font-semibold tabular-nums">{formatMoney(partsSubTotal)}</span>
+              <div className="mt-4 grid grid-cols-1 gap-4 border-t border-gray-300 pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900">Terms of Service :</p>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-700">
+                    Payment is due upon completion unless otherwise agreed. All work is subject to shop
+                    terms and applicable taxes.
+                  </p>
                 </div>
-                <div className="flex justify-between gap-8 py-1 lg:w-[min(100%,320px)]">
-                  <span className="font-semibold text-gray-800">Labour cost</span>
-                  <span className="font-semibold tabular-nums">{formatMoney(labourSubTotal)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4 py-1 lg:w-[min(100%,320px)]">
-                  <span className="shrink-0 font-semibold text-gray-800">Discount</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={form.discount}
-                    onChange={(e) => setForm((f) => ({ ...f, discount: e.target.value }))}
-                    placeholder="0.00"
-                    className={`${formCellInputClass} w-[7rem] text-right tabular-nums`}
-                  />
-                </div>
-                <div className="mt-1 flex justify-between gap-8 rounded border border-gray-300 bg-[#f5f5f5] px-3 py-2 text-base font-bold lg:w-[min(100%,320px)]">
-                  <span>Total</span>
-                  <span className="tabular-nums text-blue-700">{formatMoney(grandTotal)}</span>
+
+                <div className="flex flex-col items-stretch gap-3 lg:items-end">
+                  <div className="w-full min-w-[15rem] rounded border border-gray-400 bg-white p-3 text-sm lg:w-[18rem]">
+                    <div className="flex items-center justify-between gap-4 py-1">
+                      <span className="font-semibold text-gray-800">Sub Total ({currencyLabel})</span>
+                      <span className="font-semibold tabular-nums">{formatMoney(partsSubTotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 py-1">
+                      <span className="font-semibold text-gray-800">Labour</span>
+                      <span className="font-semibold tabular-nums">{formatMoney(labourSubTotal)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-4 border-t border-gray-300 pt-2">
+                      <span className="text-base font-bold text-gray-900">Total {currencyLabel}</span>
+                      <span className="text-base font-bold tabular-nums text-gray-900">
+                        {formatMoney(grandTotal)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="submit"
+                      disabled={
+                        formLoading ||
+                        editPrefillLoading ||
+                        dataLoading ||
+                        categoriesWithSubs.length === 0
+                      }
+                      className="inline-flex min-w-[7.5rem] items-center justify-center rounded bg-ad-form-save px-8 py-2 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
+                    >
+                      {formLoading
+                        ? "Saving..."
+                        : editPrefillLoading || dataLoading
+                          ? "Loading…"
+                          : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      disabled={formLoading || editPrefillLoading}
+                      className="text-xs font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {saveError ? (
-              <div className="mb-3 text-xs text-[#c0392b]">{saveError}</div>
-            ) : null}
-          </>
-        )}
-      </form>
-
-      <div className="mt-4 flex flex-wrap items-stretch justify-between gap-2 border-t border-ad-form-border bg-ad-form-bg">
-        <div className="flex min-w-[180px] flex-1 items-center bg-ad-form-required-bg px-3 py-2.5 text-xs text-gray-800">
-          Select at least one included sub-service to save.
-        </div>
-        <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-          <button
-            type="submit"
-            form="job-card-form"
-            disabled={
-              formLoading || editPrefillLoading || dataLoading || categoriesWithSubs.length === 0
-            }
-            className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
-          >
-            {formLoading
-              ? "Saving..."
-              : editPrefillLoading || dataLoading
-                ? "Loading…"
-                : "Save and Send"}
-            {!formLoading && <FiArrowRight size={16} aria-hidden />}
-          </button>
-          <span className="text-xs text-gray-700">
-            or{" "}
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={formLoading || editPrefillLoading}
-              className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
-            >
-              Cancel
-            </button>
-          </span>
-        </div>
+              {saveError ? (
+                <div className="mt-3 text-xs text-red-700">{saveError}</div>
+              ) : null}
+            </>
+          )}
+        </form>
       </div>
-    </DashboardPanelCard>
     </div>
   );
 }

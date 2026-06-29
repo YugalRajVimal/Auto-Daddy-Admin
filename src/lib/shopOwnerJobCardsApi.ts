@@ -16,6 +16,7 @@ export type JobCardFormCustomer = {
   _id: string;
   name?: string;
   phone?: string;
+  city?: string;
   myVehicles: Array<{
     _id?: string;
     vId?: string;
@@ -59,6 +60,7 @@ function toFormCustomer(c: MyCustomer): JobCardFormCustomer {
     _id: id,
     name: c.name,
     phone: c.phone,
+    city: c.city,
     myVehicles: (c.vehicles ?? []).map((v) => ({
       ...v,
       _id: (v._id ?? v.vId ?? "").trim(),
