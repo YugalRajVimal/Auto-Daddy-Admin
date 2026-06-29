@@ -86,9 +86,8 @@ export function OwnerGroupedReportTable({
                 {headers.map((header) => (
                   <th
                     key={header}
-                    className={`${ADMIN_PANEL_TH_CLASS} ${
-                      header === "Amount" ? "text-right" : "text-left"
-                    }`}
+                    className={`${ADMIN_PANEL_TH_CLASS} ${header === "Amount" ? "text-right" : "text-left"
+                      }`}
                   >
                     {header}
                   </th>
@@ -108,9 +107,8 @@ export function OwnerGroupedReportTable({
                       {headers.map((header) => (
                         <td
                           key={`${row.id}-${header}`}
-                          className={`${ADMIN_PANEL_TD_CLASS} ${
-                            header === "Amount" ? "text-right" : ""
-                          } ${header === "Auto Shop" || header === "Vendor" ? "uppercase" : ""}`}
+                          className={`${ADMIN_PANEL_TD_CLASS} ${header === "Amount" ? "text-right" : ""
+                            } ${header === "Auto Shop" || header === "Vendor" ? "uppercase" : ""}`}
                         >
                           {cellValueForHeader(row, header, groupBy)}
                         </td>
@@ -169,9 +167,8 @@ export function OwnerFlatReportTable({
                 {headers.map((header) => (
                   <th
                     key={header}
-                    className={`${ADMIN_PANEL_TH_CLASS} ${
-                      header === "Amount" || header === "Rating" ? "text-right" : "text-left"
-                    }`}
+                    className={`${ADMIN_PANEL_TH_CLASS} ${header === "Amount" || header === "Rating" ? "text-right" : "text-left"
+                      }`}
                   >
                     {header}
                   </th>
@@ -184,9 +181,8 @@ export function OwnerFlatReportTable({
                   {headers.map((header) => (
                     <td
                       key={`${row.id}-${header}`}
-                      className={`${ADMIN_PANEL_TD_CLASS} ${
-                        header === "Amount" || header === "Rating" ? "text-right" : ""
-                      }`}
+                      className={`${ADMIN_PANEL_TD_CLASS} ${header === "Amount" || header === "Rating" ? "text-right" : ""
+                        }`}
                     >
                       {renderCell(row, header)}
                     </td>
