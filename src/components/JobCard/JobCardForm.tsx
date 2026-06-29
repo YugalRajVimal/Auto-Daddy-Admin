@@ -20,14 +20,12 @@ import {
 import {
   fetchJobCardByIdForForm,
   fetchJobCardFormData,
-  MAX_JOB_CARD_VEHICLE_PHOTOS,
   normalizeJobCardServiceBlocks,
   resolveJobCardFromApiResponse,
   saveJobCard,
   type JobCardFormCustomer,
 } from "../../lib/shopOwnerJobCardsApi";
 
-const MAX_VEHICLE_PHOTOS = MAX_JOB_CARD_VEHICLE_PHOTOS;
 const formCellInputClass = shopCompactInputClass;
 
 const DEFAULT_FORM = {
