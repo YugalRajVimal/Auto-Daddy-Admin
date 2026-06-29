@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { FiChevronDown } from "react-icons/fi";
-import {
-  portalSidebarSectionHeaderClass,
-} from "../admin/portalSidebarStyles";
-import PortalSidebarButton from "../admin/PortalSidebarButton";
+import { ShopSidebarButton } from "../shop/ShopSidebar";
+import { shopSidebarButtonStackClass } from "../shop/shopSidebarStyles";
 import { OwnerFaqsButton, ownerPageSidebarFooterClass } from "./OwnerFaqsButton";
-import { ownerPageSidebarClass } from "./OwnerPageShell";
+import { ownerPageSidebarClass } from "./ownerLayoutStyles";
 
 export type OwnerReportType =
   | "service"
@@ -43,18 +41,17 @@ function TicketSectionHeader({
   onToggle: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <ShopSidebarButton
+      label="Ticket Reports"
+      active={active || expanded}
       onClick={onToggle}
-      aria-expanded={expanded}
-      className={portalSidebarSectionHeaderClass(active, expanded)}
-    >
-      <span className="min-w-0 flex-1">Ticket Reports</span>
-      <FiChevronDown
-        className={`shrink-0 text-base transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
-        aria-hidden
-      />
-    </button>
+      trailing={
+        <FiChevronDown
+          className={`shrink-0 text-base transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      }
+    />
   );
 }
 
@@ -64,7 +61,7 @@ export default function OwnerReportsSidebar({
   onFaqsClick,
 }: OwnerReportsSidebarProps) {
   const [ticketOpen, setTicketOpen] = useState(
-    activeReport === "ticket-raised" || activeReport === "ticket-resolved"
+    activeReport === "ticket-raised" || activeReport === "ticket-resolved",
   );
   const asideRef = useRef<HTMLElement>(null);
 
@@ -85,10 +82,10 @@ export default function OwnerReportsSidebar({
   }, [ticketActive]);
 
   return (
-    <aside ref={asideRef} className={ownerPageSidebarClass}>
-      <div className="flex flex-col gap-3">
+    <aside ref={asideRef} className={`${ownerPageSidebarClass} lg:!h-auto lg:!max-h-none`}>
+      <div className={`min-h-0 flex-1 overflow-y-auto lg:pr-0.5 ${shopSidebarButtonStackClass}`}>
         {PRIMARY_REPORTS.map((item) => (
-          <PortalSidebarButton
+          <ShopSidebarButton
             key={item.id}
             label={item.label}
             active={activeReport === item.id}
@@ -106,9 +103,9 @@ export default function OwnerReportsSidebar({
             }}
           />
           {ticketOpen ? (
-            <div className="mt-3 flex flex-col gap-3">
+            <div className={`mt-4 ${shopSidebarButtonStackClass}`}>
               {TICKET_REPORTS.map((item) => (
-                <PortalSidebarButton
+                <ShopSidebarButton
                   key={item.id}
                   label={item.label}
                   active={activeReport === item.id}

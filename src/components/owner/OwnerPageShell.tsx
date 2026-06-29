@@ -1,65 +1,36 @@
 import type { ReactNode } from "react";
-import PageMeta from "../common/PageMeta";
-import { PortalPageContent } from "../admin/PortalPageContent";
-import OwnerFaqsDialog from "./OwnerFaqsDialog";
-import { OwnerFaqsButton, ownerPageSidebarFooterClass } from "./OwnerFaqsButton";
+import type { OwnerPageChromeConfig } from "../../context/OwnerPageChromeContext";
+import { useOwnerPageChrome } from "../../context/OwnerPageChromeContext";
+import { ownerPageSidebarFooterClass } from "./OwnerFaqsButton";
+import { shopSidebarButtonStackClass } from "../shop/shopSidebarStyles";
+import { ownerPageSidebarClass } from "./ownerLayoutStyles";
 
-export const ownerPageTitleClass = "text-xl font-bold text-blue-700 md:text-2xl";
-
-export const ownerPageHeaderClass = "mb-3 flex items-center justify-between gap-3";
-
-export const ownerPageAddFormSubtitleClass =
-  "text-center font-serif text-xl font-bold text-ad-grey-dark md:text-2xl";
-
-export const ownerPageSectionTitleClass = ownerPageAddFormSubtitleClass;
-
-export const ownerPageLayoutClass =
-  "flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5";
-
-export const ownerPageSidebarClass =
-  "relative flex w-full shrink-0 flex-col gap-3 overflow-visible lg:w-[220px] xl:w-[260px] lg:min-h-[calc(100vh-220px)]";
-
-export const ownerPageMainClass = "min-w-0 flex-1";
+export {
+  ownerPageAddFormSubtitleClass,
+  ownerPageHeaderClass,
+  ownerPageLayoutClass,
+  ownerPageMainClass,
+  ownerPageSectionTitleClass,
+  ownerPageSidebarClass,
+  ownerPageTitleClass,
+} from "./ownerLayoutStyles";
 
 type OwnerPageSidebarProps = {
   children: ReactNode;
   className?: string;
-  onFaqsClick?: () => void;
   footer?: ReactNode;
 };
 
-export function OwnerPageSidebar({
-  children,
-  className = "",
-  onFaqsClick,
-  footer,
-}: OwnerPageSidebarProps) {
+export function OwnerPageSidebar({ children, className = "", footer }: OwnerPageSidebarProps) {
   return (
-    <aside className={`${ownerPageSidebarClass} ${className}`.trim()}>
-      <div className="flex flex-col gap-3">{children}</div>
-      {footer || onFaqsClick ? (
-        <div className={ownerPageSidebarFooterClass}>
-          {footer}
-          {onFaqsClick ? <OwnerFaqsButton onClick={onFaqsClick} /> : null}
-        </div>
-      ) : null}
+    <aside className={`${ownerPageSidebarClass} lg:!h-auto lg:!max-h-none ${className}`.trim()}>
+      <div className={`min-h-0 flex-1 overflow-y-auto lg:pr-0.5 ${shopSidebarButtonStackClass}`}>
+        {children}
+      </div>
+      {footer ? <div className={ownerPageSidebarFooterClass}>{footer}</div> : null}
     </aside>
   );
 }
-
-type OwnerPageShellProps = {
-  title?: string;
-  titleClassName?: string;
-  headerClassName?: string;
-  metaTitle: string;
-  metaDescription: string;
-  headerAction?: ReactNode;
-  children: ReactNode;
-  faqsOpen?: boolean;
-  onFaqsClose?: () => void;
-  faqsHeading?: string;
-  faqsDescription?: string;
-};
 
 export function OwnerPageRefreshButton({
   onClick,
@@ -104,42 +75,13 @@ export function OwnerPageSearchInput({
   );
 }
 
-export default function OwnerPageShell({
-  title,
-  titleClassName,
-  headerClassName,
-  metaTitle,
-  metaDescription,
-  headerAction,
-  children,
-  faqsOpen = false,
-  onFaqsClose,
-  faqsHeading,
-  faqsDescription,
-}: OwnerPageShellProps) {
-  return (
-    <PortalPageContent className="flex flex-col px-3 py-3 sm:px-4 md:py-4 lg:px-6">
-      <PageMeta title={metaTitle} description={metaDescription} />
+type OwnerPageShellProps = OwnerPageChromeConfig & {
+  children: ReactNode;
+};
 
-      {title ? (
-        <div className={`${ownerPageHeaderClass} ${headerClassName ?? ""}`.trim()}>
-          <h1 className={`shrink-0 whitespace-nowrap ${titleClassName ?? ownerPageTitleClass}`}>
-            {title}
-          </h1>
-          {headerAction}
-        </div>
-      ) : null}
+/** Registers page chrome with {@link OwnerPageLayout}; renders route content only. */
+export default function OwnerPageShell({ children, ...chrome }: OwnerPageShellProps) {
+  useOwnerPageChrome(chrome);
 
-      {children}
-
-      {onFaqsClose ? (
-        <OwnerFaqsDialog
-          open={faqsOpen}
-          onClose={onFaqsClose}
-          heading={faqsHeading}
-          description={faqsDescription}
-        />
-      ) : null}
-    </PortalPageContent>
-  );
+  return <>{children}</>;
 }

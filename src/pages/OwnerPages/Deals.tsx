@@ -1,14 +1,9 @@
-import { useMemo, useState } from "react";
-import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
+import { useCallback, useMemo, useState } from "react";
 import OwnerDealFilters from "../../components/owner/OwnerDealFilters";
 import OwnerDealRow from "../../components/owner/OwnerDealRow";
-import OwnerPageShell, {
-  OwnerPageSidebar,
-  ownerPageLayoutClass,
-  ownerPageMainClass,
-} from "../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../components/owner/OwnerPageShell";
 import { useAuth } from "../../auth";
-import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
+import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import { useCarOwnerDeals } from "../../hooks/useCarOwnerDeals";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import {
@@ -28,6 +23,12 @@ const CATEGORIES: { id: DealCategory; label: string }[] = [
   { id: "salvage", label: "Salvages" },
 ];
 
+const CATEGORY_HEADINGS: Record<DealCategory, string> = {
+  service: "Service Deals",
+  tire: "Tires and Alloy wheels",
+  parts: "Spare Part Deal",
+  salvage: "Salvages",
+};
 
 function dealRowVehicleLabel(deal: CarOwnerDeal, index: number, vehicles: CarOwnerVehicle[]): string {
   if ("selectedVehicle" in deal && deal.selectedVehicle) {
@@ -52,26 +53,30 @@ export default function OwnerDealsPage() {
   const countryCode = session?.meta?.countryCode;
   const { deals, loading, error, refresh } = useCarOwnerDeals();
   const { vehicles } = useCarOwnerVehicles();
-  const { faqsHeading, faqsDescription } = useCarOwnerDashboard();
 
-  const [category, setCategory] = useState<DealCategory>("service");
+  const [category, setCategory] = useState<DealCategory>(CATEGORIES[0].id);
   const [listFilters, setListFilters] = useState<DealListFilters>(EMPTY_DEAL_LIST_FILTERS);
-  const [faqsOpen, setFaqsOpen] = useState(false);
+
+  const resetSidebar = useCallback(() => {
+    setCategory(CATEGORIES[0].id);
+    setListFilters(EMPTY_DEAL_LIST_FILTERS);
+  }, []);
+
+  useOwnerNavReset(resetSidebar);
 
   const categoryDeals = useMemo(
     () => deals.filter((d) => matchesDealCategory(d, category)),
-    [deals, category]
+    [deals, category],
   );
 
   const filteredDeals = useMemo(
     () => categoryDeals.filter((d) => matchesDealListFilters(d, listFilters)),
-    [categoryDeals, listFilters]
+    [categoryDeals, listFilters],
   );
 
   return (
     <OwnerPageShell
-      title="Current Deals"
-      headerClassName="flex-nowrap gap-2 overflow-x-auto sm:gap-3"
+      pageHeading={CATEGORY_HEADINGS[category]}
       metaTitle="Deals | AutoDaddy"
       metaDescription="Car owner deals"
       headerAction={
@@ -79,59 +84,51 @@ export default function OwnerDealsPage() {
           <OwnerDealFilters deals={categoryDeals} filters={listFilters} onChange={setListFilters} />
         ) : null
       }
-      faqsOpen={faqsOpen}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
+      sidebarItems={CATEGORIES.map((item) => ({
+        id: item.id,
+        label: item.label,
+        variant: "primary" as const,
+      }))}
+      activeSidebarId={category}
+      onSidebarSelect={(id) => {
+        setCategory(id as DealCategory);
+        setListFilters(EMPTY_DEAL_LIST_FILTERS);
+      }}
+      heroCardFlush
+      contentTopOffset
     >
-      <div className={ownerPageLayoutClass}>
-        <OwnerPageSidebar onFaqsClick={() => setFaqsOpen(true)}>
-          {CATEGORIES.map((item) => (
-            <PortalSidebarButton
-              key={item.id}
-              label={item.label}
-              active={category === item.id}
-              onClick={() => {
-                setCategory(item.id);
-                setListFilters(EMPTY_DEAL_LIST_FILTERS);
-              }}
+      <div className="flex flex-col gap-3 overflow-y-auto px-1 pb-2">
+        {loading ? (
+          <div className="flex flex-1 items-center justify-center py-16">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <p className="text-sm font-semibold text-gray-800">{error}</p>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
+            >
+              Try again
+            </button>
+          </div>
+        ) : filteredDeals.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
+            {categoryDeals.length === 0
+              ? "No deals in this category right now."
+              : "No deals match the selected filters."}
+          </div>
+        ) : (
+          filteredDeals.map((deal, index) => (
+            <OwnerDealRow
+              key={deal._id}
+              deal={deal}
+              vehicleLabel={dealRowVehicleLabel(deal, index, vehicles)}
+              countryCode={countryCode}
             />
-          ))}
-        </OwnerPageSidebar>
-
-        <div className={`flex min-h-[420px] flex-col overflow-y-auto px-1 pb-2 ${ownerPageMainClass}`}>
-          {loading ? (
-            <div className="flex flex-1 items-center justify-center">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
-            </div>
-          ) : error ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-              <p className="text-sm font-semibold text-gray-800">{error}</p>
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
-              >
-                Try again
-              </button>
-            </div>
-          ) : filteredDeals.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
-              {categoryDeals.length === 0
-                ? "No deals in this category right now."
-                : "No deals match the selected filters."}
-            </div>
-          ) : (
-            filteredDeals.map((deal, index) => (
-              <OwnerDealRow
-                key={deal._id}
-                deal={deal}
-                vehicleLabel={dealRowVehicleLabel(deal, index, vehicles)}
-                countryCode={countryCode}
-              />
-            ))
-          )}
-        </div>
+          ))
+        )}
       </div>
     </OwnerPageShell>
   );

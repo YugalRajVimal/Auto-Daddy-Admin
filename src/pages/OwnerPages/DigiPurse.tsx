@@ -1,15 +1,9 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { toast } from "react-toastify";
-import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
-import OwnerPageShell, {
-  OwnerPageRefreshButton,
-  OwnerPageSidebar,
-  ownerPageLayoutClass,
-  ownerPageMainClass,
-} from "../../components/owner/OwnerPageShell";
+import OwnerPageShell, { OwnerPageRefreshButton } from "../../components/owner/OwnerPageShell";
+import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import { useCarOwnerDocuments } from "../../hooks/useCarOwnerDocuments";
-import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 import {
   DIGI_PURSE_CATEGORIES,
   fieldLabelForCategory,
@@ -18,18 +12,6 @@ import {
   type VehicleDocumentFieldKey,
   type VehicleDocumentsSection,
 } from "../../lib/carOwnerDocuments";
-
-function CategoryButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return <PortalSidebarButton label={label} active={active} onClick={onClick} />;
-}
 
 function DocumentFieldPanel({
   category,
@@ -157,13 +139,18 @@ function VehicleDocumentRow({
 }
 
 export default function OwnerDigiPursePage() {
-  const { faqsHeading, faqsDescription } = useCarOwnerDashboard();
   const { sections, loading, error, mutating, busyField, refresh, uploadDocumentField } =
     useCarOwnerDocuments();
 
-  const [category, setCategory] = useState<DigiPurseCategoryId>("ownership");
+  const [category, setCategory] = useState<DigiPurseCategoryId>(DIGI_PURSE_CATEGORIES[0].id);
   const [expandedVehicleId, setExpandedVehicleId] = useState<string | null>(null);
-  const [faqsOpen, setFaqsOpen] = useState(false);
+
+  const resetSidebar = useCallback(() => {
+    setCategory(DIGI_PURSE_CATEGORIES[0].id);
+    setExpandedVehicleId(null);
+  }, []);
+
+  useOwnerNavReset(resetSidebar);
 
   const handleCategoryChange = (next: DigiPurseCategoryId) => {
     setCategory(next);
@@ -181,66 +168,56 @@ export default function OwnerDigiPursePage() {
 
   return (
     <OwnerPageShell
-      title="Digi Purse"
+      pageHeading="Digi Purse"
       metaTitle="Digi Purse | AutoDaddy"
       metaDescription="Car owner documents"
       headerAction={<OwnerPageRefreshButton onClick={() => void refresh()} />}
-      faqsOpen={faqsOpen}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
+      sidebarItems={DIGI_PURSE_CATEGORIES.map((item) => ({
+        id: item.id,
+        label: item.label,
+        variant: "primary" as const,
+      }))}
+      activeSidebarId={category}
+      onSidebarSelect={(id) => handleCategoryChange(id as DigiPurseCategoryId)}
+      heroCardFlush
+      contentTopOffset
     >
-      <div className={ownerPageLayoutClass}>
-        <OwnerPageSidebar onFaqsClick={() => setFaqsOpen(true)}>
-          {DIGI_PURSE_CATEGORIES.map((item) => (
-            <CategoryButton
-              key={item.id}
-              label={item.label}
-              active={category === item.id}
-              onClick={() => handleCategoryChange(item.id)}
+      <div className="flex flex-col gap-3">
+        {loading ? (
+          <div className="flex flex-1 items-center justify-center py-16">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <p className="text-sm font-semibold text-gray-800">{error}</p>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
+            >
+              Try again
+            </button>
+          </div>
+        ) : sections.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
+            No vehicles on file. Add a vehicle to upload documents.
+          </div>
+        ) : (
+          sections.map((section) => (
+            <VehicleDocumentRow
+              key={section.vehicleId}
+              section={section}
+              category={category}
+              expanded={expandedVehicleId === section.vehicleId}
+              onToggle={() =>
+                setExpandedVehicleId((cur) => (cur === section.vehicleId ? null : section.vehicleId))
+              }
+              busyField={busyField}
+              mutating={mutating}
+              onUpload={(vehicleId, field, file) => void handleUpload(vehicleId, field, file)}
             />
-          ))}
-        </OwnerPageSidebar>
-
-        <div className={`flex min-h-[420px] flex-col ${ownerPageMainClass}`}>
-          {loading ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
-            </div>
-          ) : error ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-md border border-gray-200 bg-white p-6 text-center">
-              <p className="text-sm font-semibold text-gray-800">{error}</p>
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
-              >
-                Try again
-              </button>
-            </div>
-          ) : sections.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">
-              No vehicles on file. Add a vehicle to upload documents.
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {sections.map((section) => (
-                <VehicleDocumentRow
-                  key={section.vehicleId}
-                  section={section}
-                  category={category}
-                  expanded={expandedVehicleId === section.vehicleId}
-                  onToggle={() =>
-                    setExpandedVehicleId((cur) => (cur === section.vehicleId ? null : section.vehicleId))
-                  }
-                  busyField={busyField}
-                  mutating={mutating}
-                  onUpload={(vehicleId, field, file) => void handleUpload(vehicleId, field, file)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+          ))
+        )}
       </div>
     </OwnerPageShell>
   );

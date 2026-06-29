@@ -76,7 +76,13 @@ export default function SubAdminSignInPage() {
             </div>
           )}
 
-          <div className="space-y-4">
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!loading && email.trim() && password) void handleLogin();
+            }}
+          >
             <label className="block text-sm text-ad-green-dark">Email Address</label>
             <div className="relative">
               <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -102,14 +108,13 @@ export default function SubAdminSignInPage() {
               />
             </div>
             <button
-              type="button"
-              onClick={handleLogin}
+              type="submit"
               disabled={loading || !email.trim() || !password}
               className="w-full rounded-lg bg-ad-green py-3 text-sm font-bold uppercase tracking-wide text-white hover:bg-ad-green-dark disabled:opacity-60"
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
-          </div>
+          </form>
         </div>
       </div>
 

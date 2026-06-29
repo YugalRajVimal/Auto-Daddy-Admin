@@ -1,10 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { toast } from "react-toastify";
-import OwnerPageShell, {
-  ownerPageLayoutClass,
-  ownerPageMainClass,
-} from "../owner/OwnerPageShell";
-import ShopHelpSidebar from "../shop/ShopHelpSidebar";
+import OwnerPageShell from "../owner/OwnerPageShell";
+import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import ShopSupportPanel from "../shop/ShopSupportPanel";
 import ShopTicketRow, { type ShopTicket } from "../shop/ShopTicketRow";
 import { ShopEmptyPanel, ShopListPanel } from "../shop/ShopPanels";
@@ -27,16 +24,18 @@ const DEMO_TICKETS: ShopTicket[] = [
   },
 ];
 
+const HELP_SECTIONS = [
+  { id: "ticket-raised", label: "Ticket Raised", variant: "primary" as const },
+  { id: "resolved", label: "Resolved", variant: "primary" as const },
+];
+
 export type HelpServiceOption = { id: string; name: string };
 
 type PortalHelpPageProps = {
   metaDescription: string;
-  faqsHeading: string;
-  faqsDescription: string;
   services: HelpServiceOption[];
   servicesLoading: boolean;
   onSubmit: (service: HelpServiceOption, audio: Blob) => Promise<boolean>;
-  title?: string;
   headerAction?: ReactNode;
 };
 
@@ -56,33 +55,37 @@ type HelpSection = "ticket-raised" | "resolved";
 
 export default function PortalHelpPage({
   metaDescription,
-  faqsHeading,
-  faqsDescription,
   services,
   servicesLoading,
   onSubmit,
-  title = "Help",
   headerAction,
 }: PortalHelpPageProps) {
   const { recording, audioBlob, error: recorderError, hasRecording, toggle, reset } =
     useWebVoiceRecorder();
 
   const [activeSection, setActiveSection] = useState<HelpSection>("ticket-raised");
-  const [faqsOpen, setFaqsOpen] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [tickets, setTickets] = useState<ShopTicket[]>(DEMO_TICKETS);
   const [draftTicketNo, setDraftTicketNo] = useState(nextTicketNo);
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const resetSidebar = useCallback(() => {
+    setActiveSection("ticket-raised");
+    setShowForm(false);
+    reset();
+  }, [reset]);
+
+  useOwnerNavReset(resetSidebar);
+
   const resolvedServiceId = selectedServiceId || services[0]?.id || "";
 
   const filteredTickets = useMemo(
     () =>
       tickets.filter((t) =>
-        activeSection === "resolved" ? t.status === "resolved" : t.status === "active"
+        activeSection === "resolved" ? t.status === "resolved" : t.status === "active",
       ),
-    [activeSection, tickets]
+    [activeSection, tickets],
   );
 
   const openNewTicketForm = useCallback(() => {
@@ -150,57 +153,51 @@ export default function PortalHelpPage({
 
   return (
     <OwnerPageShell
-      title={title}
+      pageHeading={activeSection === "resolved" ? "Resolved" : "Ticket Raised"}
       metaTitle="Help | AutoDaddy"
       metaDescription={metaDescription}
       headerAction={headerAction ?? raiseTicketButton}
-      faqsOpen={faqsOpen}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
+      sidebarItems={HELP_SECTIONS}
+      activeSidebarId={activeSection}
+      onSidebarSelect={(id) => handleSectionChange(id as HelpSection)}
+      heroBackgroundImage={false}
+      heroCardFlush
+      contentTopOffset
     >
-      <div className={ownerPageLayoutClass}>
-        <ShopHelpSidebar
-          activeSection={activeSection}
-          onSectionChange={handleSectionChange}
-          onFaqsClick={() => setFaqsOpen(true)}
+      {showForm ? (
+        <ShopSupportPanel
+          ticketNo={draftTicketNo}
+          services={services}
+          servicesLoading={servicesLoading}
+          selectedServiceId={resolvedServiceId}
+          onServiceChange={setSelectedServiceId}
+          recording={recording}
+          hasRecording={hasRecording}
+          recorderError={recorderError}
+          onToggleRecording={() => void toggle()}
+          saving={saving}
+          onSave={() => void handleSave()}
+          onCancel={closeForm}
         />
-
-        {showForm ? (
-          <ShopSupportPanel
-            ticketNo={draftTicketNo}
-            services={services}
-            servicesLoading={servicesLoading}
-            selectedServiceId={resolvedServiceId}
-            onServiceChange={setSelectedServiceId}
-            recording={recording}
-            hasRecording={hasRecording}
-            recorderError={recorderError}
-            onToggleRecording={() => void toggle()}
-            saving={saving}
-            onSave={() => void handleSave()}
-            onCancel={closeForm}
-          />
-        ) : (
-          <div className={`flex min-h-[420px] flex-col gap-3 lg:min-h-[calc(100vh-220px)] ${ownerPageMainClass}`}>
-            {filteredTickets.length === 0 ? (
-              <ShopEmptyPanel
-                message={
-                  activeSection === "resolved"
-                    ? "No resolved tickets yet."
-                    : "No active tickets. Raise a ticket to get help."
-                }
-              />
-            ) : (
-              <ShopListPanel>
-                {filteredTickets.map((ticket) => (
-                  <ShopTicketRow key={ticket.id} ticket={ticket} />
-                ))}
-              </ShopListPanel>
-            )}
-          </div>
-        )}
-      </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filteredTickets.length === 0 ? (
+            <ShopEmptyPanel
+              message={
+                activeSection === "resolved"
+                  ? "No resolved tickets yet."
+                  : "No active tickets. Raise a ticket to get help."
+              }
+            />
+          ) : (
+            <ShopListPanel>
+              {filteredTickets.map((ticket) => (
+                <ShopTicketRow key={ticket.id} ticket={ticket} />
+              ))}
+            </ShopListPanel>
+          )}
+        </div>
+      )}
     </OwnerPageShell>
   );
 }

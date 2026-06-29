@@ -259,7 +259,13 @@ export default function AdminSignInPage() {
               )}
 
               {!otpSent ? (
-                <div className="mx-auto w-full max-w-xs space-y-4">
+                <form
+                  className="mx-auto w-full max-w-xs space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!loading && canRequestOtp()) void handleSendOtp();
+                  }}
+                >
                   <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
                     <input
                       type="checkbox"
@@ -325,21 +331,25 @@ export default function AdminSignInPage() {
                   )}
 
                   <button
-                    type="button"
-                    onClick={handleSendOtp}
+                    type="submit"
                     disabled={loading || !canRequestOtp()}
                     className="w-full rounded-md bg-ad-green py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-ad-green-dark disabled:opacity-60"
                   >
                     {loading ? "Sending..." : "Get OTP"}
                   </button>
-                </div>
+                </form>
               ) : (
-                <div className="mx-auto w-full max-w-xs space-y-4">
+                <form
+                  className="mx-auto w-full max-w-xs space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!loading && otp.length === 6) void handleVerifyOtp();
+                  }}
+                >
                   <label className="block text-sm text-ad-green-dark">OTP</label>
                   <OtpInput value={otp} onChange={setOtp} disabled={loading} autoFocus />
                   <button
-                    type="button"
-                    onClick={handleVerifyOtp}
+                    type="submit"
                     disabled={loading || otp.length !== 6}
                     className="w-full rounded-md bg-ad-green py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-ad-green-dark disabled:opacity-60"
                   >
@@ -375,7 +385,7 @@ export default function AdminSignInPage() {
                   >
                     ← Back to {loginWithEmail ? "Email" : "Mobile Number"}
                   </button>
-                </div>
+                </form>
               )}
             </div>
           </div>

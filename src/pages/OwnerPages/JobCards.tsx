@@ -1,89 +1,125 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import OwnerPageShell, {
   OwnerPageRefreshButton,
-  ownerPageLayoutClass,
-  ownerPageMainClass,
+  OwnerPageSearchInput,
 } from "../../components/owner/OwnerPageShell";
-import OwnerJobCardRow from "../../components/owner/OwnerJobCardRow";
-import OwnerVehicleSidebar from "../../components/owner/OwnerVehicleSidebar";
+import { OwnerJobCardsTable } from "../../components/owner/OwnerPanelTables";
 import { useAuth } from "../../auth";
-import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
-import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
+import {
+  businessName,
+  jobCardLicensePlate,
+  jobChipLabel,
+  serviceTypeLabel,
+} from "../../lib/carOwnerJobCards";
+
+const PAGE_SIZE = 10;
 
 export default function OwnerJobCardsPage() {
   const { session } = useAuth();
   const countryCode = session?.meta?.countryCode;
-  const { faqsHeading, faqsDescription } = useCarOwnerDashboard();
-  const { vehicles, loading: vehiclesLoading, refresh: refreshVehicles } = useCarOwnerVehicles();
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
-  const { items, loading, error, refresh } = useCarOwnerJobCards(selectedVehicleId);
-  const [faqsOpen, setFaqsOpen] = useState(false);
+  const { items, loading, error, refresh } = useCarOwnerJobCards(null);
+
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((jc) => {
+      const hay = [
+        jobChipLabel(jc),
+        businessName(jc.business),
+        jobCardLicensePlate(jc),
+        serviceTypeLabel(jc),
+        jc.status,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [items, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageRows = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   useEffect(() => {
-    if (vehicles.length === 0) {
-      setSelectedVehicleId(null);
-      return;
-    }
-    if (selectedVehicleId && !vehicles.some((v) => v.id === selectedVehicleId)) {
-      setSelectedVehicleId(vehicles[0]?.id ?? null);
-    }
-  }, [vehicles, selectedVehicleId]);
+    setPage(1);
+  }, [search]);
 
-  const handleRefresh = () => {
-    void refreshVehicles();
-    void refresh();
-  };
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const headerAction = (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <OwnerPageSearchInput value={search} onChange={setSearch} placeholder="Search job cards…" />
+      <OwnerPageRefreshButton onClick={() => void refresh()} />
+    </div>
+  );
 
   return (
     <OwnerPageShell
-      title="Job Cards"
+      pageHeading="Job Cards"
       metaTitle="Job Cards | AutoDaddy"
       metaDescription="Car owner job cards"
-      headerAction={<OwnerPageRefreshButton onClick={handleRefresh} />}
-      faqsOpen={faqsOpen}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
+      headerAction={headerAction}
+      heroCardFlush
+      contentTopOffset
     >
-      <div className={ownerPageLayoutClass}>
-        <OwnerVehicleSidebar
-          vehicles={vehicles}
-          selectedVehicleId={selectedVehicleId}
-          loading={vehiclesLoading}
-          onSelect={setSelectedVehicleId}
-          onFaqsClick={() => setFaqsOpen(true)}
-        />
-
-        <div className={`flex min-h-[420px] flex-col ${ownerPageMainClass}`}>
-          {loading || vehiclesLoading ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
-            </div>
-          ) : error ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-md border border-gray-200 bg-white p-6 text-center">
-              <p className="text-sm font-semibold text-gray-800">{error}</p>
-              <button
-                type="button"
-                onClick={handleRefresh}
-                className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
-              >
-                Try again
-              </button>
-            </div>
-          ) : items.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">
-              {selectedVehicleId ? "No job cards for this vehicle yet." : "No job cards yet."}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {items.map((jc) => (
-                <OwnerJobCardRow key={jc._id} jc={jc} countryCode={countryCode} />
-              ))}
-            </div>
-          )}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
         </div>
-      </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <p className="text-sm font-semibold text-gray-800">{error}</p>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
+          >
+            Try again
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="py-8 text-center text-sm text-gray-600">
+          {search.trim() ? "No job cards match your search." : "No job cards yet."}
+        </p>
+      ) : (
+        <div className="space-y-3">
+          <OwnerJobCardsTable rows={pageRows} countryCode={countryCode} />
+          {totalPages > 1 ? (
+            <div className="flex items-center justify-between gap-2 border-t border-gray-200 pt-3 text-xs text-gray-600">
+              <span>
+                Page {page} of {totalPages} ({filtered.length} total)
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="rounded border border-gray-300 bg-white px-2 py-1 font-semibold text-ad-purple disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="rounded border border-gray-300 bg-white px-2 py-1 font-semibold text-ad-purple disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
     </OwnerPageShell>
   );
 }

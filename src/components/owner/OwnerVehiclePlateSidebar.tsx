@@ -1,4 +1,4 @@
-import PortalSidebarButton from "../admin/PortalSidebarButton";
+import { ShopSidebarButton } from "../shop/ShopSidebar";
 import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
 
 type OwnerVehiclePlateSidebarProps = {
@@ -20,22 +20,23 @@ export default function OwnerVehiclePlateSidebar({
   loading,
   onSelect,
 }: OwnerVehiclePlateSidebarProps) {
+  if (loading) {
+    return <p className="px-1 text-xs text-gray-500">Loading vehicles…</p>;
+  }
+  if (vehicles.length === 0) {
+    return <p className="px-1 text-xs text-gray-500">No vehicles on file.</p>;
+  }
+
   return (
-    <div className="flex flex-col gap-3">
-      {loading ? (
-        <p className="px-1 text-xs text-gray-500">Loading vehicles…</p>
-      ) : vehicles.length === 0 ? (
-        <p className="px-1 text-xs text-gray-500">No vehicles on file.</p>
-      ) : (
-        vehicles.map((vehicle) => (
-          <PortalSidebarButton
-            key={vehicle.id}
-            label={vehiclePlateLabel(vehicle)}
-            active={selectedVehicleId === vehicle.id}
-            onClick={() => onSelect(vehicle.id)}
-          />
-        ))
-      )}
-    </div>
+    <>
+      {vehicles.map((vehicle) => (
+        <ShopSidebarButton
+          key={vehicle.id}
+          label={vehiclePlateLabel(vehicle)}
+          active={selectedVehicleId === vehicle.id}
+          onClick={() => onSelect(vehicle.id)}
+        />
+      ))}
+    </>
   );
 }

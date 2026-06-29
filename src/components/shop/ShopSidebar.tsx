@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 import PortalSidebarButton from "../admin/PortalSidebarButton";
 import { Skeleton } from "../common/Skeleton";
-import { shopSidebarButtonClass, shopSidebarButtonStackClass } from "./shopSidebarStyles";
+import {
+  shopSidebarButtonClass,
+  shopSidebarButtonStackClass,
+  shopSidebarShellClass,
+} from "./shopSidebarStyles";
 
 function ShopSidebarListIcon() {
   return (
@@ -22,6 +26,7 @@ export type ShopSidebarButtonProps = {
   onClick?: () => void;
   trailing?: ReactNode;
   className?: string;
+  "aria-expanded"?: boolean;
 };
 
 export function ShopSidebarButton({
@@ -30,12 +35,14 @@ export function ShopSidebarButton({
   onClick,
   trailing,
   className = "",
+  "aria-expanded": ariaExpanded,
 }: ShopSidebarButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-current={active ? "true" : undefined}
+      aria-expanded={ariaExpanded}
       className={shopSidebarButtonClass(active, className)}
     >
       <ShopSidebarListIcon />
@@ -83,9 +90,6 @@ export function ShopSidebarButtonsSkeleton({
   );
 }
 
-const SHOP_SIDEBAR_SHELL_CLASS =
-  "flex w-full shrink-0 flex-col lg:w-[220px] xl:w-[260px] lg:h-[calc(100vh-220px)] lg:max-h-[calc(100vh-220px)]";
-
 type ShopSidebarProps = {
   items: ShopSidebarItem[];
   activeId?: string | null;
@@ -116,7 +120,7 @@ export default function ShopSidebar({
   skeletonCount = 4,
 }: ShopSidebarProps) {
   return (
-    <aside className={`${SHOP_SIDEBAR_SHELL_CLASS} ${className}`}>
+    <aside className={`${shopSidebarShellClass} ${className}`}>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:pr-0.5">
         {heading ? <h2 className={headingClassName}>{heading}</h2> : null}
 

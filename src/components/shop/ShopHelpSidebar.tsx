@@ -1,5 +1,5 @@
 import { OwnerFaqsButton, ownerPageSidebarFooterClass } from "../owner/OwnerFaqsButton";
-import { ownerPageSidebarClass } from "../owner/OwnerPageShell";
+import { ownerPageSidebarClass } from "../owner/ownerLayoutStyles";
 
 type HelpSection = "ticket-raised" | "resolved";
 

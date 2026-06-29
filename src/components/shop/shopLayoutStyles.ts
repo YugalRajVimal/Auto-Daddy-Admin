@@ -90,6 +90,12 @@ export const shopHeroCardSearchClass =
 export const shopCompactInputClass =
   "shop-compact-input w-full h-[26px] box-border border border-gray-400 bg-white px-2 py-0 text-sm leading-tight focus:border-blue-500 focus:outline-none";
 
+/** Top action row inside flush hero cards (My Website style — no grey toolbar bar). */
+export const shopHeroCardInlineToolbarClass =
+  "flex min-h-[2rem] shrink-0 flex-wrap items-center justify-end gap-3";
+
+export const shopHeroCardCompactSearchClass = `min-w-[160px] max-w-[240px] sm:min-w-[200px] ${shopCompactInputClass}`;
+
 /** Multiline fields in shop form cards. */
 export const shopCompactTextareaClass =
   "shop-compact-input w-full min-h-[26px] border border-gray-400 bg-white px-2 py-0.5 text-sm leading-tight focus:border-blue-500 focus:outline-none resize-y";

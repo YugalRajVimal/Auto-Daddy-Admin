@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getJson } from "../../api/mobileAuth";
-import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
 import {
   CompactField,
   CompactFormFooter,
@@ -8,14 +7,9 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../components/admin/ContentPanel";
-import OwnerPageShell, {
-  OwnerPageSidebar,
-  ownerPageLayoutClass,
-  ownerPageMainClass,
-} from "../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../components/owner/OwnerPageShell";
 import { useAuth } from "../../auth";
 import { useCarOwnerProfile } from "../../hooks/useCarOwnerProfile";
-import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 import { parseCitiesApiResponse, type UserCity } from "../../lib/carOwnerCities";
 
 const fieldErrorClass = "mt-0.5 text-[11px] text-red-600";
@@ -25,10 +19,8 @@ const checkboxBoxClass =
 export default function OwnerProfilePage() {
   const { token } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [faqsOpen, setFaqsOpen] = useState(false);
   const [showUploadImage, setShowUploadImage] = useState(false);
   const [cityOptions, setCityOptions] = useState<UserCity[]>([]);
-  const { faqsHeading, faqsDescription } = useCarOwnerDashboard();
 
   const {
     loading,
@@ -98,26 +90,21 @@ export default function OwnerProfilePage() {
 
   return (
     <OwnerPageShell
-      title="My Profile"
+      pageHeading="My Profile"
       metaTitle="Profile | AutoDaddy"
       metaDescription="Car owner profile"
-      faqsOpen={faqsOpen}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
+      sidebarItems={[{ id: "personal", label: "Personal Profile", variant: "primary" as const }]}
+      activeSidebarId="personal"
+      heroCardFlush
+      contentTopOffset
     >
       {loading ? (
         <div className="flex min-h-[320px] items-center justify-center">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
         </div>
       ) : (
-        <div className={ownerPageLayoutClass}>
-          <OwnerPageSidebar onFaqsClick={() => setFaqsOpen(true)}>
-            <PortalSidebarButton label="Personal Profile" active />
-          </OwnerPageSidebar>
-
-          <div className={`${ownerPageMainClass} lg:min-h-[calc(100vh-220px)]`}>
-            <CompactFormPanel
+        <>
+          <CompactFormPanel
               footer={
                 <CompactFormFooter
                   message="You are updating your profile"
@@ -288,12 +275,11 @@ export default function OwnerProfilePage() {
               </div>
             </CompactFormPanel>
 
-            <footer className="mt-4 text-center font-serif text-lg italic leading-snug text-gray-600 md:text-xl lg:text-2xl">
-              <p>With Autodaddy, you are not just choosing a system,</p>
-              <p>You are choosing a standard of excellence</p>
-            </footer>
-          </div>
-        </div>
+          <footer className="mt-4 text-center font-serif text-lg italic leading-snug text-gray-600 md:text-xl lg:text-2xl">
+            <p>With Autodaddy, you are not just choosing a system,</p>
+            <p>You are choosing a standard of excellence</p>
+          </footer>
+        </>
       )}
     </OwnerPageShell>
   );

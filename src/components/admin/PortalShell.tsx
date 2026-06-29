@@ -151,7 +151,7 @@ export default function PortalShell({
 
   return (
     <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
-      <div className="flex w-full flex-col">
+      <div className="flex min-h-0 w-full flex-1 flex-col">
         <header className="px-3 pt-4 pb-2 sm:px-4 md:pt-5">
           <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-3 md:grid-cols-[auto_1fr_auto] md:gap-x-4">
             <div className="flex items-center gap-3">
@@ -315,7 +315,7 @@ export default function PortalShell({
           </div>
         )}
 
-        <main>{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
       </div>
     </div>
   );

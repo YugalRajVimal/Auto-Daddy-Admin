@@ -1,4 +1,5 @@
 import { Route } from "react-router";
+import OwnerPageLayout from "../../layout/Owner/OwnerPageLayout";
 import OwnerPanelLayout from "../../layout/Owner/OwnerPanelLayout";
 import ShopPanelLayout from "../../layout/Shop/ShopPanelLayout";
 import ShopPageLayout from "../../layout/Shop/ShopPageLayout";
@@ -33,17 +34,19 @@ import ShopHelpPage from "../../pages/ShopPages/Help";
 
 export const ownerRoutes = (
   <Route element={<OwnerPanelLayout />}>
-    <Route index path="/owner" element={<OwnerHomePage />} />
-    <Route path="/owner/profile" element={<OwnerProfilePage />} />
-    <Route path="/owner/vehicles" element={<OwnerVehiclesPage />} />
-    <Route path="/owner/auto-shops" element={<OwnerAutoShopsPage />} />
-    <Route path="/owner/job-cards" element={<OwnerJobCardsPage />} />
-    <Route path="/owner/reports" element={<OwnerReportsPage />} />
-    <Route path="/owner/invoices" element={<OwnerInvoicesPage />} />
-    <Route path="/owner/messages" element={<OwnerMessagesPage />} />
-    <Route path="/owner/digi-purse" element={<OwnerDigiPursePage />} />
-    <Route path="/owner/deals" element={<OwnerDealsPage />} />
-    <Route path="/owner/help" element={<OwnerHelpPage />} />
+    <Route element={<OwnerPageLayout />}>
+      <Route index path="/owner" element={<OwnerHomePage />} />
+      <Route path="/owner/profile" element={<OwnerProfilePage />} />
+      <Route path="/owner/vehicles" element={<OwnerVehiclesPage />} />
+      <Route path="/owner/auto-shops" element={<OwnerAutoShopsPage />} />
+      <Route path="/owner/job-cards" element={<OwnerJobCardsPage />} />
+      <Route path="/owner/reports" element={<OwnerReportsPage />} />
+      <Route path="/owner/invoices" element={<OwnerInvoicesPage />} />
+      <Route path="/owner/messages" element={<OwnerMessagesPage />} />
+      <Route path="/owner/digi-purse" element={<OwnerDigiPursePage />} />
+      <Route path="/owner/deals" element={<OwnerDealsPage />} />
+      <Route path="/owner/help" element={<OwnerHelpPage />} />
+    </Route>
   </Route>
 );
 

@@ -5,12 +5,14 @@ type ShopPrimaryNavProps = {
   homePath: string;
   primaryNav: NavItem[];
   className?: string;
+  navLabel?: string;
 };
 
 export default function ShopPrimaryNav({
   homePath,
   primaryNav,
   className = "",
+  navLabel = "Shop sections",
 }: ShopPrimaryNavProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -24,7 +26,7 @@ export default function ShopPrimaryNav({
   };
 
   return (
-    <nav className={`min-w-0 w-full ${className}`.trim()} aria-label="Shop sections">
+    <nav className={`min-w-0 w-full ${className}`.trim()} aria-label={navLabel}>
       <ul className="flex h-full w-full flex-col gap-2 py-1 lg:flex-row lg:items-center lg:justify-between lg:gap-1 lg:py-0">
         {primaryNav.map((item) => {
           const isActive = activePrimary?.name === item.name;

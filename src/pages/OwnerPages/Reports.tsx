@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   CompactField,
   CompactFormFooter,
@@ -7,16 +7,14 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../components/admin/ContentPanel";
-import OwnerPageShell, {
-  ownerPageLayoutClass,
-  ownerPageMainClass,
-} from "../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../components/owner/OwnerPageShell";
 import {
   OwnerFlatReportTable,
   OwnerGroupedReportTable,
 } from "../../components/owner/OwnerReportTableView";
-import OwnerReportsSidebar, { type OwnerReportType } from "../../components/owner/OwnerReportsSidebar";
+import type { OwnerReportType } from "../../components/owner/OwnerReportsSidebar";
 import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
+import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import {
   DUMMY_REPORT_INVOICES,
   DUMMY_REPORT_JOB_CARDS,
@@ -47,6 +45,24 @@ const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "vendor", label: "Vendor" },
   { value: "project", label: "Project" },
 ];
+
+const REPORT_SECTIONS: { id: OwnerReportType; label: string }[] = [
+  { id: "service", label: "Service Reports" },
+  { id: "job-card", label: "Job Card Reports" },
+  { id: "invoice", label: "Invoice Reports" },
+  { id: "auto-shop", label: "Auto Shop Reports" },
+  { id: "ticket-raised", label: "Ticket Raised" },
+  { id: "ticket-resolved", label: "Resolved" },
+];
+
+const REPORT_PAGE_HEADINGS: Record<OwnerReportType, string> = {
+  service: "Service Reports",
+  "job-card": "Job Card Reports",
+  invoice: "Invoice Reports",
+  "auto-shop": "Auto Shop Reports",
+  "ticket-raised": "Ticket Raised",
+  "ticket-resolved": "Resolved",
+};
 
 const SAMPLE_REPORT_CATEGORIES = [
   "General Repair",
@@ -96,18 +112,28 @@ function filterJobCards(items: CarOwnerJobCard[], filters: AppliedFilters): CarO
 }
 
 export default function OwnerReportsPage() {
-  const { faqsHeading, faqsDescription, displayName } = useCarOwnerDashboard();
+  const { displayName } = useCarOwnerDashboard();
 
   const defaultToDate = todayIso();
   const defaultFromDate = `${defaultToDate.slice(0, 4)}-01-01`;
 
-  const [activeReport, setActiveReport] = useState<OwnerReportType>("service");
+  const [activeReport, setActiveReport] = useState<OwnerReportType>(REPORT_SECTIONS[0].id);
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
   const [category, setCategory] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("category");
   const [applied, setApplied] = useState<AppliedFilters | null>(null);
-  const [faqsOpen, setFaqsOpen] = useState(false);
+
+  const resetSidebar = useCallback(() => {
+    setActiveReport(REPORT_SECTIONS[0].id);
+    setFromDate(defaultFromDate);
+    setToDate(defaultToDate);
+    setCategory("");
+    setGroupBy("category");
+    setApplied(null);
+  }, [defaultFromDate, defaultToDate]);
+
+  useOwnerNavReset(resetSidebar);
 
   const categoryOptions = useMemo(() => {
     const names = new Set<string>(SAMPLE_REPORT_CATEGORIES);
@@ -291,91 +317,87 @@ export default function OwnerReportsPage() {
 
   return (
     <OwnerPageShell
-      title="Reports"
+      pageHeading={REPORT_PAGE_HEADINGS[activeReport]}
       metaTitle="Reports | AutoDaddy"
       metaDescription="Car owner reports"
-      faqsOpen={faqsOpen}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
+      sidebarItems={REPORT_SECTIONS.map((item) => ({
+        id: item.id,
+        label: item.label,
+        variant: "primary" as const,
+      }))}
+      activeSidebarId={activeReport}
+      onSidebarSelect={(id) => {
+        setActiveReport(id as OwnerReportType);
+        setApplied(null);
+      }}
+      heroCardFlush
+      contentTopOffset
     >
-      <div className={ownerPageLayoutClass}>
-        <OwnerReportsSidebar
-          activeReport={activeReport}
-          onSelect={(report) => {
-            setActiveReport(report);
-            setApplied(null);
-          }}
-          onFaqsClick={() => setFaqsOpen(true)}
-        />
-
-        <div className={`${ownerPageMainClass} lg:min-h-[calc(100vh-220px)]`}>
-          <CompactFormPanel
-            className="mb-4"
-            footer={
-              <CompactFormFooter
-                actionLabel="Save"
-                cancelLabel="Reset"
-                onSave={handleSave}
-                onCancel={handleReset}
-                messageCenter
-                message=""
+      <div className="space-y-4">
+        <CompactFormPanel
+          footer={
+            <CompactFormFooter
+              actionLabel="Save"
+              cancelLabel="Reset"
+              onSave={handleSave}
+              onCancel={handleReset}
+              messageCenter
+              message=""
+            />
+          }
+        >
+          <CompactFormRow className="w-full flex-nowrap items-end overflow-x-auto">
+            <CompactField label="Date Range" required className={compactFixedFieldWidth}>
+              <input
+                type="date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => setFromDate(e.target.value)}
+                className={compactInputClass}
+                required
               />
-            }
-          >
-            <CompactFormRow className="w-full flex-nowrap items-end overflow-x-auto">
-              <CompactField label="Date Range" required className={compactFixedFieldWidth}>
-                <input
-                  type="date"
-                  value={fromDate}
-                  max={toDate || undefined}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className={compactInputClass}
-                  required
-                />
-              </CompactField>
-              <CompactField label="To Date" required className={compactFixedFieldWidth}>
-                <input
-                  type="date"
-                  value={toDate}
-                  min={fromDate || undefined}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className={compactInputClass}
-                  required
-                />
-              </CompactField>
-              <CompactField label="Category" className={compactFixedFieldWidth}>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className={compactInputClass}
-                >
-                  <option value="">Categories</option>
-                  {categoryOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </CompactField>
-              <CompactField label="Group By" className={compactFixedFieldWidth}>
-                <select
-                  value={groupBy}
-                  onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-                  className={compactInputClass}
-                >
-                  {GROUP_BY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </CompactField>
-            </CompactFormRow>
-          </CompactFormPanel>
+            </CompactField>
+            <CompactField label="To Date" required className={compactFixedFieldWidth}>
+              <input
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => setToDate(e.target.value)}
+                className={compactInputClass}
+                required
+              />
+            </CompactField>
+            <CompactField label="Category" className={compactFixedFieldWidth}>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className={compactInputClass}
+              >
+                <option value="">Categories</option>
+                {categoryOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </CompactField>
+            <CompactField label="Group By" className={compactFixedFieldWidth}>
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+                className={compactInputClass}
+              >
+                {GROUP_BY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </CompactField>
+          </CompactFormRow>
+        </CompactFormPanel>
 
-          {renderResults()}
-        </div>
+        {renderResults()}
       </div>
     </OwnerPageShell>
   );

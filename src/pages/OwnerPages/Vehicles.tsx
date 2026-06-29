@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import {
   InvoiceViewerDialog,
   JobCardViewerDialog,
 } from "../../../invoice-job-card-viewer/InvoiceJobCardViewer.jsx";
-import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
-import { isPortalSidebarHighlighted, portalSidebarPillClass } from "../../components/admin/portalSidebarStyles";
 import { AddNewButton } from "../../components/admin/AdminPage";
 import {
   CompactFormPanel,
@@ -13,25 +11,24 @@ import {
 } from "../../components/admin/ContentPanel";
 import OwnerAddVehicleForm from "../../components/owner/OwnerAddVehicleForm";
 import OwnerEditVehiclePanel from "../../components/owner/OwnerEditVehiclePanel";
-import OwnerPageShell, {
-  OwnerPageSearchInput,
-  OwnerPageSidebar,
-  ownerPageHeaderClass,
-  ownerPageLayoutClass,
-  ownerPageMainClass,
-  ownerPageSectionTitleClass,
-  ownerPageTitleClass,
-} from "../../components/owner/OwnerPageShell";
-import OwnerInvoiceRow from "../../components/owner/OwnerInvoiceRow";
-import OwnerJobCardRow from "../../components/owner/OwnerJobCardRow";
-import VehiclePickerPopup from "../../components/owner/OwnerVehiclePicker";
+import { OwnerHeroCardInlineToolbar } from "../../components/owner/OwnerHeroCardInlineToolbar";
+import {
+  OwnerInvoicesTable,
+  OwnerJobCardsTable,
+} from "../../components/owner/OwnerPanelTables";
+import OwnerPageShell, { OwnerPageSidebar } from "../../components/owner/OwnerPageShell";
+import OwnerVehicleSectionsSidebar, {
+  type VehiclePanelSection,
+} from "../../components/owner/OwnerVehicleSectionsSidebar";
+import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
+import { shopHeroCardCompactSearchClass } from "../../components/shop/shopLayoutStyles";
 import { putJson } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
 import { useCarOwnerDocuments } from "../../hooks/useCarOwnerDocuments";
 import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
-import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
 import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "../../hooks/useCarOwnerInvoices";
+import { useOwnerNavReset, useOwnerSidebarDefault } from "../../hooks/useOwnerNavReset";
 import {
   businessName,
   fetchCarOwnerJobCardById,
@@ -54,7 +51,13 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, ""
 
 type ViewerKind = "invoice" | "jobcard";
 
-type VehiclePanelSection = "vehicle-details" | "job-cards" | "invoices" | "documents" | "update-odometer";
+const VEHICLE_SECTIONS: { id: VehiclePanelSection; label: string }[] = [
+  { id: "vehicle-details", label: "Vehicle Details" },
+  { id: "job-cards", label: "Job Card Details" },
+  { id: "invoices", label: "Invoice Details" },
+  { id: "documents", label: "Documents" },
+  { id: "update-odometer", label: "Update Odometer" },
+];
 
 const VEHICLE_SECTION_LABELS: Record<VehiclePanelSection, string> = {
   "vehicle-details": "Vehicle Details",
@@ -76,46 +79,8 @@ function matchesListSearch(query: string, ...parts: (string | number | null | un
   return parts.some((part) => String(part ?? "").toLowerCase().includes(q));
 }
 
-function SidebarSectionItem({
-  section,
-  label,
-  active,
-  popupOpen,
-  vehicles,
-  onSectionClick,
-  onVehicleSelect,
-  children,
-}: {
-  section: VehiclePanelSection;
-  label: string;
-  active: boolean;
-  popupOpen: boolean;
-  vehicles: CarOwnerVehicle[];
-  onSectionClick: (section: VehiclePanelSection) => void;
-  onVehicleSelect: (vehicleId: string, section: VehiclePanelSection) => void;
-  children?: ReactNode;
-}) {
-  const anchorRef = useRef<HTMLDivElement>(null);
-
-  return (
-    <div ref={anchorRef} className="relative">
-      {children ?? (
-        <PortalSidebarButton
-          label={label}
-          active={active}
-          filled={popupOpen}
-          onClick={() => onSectionClick(section)}
-        />
-      )}
-      {popupOpen && vehicles.length > 1 ? (
-        <VehiclePickerPopup
-          anchorRef={anchorRef}
-          vehicles={vehicles}
-          onSelect={(vehicleId) => onVehicleSelect(vehicleId, section)}
-        />
-      ) : null}
-    </div>
-  );
+function sectionNeedsVehicle(section: VehiclePanelSection): boolean {
+  return section !== "invoices";
 }
 
 const EXCELLENCE_QUOTE_LINES = [
@@ -467,17 +432,13 @@ function OdometerUpdatePanel({
 export default function OwnerVehiclesPage() {
   const { token, session } = useAuth();
   const countryCode = session?.meta?.countryCode;
-  const { faqsHeading, faqsDescription } = useCarOwnerDashboard();
   const { vehicles, loading, error, refresh } = useCarOwnerVehicles();
   const { sections, loading: docsLoading, mutating, busyField, uploadDocumentField } = useCarOwnerDocuments();
 
   const [showForm, setShowForm] = useState(false);
   const [addFormDismissed, setAddFormDismissed] = useState(false);
-  const [faqsOpen, setFaqsOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<VehiclePanelSection | null>(null);
+  const [activeSection, setActiveSection] = useState<VehiclePanelSection | null>(VEHICLE_SECTIONS[0].id);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
-  const [popupSection, setPopupSection] = useState<VehiclePanelSection | null>(null);
-  const asideRef = useRef<HTMLDivElement>(null);
 
   const { items: jobCards, loading: jobCardsLoading, error: jobCardsError } = useCarOwnerJobCards(
     activeSection === "job-cards" || activeSection === "update-odometer" ? selectedVehicleId : null
@@ -545,49 +506,53 @@ export default function OwnerVehiclesPage() {
   const documentSection = sections.find((s) => s.vehicleId === selectedVehicleId) ?? null;
 
   useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!asideRef.current?.contains(event.target as Node)) {
-        setPopupSection(null);
-      }
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, []);
-
-  useEffect(() => {
     if (!loading && !error && vehicles.length === 0 && !addFormDismissed) {
       setShowForm(true);
       setActiveSection("vehicle-details");
     }
   }, [loading, error, vehicles.length, addFormDismissed]);
 
-  const openSection = (section: VehiclePanelSection) => {
+  const selectSection = useCallback((id: string) => {
+    const section = id as VehiclePanelSection;
     if (vehicles.length === 0) {
       toast.info("Add a vehicle first.");
       return;
     }
 
+    if (showForm) {
+      setShowForm(false);
+      setAddFormDismissed(true);
+    }
+
+    setActiveSection(section);
+
     if (section === "invoices") {
-      setActiveSection("invoices");
-      setPopupSection(null);
+      setSelectedVehicleId(null);
       return;
     }
 
     if (vehicles.length === 1) {
-      setActiveSection(section);
       setSelectedVehicleId(vehicles[0].id);
-      setPopupSection(null);
       return;
     }
 
-    setPopupSection((current) => (current === section ? null : section));
-  };
+    setSelectedVehicleId(vehicles[0]?.id ?? null);
+  }, [showForm, vehicles]);
 
-  const handleVehiclePicked = (vehicleId: string, section: VehiclePanelSection) => {
-    setActiveSection(section);
+  const resetSidebar = useCallback(() => {
+    if (vehicles.length === 0) {
+      setActiveSection(VEHICLE_SECTIONS[0].id);
+      return;
+    }
+    selectSection(VEHICLE_SECTIONS[0].id);
+  }, [selectSection, vehicles.length]);
+
+  useOwnerSidebarDefault(!loading, resetSidebar);
+  useOwnerNavReset(resetSidebar);
+
+  const handleVehicleSelect = useCallback((vehicleId: string) => {
     setSelectedVehicleId(vehicleId);
-    setPopupSection(null);
-  };
+  }, []);
 
   const handleDocumentUpload = async (vehicleId: string, field: VehicleDocumentFieldKey, file: File) => {
     const res = await uploadDocumentField(vehicleId, field, file);
@@ -704,15 +669,18 @@ export default function OwnerVehiclesPage() {
         return <p className="text-sm text-gray-600">No invoices match your search.</p>;
       }
       return (
-        <div className="flex flex-col gap-3">
-          {filteredInvoices.map((row) => (
-            <OwnerInvoiceRow
-              key={row.id}
-              row={row}
-              countryCode={countryCode}
-              onClick={() => handleInvoiceRowClick(row)}
-            />
-          ))}
+        <OwnerInvoicesTable
+          rows={filteredInvoices}
+          countryCode={countryCode}
+          onRowClick={handleInvoiceRowClick}
+        />
+      );
+    }
+
+    if (activeSection && sectionNeedsVehicle(activeSection) && !selectedVehicle) {
+      return (
+        <div className="flex min-h-[320px] items-center justify-center p-6 text-center text-sm text-gray-600">
+          Select a vehicle from the sidebar.
         </div>
       );
     }
@@ -773,16 +741,11 @@ export default function OwnerVehiclesPage() {
           return <p className="text-sm text-gray-600">No job cards match your search.</p>;
         }
         return (
-          <div className="flex flex-col gap-3">
-            {filteredJobCards.map((jc) => (
-              <OwnerJobCardRow
-                key={jc._id}
-                jc={jc}
-                countryCode={countryCode}
-                onClick={() => handleJobCardRowClick(jc)}
-              />
-            ))}
-          </div>
+          <OwnerJobCardsTable
+            rows={filteredJobCards}
+            countryCode={countryCode}
+            onRowClick={handleJobCardRowClick}
+          />
         );
 
       case "update-odometer":
@@ -804,152 +767,86 @@ export default function OwnerVehiclesPage() {
   const mainSectionLabel = vehicleSectionLabel(showForm, activeSection);
   const headerAction =
     !showForm && vehicles.length > 0 && (activeSection === null || activeSection === "vehicle-details") ? (
-      <AddNewButton
+      <button
+        type="button"
         onClick={() => {
           setAddFormDismissed(false);
           setShowForm(true);
           setActiveSection("vehicle-details");
         }}
-      />
+        className={shopAddNewButtonClass}
+      >
+        Add New
+      </button>
     ) : undefined;
   const sectionSearchInput =
     !showForm && activeSection === "job-cards" ? (
-      <OwnerPageSearchInput
-        value={jobCardsSearch}
-        onChange={setJobCardsSearch}
-        placeholder="Search job cards…"
+      <input
         id="owner-vehicle-job-cards-search"
+        type="search"
+        value={jobCardsSearch}
+        onChange={(e) => setJobCardsSearch(e.target.value)}
+        placeholder="Search job cards…"
+        className={shopHeroCardCompactSearchClass}
       />
     ) : !showForm && activeSection === "invoices" ? (
-      <OwnerPageSearchInput
-        value={invoicesSearch}
-        onChange={setInvoicesSearch}
-        placeholder="Search invoices…"
+      <input
         id="owner-vehicle-invoices-search"
+        type="search"
+        value={invoicesSearch}
+        onChange={(e) => setInvoicesSearch(e.target.value)}
+        placeholder="Search invoices…"
+        className={shopHeroCardCompactSearchClass}
       />
     ) : null;
 
+  const showInlineToolbar = Boolean(headerAction || sectionSearchInput);
+
   return (
     <OwnerPageShell
-      title={mainSectionLabel ? undefined : "Vehicles"}
+      pageHeading={mainSectionLabel || "Vehicles"}
       metaTitle="Vehicles | AutoDaddy"
       metaDescription="Car owner vehicles"
-      headerAction={mainSectionLabel ? undefined : headerAction}
-      faqsOpen={faqsOpen}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
+      customSidebar={
+        <OwnerPageSidebar>
+          <OwnerVehicleSectionsSidebar
+            sections={VEHICLE_SECTIONS}
+            vehicles={vehicles}
+            loading={loading}
+            activeSection={showForm ? "vehicle-details" : activeSection}
+            selectedVehicleId={selectedVehicleId}
+            onSectionSelect={selectSection}
+            onVehicleSelect={handleVehicleSelect}
+          />
+        </OwnerPageSidebar>
+      }
+      heroCardFlush
+      contentTopOffset
     >
-      {mainSectionLabel ? (
-        <div
-          className={`${ownerPageHeaderClass} grid grid-cols-1 gap-2 lg:grid-cols-[220px_1fr] xl:grid-cols-[260px_1fr] lg:items-center lg:gap-5`}
-        >
-          <h1 className={ownerPageTitleClass}>Vehicles</h1>
-          <div className="relative min-w-0">
-            <h2
-              className={`${ownerPageSectionTitleClass}${headerAction || sectionSearchInput ? " pr-[148px] sm:pr-[196px]" : ""}`}
-            >
-              {mainSectionLabel}
-            </h2>
-            {headerAction || sectionSearchInput ? (
-              <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
-                {sectionSearchInput}
-                {headerAction}
-              </div>
-            ) : null}
-          </div>
+      {showForm ? (
+        <OwnerAddVehicleForm
+          onCancel={() => {
+            setShowForm(false);
+            setAddFormDismissed(true);
+          }}
+          onAdded={() => {
+            setAddFormDismissed(false);
+            setShowForm(false);
+            void refresh();
+            setActiveSection("vehicle-details");
+          }}
+        />
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col gap-1">
+          {showInlineToolbar ? (
+            <OwnerHeroCardInlineToolbar>
+              {sectionSearchInput}
+              {headerAction}
+            </OwnerHeroCardInlineToolbar>
+          ) : null}
+          <div className="min-h-0 flex-1 overflow-y-auto">{renderRightPanel()}</div>
         </div>
-      ) : null}
-      <div className={ownerPageLayoutClass}>
-        <div ref={asideRef}>
-          <OwnerPageSidebar
-            onFaqsClick={() => setFaqsOpen(true)}
-            footer={
-              <SidebarSectionItem
-                section="update-odometer"
-                label="Update Odometer"
-                active={activeSection === "update-odometer"}
-                popupOpen={popupSection === "update-odometer"}
-                vehicles={vehicles}
-                onSectionClick={openSection}
-                onVehicleSelect={handleVehiclePicked}
-              >
-                <button
-                  type="button"
-                  onClick={() => openSection("update-odometer")}
-                  className={`w-full text-center ${portalSidebarPillClass(isPortalSidebarHighlighted(activeSection === "update-odometer", popupSection === "update-odometer"))}`}
-                >
-                  Update Odometer
-                </button>
-              </SidebarSectionItem>
-            }
-          >
-            <div className="relative flex flex-col gap-3 overflow-visible">
-              <SidebarSectionItem
-                section="vehicle-details"
-                label="Vehicle Details"
-                active={activeSection === "vehicle-details" || showForm}
-                popupOpen={popupSection === "vehicle-details"}
-                vehicles={vehicles}
-                onSectionClick={(section) => {
-                  if (showForm) {
-                    setShowForm(false);
-                    setAddFormDismissed(true);
-                  }
-                  openSection(section);
-                }}
-                onVehicleSelect={handleVehiclePicked}
-              />
-              <SidebarSectionItem
-                section="job-cards"
-                label="Job Card Details"
-                active={activeSection === "job-cards"}
-                popupOpen={popupSection === "job-cards"}
-                vehicles={vehicles}
-                onSectionClick={openSection}
-                onVehicleSelect={handleVehiclePicked}
-              />
-              <SidebarSectionItem
-                section="invoices"
-                label="Invoice Details"
-                active={activeSection === "invoices"}
-                popupOpen={false}
-                vehicles={vehicles}
-                onSectionClick={openSection}
-                onVehicleSelect={handleVehiclePicked}
-              />
-              <SidebarSectionItem
-                section="documents"
-                label="Documents"
-                active={activeSection === "documents"}
-                popupOpen={popupSection === "documents"}
-                vehicles={vehicles}
-                onSectionClick={openSection}
-                onVehicleSelect={handleVehiclePicked}
-              />
-            </div>
-          </OwnerPageSidebar>
-        </div>
-
-        <div className={`${ownerPageMainClass} lg:min-h-[calc(100vh-220px)]`}>
-          {showForm ? (
-            <OwnerAddVehicleForm
-              onCancel={() => {
-                setShowForm(false);
-                setAddFormDismissed(true);
-              }}
-              onAdded={() => {
-                setAddFormDismissed(false);
-                setShowForm(false);
-                void refresh();
-                setActiveSection("vehicle-details");
-              }}
-            />
-          ) : (
-            renderRightPanel()
-          )}
-        </div>
-      </div>
+      )}
 
       <InvoiceViewerDialog
         open={viewerKind === "invoice"}

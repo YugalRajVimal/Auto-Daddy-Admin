@@ -1,15 +1,6 @@
-import { useMemo, useState } from "react";
-import PortalSidebarButton from "../../components/admin/PortalSidebarButton";
-import OwnerPageShell, {
-  OwnerPageRefreshButton,
-  OwnerPageSidebar,
-  ownerPageHeaderClass,
-  ownerPageLayoutClass,
-  ownerPageMainClass,
-  ownerPageSectionTitleClass,
-  ownerPageTitleClass,
-} from "../../components/owner/OwnerPageShell";
-import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
+import { useCallback, useMemo, useState } from "react";
+import OwnerPageShell, { OwnerPageRefreshButton } from "../../components/owner/OwnerPageShell";
+import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import { useCarOwnerNotifications } from "../../hooks/useCarOwnerNotifications";
 import {
   DUMMY_OWNER_NOTIFICATIONS,
@@ -19,6 +10,11 @@ import {
 import { notificationDisplay, type CarOwnerNotification } from "../../types/carOwnerNotifications";
 
 type MessagesTab = "messages" | "notifications";
+
+const MESSAGE_SECTIONS = [
+  { id: "messages", label: "Messages" },
+  { id: "notifications", label: "Notifications" },
+] as const;
 
 function formatNotificationTime(iso: string): string {
   const d = new Date(iso);
@@ -94,7 +90,7 @@ function NotificationRow({ item }: { item: CarOwnerNotification }) {
 
 function mergeNotifications(
   dummy: CarOwnerNotification[],
-  api: CarOwnerNotification[]
+  api: CarOwnerNotification[],
 ): CarOwnerNotification[] {
   const seen = new Set<string>();
   const merged: CarOwnerNotification[] = [];
@@ -109,85 +105,76 @@ function mergeNotifications(
 }
 
 export default function OwnerMessagesPage() {
-  const { faqsHeading, faqsDescription } = useCarOwnerDashboard();
   const { items, loading, loadingMore, error, hasMore, loadMore, refresh } = useCarOwnerNotifications();
 
-  const [tab, setTab] = useState<MessagesTab>("messages");
-  const [faqsOpen, setFaqsOpen] = useState(false);
+  const [tab, setTab] = useState<MessagesTab>(MESSAGE_SECTIONS[0].id);
+
+  const resetSidebar = useCallback(() => {
+    setTab(MESSAGE_SECTIONS[0].id);
+  }, []);
+
+  useOwnerNavReset(resetSidebar);
 
   const notifications = useMemo(() => mergeNotifications(DUMMY_OWNER_NOTIFICATIONS, items), [items]);
   const sectionLabel = tab === "messages" ? "Messages Sent" : "Notifications Received";
 
   return (
     <OwnerPageShell
+      pageHeading={sectionLabel}
       metaTitle="Messages | AutoDaddy"
       metaDescription="Car owner messages and notifications"
-      faqsOpen={faqsOpen}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
+      headerAction={<OwnerPageRefreshButton onClick={() => void refresh()} />}
+      sidebarItems={MESSAGE_SECTIONS.map((item) => ({
+        id: item.id,
+        label: item.label,
+        variant: "primary" as const,
+      }))}
+      activeSidebarId={tab}
+      onSidebarSelect={(id) => setTab(id as MessagesTab)}
+      heroCardFlush
+      contentTopOffset
     >
-      <div
-        className={`${ownerPageHeaderClass} grid grid-cols-1 gap-2 lg:grid-cols-[220px_1fr] xl:grid-cols-[260px_1fr] lg:items-center lg:gap-5`}
-      >
-        <h1 className={ownerPageTitleClass}>Messages</h1>
-        <div className="relative min-w-0">
-          <h2 className={`${ownerPageSectionTitleClass} pr-[148px] sm:pr-[196px]`}>{sectionLabel}</h2>
-          <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <OwnerPageRefreshButton onClick={() => void refresh()} />
+      <div className="flex flex-col gap-3">
+        {tab === "messages" ? (
+          DUMMY_OWNER_SERVICE_REQUESTS.map((item) => (
+            <ServiceRequestRow key={item.id} item={item} />
+          ))
+        ) : loading && notifications.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center py-16">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
           </div>
-        </div>
-      </div>
-      <div className={ownerPageLayoutClass}>
-        <OwnerPageSidebar onFaqsClick={() => setFaqsOpen(true)}>
-          <PortalSidebarButton label="Messages" active={tab === "messages"} onClick={() => setTab("messages")} />
-          <PortalSidebarButton label="Notifications" active={tab === "notifications"} onClick={() => setTab("notifications")} />
-        </OwnerPageSidebar>
-
-        <div className={`flex min-h-[420px] flex-col ${ownerPageMainClass}`}>
-          {tab === "messages" ? (
-            <div className="flex flex-col gap-3">
-              {DUMMY_OWNER_SERVICE_REQUESTS.map((item) => (
-                <ServiceRequestRow key={item.id} item={item} />
-              ))}
-            </div>
-          ) : loading && notifications.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
-            </div>
-          ) : error && notifications.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-md border border-gray-200 bg-white p-6 text-center">
-              <p className="text-sm font-semibold text-gray-800">{error}</p>
+        ) : error && notifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <p className="text-sm font-semibold text-gray-800">{error}</p>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
+            >
+              Try again
+            </button>
+          </div>
+        ) : notifications.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
+            No notifications yet.
+          </div>
+        ) : (
+          <>
+            {notifications.map((item) => (
+              <NotificationRow key={item.id} item={item} />
+            ))}
+            {hasMore ? (
               <button
                 type="button"
-                onClick={() => void refresh()}
-                className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
+                onClick={() => loadMore()}
+                disabled={loadingMore}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-ad-purple hover:bg-gray-50 disabled:opacity-60"
               >
-                Try again
+                {loadingMore ? "Loading…" : "Load more"}
               </button>
-            </div>
-          ) : notifications.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">
-              No notifications yet.
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {notifications.map((item) => (
-                <NotificationRow key={item.id} item={item} />
-              ))}
-              {hasMore ? (
-                <button
-                  type="button"
-                  onClick={() => loadMore()}
-                  disabled={loadingMore}
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-ad-purple hover:bg-gray-50 disabled:opacity-60"
-                >
-                  {loadingMore ? "Loading…" : "Load more"}
-                </button>
-              ) : null}
-            </div>
-          )}
-        </div>
+            ) : null}
+          </>
+        )}
       </div>
     </OwnerPageShell>
   );

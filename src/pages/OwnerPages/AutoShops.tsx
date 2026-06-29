@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
+import { useCallback, useMemo, useState, type ComponentType } from "react";
 import {
   FiChevronDown,
   FiClock,
@@ -10,53 +10,22 @@ import {
   FiStar,
   FiTool,
 } from "react-icons/fi";
-import OwnerPageShell, {
-  OwnerPageSidebar,
-  ownerPageHeaderClass,
-  ownerPageLayoutClass,
-  ownerPageMainClass,
-  ownerPageSectionTitleClass,
-  ownerPageTitleClass,
-} from "../../components/owner/OwnerPageShell";
+import OwnerPageShell, { OwnerPageSidebar } from "../../components/owner/OwnerPageShell";
+import {
+  OwnerCollapsibleSidebarItem,
+  OwnerCollapsibleSidebarList,
+} from "../../components/owner/OwnerCollapsibleSidebar";
 import OwnerVehiclePlateSidebar from "../../components/owner/OwnerVehiclePlateSidebar";
 import { postJson } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
 import { useCarOwnerAutoShops } from "../../hooks/useCarOwnerAutoShops";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
-import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
+import { useOwnerNavReset, useOwnerSidebarDefault } from "../../hooks/useOwnerNavReset";
 import { isCarOwnerShopOpenToday } from "../../lib/carOwnerAutoShops";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import type { CarOwnerAutoShopListItem } from "../../types/carOwnerAutoShops";
 
-const SELECT_VEHICLE_PROMPT = "Choose a vehicle from the sidebar to find matching auto shops.";
-
-function TypingText({ text, className = "" }: { text: string; className?: string }) {
-  const [charIndex, setCharIndex] = useState(0);
-
-  useEffect(() => {
-    setCharIndex(0);
-  }, [text]);
-
-  useEffect(() => {
-    if (charIndex >= text.length) return;
-
-    const timer = window.setTimeout(() => setCharIndex((index) => index + 1), 42);
-    return () => window.clearTimeout(timer);
-  }, [charIndex, text]);
-
-  const isComplete = charIndex >= text.length;
-
-  return (
-    <p className={className}>
-      {text.slice(0, charIndex)}
-      {!isComplete ? (
-        <span className="ml-0.5 inline-block animate-pulse text-ad-purple" aria-hidden>
-          |
-        </span>
-      ) : null}
-    </p>
-  );
-}
+const SELECT_VEHICLE_PROMPT = "Select a vehicle from the sidebar to find matching auto shops.";
 
 function mapsUrl(shop: CarOwnerAutoShopListItem): string | null {
   if (shop.mapLat != null && shop.mapLng != null) {
@@ -383,11 +352,10 @@ function ShopExpandedPanel({
 
 export default function OwnerAutoShopsPage() {
   const { token } = useAuth();
-  const { faqsHeading, faqsDescription } = useCarOwnerDashboard();
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [vehiclesExpanded, setVehiclesExpanded] = useState(true);
   const [expandedShopId, setExpandedShopId] = useState<string | null>(null);
-  const [faqsOpen, setFaqsOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [connectingServiceKey, setConnectingServiceKey] = useState<string | null>(null);
   const [sentServiceKeys, setSentServiceKeys] = useState<Record<string, boolean>>({});
@@ -417,11 +385,23 @@ export default function OwnerAutoShopsPage() {
   const showShopList = Boolean(selectedVehicleId);
 
   const handleVehicleSelect = useCallback((vehicleId: string) => {
-    setSelectedVehicleId((prev) => (prev === vehicleId ? null : vehicleId));
+    setSelectedVehicleId(vehicleId);
     setExpandedShopId(null);
     setStatusMessage(null);
     setSentServiceKeys({});
   }, []);
+
+  const resetSidebar = useCallback(() => {
+    setExpandedShopId(null);
+    setStatusMessage(null);
+    setSentServiceKeys({});
+    setConnectingServiceKey(null);
+    setVehiclesExpanded(true);
+    setSelectedVehicleId(vehicles[0]?.id ?? null);
+  }, [vehicles]);
+
+  useOwnerSidebarDefault(!vehiclesLoading, resetSidebar);
+  useOwnerNavReset(resetSidebar);
 
   const handleExpandShop = useCallback((shopId: string) => {
     setExpandedShopId(shopId);
@@ -484,98 +464,105 @@ export default function OwnerAutoShopsPage() {
     [expandedShopId, selectedVehicleId, shops, token]
   );
 
+  const pageHeading = selectedVehicleId
+    ? `Auto Repair Shop - ${vehicleMakeLabel}`
+    : "Auto Repair Shops";
+
   return (
     <OwnerPageShell
-      title={selectedVehicleId ? undefined : "Auto Repair Shops"}
+      pageHeading={pageHeading}
       metaTitle="Auto Shops | AutoDaddy"
       metaDescription="Find auto shops near you"
-      faqsOpen={faqsOpen}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
-    >
-      {selectedVehicleId ? (
-        <div
-          className={`${ownerPageHeaderClass} grid grid-cols-1 gap-2 lg:grid-cols-[220px_1fr] xl:grid-cols-[260px_1fr] lg:items-center lg:gap-5`}
-        >
-          <h1 className={ownerPageTitleClass}>Auto Repair Shops</h1>
-          <h2 className={ownerPageSectionTitleClass}>Auto Repair Shop - {vehicleMakeLabel}</h2>
-        </div>
-      ) : null}
-      <div className={ownerPageLayoutClass}>
-        <OwnerPageSidebar onFaqsClick={() => setFaqsOpen(true)}>
-          <OwnerVehiclePlateSidebar
-            vehicles={vehicles}
-            loading={vehiclesLoading}
-            selectedVehicleId={selectedVehicleId}
-            onSelect={handleVehicleSelect}
-          />
-        </OwnerPageSidebar>
-
-        <div className={`flex min-h-[420px] flex-col ${ownerPageMainClass}`}>
-          {vehiclesLoading ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
-            </div>
-          ) : vehiclesError ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white p-6 text-center text-sm text-red-600">
-              {vehiclesError}
-            </div>
-          ) : vehicles.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-md border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">
-              <p>Add a vehicle before finding auto shops.</p>
-              <Link
-                to="/owner/vehicles"
-                className="rounded-lg bg-ad-purple px-4 py-2 text-sm font-bold text-white hover:bg-ad-purple-dark"
-              >
-                Add vehicle
-              </Link>
-            </div>
-          ) : !selectedVehicleId ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white p-6 text-center">
-              <TypingText
-                text={SELECT_VEHICLE_PROMPT}
-                className="max-w-md text-sm text-gray-600 md:text-base"
+      customSidebar={
+        <OwnerPageSidebar>
+          <OwnerCollapsibleSidebarList>
+            <OwnerCollapsibleSidebarItem
+              label="Your Vehicles"
+              expanded={vehiclesExpanded}
+              active={Boolean(selectedVehicleId)}
+              onToggle={() => {
+                setVehiclesExpanded((open) => {
+                  const next = !open;
+                  if (next && vehicles[0]) {
+                    handleVehicleSelect(vehicles[0].id);
+                  }
+                  return next;
+                });
+              }}
+            >
+              <OwnerVehiclePlateSidebar
+                vehicles={vehicles}
+                loading={vehiclesLoading}
+                selectedVehicleId={selectedVehicleId}
+                onSelect={handleVehicleSelect}
               />
-            </div>
-          ) : !showShopList ? null : loading ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
-            </div>
-          ) : error ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-md border border-gray-200 bg-white p-6 text-center">
-              <p className="text-sm font-semibold text-gray-800">{error}</p>
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
-              >
-                Try again
-              </button>
-            </div>
-          ) : shops.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">
-              No auto repair shops found in your area yet.
-            </div>
-          ) : (
-            <div className="flex flex-1 flex-col overflow-y-auto px-1 pb-2">
-              {expandedShop ? (
-                <ShopExpandedPanel
-                  shop={expandedShop}
-                  connectingServiceKey={connectingServiceKey}
-                  sentServiceKeys={sentServiceKeys}
-                  statusMessage={statusMessage}
-                  onCollapse={handleCollapseShop}
-                  onConnect={(serviceId, serviceName) => void handleConnect(serviceId, serviceName)}
-                />
-              ) : (
-                shops.map((shop) => (
-                  <ShopListRow key={shop.id} shop={shop} onExpand={() => handleExpandShop(shop.id)} />
-                ))
-              )}
-            </div>
-          )}
-        </div>
+            </OwnerCollapsibleSidebarItem>
+          </OwnerCollapsibleSidebarList>
+        </OwnerPageSidebar>
+      }
+      heroCardFlush
+      contentTopOffset
+    >
+      <div className="flex min-h-[320px] flex-col">
+        {vehiclesLoading ? (
+          <div className="flex flex-1 items-center justify-center py-16">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
+          </div>
+        ) : vehiclesError ? (
+          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-red-600">
+            {vehiclesError}
+          </div>
+        ) : vehicles.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-gray-600">
+            <p>Add a vehicle before finding auto shops.</p>
+            <Link
+              to="/owner/vehicles"
+              className="rounded-lg bg-ad-purple px-4 py-2 text-sm font-bold text-white hover:bg-ad-purple-dark"
+            >
+              Add vehicle
+            </Link>
+          </div>
+        ) : !selectedVehicleId ? (
+          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
+            {SELECT_VEHICLE_PROMPT}
+          </div>
+        ) : !showShopList ? null : loading ? (
+          <div className="flex flex-1 items-center justify-center py-16">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <p className="text-sm font-semibold text-gray-800">{error}</p>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
+            >
+              Try again
+            </button>
+          </div>
+        ) : shops.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
+            No auto repair shops found in your area yet.
+          </div>
+        ) : (
+          <div className="flex flex-1 flex-col overflow-y-auto px-1 pb-2">
+            {expandedShop ? (
+              <ShopExpandedPanel
+                shop={expandedShop}
+                connectingServiceKey={connectingServiceKey}
+                sentServiceKeys={sentServiceKeys}
+                statusMessage={statusMessage}
+                onCollapse={handleCollapseShop}
+                onConnect={(serviceId, serviceName) => void handleConnect(serviceId, serviceName)}
+              />
+            ) : (
+              shops.map((shop) => (
+                <ShopListRow key={shop.id} shop={shop} onExpand={() => handleExpandShop(shop.id)} />
+              ))
+            )}
+          </div>
+        )}
       </div>
     </OwnerPageShell>
   );
