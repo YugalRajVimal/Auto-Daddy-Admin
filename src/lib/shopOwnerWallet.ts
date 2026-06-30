@@ -73,7 +73,11 @@ export function getWalletLedgerTab(raw: unknown): WalletLedgerTab {
   if (n === "cash") {
     return "cash";
   }
-  if (n === "online") {
+  if (n === "online" || n === "invoice") {
+    return "invoice";
+  }
+  const paymentStatus = typeof o.paymentStatus === "string" ? o.paymentStatus.trim().toLowerCase() : "";
+  if (paymentStatus.includes("invoice")) {
     return "invoice";
   }
   return "cash";

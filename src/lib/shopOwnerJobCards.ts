@@ -447,3 +447,15 @@ export function parseJobCardsFromPagePayload(payload: unknown): JobCardListRow[]
     .map(({ raw, bucket }) => toRow(raw, bucket))
     .filter(Boolean) as JobCardListRow[];
 }
+
+/** Merge job card lists by id; later entries override earlier ones. */
+export function mergeJobCardListRows(...lists: JobCardListRow[][]): JobCardListRow[] {
+  const byId = new Map<string, JobCardListRow>();
+  for (const list of lists) {
+    for (const row of list) {
+      if (!row.id) continue;
+      byId.set(row.id, row);
+    }
+  }
+  return [...byId.values()];
+}

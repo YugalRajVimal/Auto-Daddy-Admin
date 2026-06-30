@@ -33,6 +33,7 @@ import {
   isEligibleForInvoiceConversion,
   jobCardStatusClass,
   jobCardStatusLabel,
+  mergeJobCardListRows,
   pickJobCardInvoiceNumber,
   type JobCardListRow,
 } from "../../lib/shopOwnerJobCards";
@@ -369,11 +370,18 @@ export default function ShopJobCardsPage() {
 
   const jobCards = USE_DUMMY_SHOP_WALLET ? mockLedger.jobCards : apiJobCards;
   const paidCash = USE_DUMMY_SHOP_WALLET ? [] : apiPaidCash;
-  const convertedInvoiceCards = USE_DUMMY_SHOP_WALLET
-    ? mockLedger.unpaid
-    : apiUnpaidOnline.length > 0
-      ? apiUnpaidOnline
-      : filterWalletInvoiceRows(apiUnpaidAll, { paid: false });
+
+  const convertedInvoiceCards = useMemo(() => {
+    if (USE_DUMMY_SHOP_WALLET) {
+      return mockLedger.unpaid;
+    }
+    const fromWallet =
+      apiUnpaidOnline.length > 0
+        ? apiUnpaidOnline
+        : filterWalletInvoiceRows(apiUnpaidAll, { paid: false });
+    const fromJobCards = filterWalletInvoiceRows(jobCards, { paid: false });
+    return mergeJobCardListRows(fromWallet, fromJobCards);
+  }, [mockLedger.unpaid, apiUnpaidOnline, apiUnpaidAll, jobCards]);
 
   const listCards = useMemo(() => {
     const filterSearch = (rows: JobCardListRow[]) =>
@@ -400,13 +408,17 @@ export default function ShopJobCardsPage() {
       ? false
       : section === "my-list" || section === "approvals"
         ? jobCardsLoading
-        : walletLoading;
+        : section === "convert-invoice"
+          ? walletLoading || jobCardsLoading
+          : walletLoading;
   const error =
     USE_DUMMY_SHOP_WALLET
       ? null
       : section === "my-list" || section === "approvals"
         ? jobCardsError
-        : walletError;
+        : section === "convert-invoice"
+          ? walletError ?? jobCardsError
+          : walletError;
 
   const totalPages = Math.max(1, Math.ceil(listCards.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
