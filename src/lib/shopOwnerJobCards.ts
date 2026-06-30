@@ -2,6 +2,8 @@
  * Normalizes rows from GET /api/auto-shop-owner/job-cards (shape varies by backend).
  */
 
+import { getWalletLedgerTab } from "./shopOwnerWallet";
+
 export type JobCardListBucket = "pending" | "approved" | "rejected" | "autoRejected";
 
 export type JobCardListRow = {
@@ -11,6 +13,7 @@ export type JobCardListRow = {
   listBucket?: JobCardListBucket;
   customerName?: string;
   jobNo?: string;
+  invoiceNumber?: string;
   vehiclePlate?: string;
   vehicleMakeModel?: string;
   servicesSummary?: string;
@@ -239,8 +242,8 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     s(o.jobNumber) ??
     s(o.jobCode) ??
     s(o.displayJobNo) ??
-    s(o.jobCardNo) ??
-    s(o.invoiceNumber);
+    s(o.jobCardNo);
+  const invoiceNumber = s(o.invoiceNumber) ?? s(o.invoiceNo) ?? s(o.invoice_number);
   const vehiclePlate =
     s(o.licensePlateNo) ??
     s(o.registration) ??
@@ -284,6 +287,7 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     listBucket,
     customerName,
     jobNo,
+    invoiceNumber,
     vehiclePlate,
     vehicleMakeModel,
     servicesSummary,
@@ -300,17 +304,70 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
   };
 }
 
-export function isJobCardPending(row: JobCardListRow): boolean {
+function normalizedJobCardStatus(row: JobCardListRow): string {
   const status = (row.status ?? "").trim().toLowerCase();
-  if (status === "pending") return true;
-  if (row.listBucket === "pending") return true;
+  if (status) return status;
+  if (row.listBucket) return row.listBucket;
   const raw = row.raw;
   if (raw && typeof raw === "object") {
     const o = raw as Record<string, unknown>;
-    const s = String(o.status ?? o.jobStatus ?? "").trim().toLowerCase();
-    return s === "pending";
+    return String(o.status ?? o.jobStatus ?? "").trim().toLowerCase();
   }
+  return "";
+}
+
+export function isJobCardPending(row: JobCardListRow): boolean {
+  return normalizedJobCardStatus(row) === "pending";
+}
+
+export function isJobCardApproved(row: JobCardListRow): boolean {
+  return normalizedJobCardStatus(row) === "approved";
+}
+
+export function isJobCardPaid(row: JobCardListRow): boolean {
+  const paymentStatus = (row.paymentStatus ?? "").trim().toLowerCase();
+  if (paymentStatus === "paid") return true;
+  if (row.unpaid === false) return true;
   return false;
+}
+
+/** Approved, unpaid job cards that are not already on invoice payment. */
+export function isEligibleForInvoiceConversion(row: JobCardListRow): boolean {
+  if (!isJobCardApproved(row)) return false;
+  if (isJobCardPaid(row)) return false;
+  return getWalletLedgerTab(row.raw) !== "invoice";
+}
+
+export function jobCardRowFromRecord(
+  job: Record<string, unknown>,
+  listRow?: JobCardListRow | null,
+): JobCardListRow {
+  const id = listRow?.id ?? String(job._id ?? job.id ?? job.jobCardId ?? "");
+  return {
+    id,
+    raw: job,
+    listBucket: listRow?.listBucket,
+    status:
+      listRow?.status ??
+      (typeof job.status === "string"
+        ? job.status
+        : typeof job.jobStatus === "string"
+          ? job.jobStatus
+          : undefined),
+    paymentStatus:
+      listRow?.paymentStatus ??
+      (typeof job.paymentStatus === "string" ? job.paymentStatus : undefined),
+    unpaid:
+      listRow?.unpaid ??
+      (typeof job.unpaid === "boolean" ? job.unpaid : undefined),
+  };
+}
+
+export function isJobRecordEligibleForInvoiceConversion(
+  job: Record<string, unknown>,
+  listRow?: JobCardListRow | null,
+): boolean {
+  return isEligibleForInvoiceConversion(jobCardRowFromRecord(job, listRow));
 }
 
 const JOB_CARD_BUCKET_LABELS: Record<JobCardListBucket, string> = {
@@ -321,10 +378,68 @@ const JOB_CARD_BUCKET_LABELS: Record<JobCardListBucket, string> = {
 };
 
 export function jobCardStatusLabel(row: JobCardListRow): string {
+  if (getWalletLedgerTab(row.raw) === "invoice") {
+    return "Converted to Invoice";
+  }
+  if (isJobCardPaid(row) && getWalletLedgerTab(row.raw) === "cash") {
+    return "Cash Paid";
+  }
+
   const status = (row.status ?? "").trim();
   if (status) return status;
   if (row.listBucket) return JOB_CARD_BUCKET_LABELS[row.listBucket];
   return isJobCardPending(row) ? "Pending" : "—";
+}
+
+export function jobCardStatusLabelFromJob(
+  job: Record<string, unknown>,
+  listRow?: JobCardListRow | null,
+): string {
+  return jobCardStatusLabel(jobCardRowFromRecord(job, listRow));
+}
+
+export function pickJobCardInvoiceNumber(row: JobCardListRow): string {
+  const direct = row.invoiceNumber?.trim();
+  if (direct) return direct;
+  const raw = row.raw;
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    return (
+      s(o.invoiceNumber) ??
+      s(o.invoiceNo) ??
+      s(o.invoice_number) ??
+      ""
+    );
+  }
+  return "";
+}
+
+/** Tailwind text color for job card workflow status in tables. */
+export function jobCardStatusClass(row: JobCardListRow): string {
+  const label = jobCardStatusLabel(row).toLowerCase();
+  if (label.includes("converted to invoice") || label.includes("invoice")) {
+    return "text-purple-700";
+  }
+  if (label.includes("cash paid") || label.includes("paid by cash")) {
+    return "text-green-700";
+  }
+
+  const norm = normalizedJobCardStatus(row);
+  if (norm === "pending") return "text-blue-700";
+  if (norm === "approved" || norm === "accepted") return "text-green-700";
+  if (norm === "rejected" || norm === "autorejected") return "text-red-600";
+
+  if (label.includes("pending")) return "text-blue-700";
+  if (label.includes("approved") || label.includes("accepted")) return "text-green-700";
+  if (label.includes("reject")) return "text-red-600";
+  return "text-gray-700";
+}
+
+export function jobCardStatusClassFromJob(
+  job: Record<string, unknown>,
+  listRow?: JobCardListRow | null,
+): string {
+  return jobCardStatusClass(jobCardRowFromRecord(job, listRow));
 }
 
 export function parseJobCardsFromPagePayload(payload: unknown): JobCardListRow[] {

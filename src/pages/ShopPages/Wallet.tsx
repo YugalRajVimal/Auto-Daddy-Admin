@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { FiChevronDown } from "react-icons/fi";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { toast } from "react-toastify";
 import {
   ADMIN_PANEL_THEAD_ROW_CLASS,
   adminPanelRowClass,
@@ -10,24 +10,30 @@ import {
 import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
-import { shopSidebarButtonClass, shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
+import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
+import { useShopOwnerData } from "../../context/ShopOwnerDataProvider";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopWallet } from "../../hooks/useShopWallet";
 import { formatCurrencyAmount } from "../../lib/currency";
 import {
-  DUMMY_PAID_INVOICES,
   DUMMY_SHOP_BANKS,
   DUMMY_SHOP_EXPENSES,
-  DUMMY_UNPAID_INVOICES,
   USE_DUMMY_SHOP_WALLET,
   type ShopWalletBankRow,
   type ShopWalletExpenseRow,
 } from "../../lib/dummyShopWallet";
+import { useMockShopInvoiceLedger } from "../../lib/mockShopInvoiceLedger";
 import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
-import { getWalletLedgerTab, shortJobBadgeCode } from "../../lib/shopOwnerWallet";
-import type { JobCardListRow } from "../../lib/shopOwnerJobCards";
+import { collectJobCardPayment, resendJobCardNotification } from "../../lib/shopOwnerMutations";
+import { pickJobCardInvoiceNumber, type JobCardListRow } from "../../lib/shopOwnerJobCards";
+import {
+  filterWalletInvoiceRows,
+  getWalletLedgerTab,
+  pickInvoiceUrl,
+  shortJobBadgeCode,
+} from "../../lib/shopOwnerWallet";
 import useAuth from "../../auth/useAuth";
 
 const PAGE_SIZE = 10;
@@ -69,6 +75,9 @@ const SHOP_TABLE_BODY_TD_CLASS = `${SHOP_TABLE.td} h-9 py-0 align-middle whitesp
 const SHOP_TABLE_BODY_TD_CHECKBOX_CLASS = `${SHOP_TABLE.tdCheckbox} h-9 py-0 align-middle`;
 const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
 
+const WALLET_BULK_BUTTON_CLASS =
+  "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
+
 function formatWalletPrice(
   total: number | string | undefined,
   countryCode: string | null | undefined,
@@ -89,7 +98,13 @@ function displayBillId(row: JobCardListRow, isPaid: boolean): string {
 function matchesSearch(row: JobCardListRow, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const haystack = [row.customerName, row.phone, row.vehiclePlate, row.jobNo]
+  const haystack = [
+    row.customerName,
+    row.phone,
+    row.vehiclePlate,
+    row.jobNo,
+    pickJobCardInvoiceNumber(row),
+  ]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -100,6 +115,40 @@ function matchesExpenseSearch(row: ShopWalletExpenseRow, query: string): boolean
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return [row.name, row.category, row.date].join(" ").toLowerCase().includes(q);
+}
+
+function walletRowsMatchingSelection(
+  selectedIds: Set<string>,
+  rows: JobCardListRow[],
+): JobCardListRow[] {
+  return rows.filter((row) => selectedIds.has(row.id));
+}
+
+function pickPaymentAmount(row: JobCardListRow): number {
+  const isInvoice = getWalletLedgerTab(row.raw) === "invoice";
+  const raw = row.raw;
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    const payable = o.payableAmounts;
+    if (payable && typeof payable === "object") {
+      const p = payable as Record<string, unknown>;
+      if (isInvoice) {
+        const online = Number(p.online ?? p.invoiceTotal);
+        if (Number.isFinite(online) && online > 0) return online;
+      } else {
+        const cash = Number(p.cash);
+        if (Number.isFinite(cash) && cash > 0) return cash;
+      }
+    }
+    const total = Number(o.totalPayableAmount ?? o.total ?? row.total);
+    if (Number.isFinite(total) && total > 0) return total;
+  }
+  const fromRow = Number(row.total);
+  return Number.isFinite(fromRow) && fromRow > 0 ? fromRow : 0;
+}
+
+function paymentMethodForRow(row: JobCardListRow): "Cash" | "Online" {
+  return getWalletLedgerTab(row.raw) === "invoice" ? "Online" : "Cash";
 }
 
 function WalletListFooter({
@@ -145,15 +194,17 @@ function WalletListFooter({
 function WalletSearchBar({
   value,
   onChange,
+  leading,
   trailing,
 }: {
   value: string;
   onChange: (value: string) => void;
+  leading?: React.ReactNode;
   trailing?: React.ReactNode;
 }) {
   return (
     <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 py-1.5 sm:gap-3">
-      <div className="flex flex-wrap items-center gap-2" />
+      <div className="flex flex-wrap items-center gap-2">{leading}</div>
       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
         <input
           id={WALLET_SEARCH_INPUT_ID}
@@ -443,18 +494,39 @@ function WalletBankTable({
 }
 
 export default function ShopWalletPage() {
-  const { session } = useAuth();
+  const { session, token } = useAuth();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
   const [view, setView] = useState<WalletView>("paid");
-  const [invoiceMenuOpen, setInvoiceMenuOpen] = useState(true);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [faqsOpen, setFaqsOpen] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set());
-  const { paid: apiPaid, unpaid: apiUnpaid, loading, error, refresh } = useShopWallet();
+  const { refreshSection } = useShopOwnerData();
+  const {
+    paid: apiPaidAll,
+    unpaid: apiUnpaidAll,
+    paidOnline: apiPaidOnline,
+    unpaidOnline: apiUnpaidOnline,
+    loading,
+    error,
+  } = useShopWallet();
+  const mockLedger = useMockShopInvoiceLedger();
 
-  const paid = USE_DUMMY_SHOP_WALLET ? DUMMY_PAID_INVOICES : apiPaid;
-  const unpaid = USE_DUMMY_SHOP_WALLET ? DUMMY_UNPAID_INVOICES : apiUnpaid;
+  const syncLedgerData = useCallback(async () => {
+    await Promise.all([refreshSection("wallet"), refreshSection("jobCards")]);
+  }, [refreshSection]);
+
+  const paid = USE_DUMMY_SHOP_WALLET
+    ? mockLedger.paid
+    : apiPaidOnline.length > 0
+      ? apiPaidOnline
+      : filterWalletInvoiceRows(apiPaidAll, { paid: true });
+  const unpaid = USE_DUMMY_SHOP_WALLET
+    ? mockLedger.unpaid
+    : apiUnpaidOnline.length > 0
+      ? apiUnpaidOnline
+      : filterWalletInvoiceRows(apiUnpaidAll, { paid: false });
   const expenses = USE_DUMMY_SHOP_WALLET ? DUMMY_SHOP_EXPENSES : [];
   const banks = USE_DUMMY_SHOP_WALLET ? DUMMY_SHOP_BANKS : [];
   const showLoading = !USE_DUMMY_SHOP_WALLET && loading;
@@ -537,16 +609,119 @@ export default function ShopWalletPage() {
     });
   };
 
-  const selectInvoiceView = (next: "paid" | "unpaid") => {
-    setView(next);
-    setInvoiceMenuOpen(true);
-  };
-
   const selectionProps = {
     selectedIds: selectedRowIds,
     onToggleRow: toggleRowSelection,
     onTogglePage: togglePageSelection,
   };
+
+  const selectedUnpaidRows = useMemo(
+    () => (view === "unpaid" ? walletRowsMatchingSelection(selectedRowIds, filteredList) : []),
+    [view, selectedRowIds, filteredList],
+  );
+
+  const selectedPaidRows = useMemo(
+    () => (view === "paid" ? walletRowsMatchingSelection(selectedRowIds, filteredList) : []),
+    [view, selectedRowIds, filteredList],
+  );
+
+  const hasUnpaidSelection = selectedUnpaidRows.length > 0;
+  const invoiceUrlRows = useMemo(
+    () => selectedUnpaidRows.filter((row) => pickInvoiceUrl(row.raw)),
+    [selectedUnpaidRows],
+  );
+  const paidInvoiceUrlRows = useMemo(
+    () => selectedPaidRows.filter((row) => pickInvoiceUrl(row.raw)),
+    [selectedPaidRows],
+  );
+
+  const runCollectPayment = async (rows: JobCardListRow[], label: string) => {
+    if (rows.length === 0 || bulkBusy) return;
+    if (!USE_DUMMY_SHOP_WALLET && !token) return;
+
+    const count = rows.length;
+    if (!window.confirm(`Mark ${count} invoice${count === 1 ? "" : "s"} as paid?`)) return;
+
+    setBulkBusy(true);
+    let failed = 0;
+    try {
+      if (USE_DUMMY_SHOP_WALLET) {
+        mockLedger.markAsPaid(rows.map((row) => row.id));
+        toast.success(`Marked ${count} invoice${count === 1 ? "" : "s"} as paid.`);
+      } else {
+        for (const row of rows) {
+          const res = await collectJobCardPayment(token!, {
+            jobCardId: row.id,
+            paymentMethod: paymentMethodForRow(row),
+            remark: "",
+            amount: pickPaymentAmount(row),
+          });
+          if (!res.ok) failed += 1;
+        }
+        await syncLedgerData();
+        if (failed > 0) {
+          toast.error(`${label} failed for ${failed} invoice${failed === 1 ? "" : "s"}.`);
+        } else {
+          toast.success(`${label} completed for ${count} invoice${count === 1 ? "" : "s"}.`);
+        }
+      }
+      setSelectedRowIds(new Set());
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleMarkAsPaid = async () => {
+    const rows = selectedUnpaidRows;
+    if (rows.length === 0) {
+      toast.info("Select one or more unpaid invoices first.");
+      return;
+    }
+    await runCollectPayment(rows, "Mark as paid");
+  };
+
+  const handleSendNotification = async (rows: JobCardListRow[], successLabel: string) => {
+    if (rows.length === 0 || bulkBusy) return;
+    if (!USE_DUMMY_SHOP_WALLET && !token) return;
+
+    setBulkBusy(true);
+    let failed = 0;
+    try {
+      if (USE_DUMMY_SHOP_WALLET) {
+        toast.success(`${successLabel} sent for ${rows.length} invoice${rows.length === 1 ? "" : "s"}.`);
+      } else {
+        for (const row of rows) {
+          const res = await resendJobCardNotification(token!, row.id);
+          if (!res.ok) failed += 1;
+        }
+        if (failed > 0) {
+          toast.error(`${successLabel} failed for ${failed} invoice${failed === 1 ? "" : "s"}.`);
+        } else {
+          toast.success(`${successLabel} sent for ${rows.length} invoice${rows.length === 1 ? "" : "s"}.`);
+        }
+      }
+      setSelectedRowIds(new Set());
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleSendReminder = () => void handleSendNotification(selectedUnpaidRows, "Reminder");
+
+  const handleViewInvoice = (rows: JobCardListRow[]) => {
+    const withUrl = rows.filter((row) => pickInvoiceUrl(row.raw));
+    if (withUrl.length === 0) {
+      toast.info("No invoice PDF is available for the selected row(s).");
+      return;
+    }
+    const url = pickInvoiceUrl(withUrl[0].raw);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    if (withUrl.length > 1) {
+      toast.info("Opened the first selected invoice. Select one row to open a specific invoice.");
+    }
+  };
+
+  const handleClearSelection = () => setSelectedRowIds(new Set());
 
   const unavailableMessage = !USE_DUMMY_SHOP_WALLET ? UNAVAILABLE_MESSAGES[view] : undefined;
 
@@ -560,7 +735,7 @@ export default function ShopWalletPage() {
     }
 
     if (showError && (view === "paid" || view === "unpaid")) {
-      return <ShopErrorPanel message={error ?? ""} onRetry={() => void refresh()} />;
+      return <ShopErrorPanel message={error ?? ""} onRetry={() => void syncLedgerData()} />;
     }
 
     if (view === "expenses") {
@@ -636,61 +811,28 @@ export default function ShopWalletPage() {
       sidebarVariant="nav"
       sidebarExtra={
         <div className={shopSidebarButtonStackClass}>
-          <div>
-            <ShopSidebarButton
-              label="All Invoices"
-              active={view === "paid" || view === "unpaid"}
-              onClick={() => {
-                if (view === "paid" || view === "unpaid") {
-                  setInvoiceMenuOpen((open) => !open);
-                } else {
-                  setView("paid");
-                  setInvoiceMenuOpen(true);
-                }
-              }}
-              trailing={
-                <FiChevronDown
-                  className={`shrink-0 text-base transition-transform ${invoiceMenuOpen ? "rotate-180" : ""}`}
-                  aria-hidden
-                />
-              }
-            />
-            {invoiceMenuOpen ? (
-              <div className={`mt-2 pl-3 ${shopSidebarButtonStackClass}`}>
-                <button
-                  type="button"
-                  onClick={() => selectInvoiceView("paid")}
-                  className={shopSidebarButtonClass(view === "paid", "text-xs")}
-                >
-                  <span className="min-w-0 flex-1 text-left">Paid Invoice</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectInvoiceView("unpaid")}
-                  className={shopSidebarButtonClass(view === "unpaid", "text-xs")}
-                >
-                  <span className="min-w-0 flex-1 text-left">Un-Paid Invoice</span>
-                </button>
-              </div>
-            ) : null}
-          </div>
+          <ShopSidebarButton
+            label="Paid Invoice"
+            active={view === "paid"}
+            onClick={() => setView("paid")}
+          />
+
+          <ShopSidebarButton
+            label="Un-Paid Invoice"
+            active={view === "unpaid"}
+            onClick={() => setView("unpaid")}
+          />
 
           <ShopSidebarButton
             label="Expenses"
             active={view === "expenses"}
-            onClick={() => {
-              setView("expenses");
-              setInvoiceMenuOpen(false);
-            }}
+            onClick={() => setView("expenses")}
           />
 
           <ShopSidebarButton
             label="Manage Banks"
             active={view === "banks"}
-            onClick={() => {
-              setView("banks");
-              setInvoiceMenuOpen(false);
-            }}
+            onClick={() => setView("banks")}
           />
         </div>
       }
@@ -707,6 +849,71 @@ export default function ShopWalletPage() {
         <WalletSearchBar
           value={search}
           onChange={setSearch}
+          leading={
+            view === "unpaid" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void handleMarkAsPaid()}
+                  disabled={!hasUnpaidSelection || bulkBusy}
+                  className={WALLET_BULK_BUTTON_CLASS}
+                >
+                  Mark as Paid
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendReminder}
+                  disabled={!hasUnpaidSelection || bulkBusy}
+                  className={WALLET_BULK_BUTTON_CLASS}
+                >
+                  Send Reminder
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleViewInvoice(selectedUnpaidRows)}
+                  disabled={invoiceUrlRows.length === 0 || bulkBusy}
+                  className={WALLET_BULK_BUTTON_CLASS}
+                >
+                  View Invoice
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  disabled={!hasUnpaidSelection || bulkBusy}
+                  className={WALLET_BULK_BUTTON_CLASS}
+                >
+                  Clear Selection
+                </button>
+              </>
+            ) : view === "paid" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleViewInvoice(selectedPaidRows)}
+                  disabled={paidInvoiceUrlRows.length === 0 || bulkBusy}
+                  className={WALLET_BULK_BUTTON_CLASS}
+                >
+                  View Invoice
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSendNotification(selectedPaidRows, "Receipt")}
+                  disabled={selectedPaidRows.length === 0 || bulkBusy}
+                  className={WALLET_BULK_BUTTON_CLASS}
+                >
+                  Send Receipt
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  disabled={selectedPaidRows.length === 0 || bulkBusy}
+                  className={WALLET_BULK_BUTTON_CLASS}
+                >
+                  Clear Selection
+                </button>
+              </>
+            ) : null
+          }
           trailing={
             view === "expenses" ? (
               <button type="button" disabled className={`${shopAddNewButtonClass} opacity-60`}>

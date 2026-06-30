@@ -1,6 +1,7 @@
 import { formatCurrencyAmount } from "../../lib/currency";
 import { formatPhoneDisplay, phoneDigits } from "../../lib/phoneFormat";
 import { resolveJobCardFromApiResponse } from "../../lib/shopOwnerJobCardsApi";
+import { getWalletLedgerTab, isOnlineInvoicePayment } from "../../lib/shopOwnerWallet";
 import type { ShopProfileBusiness } from "../../types/shopOwner";
 
 function s(v: unknown): string {
@@ -93,9 +94,30 @@ export function formatEstimateMoney(
   return formatCurrencyAmount(amount, countryCode, { fallback: "—", includeSign: false });
 }
 
+/** HST/GST line items apply only after a job card is converted to invoice (online payment). */
+export function jobCardShowsInvoiceHst(job: Record<string, unknown>): boolean {
+  if (getWalletLedgerTab(job) === "invoice") {
+    return true;
+  }
+  const paymentMethod = job.paymentMethod ?? job.payment_method;
+  if (isOnlineInvoicePayment(paymentMethod)) {
+    return true;
+  }
+  const paymentStatus = s(job.paymentStatus).toLowerCase();
+  return paymentStatus.includes("invoice");
+}
+
 export function estimateStatusRibbon(job: Record<string, unknown>): string {
+  if (getWalletLedgerTab(job) === "invoice") {
+    return "Converted to Invoice";
+  }
   const payment = s(job.paymentStatus).toLowerCase();
-  if (payment.includes("paid") || payment.includes("invoice")) return "Invoiced";
+  if (payment.includes("paid") && getWalletLedgerTab(job) === "cash") {
+    return "Cash Paid";
+  }
+  if (payment.includes("invoice")) {
+    return "Converted to Invoice";
+  }
   const status = s(job.status ?? job.jobStatus).toLowerCase();
   if (status.includes("approved")) return "Approved";
   if (status.includes("reject")) return "Rejected";
@@ -236,20 +258,33 @@ export function buildCustomerBlock(job: Record<string, unknown>) {
   return { name, company, address };
 }
 
-export function estimateTotals(lines: EstimateLine[], hstRate: number, job: Record<string, unknown>) {
+export function estimateTotals(
+  lines: EstimateLine[],
+  hstRate: number,
+  job: Record<string, unknown>,
+  options?: { includeHst?: boolean },
+) {
+  const includeHst = options?.includeHst !== false;
   const subtotal = lines.reduce((sum, line) => sum + line.price, 0);
   const payable = nested(job.payableAmounts);
   const gstAmount = parseNum(payable?.gstAmount);
   const roundOff = parseNum(payable?.roundOff);
-  const hst =
-    gstAmount > 0 ? gstAmount : hstRate > 0 ? (subtotal * hstRate) / 100 : 0;
+  const hst = includeHst
+    ? gstAmount > 0
+      ? gstAmount
+      : hstRate > 0
+        ? (subtotal * hstRate) / 100
+        : 0
+    : 0;
   const computedTotal = subtotal + hst + roundOff;
-  const apiTotal =
-    parseNum(job.totalPayableAmount) ||
-    parseNum(payable?.cash) ||
-    parseNum(payable?.online) ||
-    parseNum(payable?.invoiceTotal) ||
-    parseNum(payable?.total);
+  const apiTotal = includeHst
+    ? parseNum(job.totalPayableAmount) ||
+      parseNum(payable?.online) ||
+      parseNum(payable?.invoiceTotal) ||
+      parseNum(payable?.total)
+    : parseNum(job.totalPayableAmount) ||
+      parseNum(payable?.cash) ||
+      parseNum(payable?.total);
   const total =
     apiTotal > 0 && Math.abs(apiTotal - computedTotal) < 0.01
       ? apiTotal

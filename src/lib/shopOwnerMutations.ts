@@ -343,6 +343,18 @@ export function markJobCardPaymentInvoice(token: string, jobCardId: string) {
   );
 }
 
+export function collectJobCardPayment(
+  token: string,
+  body: {
+    jobCardId: string;
+    paymentMethod: "Cash" | "Online";
+    remark?: string;
+    amount: number;
+  },
+) {
+  return postJson<ApiEnvelope>("/api/auto-shop-owner/job-cards/collect-payment", body, token);
+}
+
 export function fetchTeamMembers(token: string) {
   return getJson<unknown>("/api/auto-shop-owner/team-members", token);
 }

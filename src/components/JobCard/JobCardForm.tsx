@@ -326,7 +326,7 @@ export default function JobCardForm({
 }: JobCardFormProps) {
   const { token } = useAuth();
   const callingCode = useShopOwnerCallingCode();
-  const { city: shopCity, business } = useShopOwnerPortal();
+  const { city: shopCity } = useShopOwnerPortal();
   const formatMoney = (x: number) =>
     formatCurrencyAmount(x, callingCode, { fallback: "", includeSign: false });
   const currencyLabel = callingCode === "+91" ? "INR" : "CAD";
@@ -385,10 +385,7 @@ export default function JobCardForm({
       cat.subServices.forEach((sub, subIdx) => {
         opts.push({
           value: subServiceKey(cat.id, subIdx),
-          label:
-            cat.subServices.length > 1
-              ? `${cat.name ?? "Category"} — ${sub.name}`
-              : (cat.name ?? sub.name ?? "Category"),
+          label: sub.name?.trim() || "Service",
         });
       });
     }
@@ -411,7 +408,6 @@ export default function JobCardForm({
   const labourAmount = parseNumberFromText(form.labourCharge);
   const discountAmount = parseNumberFromText(form.discount);
   const grandTotal = partsSubTotal + labourAmount - discountAmount;
-  const hstNumber = business?.hstNumber?.trim() || "—";
 
   function resetForm() {
     setForm({ ...DEFAULT_FORM });
@@ -602,7 +598,7 @@ export default function JobCardForm({
       return;
     }
     if (services.length === 0) {
-      setSaveError("Add at least one line item with a category.");
+      setSaveError("Add at least one line item with a service.");
       setFormLoading(false);
       return;
     }
@@ -819,35 +815,6 @@ export default function JobCardForm({
                         </select>
                       </>
                     ) : null}
-
-                    <div className="sr-only" aria-hidden>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={form.odometerReading}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            odometerReading: e.target.value.replace(/\D/g, ""),
-                          }))
-                        }
-                        placeholder={odometerPlaceholders.in}
-                        tabIndex={-1}
-                      />
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={form.dueOdometerReading}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            dueOdometerReading: e.target.value.replace(/\D/g, ""),
-                          }))
-                        }
-                        placeholder={odometerPlaceholders.out}
-                        tabIndex={-1}
-                      />
-                    </div>
                   </div>
 
                   <div className={`${META_ROW_GRID_CLASS} lg:justify-self-end`}>
@@ -864,11 +831,35 @@ export default function JobCardForm({
                       onChange={(e) => setServiceDate(e.target.value)}
                       className={META_VALUE_CLASS}
                     />
-                    <span className={META_LABEL_CELL_CLASS}>HST</span>
+                    <span className={META_LABEL_CELL_CLASS}>Odo In</span>
                     <input
-                      readOnly
-                      value={hstNumber}
-                      className={`${META_VALUE_CLASS} bg-gray-100`}
+                      type="text"
+                      inputMode="numeric"
+                      value={form.odometerReading}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          odometerReading: e.target.value.replace(/\D/g, ""),
+                        }))
+                      }
+                      placeholder={odometerPlaceholders.in}
+                      aria-label="Odometer in"
+                      className={META_VALUE_CLASS}
+                    />
+                    <span className={META_LABEL_CELL_CLASS}>Odo Out</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={form.dueOdometerReading}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          dueOdometerReading: e.target.value.replace(/\D/g, ""),
+                        }))
+                      }
+                      placeholder={odometerPlaceholders.out}
+                      aria-label="Odometer out"
+                      className={META_VALUE_CLASS}
                     />
                   </div>
                 </div>
@@ -885,7 +876,7 @@ export default function JobCardForm({
                       <table className={JOB_CARD_TABLE.table}>
                         <thead>
                           <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-                            <th className={JOB_CARD_TABLE_HEAD_TH_CLASS}>Category</th>
+                            <th className={JOB_CARD_TABLE_HEAD_TH_CLASS}>Service</th>
                             <th className={JOB_CARD_TABLE_HEAD_TH_CLASS}>Description</th>
                             <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} text-right`}>Unit Cost</th>
                             <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} text-center`}>Qty</th>
@@ -903,7 +894,7 @@ export default function JobCardForm({
                                   onChange={(e) => setLineCategory(line.id, e.target.value)}
                                   className={`${formCellInputClass} min-w-[9rem]`}
                                 >
-                                  <option value="">Select Category</option>
+                                  <option value="">Select service</option>
                                   {categoryOptions.map((option) => (
                                     <option key={option.value} value={option.value}>
                                       {option.label}

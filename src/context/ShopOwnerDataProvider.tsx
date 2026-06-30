@@ -56,6 +56,10 @@ export type ShopPortalCache = {
 export type ShopWalletCache = {
   paid: JobCardListRow[];
   unpaid: JobCardListRow[];
+  paidCash: JobCardListRow[];
+  paidOnline: JobCardListRow[];
+  unpaidCash: JobCardListRow[];
+  unpaidOnline: JobCardListRow[];
 };
 
 export type ShopWebsiteTemplatesCache = {
@@ -142,19 +146,39 @@ async function fetchSectionData(
         const paid = paidRes.ok
           ? (() => {
               const { cash, online } = parsePaidWalletPayload(paidRes.data);
-              return [...cash, ...online];
+              return { all: [...cash, ...online], cash, online };
             })()
-          : [];
+          : { all: [] as JobCardListRow[], cash: [] as JobCardListRow[], online: [] as JobCardListRow[] };
         const unpaid = unpaidRes.ok
           ? (() => {
               const { cash, online } = parseUnpaidWalletPayload(unpaidRes.data);
-              return [...cash, ...online];
+              return { all: [...cash, ...online], cash, online };
             })()
-          : [];
+          : { all: [] as JobCardListRow[], cash: [] as JobCardListRow[], online: [] as JobCardListRow[] };
         if (!paidRes.ok && !unpaidRes.ok) {
-          return { data: { paid: [], unpaid: [] }, error: "Could not load wallet data." };
+          return {
+            data: {
+              paid: [],
+              unpaid: [],
+              paidCash: [],
+              paidOnline: [],
+              unpaidCash: [],
+              unpaidOnline: [],
+            },
+            error: "Could not load wallet data.",
+          };
         }
-        return { data: { paid, unpaid }, error: null };
+        return {
+          data: {
+            paid: paid.all,
+            unpaid: unpaid.all,
+            paidCash: paid.cash,
+            paidOnline: paid.online,
+            unpaidCash: unpaid.cash,
+            unpaidOnline: unpaid.online,
+          },
+          error: null,
+        };
       }
       case "deals": {
         const res = await fetchMyDeals(token);

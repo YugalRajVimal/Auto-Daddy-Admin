@@ -1,5 +1,9 @@
 import { formatCurrencyAmount } from "./currency";
-import { parseJobCardsFromPagePayload, type JobCardListRow } from "./shopOwnerJobCards";
+import {
+  isJobCardPaid,
+  parseJobCardsFromPagePayload,
+  type JobCardListRow,
+} from "./shopOwnerJobCards";
 
 export type WalletLedgerTab = "cash" | "invoice";
 
@@ -39,6 +43,23 @@ function pickPaymentMethodString(o: Record<string, unknown>): string | undefined
  * - `online` → Invoice
  * Missing / other values → Cash (default).
  */
+export function isWalletInvoiceRow(row: JobCardListRow): boolean {
+  return getWalletLedgerTab(row.raw) === "invoice";
+}
+
+/** Invoice ledger rows (online payment), optionally filtered by paid state. */
+export function filterWalletInvoiceRows(
+  rows: JobCardListRow[],
+  options?: { paid?: boolean },
+): JobCardListRow[] {
+  return rows.filter((row) => {
+    if (!isWalletInvoiceRow(row)) return false;
+    if (options?.paid === true) return isJobCardPaid(row);
+    if (options?.paid === false) return !isJobCardPaid(row);
+    return true;
+  });
+}
+
 export function getWalletLedgerTab(raw: unknown): WalletLedgerTab {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return "cash";

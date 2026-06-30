@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiCopy, FiPrinter } from "react-icons/fi";
-import { FaWhatsapp } from "react-icons/fa";
+import { FiPrinter } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useAuth from "../../auth/useAuth";
 import { useShopOwnerCallingCode } from "../../hooks/useShopOwnerCallingCode";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
-import { fetchJobCardById, resendJobCardNotification } from "../../lib/shopOwnerMutations";
+import { fetchJobCardById, markJobCardPaymentInvoice } from "../../lib/shopOwnerMutations";
+import { isJobRecordEligibleForInvoiceConversion, jobCardStatusClassFromJob, jobCardStatusLabelFromJob } from "../../lib/shopOwnerJobCards";
 import { resolveJobCardFromApiResponse } from "../../lib/shopOwnerJobCardsApi";
 import { ShopListSkeleton } from "../shop/ShopListSkeletons";
 import { ShopErrorPanel } from "../shop/ShopPanels";
@@ -21,6 +21,7 @@ import {
   extractJobNoFromApiEnvelope,
   formatEstimateDate,
   formatEstimateMoney,
+  jobCardShowsInvoiceHst,
   pickBusinessHstNumber,
   pickJobNoFromListRow,
   pickJobNoFromRecord,
@@ -30,10 +31,10 @@ import type { JobCardListRow } from "../../lib/shopOwnerJobCards";
 const OUTLINE_BTN_CLASS =
   "inline-flex items-center gap-1.5 rounded border border-gray-400 bg-white px-3 py-1.5 text-xs font-bold text-gray-800 hover:bg-gray-50 disabled:opacity-60";
 
-const WHATSAPP_BTN_CLASS =
-  "inline-flex items-center gap-1.5 rounded border border-[#25D366] bg-white px-3 py-1.5 text-xs font-bold text-[#1a9e47] hover:bg-[#e8f8ee] disabled:opacity-60";
+const CONVERT_INVOICE_BTN_CLASS =
+  "inline-flex items-center gap-1.5 rounded border border-ad-purple bg-white px-3 py-1.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
 
-function EstimateMetaRow({ label, value }: { label: string; value: string }) {
+function EstimateMetaRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[9.5rem_minmax(0,1fr)] items-baseline gap-x-2">
       <span className="text-right text-sm font-semibold text-gray-700">{label}</span>
@@ -71,18 +72,20 @@ function EstimateTotalsBlock({
   roundOff,
   total,
   totalLabel,
+  showHst,
 }: {
   subtotal: string;
   hst: string;
   roundOff?: string;
   total: string;
   totalLabel: string;
+  showHst: boolean;
 }) {
   return (
     <div className="ml-auto w-[19rem] text-sm sm:w-[21rem]">
       <div className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-1">
         <TotalsRow label="Subtotal :" value={subtotal} />
-        <TotalsRow label="HST :" value={hst} />
+        {showHst ? <TotalsRow label="HST :" value={hst} /> : null}
         {roundOff ? <TotalsRow label="Round Off :" value={roundOff} /> : null}
         <div className="col-span-2 grid grid-cols-subgrid gap-x-6 bg-gray-100 py-2 font-bold">
           <TotalsRow label={totalLabel} value={total} strong />
@@ -97,6 +100,7 @@ type ShopJobCardEstimateViewProps = {
   listRow?: JobCardListRow | null;
   jobNoHint?: string | null;
   onBack?: () => void;
+  onConverted?: () => void;
 };
 
 function parseHstRate(business: ReturnType<typeof useShopOwnerPortal>["business"]) {
@@ -110,6 +114,7 @@ export default function ShopJobCardEstimateView({
   listRow = null,
   jobNoHint = null,
   onBack,
+  onConverted,
 }: ShopJobCardEstimateViewProps) {
   const { token } = useAuth();
   const callingCode = useShopOwnerCallingCode();
@@ -117,7 +122,7 @@ export default function ShopJobCardEstimateView({
   const [job, setJob] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   const load = useCallback(async () => {
     if (!token || !jobCardId) return;
@@ -148,14 +153,19 @@ export default function ShopJobCardEstimateView({
     void load();
   }, [load]);
 
+  const showHst = job ? jobCardShowsInvoiceHst(job) : false;
   const hstRate = parseHstRate(business);
+  const effectiveHstRate = showHst ? hstRate : 0;
   const lines = useMemo(
-    () => (job ? extractEstimateLines(job, hstRate) : []),
-    [job, hstRate],
+    () => (job ? extractEstimateLines(job, effectiveHstRate) : []),
+    [job, effectiveHstRate],
   );
   const totals = useMemo(
-    () => (job ? estimateTotals(lines, hstRate, job) : { subtotal: 0, hst: 0, roundOff: 0, total: 0 }),
-    [job, lines, hstRate],
+    () =>
+      job
+        ? estimateTotals(lines, effectiveHstRate, job, { includeHst: showHst })
+        : { subtotal: 0, hst: 0, roundOff: 0, total: 0 },
+    [job, lines, effectiveHstRate, showHst],
   );
 
   const docNo = useMemo(
@@ -168,46 +178,39 @@ export default function ShopJobCardEstimateView({
   const logoUrl = normalizeMediaUrl(business?.businessLogo);
   const hstNumber = pickBusinessHstNumber(business, job) || "—";
 
+  const canConvertToInvoice = useMemo(
+    () => (job ? isJobRecordEligibleForInvoiceConversion(job, listRow) : false),
+    [job, listRow],
+  );
+
+  const statusLabel = useMemo(
+    () => (job ? jobCardStatusLabelFromJob(job, listRow) : "—"),
+    [job, listRow],
+  );
+
+  const statusClass = useMemo(
+    () => (job ? jobCardStatusClassFromJob(job, listRow) : "text-gray-700"),
+    [job, listRow],
+  );
+
   const handlePrint = () => {
     window.print();
   };
 
-  const handleCopy = async () => {
-    if (!job) return;
-    const text = [
-      `Job Card : ${docNo}`,
-      `Date: ${formatEstimateDate(job.serviceDate ?? job.jobDate ?? job.createdAt)}`,
-      `Customer: ${customerBlock.name}`,
-      "",
-      ...lines.map(
-        (line, index) =>
-          `${index + 1}. ${line.description}\t${formatEstimateMoney(line.price, callingCode)}`,
-      ),
-      "",
-      `Subtotal: ${formatEstimateMoney(totals.subtotal, callingCode)}`,
-      `HST: ${formatEstimateMoney(totals.hst, callingCode)}`,
-      `Total: ${formatEstimateMoney(totals.total, callingCode)}`,
-    ].join("\n");
+  const handleConvertToInvoice = async () => {
+    if (!token || converting || !canConvertToInvoice) return;
+    setConverting(true);
     try {
-      await navigator.clipboard.writeText(text);
-      toast.success("Estimate copied.");
-    } catch {
-      toast.error("Could not copy to clipboard.");
-    }
-  };
-
-  const handleWhatsapp = async () => {
-    if (!token || sending) return;
-    setSending(true);
-    try {
-      const res = await resendJobCardNotification(token, jobCardId);
+      const res = await markJobCardPaymentInvoice(token, jobCardId);
       if (!res.ok) {
-        toast.error("Could not send on WhatsApp.");
+        toast.error("Could not convert to invoice.");
         return;
       }
-      toast.success("Sent on WhatsApp.");
+      toast.success("Converted to invoice.");
+      await load();
+      onConverted?.();
     } finally {
-      setSending(false);
+      setConverting(false);
     }
   };
 
@@ -259,16 +262,11 @@ export default function ShopJobCardEstimateView({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => void handleWhatsapp()}
-            disabled={sending}
-            className={WHATSAPP_BTN_CLASS}
+            onClick={() => void handleConvertToInvoice()}
+            disabled={!canConvertToInvoice || converting}
+            className={CONVERT_INVOICE_BTN_CLASS}
           >
-            <FaWhatsapp size={14} aria-hidden />
-            Send on Whatsapp
-          </button>
-          <button type="button" onClick={() => void handleCopy()} className={OUTLINE_BTN_CLASS}>
-            <FiCopy size={13} aria-hidden />
-            Copy
+            {converting ? "Converting…" : "Convert to Invoice"}
           </button>
           <button type="button" onClick={handlePrint} className={OUTLINE_BTN_CLASS}>
             <FiPrinter size={13} aria-hidden />
@@ -319,7 +317,11 @@ export default function ShopJobCardEstimateView({
                 label="Date :"
                 value={formatEstimateDate(job.serviceDate ?? job.jobDate ?? job.createdAt)}
               />
-              <EstimateMetaRow label="HST No. :" value={hstNumber} />
+              <EstimateMetaRow
+                label="Status :"
+                value={<span className={`font-semibold ${statusClass}`}>{statusLabel}</span>}
+              />
+              {showHst ? <EstimateMetaRow label="HST No. :" value={hstNumber} /> : null}
             </div>
           </div>
         </div>
@@ -332,14 +334,19 @@ export default function ShopJobCardEstimateView({
                 <th className="border border-gray-300 px-2 py-2">Description</th>
                 <th className="border border-gray-300 px-2 py-2 text-right">Unit Cost</th>
                 <th className="border border-gray-300 px-2 py-2 text-center">Qty</th>
-                <th className="border border-gray-300 px-2 py-2 text-right">HST</th>
+                {showHst ? (
+                  <th className="border border-gray-300 px-2 py-2 text-right">HST</th>
+                ) : null}
                 <th className="border border-gray-300 px-2 py-2 text-right">Price</th>
               </tr>
             </thead>
             <tbody>
               {lines.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="border border-gray-300 px-2 py-4 text-center text-gray-500">
+                  <td
+                    colSpan={showHst ? 6 : 5}
+                    className="border border-gray-300 px-2 py-4 text-center text-gray-500"
+                  >
                     No line items
                   </td>
                 </tr>
@@ -354,9 +361,11 @@ export default function ShopJobCardEstimateView({
                     <td className="border border-gray-300 px-2 py-2 text-center align-top tabular-nums">
                       {line.qty}
                     </td>
-                    <td className="border border-gray-300 px-2 py-2 text-right align-top tabular-nums">
-                      {line.hstRate > 0 ? `${line.hstRate}%` : "—"}
-                    </td>
+                    {showHst ? (
+                      <td className="border border-gray-300 px-2 py-2 text-right align-top tabular-nums">
+                        {line.hstRate > 0 ? `${line.hstRate}%` : "—"}
+                      </td>
+                    ) : null}
                     <td className="border border-gray-300 px-2 py-2 text-right align-top tabular-nums">
                       {formatEstimateMoney(line.price, callingCode)}
                     </td>
@@ -378,6 +387,7 @@ export default function ShopJobCardEstimateView({
             }
             total={formatEstimateMoney(totals.total, callingCode)}
             totalLabel={`Total (${currencyLabel}) :`}
+            showHst={showHst}
           />
         </div>
 

@@ -1,7 +1,5 @@
-import type { JobCardListRow } from "./shopOwnerJobCards";
-
 /** Flip to false once wallet, expenses, and bank APIs are wired on the shop portal. */
-export const USE_DUMMY_SHOP_WALLET = true;
+export const USE_DUMMY_SHOP_WALLET = false;
 
 export type ShopWalletExpenseRow = {
   id: string;
@@ -19,76 +17,6 @@ export type ShopWalletBankRow = {
   balance: number;
   assignToInvoice: boolean;
 };
-
-function invoiceRow(
-  id: string,
-  jobNo: string,
-  customerName: string,
-  phone: string,
-  plate: string,
-  amount: number,
-  date: string,
-  paymentStatus: "Paid" | "Unpaid",
-  paymentMethod: "Cash" | "Online",
-): JobCardListRow {
-  return {
-    id,
-    raw: { paymentMethod },
-    customerName,
-    jobNo,
-    vehiclePlate: plate,
-    phone,
-    date,
-    total: amount,
-    paymentStatus,
-  };
-}
-
-const CUSTOMERS = [
-  { name: "Name Customer", phone: "7059913785", plate: "GVTY 884" },
-  { name: "Raj Singh", phone: "4165550192", plate: "BRAM 221" },
-  { name: "Maria Lopez", phone: "9055554433", plate: "ONPK 902" },
-  { name: "James Chen", phone: "6475558821", plate: "GTAA 441" },
-  { name: "Priya Patel", phone: "2895557710", plate: "MISS 118" },
-  { name: "David Miller", phone: "5195553399", plate: "KWEL 552" },
-];
-
-function buildInvoices(paymentStatus: "Paid" | "Unpaid", prefix: string): JobCardListRow[] {
-  const amounts = [185, 240, 95, 420, 310, 175, 560, 88, 225, 390, 145, 275];
-  const dates = [
-    "2026-06-14",
-    "2026-06-13",
-    "2026-06-12",
-    "2026-06-11",
-    "2026-06-10",
-    "2026-06-09",
-    "2026-06-08",
-    "2026-06-07",
-    "2026-06-06",
-    "2026-06-05",
-    "2026-06-04",
-    "2026-06-03",
-  ];
-
-  return amounts.map((amount, index) => {
-    const customer = CUSTOMERS[index % CUSTOMERS.length];
-    const jobNo = String(1254 - index);
-    return invoiceRow(
-      `${prefix}-${index + 1}`,
-      jobNo,
-      customer.name,
-      customer.phone,
-      customer.plate,
-      amount,
-      dates[index],
-      paymentStatus,
-      index % 2 === 0 ? "Online" : "Cash",
-    );
-  });
-}
-
-export const DUMMY_PAID_INVOICES: JobCardListRow[] = buildInvoices("Paid", "dummy-paid");
-export const DUMMY_UNPAID_INVOICES: JobCardListRow[] = buildInvoices("Unpaid", "dummy-unpaid");
 
 export const DUMMY_SHOP_EXPENSES: ShopWalletExpenseRow[] = [
   { id: "exp-1", date: "2026-06-14", name: "Parts Supply Co.", category: "Parts", amount: 185 },

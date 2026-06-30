@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiEdit2 } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import JobCardForm from "../../components/JobCard/JobCardForm";
@@ -23,15 +22,23 @@ import { formatCurrencyAmount } from "../../lib/currency";
 import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import {
   deleteJobCard,
+  collectJobCardPayment,
   markJobCardPaymentInvoice,
   resendJobCardNotification,
 } from "../../lib/shopOwnerMutations";
 import {
+  isJobCardApproved,
+  isJobCardPaid,
   isJobCardPending,
+  isEligibleForInvoiceConversion,
+  jobCardStatusClass,
   jobCardStatusLabel,
+  pickJobCardInvoiceNumber,
   type JobCardListRow,
 } from "../../lib/shopOwnerJobCards";
-import { getWalletLedgerTab } from "../../lib/shopOwnerWallet";
+import { getWalletLedgerTab, filterWalletInvoiceRows } from "../../lib/shopOwnerWallet";
+import { USE_DUMMY_SHOP_WALLET } from "../../lib/dummyShopWallet";
+import { useMockShopInvoiceLedger } from "../../lib/mockShopInvoiceLedger";
 import useAuth from "../../auth/useAuth";
 
 type JobCardSection = "my-list" | "approvals" | "convert-invoice" | "paid";
@@ -43,22 +50,22 @@ const JOB_CARDS_SEARCH_INPUT_ID = "shop-job-cards-search";
 const JOB_CARD_SECTIONS = [
   { id: "my-list", label: "My Job Cards", variant: "primary" as const },
   { id: "approvals", label: "Approvals", variant: "primary" as const },
-  { id: "convert-invoice", label: "Convert to Invoice", variant: "primary" as const },
+  { id: "convert-invoice", label: "Converted to Invoice", variant: "primary" as const },
   { id: "paid", label: "Paid Jobs", variant: "primary" as const },
 ];
 
 const SECTION_HEADINGS: Record<JobCardSection, string> = {
   "my-list": "My Job Cards",
   approvals: "Approvals",
-  "convert-invoice": "Convert to Invoice",
+  "convert-invoice": "Converted to Invoice",
   paid: "Paid Jobs",
 };
 
 const EMPTY_MESSAGES: Record<JobCardSection, string> = {
   "my-list": "No job cards yet.",
-  approvals: "No job cards awaiting approval.",
-  "convert-invoice": "No cash job cards to convert to invoice.",
-  paid: "No paid job cards yet.",
+  approvals: "No approved job cards yet.",
+  "convert-invoice": "No converted to invoice job cards yet.",
+  paid: "No paid cash job cards yet.",
 };
 
 const SHOP_TABLE_BASE = adminPanelTableClasses(true);
@@ -78,6 +85,9 @@ const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
 
 const SHOP_JOB_CARD_BULK_BUTTON_CLASS =
   "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
+
+const SHOP_JOB_CARD_EDIT_BUTTON_CLASS =
+  "rounded border border-ad-purple bg-white px-2 py-0.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8]";
 
 function displayJobId(jobNo: string | undefined): string {
   const raw = (jobNo ?? "").trim().replace(/^#/, "");
@@ -100,7 +110,7 @@ function formatJobPrice(
 function matchesJobCardSearch(row: JobCardListRow, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const haystack = [row.customerName, row.phone, row.vehiclePlate, row.jobNo]
+  const haystack = [row.customerName, row.phone, row.vehiclePlate, row.jobNo, row.invoiceNumber]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -111,11 +121,28 @@ function usesJobCardApiSearch(section: JobCardSection): boolean {
   return section === "my-list" || section === "approvals";
 }
 
-function isConvertToInvoiceJob(row: JobCardListRow): boolean {
-  const paymentStatus = (row.paymentStatus ?? "").trim().toLowerCase();
-  if (paymentStatus === "paid") return false;
-  if (row.unpaid === false) return false;
-  return getWalletLedgerTab(row.raw) === "cash";
+/** Approved job cards that can be marked paid by cash. */
+function isEligibleForCashPayment(row: JobCardListRow): boolean {
+  if (!isJobCardApproved(row)) return false;
+  if (isJobCardPaid(row)) return false;
+  return getWalletLedgerTab(row.raw) !== "invoice";
+}
+
+function pickCashPaymentAmount(row: JobCardListRow): number {
+  const raw = row.raw;
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    const payable = o.payableAmounts;
+    if (payable && typeof payable === "object") {
+      const p = payable as Record<string, unknown>;
+      const cash = Number(p.cash);
+      if (Number.isFinite(cash) && cash > 0) return cash;
+    }
+    const total = Number(o.totalPayableAmount ?? o.total ?? row.total);
+    if (Number.isFinite(total) && total > 0) return total;
+  }
+  const fromRow = Number(row.total);
+  return Number.isFinite(fromRow) && fromRow > 0 ? fromRow : 0;
 }
 
 function AddNewButton({ onClick }: { onClick: () => void }) {
@@ -171,7 +198,9 @@ function JobCardListTable({
   selectedIds,
   onToggleRow,
   onTogglePage,
-  showStatus = false,
+  showStatusColumn = false,
+  showInvoiceColumn = false,
+  showActions = true,
 }: {
   rows: JobCardListRow[];
   countryCode: string | null | undefined;
@@ -180,7 +209,9 @@ function JobCardListTable({
   selectedIds: Set<string>;
   onToggleRow: (id: string) => void;
   onTogglePage: (ids: string[], checked: boolean) => void;
-  showStatus?: boolean;
+  showStatusColumn?: boolean;
+  showInvoiceColumn?: boolean;
+  showActions?: boolean;
 }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
   const editHeadClass = `${SHOP_TABLE_HEAD_TH_CLASS} text-center`;
@@ -215,17 +246,24 @@ function JobCardListTable({
                 />
               </th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Job No.</th>
+              {showInvoiceColumn ? (
+                <th className={SHOP_TABLE_HEAD_TH_CLASS}>Invoice No.</th>
+              ) : null}
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Customer</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Phone</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Plate</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Total</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
-              <th className={editHeadClass}>{showStatus ? "Status" : "Actions"}</th>
+              {showStatusColumn ? (
+                <th className={SHOP_TABLE_HEAD_TH_CLASS}>Status</th>
+              ) : null}
+              {showActions ? <th className={editHeadClass}>Actions</th> : null}
             </tr>
           </thead>
           <tbody>
             {rows.map((jc, index) => {
               const customerName = jc.customerName?.trim() || "—";
+              const invoiceNo = pickJobCardInvoiceNumber(jc);
               return (
                 <tr key={jc.id} className={adminPanelRowClass(index)}>
                   <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
@@ -246,6 +284,11 @@ function JobCardListTable({
                       {displayJobId(jc.jobNo)}
                     </button>
                   </td>
+                  {showInvoiceColumn ? (
+                    <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                      {invoiceNo || "—"}
+                    </td>
+                  ) : null}
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
                     {customerName}
                   </td>
@@ -262,21 +305,28 @@ function JobCardListTable({
                     {formatJobPrice(jc.total, countryCode)}
                   </td>
                   <td className={SHOP_TABLE_BODY_TD_CLASS}>{jc.date ?? "—"}</td>
-                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
-                    {showStatus ? (
-                      <span className="font-semibold text-blue-700">{jobCardStatusLabel(jc)}</span>
-                    ) : (
-                      <button
-                        type="button"
-                        title={`Edit job ${displayJobId(jc.jobNo)}`}
-                        aria-label={`Edit job ${displayJobId(jc.jobNo)}`}
-                        onClick={() => onEdit(jc)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
-                      >
-                        <FiEdit2 size={13} aria-hidden />
-                      </button>
-                    )}
-                  </td>
+                  {showStatusColumn ? (
+                    <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                      <span className={`font-semibold ${jobCardStatusClass(jc)}`}>
+                        {jobCardStatusLabel(jc)}
+                      </span>
+                    </td>
+                  ) : null}
+                  {showActions ? (
+                    <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
+                      {isJobCardPending(jc) ? (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(jc)}
+                          className={SHOP_JOB_CARD_EDIT_BUTTON_CLASS}
+                        >
+                          Edit
+                        </button>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
@@ -302,18 +352,28 @@ export default function ShopJobCardsPage() {
   const [selectedJobCardIds, setSelectedJobCardIds] = useState<Set<string>>(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const {
-    cards: jobCards,
+    cards: apiJobCards,
     loading: jobCardsLoading,
     error: jobCardsError,
     refresh: refreshJobCards,
   } = useShopJobCards(usesJobCardApiSearch(section) ? search : "");
+  const mockLedger = useMockShopInvoiceLedger();
   const {
-    paid,
-    unpaid,
+    paidCash: apiPaidCash,
+    unpaid: apiUnpaidAll,
+    unpaidOnline: apiUnpaidOnline,
     loading: walletLoading,
     error: walletError,
     refresh: refreshWallet,
   } = useShopWallet();
+
+  const jobCards = USE_DUMMY_SHOP_WALLET ? mockLedger.jobCards : apiJobCards;
+  const paidCash = USE_DUMMY_SHOP_WALLET ? [] : apiPaidCash;
+  const convertedInvoiceCards = USE_DUMMY_SHOP_WALLET
+    ? mockLedger.unpaid
+    : apiUnpaidOnline.length > 0
+      ? apiUnpaidOnline
+      : filterWalletInvoiceRows(apiUnpaidAll, { paid: false });
 
   const listCards = useMemo(() => {
     const filterSearch = (rows: JobCardListRow[]) =>
@@ -327,17 +387,26 @@ export default function ShopJobCardsPage() {
       return filterSearch(jobCards);
     }
     if (section === "approvals") {
-      return filterSearch(jobCards.filter(isJobCardPending));
+      return filterSearch(jobCards.filter(isJobCardApproved));
     }
     if (section === "convert-invoice") {
-      return filterSearch(unpaid.filter(isConvertToInvoiceJob));
+      return filterSearch(convertedInvoiceCards);
     }
-    return filterSearch(paid);
-  }, [section, jobCards, paid, unpaid, search]);
+    return filterSearch(paidCash);
+  }, [section, jobCards, paidCash, convertedInvoiceCards, search]);
 
   const loading =
-    section === "my-list" || section === "approvals" ? jobCardsLoading : walletLoading;
-  const error = section === "my-list" || section === "approvals" ? jobCardsError : walletError;
+    USE_DUMMY_SHOP_WALLET
+      ? false
+      : section === "my-list" || section === "approvals"
+        ? jobCardsLoading
+        : walletLoading;
+  const error =
+    USE_DUMMY_SHOP_WALLET
+      ? null
+      : section === "my-list" || section === "approvals"
+        ? jobCardsError
+        : walletError;
 
   const totalPages = Math.max(1, Math.ceil(listCards.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -399,6 +468,29 @@ export default function ShopJobCardsPage() {
     [selectedJobCardIds, listCards],
   );
 
+  const deletableSelectedJobCards = useMemo(
+    () => selectedJobCards.filter((row) => !isJobCardApproved(row)),
+    [selectedJobCards],
+  );
+
+  const canBulkDelete = hasBulkSelection && deletableSelectedJobCards.length > 0;
+
+  const convertibleSelectedJobCards = useMemo(
+    () => selectedJobCards.filter(isEligibleForInvoiceConversion),
+    [selectedJobCards],
+  );
+
+  const cashPayableSelectedJobCards = useMemo(
+    () => selectedJobCards.filter(isEligibleForCashPayment),
+    [selectedJobCards],
+  );
+
+  const canBulkConvertToInvoice = convertibleSelectedJobCards.length > 0;
+  const canBulkPaidByCash = cashPayableSelectedJobCards.length > 0;
+
+  const showConvertToInvoiceButton = section !== "paid" && section !== "convert-invoice";
+  const showPaidByCashButton = section === "approvals" || section === "my-list";
+
   const runBulkAction = async (
     label: string,
     action: (row: JobCardListRow) => Promise<boolean>,
@@ -427,13 +519,37 @@ export default function ShopJobCardsPage() {
   };
 
   const handleBulkDelete = async () => {
-    if (!hasBulkSelection || bulkBusy) return;
-    const count = selectedJobCards.length;
-    if (!window.confirm(`Delete ${count} selected job card${count === 1 ? "" : "s"}?`)) return;
-    await runBulkAction("Delete", async (row) => {
-      const res = await deleteJobCard(token!, row.id);
-      return res.ok;
-    });
+    if (!canBulkDelete || bulkBusy) return;
+    const rows = deletableSelectedJobCards;
+    const skipped = selectedJobCards.length - rows.length;
+    const count = rows.length;
+    const confirmMessage =
+      skipped > 0
+        ? `Delete ${count} selected job card${count === 1 ? "" : "s"}? (${skipped} approved job card${skipped === 1 ? "" : "s"} will be skipped.)`
+        : `Delete ${count} selected job card${count === 1 ? "" : "s"}?`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setBulkBusy(true);
+    let failed = 0;
+    try {
+      for (const row of rows) {
+        const res = await deleteJobCard(token!, row.id);
+        if (!res.ok) failed += 1;
+      }
+      await refresh();
+      setSelectedJobCardIds(new Set());
+      if (failed > 0) {
+        toast.error(`Delete failed for ${failed} job card${failed === 1 ? "" : "s"}.`);
+      } else if (skipped > 0) {
+        toast.success(
+          `Deleted ${count} job card${count === 1 ? "" : "s"}. Approved job cards were not deleted.`,
+        );
+      } else {
+        toast.success(`Deleted ${count} job card${count === 1 ? "" : "s"}.`);
+      }
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   const handleBulkSend = async () => {
@@ -444,12 +560,35 @@ export default function ShopJobCardsPage() {
   };
 
   const handleBulkConvertToInvoice = async () => {
-    const eligible = selectedJobCards.filter(isConvertToInvoiceJob);
+    const eligible = convertibleSelectedJobCards;
     if (eligible.length === 0) {
-      toast.info("Selected job cards are not eligible to convert to invoice.");
+      toast.info("Only approved, unpaid job cards can be converted to invoice.");
       return;
     }
-    if (!token || bulkBusy) return;
+    if (bulkBusy) return;
+
+    if (USE_DUMMY_SHOP_WALLET) {
+      setBulkBusy(true);
+      try {
+        const converted = mockLedger.convertToInvoice(eligible);
+        setSelectedJobCardIds(new Set());
+        const skipped = selectedJobCards.length - eligible.length;
+        if (skipped > 0) {
+          toast.success(
+            `Converted ${converted} job card${converted === 1 ? "" : "s"} to invoice. ${skipped} selected card${skipped === 1 ? " was" : "s were"} not eligible.`,
+          );
+        } else {
+          toast.success(
+            `Converted ${converted} job card${converted === 1 ? "" : "s"} to invoice.`,
+          );
+        }
+      } finally {
+        setBulkBusy(false);
+      }
+      return;
+    }
+
+    if (!token) return;
     setBulkBusy(true);
     let failed = 0;
     try {
@@ -459,8 +598,13 @@ export default function ShopJobCardsPage() {
       }
       await refresh();
       setSelectedJobCardIds(new Set());
+      const skipped = selectedJobCards.length - eligible.length;
       if (failed > 0) {
         toast.error(`Convert to invoice failed for ${failed} job card${failed === 1 ? "" : "s"}.`);
+      } else if (skipped > 0) {
+        toast.success(
+          `Converted ${eligible.length} job card${eligible.length === 1 ? "" : "s"} to invoice. ${skipped} selected card${skipped === 1 ? " was" : "s were"} not eligible.`,
+        );
       } else {
         toast.success(
           `Converted ${eligible.length} job card${eligible.length === 1 ? "" : "s"} to invoice.`,
@@ -471,9 +615,48 @@ export default function ShopJobCardsPage() {
     }
   };
 
-  const handleBulkPrint = () => {
-    if (!hasBulkSelection) return;
-    window.print();
+  const handleBulkPaidByCash = async () => {
+    const eligible = cashPayableSelectedJobCards;
+    if (eligible.length === 0) {
+      toast.info("Only approved, unpaid job cards can be marked paid by cash.");
+      return;
+    }
+    if (!token || bulkBusy) return;
+    const count = eligible.length;
+    if (
+      !window.confirm(
+        `Mark ${count} selected job card${count === 1 ? "" : "s"} as paid by cash?`,
+      )
+    ) {
+      return;
+    }
+    setBulkBusy(true);
+    let failed = 0;
+    try {
+      for (const row of eligible) {
+        const res = await collectJobCardPayment(token, {
+          jobCardId: row.id,
+          paymentMethod: "Cash",
+          remark: "",
+          amount: pickCashPaymentAmount(row),
+        });
+        if (!res.ok) failed += 1;
+      }
+      await refresh();
+      setSelectedJobCardIds(new Set());
+      const skipped = selectedJobCards.length - eligible.length;
+      if (failed > 0) {
+        toast.error(`Paid by cash failed for ${failed} job card${failed === 1 ? "" : "s"}.`);
+      } else if (skipped > 0) {
+        toast.success(
+          `Marked ${count} job card${count === 1 ? "" : "s"} as paid by cash. ${skipped} selected card${skipped === 1 ? " was" : "s were"} not eligible.`,
+        );
+      } else {
+        toast.success(`Marked ${count} job card${count === 1 ? "" : "s"} as paid by cash.`);
+      }
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   const refresh = () => {
@@ -488,6 +671,10 @@ export default function ShopJobCardsPage() {
   };
 
   const openJobCard = (jc: JobCardListRow) => {
+    if (!isJobCardPending(jc)) {
+      toast.info("Only pending job cards can be edited.");
+      return;
+    }
     setFormMode("edit");
     setEditJobCardId(jc.id);
     setView("form");
@@ -567,6 +754,7 @@ export default function ShopJobCardsPage() {
               listRow={detailListRow}
               jobNoHint={detailListRow ? pickJobNoFromListRow(detailListRow) ?? null : null}
               onBack={showList}
+              onConverted={() => void refresh()}
             />
           ) : null}
         </ShopReveal>
@@ -581,18 +769,10 @@ export default function ShopJobCardsPage() {
                   <button
                     type="button"
                     onClick={() => void handleBulkDelete()}
-                    disabled={!hasBulkSelection || bulkBusy}
+                    disabled={!canBulkDelete || bulkBusy}
                     className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
                   >
                     Delete
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleBulkPrint}
-                    disabled={!hasBulkSelection || bulkBusy}
-                    className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
-                  >
-                    Print
                   </button>
                   <button
                     type="button"
@@ -602,14 +782,26 @@ export default function ShopJobCardsPage() {
                   >
                     Send
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleBulkConvertToInvoice()}
-                    disabled={!hasBulkSelection || bulkBusy}
-                    className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
-                  >
-                    Convert to Invoice
-                  </button>
+                  {showPaidByCashButton ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleBulkPaidByCash()}
+                      disabled={!canBulkPaidByCash || bulkBusy}
+                      className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
+                    >
+                      Paid by Cash
+                    </button>
+                  ) : null}
+                  {showConvertToInvoiceButton ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleBulkConvertToInvoice()}
+                      disabled={!canBulkConvertToInvoice || bulkBusy}
+                      className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
+                    >
+                      Convert to Invoice
+                    </button>
+                  ) : null}
                 </>
               }
               trailing={
@@ -633,7 +825,9 @@ export default function ShopJobCardsPage() {
                   selectedIds={selectedJobCardIds}
                   onToggleRow={toggleJobCardSelection}
                   onTogglePage={toggleJobCardPageSelection}
-                  showStatus={section === "approvals"}
+                  showStatusColumn
+                  showInvoiceColumn={section === "convert-invoice"}
+                  showActions={section !== "approvals"}
                 />
 
                 <ShopListFooter className="text-sm font-semibold text-gray-600">
