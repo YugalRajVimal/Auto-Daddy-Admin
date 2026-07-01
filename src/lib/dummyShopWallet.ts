@@ -1,4 +1,4 @@
-/** Flip to false once wallet, expenses, and bank APIs are wired on the shop portal. */
+/** Flip to false once paid/unpaid invoice APIs fully replace mock ledger data. Expenses and banks still use dummy rows below. */
 export const USE_DUMMY_SHOP_WALLET = false;
 
 export type ShopWalletExpenseRow = {

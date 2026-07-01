@@ -320,15 +320,21 @@ export function isJobCardPending(row: JobCardListRow): boolean {
   return normalizedJobCardStatus(row) === "pending";
 }
 
-export function isJobCardApproved(row: JobCardListRow): boolean {
-  return normalizedJobCardStatus(row) === "approved";
-}
-
 export function isJobCardPaid(row: JobCardListRow): boolean {
   const paymentStatus = (row.paymentStatus ?? "").trim().toLowerCase();
   if (paymentStatus === "paid") return true;
   if (row.unpaid === false) return true;
   return false;
+}
+
+export function isJobCardEditable(row: JobCardListRow): boolean {
+  if (isJobCardPaid(row)) return false;
+  const norm = normalizedJobCardStatus(row).toLowerCase().replace(/\s+/g, "");
+  return norm === "pending" || norm === "rejected" || norm === "autorejected";
+}
+
+export function isJobCardApproved(row: JobCardListRow): boolean {
+  return normalizedJobCardStatus(row) === "approved";
 }
 
 /** Approved, unpaid job cards that are not already on invoice payment. */

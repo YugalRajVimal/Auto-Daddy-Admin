@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { toast } from "react-toastify";
 import DashboardPanelCard from "../../components/COMP";
 import { ThoughtOfTheDayCard } from "../../components/portal/ThoughtOfTheDayCard";
+import ShopBusinessOpenToggle from "../../components/shop/ShopBusinessOpenToggle";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopBusinessProfileEditor,
@@ -122,6 +123,9 @@ export default function ShopProfilePage() {
     thoughtOfTheDay,
     loading,
     refresh,
+    isBusinessActive,
+    updatingActive,
+    setBusinessActive,
   } = useShopOwnerPortal();
   const [activeId, setActiveId] = useState("personal");
   const [faqsOpen, setFaqsOpen] = useState(false);
@@ -412,7 +416,16 @@ export default function ShopProfilePage() {
             showAddForm={showAddHours}
             onAddFormClose={() => setShowAddHours(false)}
             headerAction={
-              !showAddHours ? <AddNewButton onClick={() => setShowAddHours(true)} /> : undefined
+              !showAddHours ? (
+                <div className="flex items-center gap-2">
+                  <ShopBusinessOpenToggle
+                    isBusinessActive={isBusinessActive}
+                    updating={updatingActive}
+                    onChange={setBusinessActive}
+                  />
+                  <AddNewButton onClick={() => setShowAddHours(true)} />
+                </div>
+              ) : undefined
             }
           />
         );

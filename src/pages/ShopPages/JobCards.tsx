@@ -28,8 +28,8 @@ import {
 } from "../../lib/shopOwnerMutations";
 import {
   isJobCardApproved,
+  isJobCardEditable,
   isJobCardPaid,
-  isJobCardPending,
   isEligibleForInvoiceConversion,
   jobCardStatusClass,
   jobCardStatusLabel,
@@ -315,7 +315,7 @@ function JobCardListTable({
                   ) : null}
                   {showActions ? (
                     <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
-                      {isJobCardPending(jc) ? (
+                      {isJobCardEditable(jc) ? (
                         <button
                           type="button"
                           onClick={() => onEdit(jc)}
@@ -695,8 +695,8 @@ export default function ShopJobCardsPage() {
   };
 
   const openJobCard = (jc: JobCardListRow) => {
-    if (!isJobCardPending(jc)) {
-      toast.info("Only pending job cards can be edited.");
+    if (!isJobCardEditable(jc)) {
+      toast.info("This job card cannot be edited.");
       return;
     }
     setFormMode("edit");

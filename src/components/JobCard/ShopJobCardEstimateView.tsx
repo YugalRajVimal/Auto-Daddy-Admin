@@ -6,7 +6,7 @@ import { useShopOwnerCallingCode } from "../../hooks/useShopOwnerCallingCode";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import { fetchJobCardById, markJobCardPaymentInvoice } from "../../lib/shopOwnerMutations";
-import { isJobRecordEligibleForInvoiceConversion, jobCardStatusClassFromJob, jobCardStatusLabelFromJob } from "../../lib/shopOwnerJobCards";
+import { isJobRecordEligibleForInvoiceConversion } from "../../lib/shopOwnerJobCards";
 import { resolveJobCardFromApiResponse } from "../../lib/shopOwnerJobCardsApi";
 import { ShopListSkeleton } from "../shop/ShopListSkeletons";
 import { ShopErrorPanel } from "../shop/ShopPanels";
@@ -15,7 +15,6 @@ import {
   buildCustomerBlock,
   currencyLabelFromCode,
   estimateDocumentNo,
-  estimateStatusRibbon,
   estimateTotals,
   extractEstimateLines,
   extractJobNoFromApiEnvelope,
@@ -34,7 +33,7 @@ const OUTLINE_BTN_CLASS =
 const CONVERT_INVOICE_BTN_CLASS =
   "inline-flex items-center gap-1.5 rounded border border-ad-purple bg-white px-3 py-1.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
 
-function EstimateMetaRow({ label, value }: { label: string; value: React.ReactNode }) {
+function EstimateMetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[9.5rem_minmax(0,1fr)] items-baseline gap-x-2">
       <span className="text-right text-sm font-semibold text-gray-700">{label}</span>
@@ -183,16 +182,6 @@ export default function ShopJobCardEstimateView({
     [job, listRow],
   );
 
-  const statusLabel = useMemo(
-    () => (job ? jobCardStatusLabelFromJob(job, listRow) : "—"),
-    [job, listRow],
-  );
-
-  const statusClass = useMemo(
-    () => (job ? jobCardStatusClassFromJob(job, listRow) : "text-gray-700"),
-    [job, listRow],
-  );
-
   const handlePrint = () => {
     window.print();
   };
@@ -279,12 +268,6 @@ export default function ShopJobCardEstimateView({
         id="shop-job-card-estimate-print"
         className="relative overflow-hidden rounded border border-gray-300 bg-white p-4 shadow-sm sm:p-6 print:border-0 print:p-0 print:shadow-none"
       >
-        <div className="pointer-events-none absolute left-0 top-0 z-10 h-16 w-16 overflow-hidden print:absolute">
-          <div className="absolute -left-8 top-4 w-32 -rotate-45 bg-[#2e7d32] py-1 text-center text-[10px] font-bold uppercase tracking-wide text-white">
-            {estimateStatusRibbon(job)}
-          </div>
-        </div>
-
         <div className="mb-4 flex justify-center">
           {logoUrl ? (
             <img src={logoUrl} alt="" className="h-12 max-w-[8rem] object-contain" />
@@ -316,10 +299,6 @@ export default function ShopJobCardEstimateView({
               <EstimateMetaRow
                 label="Date :"
                 value={formatEstimateDate(job.serviceDate ?? job.jobDate ?? job.createdAt)}
-              />
-              <EstimateMetaRow
-                label="Status :"
-                value={<span className={`font-semibold ${statusClass}`}>{statusLabel}</span>}
               />
               {showHst ? <EstimateMetaRow label="HST No. :" value={hstNumber} /> : null}
             </div>

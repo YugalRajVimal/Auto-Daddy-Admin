@@ -7,8 +7,19 @@ import {
   adminPanelTableClasses,
   type AdminPanelTableClasses,
 } from "../../components/admin/adminPanelTableStyles";
+import {
+  CompactField,
+  CompactFormPanel,
+  CompactFormRow,
+} from "../../components/admin/ContentPanel";
+import { ShopReveal } from "../../components/shop/ShopAnimated";
 import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
+import {
+  shopCompactInputClass,
+  shopProfileFormPanelClass,
+  shopProfileFormPanelFooterClass,
+} from "../../components/shop/shopLayoutStyles";
 import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
 import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
@@ -55,10 +66,17 @@ const EMPTY_MESSAGES: Record<WalletView, string> = {
   banks: "No bank accounts match your search.",
 };
 
-const UNAVAILABLE_MESSAGES: Partial<Record<WalletView, string>> = {
-  expenses: "Expenses are not available via API yet.",
-  banks: "Bank account management is not available yet.",
-};
+const EXPENSE_CATEGORIES = Array.from(
+  new Set(DUMMY_SHOP_EXPENSES.map((row) => row.category)),
+).sort();
+
+function todayYMD() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 const SHOP_TABLE_BASE = adminPanelTableClasses(true);
 const SHOP_TABLE: AdminPanelTableClasses = {
@@ -174,11 +192,10 @@ function WalletListFooter({
                 key={pageNumber}
                 type="button"
                 onClick={() => onPageChange(pageNumber)}
-                className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${
-                  isActive
+                className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${isActive
                     ? "bg-gray-500 text-white"
                     : "border border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
                 aria-current={isActive ? "page" : undefined}
               >
                 {pageNumber}
@@ -188,6 +205,237 @@ function WalletListFooter({
         </div>
       ) : null}
     </ShopListFooter>
+  );
+}
+
+function AddNewButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={shopAddNewButtonClass}>
+      + Add New
+    </button>
+  );
+}
+
+function WalletExpenseForm({
+  date,
+  name,
+  category,
+  amount,
+  onDateChange,
+  onNameChange,
+  onCategoryChange,
+  onAmountChange,
+  onSave,
+  onCancel,
+}: {
+  date: string;
+  name: string;
+  category: string;
+  amount: string;
+  onDateChange: (value: string) => void;
+  onNameChange: (value: string) => void;
+  onCategoryChange: (value: string) => void;
+  onAmountChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <CompactFormPanel
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
+      focusOnMount
+      footer={
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
+        >
+          <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
+            You are adding a new expense
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onSave}
+              className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95"
+            >
+              Save
+            </button>
+            <span className="text-xs text-gray-700">
+              or{" "}
+              <button
+                type="button"
+                onClick={onCancel}
+                className="font-medium text-blue-600 underline hover:text-blue-700"
+              >
+                Cancel
+              </button>
+            </span>
+          </div>
+        </div>
+      }
+    >
+      <CompactFormRow className="flex-nowrap items-end gap-x-3 overflow-x-auto">
+        <CompactField label="Date" required className="w-[9.5rem] shrink-0">
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => onDateChange(e.target.value)}
+            className={shopCompactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Name" required className="min-w-[12rem] flex-1">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="Vendor or payee"
+            className={shopCompactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Category" required className="w-[10.5rem] shrink-0">
+          <select
+            value={category}
+            onChange={(e) => onCategoryChange(e.target.value)}
+            className={shopCompactInputClass}
+          >
+            <option value="">Select category</option>
+            {EXPENSE_CATEGORIES.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+        <CompactField label="Amount" required className="w-[8.5rem] shrink-0">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => onAmountChange(e.target.value)}
+            placeholder="0.00"
+            className={shopCompactInputClass}
+          />
+        </CompactField>
+      </CompactFormRow>
+    </CompactFormPanel>
+  );
+}
+
+function WalletBankForm({
+  mode,
+  label,
+  accountName,
+  accountNumber,
+  balance,
+  assignToInvoice,
+  onLabelChange,
+  onAccountNameChange,
+  onAccountNumberChange,
+  onBalanceChange,
+  onAssignToInvoiceChange,
+  onSave,
+  onCancel,
+}: {
+  mode: "add" | "edit";
+  label: string;
+  accountName: string;
+  accountNumber: string;
+  balance: string;
+  assignToInvoice: boolean;
+  onLabelChange: (value: string) => void;
+  onAccountNameChange: (value: string) => void;
+  onAccountNumberChange: (value: string) => void;
+  onBalanceChange: (value: string) => void;
+  onAssignToInvoiceChange: (value: boolean) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const isEdit = mode === "edit";
+
+  return (
+    <CompactFormPanel
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
+      focusOnMount
+      footer={
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
+        >
+          <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
+            {isEdit ? "You are editing a bank account" : "You are adding a new bank account"}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onSave}
+              className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95"
+            >
+              {isEdit ? "Update" : "Save"}
+            </button>
+            <span className="text-xs text-gray-700">
+              or{" "}
+              <button
+                type="button"
+                onClick={onCancel}
+                className="font-medium text-blue-600 underline hover:text-blue-700"
+              >
+                Cancel
+              </button>
+            </span>
+          </div>
+        </div>
+      }
+    >
+      <CompactFormRow className="flex-nowrap items-end gap-x-3 overflow-x-auto">
+        <CompactField label="Bank / Wallet Label" required className="min-w-[11rem] flex-1">
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => onLabelChange(e.target.value)}
+            placeholder="e.g. Business Chequing"
+            className={shopCompactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Account Name" className="min-w-[11rem] flex-1">
+          <input
+            type="text"
+            value={accountName}
+            onChange={(e) => onAccountNameChange(e.target.value)}
+            placeholder="Account holder name"
+            className={shopCompactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Account Number" className="w-[10.5rem] shrink-0">
+          <input
+            type="text"
+            value={accountNumber}
+            onChange={(e) => onAccountNumberChange(e.target.value)}
+            placeholder="****1234"
+            className={shopCompactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Balance" required className="w-[8.5rem] shrink-0">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={balance}
+            onChange={(e) => onBalanceChange(e.target.value)}
+            placeholder="0.00"
+            className={shopCompactInputClass}
+          />
+        </CompactField>
+        <CompactField label="Invoice" className="w-[9.5rem] shrink-0">
+          <label className="flex h-[30px] cursor-pointer items-center gap-2 text-sm font-semibold text-gray-800">
+            <input
+              type="checkbox"
+              checked={assignToInvoice}
+              onChange={(e) => onAssignToInvoiceChange(e.target.checked)}
+              className="h-3.5 w-3.5 accent-ad-purple"
+            />
+            Assign to invoice
+          </label>
+        </CompactField>
+      </CompactFormRow>
+    </CompactFormPanel>
   );
 }
 
@@ -502,6 +750,20 @@ export default function ShopWalletPage() {
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set());
+  const [expenses, setExpenses] = useState<ShopWalletExpenseRow[]>(() => [...DUMMY_SHOP_EXPENSES]);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [expenseDate, setExpenseDate] = useState(todayYMD);
+  const [expenseName, setExpenseName] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState(EXPENSE_CATEGORIES[0] ?? "");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [banks, setBanks] = useState<ShopWalletBankRow[]>(() => [...DUMMY_SHOP_BANKS]);
+  const [showBankForm, setShowBankForm] = useState(false);
+  const [editingBankId, setEditingBankId] = useState<string | null>(null);
+  const [bankLabel, setBankLabel] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankBalance, setBankBalance] = useState("");
+  const [bankAssignToInvoice, setBankAssignToInvoice] = useState(false);
   const { refreshSection } = useShopOwnerData();
   const {
     paid: apiPaidAll,
@@ -527,8 +789,6 @@ export default function ShopWalletPage() {
     : apiUnpaidOnline.length > 0
       ? apiUnpaidOnline
       : filterWalletInvoiceRows(apiUnpaidAll, { paid: false });
-  const expenses = USE_DUMMY_SHOP_WALLET ? DUMMY_SHOP_EXPENSES : [];
-  const banks = USE_DUMMY_SHOP_WALLET ? DUMMY_SHOP_BANKS : [];
   const showLoading = !USE_DUMMY_SHOP_WALLET && loading;
   const showError = !USE_DUMMY_SHOP_WALLET && error;
 
@@ -574,6 +834,123 @@ export default function ShopWalletPage() {
     () => filteredBanks.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
     [filteredBanks, safePage],
   );
+
+  const openExpenseForm = useCallback(() => {
+    setExpenseDate(todayYMD());
+    setExpenseName("");
+    setExpenseCategory(EXPENSE_CATEGORIES[0] ?? "");
+    setExpenseAmount("");
+    setShowExpenseForm(true);
+  }, []);
+
+  const closeExpenseForm = useCallback(() => {
+    setShowExpenseForm(false);
+  }, []);
+
+  const openAddBankForm = useCallback(() => {
+    setEditingBankId(null);
+    setBankLabel("");
+    setBankAccountName("");
+    setBankAccountNumber("");
+    setBankBalance("");
+    setBankAssignToInvoice(banks.length === 0);
+    setShowBankForm(true);
+  }, [banks.length]);
+
+  const openEditBankForm = useCallback(() => {
+    const row = banks.find((bank) => selectedRowIds.has(bank.id));
+    if (!row) {
+      toast.info("Select one bank account to edit.");
+      return;
+    }
+    setEditingBankId(row.id);
+    setBankLabel(row.label);
+    setBankAccountName(row.accountName === "—" ? "" : row.accountName);
+    setBankAccountNumber(row.accountNumber === "—" ? "" : row.accountNumber);
+    setBankBalance(String(row.balance));
+    setBankAssignToInvoice(row.assignToInvoice);
+    setShowBankForm(true);
+  }, [banks, selectedRowIds]);
+
+  const closeBankForm = useCallback(() => {
+    setShowBankForm(false);
+    setEditingBankId(null);
+  }, []);
+
+  const handleSaveBank = () => {
+    const trimmedLabel = bankLabel.trim();
+    if (!trimmedLabel) {
+      toast.error("Enter a bank or wallet label.");
+      return;
+    }
+    const balance = Number(bankBalance);
+    if (!Number.isFinite(balance)) {
+      toast.error("Enter a valid balance.");
+      return;
+    }
+
+    const bankId = editingBankId ?? `bank-${Date.now()}`;
+    const nextRow: ShopWalletBankRow = {
+      id: bankId,
+      label: trimmedLabel.toUpperCase(),
+      accountName: bankAccountName.trim() || "—",
+      accountNumber: bankAccountNumber.trim() || "—",
+      balance,
+      assignToInvoice: bankAssignToInvoice,
+    };
+
+    setBanks((prev) => {
+      const updated = editingBankId
+        ? prev.map((row) => (row.id === editingBankId ? nextRow : row))
+        : [nextRow, ...prev];
+      if (!nextRow.assignToInvoice) return updated;
+      return updated.map((row) => ({
+        ...row,
+        assignToInvoice: row.id === bankId,
+      }));
+    });
+    setPage(1);
+    setSelectedRowIds(new Set());
+    toast.success(editingBankId ? "Bank account updated." : "Bank account added.");
+    closeBankForm();
+  };
+
+  const handleSaveExpense = () => {
+    const trimmedName = expenseName.trim();
+    if (!trimmedName) {
+      toast.error("Enter an expense name.");
+      return;
+    }
+    if (!expenseCategory.trim()) {
+      toast.error("Choose a category.");
+      return;
+    }
+    const amount = Number(expenseAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Enter a valid amount.");
+      return;
+    }
+
+    setExpenses((prev) => [
+      {
+        id: `exp-${Date.now()}`,
+        date: expenseDate,
+        name: trimmedName,
+        category: expenseCategory,
+        amount,
+      },
+      ...prev,
+    ]);
+    setPage(1);
+    toast.success("Expense added.");
+    closeExpenseForm();
+  };
+
+  useEffect(() => {
+    setShowExpenseForm(false);
+    setShowBankForm(false);
+    setEditingBankId(null);
+  }, [view]);
 
   useEffect(() => {
     setPage(1);
@@ -625,7 +1002,13 @@ export default function ShopWalletPage() {
     [view, selectedRowIds, filteredList],
   );
 
+  const selectedBankRows = useMemo(
+    () => (view === "banks" ? banks.filter((row) => selectedRowIds.has(row.id)) : []),
+    [view, selectedRowIds, banks],
+  );
+
   const hasUnpaidSelection = selectedUnpaidRows.length > 0;
+  const hasSingleBankSelection = selectedBankRows.length === 1;
   const invoiceUrlRows = useMemo(
     () => selectedUnpaidRows.filter((row) => pickInvoiceUrl(row.raw)),
     [selectedUnpaidRows],
@@ -723,13 +1106,18 @@ export default function ShopWalletPage() {
 
   const handleClearSelection = () => setSelectedRowIds(new Set());
 
-  const unavailableMessage = !USE_DUMMY_SHOP_WALLET ? UNAVAILABLE_MESSAGES[view] : undefined;
+  const walletFormOpen =
+    (showExpenseForm && view === "expenses") || (showBankForm && view === "banks");
+  const pageHeading =
+    showExpenseForm && view === "expenses"
+      ? "Add Expense"
+      : showBankForm && view === "banks"
+        ? editingBankId
+          ? "Edit Bank Account"
+          : "Add Bank Account"
+        : SECTION_HEADINGS[view];
 
   const renderListContent = () => {
-    if (unavailableMessage) {
-      return <p className="text-center text-sm text-gray-600">{unavailableMessage}</p>;
-    }
-
     if (showLoading) {
       return <ShopListSkeleton variant="profile-table" className="w-full" />;
     }
@@ -805,7 +1193,7 @@ export default function ShopWalletPage() {
   return (
     <ShopPageShell
       title="Wallet"
-      pageHeading={SECTION_HEADINGS[view]}
+      pageHeading={pageHeading}
       metaTitle="Wallet | AutoDaddy"
       metaDescription="Auto shop wallet and invoices"
       sidebarVariant="nav"
@@ -846,10 +1234,45 @@ export default function ShopWalletPage() {
       faqsDescription={faqsDescription}
     >
       <div className="space-y-1">
-        <WalletSearchBar
-          value={search}
-          onChange={setSearch}
-          leading={
+        <ShopReveal show={showExpenseForm && view === "expenses"}>
+          <WalletExpenseForm
+            date={expenseDate}
+            name={expenseName}
+            category={expenseCategory}
+            amount={expenseAmount}
+            onDateChange={setExpenseDate}
+            onNameChange={setExpenseName}
+            onCategoryChange={setExpenseCategory}
+            onAmountChange={setExpenseAmount}
+            onSave={handleSaveExpense}
+            onCancel={closeExpenseForm}
+          />
+        </ShopReveal>
+
+        <ShopReveal show={showBankForm && view === "banks"}>
+          <WalletBankForm
+            mode={editingBankId ? "edit" : "add"}
+            label={bankLabel}
+            accountName={bankAccountName}
+            accountNumber={bankAccountNumber}
+            balance={bankBalance}
+            assignToInvoice={bankAssignToInvoice}
+            onLabelChange={setBankLabel}
+            onAccountNameChange={setBankAccountName}
+            onAccountNumberChange={setBankAccountNumber}
+            onBalanceChange={setBankBalance}
+            onAssignToInvoiceChange={setBankAssignToInvoice}
+            onSave={handleSaveBank}
+            onCancel={closeBankForm}
+          />
+        </ShopReveal>
+
+        {!walletFormOpen ? (
+          <>
+            <WalletSearchBar
+              value={search}
+              onChange={setSearch}
+              leading={
             view === "unpaid" ? (
               <>
                 <button
@@ -912,17 +1335,38 @@ export default function ShopWalletPage() {
                   Clear Selection
                 </button>
               </>
+            ) : view === "banks" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={openEditBankForm}
+                  disabled={!hasSingleBankSelection}
+                  className={WALLET_BULK_BUTTON_CLASS}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  disabled={selectedBankRows.length === 0}
+                  className={WALLET_BULK_BUTTON_CLASS}
+                >
+                  Clear Selection
+                </button>
+              </>
             ) : null
           }
-          trailing={
-            view === "expenses" ? (
-              <button type="button" disabled className={`${shopAddNewButtonClass} opacity-60`}>
-                + Add New
-              </button>
-            ) : null
-          }
-        />
-        {renderListContent()}
+              trailing={
+                view === "expenses" ? (
+                  <AddNewButton onClick={openExpenseForm} />
+                ) : view === "banks" ? (
+                  <AddNewButton onClick={openAddBankForm} />
+                ) : null
+              }
+            />
+            {renderListContent()}
+          </>
+        ) : null}
       </div>
     </ShopPageShell>
   );
