@@ -145,10 +145,6 @@ function compactFormRowGridCols(childCount: number) {
   return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
 }
 
-function compactFormRowUsesFlexLayout(className: string) {
-  return /\bflex-nowrap\b/.test(className) || /\boverflow-x-auto\b/.test(className);
-}
-
 function compactFormRowHasExplicitGridCols(className: string) {
   return /\bgrid-cols-/.test(className);
 }
@@ -160,38 +156,28 @@ export function CompactFormRow({
 }: {
   children: ReactNode;
   className?: string;
-  /** When set, fixes the row to this many equal-width columns (fields share full row width). */
+  /** When set, lays out fields in a responsive grid with this many columns. */
   columns?: number;
 }) {
   const childCount = compactFormRowChildCount(children);
 
-  if (compactFormRowUsesFlexLayout(className)) {
+  if (columns != null || compactFormRowHasExplicitGridCols(className)) {
+    const columnCount = columns ?? Math.min(Math.max(childCount, 1), 4);
     return (
-      <div className={twMerge("flex w-full flex-wrap items-end gap-x-4 gap-y-4", className)}>
+      <div
+        className={twMerge(
+          "grid w-full items-end gap-x-4 gap-y-4",
+          compactFormRowGridCols(columnCount),
+          className
+        )}
+      >
         {children}
       </div>
     );
   }
-
-  if (compactFormRowHasExplicitGridCols(className)) {
-    return (
-      <div className={twMerge("grid w-full gap-x-4 gap-y-4 items-end", className)}>
-        {children}
-      </div>
-    );
-  }
-
-  const columnCount =
-    columns ?? (childCount >= 4 ? 4 : Math.max(childCount, 1));
 
   return (
-    <div
-      className={twMerge(
-        "grid w-full items-end gap-x-4 gap-y-4",
-        compactFormRowGridCols(columnCount),
-        className
-      )}
-    >
+    <div className={twMerge("flex w-full flex-wrap items-end gap-x-4 gap-y-4", className)}>
       {children}
     </div>
   );
@@ -209,7 +195,7 @@ export function CompactField({
   className?: string;
 }) {
   return (
-    <div className={`min-w-0 flex-1 ${className}`}>
+    <div className={twMerge("min-w-0 flex-1", className)}>
       <label className="mb-1 block text-xs font-bold text-ad-green-dark">
         {label}
         {required ? <span className="text-red-600"> *</span> : null}

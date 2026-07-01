@@ -561,7 +561,7 @@ export default function Reports() {
         />
       }
     >
-      <CompactFormRow className="w-full flex-nowrap items-end overflow-x-auto">
+      <CompactFormRow className="w-full items-end">
         <CompactField label="Date Range" required className={dateRangeFieldWidth}>
           <div className="flex items-center gap-1.5">
             <input
@@ -583,51 +583,49 @@ export default function Reports() {
             />
           </div>
         </CompactField>
-        <div className="ml-auto flex shrink-0 items-end gap-x-4">
-          <CompactField
-            label={selectedReport === "bank" ? "Account" : "Category"}
-            className={compactFixedFieldWidth}
+        <CompactField
+          label={selectedReport === "bank" ? "Account" : "Category"}
+          className={compactFixedFieldWidth}
+        >
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className={compactInputClass}
           >
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className={compactInputClass}
-            >
-              {selectedReport === "bank" ? (
-                <>
-                  <option value="">All Accounts</option>
-                  {bankAccountOptions.map((bank) => (
-                    <option key={bank.value} value={bank.value}>
-                      {bank.label}
-                    </option>
-                  ))}
-                </>
-              ) : (
-                <>
-                  <option value="">All Categories</option>
-                  {activeCategories.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </>
-              )}
-            </select>
-          </CompactField>
-          <CompactField label="Group By" className={compactFixedFieldWidth}>
-            <select
-              value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-              className={compactInputClass}
-            >
-              {GROUP_BY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </CompactField>
-        </div>
+            {selectedReport === "bank" ? (
+              <>
+                <option value="">All Accounts</option>
+                {bankAccountOptions.map((bank) => (
+                  <option key={bank.value} value={bank.value}>
+                    {bank.label}
+                  </option>
+                ))}
+              </>
+            ) : (
+              <>
+                <option value="">All Categories</option>
+                {activeCategories.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
+        </CompactField>
+        <CompactField label="Group By" className={compactFixedFieldWidth}>
+          <select
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+            className={compactInputClass}
+          >
+            {GROUP_BY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </CompactField>
       </CompactFormRow>
     </CompactFormPanel>
   ) : null;

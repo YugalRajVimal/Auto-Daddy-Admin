@@ -643,7 +643,7 @@ export default function Domain() {
             {domainsError}
           </div>
         )}
-        <CompactFormRow className="w-full items-start flex-nowrap overflow-x-auto">
+        <CompactFormRow className="w-full items-start">
           <CompactField label="User Type" required className={compactFixedFieldWidth}>
             <select
               name="userType"

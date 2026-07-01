@@ -602,7 +602,7 @@ export default function Invitehelp({
         </div>
       }
     >
-      <CompactFormRow className="w-full flex-nowrap items-start">
+      <CompactFormRow className="w-full items-start">
         <CompactField label="Date">
           <div className={compactReadOnlyValueClass}>{receivedDate(viewingReceived)}</div>
         </CompactField>
