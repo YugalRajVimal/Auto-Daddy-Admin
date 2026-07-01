@@ -10,7 +10,9 @@ import {
   FiStar,
   FiTool,
 } from "react-icons/fi";
+import DashboardPanelCard from "../../components/COMP";
 import OwnerPageShell, { OwnerPageSidebar } from "../../components/owner/OwnerPageShell";
+import { OwnerAutoShopsTable } from "../../components/owner/OwnerPanelTables";
 import {
   OwnerCollapsibleSidebarItem,
   OwnerCollapsibleSidebarList,
@@ -22,7 +24,6 @@ import { useCarOwnerAutoShops } from "../../hooks/useCarOwnerAutoShops";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import { useOwnerNavReset, useOwnerSidebarDefault } from "../../hooks/useOwnerNavReset";
 import { isCarOwnerShopOpenToday } from "../../lib/carOwnerAutoShops";
-import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import type { CarOwnerAutoShopListItem } from "../../types/carOwnerAutoShops";
 
 const SELECT_VEHICLE_PROMPT = "Select a vehicle from the sidebar to find matching auto shops.";
@@ -95,47 +96,6 @@ function ContactActionButton({
   );
 }
 
-function ShopListRow({
-  shop,
-  onExpand,
-}: {
-  shop: CarOwnerAutoShopListItem;
-  onExpand: () => void;
-}) {
-  const openToday = isCarOwnerShopOpenToday(shop);
-  const logoUri = normalizeMediaUrl(shop.logoUrl);
-  const phone = shop.phone.trim();
-
-  return (
-    <button
-      type="button"
-      onClick={onExpand}
-      className="mb-3 flex w-full cursor-pointer items-center gap-3 rounded-xl border border-[#b2e0a0] bg-gradient-to-r from-[#e8ffe8] to-[#f4fff0] px-3 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-ad-green hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ad-purple/40"
-    >
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white bg-white shadow-sm ring-1 ring-gray-200/80">
-        {logoUri ? <img src={logoUri} alt="" className="h-full w-full object-cover" /> : null}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-gray-900">{shop.name}</p>
-        <p className="truncate text-sm text-blue-600">{phone || "Phone not listed"}</p>
-      </div>
-
-      <span
-        className={`shrink-0 rounded-full px-4 py-1 text-xs font-bold text-white shadow-sm ${
-          openToday ? "bg-ad-green" : "bg-gray-400"
-        }`}
-      >
-        {openToday ? "Shop is open" : "Shop is closed"}
-      </span>
-
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center text-2xl font-bold leading-none text-ad-purple">
-        <FiPlus aria-hidden />
-      </span>
-    </button>
-  );
-}
-
 function serviceRequestKey(shopId: string, serviceId: string, serviceName: string): string {
   return `${shopId}:${serviceId}:${serviceName}`;
 }
@@ -168,8 +128,8 @@ function ShopExpandedPanel({
   const services = shop.mainServiceItems;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#9fd48f] bg-gradient-to-br from-[#e8ffe8] via-[#f0fff4] to-white shadow-lg ring-1 ring-white/80">
-      <div className="flex items-start gap-4 border-b border-[#b2e0a0]/70 bg-white/40 px-4 py-4 sm:px-5">
+    <>
+      <div className="flex items-start gap-4 border-b border-ad-form-border pb-4">
         <div className="min-w-0 flex-1">
           <p className="text-lg font-bold text-gray-900">{shop.name}</p>
           <p className="mt-0.5 text-sm font-medium text-blue-600">{phone || "Phone not listed"}</p>
@@ -197,7 +157,7 @@ function ShopExpandedPanel({
         </button>
       </div>
 
-      <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-2">
+      <div className="grid gap-5 pt-4 lg:grid-cols-2">
         <div className="rounded-xl border border-white/80 bg-white/70 p-4 shadow-sm backdrop-blur-sm">
           <p className="mb-4 flex items-center gap-2 text-sm font-bold text-gray-800">
             <FiMapPin size={15} className="text-ad-purple" />
@@ -337,7 +297,7 @@ function ShopExpandedPanel({
 
       {statusMessage ? (
         <p
-          className={`border-t border-[#b2e0a0]/60 px-4 py-3 text-center text-xs font-semibold sm:px-5 ${
+          className={`border-t border-ad-form-border pt-3 text-center text-xs font-semibold ${
             statusMessage.includes("sent") || statusMessage.includes("Connected") || statusMessage.includes("Request")
               ? "text-ad-green"
               : "text-red-600"
@@ -346,7 +306,7 @@ function ShopExpandedPanel({
           {statusMessage}
         </p>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -546,20 +506,20 @@ export default function OwnerAutoShopsPage() {
             No auto repair shops found in your area yet.
           </div>
         ) : (
-          <div className="flex flex-1 flex-col overflow-y-auto px-1 pb-2">
+          <div className="flex flex-1 flex-col overflow-y-auto">
             {expandedShop ? (
-              <ShopExpandedPanel
-                shop={expandedShop}
-                connectingServiceKey={connectingServiceKey}
-                sentServiceKeys={sentServiceKeys}
-                statusMessage={statusMessage}
-                onCollapse={handleCollapseShop}
-                onConnect={(serviceId, serviceName) => void handleConnect(serviceId, serviceName)}
-              />
+              <DashboardPanelCard variant="form" className="mb-0 flex min-h-0 flex-1 flex-col">
+                <ShopExpandedPanel
+                  shop={expandedShop}
+                  connectingServiceKey={connectingServiceKey}
+                  sentServiceKeys={sentServiceKeys}
+                  statusMessage={statusMessage}
+                  onCollapse={handleCollapseShop}
+                  onConnect={(serviceId, serviceName) => void handleConnect(serviceId, serviceName)}
+                />
+              </DashboardPanelCard>
             ) : (
-              shops.map((shop) => (
-                <ShopListRow key={shop.id} shop={shop} onExpand={() => handleExpandShop(shop.id)} />
-              ))
+              <OwnerAutoShopsTable shops={shops} onRowClick={(shop) => handleExpandShop(shop.id)} />
             )}
           </div>
         )}

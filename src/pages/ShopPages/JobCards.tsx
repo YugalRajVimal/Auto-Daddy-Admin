@@ -361,7 +361,9 @@ export default function ShopJobCardsPage() {
   const mockLedger = useMockShopInvoiceLedger();
   const {
     paidCash: apiPaidCash,
+    paid: apiPaidAll,
     unpaid: apiUnpaidAll,
+    paidOnline: apiPaidOnline,
     unpaidOnline: apiUnpaidOnline,
     loading: walletLoading,
     error: walletError,
@@ -373,15 +375,25 @@ export default function ShopJobCardsPage() {
 
   const convertedInvoiceCards = useMemo(() => {
     if (USE_DUMMY_SHOP_WALLET) {
-      return mockLedger.unpaid;
+      return mergeJobCardListRows(mockLedger.unpaid, mockLedger.paid);
     }
-    const fromWallet =
-      apiUnpaidOnline.length > 0
-        ? apiUnpaidOnline
-        : filterWalletInvoiceRows(apiUnpaidAll, { paid: false });
-    const fromJobCards = filterWalletInvoiceRows(jobCards, { paid: false });
+    const fromWallet = mergeJobCardListRows(
+      apiUnpaidOnline,
+      apiPaidOnline,
+      filterWalletInvoiceRows(apiUnpaidAll),
+      filterWalletInvoiceRows(apiPaidAll),
+    );
+    const fromJobCards = filterWalletInvoiceRows(jobCards);
     return mergeJobCardListRows(fromWallet, fromJobCards);
-  }, [mockLedger.unpaid, apiUnpaidOnline, apiUnpaidAll, jobCards]);
+  }, [
+    mockLedger.unpaid,
+    mockLedger.paid,
+    apiUnpaidOnline,
+    apiPaidOnline,
+    apiUnpaidAll,
+    apiPaidAll,
+    jobCards,
+  ]);
 
   const listCards = useMemo(() => {
     const filterSearch = (rows: JobCardListRow[]) =>

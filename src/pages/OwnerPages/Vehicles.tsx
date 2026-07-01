@@ -15,6 +15,7 @@ import { OwnerHeroCardInlineToolbar } from "../../components/owner/OwnerHeroCard
 import {
   OwnerInvoicesTable,
   OwnerJobCardsTable,
+  OwnerVehicleDocumentsTable,
 } from "../../components/owner/OwnerPanelTables";
 import OwnerPageShell, { OwnerPageSidebar } from "../../components/owner/OwnerPageShell";
 import OwnerVehicleSectionsSidebar, {
@@ -142,117 +143,6 @@ function vehicleDetailsBracket(vehicle: CarOwnerVehicle): string {
   const year = vehicle.year != null && String(vehicle.year).trim() ? String(vehicle.year).trim() : "";
   const parts = [makeName, model, year].filter(Boolean);
   return parts.length ? `(${parts.join(" ")})` : "";
-}
-
-function DocumentFieldRow({
-  vehicleId,
-  fieldKey,
-  label,
-  uri,
-  licensePlate,
-  vehicleDetails,
-  busy,
-  disabled,
-  onUpload,
-}: {
-  vehicleId: string;
-  fieldKey: VehicleDocumentFieldKey;
-  label: string;
-  uri: string | null;
-  licensePlate?: string;
-  vehicleDetails?: string;
-  busy: boolean;
-  disabled: boolean;
-  onUpload: (vehicleId: string, field: VehicleDocumentFieldKey, file: File) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const plate = licensePlate?.trim().toUpperCase() ?? "";
-
-  return (
-    <div className="flex flex-wrap items-center gap-4 border-t border-[#b2e0a0] bg-white/60 px-4 py-3 first:border-t-0">
-      <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-300 bg-gray-50">
-        {uri ? (
-          <a href={uri} target="_blank" rel="noopener noreferrer" className="h-full w-full">
-            <img src={uri} alt="" className="h-full w-full object-cover" />
-          </a>
-        ) : (
-          <span className="text-xs text-gray-400">No file</span>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold text-[#006600]">{label}</p>
-        <p className="text-xs text-gray-600">{uri ? "Tap image to view full size" : "Not uploaded yet"}</p>
-      </div>
-
-      <div className="shrink-0 text-center sm:min-w-[120px]">
-        {plate ? <p className="text-base font-bold tracking-wide text-gray-900">{plate}</p> : null}
-        {vehicleDetails ? <p className="text-xs font-semibold text-gray-600">{vehicleDetails}</p> : null}
-      </div>
-
-      <div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*,.pdf"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) onUpload(vehicleId, fieldKey, file);
-          }}
-        />
-        <button
-          type="button"
-          disabled={disabled || busy}
-          onClick={() => inputRef.current?.click()}
-          className="rounded border border-[#008000] bg-white px-3 py-1.5 text-xs font-semibold text-[#006600] hover:bg-[#CCFFCC] disabled:opacity-50"
-        >
-          {busy ? "Uploading…" : uri ? "Replace" : "Upload"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function VehicleDocumentsPanel({
-  vehicleId,
-  licensePlate,
-  vehicleDetails,
-  busyField,
-  mutating,
-  onUpload,
-  fields,
-}: {
-  vehicleId: string;
-  licensePlate?: string;
-  vehicleDetails?: string;
-  busyField: string | null;
-  mutating: boolean;
-  onUpload: (vehicleId: string, field: VehicleDocumentFieldKey, file: File) => void;
-  fields: Array<{ key: VehicleDocumentFieldKey; label: string; uri: string | null }>;
-}) {
-  return (
-    <div className="overflow-hidden rounded-md border border-[#b2e0a0] bg-[#e8ffe8] shadow-sm">
-      {fields.map((field) => {
-        const fieldBusy = busyField === `${vehicleId}:${field.key}`;
-        return (
-          <DocumentFieldRow
-            key={field.key}
-            vehicleId={vehicleId}
-            fieldKey={field.key}
-            label={field.label}
-            uri={field.uri}
-            licensePlate={licensePlate}
-            vehicleDetails={vehicleDetails}
-            busy={fieldBusy}
-            disabled={mutating && !fieldBusy}
-            onUpload={onUpload}
-          />
-        );
-      })}
-    </div>
-  );
 }
 
 function odometerToNumber(value: string | number | null | undefined): number | null {
@@ -712,7 +602,7 @@ export default function OwnerVehiclesPage() {
           );
         }
         return (
-          <VehicleDocumentsPanel
+          <OwnerVehicleDocumentsTable
             vehicleId={selectedVehicle.id}
             licensePlate={selectedVehicle.licensePlateNo ?? undefined}
             vehicleDetails={vehicleDetailsBracket(selectedVehicle)}
