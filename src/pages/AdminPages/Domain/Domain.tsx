@@ -10,6 +10,7 @@ import {
   CompactFormRow,
   compactFixedFieldWidth,
   compactInputClass,
+  compactReadOnlyValueClass,
 } from "../../../components/admin/ContentPanel";
 
 interface BusinessProfile {
@@ -57,27 +58,32 @@ const EMPTY_DOMAIN_FORM: DomainForm = {
   dns: "",
 };
 
-interface Ad {
+interface DomainEntry {
   _id: string;
-  category: string;
-  websiteURL: string;
-  imageUpload: string;
-  createdAt: string;
-  updatedAt: string;
+  userName?: string;
+  userType?: string;
+  domain?: string;
+  websiteURL?: string;
+  expiry?: string;
+  provider?: string;
+  category?: string;
+  dns?: string;
+  imageUpload?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-type DealerAdRow = {
+type DomainRow = {
   id: string;
-  shopName: string;
-  phone: string;
-  city: string;
-  date: string;
-  adds: number;
-  invoice: number;
-  daysLeft: number;
-  sent: number;
-  status: string;
-  owner?: AutoShopOwner;
+  userType: string;
+  userName: string;
+  domain: string;
+  expiry: string;
+  expiryRaw: string;
+  provider: string;
+  providerLabel: string;
+  dns: string;
+  owner: AutoShopOwner;
 };
 
 const PAGE_TITLE = "Domain Manager";
@@ -95,17 +101,14 @@ const PROVIDER_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-const DEALER_HEADINGS = [
+const DOMAIN_HEADINGS = [
   { value: "all", label: "Select Heading" },
-  { value: "shopName", label: "Shop Name" },
-  { value: "phone", label: "Phone" },
-  { value: "city", label: "City" },
-  { value: "date", label: "Date" },
-  { value: "adds", label: "Adds" },
-  { value: "invoice", label: "Invoice" },
-  { value: "daysLeft", label: "Days Left" },
-  { value: "sent", label: "Sent" },
-  { value: "status", label: "Status" },
+  { value: "userType", label: "User Type" },
+  { value: "userName", label: "User Name" },
+  { value: "domain", label: "Domain" },
+  { value: "expiry", label: "Expiry" },
+  { value: "providerLabel", label: "Provider" },
+  { value: "dns", label: "DNS" },
 ];
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -116,58 +119,58 @@ function formatDisplayDate(iso: string) {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-function getOwnerStatus(owner: AutoShopOwner): { label: string; color: string } {
-  if (owner.isDisabled) return { label: "Suspended", color: "#dc3545" };
-  if (!owner.isProfileComplete) return { label: "Incomplete", color: "#ffc107" };
-  if (!owner.businessProfile) return { label: "No Business", color: "#999" };
-  return { label: "Active", color: "#28a745" };
+function toDateInputValue(value?: string) {
+  if (!value) return "";
+  return value.slice(0, 10);
 }
 
-function ownerToDealerRow(owner: AutoShopOwner, index: number): DealerAdRow {
-  const status = getOwnerStatus(owner);
-  return {
-    id: owner._id,
-    shopName: owner.businessProfile?.businessName || owner.name || "—",
-    phone: `${owner.countryCode ? `${owner.countryCode} ` : ""}${owner.phone || "—"}`,
-    city: owner.businessProfile?.city || "—",
-    date: owner.createdAt ? formatDisplayDate(owner.createdAt) : "—",
-    adds: (index % 7) + 1,
-    invoice: 1000 + index,
-    daysLeft: 30 - (index % 31),
-    sent: index % 6,
-    status: status.label,
-    owner,
-  };
+function userTypeLabel(value: string) {
+  return USER_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
-function adImageUrl(imageUpload: string) {
-  if (!imageUpload) return "";
-  return imageUpload.startsWith("http")
-    ? imageUpload
-    : `${API_URL}/${imageUpload.replace(/^\.?\/?/, "")}`;
+function providerLabel(value: string) {
+  return PROVIDER_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
 function ownerDisplayName(owner: AutoShopOwner) {
   return owner.businessProfile?.businessName || owner.name || "—";
 }
 
+function entryToDomainRow(entry: DomainEntry, owner: AutoShopOwner): DomainRow {
+  const domain = entry.domain || entry.websiteURL || "";
+  const provider = entry.provider || entry.category || "";
+  const expiryRaw = entry.expiry || "";
+  const dns = entry.dns || "";
+
+  return {
+    id: entry._id,
+    userType: entry.userType || "shopOwner",
+    userName: entry.userName || ownerDisplayName(owner),
+    domain: domain || "—",
+    expiry: expiryRaw ? formatDisplayDate(expiryRaw) : "—",
+    expiryRaw,
+    provider,
+    providerLabel: provider ? providerLabel(provider) : "—",
+    dns: dns || "—",
+    owner,
+  };
+}
+
 export default function Domain() {
   const [owners, setOwners] = useState<AutoShopOwner[]>([]);
   const [carOwners, setCarOwners] = useState<CarOwner[]>([]);
-  const [ownersLoading, setOwnersLoading] = useState(false);
-  const [ownersError, setOwnersError] = useState<string | null>(null);
+  const [domains, setDomains] = useState<DomainRow[]>([]);
+  const [domainsLoading, setDomainsLoading] = useState(false);
+  const [domainsError, setDomainsError] = useState<string | null>(null);
 
   const [activeOwner, setActiveOwner] = useState<AutoShopOwner | null>(null);
   const [viewingOwner, setViewingOwner] = useState<AutoShopOwner | null>(null);
   const [showForm, setShowForm] = useState(false);
 
-  const [ads, setAds] = useState<Ad[]>([]);
-  const [adsLoading, setAdsLoading] = useState(false);
-  const [adsError, setAdsError] = useState<string | null>(null);
-
   const [form, setForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
   const [formMode, setFormMode] = useState<"CREATE" | "EDIT" | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
   const [heading, setHeading] = useState("all");
@@ -189,45 +192,46 @@ export default function Domain() {
     }
   };
 
+  const fetchAllDomains = async (ownerList: AutoShopOwner[]) => {
+    const ownersWithProfile = ownerList.filter((o) => o.businessProfile?._id);
+    const results = await Promise.all(
+      ownersWithProfile.map(async (owner) => {
+        const businessId = owner.businessProfile!._id;
+        try {
+          const res = await axios.get(
+            `${API_URL}/api/admin/business-profiles/${businessId}/ads`
+          );
+          const entries: DomainEntry[] = res.data.data || [];
+          return entries.map((entry) => entryToDomainRow(entry, owner));
+        } catch {
+          return [];
+        }
+      })
+    );
+    setDomains(results.flat());
+  };
+
   const fetchOwners = async () => {
-    setOwnersLoading(true);
-    setOwnersError(null);
+    setDomainsLoading(true);
+    setDomainsError(null);
     try {
       const res = await axios.get(`${API_URL}/api/admin/autoshopowners`);
-      setOwners(res.data.data || []);
+      const ownerList: AutoShopOwner[] = res.data.data || [];
+      setOwners(ownerList);
+      await fetchAllDomains(ownerList);
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      setOwnersError(message || "Failed to fetch shop owners");
+      setDomainsError(message || "Failed to fetch shop owners");
     } finally {
-      setOwnersLoading(false);
+      setDomainsLoading(false);
     }
   };
 
-  const fetchAds = async (owner: AutoShopOwner) => {
-    setAdsLoading(true);
-    setAdsError(null);
-    setAds([]);
-    try {
-      const businessId = owner.businessProfile?._id;
-      if (!businessId) {
-        setAds([]);
-        setAdsLoading(false);
-        return;
-      }
-      const res = await axios.get(`${API_URL}/api/admin/business-profiles/${businessId}/ads`);
-      setAds(res.data.data || []);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "response" in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setAdsError(message || "Failed to fetch domains");
-    } finally {
-      setAdsLoading(false);
-    }
+  const refreshDomains = async () => {
+    await fetchAllDomains(owners);
   };
 
   const handleFormChange = (
@@ -243,20 +247,16 @@ export default function Domain() {
     setEditId(null);
   };
 
-  const openOwnerView = async (owner: AutoShopOwner) => {
+  const openOwnerView = (owner: AutoShopOwner) => {
     setActiveOwner(owner);
     setViewingOwner(owner);
     setShowForm(false);
-    setAds([]);
-    setAdsError(null);
     resetForm();
-    await fetchAds(owner);
   };
 
   const closeOwnerView = () => {
     setViewingOwner(null);
     setActiveOwner(null);
-    setAds([]);
     setShowForm(false);
     resetForm();
   };
@@ -272,23 +272,24 @@ export default function Domain() {
     });
     setEditId(null);
     setShowForm(true);
-    setAdsError(null);
+    setDomainsError(null);
   };
 
-  const openEditForm = (ad: Ad) => {
+  const openEditForm = (row: DomainRow) => {
+    setActiveOwner(row.owner);
     setFormMode("EDIT");
-    setEditId(ad._id);
+    setEditId(row.id);
     setForm({
-      userName: activeOwner ? ownerDisplayName(activeOwner) : "",
-      userType: "shopOwner",
-      domain: ad.websiteURL,
-      expiry: ad.createdAt ? ad.createdAt.slice(0, 10) : "",
-      provider: ad.category,
-      dns: "",
+      userName: row.userName === "—" ? ownerDisplayName(row.owner) : row.userName,
+      userType: row.userType,
+      domain: row.domain === "—" ? "" : row.domain,
+      expiry: toDateInputValue(row.expiryRaw),
+      provider: row.provider,
+      dns: row.dns === "—" ? "" : row.dns,
     });
     setShowForm(true);
     setViewingOwner(null);
-    setAdsError(null);
+    setDomainsError(null);
   };
 
   const handleCancelForm = () => {
@@ -297,23 +298,28 @@ export default function Domain() {
     if (activeOwner) setViewingOwner(activeOwner);
   };
 
-  const handleDelete = async (adId: string) => {
-    if (!activeOwner?.businessProfile?._id || !window.confirm("Delete this domain entry?")) return;
-    setAdsLoading(true);
-    setAdsError(null);
+  const handleDelete = async (row: DomainRow) => {
+    const businessId = row.owner.businessProfile?._id;
+    if (!businessId || !window.confirm("Delete this domain entry?")) return;
+    setDomainsLoading(true);
+    setDomainsError(null);
     try {
       await axios.delete(
-        `${API_URL}/api/admin/business-profiles/${activeOwner.businessProfile._id}/ads/${adId}`
+        `${API_URL}/api/admin/business-profiles/${businessId}/ads/${row.id}`
       );
-      await fetchAds(activeOwner);
+      await refreshDomains();
+      if (viewingOwner?._id === row.owner._id) {
+        setViewingOwner(row.owner);
+        setActiveOwner(row.owner);
+      }
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      setAdsError(message || "Failed to delete domain entry");
+      setDomainsError(message || "Failed to delete domain entry");
     } finally {
-      setAdsLoading(false);
+      setDomainsLoading(false);
     }
   };
 
@@ -325,15 +331,14 @@ export default function Domain() {
         : null);
     if (!owner?.businessProfile?._id || !formMode) {
       if (form.userType === "carOwner") {
-        setAdsError("Domain entries for car owners are not yet supported.");
+        setDomainsError("Domain entries for car owners are not yet supported.");
       } else if (!form.userName) {
-        setAdsError("Please select a user.");
+        setDomainsError("Please select a user.");
       } else {
-        setAdsError("Selected shop owner has no business profile.");
+        setDomainsError("Selected shop owner has no business profile.");
       }
       return;
     }
-    const businessId = owner.businessProfile._id;
     if (
       !form.userName ||
       !form.userType ||
@@ -342,11 +347,13 @@ export default function Domain() {
       !form.provider ||
       !form.dns
     ) {
-      setAdsError("All required fields must be filled.");
+      setDomainsError("All required fields must be filled.");
       return;
     }
-    setAdsLoading(true);
-    setAdsError(null);
+
+    const businessId = owner.businessProfile._id;
+    setSaving(true);
+    setDomainsError(null);
     try {
       const fd = new FormData();
       fd.append("userName", form.userName);
@@ -358,50 +365,58 @@ export default function Domain() {
 
       const headers = { "Content-Type": "multipart/form-data" };
       if (formMode === "CREATE") {
-        await axios.post(`${API_URL}/api/admin/business-profiles/${businessId}/ads`, fd, { headers });
+        await axios.post(`${API_URL}/api/admin/business-profiles/${businessId}/ads`, fd, {
+          headers,
+        });
       } else if (formMode === "EDIT" && editId) {
-        await axios.patch(`${API_URL}/api/admin/business-profiles/${businessId}/ads/${editId}`, fd, { headers });
+        await axios.patch(
+          `${API_URL}/api/admin/business-profiles/${businessId}/ads/${editId}`,
+          fd,
+          { headers }
+        );
       }
       setActiveOwner(owner);
       resetForm();
       setShowForm(false);
       setViewingOwner(owner);
-      await fetchAds(owner);
+      await refreshDomains();
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      setAdsError(message || "Failed to save domain entry");
+      setDomainsError(message || "Failed to save domain entry");
     } finally {
-      setAdsLoading(false);
+      setSaving(false);
     }
   };
 
-  const dealerRows: DealerAdRow[] = owners.map(ownerToDealerRow);
+  const visibleDomains = viewingOwner
+    ? domains.filter((row) => row.owner._id === viewingOwner._id)
+    : domains;
 
-  const filteredDealerRows = dealerRows.filter((row) => {
+  const filteredDomainRows = visibleDomains.filter((row) => {
     const q = search.toLowerCase();
     const matchesSearch =
-      row.shopName.toLowerCase().includes(q) ||
-      row.phone.includes(q) ||
-      row.city.toLowerCase().includes(q) ||
-      row.date.toLowerCase().includes(q) ||
-      String(row.adds).includes(q) ||
-      String(row.invoice).includes(q) ||
-      String(row.daysLeft).includes(q) ||
-      String(row.sent).includes(q) ||
-      row.status.toLowerCase().includes(q);
+      userTypeLabel(row.userType).toLowerCase().includes(q) ||
+      row.userName.toLowerCase().includes(q) ||
+      row.domain.toLowerCase().includes(q) ||
+      row.expiry.toLowerCase().includes(q) ||
+      row.providerLabel.toLowerCase().includes(q) ||
+      row.dns.toLowerCase().includes(q);
 
     if (!matchesSearch) return false;
     if (heading === "all" || !q) return true;
 
-    const fieldValue = String(row[heading as keyof DealerAdRow] ?? "").toLowerCase();
+    const fieldValue = String(row[heading as keyof DomainRow] ?? "").toLowerCase();
     return fieldValue.includes(q);
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredDealerRows.length / entriesPerPage));
-  const pagedDealerRows = filteredDealerRows.slice((page - 1) * entriesPerPage, page * entriesPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredDomainRows.length / entriesPerPage));
+  const pagedDomainRows = filteredDomainRows.slice(
+    (page - 1) * entriesPerPage,
+    page * entriesPerPage
+  );
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -413,12 +428,14 @@ export default function Domain() {
   };
 
   const toggleSelectAll = () => {
-    if (selected.size === pagedDealerRows.length) setSelected(new Set());
-    else setSelected(new Set(pagedDealerRows.map((r) => r.id)));
+    if (selected.size === pagedDomainRows.length) setSelected(new Set());
+    else setSelected(new Set(pagedDomainRows.map((r) => r.id)));
   };
 
-  const openShopDomains = (row: DealerAdRow) => {
-    if (row.owner?.businessProfile?._id) openOwnerView(row.owner);
+  const handleToolbarUpdate = () => {
+    if (selected.size !== 1) return;
+    const row = pagedDomainRows.find((r) => selected.has(r.id));
+    if (row) openEditForm(row);
   };
 
   const handleAddNew = () => {
@@ -430,7 +447,109 @@ export default function Domain() {
       ? carOwners.map((owner) => owner.name || "—").filter((name) => name !== "—")
       : owners.filter((o) => o.businessProfile?._id).map(ownerDisplayName);
 
-  const readOnlyValueClass = `${compactInputClass} bg-gray-50 text-gray-800`;
+  const renderDomainTableBody = (rows: DomainRow[], emptyMessage: string) => {
+    if (domainsLoading) {
+      return (
+        <tr>
+          <td colSpan={8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+            Loading...
+          </td>
+        </tr>
+      );
+    }
+    if (rows.length === 0) {
+      return (
+        <tr>
+          <td colSpan={8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+            {emptyMessage}
+          </td>
+        </tr>
+      );
+    }
+    return rows.map((row, idx) => (
+      <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+        <td className="border border-gray-300 px-2 py-2">
+          <input
+            type="checkbox"
+            checked={selected.has(row.id)}
+            onChange={() => toggleSelect(row.id)}
+            className="accent-ad-purple"
+          />
+        </td>
+        <td className="border border-gray-300 px-3 py-2">{userTypeLabel(row.userType)}</td>
+        <td className="border border-gray-300 px-3 py-2">
+          {!viewingOwner ? (
+            <button
+              type="button"
+              onClick={() => openOwnerView(row.owner)}
+              className="text-blue-700 hover:underline"
+            >
+              {row.userName}
+            </button>
+          ) : (
+            row.userName
+          )}
+        </td>
+        <td className="border border-gray-300 px-3 py-2">
+          {row.domain !== "—" ? (
+            <a
+              href={row.domain.startsWith("http") ? row.domain : `https://${row.domain}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-700 hover:underline"
+            >
+              {row.domain}
+            </a>
+          ) : (
+            "—"
+          )}
+        </td>
+        <td className="border border-gray-300 px-3 py-2">{row.expiry}</td>
+        <td className="border border-gray-300 px-3 py-2">{row.providerLabel}</td>
+        <td className="border border-gray-300 px-3 py-2 max-w-[200px] truncate" title={row.dns}>
+          {row.dns}
+        </td>
+        <td className="border border-gray-300 px-3 py-2 text-center">
+          <button
+            type="button"
+            onClick={() => openEditForm(row)}
+            className="mr-2 text-blue-700 hover:underline"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDelete(row)}
+            className="text-red-700 hover:underline"
+          >
+            Delete
+          </button>
+        </td>
+      </tr>
+    ));
+  };
+
+  const domainTableHead = (
+    <thead>
+      <tr className="bg-ad-purple text-white">
+        <th className="border border-ad-purple-dark px-2 py-2 text-left">
+          <input
+            type="checkbox"
+            checked={pagedDomainRows.length > 0 && selected.size === pagedDomainRows.length}
+            onChange={toggleSelectAll}
+            className="accent-white"
+          />
+        </th>
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User Type</th>
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User Name</th>
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Domain</th>
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Expiry</th>
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Provider</th>
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">DNS</th>
+        <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Actions</th>
+      </tr>
+    </thead>
+  );
 
   const ownerViewPanel =
     viewingOwner && !showForm ? (
@@ -447,7 +566,8 @@ export default function Domain() {
               </button>
             </div>
             <span className="text-center text-xs font-serif italic text-gray-800">
-              You are viewing domains for &apos;{viewingOwner.businessProfile?.businessName || viewingOwner.name}&apos;
+              You are viewing domains for &apos;
+              {viewingOwner.businessProfile?.businessName || viewingOwner.name}&apos;
             </span>
             <div className="flex justify-end">
               <button
@@ -462,108 +582,47 @@ export default function Domain() {
         }
       >
         <CompactFormRow className="w-full items-start">
-          <CompactField label="Shop Name" className={compactFixedFieldWidth}>
-            <div className={readOnlyValueClass}>
+          <CompactField label="User Type" className={compactFixedFieldWidth}>
+            <div className={compactReadOnlyValueClass}>Shop Owner</div>
+          </CompactField>
+          <CompactField label="User Name" className={compactFixedFieldWidth}>
+            <div className={compactReadOnlyValueClass}>
               {viewingOwner.businessProfile?.businessName || viewingOwner.name || "—"}
             </div>
           </CompactField>
           <CompactField label="Phone" className={compactFixedFieldWidth}>
-            <div className={readOnlyValueClass}>
+            <div className={compactReadOnlyValueClass}>
               {viewingOwner.countryCode ? `${viewingOwner.countryCode} ` : ""}
               {viewingOwner.phone || "—"}
             </div>
           </CompactField>
-          <CompactField label="City" className={compactFixedFieldWidth}>
-            <div className={readOnlyValueClass}>{viewingOwner.businessProfile?.city || "—"}</div>
-          </CompactField>
-          <CompactField label="Owner" className="min-w-0 flex-1">
-            <div className={readOnlyValueClass}>{viewingOwner.name || "—"}</div>
+          <CompactField label="City" className="min-w-0 flex-1">
+            <div className={compactReadOnlyValueClass}>{viewingOwner.businessProfile?.city || "—"}</div>
           </CompactField>
         </CompactFormRow>
 
-        {adsError && (
+        {domainsError && (
           <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
-            {adsError}
+            {domainsError}
           </div>
         )}
 
         <div className="mt-2 overflow-x-auto">
-          {adsLoading ? (
-            <p className="py-4 text-center text-sm text-gray-500">Loading domains…</p>
-          ) : (
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-ad-purple text-white">
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Image</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Category</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Website URL</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Created</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ads.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
-                      No domains yet for this shop.
-                    </td>
-                  </tr>
-                ) : (
-                  ads.map((ad, idx) => (
-                    <tr key={ad._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                      <td className="border border-gray-300 px-3 py-2">
-                        {ad.imageUpload ? (
-                          <img
-                            src={adImageUrl(ad.imageUpload)}
-                            alt={ad.category}
-                            className="h-12 w-16 rounded border border-gray-200 object-cover"
-                          />
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="border border-gray-300 px-3 py-2">{ad.category}</td>
-                      <td className="border border-gray-300 px-3 py-2">
-                        <a
-                          href={ad.websiteURL}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-700 hover:underline"
-                        >
-                          {ad.websiteURL}
-                        </a>
-                      </td>
-                      <td className="border border-gray-300 px-3 py-2">
-                        {formatDisplayDate(ad.createdAt)}
-                      </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => openEditForm(ad)}
-                          className="mr-2 text-blue-700 hover:underline"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(ad._id)}
-                          className="text-red-700 hover:underline"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
+          <table className="w-full border-collapse text-sm">
+            {domainTableHead}
+            <tbody>
+              {renderDomainTableBody(
+                pagedDomainRows,
+                "No domains yet for this shop."
+              )}
+            </tbody>
+          </table>
         </div>
       </CompactFormPanel>
     ) : undefined;
 
   const adFormPanel =
-    showForm && formMode && (formMode === "EDIT" ? activeOwner : true) ? (
+    showForm && formMode ? (
       <CompactFormPanel
         footer={
           <CompactFormFooter
@@ -573,15 +632,15 @@ export default function Domain() {
                 : "You are editing a 'Domain' entry"
             }
             messageCenter
-            actionLabel={adsLoading ? "Saving..." : "Save"}
+            actionLabel={saving ? "Saving..." : "Save"}
             onSave={handleSave}
             onCancel={handleCancelForm}
           />
         }
       >
-        {adsError && (
+        {domainsError && (
           <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
-            {adsError}
+            {domainsError}
           </div>
         )}
         <CompactFormRow className="w-full items-start flex-nowrap overflow-x-auto">
@@ -672,12 +731,17 @@ export default function Domain() {
       </CompactFormPanel>
     ) : undefined;
 
-  const betweenPanel = ownerViewPanel ?? adFormPanel;
+  const betweenPanel = showForm ? adFormPanel : ownerViewPanel;
 
   const toolbar = (
     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
       <div className="flex flex-wrap gap-1">
-        <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+        <button
+          type="button"
+          onClick={handleToolbarUpdate}
+          disabled={selected.size !== 1}
+          className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+        >
           Update
         </button>
         <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
@@ -712,7 +776,7 @@ export default function Domain() {
           onChange={(e) => setHeading(e.target.value)}
           className="border border-gray-400 bg-gray-500 px-2 py-1 text-xs font-medium text-white"
         >
-          {DEALER_HEADINGS.map((h) => (
+          {DOMAIN_HEADINGS.map((h) => (
             <option key={h.value} value={h.value}>
               {h.label}
             </option>
@@ -765,113 +829,20 @@ export default function Domain() {
     </div>
   );
 
-  const renderDealerTable = () => (
+  const renderDomainTable = () => (
     <>
-      {ownersError && (
+      {domainsError && !showForm && (
         <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
-          {ownersError}
+          {domainsError}
         </div>
       )}
       {toolbar}
       {entriesControl}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
-                <input
-                  type="checkbox"
-                  checked={pagedDealerRows.length > 0 && selected.size === pagedDealerRows.length}
-                  onChange={toggleSelectAll}
-                  className="accent-white"
-                />
-              </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">City</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Adds</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Invoice</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Days Left</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Sent</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
-            </tr>
-          </thead>
+          {domainTableHead}
           <tbody>
-            {ownersLoading ? (
-              <tr>
-                <td colSpan={10} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                  Loading...
-                </td>
-              </tr>
-            ) : pagedDealerRows.length === 0 ? (
-              <tr>
-                <td colSpan={10} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                  No records found.
-                </td>
-              </tr>
-            ) : (
-              pagedDealerRows.map((row, idx) => {
-                const canOpen = !!row.owner?.businessProfile?._id;
-                return (
-                  <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                    <td className="border border-gray-300 px-2 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.id)}
-                        onChange={() => toggleSelect(row.id)}
-                        className="accent-ad-purple"
-                      />
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2">
-                      {canOpen ? (
-                        <button
-                          type="button"
-                          onClick={() => openShopDomains(row)}
-                          className="text-blue-700 hover:underline"
-                        >
-                          {row.shopName}
-                        </button>
-                      ) : (
-                        row.shopName
-                      )}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2">{row.phone}</td>
-                    <td className="border border-gray-300 px-3 py-2">{row.city}</td>
-                    <td className="border border-gray-300 px-3 py-2">{row.date}</td>
-                    <td className="border border-gray-300 px-3 py-2">
-                      {canOpen ? (
-                        <button
-                          type="button"
-                          onClick={() => openShopDomains(row)}
-                          className="text-blue-700 underline hover:text-blue-900"
-                        >
-                          {row.adds}
-                        </button>
-                      ) : (
-                        row.adds
-                      )}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2">
-                      <button type="button" className="text-blue-700 underline hover:text-blue-900">
-                        {row.invoice}
-                      </button>
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2">
-                      <button type="button" className="text-blue-700 underline hover:text-blue-900">
-                        {row.daysLeft}
-                      </button>
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2">
-                      <button type="button" className="text-blue-700 underline hover:text-blue-900">
-                        {row.sent}
-                      </button>
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2">{row.status}</td>
-                  </tr>
-                );
-              })
-            )}
+            {renderDomainTableBody(pagedDomainRows, "No records found.")}
           </tbody>
         </table>
       </div>
@@ -883,14 +854,13 @@ export default function Domain() {
     <AdminPage
       title={PAGE_TITLE}
       noPanel
+      onTitleClick={viewingOwner ? closeOwnerView : undefined}
       headerAction={
-        !showForm && !viewingOwner ? (
-          <AddNewButton onClick={handleAddNew} />
-        ) : undefined
+        !showForm && !viewingOwner ? <AddNewButton onClick={handleAddNew} /> : undefined
       }
       between={betweenPanel}
     >
-      {renderDealerTable()}
+      {!viewingOwner ? renderDomainTable() : null}
     </AdminPage>
   );
 }

@@ -1,7 +1,5 @@
 import type { ReactNode, TextareaHTMLAttributes } from "react";
-import { Children, useEffect, useRef } from "react";
-import { twMerge } from "tailwind-merge";
-import { useFormRevealFocus } from "../shop/ShopAnimated";
+import { useEffect, useRef } from "react";
 
 type ContentPanelProps = {
   children: ReactNode;
@@ -28,10 +26,22 @@ export function ContentPanel({ children, title, action, footer, className = "" }
   );
 }
 
-export const compactInputClass =
-  "w-full min-h-[30px] border border-gray-400 bg-white px-2 py-1.5 text-sm leading-snug focus:border-blue-500 focus:outline-none";
+/** Shared single-line control height (inputs, selects, date, combo triggers, read-only values). */
+export const COMPACT_FIELD_HEIGHT_PX = 30;
 
-export const compactFixedFieldWidth = "min-w-0 w-full";
+export const compactInputClass =
+  "w-full h-[30px] min-h-[30px] box-border border border-gray-400 bg-white px-2 text-sm leading-[18px] focus:border-blue-500 focus:outline-none";
+
+export const compactTextareaClass =
+  "w-full min-h-[30px] box-border border border-gray-400 bg-white px-2 py-1 text-sm leading-snug focus:border-blue-500 focus:outline-none resize-none overflow-hidden";
+
+export const compactReadOnlyValueClass =
+  `${compactInputClass} flex items-center overflow-hidden bg-gray-50 text-gray-800`;
+
+export const compactReadOnlyMultilineClass =
+  "w-full min-h-[30px] box-border border border-gray-400 bg-gray-50 px-2 py-1 text-sm leading-snug text-gray-800";
+
+export const compactFixedFieldWidth = "w-[140px] shrink-0 flex-none sm:w-[180px]";
 
 export function CompactAutoGrowTextarea({
   value,
@@ -45,7 +55,7 @@ export function CompactAutoGrowTextarea({
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    el.style.height = `${Math.max(COMPACT_FIELD_HEIGHT_PX, el.scrollHeight)}px`;
   }, [value]);
 
   return (
@@ -54,7 +64,7 @@ export function CompactAutoGrowTextarea({
       value={value}
       onChange={onChange}
       rows={1}
-      className={`${compactInputClass} resize-none overflow-hidden ${className}`}
+      className={`${compactTextareaClass} ${className}`}
       {...props}
     />
   );
@@ -62,22 +72,16 @@ export function CompactAutoGrowTextarea({
 
 export const PANEL_BOTTOM_BORDER_HEIGHT = 24;
 
-export function PanelBottomBorder({
-  fill = "silver",
-  height = PANEL_BOTTOM_BORDER_HEIGHT,
-}: {
-  fill?: string;
-  height?: number;
-}) {
+export function PanelBottomBorder({ fill = "silver" }: { fill?: string }) {
   return (
     <div
       className="pointer-events-none absolute left-0 z-20 mx-auto w-full overflow-hidden"
-      style={{ bottom: -height, height }}
+      style={{ bottom: -PANEL_BOTTOM_BORDER_HEIGHT, height: PANEL_BOTTOM_BORDER_HEIGHT }}
       aria-hidden
     >
       <svg
         width="95%"
-        height={height}
+        height={PANEL_BOTTOM_BORDER_HEIGHT}
         viewBox="0 0 400 20"
         preserveAspectRatio="none"
         className="mx-auto block"
@@ -92,94 +96,31 @@ export function CompactFormPanel({
   children,
   footer,
   className = "",
-  focusOnMount = false,
-  showBottomBorder = true,
 }: {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
-  /** Scroll into view and focus the first field when the panel mounts. */
-  focusOnMount?: boolean;
-  /** When false, omits the decorative curved bottom border/shadow. */
-  showBottomBorder?: boolean;
 }) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  useFormRevealFocus(focusOnMount, panelRef);
-
   return (
     <div
-      ref={panelRef}
       className={`relative mb-10 rounded border border-ad-form-border bg-ad-form-bg shadow-sm ${className}`}
     >
       <div className="min-h-[96px] space-y-4 px-4 py-4">{children}</div>
       {footer}
-      {showBottomBorder ? <PanelBottomBorder /> : null}
+      <PanelBottomBorder />
     </div>
   );
-}
-
-function compactFormRowChildCount(children: ReactNode) {
-  return Children.toArray(children).filter((child) => {
-    if (child == null) return false;
-    return typeof child !== "boolean";
-  }).length;
-}
-
-function compactFormRowGridCols(childCount: number) {
-  const columns = childCount >= 4 ? 4 : Math.max(childCount, 1);
-  if (columns === 1) return "grid-cols-1";
-  if (columns === 2) return "grid-cols-1 sm:grid-cols-2";
-  if (columns === 3) return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
-  return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
-}
-
-function compactFormRowUsesFlexLayout(className: string) {
-  return /\bflex-nowrap\b/.test(className) || /\boverflow-x-auto\b/.test(className);
-}
-
-function compactFormRowHasExplicitGridCols(className: string) {
-  return /\bgrid-cols-/.test(className);
 }
 
 export function CompactFormRow({
   children,
   className = "",
-  columns,
 }: {
   children: ReactNode;
   className?: string;
-  /** When set, fixes the row to this many equal-width columns (fields share full row width). */
-  columns?: number;
 }) {
-  const childCount = compactFormRowChildCount(children);
-
-  if (compactFormRowUsesFlexLayout(className)) {
-    return (
-      <div className={twMerge("flex w-full flex-wrap items-end gap-x-4 gap-y-4", className)}>
-        {children}
-      </div>
-    );
-  }
-
-  if (compactFormRowHasExplicitGridCols(className)) {
-    return (
-      <div className={twMerge("grid w-full gap-x-4 gap-y-4 items-end", className)}>
-        {children}
-      </div>
-    );
-  }
-
-  const columnCount =
-    columns ?? (childCount >= 4 ? 4 : Math.max(childCount, 1));
-
   return (
-    <div
-      className={twMerge(
-        "grid w-full items-end gap-x-4 gap-y-4",
-        compactFormRowGridCols(columnCount),
-        className
-      )}
-    >
+    <div className={`flex flex-wrap items-end gap-x-4 gap-y-4 ${className}`}>
       {children}
     </div>
   );
@@ -197,7 +138,7 @@ export function CompactField({
   className?: string;
 }) {
   return (
-    <div className={twMerge("min-w-0 w-full", className)}>
+    <div className={`min-w-0 flex-1 ${className}`}>
       <label className="mb-1 block text-xs font-bold text-ad-green-dark">
         {label}
         {required ? <span className="text-red-600"> *</span> : null}
@@ -233,18 +174,16 @@ export function CompactFormFooter({
 
   const actions = (
     <div className="flex items-center gap-2">
-      {onSave ? (
-        <button
-          type={actionType}
-          onClick={onSave}
-          className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95"
-        >
-          {actionLabel}
-          <span aria-hidden className="text-base leading-none">
-            →
-          </span>
-        </button>
-      ) : null}
+      <button
+        type={actionType}
+        onClick={onSave}
+        className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95"
+      >
+        {actionLabel}
+        <span aria-hidden className="text-base leading-none">
+          →
+        </span>
+      </button>
       {onCancel ? (
         <span className="text-xs text-gray-700">
           or{" "}

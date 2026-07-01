@@ -10,6 +10,8 @@ import {
   CompactFormRow,
   compactFixedFieldWidth,
   compactInputClass,
+  compactReadOnlyMultilineClass,
+  compactReadOnlyValueClass,
 } from "../../../components/admin/ContentPanel";
 
 // Date + gap-x-4 + Sent To (matches compactFixedFieldWidth × 2 + 16px)
@@ -210,8 +212,6 @@ export default function LeadsPage({
     section === "visited" ? "Visited By" : section === "completed" ? "Completed By" : "Sent To";
   const isCompletedSection = section === "completed";
 
-  const readOnlyValueClass = `${compactInputClass} bg-gray-50 text-gray-800`;
-
   const viewDetailPanel = viewingLead ? (
     <CompactFormPanel
       footer={
@@ -234,32 +234,32 @@ export default function LeadsPage({
     >
       <CompactFormRow className="w-full items-start">
         <CompactField label="Date" className={compactFixedFieldWidth}>
-          <div className={readOnlyValueClass}>{viewingLead.date}</div>
+          <div className={compactReadOnlyValueClass}>{viewingLead.date}</div>
         </CompactField>
         <CompactField label={sentToLabel} className={compactFixedFieldWidth}>
-          <div className={readOnlyValueClass}>{viewingLead.sentTo || "-"}</div>
+          <div className={compactReadOnlyValueClass}>{viewingLead.sentTo || "-"}</div>
         </CompactField>
         <CompactField label="Name" className="min-w-0 flex-1">
-          <div className={readOnlyValueClass}>{viewingLead.name}</div>
+          <div className={compactReadOnlyValueClass}>{viewingLead.name}</div>
         </CompactField>
         <CompactField label="Phone" className={compactFixedFieldWidth}>
-          <div className={readOnlyValueClass}>{viewingLead.phone}</div>
+          <div className={compactReadOnlyValueClass}>{viewingLead.phone}</div>
         </CompactField>
         <CompactField label="Email" className="min-w-0 flex-1">
-          <div className={readOnlyValueClass}>{viewingLead.email}</div>
+          <div className={compactReadOnlyValueClass}>{viewingLead.email}</div>
         </CompactField>
       </CompactFormRow>
       <CompactFormRow className="w-full items-start">
         <CompactField label="Website" className={leadWebsiteFieldWidth}>
-          <div className={readOnlyValueClass}>{viewingLead.website}</div>
+          <div className={compactReadOnlyValueClass}>{viewingLead.website}</div>
         </CompactField>
         {isCompletedSection && (
           <CompactField label="Person Contacted" className={compactFixedFieldWidth}>
-            <div className={readOnlyValueClass}>{viewingLead.personContacted || "-"}</div>
+            <div className={compactReadOnlyValueClass}>{viewingLead.personContacted || "-"}</div>
           </CompactField>
         )}
         <CompactField label="Notes" className="min-w-0 flex-1">
-          <div className={`${readOnlyValueClass} whitespace-pre-wrap`}>{viewingLead.notes}</div>
+          <div className={`${compactReadOnlyMultilineClass} whitespace-pre-wrap`}>{viewingLead.notes}</div>
         </CompactField>
       </CompactFormRow>
     </CompactFormPanel>

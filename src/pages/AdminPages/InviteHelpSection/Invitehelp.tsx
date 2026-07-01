@@ -11,6 +11,8 @@ import {
   CompactFormRow,
   compactFixedFieldWidth,
   compactInputClass,
+  compactReadOnlyMultilineClass,
+  compactReadOnlyValueClass,
 } from "../../../components/admin/ContentPanel";
 
 interface InviteHelp {
@@ -301,8 +303,6 @@ function receivedAudioUrl(inv: InviteHelp) {
   }
   return null;
 }
-
-const readOnlyValueClass = `${compactInputClass} bg-gray-50 text-gray-800`;
 
 export default function Invitehelp({
   title = "Messages",
@@ -604,31 +604,31 @@ export default function Invitehelp({
     >
       <CompactFormRow className="w-full flex-nowrap items-start">
         <CompactField label="Date">
-          <div className={readOnlyValueClass}>{receivedDate(viewingReceived)}</div>
+          <div className={compactReadOnlyValueClass}>{receivedDate(viewingReceived)}</div>
         </CompactField>
         <CompactField label="Ticket No.">
-          <div className={readOnlyValueClass}>{receivedTicketNo(viewingReceived)}</div>
+          <div className={compactReadOnlyValueClass}>{receivedTicketNo(viewingReceived)}</div>
         </CompactField>
         <CompactField label="User Type">
-          <div className={readOnlyValueClass}>{userTypeLabel(receivedUserType(viewingReceived))}</div>
+          <div className={compactReadOnlyValueClass}>{userTypeLabel(receivedUserType(viewingReceived))}</div>
         </CompactField>
         <CompactField label="User Name">
-          <div className={readOnlyValueClass}>{receivedUserName(viewingReceived)}</div>
+          <div className={compactReadOnlyValueClass}>{receivedUserName(viewingReceived)}</div>
         </CompactField>
         <CompactField label="Title">
-          <div className={readOnlyValueClass}>{viewingReceived.title || "—"}</div>
+          <div className={compactReadOnlyValueClass}>{viewingReceived.title || "—"}</div>
         </CompactField>
         <CompactField label="Audio">
           {receivedAudioUrl(viewingReceived) ? (
             <audio controls src={receivedAudioUrl(viewingReceived)!} className="h-[30px] w-full accent-blue-600" />
           ) : (
-            <div className={`${readOnlyValueClass} text-gray-500`}>No audio</div>
+            <div className={`${compactReadOnlyValueClass} text-gray-500`}>No audio</div>
           )}
         </CompactField>
       </CompactFormRow>
       <CompactFormRow className="w-full items-start">
         <CompactField label="Message" className="min-w-0 basis-full">
-          <div className={`${readOnlyValueClass} whitespace-pre-wrap`}>
+          <div className={`${compactReadOnlyMultilineClass} whitespace-pre-wrap`}>
             {viewingReceived.message || "—"}
           </div>
         </CompactField>

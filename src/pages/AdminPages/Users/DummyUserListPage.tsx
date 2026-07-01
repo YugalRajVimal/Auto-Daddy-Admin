@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
+  CompactAutoGrowTextarea,
   CompactField,
   CompactFormFooter,
   CompactFormPanel,
@@ -280,11 +281,10 @@ const DummyUserAddEditForm: React.FC<{
           />
         </CompactField>
         <CompactField label="Address" className="min-w-[200px] flex-1">
-          <textarea
+          <CompactAutoGrowTextarea
             value={address}
             onChange={(e) => setAddress(e.target.value.slice(0, 100))}
-            rows={2}
-            className={`${compactInputClass} resize-y`}
+            placeholder="Max 100 chars"
           />
         </CompactField>
       </CompactFormRow>
