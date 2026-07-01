@@ -1,5 +1,7 @@
 import type { ReactNode, TextareaHTMLAttributes } from "react";
-import { useEffect, useRef } from "react";
+import { Children, useEffect, useRef } from "react";
+import { twMerge } from "tailwind-merge";
+import { useFormRevealFocus } from "../shop/ShopAnimated";
 
 type ContentPanelProps = {
   children: ReactNode;
@@ -72,16 +74,22 @@ export function CompactAutoGrowTextarea({
 
 export const PANEL_BOTTOM_BORDER_HEIGHT = 24;
 
-export function PanelBottomBorder({ fill = "silver" }: { fill?: string }) {
+export function PanelBottomBorder({
+  fill = "silver",
+  height = PANEL_BOTTOM_BORDER_HEIGHT,
+}: {
+  fill?: string;
+  height?: number;
+}) {
   return (
     <div
       className="pointer-events-none absolute left-0 z-20 mx-auto w-full overflow-hidden"
-      style={{ bottom: -PANEL_BOTTOM_BORDER_HEIGHT, height: PANEL_BOTTOM_BORDER_HEIGHT }}
+      style={{ bottom: -height, height }}
       aria-hidden
     >
       <svg
         width="95%"
-        height={PANEL_BOTTOM_BORDER_HEIGHT}
+        height={height}
         viewBox="0 0 400 20"
         preserveAspectRatio="none"
         className="mx-auto block"
@@ -96,31 +104,94 @@ export function CompactFormPanel({
   children,
   footer,
   className = "",
+  focusOnMount = false,
+  showBottomBorder = true,
 }: {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  /** Scroll into view and focus the first field when the panel mounts. */
+  focusOnMount?: boolean;
+  /** When false, omits the decorative curved bottom border/shadow. */
+  showBottomBorder?: boolean;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFormRevealFocus(focusOnMount, panelRef);
+
   return (
     <div
+      ref={panelRef}
       className={`relative mb-10 rounded border border-ad-form-border bg-ad-form-bg shadow-sm ${className}`}
     >
       <div className="min-h-[96px] space-y-4 px-4 py-4">{children}</div>
       {footer}
-      <PanelBottomBorder />
+      {showBottomBorder ? <PanelBottomBorder /> : null}
     </div>
   );
+}
+
+function compactFormRowChildCount(children: ReactNode) {
+  return Children.toArray(children).filter((child) => {
+    if (child == null) return false;
+    return typeof child !== "boolean";
+  }).length;
+}
+
+function compactFormRowGridCols(childCount: number) {
+  const columns = childCount >= 4 ? 4 : Math.max(childCount, 1);
+  if (columns === 1) return "grid-cols-1";
+  if (columns === 2) return "grid-cols-1 sm:grid-cols-2";
+  if (columns === 3) return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+  return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
+}
+
+function compactFormRowUsesFlexLayout(className: string) {
+  return /\bflex-nowrap\b/.test(className) || /\boverflow-x-auto\b/.test(className);
+}
+
+function compactFormRowHasExplicitGridCols(className: string) {
+  return /\bgrid-cols-/.test(className);
 }
 
 export function CompactFormRow({
   children,
   className = "",
+  columns,
 }: {
   children: ReactNode;
   className?: string;
+  /** When set, fixes the row to this many equal-width columns (fields share full row width). */
+  columns?: number;
 }) {
+  const childCount = compactFormRowChildCount(children);
+
+  if (compactFormRowUsesFlexLayout(className)) {
+    return (
+      <div className={twMerge("flex w-full flex-wrap items-end gap-x-4 gap-y-4", className)}>
+        {children}
+      </div>
+    );
+  }
+
+  if (compactFormRowHasExplicitGridCols(className)) {
+    return (
+      <div className={twMerge("grid w-full gap-x-4 gap-y-4 items-end", className)}>
+        {children}
+      </div>
+    );
+  }
+
+  const columnCount =
+    columns ?? (childCount >= 4 ? 4 : Math.max(childCount, 1));
+
   return (
-    <div className={`flex flex-wrap items-end gap-x-4 gap-y-4 ${className}`}>
+    <div
+      className={twMerge(
+        "grid w-full items-end gap-x-4 gap-y-4",
+        compactFormRowGridCols(columnCount),
+        className
+      )}
+    >
       {children}
     </div>
   );
