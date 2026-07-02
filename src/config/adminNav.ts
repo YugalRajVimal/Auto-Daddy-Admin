@@ -90,7 +90,7 @@ export const primaryNav: NavItem[] = [
     permissionModule: "inviteHelp",
     subItems: [
       { name: "Notifications Sent", path: "/admin/messages/sent", permissionModule: "inviteHelp" },
-      { name: "Notifications Received", path: "/admin/messages/received", permissionModule: "inviteHelp" },
+      { name: "Messages Received", path: "/admin/messages/received", permissionModule: "inviteHelp" },
     ],
     matchPaths: ["/admin/messages/sent", "/admin/messages/received"],
   },

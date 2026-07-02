@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ChangeEvent } from "react";
 import axios from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
@@ -42,6 +43,7 @@ interface CarOwner {
 }
 
 type DomainForm = {
+  domainType: "new" | "existing";
   userName: string;
   userType: string;
   domain: string;
@@ -51,6 +53,7 @@ type DomainForm = {
 };
 
 const EMPTY_DOMAIN_FORM: DomainForm = {
+  domainType: "new",
   userName: "",
   userType: "shopOwner",
   domain: "",
@@ -113,6 +116,18 @@ const DOMAIN_HEADINGS = [
 ];
 
 const API_URL = import.meta.env.VITE_API_URL;
+
+type WebsiteTemplate = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
+const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
+  { id: "template-1", name: "Template 1", description: "Clean hero + services + contact" },
+  { id: "template-2", name: "Template 2", description: "Bold branding + gallery + reviews" },
+  { id: "template-3", name: "Template 3", description: "Minimal one-page with CTA" },
+];
 
 function formatDisplayDate(iso: string) {
   const d = new Date(iso);
@@ -179,6 +194,9 @@ export default function Domain() {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  const [websiteTemplateOpen, setWebsiteTemplateOpen] = useState(false);
+  const [activeWebsiteTemplateId, setActiveWebsiteTemplateId] = useState<string>("");
+
   useEffect(() => {
     fetchOwners();
     fetchCarOwners();
@@ -236,7 +254,7 @@ export default function Domain() {
   };
 
   const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -268,6 +286,7 @@ export default function Domain() {
     setFormMode("CREATE");
     setForm({
       ...EMPTY_DOMAIN_FORM,
+      domainType: "new",
       userType: "shopOwner",
       userName: owner ? ownerDisplayName(owner) : "",
     });
@@ -281,6 +300,7 @@ export default function Domain() {
     setFormMode("EDIT");
     setEditId(row.id);
     setForm({
+      domainType: "existing",
       userName: row.userName === "—" ? ownerDisplayName(row.owner) : row.userName,
       userType: row.userType,
       domain: row.domain === "—" ? "" : row.domain,
@@ -460,6 +480,29 @@ export default function Domain() {
           row.dns,
         ]),
     });
+  };
+
+  const selectedRows = useMemo(
+    () => domains.filter((row) => selected.has(row.id)),
+    [domains, selected]
+  );
+
+  const openWebsiteTemplates = () => {
+    if (selected.size === 0) return;
+    setDomainsError(null);
+    setActiveWebsiteTemplateId(WEBSITE_TEMPLATES[0]?.id ?? "");
+    setWebsiteTemplateOpen(true);
+  };
+
+  const closeWebsiteTemplates = () => {
+    setWebsiteTemplateOpen(false);
+  };
+
+  const applyWebsiteTemplate = () => {
+    const template = WEBSITE_TEMPLATES.find((t) => t.id === activeWebsiteTemplateId);
+    if (!template) return;
+    adminNotify.success(`Selected "${template.name}" for ${selected.size} domain row(s).`);
+    setWebsiteTemplateOpen(false);
   };
 
   const handleAddNew = () => {
@@ -723,6 +766,42 @@ export default function Domain() {
               className={compactInputClass}
             />
           </CompactField>
+          <CompactField label="Domain Type" required className={compactFixedFieldWidth}>
+            <div className="flex items-center gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-800">
+                <input
+                  type="radio"
+                  name="domainType"
+                  value="new"
+                  checked={form.domainType === "new"}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      domainType: e.target.value as DomainForm["domainType"],
+                    }))
+                  }
+                  className="accent-ad-purple"
+                />
+                New
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-800">
+                <input
+                  type="radio"
+                  name="domainType"
+                  value="existing"
+                  checked={form.domainType === "existing"}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      domainType: e.target.value as DomainForm["domainType"],
+                    }))
+                  }
+                  className="accent-ad-purple"
+                />
+                Existing
+              </label>
+            </div>
+          </CompactField>
           <CompactField label="Expiry (Date)" required className={compactFixedFieldWidth}>
             <input
               type="date"
@@ -770,7 +849,12 @@ export default function Domain() {
         <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
           Whatsapp
         </button>
-        <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
+        <button
+          type="button"
+          onClick={openWebsiteTemplates}
+          disabled={selected.size === 0}
+          className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
           Website
         </button>
         <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
@@ -810,6 +894,81 @@ export default function Domain() {
       </div>
     </div>
   );
+
+  const websiteTemplatesModal = websiteTemplateOpen ? (
+    <div className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-black/40 px-3 py-10">
+      <div className="w-full max-w-2xl rounded-md bg-white shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
+        <div className="flex items-center justify-between rounded-t-md bg-ad-purple px-4 py-3 text-white">
+          <div className="text-sm font-bold">Select website template</div>
+          <button
+            type="button"
+            onClick={closeWebsiteTemplates}
+            className="text-2xl leading-none text-white/90 hover:text-white"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="space-y-3 px-4 py-4">
+          <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+            Applying to <span className="font-semibold">{selected.size}</span> selected row(s).
+            {selectedRows.length > 0 ? (
+              <span className="ml-1 text-gray-500">
+                ({selectedRows.slice(0, 3).map((r) => r.userName).join(", ")}
+                {selectedRows.length > 3 ? ` +${selectedRows.length - 3} more` : ""})
+              </span>
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            {WEBSITE_TEMPLATES.map((tpl) => (
+              <label
+                key={tpl.id}
+                className={`flex cursor-pointer items-start gap-3 rounded border px-3 py-2 text-sm ${
+                  activeWebsiteTemplateId === tpl.id
+                    ? "border-ad-purple bg-purple-50"
+                    : "border-gray-200 bg-white hover:bg-gray-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="websiteTemplate"
+                  checked={activeWebsiteTemplateId === tpl.id}
+                  onChange={() => setActiveWebsiteTemplateId(tpl.id)}
+                  className="mt-1 accent-ad-purple"
+                />
+                <div className="min-w-0">
+                  <div className="font-semibold text-gray-900">{tpl.name}</div>
+                  {tpl.description ? (
+                    <div className="text-xs text-gray-600">{tpl.description}</div>
+                  ) : null}
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 rounded-b-md border-t border-gray-200 bg-white px-4 py-3">
+          <button
+            type="button"
+            onClick={closeWebsiteTemplates}
+            className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={applyWebsiteTemplate}
+            disabled={!activeWebsiteTemplateId}
+            className="rounded bg-ad-green px-3 py-1.5 text-xs font-bold text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Apply Template
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   const entriesControl = (
     <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
@@ -882,6 +1041,7 @@ export default function Domain() {
       }
       between={betweenPanel}
     >
+      {websiteTemplatesModal}
       {!viewingOwner ? renderDomainTable() : null}
     </AdminPage>
   );

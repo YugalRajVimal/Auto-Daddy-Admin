@@ -4,6 +4,7 @@ import {
   OwnerNotificationsTable,
   OwnerServiceRequestsTable,
 } from "../../components/owner/OwnerPanelTables";
+import { useLocation } from "react-router";
 import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import { useCarOwnerNotifications } from "../../hooks/useCarOwnerNotifications";
 import {
@@ -36,9 +37,12 @@ function mergeNotifications(
 }
 
 export default function OwnerMessagesPage() {
+  const location = useLocation();
   const { items, loading, loadingMore, error, hasMore, loadMore, refresh } = useCarOwnerNotifications();
 
-  const [tab, setTab] = useState<MessagesTab>(MESSAGE_SECTIONS[0].id);
+  const initialTab =
+    (location.state as { initialTab?: MessagesTab } | null | undefined)?.initialTab ?? MESSAGE_SECTIONS[0].id;
+  const [tab, setTab] = useState<MessagesTab>(initialTab);
 
   const resetSidebar = useCallback(() => {
     setTab(MESSAGE_SECTIONS[0].id);

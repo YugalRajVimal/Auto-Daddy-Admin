@@ -1,13 +1,17 @@
-import { useEffect } from "react";
-import { Link, Outlet, useLocation } from "react-router";
+import { useEffect, useMemo } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { FiBell } from "react-icons/fi";
 import useAuth from "../../auth/useAuth";
 import { getActivePrimaryItem, type NavItem } from "../../config/adminNav";
 import { Skeleton } from "../common/Skeleton";
 import { useShopPageChromeContext } from "../../context/ShopPageChromeContext";
+import { useShopNotifications } from "../../hooks/useShopNotifications";
 import type { PortalBrandLogo } from "../admin/PortalShell";
 import ShopBrandLogo from "./ShopBrandLogo";
 import { shopNavVerticalGapClass, shopPortalHorizPaddingClass } from "./shopLayoutStyles";
+
+const SHOP_MESSAGES_PATH = "/shop/messages";
+const SHOP_LAST_SEEN_KEY = "ad:lastSeen:shop-notifications";
 
 function isPathActive(pathname: string, path: string, homePath: string) {
   if (path === homePath) return pathname === homePath;
@@ -38,8 +42,10 @@ export default function ShopPortalShell({
   helpPath,
 }: ShopPortalShellProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { logout } = useAuth();
   const { chrome } = useShopPageChromeContext();
+  const { items } = useShopNotifications();
 
   const activePrimary = getActivePrimaryItem(location.pathname, primaryNav, homePath);
   const onHelpNav = helpPath != null && isPathActive(location.pathname, helpPath, homePath);
@@ -53,6 +59,21 @@ export default function ShopPortalShell({
   const handleLogout = () => {
     if (!window.confirm("Are you sure you want to log out?")) return;
     logout();
+  };
+
+  const newCount = useMemo(() => {
+    const lastSeen = Number(localStorage.getItem(SHOP_LAST_SEEN_KEY) ?? 0);
+    if (!Number.isFinite(lastSeen) || lastSeen <= 0) return 0;
+    return items.reduce((count, n) => {
+      const t = n.time ? new Date(n.time).getTime() : NaN;
+      if (!Number.isNaN(t) && t > lastSeen) return count + 1;
+      return count;
+    }, 0);
+  }, [items]);
+
+  const handleNotificationsClick = () => {
+    localStorage.setItem(SHOP_LAST_SEEN_KEY, String(Date.now()));
+    navigate(SHOP_MESSAGES_PATH, { state: { initialTab: "notifications" } });
   };
 
   const utilityLinkClass =
@@ -126,11 +147,14 @@ export default function ShopPortalShell({
                 type="button"
                 className="relative text-blue-600 hover:text-blue-700"
                 aria-label="Notifications"
+                onClick={handleNotificationsClick}
               >
                 <FiBell size={22} strokeWidth={1.75} />
-                <span className="absolute -right-1.5 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold leading-none text-white">
-                  1
-                </span>
+                {newCount > 0 ? (
+                  <span className="absolute -right-1.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold leading-none text-white">
+                    {newCount > 99 ? "99+" : newCount}
+                  </span>
+                ) : null}
               </button>
               {headerLogo ? (
                 <Link to={homePath} className="shrink-0">

@@ -7,16 +7,12 @@ import {
   CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
-  compactFixedFieldWidth,
   compactInputClass,
   compactReadOnlyMultilineClass,
   compactReadOnlyValueClass,
 } from "../../../components/admin/ContentPanel";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
-
-// Date + gap-x-4 + Sent To (matches compactFixedFieldWidth × 2 + 16px)
-const leadWebsiteFieldWidth = "w-[296px] shrink-0 flex-none sm:w-[376px]";
 
 const ASSOCIATE_OPTIONS = [
   "Sarah Mitchell",
@@ -183,6 +179,10 @@ export default function LeadsPage({
   };
 
   const openEdit = (row: LeadRow) => {
+    if (readOnly || section === "completed") {
+      openView(row);
+      return;
+    }
     setViewingLead(null);
     setEditingId(row.id);
     setDate(row.date);
@@ -194,7 +194,7 @@ export default function LeadsPage({
     setNotes(row.notes);
     setSentTo(row.sentTo || "");
     // In "Visited Leads", allow changing visited -> completed (dropdown). In "Completed", status is fixed.
-    setStatus(row.status ?? (section === "completed" ? "completed" : "visited"));
+    setStatus(row.status ?? (section === "visited" ? "visited" : "completed"));
     setImageUrl(row.imageUrl ?? null);
     setShowForm(true);
   };
@@ -284,7 +284,7 @@ export default function LeadsPage({
             You are viewing a &apos;Lead&apos;
           </span>
           <div className="flex justify-end">
-            {!readOnly && (
+            {!readOnly && section !== "completed" && (
               <button
                 type="button"
                 onClick={() => openEdit(viewingLead)}
@@ -304,36 +304,55 @@ export default function LeadsPage({
         </div>
       }
     >
-      <CompactFormRow className="w-full items-start">
-        <CompactField label="Date" className={compactFixedFieldWidth}>
+      <CompactFormRow className="w-full items-start" columns={4}>
+        <CompactField label="Date" className="w-full min-w-0">
           <div className={compactReadOnlyValueClass}>{viewingLead.date}</div>
         </CompactField>
-        <CompactField label="Name" className="min-w-0 flex-1">
+        <CompactField label="Name" className="w-full min-w-0">
           <div className={compactReadOnlyValueClass}>{viewingLead.name}</div>
         </CompactField>
-        <CompactField label="Phone" className={compactFixedFieldWidth}>
+        <CompactField label="Phone" className="w-full min-w-0">
           <div className={compactReadOnlyValueClass}>{viewingLead.phone}</div>
         </CompactField>
-        <CompactField label="City" className={compactFixedFieldWidth}>
+        <CompactField label="City" className="w-full min-w-0">
           <div className={compactReadOnlyValueClass}>{viewingLead.city}</div>
         </CompactField>
-        <CompactField label="Email" className="min-w-0 flex-1">
+      </CompactFormRow>
+      <CompactFormRow className="w-full items-start" columns={4}>
+        <CompactField label="Email" className="w-full min-w-0">
           <div className={compactReadOnlyValueClass}>{viewingLead.email}</div>
         </CompactField>
-      </CompactFormRow>
-      <CompactFormRow className="w-full items-start">
-        <CompactField label="Website" className={leadWebsiteFieldWidth}>
+        <CompactField label="Website" className="w-full min-w-0">
           <div className={compactReadOnlyValueClass}>{viewingLead.website}</div>
         </CompactField>
-        <CompactField label="Notes" className="min-w-0 flex-1">
+        <CompactField label="Notes" className="w-full min-w-0">
           <div className={`${compactReadOnlyMultilineClass} whitespace-pre-wrap`}>{viewingLead.notes}</div>
         </CompactField>
-      </CompactFormRow>
-      <CompactFormRow className="w-full items-start">
-        <CompactField label={sentToLabel} className={compactFixedFieldWidth}>
+        <CompactField label={sentToLabel} className="w-full min-w-0">
           <div className={compactReadOnlyValueClass}>{viewingLead.sentTo || "-"}</div>
         </CompactField>
-        <CompactField label="Status" className={compactFixedFieldWidth}>
+      </CompactFormRow>
+      <CompactFormRow className="w-full items-start" columns={4}>
+        <CompactField label="Image" className="w-full min-w-0 lg:col-span-3">
+          {viewingLead.imageUrl ? (
+            <button
+              type="button"
+              onClick={() =>
+                setImagePreview({
+                  url: viewingLead.imageUrl!,
+                  title: `${viewingLead.name} — lead image`,
+                })
+              }
+              className="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <FiPaperclip className="size-4" aria-hidden />
+              View
+            </button>
+          ) : (
+            <div className={compactReadOnlyValueClass}>-</div>
+          )}
+        </CompactField>
+        <CompactField label="Status" className="w-full min-w-0 lg:col-span-1">
           {section === "visited" ? (
             <select
               value={viewingLead.status ?? "visited"}
@@ -358,25 +377,6 @@ export default function LeadsPage({
             <div className={compactReadOnlyValueClass}>{viewingLead.status || "-"}</div>
           )}
         </CompactField>
-        <CompactField label="Image" className="min-w-0 flex-1">
-          {viewingLead.imageUrl ? (
-            <button
-              type="button"
-              onClick={() =>
-                setImagePreview({
-                  url: viewingLead.imageUrl!,
-                  title: `${viewingLead.name} — lead image`,
-                })
-              }
-              className="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <FiPaperclip className="size-4" aria-hidden />
-              View
-            </button>
-          ) : (
-            <div className={compactReadOnlyValueClass}>-</div>
-          )}
-        </CompactField>
       </CompactFormRow>
     </CompactFormPanel>
   ) : undefined;
@@ -394,13 +394,14 @@ export default function LeadsPage({
               <CompactFormFooter
                 message={editingId != null ? "You are editing a 'Lead'" : "You are creating a 'Lead'"}
                 messageCenter
+                actionLabel={editingId != null ? "Update" : "Save"}
                 onSave={handleSave}
                 onCancel={handleCancel}
               />
             }
           >
-            <CompactFormRow className="w-full items-start">
-              <CompactField label="Date" required className={compactFixedFieldWidth}>
+            <CompactFormRow className="w-full items-start" columns={4}>
+              <CompactField label="Date" required className="w-full min-w-0">
                 <input
                   type="date"
                   value={date}
@@ -408,7 +409,7 @@ export default function LeadsPage({
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Name" required className="min-w-0 flex-1">
+              <CompactField label="Name" required className="w-full min-w-0">
                 <input
                   type="text"
                   value={name}
@@ -416,7 +417,7 @@ export default function LeadsPage({
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Phone" required className={compactFixedFieldWidth}>
+              <CompactField label="Phone" required className="w-full min-w-0">
                 <input
                   type="text"
                   value={phone}
@@ -424,7 +425,7 @@ export default function LeadsPage({
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="City" required className={compactFixedFieldWidth}>
+              <CompactField label="City" required className="w-full min-w-0">
                 <input
                   type="text"
                   value={city}
@@ -432,7 +433,9 @@ export default function LeadsPage({
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Email" required className="min-w-0 flex-1">
+            </CompactFormRow>
+            <CompactFormRow className="w-full items-start" columns={4}>
+              <CompactField label="Email" required className="w-full min-w-0">
                 <input
                   type="email"
                   value={email}
@@ -440,9 +443,7 @@ export default function LeadsPage({
                   className={compactInputClass}
                 />
               </CompactField>
-            </CompactFormRow>
-            <CompactFormRow className="w-full items-start">
-              <CompactField label="Website" required className={leadWebsiteFieldWidth}>
+              <CompactField label="Website" required className="w-full min-w-0">
                 <input
                   type="text"
                   value={website}
@@ -450,14 +451,15 @@ export default function LeadsPage({
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Notes" required className="min-w-0 flex-1">
+              <CompactField label="Notes" required className="w-full min-w-0">
                 <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
               </CompactField>
-              <CompactField label={sentToLabel} className={compactFixedFieldWidth}>
+              <CompactField label={sentToLabel} className="w-full min-w-0">
                 <select
                   value={sentTo}
                   onChange={(e) => setSentTo(e.target.value)}
                   className={compactInputClass}
+                  disabled={editingId != null}
                 >
                   <option value="">-</option>
                   {ASSOCIATE_OPTIONS.map((associate) => (
@@ -469,8 +471,8 @@ export default function LeadsPage({
               </CompactField>
             </CompactFormRow>
             {editingId != null && (
-              <CompactFormRow className="w-full items-start">
-                <CompactField label="Upload Image" className="min-w-0 flex-1">
+              <CompactFormRow className="w-full items-start" columns={4}>
+                <CompactField label="Upload Image" className="w-full min-w-0 lg:col-span-3">
                   <input
                     type="file"
                     accept="image/*"
@@ -508,7 +510,7 @@ export default function LeadsPage({
                     </div>
                   )}
                 </CompactField>
-                <CompactField label="Status" className={compactFixedFieldWidth}>
+                <CompactField label="Status" className="w-full min-w-0 lg:col-span-1">
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as LeadStatus)}
@@ -625,7 +627,7 @@ export default function LeadsPage({
                 <td className="border border-gray-300 px-3 py-2">
                   <button
                     type="button"
-                    onClick={() => openView(row)}
+                    onClick={() => (readOnly || section === "completed" ? openView(row) : openEdit(row))}
                     className="text-blue-700 hover:underline"
                   >
                     {row.date}

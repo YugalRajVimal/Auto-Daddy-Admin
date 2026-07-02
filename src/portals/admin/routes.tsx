@@ -68,7 +68,7 @@ export const adminRoutes = (
     <Route path="/admin/accounts/bank" element={<P module="dashboard"><AccountsPage title="Manage Banks" /></P>} />
     <Route path="/admin/messages" element={<Navigate to="/admin/messages/sent" replace />} />
     <Route path="/admin/messages/sent" element={<P module="inviteHelp"><Invitehelp title="Notifications Sent" section="sent" /></P>} />
-    <Route path="/admin/messages/received" element={<P module="inviteHelp"><Invitehelp title="Notifications Received" section="received" showAddNew={false} /></P>} />
+    <Route path="/admin/messages/received" element={<P module="inviteHelp"><Invitehelp title="Messages Received" section="received" showAddNew={false} /></P>} />
     <Route path="/admin/reports" element={<P module="dashboard"><Reports /></P>} />
     <Route path="/admin/reports/:reportType" element={<P module="dashboard"><Reports /></P>} />
     <Route path="/admin/car-owners" element={<P module="users"><CarOwners /></P>} />

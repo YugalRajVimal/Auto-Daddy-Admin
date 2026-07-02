@@ -4,12 +4,10 @@ import { adminNotify } from "../../../utils/adminNotify";
 import { authHeaders } from "../../../api/client";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
-  CompactAutoGrowTextarea,
   CompactField,
   CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
-  compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 
@@ -560,8 +558,6 @@ function exportCsv(owners: AutoShopOwnerType[], visibleCols: string[]) {
 
 // ─── STYLE CONSTANTS ──────────────────────────────────────────────────────────
 const fieldErrorClass = "mt-0.5 text-[11px] font-semibold text-red-700";
-const autoShopRowFieldWidth = compactFixedFieldWidth;
-const autoShopAddressFieldWidth = "min-w-0 flex-1";
 type ProvinceCityOption = { name: string; status?: string };
 type ProvinceWithCities = { cities?: ProvinceCityOption[] };
 const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700";
@@ -574,11 +570,12 @@ const AutoShopAddEditForm: React.FC<{
   onSaved: () => void;
 }> = ({ owner, onCancel, onSaved }) => {
   const isEdit = !!owner;
-  const [name, setName] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
+  const [zipCode, setZipCode] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
   const [shopType, setShopType] = useState<ShopType>("autoShop");
   const [attempted, setAttempted] = useState(false);
@@ -617,26 +614,28 @@ const AutoShopAddEditForm: React.FC<{
     setAttempted(false);
     setApiError(null);
     if (isEdit && owner) {
-      setName(owner.name || "");
+      setBusinessName(owner.businessProfile?.businessName || owner.name || "");
       setEmail(owner.email || "");
       setPhone(owner.phone || "");
       setCity(owner.businessProfile?.city || "");
       setAddress(owner.address || owner.businessProfile?.businessAddress || "");
+      setZipCode(owner.pincode || owner.businessProfile?.pincode || "");
       setJoiningDate(fmtDate(owner.createdAt) !== "-" ? fmtDate(owner.createdAt) : "");
       setShopType(ownerShopType(owner));
     } else {
-      setName("");
+      setBusinessName("");
       setEmail("");
       setPhone("");
       setCity("");
       setAddress("");
+      setZipCode("");
       setJoiningDate(new Date().toISOString().slice(0, 10));
       setShopType("autoShop");
     }
   }, [isEdit, owner]);
 
   function validate(): string | null {
-    if (!name.trim()) return "Name is required.";
+    if (!businessName.trim()) return "Business name is required.";
     if (!email.trim() || !isEmail(email)) return "Valid email required.";
     if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
     if (!address.trim()) return "Address is required.";
@@ -654,11 +653,13 @@ const AutoShopAddEditForm: React.FC<{
     }
     setApiError(null);
     const payload: Record<string, string> = {
-      name: name.trim(),
+      name: businessName.trim(),
+      businessName: businessName.trim(),
       email: email.trim(),
       phone: phone.replace(/\D/g, ""),
       city: city.trim(),
       address: address.trim(),
+      pincode: zipCode.trim(),
       role: "autoshopowner",
       shopType,
     };
@@ -703,8 +704,8 @@ const AutoShopAddEditForm: React.FC<{
           {apiError}
         </div>
       )}
-      <CompactFormRow className="items-start">
-        <CompactField label="Date" className={autoShopRowFieldWidth}>
+      <CompactFormRow columns={4} className="items-start">
+        <CompactField label="Date">
           <input
             type="date"
             value={joiningDate}
@@ -712,7 +713,7 @@ const AutoShopAddEditForm: React.FC<{
             className={compactInputClass}
           />
         </CompactField>
-        <CompactField label="Phone" required className={autoShopRowFieldWidth}>
+        <CompactField label="Phone" required>
           <input
             type="tel"
             value={phone}
@@ -723,16 +724,32 @@ const AutoShopAddEditForm: React.FC<{
             <p className={fieldErrorClass}>Must be 10 digits</p>
           )}
         </CompactField>
-        <CompactField label="Full Name" required className={autoShopRowFieldWidth}>
+        <CompactField label="Business Name" required>
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value.slice(0, 40))}
+            value={businessName}
+            onChange={(e) => setBusinessName(e.target.value.slice(0, 60))}
             className={compactInputClass}
           />
-          {attempted && !name.trim() && <p className={fieldErrorClass}>Required</p>}
+          {attempted && !businessName.trim() && <p className={fieldErrorClass}>Required</p>}
         </CompactField>
-        <CompactField label="City" className={autoShopRowFieldWidth}>
+        <CompactField label="Shop Type" required>
+          <select
+            value={shopType}
+            onChange={(e) => setShopType(e.target.value as ShopType)}
+            className={compactInputClass}
+          >
+            {SHOP_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+      </CompactFormRow>
+
+      <CompactFormRow columns={4} className="items-start">
+        <CompactField label="City">
           <select
             value={city}
             onChange={(e) => setCity(e.target.value)}
@@ -746,30 +763,25 @@ const AutoShopAddEditForm: React.FC<{
             ))}
           </select>
         </CompactField>
-        <CompactField label="Address" required className={autoShopAddressFieldWidth}>
-          <CompactAutoGrowTextarea
+        <CompactField label="Address" required>
+          <input
+            type="text"
             value={address}
-            onChange={(e) => setAddress(e.target.value.slice(0, 100))}
-            placeholder="Max 100 chars"
+            onChange={(e) => setAddress(e.target.value.slice(0, 120))}
+            placeholder="Street / Area"
+            className={compactInputClass}
           />
           {attempted && !address.trim() && <p className={fieldErrorClass}>Required</p>}
         </CompactField>
-      </CompactFormRow>
-      <CompactFormRow className="items-start justify-start gap-6">
-        <CompactField label="Shop Type" required className={autoShopRowFieldWidth}>
-          <select
-            value={shopType}
-            onChange={(e) => setShopType(e.target.value as ShopType)}
+        <CompactField label="Zip Code">
+          <input
+            type="text"
+            value={zipCode}
+            onChange={(e) => setZipCode(e.target.value.replace(/[^\d]/g, "").slice(0, 10))}
             className={compactInputClass}
-          >
-            {SHOP_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          />
         </CompactField>
-        <CompactField label="Email" required className={autoShopRowFieldWidth}>
+        <CompactField label="Email" required>
           <input
             type="email"
             value={email}
@@ -1169,8 +1181,8 @@ const AutoShopOwners: React.FC = () => {
                   type="button"
                   onClick={() => setCurrentPage(p)}
                   className={`h-7 w-7 border text-xs font-medium ${currentPage === p
-                      ? "border-ad-green bg-ad-green text-white"
-                      : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+                    ? "border-ad-green bg-ad-green text-white"
+                    : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
                     }`}
                 >
                   {p}

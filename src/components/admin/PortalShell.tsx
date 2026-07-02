@@ -1,11 +1,14 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { FiBell, FiImage, FiUser } from "react-icons/fi";
 import useAuth from "../../auth/useAuth";
 import { getRoleConfig } from "../../auth/roleRegistry";
 import { getActivePrimaryItem, type NavItem, type NavSubItem } from "../../config/adminNav";
+import { Modal } from "../ui/modal";
+import { adminNotify } from "../../utils/adminNotify";
 
 const LOGO = "/logo.png";
+const ADMIN_MESSAGES_PATH = "/admin/messages/received";
 
 function isPathActive(pathname: string, path: string, homePath: string) {
   if (path === homePath) return pathname === homePath;
@@ -69,6 +72,10 @@ export default function PortalShell({
   const navigate = useNavigate();
   const { role, logout, session } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpSubject, setHelpSubject] = useState("");
+  const [helpDetails, setHelpDetails] = useState("");
+  const [helpTicketNo, setHelpTicketNo] = useState<string>("");
   const navReset = (location.state as { navReset?: number } | null | undefined)?.navReset ?? 0;
   const contentKey = `${location.pathname}-${navReset}`;
 
@@ -106,6 +113,44 @@ export default function PortalShell({
   const handleLogout = () => {
     if (!window.confirm("Are you sure you want to log out?")) return;
     logout();
+  };
+
+  const helpSubjects = useMemo(
+    () => [
+      "Accounts",
+      "Apps",
+      "Clients",
+      "Estimates",
+      "Expenses",
+      "Inventory",
+      "Invoicing",
+      "Others",
+      "Reports",
+      "Taxation",
+    ],
+    []
+  );
+
+  const openHelp = () => {
+    setHelpTicketNo(String(Math.floor(10000000 + Math.random() * 90000000)));
+    setHelpSubject("");
+    setHelpDetails("");
+    setHelpOpen(true);
+  };
+
+  const closeHelp = () => setHelpOpen(false);
+
+  const submitHelp = () => {
+    if (!helpSubject.trim()) {
+      adminNotify.error("Please select a subject.");
+      return;
+    }
+    if (!helpDetails.trim()) {
+      adminNotify.error("Please enter details.");
+      return;
+    }
+    adminNotify.success(`Ticket submitted. Ticket No. ${helpTicketNo}`);
+    setHelpOpen(false);
   };
 
   const utilityLinkClass =
@@ -175,8 +220,9 @@ export default function PortalShell({
         to={helpPath ?? "#"}
         className={helpPath && onHelpNav ? helpLinkActiveClass : utilityLinkClass}
         onClick={(e) => {
-          if (!helpPath) return;
-          handleNavLinkClick(helpPath, e);
+          e.preventDefault();
+          if (helpPath) handleNavLinkClick(helpPath, e);
+          else openHelp();
         }}
       >
         Help
@@ -190,6 +236,81 @@ export default function PortalShell({
   return (
     <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
       <div className="fixed top-0 right-3 z-50 bg-ad-app-bg sm:right-4">{utilityNavBar}</div>
+
+      <Modal isOpen={helpOpen} onClose={closeHelp} className="mx-3 w-full max-w-3xl p-0" showCloseButton>
+        <div className="overflow-hidden rounded-3xl border border-gray-300 bg-white">
+          <div className="border-b border-gray-300 bg-gray-50 px-5 py-3">
+            <h2 className="text-base font-semibold text-gray-800">Support (Help)</h2>
+          </div>
+
+          <div className="px-5 py-4">
+            <p className="text-sm text-gray-600">
+              AutoDaddy is providing better solution to its clients promptly. If you have any question about AutoDaddy feel
+              free to generate ticket.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_220px]">
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-gray-700">
+                    Subject <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={helpSubject}
+                    onChange={(e) => setHelpSubject(e.target.value)}
+                    className="h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-ad-purple focus:outline-none"
+                  >
+                    <option value="" disabled>
+                      Select
+                    </option>
+                    {helpSubjects.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-gray-700">
+                    Details <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={helpDetails}
+                    onChange={(e) => setHelpDetails(e.target.value)}
+                    rows={6}
+                    className="w-full resize-none rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-ad-purple focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="md:pt-6">
+                <div className="rounded border border-gray-200 bg-ad-blue-light/40 px-4 py-3 text-center">
+                  <div className="text-xs font-semibold text-gray-600">Ticket No.</div>
+                  <div className="mt-1 font-mono text-sm font-bold text-gray-700">{helpTicketNo || "—"}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={submitHelp}
+                className="rounded bg-ad-green px-5 py-2 text-sm font-semibold text-white hover:bg-ad-green-dark"
+              >
+                Submit
+              </button>
+              <button
+                type="button"
+                onClick={closeHelp}
+                className="rounded border border-gray-300 bg-white px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       <div className="flex min-h-0 w-full flex-1 flex-col">
         <header className="px-3 pt-0 pb-2 sm:px-4">
@@ -232,11 +353,9 @@ export default function PortalShell({
                   type="button"
                   className="relative text-blue-600 hover:text-blue-700"
                   aria-label="Notifications"
+                  onClick={() => navigate(ADMIN_MESSAGES_PATH)}
                 >
                   <FiBell size={26} strokeWidth={1.75} />
-                  <span className="absolute -right-1.5 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold leading-none text-white">
-                    1
-                  </span>
                 </button>
                 <Link
                   to={profilePath}

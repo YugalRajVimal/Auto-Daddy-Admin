@@ -36,6 +36,8 @@ const BANK_STATUS_OPTIONS = [
   { value: "inactive", label: "Inactive" },
 ];
 
+const INCOME_PAYMENT_MODE_OPTIONS = ["Bank Transfer", "Cash", "Cheque", "Online Payment"] as const;
+
 type PageVariant = "bank" | "expenses" | "income";
 
 type AccountsPageProps = {
@@ -44,15 +46,173 @@ type AccountsPageProps = {
   variant?: PageVariant;
 };
 
+const BANKS_STORAGE_KEY = "admin.accounts.banks.v1";
+
+function loadStoredBanks(fallback: BankRow[]) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(BANKS_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return fallback;
+    return parsed as BankRow[];
+  } catch {
+    return fallback;
+  }
+}
+
+function persistBanks(banks: BankRow[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(BANKS_STORAGE_KEY, JSON.stringify(banks));
+  } catch {
+    // ignore persistence errors (private mode / quota)
+  }
+}
+
+function normalizeVendorLabel(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function VendorComboField({
+  label,
+  required,
+  value,
+  onChange,
+  options,
+  className,
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (next: string) => void;
+  options: string[];
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const normalizedValue = value;
+  const filtered = useMemo(() => {
+    const q = normalizeVendorLabel(normalizedValue).toLowerCase();
+    const base = options
+      .map(normalizeVendorLabel)
+      .filter(Boolean)
+      .filter((opt, idx, arr) => arr.findIndex((v) => v.toLowerCase() === opt.toLowerCase()) === idx);
+    if (!q) return base.slice(0, 25);
+    return base.filter((opt) => opt.toLowerCase().includes(q)).slice(0, 25);
+  }, [normalizedValue, options]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [normalizedValue, open]);
+
+  const listboxId = `vendor-listbox-${label.replace(/\s+/g, "-").toLowerCase()}`;
+
+  return (
+    <CompactField label={label} required={required} className={className}>
+      <div ref={rootRef} className="relative">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+              setOpen(true);
+              return;
+            }
+            if (!open) return;
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActiveIndex((i) => Math.min(filtered.length - 1, i + 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActiveIndex((i) => Math.max(0, i - 1));
+            } else if (e.key === "Enter") {
+              const hit = filtered[activeIndex];
+              if (hit) {
+                e.preventDefault();
+                onChange(hit);
+                setOpen(false);
+              }
+            }
+          }}
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          className={compactInputClass}
+          autoComplete="off"
+        />
+
+        {open && filtered.length > 0 ? (
+          <div
+            id={listboxId}
+            role="listbox"
+            className="absolute left-0 right-0 z-50 mt-0.5 max-h-52 overflow-y-auto rounded border border-gray-400 bg-white shadow-lg"
+          >
+            {filtered.map((opt, idx) => {
+              const active = idx === activeIndex;
+              return (
+                <button
+                  key={`${opt}-${idx}`}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  onClick={() => {
+                    onChange(opt);
+                    setOpen(false);
+                  }}
+                  className={`block w-full px-2 py-1.5 text-left text-sm hover:bg-gray-100 ${
+                    active ? "bg-ad-green-light/60 font-semibold text-ad-green-dark" : "text-gray-900"
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    </CompactField>
+  );
+}
+
 function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: AccountsPageProps) {
-  const [banks, setBanks] = useState(DUMMY_BANKS);
-  const [draft, setDraft] = useState<BankRow[]>(() => structuredClone(DUMMY_BANKS));
+  const [banks, setBanks] = useState(() => loadStoredBanks(DUMMY_BANKS));
+  const [draft, setDraft] = useState<BankRow[]>(() => structuredClone(loadStoredBanks(DUMMY_BANKS)));
   const [showForm, setShowForm] = useState(initialShowForm);
   const [bankWalletName, setBankWalletName] = useState("");
   const [openingBalance, setOpeningBalance] = useState("");
 
   useEffect(() => {
     setDraft(structuredClone(banks));
+  }, [banks]);
+
+  useEffect(() => {
+    persistBanks(banks);
   }, [banks]);
 
   const hasDraftChanges = useMemo(
@@ -289,10 +449,12 @@ function LedgerPage({
   variant: "expenses" | "income";
 }) {
   const isExpense = variant === "expenses";
+  const isIncome = variant === "income";
   const baseCategories = isExpense ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
   const vendorLabel = "Vendor";
   const billLabel = isExpense ? "Bill Number" : "Invoice Number";
   const initialData = isExpense ? DUMMY_EXPENSES : DUMMY_INCOME;
+  const [banks, setBanks] = useState<BankRow[]>(() => loadStoredBanks(DUMMY_BANKS));
 
   const [categories, setCategories] = useState<CategoryOption[]>(() => cloneCategories(baseCategories));
   const [rows, setRows] = useState(initialData);
@@ -305,6 +467,8 @@ function LedgerPage({
 
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState("2026-06-20");
+  const [paymentMode, setPaymentMode] = useState("");
+  const [bank, setBank] = useState("");
   const [vendor, setVendor] = useState("");
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
@@ -314,8 +478,9 @@ function LedgerPage({
   const [hasBillNumber, setHasBillNumber] = useState(false);
   const [billNumber, setBillNumber] = useState("");
   const [byCheque, setByCheque] = useState(false);
-  const [chequeNumber, setChequeNumber] = useState("");
+  const [chequeAccount, setChequeAccount] = useState("");
   const [attachReceipt, setAttachReceipt] = useState(false);
+  const [attachmentName, setAttachmentName] = useState<string | null>(null);
 
   const [categoriesPopupOpen, setCategoriesPopupOpen] = useState(false);
   const [subcategoriesPopupOpen, setSubcategoriesPopupOpen] = useState(false);
@@ -338,6 +503,36 @@ function LedgerPage({
     selectedCategory?.subcategories.find((sub) => sub.value === subcategory)?.label ?? "";
 
   const subcategoryOptions = useMemo(() => selectedCategory?.subcategories ?? [], [selectedCategory]);
+  const vendorOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const row of rows) {
+      const normalized = normalizeVendorLabel(row.vendor);
+      if (!normalized) continue;
+      const key = normalized.toLowerCase();
+      if (!seen.has(key)) seen.set(key, normalized);
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+  const chequeAccountOptions = useMemo(() => {
+    return banks
+      .filter((b) => String(b.status).toLowerCase() === "active")
+      .map((b) => b.label)
+      .filter(Boolean);
+  }, [banks]);
+
+  const bankOptions = useMemo(() => {
+    return banks.map((b) => b.label).filter(Boolean);
+  }, [banks]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== BANKS_STORAGE_KEY) return;
+      setBanks(loadStoredBanks(DUMMY_BANKS));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   useEffect(() => {
     if (subcategory && !subcategoryOptions.some((s) => s.value === subcategory)) {
@@ -460,10 +655,13 @@ function LedgerPage({
       row.vendor,
       String(row.amount),
       `${row.amount} CAD`,
+      row.paymentMode ?? "",
+      row.bank ?? "",
       labels.category,
       labels.subcategory,
       row.notes,
       row.billNumber ?? "",
+      row.attachmentName ?? "",
     ]
       .join(" ")
       .toLowerCase();
@@ -491,6 +689,8 @@ function LedgerPage({
     setEditingId(null);
     setAmount("");
     setDate("2026-06-20");
+    setPaymentMode("");
+    setBank("");
     setVendor("");
     setCategory("");
     setSubcategory("");
@@ -500,8 +700,9 @@ function LedgerPage({
     setHasBillNumber(false);
     setBillNumber("");
     setByCheque(false);
-    setChequeNumber("");
+    setChequeAccount("");
     setAttachReceipt(false);
+    setAttachmentName(null);
   };
 
   const openAdd = () => {
@@ -513,6 +714,8 @@ function LedgerPage({
     setEditingId(row.id);
     setAmount(String(row.amount));
     setDate(row.date);
+    setPaymentMode(row.paymentMode ?? "");
+    setBank(row.bank ?? "");
     setVendor(row.vendor);
     setCategory(row.category);
     setSubcategory(row.subcategory);
@@ -522,6 +725,7 @@ function LedgerPage({
     setBillNumber(row.billNumber ?? "");
     setByCheque(row.byCheque);
     setAttachReceipt(row.hasReceipt);
+    setAttachmentName(row.attachmentName ?? null);
     setShowForm(true);
   };
 
@@ -531,19 +735,52 @@ function LedgerPage({
   };
 
   const handleSave = () => {
-    const parsedAmount = Number.parseFloat(amount) || 0;
+    const parsedAmount = Number.parseFloat(amount);
+    const normalizedVendor = vendor.trim();
+    const normalizedPaymentMode = paymentMode.trim();
+    const normalizedBank = bank.trim();
+
+    if (!amount.trim() || !Number.isFinite(parsedAmount)) {
+      adminNotify.error("Amount is required.");
+      return;
+    }
+    if (!date) {
+      adminNotify.error("Date is required.");
+      return;
+    }
+    if (!normalizedVendor) {
+      adminNotify.error(`${vendorLabel} is required.`);
+      return;
+    }
+    if (isIncome && !normalizedPaymentMode) {
+      adminNotify.error("Payment Mode is required.");
+      return;
+    }
+
     const payload: Omit<LedgerRow, "id"> = {
       date,
-      vendor: vendor.trim(),
-      amount: parsedAmount,
+      vendor: normalizedVendor,
+      amount: parsedAmount || 0,
       category: category || categories[0]?.value || "",
       subcategory: subcategory || subcategoryOptions[0]?.value || "",
       notes,
       gst,
       billNumber: hasBillNumber && billNumber.trim() ? billNumber.trim() : null,
       byCheque,
-      hasReceipt: attachReceipt,
+      hasReceipt: isIncome ? Boolean(attachmentName) : attachReceipt,
+      paymentMode: isIncome ? normalizedPaymentMode : undefined,
+      bank: isIncome ? normalizedBank : undefined,
+      attachmentName: isIncome ? attachmentName : undefined,
     };
+
+    if (!payload.category) {
+      adminNotify.error("Category is required.");
+      return;
+    }
+    if (isExpense && !payload.subcategory) {
+      adminNotify.error("Subcategory is required.");
+      return;
+    }
 
     if (editingId != null) {
       setRows((prev) => prev.map((row) => (row.id === editingId ? { ...row, ...payload } : row)));
@@ -571,7 +808,7 @@ function LedgerPage({
           <CompactFormPanel
             footer={
               <CompactFormFooter
-                actionLabel="Save"
+                actionLabel={editingId != null ? "Update" : "Save"}
                 onSave={handleSave}
                 onCancel={handleCancel}
               />
@@ -588,31 +825,33 @@ function LedgerPage({
                     className={compactInputClass}
                   />
                 </CompactField>
-                <div className="mt-3">
-                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                    <input
-                      type="checkbox"
-                      checked={gst}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setGst(checked);
-                        if (!checked) setGstAmount("");
-                      }}
-                      className="h-3.5 w-3.5 accent-ad-green"
-                    />
-                    GST
-                  </label>
-                  {gst ? (
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={gstAmount}
-                      onChange={(e) => setGstAmount(e.target.value)}
-                      placeholder="GST amount"
-                      className={compactInputClass}
-                    />
-                  ) : null}
-                </div>
+                {isExpense ? (
+                  <div className="mt-3">
+                    <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                      <input
+                        type="checkbox"
+                        checked={gst}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setGst(checked);
+                          if (!checked) setGstAmount("");
+                        }}
+                        className="h-3.5 w-3.5 accent-ad-green"
+                      />
+                      GST
+                    </label>
+                    {gst ? (
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={gstAmount}
+                        onChange={(e) => setGstAmount(e.target.value)}
+                        placeholder="GST amount"
+                        className={compactInputClass}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               <CompactField label="Date" required className={compactFixedFieldWidth}>
                 <input
@@ -622,38 +861,68 @@ function LedgerPage({
                   className={compactInputClass}
                 />
               </CompactField>
-              <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
-                <CompactField label={vendorLabel} required className="w-full flex-none">
-                  <input
-                    type="text"
-                    value={vendor}
-                    onChange={(e) => setVendor(e.target.value)}
+              {isIncome ? (
+                <CompactField label="Payment Mode" required className={compactFixedFieldWidth}>
+                  <select
+                    value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value)}
                     className={compactInputClass}
-                  />
+                  >
+                    <option value="">Select</option>
+                    {INCOME_PAYMENT_MODE_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
                 </CompactField>
-                <div className="mt-3">
-                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                    <input
-                      type="checkbox"
-                      checked={hasBillNumber}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setHasBillNumber(checked);
-                        if (!checked) setBillNumber("");
-                      }}
-                      className="h-3.5 w-3.5 accent-ad-green"
-                    />
-                    {billLabel}
-                  </label>
-                  {hasBillNumber ? (
-                    <input
-                      type="text"
-                      value={billNumber}
-                      onChange={(e) => setBillNumber(e.target.value)}
-                      className={compactInputClass}
-                    />
-                  ) : null}
-                </div>
+              ) : null}
+              {isIncome ? (
+                <CompactField label="Bank" className={compactFixedFieldWidth}>
+                  <select value={bank} onChange={(e) => setBank(e.target.value)} className={compactInputClass}>
+                    <option value="">Select account</option>
+                    {bankOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </CompactField>
+              ) : null}
+              <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+                <VendorComboField
+                  label={vendorLabel}
+                  required
+                  value={vendor}
+                  onChange={setVendor}
+                  options={vendorOptions}
+                  className="w-full flex-none"
+                />
+                {isExpense ? (
+                  <div className="mt-3">
+                    <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                      <input
+                        type="checkbox"
+                        checked={hasBillNumber}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setHasBillNumber(checked);
+                          if (!checked) setBillNumber("");
+                        }}
+                        className="h-3.5 w-3.5 accent-ad-green"
+                      />
+                      {billLabel}
+                    </label>
+                    {hasBillNumber ? (
+                      <input
+                        type="text"
+                        value={billNumber}
+                        onChange={(e) => setBillNumber(e.target.value)}
+                        className={compactInputClass}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               <div className="min-w-[160px] flex-1">
                 <ComboSelectWithEditor
@@ -666,65 +935,103 @@ function LedgerPage({
                   onEditAddNew={openCategoriesPopup}
                   className="w-full"
                 />
-                <div className="mt-3">
-                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                    <input
-                      type="checkbox"
-                      checked={byCheque}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setByCheque(checked);
-                        if (!checked) setChequeNumber("");
-                      }}
-                      className="h-3.5 w-3.5 accent-ad-green"
-                    />
-                    By Cheque
-                  </label>
-                  {byCheque ? (
-                    <input
-                      type="text"
-                      value={chequeNumber}
-                      onChange={(e) => setChequeNumber(e.target.value)}
-                      placeholder="Cheque number"
-                      className={compactInputClass}
-                    />
-                  ) : null}
-                </div>
-              </div>
-              <ComboSelectWithEditor
-                label="Subcategory"
-                required
-                value={selectedSubcategoryLabel}
-                placeholder="Select subcategory"
-                options={subcategoryLabels}
-                disabled={!category}
-                onChange={handleSubcategoryChange}
-                onEditAddNew={openSubcategoriesPopup}
-                className="min-w-[160px] flex-1"
-              />
-              <div className="min-w-[160px] flex-1">
-                <CompactField label="Notes" className="w-full flex-none">
-                  <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-                </CompactField>
-                <div className="mt-3">
-                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                    <input
-                      type="checkbox"
-                      checked={attachReceipt}
-                      onChange={(e) => setAttachReceipt(e.target.checked)}
-                      className="h-3.5 w-3.5 accent-ad-green"
-                    />
-                    Attach Image of Receipt
-                  </label>
-                  {attachReceipt ? (
-                    <label className="block w-full cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-1.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-300">
-                      Upload File
-                      <input type="file" accept="image/*" className="hidden" />
+                {isExpense ? (
+                  <div className="mt-3">
+                    <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                      <input
+                        type="checkbox"
+                        checked={byCheque}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setByCheque(checked);
+                          if (!checked) setChequeAccount("");
+                        }}
+                        className="h-3.5 w-3.5 accent-ad-green"
+                      />
+                      By Cheque
                     </label>
-                  ) : null}
-                </div>
+                    {byCheque ? (
+                      <select
+                        value={chequeAccount}
+                        onChange={(e) => setChequeAccount(e.target.value)}
+                        className={compactInputClass}
+                      >
+                        <option value="">Select account</option>
+                        {chequeAccountOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
+              {isExpense ? (
+                <ComboSelectWithEditor
+                  label="Subcategory"
+                  required
+                  value={selectedSubcategoryLabel}
+                  placeholder="Select subcategory"
+                  options={subcategoryLabels}
+                  disabled={!category}
+                  onChange={handleSubcategoryChange}
+                  onEditAddNew={openSubcategoriesPopup}
+                  className="min-w-[160px] flex-1"
+                />
+              ) : null}
+              {isExpense ? (
+                <div className="min-w-[160px] flex-1">
+                  <CompactField label="Notes" className="w-full flex-none">
+                    <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+                  </CompactField>
+                  <div className="mt-3">
+                    <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                      <input
+                        type="checkbox"
+                        checked={attachReceipt}
+                        onChange={(e) => setAttachReceipt(e.target.checked)}
+                        className="h-3.5 w-3.5 accent-ad-green"
+                      />
+                      Attach Image of Receipt
+                    </label>
+                    {attachReceipt ? (
+                      <label className="block w-full cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-1.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-300">
+                        Upload File
+                        <input type="file" accept="image/*" className="hidden" />
+                      </label>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </CompactFormRow>
+
+            {isIncome ? (
+              <CompactFormRow className="items-start gap-y-6">
+                <div className="min-w-0 flex-1">
+                  <CompactField label="Notes" className="w-full">
+                    <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+                  </CompactField>
+                </div>
+                <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+                  <CompactField label="Attachment" className="w-full">
+                    <input
+                      type="file"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setAttachmentName(file ? file.name : null);
+                      }}
+                      className="w-full text-xs"
+                    />
+                    {attachmentName ? (
+                      <div className="mt-1 text-[11px] text-gray-600">Selected: {attachmentName}</div>
+                    ) : (
+                      <div className="mt-1 text-[11px] text-gray-600">No file selected.</div>
+                    )}
+                  </CompactField>
+                </div>
+              </CompactFormRow>
+            ) : null}
             {categoriesPopupOpen && (
               <ListEditorPopup
                 title="Edit / Add Categories"
@@ -813,9 +1120,17 @@ function LedgerPage({
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">{vendorLabel}</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Amount</th>
+              {isIncome ? (
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Payment Mode</th>
+              ) : null}
+              {isIncome ? (
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Bank</th>
+              ) : null}
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Category</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
+                {isIncome ? "Attachment" : "Clip"}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -844,6 +1159,12 @@ function LedgerPage({
                   <td className="border border-gray-300 px-3 py-2">
                     {row.amount % 1 === 0 ? row.amount : row.amount.toFixed(2)} CAD
                   </td>
+                  {isIncome ? (
+                    <td className="border border-gray-300 px-3 py-2">{row.paymentMode || ""}</td>
+                  ) : null}
+                  {isIncome ? (
+                    <td className="border border-gray-300 px-3 py-2">{row.bank || ""}</td>
+                  ) : null}
                   <td className="border border-gray-300 px-3 py-2">
                     <div>
                       <div className="font-bold leading-tight">{labels.category}</div>
@@ -852,8 +1173,15 @@ function LedgerPage({
                   </td>
                   <td className="border border-gray-300 px-3 py-2">{row.notes || ""}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">
-                    {row.hasReceipt ? (
-                      <FiPaperclip className="inline text-blue-600" size={16} aria-hidden />
+                    {row.hasReceipt || Boolean(row.attachmentName) ? (
+                      <span className="inline-flex items-center gap-2">
+                        <FiPaperclip className="inline text-blue-600" size={16} aria-hidden />
+                        {isIncome && row.attachmentName ? (
+                          <span className="max-w-[160px] truncate text-xs text-gray-700" title={row.attachmentName}>
+                            {row.attachmentName}
+                          </span>
+                        ) : null}
+                      </span>
                     ) : (
                       <span className="text-gray-500">--</span>
                     )}

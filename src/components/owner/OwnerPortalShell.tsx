@@ -1,11 +1,15 @@
-import { useEffect } from "react";
-import { Link, Outlet, useLocation } from "react-router";
+import { useEffect, useMemo } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { FiBell, FiUser } from "react-icons/fi";
 import useAuth from "../../auth/useAuth";
 import { getActivePrimaryItem, type NavItem } from "../../config/adminNav";
 import { useOwnerPageChromeContext } from "../../context/OwnerPageChromeContext";
+import { useCarOwnerNotifications } from "../../hooks/useCarOwnerNotifications";
 import ShopBrandLogo from "../shop/ShopBrandLogo";
 import { shopNavVerticalGapClass, shopPortalHorizPaddingClass } from "../shop/shopLayoutStyles";
+
+const OWNER_MESSAGES_PATH = "/owner/messages";
+const OWNER_LAST_SEEN_KEY = "ad:lastSeen:owner-notifications";
 
 function isPathActive(pathname: string, path: string, homePath: string) {
   if (path === homePath) return pathname === homePath;
@@ -32,8 +36,10 @@ export default function OwnerPortalShell({
   helpPath,
 }: OwnerPortalShellProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { logout } = useAuth();
   const { chrome } = useOwnerPageChromeContext();
+  const { items } = useCarOwnerNotifications();
 
   const activePrimary = getActivePrimaryItem(location.pathname, primaryNav, homePath);
   const onHelpNav = helpPath != null && isPathActive(location.pathname, helpPath, homePath);
@@ -47,6 +53,21 @@ export default function OwnerPortalShell({
   const handleLogout = () => {
     if (!window.confirm("Are you sure you want to log out?")) return;
     logout();
+  };
+
+  const newCount = useMemo(() => {
+    const lastSeen = Number(localStorage.getItem(OWNER_LAST_SEEN_KEY) ?? 0);
+    if (!Number.isFinite(lastSeen) || lastSeen <= 0) return 0;
+    return items.reduce((count, n) => {
+      const t = new Date(n.time).getTime();
+      if (!Number.isNaN(t) && t > lastSeen) return count + 1;
+      return count;
+    }, 0);
+  }, [items]);
+
+  const handleNotificationsClick = () => {
+    localStorage.setItem(OWNER_LAST_SEEN_KEY, String(Date.now()));
+    navigate(OWNER_MESSAGES_PATH, { state: { initialTab: "notifications" } });
   };
 
   const utilityLinkClass =
@@ -113,11 +134,14 @@ export default function OwnerPortalShell({
                 type="button"
                 className="relative text-blue-600 hover:text-blue-700"
                 aria-label="Notifications"
+                onClick={handleNotificationsClick}
               >
                 <FiBell size={22} strokeWidth={1.75} />
-                <span className="absolute -right-1.5 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold leading-none text-white">
-                  1
-                </span>
+                {newCount > 0 ? (
+                  <span className="absolute -right-1.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold leading-none text-white">
+                    {newCount > 99 ? "99+" : newCount}
+                  </span>
+                ) : null}
               </button>
               <Link to={profilePath} className="shrink-0">
                 {headerAvatar}

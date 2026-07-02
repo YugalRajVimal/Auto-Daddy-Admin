@@ -21,6 +21,10 @@ export type LedgerRow = {
   billNumber: string | null;
   byCheque: boolean;
   hasReceipt: boolean;
+  /** Income-only fields (optional for backward compatibility). */
+  paymentMode?: string;
+  bank?: string;
+  attachmentName?: string | null;
 };
 
 export type AccountReportTitle = "income" | "expenses" | "bank" | "gst";

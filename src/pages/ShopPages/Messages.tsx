@@ -10,6 +10,7 @@ import {
 } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopNotifications } from "../../hooks/useShopNotifications";
+import { useLocation } from "react-router";
 
 const MESSAGE_SECTIONS = [
   { id: "notifications", label: "Notifications", variant: "primary" as const },
@@ -30,8 +31,10 @@ function formatTime(iso: string): string {
 }
 
 export default function ShopMessagesPage() {
+  const location = useLocation();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
-  const [activeId, setActiveId] = useState("notifications");
+  const initialTab = (location.state as { initialTab?: string } | null | undefined)?.initialTab;
+  const [activeId, setActiveId] = useState(initialTab || "notifications");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const { items, loading, loadingMore, hasMore, error, refresh, loadMore } = useShopNotifications();
 
