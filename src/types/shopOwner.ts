@@ -49,6 +49,7 @@ export type ShopDeal = {
   discountedPrice?: number | string;
   dealEnabled?: boolean;
   offersEndOnDate?: string;
+  createdAt?: string;
   serviceId?: string;
   vehicleId?: string;
   service?: { id?: string; name?: string; desc?: string };
@@ -79,6 +80,7 @@ export type ShopServiceCategory = {
   createdAt?: string;
   updatedAt?: string;
   isActive?: boolean;
+  odoOutRequired?: boolean;
   subServices: { id?: string; name: string; desc: string; price: number; qty?: number; tax?: number }[];
 };
 

@@ -88,7 +88,7 @@ export const shopHeroCardSearchClass =
 
 /** Shorter inputs for shop add/edit form cards. */
 export const shopCompactInputClass =
-  "shop-compact-input w-full h-[26px] box-border border border-gray-400 bg-white px-2 py-0 text-sm leading-tight focus:border-blue-500 focus:outline-none";
+  "shop-compact-input w-full h-[26px] box-border border border-gray-400 bg-white px-2 py-0 text-sm leading-tight text-gray-800 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none";
 
 /** Top action row inside flush hero cards (My Website style — no grey toolbar bar). */
 export const shopHeroCardInlineToolbarClass =
@@ -98,7 +98,7 @@ export const shopHeroCardCompactSearchClass = `min-w-[160px] max-w-[240px] sm:mi
 
 /** Multiline fields in shop form cards. */
 export const shopCompactTextareaClass =
-  "shop-compact-input w-full min-h-[26px] border border-gray-400 bg-white px-2 py-0.5 text-sm leading-tight focus:border-blue-500 focus:outline-none resize-y";
+  "shop-compact-input w-full min-h-[26px] border border-gray-400 bg-white px-2 py-0.5 text-sm leading-tight text-gray-800 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none resize-y";
 
 /** Read-only value cells matching compact input height. */
 export const shopCompactReadOnlyClass =

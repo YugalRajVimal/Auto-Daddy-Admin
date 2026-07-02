@@ -50,6 +50,7 @@ export type SaveJobCardInput = {
     labourDuration?: string;
     technicalRemarks?: string;
     discount?: string;
+    additionalNotes?: string;
   };
   vehiclePhotoFiles: File[];
   existingVehiclePhotoUrls?: string[];
@@ -75,6 +76,7 @@ function toFormServices(categories: ShopServiceCategory[]) {
     id: svc.id,
     name: svc.name,
     desc: svc.desc,
+    odoOutRequired: svc.odoOutRequired,
     subServices: svc.subServices,
   }));
 }
@@ -145,6 +147,7 @@ function buildSaveFormData(input: SaveJobCardInput): FormData {
   fd.append("labourCharge", fields.labourCharge ?? "0");
   fd.append("labourDuration", fields.labourDuration ?? "0");
   if (fields.technicalRemarks) fd.append("technicalRemarks", fields.technicalRemarks);
+  if (form.additionalNotes?.trim()) fd.append("additionalNotes", form.additionalNotes.trim());
   for (const photo of fields.vehiclePhotos ?? []) {
     fd.append("vehiclePhotos", photo);
   }

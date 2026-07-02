@@ -23,6 +23,7 @@ export interface Service {
   name: string;
   status: ServiceStatus;
   shopType: ShopType;
+  odoOutRequired?: boolean;
   subServices?: { name: string; status?: ServiceStatus }[];
 }
 
@@ -54,6 +55,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
   const [name, setName] = useState("");
   const [shopType, setShopType] = useState<ShopType>("autoShop");
   const [status, setStatus] = useState<ServiceStatus>("active");
+  const [odoOutRequired, setOdoOutRequired] = useState(false);
 
   const resetTableControls = () => {
     setPage(1);
@@ -126,6 +128,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     setName("");
     setShopType("autoShop");
     setStatus("active");
+    setOdoOutRequired(false);
     setEditingId(null);
     setError("");
   };
@@ -139,6 +142,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     setName(service.name);
     setShopType(service.shopType);
     setStatus(service.status || "active");
+    setOdoOutRequired(Boolean(service.odoOutRequired));
     setEditingId(service._id);
     setError("");
     setShowForm(true);
@@ -160,7 +164,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     setError("");
     setSuccessMsg("");
     try {
-      const payload = { name: name.trim(), shopType, status };
+      const payload = { name: name.trim(), shopType, status, odoOutRequired };
       if (editingId) {
         await axios.put(`${API_BASE}/admin/services/${editingId}`, payload);
         adminNotify.success("Service updated successfully.");
@@ -228,6 +232,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
         name: service.name,
         shopType: service.shopType,
         status: service.status || "active",
+        odoOutRequired: Boolean(service.odoOutRequired),
       });
       restoreStashed((item) => item._id === service._id);
       adminNotify.success("Service restored.");
@@ -290,7 +295,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                 {error}
               </div>
             )}
-            <CompactFormRow className="items-start">
+            <CompactFormRow className="items-start" columns={4}>
               <CompactField label="Service Name" required>
                 <input
                   type="text"
@@ -321,6 +326,17 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
+              </CompactField>
+              <CompactField label="Odo Out Required?">
+                <label className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 text-sm text-gray-800">
+                  <input
+                    type="checkbox"
+                    checked={odoOutRequired}
+                    onChange={(e) => setOdoOutRequired(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-ad-green"
+                  />
+                  Yes
+                </label>
               </CompactField>
             </CompactFormRow>
           </CompactFormPanel>

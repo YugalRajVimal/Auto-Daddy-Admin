@@ -11,6 +11,9 @@ type ComboSelectWithEditorProps = {
   onChange: (value: string) => void;
   onEditAddNew: () => void;
   className?: string;
+  inputClassName?: string;
+  editButtonClassName?: string;
+  activeItemClassName?: string;
 };
 
 export default function ComboSelectWithEditor({
@@ -23,6 +26,9 @@ export default function ComboSelectWithEditor({
   onChange,
   onEditAddNew,
   className = "min-w-0 w-full",
+  inputClassName = compactInputClass,
+  editButtonClassName = "block w-full border-b-2 border-ad-green-dark bg-ad-green px-2 py-2 text-left text-sm font-bold tracking-wide text-white shadow-inner hover:bg-ad-green-dark",
+  activeItemClassName = "bg-ad-green-light/60 font-semibold text-ad-green-dark",
 }: ComboSelectWithEditorProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -52,7 +58,7 @@ export default function ComboSelectWithEditor({
           type="button"
           disabled={disabled}
           onClick={() => setOpen((prev) => !prev)}
-          className={`${compactInputClass} flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:bg-gray-100 ${
+          className={`${inputClassName} flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:bg-gray-100 ${
             value ? "text-gray-900" : "text-gray-500"
           }`}
         >
@@ -68,7 +74,7 @@ export default function ComboSelectWithEditor({
                 onEditAddNew();
                 setOpen(false);
               }}
-              className="block w-full border-b-2 border-ad-green-dark bg-ad-green px-2 py-2 text-left text-sm font-bold tracking-wide text-white shadow-inner hover:bg-ad-green-dark"
+              className={editButtonClassName}
             >
               + Edit / Add New
             </button>
@@ -94,7 +100,7 @@ export default function ComboSelectWithEditor({
                     setOpen(false);
                   }}
                   className={`block w-full px-2 py-1.5 text-left text-sm hover:bg-gray-100 ${
-                    opt === value ? "bg-ad-green-light/60 font-semibold text-ad-green-dark" : "text-gray-900"
+                    opt === value ? activeItemClassName : "text-gray-900"
                   }`}
                 >
                   {opt}
@@ -104,7 +110,7 @@ export default function ComboSelectWithEditor({
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="block w-full bg-ad-green-light/60 px-2 py-1.5 text-left text-sm font-semibold text-ad-green-dark"
+                  className={`block w-full px-2 py-1.5 text-left text-sm ${activeItemClassName}`}
                 >
                   {value}
                 </button>

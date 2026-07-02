@@ -35,10 +35,13 @@ export function ShopReveal({
   show,
   children,
   className = "",
+  clipOverflow = true,
 }: {
   show: boolean;
   children: ReactNode;
   className?: string;
+  /** When false, child popovers/dropdowns can extend outside the animated shell. */
+  clipOverflow?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   useFormRevealFocus(show, containerRef);
@@ -54,7 +57,7 @@ export function ShopReveal({
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.28, ease, layout: { duration: 0.28, ease } }}
-          className={`overflow-hidden ${className}`}
+          className={`${clipOverflow ? "overflow-hidden" : "overflow-visible"} ${className}`}
         >
           <motion.div
             initial={{ y: -6 }}

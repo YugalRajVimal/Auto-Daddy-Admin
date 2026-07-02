@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type TextareaHTMLAttributes } from "react";
 import { motion } from "framer-motion";
+import { FiPaperclip } from "react-icons/fi";
 import { toast } from "react-toastify";
+import ComboSelectWithEditor from "../../components/admin/ComboSelectWithEditor";
 import {
   ADMIN_PANEL_THEAD_ROW_CLASS,
   adminPanelRowClass,
@@ -11,12 +13,15 @@ import {
   CompactField,
   CompactFormPanel,
   CompactFormRow,
+  compactFixedFieldWidth,
 } from "../../components/admin/ContentPanel";
+import ListEditorPopup from "../../components/admin/ListEditorPopup";
 import { ShopReveal } from "../../components/shop/ShopAnimated";
 import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   shopCompactInputClass,
+  shopCompactTextareaClass,
   shopProfileFormPanelClass,
   shopProfileFormPanelFooterClass,
 } from "../../components/shop/shopLayoutStyles";
@@ -39,6 +44,15 @@ import { useMockShopInvoiceLedger } from "../../lib/mockShopInvoiceLedger";
 import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import { collectJobCardPayment, resendJobCardNotification } from "../../lib/shopOwnerMutations";
 import { pickJobCardInvoiceNumber, type JobCardListRow } from "../../lib/shopOwnerJobCards";
+import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
+import {
+  categoryLabel,
+  cloneCategories,
+  dedupeLabels,
+  EXPENSE_CATEGORIES,
+  slugifyLabel,
+  type CategoryOption,
+} from "../AdminPages/Accounts/ledgerCategories";
 import {
   filterWalletInvoiceRows,
   getWalletLedgerTab,
@@ -66,9 +80,167 @@ const EMPTY_MESSAGES: Record<WalletView, string> = {
   banks: "No bank accounts match your search.",
 };
 
-const EXPENSE_CATEGORIES = Array.from(
-  new Set(DUMMY_SHOP_EXPENSES.map((row) => row.category)),
-).sort();
+const SHOP_COMBO_EDIT_BUTTON_CLASS =
+  "block w-full border-b-2 border-ad-purple-dark bg-ad-purple px-2 py-2 text-left text-sm font-bold tracking-wide text-white shadow-inner hover:bg-ad-purple-dark";
+const SHOP_COMBO_ACTIVE_ITEM_CLASS = "bg-[#f5cce8] font-semibold text-ad-purple";
+const SHOP_FORM_CHECKBOX_LABEL_CLASS = "mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-purple";
+const SHOP_LIST_EDITOR_HEADER_CLASS = "bg-[#FDE4D0] px-4 py-2.5 text-center text-sm font-bold text-ad-purple";
+
+function normalizeVendorLabel(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function ShopCompactAutoGrowTextarea({
+  value,
+  onChange,
+  className = "",
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.max(26, el.scrollHeight)}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={onChange}
+      rows={1}
+      className={`${shopCompactTextareaClass} ${className}`}
+      {...props}
+    />
+  );
+}
+
+function ShopVendorComboField({
+  label,
+  required,
+  value,
+  onChange,
+  options,
+  className,
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (next: string) => void;
+  options: string[];
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(() => {
+    const q = normalizeVendorLabel(value).toLowerCase();
+    const base = options
+      .map(normalizeVendorLabel)
+      .filter(Boolean)
+      .filter((opt, idx, arr) => arr.findIndex((v) => v.toLowerCase() === opt.toLowerCase()) === idx);
+    if (!q) return base.slice(0, 25);
+    return base.filter((opt) => opt.toLowerCase().includes(q)).slice(0, 25);
+  }, [value, options]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [value, open]);
+
+  const listboxId = `shop-vendor-listbox-${label.replace(/\s+/g, "-").toLowerCase()}`;
+
+  return (
+    <CompactField label={label} required={required} className={className}>
+      <div ref={rootRef} className="relative">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+              setOpen(true);
+              return;
+            }
+            if (!open) return;
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActiveIndex((i) => Math.min(filtered.length - 1, i + 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActiveIndex((i) => Math.max(0, i - 1));
+            } else if (e.key === "Enter") {
+              const hit = filtered[activeIndex];
+              if (hit) {
+                e.preventDefault();
+                onChange(hit);
+                setOpen(false);
+              }
+            }
+          }}
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          className={shopCompactInputClass}
+          autoComplete="off"
+        />
+
+        {open && filtered.length > 0 ? (
+          <div
+            id={listboxId}
+            role="listbox"
+            className="absolute left-0 right-0 z-50 mt-0.5 max-h-52 overflow-y-auto rounded border border-gray-400 bg-white shadow-lg"
+          >
+            {filtered.map((opt, idx) => {
+              const active = idx === activeIndex;
+              return (
+                <button
+                  key={`${opt}-${idx}`}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  onClick={() => {
+                    onChange(opt);
+                    setOpen(false);
+                  }}
+                  className={`block w-full px-2 py-1.5 text-left text-sm hover:bg-gray-100 ${
+                    active ? SHOP_COMBO_ACTIVE_ITEM_CLASS : "text-gray-900"
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    </CompactField>
+  );
+}
 
 function todayYMD() {
   const d = new Date();
@@ -129,10 +301,27 @@ function matchesSearch(row: JobCardListRow, query: string): boolean {
   return haystack.includes(q);
 }
 
-function matchesExpenseSearch(row: ShopWalletExpenseRow, query: string): boolean {
+function matchesExpenseSearch(
+  row: ShopWalletExpenseRow,
+  query: string,
+  categories: CategoryOption[],
+): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [row.name, row.category, row.date].join(" ").toLowerCase().includes(q);
+  const labels = categoryLabel(categories, row.category, row.subcategory);
+  const haystack = [
+    row.date,
+    formatDisplayDate(row.date),
+    row.vendor,
+    String(row.amount),
+    labels.category,
+    labels.subcategory,
+    row.notes,
+    row.billNumber ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
 }
 
 function walletRowsMatchingSelection(
@@ -217,31 +406,85 @@ function AddNewButton({ onClick }: { onClick: () => void }) {
 }
 
 function WalletExpenseForm({
-  date,
-  name,
-  category,
+  mode,
   amount,
-  onDateChange,
-  onNameChange,
-  onCategoryChange,
+  date,
+  vendor,
+  category,
+  notes,
+  gst,
+  gstAmount,
+  hasBillNumber,
+  billNumber,
+  byCheque,
+  chequeAccount,
+  attachReceipt,
+  categoryLabels,
+  subcategoryLabels,
+  selectedCategoryLabel,
+  selectedSubcategoryLabel,
+  chequeAccountOptions,
+  vendorOptions,
   onAmountChange,
+  onDateChange,
+  onVendorChange,
+  onCategoryChange,
+  onSubcategoryChange,
+  onNotesChange,
+  onGstChange,
+  onGstAmountChange,
+  onHasBillNumberChange,
+  onBillNumberChange,
+  onByChequeChange,
+  onChequeAccountChange,
+  onAttachReceiptChange,
+  onOpenCategoriesPopup,
+  onOpenSubcategoriesPopup,
   onSave,
   onCancel,
 }: {
-  date: string;
-  name: string;
-  category: string;
+  mode: "add" | "edit";
   amount: string;
-  onDateChange: (value: string) => void;
-  onNameChange: (value: string) => void;
-  onCategoryChange: (value: string) => void;
+  date: string;
+  vendor: string;
+  category: string;
+  notes: string;
+  gst: boolean;
+  gstAmount: string;
+  hasBillNumber: boolean;
+  billNumber: string;
+  byCheque: boolean;
+  chequeAccount: string;
+  attachReceipt: boolean;
+  categoryLabels: string[];
+  subcategoryLabels: string[];
+  selectedCategoryLabel: string;
+  selectedSubcategoryLabel: string;
+  chequeAccountOptions: string[];
+  vendorOptions: string[];
   onAmountChange: (value: string) => void;
+  onDateChange: (value: string) => void;
+  onVendorChange: (value: string) => void;
+  onCategoryChange: (value: string) => void;
+  onSubcategoryChange: (value: string) => void;
+  onNotesChange: (value: string) => void;
+  onGstChange: (value: boolean) => void;
+  onGstAmountChange: (value: string) => void;
+  onHasBillNumberChange: (value: boolean) => void;
+  onBillNumberChange: (value: string) => void;
+  onByChequeChange: (value: boolean) => void;
+  onChequeAccountChange: (value: string) => void;
+  onAttachReceiptChange: (value: boolean) => void;
+  onOpenCategoriesPopup: () => void;
+  onOpenSubcategoriesPopup: () => void;
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const isEdit = mode === "edit";
+
   return (
     <CompactFormPanel
-      className={shopProfileFormPanelClass}
+      className={`${shopProfileFormPanelClass} !mb-4`}
       showBottomBorder={false}
       focusOnMount
       footer={
@@ -249,7 +492,7 @@ function WalletExpenseForm({
           className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
         >
           <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
-            You are adding a new expense
+            {isEdit ? "You are editing an expense" : "You are adding a new expense"}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -257,7 +500,7 @@ function WalletExpenseForm({
               onClick={onSave}
               className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95"
             >
-              Save
+              {isEdit ? "Update" : "Save"}
             </button>
             <span className="text-xs text-gray-700">
               or{" "}
@@ -273,8 +516,44 @@ function WalletExpenseForm({
         </div>
       }
     >
-      <CompactFormRow className="flex-nowrap items-end gap-x-3 overflow-x-auto">
-        <CompactField label="Date" required className="w-[9.5rem] shrink-0">
+      <CompactFormRow className="items-start gap-y-6">
+        <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+          <CompactField label="Amount" required className="w-full flex-none">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => onAmountChange(e.target.value)}
+              className={shopCompactInputClass}
+            />
+          </CompactField>
+          <div className="mt-3">
+            <label className={SHOP_FORM_CHECKBOX_LABEL_CLASS}>
+              <input
+                type="checkbox"
+                checked={gst}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  onGstChange(checked);
+                  if (!checked) onGstAmountChange("");
+                }}
+                className="h-3.5 w-3.5 accent-ad-purple"
+              />
+              GST
+            </label>
+            {gst ? (
+              <input
+                type="text"
+                inputMode="decimal"
+                value={gstAmount}
+                onChange={(e) => onGstAmountChange(e.target.value)}
+                placeholder="GST amount"
+                className={shopCompactInputClass}
+              />
+            ) : null}
+          </div>
+        </div>
+        <CompactField label="Date" required className={compactFixedFieldWidth}>
           <input
             type="date"
             value={date}
@@ -282,39 +561,119 @@ function WalletExpenseForm({
             className={shopCompactInputClass}
           />
         </CompactField>
-        <CompactField label="Name" required className="min-w-[12rem] flex-1">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            placeholder="Vendor or payee"
-            className={shopCompactInputClass}
+        <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+          <ShopVendorComboField
+            label="Vendor"
+            required
+            value={vendor}
+            onChange={onVendorChange}
+            options={vendorOptions}
+            className="w-full flex-none"
           />
-        </CompactField>
-        <CompactField label="Category" required className="w-[10.5rem] shrink-0">
-          <select
-            value={category}
-            onChange={(e) => onCategoryChange(e.target.value)}
-            className={shopCompactInputClass}
-          >
-            <option value="">Select category</option>
-            {EXPENSE_CATEGORIES.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </CompactField>
-        <CompactField label="Amount" required className="w-[8.5rem] shrink-0">
-          <input
-            type="text"
-            inputMode="decimal"
-            value={amount}
-            onChange={(e) => onAmountChange(e.target.value)}
-            placeholder="0.00"
-            className={shopCompactInputClass}
+          <div className="mt-3">
+            <label className={SHOP_FORM_CHECKBOX_LABEL_CLASS}>
+              <input
+                type="checkbox"
+                checked={hasBillNumber}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  onHasBillNumberChange(checked);
+                  if (!checked) onBillNumberChange("");
+                }}
+                className="h-3.5 w-3.5 accent-ad-purple"
+              />
+              Bill Number
+            </label>
+            {hasBillNumber ? (
+              <input
+                type="text"
+                value={billNumber}
+                onChange={(e) => onBillNumberChange(e.target.value)}
+                className={shopCompactInputClass}
+              />
+            ) : null}
+          </div>
+        </div>
+        <div className="min-w-[160px] flex-1">
+          <ComboSelectWithEditor
+            label="Category"
+            required
+            value={selectedCategoryLabel}
+            placeholder="Select category"
+            options={categoryLabels}
+            onChange={onCategoryChange}
+            onEditAddNew={onOpenCategoriesPopup}
+            className="w-full"
+            inputClassName={shopCompactInputClass}
+            editButtonClassName={SHOP_COMBO_EDIT_BUTTON_CLASS}
+            activeItemClassName={SHOP_COMBO_ACTIVE_ITEM_CLASS}
           />
-        </CompactField>
+          <div className="mt-3">
+            <label className={SHOP_FORM_CHECKBOX_LABEL_CLASS}>
+              <input
+                type="checkbox"
+                checked={byCheque}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  onByChequeChange(checked);
+                  if (!checked) onChequeAccountChange("");
+                }}
+                className="h-3.5 w-3.5 accent-ad-purple"
+              />
+              By Cheque
+            </label>
+            {byCheque ? (
+              <select
+                value={chequeAccount}
+                onChange={(e) => onChequeAccountChange(e.target.value)}
+                className={shopCompactInputClass}
+              >
+                <option value="">Select account</option>
+                {chequeAccountOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+          </div>
+        </div>
+        <ComboSelectWithEditor
+          label="Subcategory"
+          required
+          value={selectedSubcategoryLabel}
+          placeholder="Select subcategory"
+          options={subcategoryLabels}
+          disabled={!category}
+          onChange={onSubcategoryChange}
+          onEditAddNew={onOpenSubcategoriesPopup}
+          className="min-w-[160px] flex-1"
+          inputClassName={shopCompactInputClass}
+          editButtonClassName={SHOP_COMBO_EDIT_BUTTON_CLASS}
+          activeItemClassName={SHOP_COMBO_ACTIVE_ITEM_CLASS}
+        />
+        <div className="min-w-[160px] flex-1">
+          <CompactField label="Notes" className="w-full flex-none">
+            <ShopCompactAutoGrowTextarea value={notes} onChange={(e) => onNotesChange(e.target.value)} />
+          </CompactField>
+          <div className="mt-3">
+            <label className={SHOP_FORM_CHECKBOX_LABEL_CLASS}>
+              <input
+                type="checkbox"
+                checked={attachReceipt}
+                onChange={(e) => onAttachReceiptChange(e.target.checked)}
+                className="h-3.5 w-3.5 accent-ad-purple"
+              />
+              Attach Image of Receipt
+            </label>
+            {attachReceipt ? (
+              <label className="block w-full cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-1.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-300">
+                Upload File
+                <input type="file" accept="image/*" className="hidden" />
+              </label>
+            ) : null}
+          </div>
+        </div>
       </CompactFormRow>
     </CompactFormPanel>
   );
@@ -353,7 +712,7 @@ function WalletBankForm({
 
   return (
     <CompactFormPanel
-      className={shopProfileFormPanelClass}
+      className={`${shopProfileFormPanelClass} !mb-4`}
       showBottomBorder={false}
       focusOnMount
       footer={
@@ -569,16 +928,20 @@ function WalletInvoiceTable({
 
 function WalletExpenseTable({
   rows,
+  categories,
   countryCode,
   selectedIds,
   onToggleRow,
   onTogglePage,
+  onEditRow,
 }: {
   rows: ShopWalletExpenseRow[];
+  categories: CategoryOption[];
   countryCode: string | null | undefined;
   selectedIds: Set<string>;
   onToggleRow: (id: string) => void;
   onTogglePage: (ids: string[], checked: boolean) => void;
+  onEditRow: (row: ShopWalletExpenseRow) => void;
 }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
   const pageRowIds = rows.map((row) => row.id);
@@ -612,37 +975,59 @@ function WalletExpenseTable({
                 />
               </th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
-              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Name</th>
-              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Category</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Vendor</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Amount</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Category</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Notes</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Clip</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
-              <tr key={row.id} className={adminPanelRowClass(index)}>
-                <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(row.id)}
-                    onChange={() => onToggleRow(row.id)}
-                    aria-label={`Select expense ${row.name}`}
-                    className={SHOP_TABLE_CHECKBOX_CLASS}
-                  />
-                </td>
-                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
-                  {row.date}
-                </td>
-                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
-                  {row.name}
-                </td>
-                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
-                  {row.category}
-                </td>
-                <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
-                  {formatWalletPrice(row.amount, countryCode)}
-                </td>
-              </tr>
-            ))}
+            {rows.map((row, index) => {
+              const labels = categoryLabel(categories, row.category, row.subcategory);
+              return (
+                <tr key={row.id} className={adminPanelRowClass(index)}>
+                  <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(row.id)}
+                      onChange={() => onToggleRow(row.id)}
+                      aria-label={`Select expense ${row.vendor}`}
+                      className={SHOP_TABLE_CHECKBOX_CLASS}
+                    />
+                  </td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                    <button
+                      type="button"
+                      onClick={() => onEditRow(row)}
+                      className="font-semibold text-blue-700 hover:underline"
+                    >
+                      {formatDisplayDate(row.date)}
+                    </button>
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold uppercase text-gray-800`}>
+                    {row.vendor}
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+                    {formatWalletPrice(row.amount, countryCode)}
+                  </td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                    <div>
+                      <div className="font-bold leading-tight text-gray-800">{labels.category}</div>
+                      <div className="text-xs text-gray-500">{labels.subcategory}</div>
+                    </div>
+                  </td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-gray-800`}>{row.notes || ""}</td>
+                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
+                    {row.hasReceipt ? (
+                      <FiPaperclip className="inline text-blue-600" size={16} aria-hidden />
+                    ) : (
+                      <span className="text-gray-500">--</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -751,11 +1136,30 @@ export default function ShopWalletPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set());
   const [expenses, setExpenses] = useState<ShopWalletExpenseRow[]>(() => [...DUMMY_SHOP_EXPENSES]);
+  const [expenseCategories, setExpenseCategories] = useState<CategoryOption[]>(() =>
+    cloneCategories(EXPENSE_CATEGORIES),
+  );
   const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [expenseDate, setExpenseDate] = useState(todayYMD);
-  const [expenseName, setExpenseName] = useState("");
-  const [expenseCategory, setExpenseCategory] = useState(EXPENSE_CATEGORIES[0] ?? "");
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseDate, setExpenseDate] = useState(todayYMD);
+  const [expenseVendor, setExpenseVendor] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("");
+  const [expenseSubcategory, setExpenseSubcategory] = useState("");
+  const [expenseNotes, setExpenseNotes] = useState("");
+  const [expenseGst, setExpenseGst] = useState(false);
+  const [expenseGstAmount, setExpenseGstAmount] = useState("");
+  const [expenseHasBillNumber, setExpenseHasBillNumber] = useState(false);
+  const [expenseBillNumber, setExpenseBillNumber] = useState("");
+  const [expenseByCheque, setExpenseByCheque] = useState(false);
+  const [expenseChequeAccount, setExpenseChequeAccount] = useState("");
+  const [expenseAttachReceipt, setExpenseAttachReceipt] = useState(false);
+  const [categoriesPopupOpen, setCategoriesPopupOpen] = useState(false);
+  const [subcategoriesPopupOpen, setSubcategoriesPopupOpen] = useState(false);
+  const [categoriesDraft, setCategoriesDraft] = useState<string[]>([""]);
+  const [subcategoriesDraft, setSubcategoriesDraft] = useState<string[]>([""]);
+  const categoriesSnapshotRef = useRef<CategoryOption[]>([]);
+  const subcategoriesSnapshotRef = useRef<{ value: string; label: string }[]>([]);
   const [banks, setBanks] = useState<ShopWalletBankRow[]>(() => [...DUMMY_SHOP_BANKS]);
   const [showBankForm, setShowBankForm] = useState(false);
   const [editingBankId, setEditingBankId] = useState<string | null>(null);
@@ -798,8 +1202,8 @@ export default function ShopWalletPage() {
     [invoiceList, search],
   );
   const filteredExpenses = useMemo(
-    () => expenses.filter((row) => matchesExpenseSearch(row, search)),
-    [expenses, search],
+    () => expenses.filter((row) => matchesExpenseSearch(row, search, expenseCategories)),
+    [expenses, search, expenseCategories],
   );
   const filteredBanks = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -835,17 +1239,213 @@ export default function ShopWalletPage() {
     [filteredBanks, safePage],
   );
 
-  const openExpenseForm = useCallback(() => {
-    setExpenseDate(todayYMD());
-    setExpenseName("");
-    setExpenseCategory(EXPENSE_CATEGORIES[0] ?? "");
+  const expenseCategoryLabels = useMemo(
+    () => expenseCategories.map((cat) => cat.label),
+    [expenseCategories],
+  );
+  const selectedExpenseCategory = useMemo(
+    () => expenseCategories.find((cat) => cat.value === expenseCategory),
+    [expenseCategories, expenseCategory],
+  );
+  const expenseSubcategoryLabels = useMemo(
+    () => selectedExpenseCategory?.subcategories.map((sub) => sub.label) ?? [],
+    [selectedExpenseCategory],
+  );
+  const selectedExpenseCategoryLabel = selectedExpenseCategory?.label ?? "";
+  const selectedExpenseSubcategoryLabel =
+    selectedExpenseCategory?.subcategories.find((sub) => sub.value === expenseSubcategory)?.label ?? "";
+  const expenseSubcategoryOptions = useMemo(
+    () => selectedExpenseCategory?.subcategories ?? [],
+    [selectedExpenseCategory],
+  );
+  const expenseVendorOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const row of expenses) {
+      const normalized = normalizeVendorLabel(row.vendor);
+      if (!normalized) continue;
+      const key = normalized.toLowerCase();
+      if (!seen.has(key)) seen.set(key, normalized);
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [expenses]);
+  const chequeAccountOptions = useMemo(
+    () => banks.map((bank) => bank.label).filter(Boolean),
+    [banks],
+  );
+
+  const resetExpenseForm = useCallback(() => {
+    setEditingExpenseId(null);
     setExpenseAmount("");
+    setExpenseDate(todayYMD());
+    setExpenseVendor("");
+    setExpenseCategory("");
+    setExpenseSubcategory("");
+    setExpenseNotes("");
+    setExpenseGst(false);
+    setExpenseGstAmount("");
+    setExpenseHasBillNumber(false);
+    setExpenseBillNumber("");
+    setExpenseByCheque(false);
+    setExpenseChequeAccount("");
+    setExpenseAttachReceipt(false);
+  }, []);
+
+  const handleExpenseCategoryChange = useCallback(
+    (nextCategoryLabel: string) => {
+      if (!nextCategoryLabel) {
+        setExpenseCategory("");
+        setExpenseSubcategory("");
+        return;
+      }
+      const match = expenseCategories.find((cat) => cat.label === nextCategoryLabel);
+      setExpenseCategory(match?.value ?? slugifyLabel(nextCategoryLabel));
+      setExpenseSubcategory("");
+    },
+    [expenseCategories],
+  );
+
+  const handleExpenseSubcategoryChange = useCallback(
+    (nextSubcategoryLabel: string) => {
+      if (!nextSubcategoryLabel) {
+        setExpenseSubcategory("");
+        return;
+      }
+      const match = expenseSubcategoryOptions.find((sub) => sub.label === nextSubcategoryLabel);
+      setExpenseSubcategory(match?.value ?? slugifyLabel(nextSubcategoryLabel));
+    },
+    [expenseSubcategoryOptions],
+  );
+
+  const openCategoriesPopup = useCallback(() => {
+    categoriesSnapshotRef.current = cloneCategories(expenseCategories);
+    setCategoriesDraft(expenseCategoryLabels.length ? [...expenseCategoryLabels] : [""]);
+    setCategoriesPopupOpen(true);
+  }, [expenseCategories, expenseCategoryLabels]);
+
+  const saveCategoriesPopup = useCallback(() => {
+    const labels = dedupeLabels(categoriesDraft);
+    const previousLabels = new Set(expenseCategoryLabels.map((label) => label.toLowerCase()));
+    const newlyAdded = labels.filter((label) => !previousLabels.has(label.toLowerCase()));
+
+    const nextCategories = labels.map((label) => {
+      const existing = expenseCategories.find((cat) => cat.label.toLowerCase() === label.toLowerCase());
+      if (existing) return { ...existing, label };
+      let value = slugifyLabel(label);
+      if (expenseCategories.some((cat) => cat.value === value)) {
+        value = `${value}-${Date.now()}`;
+      }
+      return { value, label, subcategories: [] };
+    });
+
+    setExpenseCategories(nextCategories);
+
+    if (newlyAdded.length > 0) {
+      const lastAdded = newlyAdded[newlyAdded.length - 1];
+      const match = nextCategories.find((cat) => cat.label.toLowerCase() === lastAdded.toLowerCase());
+      if (match) handleExpenseCategoryChange(match.label);
+    } else if (expenseCategory && !nextCategories.some((cat) => cat.value === expenseCategory)) {
+      handleExpenseCategoryChange(nextCategories[0]?.label ?? "");
+    }
+
+    setCategoriesPopupOpen(false);
+  }, [
+    categoriesDraft,
+    expenseCategory,
+    expenseCategoryLabels,
+    expenseCategories,
+    handleExpenseCategoryChange,
+  ]);
+
+  const cancelCategoriesPopup = useCallback(() => {
+    setExpenseCategories(categoriesSnapshotRef.current);
+    setCategoriesPopupOpen(false);
+  }, []);
+
+  const openSubcategoriesPopup = useCallback(() => {
+    if (!expenseCategory) return;
+    subcategoriesSnapshotRef.current = [...expenseSubcategoryOptions];
+    setSubcategoriesDraft(expenseSubcategoryLabels.length ? [...expenseSubcategoryLabels] : [""]);
+    setSubcategoriesPopupOpen(true);
+  }, [expenseCategory, expenseSubcategoryLabels, expenseSubcategoryOptions]);
+
+  const saveSubcategoriesPopup = useCallback(() => {
+    if (!expenseCategory) return;
+    const labels = dedupeLabels(subcategoriesDraft);
+    const previousLabels = new Set(expenseSubcategoryLabels.map((label) => label.toLowerCase()));
+    const newlyAdded = labels.filter((label) => !previousLabels.has(label.toLowerCase()));
+
+    const nextSubcategories = labels.map((label) => {
+      const existing = expenseSubcategoryOptions.find((sub) => sub.label.toLowerCase() === label.toLowerCase());
+      if (existing) return { ...existing, label };
+      let value = slugifyLabel(label);
+      if (expenseSubcategoryOptions.some((sub) => sub.value === value)) {
+        value = `${value}-${Date.now()}`;
+      }
+      return { value, label };
+    });
+
+    setExpenseCategories((prev) =>
+      prev.map((cat) => (cat.value === expenseCategory ? { ...cat, subcategories: nextSubcategories } : cat)),
+    );
+
+    if (newlyAdded.length > 0) {
+      const lastAdded = newlyAdded[newlyAdded.length - 1];
+      const match = nextSubcategories.find((sub) => sub.label.toLowerCase() === lastAdded.toLowerCase());
+      if (match) setExpenseSubcategory(match.value);
+    } else if (expenseSubcategory && !nextSubcategories.some((sub) => sub.value === expenseSubcategory)) {
+      setExpenseSubcategory(nextSubcategories[0]?.value ?? "");
+    }
+
+    setSubcategoriesPopupOpen(false);
+  }, [
+    expenseCategory,
+    expenseSubcategory,
+    expenseSubcategoryLabels,
+    expenseSubcategoryOptions,
+    subcategoriesDraft,
+  ]);
+
+  const cancelSubcategoriesPopup = useCallback(() => {
+    if (!expenseCategory) return;
+    setExpenseCategories((prev) =>
+      prev.map((cat) =>
+        cat.value === expenseCategory ? { ...cat, subcategories: [...subcategoriesSnapshotRef.current] } : cat,
+      ),
+    );
+    setSubcategoriesPopupOpen(false);
+  }, [expenseCategory]);
+
+  useEffect(() => {
+    if (expenseSubcategory && !expenseSubcategoryOptions.some((sub) => sub.value === expenseSubcategory)) {
+      setExpenseSubcategory("");
+    }
+  }, [expenseSubcategory, expenseSubcategoryOptions]);
+
+  const openExpenseForm = useCallback(() => {
+    resetExpenseForm();
+    setShowExpenseForm(true);
+  }, [resetExpenseForm]);
+
+  const openEditExpenseForm = useCallback((row: ShopWalletExpenseRow) => {
+    setEditingExpenseId(row.id);
+    setExpenseAmount(String(row.amount));
+    setExpenseDate(row.date);
+    setExpenseVendor(row.vendor);
+    setExpenseCategory(row.category);
+    setExpenseSubcategory(row.subcategory);
+    setExpenseNotes(row.notes);
+    setExpenseGst(row.gst);
+    setExpenseHasBillNumber(Boolean(row.billNumber));
+    setExpenseBillNumber(row.billNumber ?? "");
+    setExpenseByCheque(row.byCheque);
+    setExpenseAttachReceipt(row.hasReceipt);
     setShowExpenseForm(true);
   }, []);
 
   const closeExpenseForm = useCallback(() => {
+    resetExpenseForm();
     setShowExpenseForm(false);
-  }, []);
+  }, [resetExpenseForm]);
 
   const openAddBankForm = useCallback(() => {
     setEditingBankId(null);
@@ -916,33 +1516,60 @@ export default function ShopWalletPage() {
   };
 
   const handleSaveExpense = () => {
-    const trimmedName = expenseName.trim();
-    if (!trimmedName) {
-      toast.error("Enter an expense name.");
+    const trimmedVendor = expenseVendor.trim();
+    const parsedAmount = Number.parseFloat(expenseAmount);
+
+    if (!expenseAmount.trim() || !Number.isFinite(parsedAmount)) {
+      toast.error("Amount is required.");
       return;
     }
-    if (!expenseCategory.trim()) {
-      toast.error("Choose a category.");
+    if (!expenseDate) {
+      toast.error("Date is required.");
       return;
     }
-    const amount = Number(expenseAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Enter a valid amount.");
+    if (!trimmedVendor) {
+      toast.error("Vendor is required.");
+      return;
+    }
+    if (!expenseCategory) {
+      toast.error("Category is required.");
+      return;
+    }
+    if (!expenseSubcategory) {
+      toast.error("Subcategory is required.");
       return;
     }
 
-    setExpenses((prev) => [
-      {
-        id: `exp-${Date.now()}`,
-        date: expenseDate,
-        name: trimmedName,
-        category: expenseCategory,
-        amount,
-      },
-      ...prev,
-    ]);
+    const payload: Omit<ShopWalletExpenseRow, "id"> = {
+      date: expenseDate,
+      vendor: trimmedVendor,
+      amount: parsedAmount || 0,
+      category: expenseCategory,
+      subcategory: expenseSubcategory,
+      notes: expenseNotes,
+      gst: expenseGst,
+      billNumber: expenseHasBillNumber && expenseBillNumber.trim() ? expenseBillNumber.trim() : null,
+      byCheque: expenseByCheque,
+      hasReceipt: expenseAttachReceipt,
+    };
+
+    if (editingExpenseId) {
+      setExpenses((prev) =>
+        prev.map((row) => (row.id === editingExpenseId ? { ...row, ...payload } : row)),
+      );
+      toast.success("Expense updated.");
+    } else {
+      setExpenses((prev) => [
+        {
+          id: `exp-${Date.now()}`,
+          ...payload,
+        },
+        ...prev,
+      ]);
+      toast.success("Expense added.");
+    }
+
     setPage(1);
-    toast.success("Expense added.");
     closeExpenseForm();
   };
 
@@ -950,7 +1577,8 @@ export default function ShopWalletPage() {
     setShowExpenseForm(false);
     setShowBankForm(false);
     setEditingBankId(null);
-  }, [view]);
+    resetExpenseForm();
+  }, [view, resetExpenseForm]);
 
   useEffect(() => {
     setPage(1);
@@ -1106,11 +1734,11 @@ export default function ShopWalletPage() {
 
   const handleClearSelection = () => setSelectedRowIds(new Set());
 
-  const walletFormOpen =
-    (showExpenseForm && view === "expenses") || (showBankForm && view === "banks");
   const pageHeading =
     showExpenseForm && view === "expenses"
-      ? "Add Expense"
+      ? editingExpenseId
+        ? "Edit Expense"
+        : "Add Expense"
       : showBankForm && view === "banks"
         ? editingBankId
           ? "Edit Bank Account"
@@ -1134,7 +1762,9 @@ export default function ShopWalletPage() {
         <>
           <WalletExpenseTable
             rows={paginatedExpenses}
+            categories={expenseCategories}
             countryCode={session?.meta?.countryCode}
+            onEditRow={openEditExpenseForm}
             {...selectionProps}
           />
           <WalletListFooter
@@ -1233,23 +1863,71 @@ export default function ShopWalletPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
-      <div className="space-y-1">
-        <ShopReveal show={showExpenseForm && view === "expenses"}>
+      <div className="space-y-3">
+        <ShopReveal show={showExpenseForm && view === "expenses"} clipOverflow={false}>
           <WalletExpenseForm
-            date={expenseDate}
-            name={expenseName}
-            category={expenseCategory}
+            mode={editingExpenseId ? "edit" : "add"}
             amount={expenseAmount}
-            onDateChange={setExpenseDate}
-            onNameChange={setExpenseName}
-            onCategoryChange={setExpenseCategory}
+            date={expenseDate}
+            vendor={expenseVendor}
+            category={expenseCategory}
+            notes={expenseNotes}
+            gst={expenseGst}
+            gstAmount={expenseGstAmount}
+            hasBillNumber={expenseHasBillNumber}
+            billNumber={expenseBillNumber}
+            byCheque={expenseByCheque}
+            chequeAccount={expenseChequeAccount}
+            attachReceipt={expenseAttachReceipt}
+            categoryLabels={expenseCategoryLabels}
+            subcategoryLabels={expenseSubcategoryLabels}
+            selectedCategoryLabel={selectedExpenseCategoryLabel}
+            selectedSubcategoryLabel={selectedExpenseSubcategoryLabel}
+            chequeAccountOptions={chequeAccountOptions}
+            vendorOptions={expenseVendorOptions}
             onAmountChange={setExpenseAmount}
+            onDateChange={setExpenseDate}
+            onVendorChange={setExpenseVendor}
+            onCategoryChange={handleExpenseCategoryChange}
+            onSubcategoryChange={handleExpenseSubcategoryChange}
+            onNotesChange={setExpenseNotes}
+            onGstChange={setExpenseGst}
+            onGstAmountChange={setExpenseGstAmount}
+            onHasBillNumberChange={setExpenseHasBillNumber}
+            onBillNumberChange={setExpenseBillNumber}
+            onByChequeChange={setExpenseByCheque}
+            onChequeAccountChange={setExpenseChequeAccount}
+            onAttachReceiptChange={setExpenseAttachReceipt}
+            onOpenCategoriesPopup={openCategoriesPopup}
+            onOpenSubcategoriesPopup={openSubcategoriesPopup}
             onSave={handleSaveExpense}
             onCancel={closeExpenseForm}
           />
+          {categoriesPopupOpen ? (
+            <ListEditorPopup
+              title="Edit / Add Categories"
+              items={categoriesDraft}
+              onChange={setCategoriesDraft}
+              onSave={saveCategoriesPopup}
+              onCancel={cancelCategoriesPopup}
+              placeholder="Category name"
+              headerClassName={SHOP_LIST_EDITOR_HEADER_CLASS}
+            />
+          ) : null}
+          {subcategoriesPopupOpen ? (
+            <ListEditorPopup
+              title={`Edit / Add Subcategories${selectedExpenseCategoryLabel ? ` — ${selectedExpenseCategoryLabel}` : ""}`}
+              items={subcategoriesDraft}
+              onChange={setSubcategoriesDraft}
+              onSave={saveSubcategoriesPopup}
+              onCancel={cancelSubcategoriesPopup}
+              placeholder="Subcategory name"
+              headerClassName={SHOP_LIST_EDITOR_HEADER_CLASS}
+            />
+          ) : null}
         </ShopReveal>
 
-        <ShopReveal show={showBankForm && view === "banks"}>
+        <ShopReveal show={showBankForm && view === "banks"} clipOverflow={false}>
           <WalletBankForm
             mode={editingBankId ? "edit" : "add"}
             label={bankLabel}
@@ -1267,12 +1945,10 @@ export default function ShopWalletPage() {
           />
         </ShopReveal>
 
-        {!walletFormOpen ? (
-          <>
-            <WalletSearchBar
-              value={search}
-              onChange={setSearch}
-              leading={
+        <WalletSearchBar
+          value={search}
+          onChange={setSearch}
+          leading={
             view === "unpaid" ? (
               <>
                 <button
@@ -1356,17 +2032,15 @@ export default function ShopWalletPage() {
               </>
             ) : null
           }
-              trailing={
-                view === "expenses" ? (
-                  <AddNewButton onClick={openExpenseForm} />
-                ) : view === "banks" ? (
-                  <AddNewButton onClick={openAddBankForm} />
-                ) : null
-              }
-            />
-            {renderListContent()}
-          </>
-        ) : null}
+          trailing={
+            view === "expenses" && !showExpenseForm ? (
+              <AddNewButton onClick={openExpenseForm} />
+            ) : view === "banks" && !showBankForm ? (
+              <AddNewButton onClick={openAddBankForm} />
+            ) : null
+          }
+        />
+        {renderListContent()}
       </div>
     </ShopPageShell>
   );

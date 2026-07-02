@@ -8,6 +8,7 @@ type ListEditorPopupProps = {
   onCancel: () => void;
   placeholder?: string;
   inputMode?: "text" | "numeric";
+  headerClassName?: string;
 };
 
 export default function ListEditorPopup({
@@ -18,6 +19,7 @@ export default function ListEditorPopup({
   onCancel,
   placeholder = "",
   inputMode = "text",
+  headerClassName = "bg-ad-green-light px-4 py-2.5 text-center text-sm font-bold text-ad-green-dark",
 }: ListEditorPopupProps) {
   const addItem = () => onChange([...items, ""]);
   const updateItem = (idx: number, value: string) =>
@@ -34,7 +36,7 @@ export default function ListEditorPopup({
         className="flex w-full max-w-sm flex-col overflow-hidden rounded border border-gray-300 bg-white shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="bg-ad-green-light px-4 py-2.5 text-center text-sm font-bold text-ad-green-dark">
+        <div className={headerClassName}>
           {title}
         </div>
         <div className="max-h-[50vh] overflow-y-auto px-4 py-3">

@@ -1056,7 +1056,12 @@ span.flatpickr-weekday,
 }
 
 select.shop-compact-input {
-  @apply min-h-0;
+  @apply min-h-0 bg-white text-gray-800;
+}
+
+select.shop-compact-input option {
+  color: #1d2939;
+  background-color: #ffffff;
 }
 
 input.shop-compact-input[type="date"],

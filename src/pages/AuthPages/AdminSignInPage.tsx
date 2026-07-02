@@ -5,12 +5,12 @@ import {
   buildSessionMeta,
   getJson,
   mapBackendRoleToUserRole,
-  normalizePhoneDigits,
   sendMobileOtp,
   verifyMobileOtp,
 } from "../../api/mobileAuth";
 import { useAuth, getPostLoginRedirect } from "../../auth";
 import type { UserRole } from "../../auth/types";
+import { formatPhoneDisplay, phoneDigits } from "../../lib/phoneFormat";
 
 const ADMIN_ROLE = "admin" as const;
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
@@ -63,18 +63,18 @@ export default function AdminSignInPage() {
   }, [otpSent, resendCooldown]);
 
   const countryCode = CALLING_CODES.find((c) => c.id === countryId)?.code ?? "+1";
-  const phoneDigits = normalizePhoneDigits(phone);
+  const nationalPhoneDigits = phoneDigits(phone);
 
   function getAdminAuthPayload() {
     if (loginWithEmail) {
       return { email: email.trim().toLowerCase(), role: ADMIN_ROLE };
     }
-    return { countryCode, phone: phoneDigits, role: ADMIN_ROLE };
+    return { countryCode, phone: nationalPhoneDigits, role: ADMIN_ROLE };
   }
 
   function canRequestOtp() {
     if (loginWithEmail) return isValidEmail(email);
-    return phoneDigits.length === 10;
+    return nationalPhoneDigits.length === 10;
   }
 
   async function handleSendOtp() {
@@ -101,7 +101,7 @@ export default function AdminSignInPage() {
         return;
       }
 
-      const res = await sendMobileOtp(phoneDigits, countryCode);
+      const res = await sendMobileOtp(nationalPhoneDigits, countryCode);
       if (res.ok) {
         const isResend = otpSent;
         setOtpSent(true);
@@ -189,7 +189,7 @@ export default function AdminSignInPage() {
         return;
       }
 
-      const res = await verifyMobileOtp(phoneDigits, countryCode, otp);
+      const res = await verifyMobileOtp(nationalPhoneDigits, countryCode, otp);
       const data = res.data;
       if (!res.ok || !data?.token) {
         setStatus(data?.message || "OTP verification failed");
@@ -202,7 +202,7 @@ export default function AdminSignInPage() {
         return;
       }
 
-      await enrichMobileProfile(data.token, userRole, data, phoneDigits, countryCode);
+      await enrichMobileProfile(data.token, userRole, data, nationalPhoneDigits, countryCode);
       setStatus("Login successful!");
       setTimeout(() => {
         navigate(getPostLoginRedirect(userRole), { replace: true });
@@ -319,10 +319,9 @@ export default function AdminSignInPage() {
                           type="tel"
                           value={phone}
                           autoComplete="tel-national"
-                          placeholder="10-digit number"
-                          onChange={(e) =>
-                            setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
-                          }
+                          placeholder="781 708 9765"
+                          maxLength={12}
+                          onChange={(e) => setPhone(formatPhoneDisplay(e.target.value))}
                           disabled={loading}
                           className="w-full rounded-r-md border border-gray-400 bg-white py-2 px-3 text-sm focus:border-ad-green focus:outline-none"
                         />

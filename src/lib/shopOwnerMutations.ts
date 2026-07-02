@@ -70,6 +70,7 @@ export type JobCardFormFields = {
   labourCharge?: string;
   labourDuration?: string;
   technicalRemarks?: string;
+  additionalNotes?: string;
   vehiclePhotos?: File[];
 };
 
@@ -256,6 +257,7 @@ function buildDealFormData(fields: DealFormFields) {
     appendText(fd, "vehicleName", fields.vehicleName);
     appendText(fd, "vehicleModel", fields.vehicleModel);
     appendText(fd, "vehicleYear", fields.vehicleYear);
+    appendText(fd, "dealEnabled", fields.dealEnabled);
   } else {
     appendText(fd, "serviceId", fields.serviceId);
     appendText(fd, "servicesId", fields.serviceId);

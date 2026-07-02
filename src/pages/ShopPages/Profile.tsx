@@ -18,6 +18,10 @@ import {
 import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import { ShopReveal } from "../../components/shop/ShopAnimated";
 import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import ShopDocumentTemplatePanel, {
+  DUMMY_INVOICE_TEMPLATES,
+  DUMMY_JOB_CARD_TEMPLATES,
+} from "../../components/shop/ShopDocumentTemplatePanel";
 import { shopHeroOnImageMutedTextClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
 import {
@@ -56,6 +60,8 @@ const PROFILE_SECTIONS = [
   { id: "open", label: "Shop is Open", variant: "primary" as const },
   { id: "brands", label: "Car Brand Specialist", variant: "primary" as const },
   { id: "services", label: "Operational Services", variant: "primary" as const },
+  { id: "invoice-templates", label: "Invoice Templates", variant: "primary" as const },
+  { id: "job-card-templates", label: "Job Card Templates", variant: "primary" as const },
 ];
 
 const SECTION_TITLES: Record<string, string> = {
@@ -64,10 +70,18 @@ const SECTION_TITLES: Record<string, string> = {
   open: "Shop is Open",
   brands: "Car Brand Specialist",
   services: "Operational Services",
+  "invoice-templates": "Invoice Templates",
+  "job-card-templates": "Job Card Templates",
   team: "Team Members",
 };
 
-const FLUSH_HERO_SECTIONS = new Set(["open", "brands", "services"]);
+const FLUSH_HERO_SECTIONS = new Set([
+  "open",
+  "brands",
+  "services",
+  "invoice-templates",
+  "job-card-templates",
+]);
 const TRANSPARENT_HERO_SECTIONS = new Set(["personal", "business"]);
 const TOP_ALIGNED_SECTIONS = new Set([...FLUSH_HERO_SECTIONS, ...TRANSPARENT_HERO_SECTIONS]);
 
@@ -147,6 +161,20 @@ export default function ShopProfilePage() {
     Record<string, { createdAt?: string; isActive?: boolean }>
   >({});
   const [showAddHours, setShowAddHours] = useState(false);
+  const [invoiceTemplateId, setInvoiceTemplateId] = useState(
+    () => DUMMY_INVOICE_TEMPLATES[0]?.id ?? "",
+  );
+  const [invoiceTemplateActive, setInvoiceTemplateActive] = useState(true);
+  const [savedInvoiceTemplateId, setSavedInvoiceTemplateId] = useState(
+    () => DUMMY_INVOICE_TEMPLATES[0]?.id ?? "",
+  );
+  const [jobCardTemplateId, setJobCardTemplateId] = useState(
+    () => DUMMY_JOB_CARD_TEMPLATES[0]?.id ?? "",
+  );
+  const [jobCardTemplateActive, setJobCardTemplateActive] = useState(true);
+  const [savedJobCardTemplateId, setSavedJobCardTemplateId] = useState(
+    () => DUMMY_JOB_CARD_TEMPLATES[0]?.id ?? "",
+  );
 
   const refreshMyServices = async () => {
     if (!token) return;
@@ -544,6 +572,32 @@ export default function ShopProfilePage() {
             }
           />
         );
+      case "invoice-templates":
+        return (
+          <ShopDocumentTemplatePanel
+            kind="invoice"
+            templates={DUMMY_INVOICE_TEMPLATES}
+            selectedId={invoiceTemplateId}
+            onSelect={setInvoiceTemplateId}
+            isActive={invoiceTemplateActive}
+            onToggleActive={setInvoiceTemplateActive}
+            savedId={savedInvoiceTemplateId}
+            onSave={setSavedInvoiceTemplateId}
+          />
+        );
+      case "job-card-templates":
+        return (
+          <ShopDocumentTemplatePanel
+            kind="jobcard"
+            templates={DUMMY_JOB_CARD_TEMPLATES}
+            selectedId={jobCardTemplateId}
+            onSelect={setJobCardTemplateId}
+            isActive={jobCardTemplateActive}
+            onToggleActive={setJobCardTemplateActive}
+            savedId={savedJobCardTemplateId}
+            onSave={setSavedJobCardTemplateId}
+          />
+        );
       case "team":
         return (
           <>
@@ -593,6 +647,7 @@ export default function ShopProfilePage() {
       heroBackgroundImage={false}
       contentTopOffset={TOP_ALIGNED_SECTIONS.has(activeId)}
       heroCardFlush={TOP_ALIGNED_SECTIONS.has(activeId)}
+      contentFillHeight={activeId === "invoice-templates" || activeId === "job-card-templates"}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}

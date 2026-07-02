@@ -760,7 +760,7 @@ export default function ShopJobCardsPage() {
       faqsDescription={faqsDescription}
     >
       <div className="space-y-1">
-        <ShopReveal show={view === "form"}>
+        <ShopReveal show={view === "form"} clipOverflow={false}>
           <JobCardForm
             active={view === "form"}
             mode={formMode}

@@ -144,8 +144,14 @@ function toDeal(raw: unknown): ShopDeal | null {
   const id = s(o._id) ?? s(o.id);
   if (!id) return null;
   const service = o.service && typeof o.service === "object" ? (o.service as Record<string, unknown>) : null;
+  const selectedVehicle =
+    o.selectedVehicle && typeof o.selectedVehicle === "object"
+      ? (o.selectedVehicle as Record<string, unknown>)
+      : null;
+  const selectedVehicleName =
+    s(selectedVehicle?.vehicleName) ?? s(selectedVehicle?.name) ?? s(o.vehicleName);
   const productName =
-    s(o.productName) ?? s(o.partName) ?? (service ? s(service.name) : undefined);
+    s(o.productName) ?? s(o.partName) ?? (service ? s(service.name) : undefined) ?? selectedVehicleName;
   return {
     _id: s(o._id),
     id,
@@ -157,8 +163,33 @@ function toDeal(raw: unknown): ShopDeal | null {
     discountedPrice: o.discountedPrice as ShopDeal["discountedPrice"],
     dealEnabled: typeof o.dealEnabled === "boolean" ? o.dealEnabled : undefined,
     offersEndOnDate: s(o.offersEndOnDate) ?? s(o.offerEndsOnDate),
+    createdAt: s(o.createdAt) ?? s(o.updatedAt),
     serviceId: s(o.servicesId) ?? s(o.serviceId),
-    vehicleId: s(o.vehicleId),
+    vehicleId: s(o.vehicleId) ?? s(selectedVehicle?.id),
+    service:
+      service && (s(service.id) || s(service.name) || s(service.desc))
+        ? {
+            id: s(service.id),
+            name: s(service.name),
+            desc: s(service.desc),
+          }
+        : undefined,
+    selectedVehicle:
+      selectedVehicleName ||
+      s(selectedVehicle?.id) ||
+      s(o.vehicleModel) ||
+      s(o.vehicleYear)
+        ? {
+            id: s(selectedVehicle?.id),
+            name: selectedVehicleName,
+            vehicleName: selectedVehicleName,
+            model: s(selectedVehicle?.model) ?? s(o.vehicleModel),
+            year:
+              selectedVehicle?.year != null
+                ? String(selectedVehicle.year)
+                : s(o.vehicleYear),
+          }
+        : undefined,
     dealImage: s(o.dealImage),
     productImage: s(o.productImage),
   };
@@ -225,6 +256,12 @@ export function parseMyServices(payload: unknown): ShopServiceCategory[] {
           ? o.isActive
           : nested && typeof nested.isActive === "boolean"
             ? nested.isActive
+            : undefined,
+      odoOutRequired:
+        typeof o.odoOutRequired === "boolean"
+          ? o.odoOutRequired
+          : nested && typeof nested.odoOutRequired === "boolean"
+            ? nested.odoOutRequired
             : undefined,
       subServices,
     });

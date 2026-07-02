@@ -4,9 +4,15 @@ export const USE_DUMMY_SHOP_WALLET = false;
 export type ShopWalletExpenseRow = {
   id: string;
   date: string;
-  name: string;
-  category: string;
+  vendor: string;
   amount: number;
+  category: string;
+  subcategory: string;
+  notes: string;
+  gst: boolean;
+  billNumber: string | null;
+  byCheque: boolean;
+  hasReceipt: boolean;
 };
 
 export type ShopWalletBankRow = {
@@ -19,18 +25,18 @@ export type ShopWalletBankRow = {
 };
 
 export const DUMMY_SHOP_EXPENSES: ShopWalletExpenseRow[] = [
-  { id: "exp-1", date: "2026-06-14", name: "Parts Supply Co.", category: "Parts", amount: 185 },
-  { id: "exp-2", date: "2026-06-13", name: "Tool Depot", category: "Equipment", amount: 420 },
-  { id: "exp-3", date: "2026-06-12", name: "City Utilities", category: "Utilities", amount: 310 },
-  { id: "exp-4", date: "2026-06-11", name: "Staff Payroll", category: "Wages", amount: 2400 },
-  { id: "exp-5", date: "2026-06-10", name: "Oil Wholesale", category: "Inventory", amount: 560 },
-  { id: "exp-6", date: "2026-06-09", name: "Shop Rent", category: "Rent", amount: 1800 },
-  { id: "exp-7", date: "2026-06-08", name: "Google Ads", category: "Marketing", amount: 275 },
-  { id: "exp-8", date: "2026-06-07", name: "Waste Disposal", category: "Operations", amount: 95 },
-  { id: "exp-9", date: "2026-06-06", name: "Insurance Premium", category: "Insurance", amount: 390 },
-  { id: "exp-10", date: "2026-06-05", name: "Coffee & Supplies", category: "Office", amount: 45 },
-  { id: "exp-11", date: "2026-06-04", name: "Tire Supplier", category: "Parts", amount: 880 },
-  { id: "exp-12", date: "2026-06-03", name: "Equipment Lease", category: "Equipment", amount: 650 },
+  { id: "exp-1", date: "2026-05-24", vendor: "ABHAY", amount: 100, category: "other-expenses", subcategory: "misc", notes: "", gst: false, billNumber: null, byCheque: false, hasReceipt: true },
+  { id: "exp-2", date: "2026-05-23", vendor: "REMAN KAMBOJ", amount: 16000, category: "staff-contractors", subcategory: "salaries", notes: "", gst: false, billNumber: null, byCheque: false, hasReceipt: false },
+  { id: "exp-3", date: "2026-05-22", vendor: "JASPREET SINGH", amount: 4200, category: "staff-contractors", subcategory: "wages", notes: "Weekly wages", gst: false, billNumber: null, byCheque: true, hasReceipt: false },
+  { id: "exp-4", date: "2026-05-21", vendor: "SURBHI WEB DEV", amount: 350, category: "professional", subcategory: "software-charges", notes: "Website maintenance", gst: true, billNumber: "SWD-221", byCheque: false, hasReceipt: true },
+  { id: "exp-5", date: "2026-05-20", vendor: "PAHADI-APP", amount: 500, category: "professional", subcategory: "software-charges", notes: "App subscription", gst: true, billNumber: null, byCheque: false, hasReceipt: true },
+  { id: "exp-6", date: "2026-05-19", vendor: "MICROSOFT", amount: 189, category: "professional", subcategory: "software-charges", notes: "Office 365", gst: true, billNumber: "MS-8821", byCheque: false, hasReceipt: false },
+  { id: "exp-7", date: "2026-05-18", vendor: "DETAIL PRO", amount: 275, category: "car-vehicle", subcategory: "detailing", notes: "Fleet vehicle detailing", gst: true, billNumber: null, byCheque: false, hasReceipt: true },
+  { id: "exp-8", date: "2026-05-15", vendor: "TD BANK", amount: 45, category: "bank", subcategory: "bank-charges", notes: "Monthly service fee", gst: false, billNumber: null, byCheque: false, hasReceipt: false },
+  { id: "exp-9", date: "2026-05-12", vendor: "BELL CANADA", amount: 89.99, category: "utilities", subcategory: "internet", notes: "Business internet", gst: true, billNumber: null, byCheque: false, hasReceipt: false },
+  { id: "exp-10", date: "2026-05-10", vendor: "TORONTO HYDRO", amount: 320, category: "utilities", subcategory: "electricity", notes: "", gst: true, billNumber: "TH-99102", byCheque: false, hasReceipt: true },
+  { id: "exp-11", date: "2026-05-08", vendor: "LANDLORD CORP", amount: 2500, category: "rent-lease", subcategory: "office-rent", notes: "Office rent — May", gst: false, billNumber: null, byCheque: true, hasReceipt: false },
+  { id: "exp-12", date: "2026-05-05", vendor: "GOOGLE ADS", amount: 450, category: "advertising", subcategory: "online", notes: "May ad campaign", gst: true, billNumber: "GA-5521", byCheque: false, hasReceipt: false },
 ];
 
 export const DUMMY_SHOP_BANKS: ShopWalletBankRow[] = [

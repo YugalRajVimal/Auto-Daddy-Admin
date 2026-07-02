@@ -27,6 +27,42 @@ type ShopDealFormDialogProps = {
   onSaved: () => void;
 };
 
+type VehicleCatalogEntry = {
+  id: string;
+  name: string;
+  models: Array<{ id?: string; name: string; year?: string }>;
+};
+
+function parseVehicleCatalogItem(item: unknown): VehicleCatalogEntry | null {
+  if (!item || typeof item !== "object") return null;
+  const o = item as Record<string, unknown>;
+  const name = String(o.company ?? o.companyName ?? o.name ?? "").trim();
+  const id = String(o.id ?? o._id ?? name).trim();
+  if (!name) return null;
+
+  const rawModels = Array.isArray(o.models) ? o.models : [];
+  const models = rawModels
+    .map((model) => {
+      const m = model as Record<string, unknown>;
+      const modelName = String(m.model ?? m.modelName ?? m.name ?? "").trim();
+      if (!modelName) return null;
+      const year =
+        m.year != null
+          ? String(m.year)
+          : Array.isArray(m.years) && m.years.length > 0
+            ? String(m.years[0])
+            : undefined;
+      return {
+        id: String(m.id ?? modelName),
+        name: modelName,
+        year,
+      };
+    })
+    .filter(Boolean) as VehicleCatalogEntry["models"];
+
+  return { id, name, models };
+}
+
 export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: ShopDealFormDialogProps) {
   const { token } = useAuth();
   const { categories } = useShopServices();
@@ -41,9 +77,7 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
   const [description, setDescription] = useState("");
   const [offerEnd, setOfferEnd] = useState("");
   const [dealImage, setDealImage] = useState<File | null>(null);
-  const [vehicleCatalog, setVehicleCatalog] = useState<
-    Array<{ id: string; name: string; models: Array<{ id?: string; name: string; year?: string }> }>
-  >([]);
+  const [vehicleCatalog, setVehicleCatalog] = useState<VehicleCatalogEntry[]>([]);
   const [saving, setSaving] = useState(false);
 
   const serviceOptions = useMemo(() => {
@@ -63,19 +97,7 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
       const root = res.data as Record<string, unknown>;
       const carDetails = Array.isArray(root.carDetails) ? root.carDetails : [];
       setVehicleCatalog(
-        carDetails.map((item) => {
-          const o = item as Record<string, unknown>;
-          const id = String(o.id ?? o._id ?? "");
-          const name = String(o.company ?? o.name ?? "");
-          const models = Array.isArray(o.models)
-            ? (o.models as Array<Record<string, unknown>>).map((m) => ({
-              id: String(m.id ?? ""),
-              name: String(m.model ?? m.name ?? ""),
-              year: m.year != null ? String(m.year) : undefined,
-            }))
-            : [];
-          return { id, name, models };
-        })
+        carDetails.map(parseVehicleCatalogItem).filter(Boolean) as VehicleCatalogEntry[],
       );
     });
   }, [mode, token]);
@@ -89,7 +111,16 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
     setDescription(deal?.description ?? "");
     setOfferEnd(deal?.offersEndOnDate?.slice(0, 10) ?? "");
     setDealImage(null);
-  }, [deal]);
+    if (mode === "parts" && deal) {
+      setVehicleId(deal.vehicleId ?? deal.selectedVehicle?.id ?? "");
+      setVehicleModel(deal.selectedVehicle?.model ?? "");
+      setVehicleYear(deal.selectedVehicle?.year ?? "");
+    } else if (!deal) {
+      setVehicleId("");
+      setVehicleModel("");
+      setVehicleYear("");
+    }
+  }, [deal, mode]);
 
   const selectedVehicle = vehicleCatalog.find((v) => v.id === vehicleId);
 
@@ -214,7 +245,17 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
             </select>
           </CompactField>
           <CompactField label="Model" required>
-            <select className={shopCompactInputClass} value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} disabled={saving}>
+            <select
+              className={shopCompactInputClass}
+              value={vehicleModel}
+              onChange={(e) => {
+                const nextModel = e.target.value;
+                setVehicleModel(nextModel);
+                const match = (selectedVehicle?.models ?? []).find((m) => m.name === nextModel);
+                if (match?.year) setVehicleYear(match.year);
+              }}
+              disabled={saving}
+            >
               <option value="">Model</option>
               {(selectedVehicle?.models ?? []).map((m) => (
                 <option key={m.name} value={m.name}>{m.name}</option>
