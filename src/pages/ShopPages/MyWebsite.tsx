@@ -600,7 +600,7 @@ function WebsiteInvoiceModal({
 }
 
 export default function ShopMyWebsitePage() {
-  const { token, meta } = useAuth();
+  const { token, profile, session } = useAuth();
   const { faqsHeading, faqsDescription, business, user } = useShopOwnerPortal();
   const [activeSection, setActiveSection] = useState<ShopWebsiteSection>("domain");
   const [faqsOpen, setFaqsOpen] = useState(false);
@@ -664,14 +664,18 @@ export default function ShopMyWebsitePage() {
 
   const billTo = useMemo(() => {
     const name =
-      business?.businessName?.trim() || user?.name?.trim() || meta?.name?.trim() || "—";
-    const street = business?.businessAddress?.trim() || user?.address?.trim() || "";
+      business?.businessName?.trim() || user?.name?.trim() || profile?.name?.trim() || "—";
+    const street =
+      business?.businessAddress?.trim() ||
+      business?.address?.trim() ||
+      user?.address?.trim() ||
+      "";
     const pincode = business?.pincode?.trim() || user?.pincode?.trim() || "";
     const addressLine = [street, pincode].filter(Boolean).join(", ") || "—";
-    const hst = business?.businessHSTNumber?.trim() || "—";
+    const hst = business?.businessHSTNumber?.trim() || business?.hstNumber?.trim() || "—";
     const phone = business?.businessPhone?.trim() || user?.phone?.trim() || "—";
     return { name, addressLine, hst, phone };
-  }, [business, meta?.name, user]);
+  }, [business, profile?.name, user]);
 
   const handleDomainSaveAndNext = async () => {
     if (!domainForm.expiryDate.trim()) {
@@ -799,7 +803,7 @@ export default function ShopMyWebsitePage() {
         billToAddress={billTo.addressLine}
         billToHst={billTo.hst}
         billToPhone={billTo.phone}
-        countryCode={meta?.countryCode}
+        countryCode={session?.meta?.countryCode}
         processing={paymentProcessing}
       />
     </>

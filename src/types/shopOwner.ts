@@ -104,8 +104,11 @@ export type ShopProfileBusiness = {
   isBusinessActive?: boolean;
   perDayOpenHours?: string;
   address?: string;
+  businessAddress?: string;
+  pincode?: string;
   email?: string;
   hstNumber?: string;
+  businessHSTNumber?: string;
   gstPercent?: number | string;
   shopType?: string;
 };
