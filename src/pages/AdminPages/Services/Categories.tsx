@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 import axios, { AxiosError } from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
@@ -9,6 +8,8 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 import type { ShopType, Service } from "./Services";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
@@ -70,10 +71,16 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       if (filterShopType !== "all") url += `?shopType=${filterShopType}`;
       const res = await axios.get<{ success: boolean; data: Service[] }>(url);
       if (res.data.success) setServices(res.data.data || []);
-      else setError("Failed to fetch sub services.");
+      else {
+        const msg = "Failed to fetch sub services.";
+        setError(msg);
+        adminNotify.error(msg);
+      }
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Error fetching sub services");
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Error fetching sub services";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
     } finally {
       setLoading(false);
     }
@@ -146,11 +153,15 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
   const handleSave = async () => {
     if (!formName.trim()) {
-      setError("Sub service name is required.");
+      const __adminMsg = "Sub service name is required.";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
       return;
     }
     if (!formServiceId) {
-      setError("Please select a service.");
+      const __adminMsg = "Please select a service.";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
       return;
     }
     setActionLoading(true);
@@ -159,7 +170,9 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     try {
       const parent = services.find((s) => s._id === formServiceId);
       if (!parent) {
-        setError("Selected service not found.");
+        const __adminMsg = "Selected service not found.";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
         return;
       }
       const existing: SubService[] = (parent.subServices || []).map((s) => ({
@@ -177,13 +190,16 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
         updated = [...existing, { name: formName.trim(), status: formStatus }];
       }
       await axios.put(`${API_BASE}/admin/services/${formServiceId}`, { subServices: updated });
+      adminNotify.success(editingRow ? "Sub service updated." : "Sub service added.");
       setSuccessMsg(editingRow ? "Sub service updated." : "Sub service added.");
       resetForm();
       setShowForm(false);
       fetchServices();
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Error saving sub service");
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Error saving sub service";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
     } finally {
       setActionLoading(false);
     }
@@ -199,6 +215,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       if (!parent) return;
       const updated = (parent.subServices || []).filter((s) => s.name !== row.name);
       await axios.put(`${API_BASE}/admin/services/${row.categoryId}`, { subServices: updated });
+      adminNotify.success("Sub service deleted successfully.");
       setSuccessMsg("Sub service deleted successfully.");
       setSelected((prev) => {
         const next = new Set(prev);
@@ -208,7 +225,9 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       fetchServices();
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Failed to delete sub service");
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to delete sub service";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
     } finally {
       setActionLoading(false);
     }
@@ -216,16 +235,25 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
   const findRowById = (id: string) => tableRows.find((r) => getRowId(r) === id);
 
-  const handleToolbarUpdate = () => {
-    if (selected.size !== 1) return;
-    const row = findRowById([...selected][0]);
-    if (row) openEdit(row);
-  };
-
   const handleToolbarDelete = () => {
     if (selected.size !== 1) return;
     const row = findRowById([...selected][0]);
     if (row) handleDelete(row);
+  };
+
+  const handleToolbarPrint = () => {
+    printAdminTable({
+      title: "Sub Services",
+      headers: ["Name", "Service", "Shop Type", "Status"],
+      rows: allRows
+        .filter((row) => selected.has(getRowId(row)))
+        .map((row) => [
+          row.name,
+          row.categoryName,
+          shopTypeLabel(row.shopType),
+          row.status || "active",
+        ]),
+    });
   };
 
   const shopTypeLabel = (value?: ShopType) =>
@@ -246,7 +274,11 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
               <CompactFormFooter
                 message={formMessage}
                 messageCenter
-                actionLabel={actionLoading ? "Saving..." : "Save"}
+                actionLabel={
+                  actionLoading
+                    ? (editingRow ? "Updating..." : "Saving...")
+                    : (editingRow ? "Update" : "Save")
+                }
                 onSave={handleSave}
                 onCancel={handleCancel}
               />
@@ -310,24 +342,18 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
-            onClick={handleToolbarUpdate}
-            disabled={selected.size !== 1}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-          >
-            Update
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Shoot
-          </button>
-          <button
-            type="button"
             onClick={handleToolbarDelete}
-            disabled={selected.size !== 1 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            disabled={selected.size === 0 || actionLoading}
+            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Delete
           </button>
-          <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+          <button
+            type="button"
+            onClick={handleToolbarPrint}
+            disabled={selected.size === 0}
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Print
           </button>
         </div>
@@ -484,9 +510,6 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
       </div>
     </AdminPage>
   );

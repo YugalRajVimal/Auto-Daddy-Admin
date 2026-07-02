@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { adminNotify } from "../../../utils/adminNotify";
 import AdminPage from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
@@ -55,6 +56,7 @@ const Tasks: React.FC = () => {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not load tasks";
       setError(message);
+      adminNotify.error(message);
     } finally {
       setLoading(false);
     }
@@ -83,6 +85,7 @@ const Tasks: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to add task");
+      adminNotify.success("Task added.");
       setShowAdd(false);
       setAddName("");
       setAddDescription("");
@@ -92,6 +95,7 @@ const Tasks: React.FC = () => {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not add task";
       setError(message);
+      adminNotify.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +122,9 @@ const Tasks: React.FC = () => {
       .filter((t) => t.name && t.link);
 
     if (bulkArray.length === 0) {
-      setError("Please enter at least one task in the correct format.");
+      const message = "Please enter at least one task in the correct format.";
+      setError(message);
+      adminNotify.error(message);
       setSubmitting(false);
       return;
     }
@@ -132,6 +138,7 @@ const Tasks: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Bulk add failed.");
+      adminNotify.success(`${bulkArray.length} task(s) added.`);
       setBulkTasksInput("");
       fetchTasks(1);
       setPage(1);
@@ -139,6 +146,7 @@ const Tasks: React.FC = () => {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not add tasks in bulk";
       setError(message);
+      adminNotify.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -155,10 +163,12 @@ const Tasks: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to delete");
+      adminNotify.success("Task deleted.");
       fetchTasks(page);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not delete";
       setError(message);
+      adminNotify.error(message);
     } finally {
       setDeleting(false);
     }
@@ -178,11 +188,13 @@ const Tasks: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Bulk delete failed");
+      adminNotify.success(`${ids.length} task(s) deleted.`);
       setSelectedIds(new Set());
       fetchTasks(page);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not bulk delete";
       setError(message);
+      adminNotify.error(message);
     } finally {
       setDeleting(false);
     }
@@ -199,12 +211,14 @@ const Tasks: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Bulk delete all failed");
+      adminNotify.success("All tasks deleted.");
       setSelectedIds(new Set());
       fetchTasks(1);
       setPage(1);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not bulk delete all";
       setError(message);
+      adminNotify.error(message);
     } finally {
       setDeleting(false);
     }

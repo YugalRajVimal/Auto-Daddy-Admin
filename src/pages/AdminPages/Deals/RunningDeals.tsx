@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useMemo } from "react";
+import { adminNotify } from "../../../utils/adminNotify";
 import AdminPage from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
@@ -77,6 +78,7 @@ const RunningDeals: React.FC = () => {
       })
       .catch((err: Error) => {
         setError(err.message);
+        adminNotify.error(err.message);
         setLoading(false);
       });
   }, []);

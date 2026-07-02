@@ -69,6 +69,8 @@ export default function PortalShell({
   const navigate = useNavigate();
   const { role, logout, session } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navReset = (location.state as { navReset?: number } | null | undefined)?.navReset ?? 0;
+  const contentKey = `${location.pathname}-${navReset}`;
 
   const activePrimary = getActivePrimaryItem(location.pathname, primaryNav, homePath);
   const onUtilityNav = utilityNav.some((s) => isPathActive(location.pathname, s.path, homePath));
@@ -79,6 +81,14 @@ export default function PortalShell({
   const activeSubItemPath = getActiveSubItemPath(location.pathname, displaySubItems, homePath);
   const utilityNavPath = utilityNav[0]?.path ?? "#";
 
+  const handleNavLinkClick = (path: string, e: React.MouseEvent<HTMLAnchorElement>) => {
+    setMobileOpen(false);
+    if (location.pathname === path) {
+      e.preventDefault();
+      navigate(path, { replace: true, state: { navReset: Date.now() } });
+    }
+  };
+
   const handlePrimaryClick = (item: NavItem) => {
     const target = item.path ?? item.subItems?.[0]?.path;
     if (target) navigate(target);
@@ -86,19 +96,11 @@ export default function PortalShell({
   };
 
   const handleSubNavClick = (path: string, e: React.MouseEvent<HTMLAnchorElement>) => {
-    setMobileOpen(false);
-    if (location.pathname === path) {
-      e.preventDefault();
-      navigate(path, { replace: true, state: { navReset: Date.now() } });
-    }
+    handleNavLinkClick(path, e);
   };
 
   const handlePrimaryNavLinkClick = (path: string, e: React.MouseEvent<HTMLAnchorElement>) => {
-    setMobileOpen(false);
-    if (location.pathname === path) {
-      e.preventDefault();
-      navigate(path, { replace: true, state: { navReset: Date.now() } });
-    }
+    handleNavLinkClick(path, e);
   };
 
   const handleLogout = () => {
@@ -149,10 +151,48 @@ export default function PortalShell({
     document.documentElement.style.overflow = "";
   }, [location.pathname]);
 
+  const utilityNavBar = (
+    <nav
+      className="flex shrink-0 items-center gap-0 [&>*+*]:-ml-px"
+      aria-label="Account actions"
+    >
+      {headerCenter != null &&
+        (subscriptionDaysLeft != null ? (
+          <span className={utilityLinkClass}>{subscriptionDaysLeft} Days Left</span>
+        ) : (
+          <span className={utilityLinkClass}>Login as : {loginAsDisplay}</span>
+        ))}
+      {utilityNav.length > 0 && (
+        <Link
+          to={utilityNavPath}
+          className={onUtilityNav ? utilityLinkActiveClass : utilityLinkClass}
+          onClick={(e) => handleNavLinkClick(utilityNavPath, e)}
+        >
+          {utilityNavLabel}
+        </Link>
+      )}
+      <Link
+        to={helpPath ?? "#"}
+        className={helpPath && onHelpNav ? helpLinkActiveClass : utilityLinkClass}
+        onClick={(e) => {
+          if (!helpPath) return;
+          handleNavLinkClick(helpPath, e);
+        }}
+      >
+        Help
+      </Link>
+      <button type="button" onClick={handleLogout} className={utilityLinkClass}>
+        Log out
+      </button>
+    </nav>
+  );
+
   return (
     <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
+      <div className="fixed top-0 right-3 z-50 bg-ad-app-bg sm:right-4">{utilityNavBar}</div>
+
       <div className="flex min-h-0 w-full flex-1 flex-col">
-        <header className="px-3 pt-4 pb-2 sm:px-4 md:pt-5">
+        <header className="px-3 pt-0 pb-2 sm:px-4">
           <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-3 md:grid-cols-[auto_1fr_auto] md:gap-x-4">
             <div className="flex items-center gap-3">
               <button
@@ -167,7 +207,9 @@ export default function PortalShell({
                   <rect width="16" height="2" y="10" />
                 </svg>
               </button>
-              <Link to={homePath}>{headerLogo}</Link>
+              <Link to={homePath} onClick={(e) => handleNavLinkClick(homePath, e)}>
+                {headerLogo}
+              </Link>
             </div>
 
             <div className="col-span-2 flex items-center justify-center md:col-span-1 md:self-center">
@@ -182,31 +224,9 @@ export default function PortalShell({
             </div>
 
             <div className="col-span-2 flex flex-col items-end gap-2 md:col-span-1 md:col-start-3 md:row-start-1">
-              <nav className="flex items-center gap-0 [&>*+*]:-ml-px" aria-label="Account actions">
-                {headerCenter != null &&
-                  (subscriptionDaysLeft != null ? (
-                    <span className={utilityLinkClass}>{subscriptionDaysLeft} Days Left</span>
-                  ) : (
-                    <span className={utilityLinkClass}>Login as : {loginAsDisplay}</span>
-                  ))}
-                {utilityNav.length > 0 && (
-                  <Link
-                    to={utilityNavPath}
-                    className={onUtilityNav ? utilityLinkActiveClass : utilityLinkClass}
-                  >
-                    {utilityNavLabel}
-                  </Link>
-                )}
-                <Link
-                  to={helpPath ?? "#"}
-                  className={helpPath && onHelpNav ? helpLinkActiveClass : utilityLinkClass}
-                >
-                  Help
-                </Link>
-                <button type="button" onClick={handleLogout} className={utilityLinkClass}>
-                  Log out
-                </button>
-              </nav>
+              <div className="pointer-events-none invisible" aria-hidden>
+                {utilityNavBar}
+              </div>
               <div className="flex items-center gap-4">
                 <button
                   type="button"
@@ -222,6 +242,7 @@ export default function PortalShell({
                   to={profilePath}
                   className="flex h-11 w-11 items-center justify-center overflow-hidden border border-gray-300 bg-white text-gray-400 shadow-sm sm:h-12 sm:w-12"
                   aria-label="Profile"
+                  onClick={(e) => handleNavLinkClick(profilePath, e)}
                 >
                   {headerAvatarSrc ? (
                     <img src={headerAvatarSrc} alt="" className="h-full w-full object-cover" />
@@ -315,7 +336,9 @@ export default function PortalShell({
           </div>
         )}
 
-        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+        <main key={contentKey} className="flex min-h-0 flex-1 flex-col">
+          {children}
+        </main>
       </div>
     </div>
   );

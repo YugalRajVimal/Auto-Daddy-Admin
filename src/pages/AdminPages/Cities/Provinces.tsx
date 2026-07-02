@@ -9,6 +9,8 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -59,7 +61,9 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
       setProvinces(res.data.data || []);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Failed to fetch provinces");
+      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to fetch provinces";
+      setError(msg);
+      adminNotify.error(msg);
     } finally {
       setLoading(false);
     }
@@ -120,7 +124,9 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError("Province name is required.");
+      const msg = "Province name is required.";
+      setError(msg);
+      adminNotify.error(msg);
       return;
     }
     setActionLoading(true);
@@ -134,6 +140,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
           country,
           status,
         });
+        adminNotify.success("Province updated successfully.");
         setSuccessMsg("Province updated successfully.");
       } else {
         await axios.post(`${API_BASE}/admin/provinces`, {
@@ -142,6 +149,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
           country,
           status,
         });
+        adminNotify.success("Province added successfully.");
         setSuccessMsg("Province added successfully.");
       }
       resetForm();
@@ -149,7 +157,9 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
       fetchProvinces();
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Failed to save province");
+      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to save province";
+      setError(msg);
+      adminNotify.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -162,6 +172,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     setSuccessMsg("");
     try {
       await axios.delete(`${API_BASE}/admin/provinces/${province._id}`);
+      adminNotify.success("Province deleted successfully.");
       setSuccessMsg("Province deleted successfully.");
       setSelected((prev) => {
         const next = new Set(prev);
@@ -171,17 +182,12 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
       fetchProvinces();
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Failed to delete province");
+      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to delete province";
+      setError(msg);
+      adminNotify.error(msg);
     } finally {
       setActionLoading(false);
     }
-  };
-
-  const handleToolbarUpdate = () => {
-    if (selected.size !== 1) return;
-    const id = [...selected][0];
-    const province = provinces.find((p) => p._id === id);
-    if (province) openEdit(province);
   };
 
   const handleToolbarDelete = () => {
@@ -189,6 +195,22 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     const id = [...selected][0];
     const province = provinces.find((p) => p._id === id);
     if (province) handleDelete(province);
+  };
+
+  const handleToolbarPrint = () => {
+    printAdminTable({
+      title: "Provinces",
+      headers: ["Province Name", "Country", "Nickname", "Cities", "Status"],
+      rows: provinces
+        .filter((province) => selected.has(province._id))
+        .map((province) => [
+          province.name,
+          province.country || "Canada",
+          province.nickName || "—",
+          String(province.cities?.length ?? 0),
+          province.status || "Active",
+        ]),
+    });
   };
 
   const formMessage = editingId
@@ -206,7 +228,11 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
               <CompactFormFooter
                 message={formMessage}
                 messageCenter
-                actionLabel={actionLoading ? "Saving..." : "Save"}
+                actionLabel={
+                  actionLoading
+                    ? (editingId ? "Updating..." : "Saving...")
+                    : (editingId ? "Update" : "Save")
+                }
                 onSave={handleSave}
                 onCancel={handleCancel}
               />
@@ -275,24 +301,18 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
-            onClick={handleToolbarUpdate}
-            disabled={selected.size !== 1}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-          >
-            Update
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Shoot
-          </button>
-          <button
-            type="button"
             onClick={handleToolbarDelete}
-            disabled={selected.size !== 1 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            disabled={selected.size === 0 || actionLoading}
+            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Delete
           </button>
-          <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+          <button
+            type="button"
+            onClick={handleToolbarPrint}
+            disabled={selected.size === 0}
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Print
           </button>
         </div>
@@ -414,7 +434,14 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
+        <Link
+          to="#"
+          onClick={(e) => {
+            e.preventDefault();
+            adminNotify.info("Deleted view is not available on Provinces yet.");
+          }}
+          className="text-sm text-blue-700 hover:underline"
+        >
           Deleted
         </Link>
       </div>

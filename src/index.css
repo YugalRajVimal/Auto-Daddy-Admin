@@ -1115,3 +1115,24 @@ input.shop-compact-input[type="time"] {
 .shop-ad-curtain-exit-down {
   animation: shop-ad-curtain-exit-down 0.55s ease-in-out both;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #report-print-area,
+  #report-print-area * {
+    visibility: visible;
+  }
+
+  #report-print-area {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    border: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+}

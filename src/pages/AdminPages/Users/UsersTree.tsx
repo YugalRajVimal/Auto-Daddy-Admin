@@ -1,6 +1,7 @@
 import Tree from "react-d3-tree";
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
+import { adminNotify } from "../../../utils/adminNotify";
 
 /* ======================================
    Types
@@ -112,7 +113,9 @@ export default function AdminUsersTree() {
       setTreeData(systemNode);
 
     } catch (err) {
-      setError("Failed to load users tree");
+      const msg = "Failed to load users tree";
+      setError(msg);
+      adminNotify.error(msg);
       console.error(err);
     } finally {
       setLoading(false);

@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { useLocation } from "react-router";
 import { FiPaperclip } from "react-icons/fi";
-import { EyeIcon } from "../../../icons";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
-  CompactAutoGrowTextarea,
   CompactField,
-  CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
-  compactFixedFieldWidth,
-  compactInputClass,
   compactReadOnlyMultilineClass,
   compactReadOnlyValueClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 
 interface InviteHelp {
   _id: string;
@@ -69,28 +66,6 @@ const USER_TYPE_OPTIONS: { value: UserType; label: string }[] = [
   { value: "shopOwner", label: "Shop Owner" },
 ];
 
-const CAR_OWNER_USERS = [
-  "John Smith",
-  "Maria Garcia",
-  "David Chen",
-  "Sarah Johnson",
-  "Michael Brown",
-  "Emily Wilson",
-  "James Taylor",
-  "Lisa Anderson",
-];
-
-const SHOP_OWNER_USERS = [
-  "Northside Auto",
-  "Premium Auto Care",
-  "Wright Fleet Services",
-  "Kim Auto Shop",
-  "Allen Motors Garage",
-  "City Tire & Brake",
-  "Lakeview Auto Repair",
-  "Eastside Detailing",
-];
-
 const notifImageUrl = (id: number) => `https://picsum.photos/seed/notif-${id}/480/320`;
 
 const DUMMY_SENT_NOTIFICATIONS: SentNotification[] = [
@@ -109,6 +84,23 @@ const DUMMY_SENT_NOTIFICATIONS: SentNotification[] = [
 ];
 
 const DUMMY_AUDIO_URL = "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3";
+
+const SUPPORT_SUBJECT_OPTIONS = [
+  "Accounts",
+  "Apps",
+  "Clients",
+  "Estimates",
+  "Expenses",
+  "Inventory",
+  "Invoicing",
+  "Others",
+  "Reports",
+  "Taxation",
+] as const;
+
+function nextSupportTicketNo() {
+  return String(Math.floor(10000000 + Math.random() * 90000000));
+}
 
 const DUMMY_RECEIVED_NOTIFICATIONS: InviteHelp[] = [
   {
@@ -252,10 +244,6 @@ function userScopeLabel(notification: SentNotification) {
   return "All";
 }
 
-function particularUsersForType(userType: UserType) {
-  return userType === "carOwner" ? CAR_OWNER_USERS : SHOP_OWNER_USERS;
-}
-
 function arrayBufferToBlobUrl(buffer: number[], mimeType = "audio/webm") {
   const arr = new Uint8Array(buffer);
   const blob = new Blob([arr], { type: mimeType });
@@ -331,6 +319,7 @@ export default function Invitehelp({
   const [notifImage, setNotifImage] = useState<File | null>(null);
   const [userType, setUserType] = useState<UserType>("carOwner");
   const [selectedUser, setSelectedUser] = useState("");
+  const [supportTicketNo, setSupportTicketNo] = useState(nextSupportTicketNo);
 
   const [viewingReceived, setViewingReceived] = useState<InviteHelp | null>(null);
   const [showActionMenu, setShowActionMenu] = useState(false);
@@ -414,6 +403,43 @@ export default function Invitehelp({
     else setSelected(new Set(paged.map((n) => n._id)));
   };
 
+  const handleToolbarPrint = () => {
+    if (section === "sent") {
+      printAdminTable({
+        title: "Sent Notifications",
+        headers: ["Date", "Title", "Note", "User Type", "User", "Attachment"],
+        rows: sentNotifications
+          .filter((notification) => selected.has(notification._id))
+          .map((notification) => [
+            notification.date,
+            notification.title,
+            notification.note,
+            userTypeLabel(notification.userType),
+            userScopeLabel(notification),
+            notification.imageUrl ? "Yes" : "—",
+          ]),
+      });
+      return;
+    }
+
+    printAdminTable({
+      title: "Received Notifications",
+      headers: ["Date", "Ticket No.", "User Type", "User Name", "Title", "Audio", "Message", "Attachment"],
+      rows: inviteHelps
+        .filter((invite) => selected.has(invite._id))
+        .map((invite) => [
+          receivedDate(invite),
+          receivedTicketNo(invite),
+          userTypeLabel(receivedUserType(invite)),
+          receivedUserName(invite),
+          invite.title || "—",
+          receivedAudioUrl(invite) ? "Yes" : "No",
+          invite.message || "—",
+          receivedImageUrl(invite) ? "Yes" : "—",
+        ]),
+    });
+  };
+
   const openReceivedView = (inv: InviteHelp) => {
     setShowForm(false);
     resetForm();
@@ -424,7 +450,9 @@ export default function Invitehelp({
 
   const applyReceivedStatus = (status: "resolved" | "unresolved") => {
     if (selected.size === 0) {
-      setError("Select at least one notification.");
+      const msg = "Select at least one notification.";
+      setError(msg);
+      adminNotify.error(msg);
       setShowActionMenu(false);
       return;
     }
@@ -435,6 +463,7 @@ export default function Invitehelp({
       setViewingReceived((prev) => (prev ? { ...prev, status } : null));
     }
     setError("");
+    adminNotify.success(status === "resolved" ? "Marked as resolved." : "Marked as unresolved.");
     setShowActionMenu(false);
   };
 
@@ -446,6 +475,7 @@ export default function Invitehelp({
     setNotifImage(null);
     setUserType("carOwner");
     setSelectedUser("");
+    setSupportTicketNo(nextSupportTicketNo());
     if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
@@ -456,8 +486,10 @@ export default function Invitehelp({
 
   const handleSave = () => {
     if (section === "sent") {
-      if (!notifDate.trim() || !notifTitle.trim() || !notifNote.trim()) {
-        setError("Date, title, and note are required.");
+      if (!notifTitle.trim() || !notifNote.trim()) {
+        const msg = "Subject and details are required.";
+        setError(msg);
+        adminNotify.error(msg);
         return;
       }
       setError("");
@@ -473,113 +505,98 @@ export default function Invitehelp({
         particularUsers: selectedUser ? [selectedUser] : null,
       };
       setSentNotifications((prev) => [entry, ...prev]);
+      adminNotify.success("Ticket submitted.");
     }
     resetForm();
     setShowForm(false);
   };
 
-  const addFormPanel = showForm && section === "sent" ? (
-    <CompactFormPanel
-      footer={
-        <CompactFormFooter
-          message="You are creating a 'Notification'"
-          messageCenter
-          onSave={handleSave}
-          onCancel={handleCancel}
-        />
-      }
-    >
-      <>
-        <CompactFormRow className="w-full items-start">
-            <CompactField label="Date" required className={compactFixedFieldWidth}>
-              <input
-                type="date"
-                value={notifDate}
-                onChange={(e) => setNotifDate(e.target.value)}
-                className={compactInputClass}
-              />
-            </CompactField>
-            <CompactField label="User Type" required className={compactFixedFieldWidth}>
-              <select
-                value={userType}
-                onChange={(e) => {
-                  const next = e.target.value as UserType;
-                  setUserType(next);
-                  setSelectedUser("");
-                }}
-                className={compactInputClass}
-              >
-                {USER_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </CompactField>
-            <CompactField label="User" className={compactFixedFieldWidth}>
-              <select
-                value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className={compactInputClass}
-              >
-                <option value="">All</option>
-                {particularUsersForType(userType).map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </CompactField>
-            <CompactField label="Title" required className={compactFixedFieldWidth}>
-              <input
-                type="text"
-                value={notifTitle}
-                onChange={(e) => setNotifTitle(e.target.value)}
-                className={compactInputClass}
-              />
-            </CompactField>
-            <CompactField label="Note" required className="min-w-0 flex-1">
-              <CompactAutoGrowTextarea
-                value={notifNote}
-                onChange={(e) => setNotifNote(e.target.value)}
-              />
-            </CompactField>
-          </CompactFormRow>
-          <CompactFormRow className="items-start justify-start">
-            <div className="flex flex-col items-start gap-1.5">
-              <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                <input
-                  type="checkbox"
-                  checked={attachImage}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setAttachImage(checked);
-                    if (!checked) {
-                      setNotifImage(null);
-                      if (imageInputRef.current) imageInputRef.current.value = "";
-                    }
-                  }}
-                  className="h-3.5 w-3.5 accent-ad-green"
-                />
-                Attach Image
-              </label>
-              {attachImage ? (
-                <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
-                  {notifImage?.name || "Upload File"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setNotifImage(e.target.files?.[0] ?? null)}
-                    ref={imageInputRef}
-                    className="hidden"
-                  />
+  const addFormPanel =
+    showForm && section === "sent" ? (
+      <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/35 p-4">
+        <div className="w-full max-w-[680px] overflow-hidden rounded-lg border border-gray-300 bg-white shadow-lg">
+          <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-3">
+            <h2 className="text-lg font-bold text-gray-900">Support (Help)</h2>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-sm text-gray-600 hover:bg-gray-100"
+              aria-label="Close"
+              title="Close"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="px-5 py-4">
+            <p className="mx-auto mb-4 max-w-[560px] text-center text-sm text-gray-600">
+              Freshkhata is providing better solution to its clients promptly. If you have any
+              question about Freshkhata feel free to generate ticket.
+            </p>
+
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
+                <div className="min-w-0">
+                  <label className="mb-1 block text-xs font-bold text-gray-800">
+                    Subject <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    value={notifTitle}
+                    onChange={(e) => setNotifTitle(e.target.value)}
+                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Subject</option>
+                    {SUPPORT_SUBJECT_OPTIONS.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:pt-6">
+                  <div className="rounded bg-ad-blue-light/35 px-4 py-2 text-sm font-semibold text-gray-700">
+                    Ticket No. {supportTicketNo}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold text-gray-800">
+                  Details <span className="text-red-600">*</span>
                 </label>
-              ) : null}
+                <textarea
+                  value={notifNote}
+                  onChange={(e) => setNotifNote(e.target.value)}
+                  rows={4}
+                  className="w-full resize-none rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
             </div>
-          </CompactFormRow>
-        </>
-    </CompactFormPanel>
-  ) : undefined;
+          </div>
+
+          <div className="flex items-center justify-end gap-3 border-t border-gray-200 bg-ad-blue-light/35 px-5 py-3">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="rounded bg-ad-form-save px-6 py-1.5 text-sm font-bold text-white hover:brightness-95"
+            >
+              Submit
+            </button>
+            <span className="text-sm text-gray-700">
+              or{" "}
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="font-medium text-blue-700 hover:underline"
+              >
+                Cancel
+              </button>
+            </span>
+          </div>
+        </div>
+      </div>
+    ) : undefined;
 
   const receivedViewPanel =
     section === "received" && viewingReceived ? (
@@ -656,7 +673,7 @@ export default function Invitehelp({
               }
               className="inline-flex items-center gap-1.5 rounded border border-gray-400 bg-white px-3 py-0.5 text-xs font-medium text-ad-purple hover:bg-ad-purple/10"
             >
-              <EyeIcon className="size-4 fill-current" />
+              <FiPaperclip size={16} aria-hidden />
               View Image
             </button>
           ) : null}
@@ -680,16 +697,14 @@ export default function Invitehelp({
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Update
-          </button>
           <div className="relative" ref={actionMenuRef}>
             <button
               type="button"
+              disabled={selected.size === 0}
               onClick={() => {
                 if (section === "received") setShowActionMenu((open) => !open);
               }}
-              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Action
             </button>
@@ -712,10 +727,15 @@ export default function Invitehelp({
               </div>
             ) : null}
           </div>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
             Delete
           </button>
-          <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+          <button
+            type="button"
+            onClick={handleToolbarPrint}
+            disabled={selected.size === 0}
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Print
           </button>
         </div>
@@ -940,9 +960,6 @@ export default function Invitehelp({
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
       </div>
 
       {imagePreview && (

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
   CompactField,
@@ -8,6 +7,8 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 import { MODULES } from "../../../components/admin/PermissionMatrix";
 
 type RoleRow = {
@@ -206,9 +207,18 @@ export default function RoleManager() {
   };
 
   const handleSave = () => {
-    if (!role.trim()) return;
-    if (!city) return;
-    if (permissionKeys.length === 0) return;
+    if (!role.trim()) {
+      adminNotify.error("Role is required.");
+      return;
+    }
+    if (!city) {
+      adminNotify.error("City is required.");
+      return;
+    }
+    if (permissionKeys.length === 0) {
+      adminNotify.error("Select at least one permission.");
+      return;
+    }
 
     const payload = {
       role: role.trim(),
@@ -228,6 +238,7 @@ export default function RoleManager() {
       ]);
     }
 
+    adminNotify.success(editingId != null ? "Role updated." : "Role created.");
     resetForm();
     setShowForm(false);
   };
@@ -237,12 +248,22 @@ export default function RoleManager() {
     if (!window.confirm(`Delete ${selected.size} selected role(s)?`)) return;
     setRoles((prev) => prev.filter((r) => !selected.has(r.id)));
     setSelected(new Set());
+    adminNotify.success("Selected role(s) deleted.");
   };
 
-  const handleUpdateSelected = () => {
-    if (selected.size !== 1) return;
-    const row = roles.find((r) => r.id === [...selected][0]);
-    if (row) openEdit(row);
+  const handleToolbarPrint = () => {
+    printAdminTable({
+      title: "Role Manager",
+      headers: ["Role", "City", "Permissions", "Created Date"],
+      rows: roles
+        .filter((role) => selected.has(role.id))
+        .map((role) => [
+          role.role,
+          role.city,
+          permissionLabels(role.permissionKeys),
+          role.createdDate,
+        ]),
+    });
   };
 
   return (
@@ -298,22 +319,18 @@ export default function RoleManager() {
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
-            onClick={handleUpdateSelected}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
-          >
-            Update
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Shoot
-          </button>
-          <button
-            type="button"
             onClick={handleDeleteSelected}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+            disabled={selected.size === 0}
+            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Delete
           </button>
-          <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+          <button
+            type="button"
+            onClick={handleToolbarPrint}
+            disabled={selected.size === 0}
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Print
           </button>
         </div>
@@ -425,9 +442,6 @@ export default function RoleManager() {
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
       </div>
     </AdminPage>
   );

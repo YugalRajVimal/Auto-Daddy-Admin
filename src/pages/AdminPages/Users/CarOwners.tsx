@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
+import { adminNotify } from "../../../utils/adminNotify";
 import { authHeaders } from "../../../api/client";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
@@ -398,7 +399,7 @@ const fieldErrorClass = "mt-0.5 text-[11px] font-semibold text-red-700";
 const uploadBtnClass =
   "rounded border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300";
 const carOwnerRowFieldWidth = compactFixedFieldWidth;
-const carOwnerAddressFieldWidth = "min-w-[220px] flex-1 sm:min-w-[300px]";
+const carOwnerAddressFieldWidth = "min-w-0 flex-1";
 const vehicleGridClass = "grid w-full grid-cols-6 gap-x-4 gap-y-3 items-start";
 const vehicleFieldClass = "!flex-none min-w-0 w-full";
 
@@ -604,7 +605,7 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
   const isEdit = !!owner;
   const [name, setName] = useState(""); const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [pincode, setPincode] = useState(""); const [address, setAddress] = useState("");
+  const [address, setAddress] = useState("");
   const [city, setCity] = useState(""); const [joiningDate, setJoiningDate] = useState("");
   const [vehicles, setVehicles] = useState<VehicleFormRow[]>([emptyVehicle()]);
   const [attachEmail, setAttachEmail] = useState(false);
@@ -665,7 +666,7 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
     setAttempted(false); setApiError(null);
     if (isEdit && owner) {
       setName(owner.name || ""); setEmail(owner.email || "");
-      setPhone(owner.phone || ""); setPincode(owner.pincode || ""); setAddress(owner.address || "");
+      setPhone(owner.phone || ""); setAddress(owner.address || "");
       setCity(owner.city || ""); setJoiningDate(fmtDate(owner.createdAt) !== "-" ? fmtDate(owner.createdAt) : "");
       const existingProfileImg = ownerProfileImg(owner);
       setAttachEmail(!!owner.email?.trim());
@@ -685,7 +686,7 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
         vehicleImagePreview: Array.isArray(v.carImages) && v.carImages[0] ? mediaUrl(v.carImages[0]) : "",
       })) || [emptyVehicle()]);
     } else {
-      setName(""); setEmail(""); setPhone(""); setPincode(""); setAddress(""); setCity("");
+      setName(""); setEmail(""); setPhone(""); setAddress(""); setCity("");
       setJoiningDate(new Date().toISOString().slice(0, 10));
       setAttachEmail(false); setAttachProfilePhoto(false); setProfileFile(null); setProfilePreview(""); setVehicles([emptyVehicle()]);
     }
@@ -695,13 +696,18 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
     if (!name.trim()) return "Name is required.";
     if (attachEmail && (!email.trim() || !isValidEmail(email))) return "Valid email required.";
     if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
-    if (!pincode.trim()) return "Zip code required.";
+    if (!address.trim()) return "Address is required.";
     return null;
   }
 
   async function handleSave() {
     setAttempted(true);
-    const err = validate(); if (err) { setApiError(err); return; }
+    const err = validate();
+    if (err) {
+      setApiError(err);
+      adminNotify.error(err);
+      return;
+    }
     setApiError(null);
     const filled = vehicles.filter(v => v.licensePlateNo.trim() || v.vehicleName.trim());
     const fd = new FormData();
@@ -709,7 +715,6 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
     fd.append("name", name.trim());
     if (attachEmail && email.trim()) fd.append("email", email.trim());
     fd.append("phone", phone.replace(/\D/g, ""));
-    fd.append("pincode", pincode.trim().replace(/\s/g, "").toUpperCase());
     fd.append("address", address.trim().slice(0, 50));
     if (city.trim()) fd.append("city", city.trim());
     if (joiningDate.trim()) fd.append("createdAt", joiningDate.trim());
@@ -734,9 +739,12 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
     try {
       if (isEdit) await axios.put(`${API()}/api/admin/my-customers`, fd, { headers: getToken() });
       else await axios.post(`${API()}/api/admin/onboard-carowner`, fd, { headers: getToken() });
+      adminNotify.success(isEdit ? "Car owner updated." : "Car owner added.");
       onSaved();
     } catch (err: any) {
-      setApiError(err?.response?.data?.message || (isEdit ? "Could not update." : "Could not add."));
+      const msg = err?.response?.data?.message || (isEdit ? "Could not update." : "Could not add.");
+      setApiError(msg);
+      adminNotify.error(msg);
     } finally { setSubmitting(false); }
   }
 
@@ -750,7 +758,7 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
         <CompactFormFooter
           message={formMessage}
           messageCenter
-          actionLabel={submitting ? "Saving..." : "Save"}
+          actionLabel={submitting ? (isEdit ? "Updating..." : "Saving...") : (isEdit ? "Update" : "Save")}
           onSave={handleSave}
           onCancel={onCancel}
         />
@@ -804,24 +812,14 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
             ))}
           </select>
         </CompactField>
-        <CompactField label="Zip / Postal Code" required className={carOwnerRowFieldWidth}>
-          <input
-            type="text"
-            value={pincode}
-            onChange={(e) => setPincode(e.target.value.slice(0, 10))}
-            placeholder="A1A 1A1"
-            className={compactInputClass}
-          />
-          {attempted && !pincode.trim() && <p className={fieldErrorClass}>Required</p>}
-        </CompactField>
-        <div className={`min-w-0 flex-1 ${carOwnerAddressFieldWidth}`}>
-          <label className="mb-1 block text-xs font-bold text-ad-green-dark">Address</label>
+        <CompactField label="Address" required className={carOwnerAddressFieldWidth}>
           <CompactAutoGrowTextarea
             value={address}
             onChange={(e) => setAddress(e.target.value.slice(0, 50))}
             placeholder="Max 50 chars"
           />
-        </div>
+          {attempted && !address.trim() && <p className={fieldErrorClass}>Required</p>}
+        </CompactField>
       </CompactFormRow>
       <CompactFormRow className="items-start justify-start gap-6">
         <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
@@ -956,13 +954,30 @@ const SendNotifModal: React.FC<{ isOpen: boolean; onClose: () => void; ids: stri
   return (
     <BaseModal isOpen onClose={onClose} title="Send Custom Notification">
       <form onSubmit={async e => {
-        e.preventDefault(); if (!title.trim() || !body.trim()) { setErr("Title and body required."); return; }
+        e.preventDefault();
+        if (!title.trim() || !body.trim()) {
+          const msg = "Title and body required.";
+          setErr(msg);
+          adminNotify.error(msg);
+          return;
+        }
         setSending(true); setErr(null);
         try {
           const res = await axios.post(`${API()}/api/admin/notification/custom/send`, { userType: "carOwner", userIds: ids, title, message: body });
-          if (res.data?.success) { setOk("Sent!"); setTimeout(() => { onClose(); onDone(); }, 900); }
-          else setErr(res.data?.message || "Failed.");
-        } catch (e: any) { setErr(e?.response?.data?.message || "Error."); } finally { setSending(false); }
+          if (res.data?.success) {
+            adminNotify.success("Notification sent.");
+            setOk("Sent!");
+            setTimeout(() => { onClose(); onDone(); }, 900);
+          } else {
+            const msg = res.data?.message || "Failed.";
+            setErr(msg);
+            adminNotify.error(msg);
+          }
+        } catch (e: any) {
+          const msg = e?.response?.data?.message || "Error.";
+          setErr(msg);
+          adminNotify.error(msg);
+        } finally { setSending(false); }
       }}>
         <div className="mb-3">
           <label className={notifLabelClass}>Title *</label>
@@ -1089,15 +1104,27 @@ const CarOwners: React.FC = () => {
       const res = await axios.get(`${API()}/api/admin/carowners`, { headers: getToken() });
       console.log(res.data.data);
       if (res.data?.success && Array.isArray(res.data.data)) setAllOwners(res.data.data);
-      else setError("Failed to fetch car owners");
-    } catch (e: any) { setError(e?.response?.data?.message || "Something went wrong"); }
+      else {
+        const msg = "Failed to fetch car owners";
+        setError(msg);
+        adminNotify.error(msg);
+      }
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Something went wrong";
+      setError(msg);
+      adminNotify.error(msg);
+    }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchOwners(); }, [fetchOwners]);
 
-  const activeOwners = allOwners.filter(o => o.status !== "deleted");
-  const deletedOwners = allOwners.filter(o => o.status === "deleted");
+  const isOwnerDeleted = (o: CarOwnerType): boolean => {
+    const status = String((o as any).status ?? "").toLowerCase();
+    return status === "deleted" || Boolean((o as any).isDeleted) || Boolean((o as any).deleted);
+  };
+  const activeOwners = allOwners.filter((o) => !isOwnerDeleted(o));
+  const deletedOwners = allOwners.filter((o) => isOwnerDeleted(o));
 
   // ── Use the right pool based on showDeleted toggle ──
   const displayOwners = showDeleted ? deletedOwners : activeOwners;
@@ -1122,8 +1149,15 @@ const CarOwners: React.FC = () => {
         { headers: getToken() }
       );
       await fetchOwners();
+      const labels: Record<string, string> = {
+        active: "Car owner activated.",
+        suspended: "Car owner set to inactive.",
+        deleted: "Car owner deleted.",
+      };
+      adminNotify.success(labels[status] ?? "Status updated.");
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Error toggling status.");
+      const msg = e?.response?.data?.message || "Error toggling status.";
+      adminNotify.error(msg);
     }
   }
 
@@ -1191,31 +1225,19 @@ const CarOwners: React.FC = () => {
       >
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
           <div className="flex flex-wrap gap-1">
-            <button type="button" onClick={() => { if (!selCount) { alert("Select at least one."); return; } setNotifOpen(true); }} className={toolbarBtnClass()}>
+            <button type="button" disabled={selCount === 0} onClick={() => setNotifOpen(true)} className={toolbarBtnClass(selCount === 0)}>
               Send Notification
             </button>
-            <button type="button" className="bg-[#25d366] px-3 py-1 text-xs font-medium text-white hover:opacity-90">
+            <button type="button" disabled={selCount === 0} className={`bg-[#25d366] px-3 py-1 text-xs font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50`}>
               WhatsApp
             </button>
-            <button type="button" onClick={() => { if (!selCount) { alert("Select at least one."); return; } exportCsv(allOwners.filter(o => selectedRows.has(o._id)), visibleCols); }} className={toolbarBtnClass()}>
+            <button type="button" disabled={selCount === 0} onClick={() => exportCsv(allOwners.filter(o => selectedRows.has(o._id)), visibleCols)} className={toolbarBtnClass(selCount === 0)}>
               Export
             </button>
             {!showDeleted && (
               <button
                 type="button"
-                disabled={selCount !== 1}
-                onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) openEdit(o); }}
-                className={toolbarBtnClass(selCount !== 1)}
-              >
-                Update
-              </button>
-            )}
-            <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-              Shoot
-            </button>
-            {!showDeleted && selCount === 1 && (
-              <button
-                type="button"
+                disabled={selCount === 0}
                 onClick={async () => {
                   const owner = allOwners.find(o => o._id === selected[0]);
                   if (!owner) return;
@@ -1224,33 +1246,35 @@ const CarOwners: React.FC = () => {
                     setSelectedRows(new Set());
                   }
                 }}
-                className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+                className={toolbarBtnClass(selCount === 0)}
               >
                 Delete
               </button>
             )}
-            {!showDeleted && selCount === 1 && (() => {
-              const owner = allOwners.find(o => o._id === selected[0]);
-              if (!owner) return null;
-              const isSuspended = owner.status === "suspended";
+            {!showDeleted && (() => {
+              const owner = selCount > 0 ? allOwners.find(o => o._id === selected[0]) : null;
+              const isSuspended = owner?.status === "suspended";
               return (
                 <button
                   type="button"
+                  disabled={selCount === 0}
                   onClick={async () => {
+                    if (!owner) return;
                     if (window.confirm(`Set ${owner.name} as ${isSuspended ? "Active" : "Inactive"}?`)) {
                       await toggleStatus(selected[0], isSuspended ? "active" : "suspended");
                       setSelectedRows(new Set());
                     }
                   }}
-                  className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+                  className={toolbarBtnClass(selCount === 0)}
                 >
                   {isSuspended ? "Set Active" : "Set Inactive"}
                 </button>
               );
             })()}
-            {showDeleted && selCount === 1 && (
+            {showDeleted && (
               <button
                 type="button"
+                disabled={selCount === 0}
                 onClick={async () => {
                   const owner = allOwners.find(o => o._id === selected[0]);
                   if (!owner) return;
@@ -1259,16 +1283,17 @@ const CarOwners: React.FC = () => {
                     setSelectedRows(new Set());
                   }
                 }}
-                className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+                className={toolbarBtnClass(selCount === 0)}
               >
                 Restore
               </button>
             )}
-            {!showDeleted && selCount === 1 && (
+            {!showDeleted && (
               <button
                 type="button"
+                disabled={selCount === 0}
                 onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) printOwner(o); }}
-                className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark"
+                className={`px-3 py-1 text-xs font-medium text-white whitespace-nowrap ${selCount === 0 ? "bg-gray-400 cursor-not-allowed" : "bg-ad-green hover:bg-ad-green-dark"}`}
               >
                 Print
               </button>

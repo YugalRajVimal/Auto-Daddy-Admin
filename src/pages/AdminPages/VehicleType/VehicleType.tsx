@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
+import { adminNotify } from "../../../utils/adminNotify";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { authHeaders } from "../../../api/client";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
@@ -69,10 +70,14 @@ const VehicleType: React.FC = () => {
       if (response.data.success) {
         setCarDetails(response.data.data);
       } else {
-        setError("Failed to fetch car details.");
+        const msg = "Failed to fetch car details.";
+        setError(msg);
+        adminNotify.error(msg);
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Error fetching car details");
+      const msg = err?.response?.data?.message || "Error fetching car details";
+      setError(msg);
+      adminNotify.error(msg);
     }
     setLoading(false);
   };
@@ -165,9 +170,9 @@ const VehicleType: React.FC = () => {
             : true)
       )
     ) {
-      setError(
-        "Each model must have a name and at least one year entry (comma allowed)."
-      );
+      const msg = "Each model must have a name and at least one year entry (comma allowed).";
+      setError(msg);
+      adminNotify.error(msg);
       return false;
     }
     return true;
@@ -181,7 +186,9 @@ const VehicleType: React.FC = () => {
     const token = getToken();
 
     if (!trimmedCompany) {
-      setError("Company name is required.");
+      const msg = "Company name is required.";
+      setError(msg);
+      adminNotify.error(msg);
       return;
     }
     if (!validateModels()) {
@@ -205,6 +212,7 @@ const VehicleType: React.FC = () => {
             }
           }
         );
+        adminNotify.success("Car details updated successfully.");
         setSuccessMsg("Car details updated successfully.");
       } else {
         await axios.post(
@@ -219,16 +227,18 @@ const VehicleType: React.FC = () => {
             }
           }
         );
+        adminNotify.success("Car details added successfully.");
         setSuccessMsg("Car details added successfully.");
       }
       setShowModal(false);
       fetchCarDetails();
     } catch (err: any) {
-      setError(
+      const msg =
         err?.response?.data?.message ||
-          err?.response?.data?.error ||
-          "Error saving car details"
-      );
+        err?.response?.data?.error ||
+        "Error saving car details";
+      setError(msg);
+      adminNotify.error(msg);
     }
   };
 
@@ -253,14 +263,16 @@ const VehicleType: React.FC = () => {
           }
         }
       );
+      adminNotify.success("Car details entry deleted.");
       setSuccessMsg("Car details entry deleted.");
       fetchCarDetails();
     } catch (err: any) {
-      setError(
+      const msg =
         err?.response?.data?.message ||
-          err?.response?.data?.error ||
-          "Error deleting car details"
-      );
+        err?.response?.data?.error ||
+        "Error deleting car details";
+      setError(msg);
+      adminNotify.error(msg);
     }
     setDeletingId(null);
   };

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 import axios, { AxiosError } from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import {
   CompactField,
   CompactFormFooter,
@@ -9,6 +10,8 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -60,6 +63,17 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
   const [formCountry, setFormCountry] = useState<Country>("Canada");
   const [formProvinceId, setFormProvinceId] = useState("");
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted } = useAdminDeletedView<CityRow>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:cities",
+  });
+
   useEffect(() => {
     fetchProvinces();
   }, []);
@@ -72,7 +86,9 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
       setProvinces(res.data.data || []);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Failed to fetch provinces");
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to fetch provinces";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
     } finally {
       setLoading(false);
     }
@@ -101,7 +117,9 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
       )
   ).filter((c) => !selectedCountry || c.country === selectedCountry);
 
-  const filtered = allCities.filter(
+  const displayCities = isDeletedView ? deletedStash : allCities;
+
+  const filtered = displayCities.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.provinceName.toLowerCase().includes(search.toLowerCase()) ||
@@ -166,11 +184,15 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
 
   const handleSave = async () => {
     if (!formName.trim()) {
-      setError("City name is required.");
+      const __adminMsg = "City name is required.";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
       return;
     }
     if (!formProvinceId) {
-      setError("Please select a province.");
+      const __adminMsg = "Please select a province.";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
       return;
     }
     setActionLoading(true);
@@ -182,20 +204,24 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
           `${API_BASE}/admin/provinces/${formProvinceId}/cities/${encodeURIComponent(editingCity.name)}`,
           { name: formName.trim(), status: formStatus }
         );
-        setSuccessMsg("City updated successfully.");
+        adminNotify.success("City updated successfully.");
+      setSuccessMsg("City updated successfully.");
       } else {
         await axios.post(`${API_BASE}/admin/provinces/${formProvinceId}/cities`, {
           name: formName.trim(),
           status: formStatus,
         });
-        setSuccessMsg("City added successfully.");
+        adminNotify.success("City added successfully.");
+      setSuccessMsg("City added successfully.");
       }
       resetForm();
       setShowForm(false);
       fetchProvinces();
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Error saving city");
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Error saving city";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
     } finally {
       setActionLoading(false);
     }
@@ -210,6 +236,8 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
       await axios.delete(
         `${API_BASE}/admin/provinces/${city.provinceId}/cities/${encodeURIComponent(city.name)}`
       );
+      stashDeleted(city);
+      adminNotify.success("City deleted successfully.");
       setSuccessMsg("City deleted successfully.");
       setSelected((prev) => {
         const next = new Set(prev);
@@ -219,16 +247,12 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
       fetchProvinces();
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Failed to delete city");
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to delete city";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
     } finally {
       setActionLoading(false);
     }
-  };
-
-  const handleToolbarUpdate = () => {
-    if (selected.size !== 1) return;
-    const city = findCityById([...selected][0]);
-    if (city) openEdit(city);
   };
 
   const handleToolbarDelete = () => {
@@ -237,11 +261,21 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     if (city) handleDelete(city);
   };
 
+  const handleToolbarPrint = () => {
+    printAdminTable({
+      title: "Cities",
+      headers: ["City", "Province", "Country", "Status"],
+      rows: allCities
+        .filter((city) => selected.has(getCityRowId(city)))
+        .map((city) => [city.name, city.provinceName, city.country, city.status || "Active"]),
+    });
+  };
+
   const formMessage = editingCity ? "You are updating a 'City'" : "You are creating a 'City'";
 
   return (
     <AdminPage
-      title="Cities"
+      title={isDeletedView ? "Deleted Cities" : "Cities"}
       headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
@@ -250,7 +284,11 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
               <CompactFormFooter
                 message={formMessage}
                 messageCenter
-                actionLabel={actionLoading ? "Saving..." : "Save"}
+                actionLabel={
+                  actionLoading
+                    ? (editingCity ? "Updating..." : "Saving...")
+                    : (editingCity ? "Update" : "Save")
+                }
                 onSave={handleSave}
                 onCancel={handleCancel}
               />
@@ -310,6 +348,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
         ) : undefined
       }
     >
+      {isDeletedView && <AdminDeletedBanner count={deletedStash.length} entityLabel="cities" />}
       {successMsg && !showForm && (
         <div className="mb-2 rounded border border-green-200 bg-green-100 px-3 py-2 text-xs text-green-800">
           {successMsg}
@@ -326,24 +365,18 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
-            onClick={handleToolbarUpdate}
-            disabled={selected.size !== 1}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-          >
-            Update
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Shoot
-          </button>
-          <button
-            type="button"
             onClick={handleToolbarDelete}
-            disabled={selected.size !== 1 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            disabled={selected.size === 0 || actionLoading}
+            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Delete
           </button>
-          <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+          <button
+            type="button"
+            onClick={handleToolbarPrint}
+            disabled={selected.size === 0}
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Print
           </button>
         </div>
@@ -447,9 +480,11 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
             ) : paged.length === 0 ? (
               <tr>
                 <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                  {selectedProvinceId
-                    ? `No cities found in ${selectedProvince?.name || "this province"}.`
-                    : "No cities found."}
+                  {isDeletedView
+                    ? "No deleted cities found."
+                    : (selectedProvinceId
+                      ? `No cities found in ${selectedProvince?.name || "this province"}.`
+                      : "No cities found.")}
                 </td>
               </tr>
             ) : (
@@ -502,9 +537,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
+        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active Cities" />
       </div>
     </AdminPage>
   );

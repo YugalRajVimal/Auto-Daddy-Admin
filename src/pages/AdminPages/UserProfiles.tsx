@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { adminNotify } from "../../utils/adminNotify";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import { UserCircleIcon } from "../../icons";
@@ -31,7 +32,9 @@ export default function SubAdminUserProfiles() {
         const apiRoute = "/api/sub-admin/get-profile-details";
 
         if (!token) {
-          setError("No sub-admin token found.");
+          const msg = "No sub-admin token found.";
+          setError(msg);
+          adminNotify.error(msg);
           setLoading(false);
           return;
         }
@@ -51,7 +54,9 @@ export default function SubAdminUserProfiles() {
 
         setProfile(data.profile || data);
       } catch (err: any) {
-        setError(err.message || "Failed to fetch profile.");
+        const msg = err.message || "Failed to fetch profile.";
+        setError(msg);
+        adminNotify.error(msg);
       } finally {
         setLoading(false);
       }

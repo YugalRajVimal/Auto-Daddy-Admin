@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 import axios from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
@@ -12,6 +11,8 @@ import {
   compactInputClass,
   compactReadOnlyValueClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 
 interface BusinessProfile {
   _id: string;
@@ -307,6 +308,7 @@ export default function Domain() {
       await axios.delete(
         `${API_URL}/api/admin/business-profiles/${businessId}/ads/${row.id}`
       );
+      adminNotify.success("Domain entry deleted.");
       await refreshDomains();
       if (viewingOwner?._id === row.owner._id) {
         setViewingOwner(row.owner);
@@ -317,7 +319,9 @@ export default function Domain() {
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      setDomainsError(message || "Failed to delete domain entry");
+      const msg = message || "Failed to delete domain entry";
+      setDomainsError(msg);
+      adminNotify.error(msg);
     } finally {
       setDomainsLoading(false);
     }
@@ -330,13 +334,16 @@ export default function Domain() {
         ? owners.find((o) => ownerDisplayName(o) === form.userName)
         : null);
     if (!owner?.businessProfile?._id || !formMode) {
+      let msg: string;
       if (form.userType === "carOwner") {
-        setDomainsError("Domain entries for car owners are not yet supported.");
+        msg = "Domain entries for car owners are not yet supported.";
       } else if (!form.userName) {
-        setDomainsError("Please select a user.");
+        msg = "Please select a user.";
       } else {
-        setDomainsError("Selected shop owner has no business profile.");
+        msg = "Selected shop owner has no business profile.";
       }
+      setDomainsError(msg);
+      adminNotify.error(msg);
       return;
     }
     if (
@@ -347,7 +354,9 @@ export default function Domain() {
       !form.provider ||
       !form.dns
     ) {
-      setDomainsError("All required fields must be filled.");
+      const msg = "All required fields must be filled.";
+      setDomainsError(msg);
+      adminNotify.error(msg);
       return;
     }
 
@@ -368,12 +377,14 @@ export default function Domain() {
         await axios.post(`${API_URL}/api/admin/business-profiles/${businessId}/ads`, fd, {
           headers,
         });
+        adminNotify.success("Domain entry created.");
       } else if (formMode === "EDIT" && editId) {
         await axios.patch(
           `${API_URL}/api/admin/business-profiles/${businessId}/ads/${editId}`,
           fd,
           { headers }
         );
+        adminNotify.success("Domain entry updated.");
       }
       setActiveOwner(owner);
       resetForm();
@@ -385,7 +396,9 @@ export default function Domain() {
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      setDomainsError(message || "Failed to save domain entry");
+      const msg = message || "Failed to save domain entry";
+      setDomainsError(msg);
+      adminNotify.error(msg);
     } finally {
       setSaving(false);
     }
@@ -432,10 +445,21 @@ export default function Domain() {
     else setSelected(new Set(pagedDomainRows.map((r) => r.id)));
   };
 
-  const handleToolbarUpdate = () => {
-    if (selected.size !== 1) return;
-    const row = pagedDomainRows.find((r) => selected.has(r.id));
-    if (row) openEditForm(row);
+  const handleToolbarPrint = () => {
+    printAdminTable({
+      title: "Domain",
+      headers: ["User Type", "User Name", "Domain", "Expiry", "Provider", "DNS"],
+      rows: domains
+        .filter((row) => selected.has(row.id))
+        .map((row) => [
+          userTypeLabel(row.userType),
+          row.userName,
+          row.domain,
+          row.expiry,
+          row.providerLabel,
+          row.dns,
+        ]),
+    });
   };
 
   const handleAddNew = () => {
@@ -632,7 +656,11 @@ export default function Domain() {
                 : "You are editing a 'Domain' entry"
             }
             messageCenter
-            actionLabel={saving ? "Saving..." : "Save"}
+            actionLabel={
+              saving
+                ? (formMode === "EDIT" ? "Updating..." : "Saving...")
+                : (formMode === "EDIT" ? "Update" : "Save")
+            }
             onSave={handleSave}
             onCancel={handleCancelForm}
           />
@@ -736,27 +764,24 @@ export default function Domain() {
   const toolbar = (
     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
       <div className="flex flex-wrap gap-1">
-        <button
-          type="button"
-          onClick={handleToolbarUpdate}
-          disabled={selected.size !== 1}
-          className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-        >
-          Update
-        </button>
-        <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+        <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
           Send Notification
         </button>
-        <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+        <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
           Whatsapp
         </button>
-        <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+        <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
           Website
         </button>
-        <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+        <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
           Delete
         </button>
-        <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-black hover:bg-ad-green-dark">
+        <button
+          type="button"
+          onClick={handleToolbarPrint}
+          disabled={selected.size === 0}
+          className="bg-ad-green px-3 py-1 text-xs font-medium text-black hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+        >
           Print
         </button>
       </div>
@@ -823,9 +848,6 @@ export default function Domain() {
           </button>
         ))}
       </div>
-      <Link to="#" className="text-sm text-blue-700 hover:underline">
-        Deleted
-      </Link>
     </div>
   );
 

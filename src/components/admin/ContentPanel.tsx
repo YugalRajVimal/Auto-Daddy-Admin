@@ -9,16 +9,34 @@ type ContentPanelProps = {
   action?: ReactNode;
   footer?: ReactNode;
   className?: string;
+  tone?: "green" | "neutral";
 };
 
-export function ContentPanel({ children, title, action, footer, className = "" }: ContentPanelProps) {
+export function ContentPanel({
+  children,
+  title,
+  action,
+  footer,
+  className = "",
+  tone = "green",
+}: ContentPanelProps) {
+  const shellClass =
+    tone === "neutral"
+      ? "border border-gray-200 bg-white shadow-sm"
+      : "border border-ad-green-dark/30 bg-ad-green-light shadow-sm";
+  const headerClass =
+    tone === "neutral"
+      ? "border-b border-gray-200"
+      : "border-b border-ad-green-dark/40";
+  const titleClass = tone === "neutral" ? "text-lg font-bold text-gray-900" : "text-lg font-bold text-ad-green-dark";
+
   return (
     <div
-      className={`overflow-hidden rounded-t-2xl rounded-b-xl border border-ad-green-dark/30 bg-ad-green-light shadow-sm ${className}`}
+      className={`overflow-hidden rounded-t-2xl rounded-b-xl ${shellClass} ${className}`}
     >
       {(title || action) && (
-        <div className="flex items-center justify-between border-b border-ad-green-dark/40 px-5 py-3">
-          {title && <h2 className="text-lg font-bold text-ad-green-dark">{title}</h2>}
+        <div className={`flex items-center justify-between px-5 py-3 ${headerClass}`}>
+          {title && <h2 className={titleClass}>{title}</h2>}
           {action}
         </div>
       )}

@@ -1,8 +1,9 @@
 // pages/AdminPages/SubAdmins/SubAdminManagement.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "react-router";
 import axios from "axios";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { MoreDotIcon } from "../../../icons";
 import {
@@ -356,13 +357,15 @@ const SubAdminManagement: React.FC = () => {
       const res = await axios.get(`${API}/api/admin/subadmins`, { headers });
       setSubAdmins(res.data.data || []);
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to load SubAdmins");
+      const msg = e?.response?.data?.message || "Failed to load SubAdmins";
+      setError(msg);
+      adminNotify.error(msg);
     } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchSubAdmins(); }, [fetchSubAdmins]);
 
-  const showMsg = (msg: string) => { setSuccess(msg); setTimeout(() => setSuccess(""), 3500); };
+  const showMsg = (msg: string) => { setSuccess(msg); adminNotify.success(msg); setTimeout(() => setSuccess(""), 3500); };
 
   const resetFormFields = () => {
     setForm({ name: "", email: "", phone: "" });
@@ -444,11 +447,36 @@ const SubAdminManagement: React.FC = () => {
 
   const saveForm = async () => {
     setFormError("");
-    if (!form.name.trim()) return setFormError("Name is required.");
-    if (!form.email.trim()) return setFormError("Email is required.");
-    if (!role) return setFormError("Role is required.");
-    if (!city) return setFormError("City is required.");
-    if (permissionKeys.length === 0) return setFormError("Select at least one permission.");
+    if (!form.name.trim()) {
+      const msg = "Name is required.";
+      setFormError(msg);
+      adminNotify.error(msg);
+      return;
+    }
+    if (!form.email.trim()) {
+      const msg = "Email is required.";
+      setFormError(msg);
+      adminNotify.error(msg);
+      return;
+    }
+    if (!role) {
+      const msg = "Role is required.";
+      setFormError(msg);
+      adminNotify.error(msg);
+      return;
+    }
+    if (!city) {
+      const msg = "City is required.";
+      setFormError(msg);
+      adminNotify.error(msg);
+      return;
+    }
+    if (permissionKeys.length === 0) {
+      const msg = "Select at least one permission.";
+      setFormError(msg);
+      adminNotify.error(msg);
+      return;
+    }
 
     const formPerms = permsFromPermissionKeys(permissionKeys);
     const basePayload = {
@@ -496,7 +524,9 @@ const SubAdminManagement: React.FC = () => {
       resetFormFields();
       fetchSubAdmins();
     } catch (e: any) {
-      setFormError(e?.response?.data?.message || "An error occurred.");
+      const msg = e?.response?.data?.message || "An error occurred.";
+      setFormError(msg);
+      adminNotify.error(msg);
     } finally { setFormLoading(false); }
   };
 
@@ -513,7 +543,9 @@ const SubAdminManagement: React.FC = () => {
       showMsg(`SubAdmin ${sa.isActive ? "deactivated" : "activated"}.`);
       fetchSubAdmins();
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to update status.");
+      const msg = e?.response?.data?.message || "Failed to update status.";
+      setError(msg);
+      adminNotify.error(msg);
     }
   };
 
@@ -528,14 +560,28 @@ const SubAdminManagement: React.FC = () => {
       setSelectedIds(new Set());
       fetchSubAdmins();
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to delete.");
+      const msg = e?.response?.data?.message || "Failed to delete.";
+      setError(msg);
+      adminNotify.error(msg);
     }
   };
 
-  const handleUpdateSelected = () => {
-    if (selectedIds.size !== 1) return;
-    const sa = subAdmins.find((s) => s._id === [...selectedIds][0]);
-    if (sa) openEdit(sa);
+  const handleToolbarPrint = () => {
+    printAdminTable({
+      title: "Sub Admin Management",
+      headers: ["Date", "Role", "Name", "Phone", "Email", "City", "Permissions"],
+      rows: subAdmins
+        .filter((subAdmin) => selectedIds.has(subAdmin._id))
+        .map((subAdmin) => [
+          formatAdminDate(subAdmin.createdAt),
+          subAdmin.role || "—",
+          subAdmin.name,
+          subAdmin.phone || "—",
+          subAdmin.email,
+          subAdmin.city || "—",
+          permissionLabels(permissionKeysFromPerms(subAdmin.permissions)) || "—",
+        ]),
+    });
   };
 
   // Permission modal
@@ -553,7 +599,9 @@ const SubAdminManagement: React.FC = () => {
       setShowPermModal(null);
       fetchSubAdmins();
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to update permissions.");
+      const msg = e?.response?.data?.message || "Failed to update permissions.";
+      setError(msg);
+      adminNotify.error(msg);
     } finally { setPermLoading(false); }
   };
 
@@ -663,7 +711,11 @@ const SubAdminManagement: React.FC = () => {
                       : "You are creating a 'Sub Admin'"
                   }
                   messageCenter
-                  actionLabel={formLoading ? "Saving..." : "Save"}
+                  actionLabel={
+                    formLoading
+                      ? (editingSubAdmin ? "Updating..." : "Saving...")
+                      : (editingSubAdmin ? "Update" : "Save")
+                  }
                   onSave={saveForm}
                   onCancel={handleCancelForm}
                 />
@@ -851,22 +903,18 @@ const SubAdminManagement: React.FC = () => {
           <div className="flex flex-wrap gap-1">
             <button
               type="button"
-              onClick={handleUpdateSelected}
-              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
-            >
-              Update
-            </button>
-            <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-              Shoot
-            </button>
-            <button
-              type="button"
               onClick={handleDeleteSelected}
-              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
+              disabled={selectedIds.size === 0}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Delete
             </button>
-            <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+            <button
+              type="button"
+              onClick={handleToolbarPrint}
+              disabled={selectedIds.size === 0}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
               Print
             </button>
           </div>
@@ -1022,9 +1070,6 @@ const SubAdminManagement: React.FC = () => {
               </button>
             ))}
           </div>
-          <Link to="#" className="text-sm text-blue-700 hover:underline">
-            Deleted
-          </Link>
         </div>
       </AdminPage>
     </>

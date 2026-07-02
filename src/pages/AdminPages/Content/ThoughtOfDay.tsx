@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
-import { FiRefreshCw } from "react-icons/fi";
+import { FiPaperclip } from "react-icons/fi";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
   CompactAutoGrowTextarea,
@@ -10,6 +9,8 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 
 type NoteRow = {
   id: number;
@@ -17,20 +18,23 @@ type NoteRow = {
   subject: string;
   notes: string;
   country: string;
-  hasClip: boolean;
+  imageUrl?: string | null;
+  likes: number;
 };
 
+const thoughtImageUrl = (id: number) => `https://picsum.photos/seed/thought-${id}/480/320`;
+
 const DUMMY_NOTES: NoteRow[] = [
-  { id: 1, date: "2026-06-16", subject: "Super Admin", notes: "705 991 3785", country: "Canada", hasClip: true },
-  { id: 2, date: "2026-06-15", subject: "Admin-1", notes: "705 991 3785", country: "Canada", hasClip: false },
-  { id: 3, date: "2026-06-14", subject: "Business Associates", notes: "705 991 3785", country: "Canada", hasClip: true },
-  { id: 4, date: "2026-06-13", subject: "Super Admin", notes: "705 991 3785", country: "Canada", hasClip: false },
-  { id: 5, date: "2026-06-12", subject: "Admin-1", notes: "705 991 3785", country: "Canada", hasClip: true },
-  { id: 6, date: "2026-06-11", subject: "Business Associates", notes: "705 991 3785", country: "Canada", hasClip: false },
-  { id: 7, date: "2026-06-10", subject: "Super Admin", notes: "705 991 3785", country: "Canada", hasClip: true },
-  { id: 8, date: "2026-06-09", subject: "Admin-1", notes: "705 991 3785", country: "Canada", hasClip: false },
-  { id: 9, date: "2026-06-08", subject: "Business Associates", notes: "705 991 3785", country: "Canada", hasClip: true },
-  { id: 10, date: "2026-06-07", subject: "Super Admin", notes: "705 991 3785", country: "Canada", hasClip: false },
+  { id: 1, date: "2026-06-16", subject: "Super Admin", notes: "705 991 3785", country: "Canada", imageUrl: thoughtImageUrl(1), likes: 18 },
+  { id: 2, date: "2026-06-15", subject: "Admin-1", notes: "705 991 3785", country: "Canada", imageUrl: null, likes: 4 },
+  { id: 3, date: "2026-06-14", subject: "Business Associates", notes: "705 991 3785", country: "Canada", imageUrl: thoughtImageUrl(3), likes: 11 },
+  { id: 4, date: "2026-06-13", subject: "Super Admin", notes: "705 991 3785", country: "Canada", imageUrl: null, likes: 0 },
+  { id: 5, date: "2026-06-12", subject: "Admin-1", notes: "705 991 3785", country: "Canada", imageUrl: thoughtImageUrl(5), likes: 7 },
+  { id: 6, date: "2026-06-11", subject: "Business Associates", notes: "705 991 3785", country: "Canada", imageUrl: null, likes: 2 },
+  { id: 7, date: "2026-06-10", subject: "Super Admin", notes: "705 991 3785", country: "Canada", imageUrl: thoughtImageUrl(7), likes: 21 },
+  { id: 8, date: "2026-06-09", subject: "Admin-1", notes: "705 991 3785", country: "Canada", imageUrl: null, likes: 6 },
+  { id: 9, date: "2026-06-08", subject: "Business Associates", notes: "705 991 3785", country: "Canada", imageUrl: thoughtImageUrl(9), likes: 13 },
+  { id: 10, date: "2026-06-07", subject: "Super Admin", notes: "705 991 3785", country: "Canada", imageUrl: null, likes: 1 },
 ];
 
 const DEFAULT_NOTE =
@@ -52,13 +56,15 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const [title, setTitle] = useState("");
   const [note, setNote] = useState(DEFAULT_NOTE);
   const [attachImage, setAttachImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ url: string; title: string } | null>(null);
 
   const filtered = notes.filter(
     (n) =>
       n.date.includes(search) ||
       n.subject.toLowerCase().includes(search.toLowerCase()) ||
       n.notes.includes(search) ||
-      n.country.toLowerCase().includes(search.toLowerCase())
+      n.country.toLowerCase().includes(search.toLowerCase()) ||
+      String(n.likes ?? 0).includes(search)
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
@@ -92,8 +98,26 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   };
 
   const handleSave = () => {
+    adminNotify.success("Saved successfully.");
     resetForm();
     setShowForm(false);
+  };
+
+  const handleToolbarPrint = () => {
+    printAdminTable({
+      title: "Today's Tip",
+      headers: ["Date", "Country", "Subject", "Notes", "Likes", "Image"],
+      rows: notes
+        .filter((note) => selected.has(note.id))
+        .map((note) => [
+          note.date,
+          note.country,
+          note.subject,
+          note.notes,
+          String(note.likes ?? 0),
+          note.imageUrl ? "Yes" : "—",
+        ]),
+    });
   };
 
   return (
@@ -172,16 +196,15 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
       {/* Toolbar */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Update
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Shoot
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
             Delete
           </button>
-          <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+          <button
+            type="button"
+            onClick={handleToolbarPrint}
+            disabled={selected.size === 0}
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Print
           </button>
         </div>
@@ -236,7 +259,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Subject</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Likes</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Image</th>
             </tr>
           </thead>
           <tbody>
@@ -262,9 +286,23 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 <td className="border border-gray-300 px-3 py-2">{row.country}</td>
                 <td className="border border-gray-300 px-3 py-2">{row.subject}</td>
                 <td className="border border-gray-300 px-3 py-2">{row.notes}</td>
+                <td className="border border-gray-300 px-3 py-2 text-center">{row.likes ?? 0}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
-                  {row.hasClip ? (
-                    <FiRefreshCw className="inline text-ad-green" size={16} />
+                  {row.imageUrl ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setImagePreview({
+                          url: row.imageUrl!,
+                          title: `${row.subject} — image`,
+                        })
+                      }
+                      className="inline-flex items-center justify-center rounded p-1 text-ad-purple hover:bg-ad-purple/10 hover:text-ad-purple-dark"
+                      aria-label={`View image for ${row.subject}`}
+                      title="View image"
+                    >
+                      <FiPaperclip className="size-5" aria-hidden />
+                    </button>
                   ) : (
                     <span className="text-gray-500">--</span>
                   )}
@@ -292,10 +330,34 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
       </div>
+
+      {imagePreview && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setImagePreview(null)}
+        >
+          <div
+            className="relative max-h-[90vh] max-w-[min(90vw,480px)] rounded border border-gray-300 bg-white p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setImagePreview(null)}
+              className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-sm text-white hover:bg-gray-900"
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <p className="mb-3 text-center text-sm font-semibold text-ad-green-dark">{imagePreview.title}</p>
+            <img
+              src={imagePreview.url}
+              alt={imagePreview.title}
+              className="mx-auto max-h-[70vh] max-w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
     </AdminPage>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
+import { adminNotify } from "../../../utils/adminNotify";
 import { authHeaders } from "../../../api/client";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
@@ -62,18 +63,16 @@ type AutoShopOwnerType = {
 
 // ─── Column Config ────────────────────────────────────────────────────────────
 const ALL_COLUMNS = [
-  { key: "name", label: "Name" },
-  { key: "phone", label: "Phone" },
-  { key: "shopName", label: "Shop Name" },
-  { key: "shopType", label: "Shop Type" }, // ADDED Shop Type Column
-  { key: "city", label: "City" },
   { key: "date", label: "Date" },
-  { key: "customers", label: "Customers" },
-  { key: "deals", label: "Deals" },
-  { key: "jobCards", label: "Job Cards" },
-  { key: "status", label: "Status" },
+  { key: "phone", label: "Phone" },
+  { key: "businessName", label: "Business Name" },
+  { key: "shopType", label: "Shop Type" },
+  { key: "city", label: "City" },
+  { key: "address", label: "Address" },
+  { key: "zipCode", label: "Zip Code" },
+  { key: "email", label: "Email" },
 ];
-const DEFAULT_VISIBLE = ["name", "phone", "shopName", "shopType", "city", "date", "customers", "deals", "jobCards", "status"];
+const DEFAULT_VISIBLE = ["date", "phone", "businessName", "shopType", "city", "address", "zipCode", "email"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const API = () => (import.meta.env.VITE_API_URL as string) || "";
@@ -102,12 +101,6 @@ function getStatus(owner: AutoShopOwnerType): string {
   if (owner.isProfileComplete && (owner.isBusinessProfileCompleted ?? owner.businessProfile)) return "Active";
   if (!owner.isProfileComplete) return "Incomplete";
   return "Unknown";
-}
-function getStatusColors(s: string): React.CSSProperties {
-  if (s === "Active") return { background: "#dff0d8", color: "#3c763d", border: "1px solid #d6e9c6" };
-  if (s === "Suspended") return { background: "#fcf8e3", color: "#8a6d3b", border: "1px solid #faebcc" };
-  if (s === "Deleted") return { background: "#f2dede", color: "#a94442", border: "1px solid #ebccd1" };
-  return { background: "#f2dede", color: "#a94442", border: "1px solid #ebccd1" };
 }
 
 // ─── Green Card Styles ────────────────────────────────────────────────────────
@@ -476,13 +469,30 @@ const SendNotifModal: React.FC<{ isOpen: boolean; onClose: () => void; ids: stri
   return (
     <BaseModal isOpen onClose={onClose} title="Send Custom Notification">
       <form onSubmit={async e => {
-        e.preventDefault(); if (!title.trim() || !body.trim()) { setErr("Title and body required."); return; }
+        e.preventDefault();
+        if (!title.trim() || !body.trim()) {
+          const msg = "Title and body required.";
+          setErr(msg);
+          adminNotify.error(msg);
+          return;
+        }
         setSending(true); setErr(null);
         try {
           const res = await axios.post(`${API()}/api/admin/notification/custom/send`, { userType: "autoshopowner", userIds: ids, title, message: body });
-          if (res.data?.success) { setOk("Sent!"); setTimeout(() => { onClose(); onDone(); }, 900); }
-          else setErr(res.data?.message || "Failed.");
-        } catch (e: any) { setErr(e?.response?.data?.message || "Error."); } finally { setSending(false); }
+          if (res.data?.success) {
+            adminNotify.success("Notification sent.");
+            setOk("Sent!");
+            setTimeout(() => { onClose(); onDone(); }, 900);
+          } else {
+            const msg = res.data?.message || "Failed.";
+            setErr(msg);
+            adminNotify.error(msg);
+          }
+        } catch (e: any) {
+          const msg = e?.response?.data?.message || "Error.";
+          setErr(msg);
+          adminNotify.error(msg);
+        } finally { setSending(false); }
       }}>
         <div style={{ marginBottom: 12 }}><label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Title *</label><input style={{ width: "100%", border: "1px solid #d2d6de", borderRadius: 3, padding: "7px 10px", fontSize: 14, outline: "none", boxSizing: "border-box" }} value={title} onChange={e => setTitle(e.target.value)} disabled={sending} placeholder="Notification title" /></div>
         <div style={{ marginBottom: 12 }}><label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Body *</label><textarea style={{ width: "100%", border: "1px solid #d2d6de", borderRadius: 3, padding: "7px 10px", fontSize: 14, outline: "none", resize: "vertical", boxSizing: "border-box", minHeight: 80, fontFamily: "inherit" }} value={body} onChange={e => setBody(e.target.value)} rows={3} disabled={sending} placeholder="Notification message" /></div>
@@ -529,16 +539,14 @@ const ColSelector: React.FC<{ visible: string[]; onChange: (v: string[]) => void
 // ─── EXPORT CSV ───────────────────────────────────────────────────────────────
 function exportCsv(owners: AutoShopOwnerType[], visibleCols: string[]) {
   const colMap: Record<string, (o: AutoShopOwnerType) => string> = {
-    name: o => o.name || "-",
     phone: o => `${o.countryCode ?? ""} ${o.phone ?? ""}`.trim() || "-",
-    shopName: o => o.businessProfile?.businessName || "-",
+    businessName: o => o.businessProfile?.businessName || "-",
     shopType: o => SHOP_TYPE_OPTIONS.find(x => x.value === ownerShopType(o))?.label || "-",
     city: o => o.businessProfile?.city || "-",
     date: o => fmtDate(o.createdAt),
-    customers: o => String(o.myCustomers?.length ?? 0),
-    deals: o => String(o.deals?.length ?? 0),
-    jobCards: o => String(o.jobCards?.length ?? 0),
-    status: o => getStatus(o),
+    address: o => o.address || o.businessProfile?.businessAddress || "-",
+    zipCode: o => o.pincode || o.businessProfile?.pincode || "-",
+    email: o => o.email || o.businessProfile?.businessEmail || "-",
   };
   const cols = ALL_COLUMNS.filter(c => visibleCols.includes(c.key));
   const esc = (v: string) => /[,"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
@@ -553,7 +561,7 @@ function exportCsv(owners: AutoShopOwnerType[], visibleCols: string[]) {
 // ─── STYLE CONSTANTS ──────────────────────────────────────────────────────────
 const fieldErrorClass = "mt-0.5 text-[11px] font-semibold text-red-700";
 const autoShopRowFieldWidth = compactFixedFieldWidth;
-const autoShopAddressFieldWidth = "min-w-[220px] flex-1 sm:min-w-[300px]";
+const autoShopAddressFieldWidth = "min-w-0 flex-1";
 type ProvinceCityOption = { name: string; status?: string };
 type ProvinceWithCities = { cities?: ProvinceCityOption[] };
 const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700";
@@ -570,7 +578,6 @@ const AutoShopAddEditForm: React.FC<{
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
-  const [pincode, setPincode] = useState("");
   const [address, setAddress] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
   const [shopType, setShopType] = useState<ShopType>("autoShop");
@@ -614,8 +621,7 @@ const AutoShopAddEditForm: React.FC<{
       setEmail(owner.email || "");
       setPhone(owner.phone || "");
       setCity(owner.businessProfile?.city || "");
-      setPincode(owner.pincode || "");
-      setAddress(owner.address || "");
+      setAddress(owner.address || owner.businessProfile?.businessAddress || "");
       setJoiningDate(fmtDate(owner.createdAt) !== "-" ? fmtDate(owner.createdAt) : "");
       setShopType(ownerShopType(owner));
     } else {
@@ -623,7 +629,6 @@ const AutoShopAddEditForm: React.FC<{
       setEmail("");
       setPhone("");
       setCity("");
-      setPincode("");
       setAddress("");
       setJoiningDate(new Date().toISOString().slice(0, 10));
       setShopType("autoShop");
@@ -634,7 +639,7 @@ const AutoShopAddEditForm: React.FC<{
     if (!name.trim()) return "Name is required.";
     if (!email.trim() || !isEmail(email)) return "Valid email required.";
     if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
-    if (!pincode.trim()) return "Zip / Postal code is required.";
+    if (!address.trim()) return "Address is required.";
     if (!shopType) return "Shop type required.";
     return null;
   }
@@ -644,6 +649,7 @@ const AutoShopAddEditForm: React.FC<{
     const err = validate();
     if (err) {
       setApiError(err);
+      adminNotify.error(err);
       return;
     }
     setApiError(null);
@@ -652,7 +658,6 @@ const AutoShopAddEditForm: React.FC<{
       email: email.trim(),
       phone: phone.replace(/\D/g, ""),
       city: city.trim(),
-      pincode: pincode.trim(),
       address: address.trim(),
       role: "autoshopowner",
       shopType,
@@ -665,10 +670,13 @@ const AutoShopAddEditForm: React.FC<{
       } else {
         await axios.post(`${API()}/api/admin/autoshopowners`, payload, { headers: getToken() });
       }
+      adminNotify.success(isEdit ? "Auto shop owner updated." : "Auto shop owner added.");
       onSaved();
     } catch (saveErr: unknown) {
       const axErr = saveErr as { response?: { data?: { message?: string } } };
-      setApiError(axErr?.response?.data?.message || (isEdit ? "Could not update." : "Could not add."));
+      const msg = axErr?.response?.data?.message || (isEdit ? "Could not update." : "Could not add.");
+      setApiError(msg);
+      adminNotify.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -684,7 +692,7 @@ const AutoShopAddEditForm: React.FC<{
         <CompactFormFooter
           message={formMessage}
           messageCenter
-          actionLabel={submitting ? "Saving..." : "Save"}
+          actionLabel={submitting ? (isEdit ? "Updating..." : "Saving...") : (isEdit ? "Update" : "Save")}
           onSave={handleSave}
           onCancel={onCancel}
         />
@@ -738,24 +746,14 @@ const AutoShopAddEditForm: React.FC<{
             ))}
           </select>
         </CompactField>
-        <CompactField label="Zip / Postal Code" required className={autoShopRowFieldWidth}>
-          <input
-            type="text"
-            value={pincode}
-            onChange={(e) => setPincode(e.target.value.slice(0, 10))}
-            placeholder="A1A 1A1"
-            className={compactInputClass}
-          />
-          {attempted && !pincode.trim() && <p className={fieldErrorClass}>Required</p>}
-        </CompactField>
-        <div className={`min-w-0 flex-1 ${autoShopAddressFieldWidth}`}>
-          <label className="mb-1 block text-xs font-bold text-ad-green-dark">Address</label>
+        <CompactField label="Address" required className={autoShopAddressFieldWidth}>
           <CompactAutoGrowTextarea
             value={address}
             onChange={(e) => setAddress(e.target.value.slice(0, 100))}
             placeholder="Max 100 chars"
           />
-        </div>
+          {attempted && !address.trim() && <p className={fieldErrorClass}>Required</p>}
+        </CompactField>
       </CompactFormRow>
       <CompactFormRow className="items-start justify-start gap-6">
         <CompactField label="Shop Type" required className={autoShopRowFieldWidth}>
@@ -819,16 +817,28 @@ const AutoShopOwners: React.FC = () => {
     try {
       const res = await axios.get(`${API()}/api/admin/autoshopowners`, { headers: getToken() });
       if (res.data?.success && Array.isArray(res.data.data)) setAllOwners(res.data.data);
-      else setError("Failed to fetch auto shop owners");
-    } catch (e: any) { setError(e?.response?.data?.message || "Something went wrong"); }
+      else {
+        const msg = "Failed to fetch auto shop owners";
+        setError(msg);
+        adminNotify.error(msg);
+      }
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Something went wrong";
+      setError(msg);
+      adminNotify.error(msg);
+    }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchOwners(); }, [fetchOwners]);
 
   // Split owners by deleted status
-  const activeOwners = allOwners.filter(o => o.status !== "deleted");
-  const deletedOwners = allOwners.filter(o => o.status === "deleted");
+  const isOwnerDeleted = (o: AutoShopOwnerType): boolean => {
+    const status = String((o as any).status ?? "").toLowerCase();
+    return status === "deleted" || Boolean((o as any).isDeleted) || Boolean((o as any).deleted);
+  };
+  const activeOwners = allOwners.filter((o) => !isOwnerDeleted(o));
+  const deletedOwners = allOwners.filter((o) => isOwnerDeleted(o));
   const displayOwners = viewMode === "deleted" ? deletedOwners : activeOwners;
 
   function toggleShopType(type: ShopType) {
@@ -838,11 +848,6 @@ const AutoShopOwners: React.FC = () => {
 
   const openAdd = () => {
     setEditingOwner(null);
-    setShowForm(true);
-  };
-
-  const openEdit = (owner: AutoShopOwnerType) => {
-    setEditingOwner(owner);
     setShowForm(true);
   };
 
@@ -862,11 +867,12 @@ const AutoShopOwners: React.FC = () => {
     if (!(shopTypeFilters[st] ?? true)) return false;
     const q = search.toLowerCase();
     const shopTypeLabel = SHOP_TYPE_OPTIONS.find(x => x.value === st)?.label ?? "";
-    return (o.name || "").toLowerCase().includes(q)
-      || (o.email || "").toLowerCase().includes(q)
+    return (o.email || "").toLowerCase().includes(q)
       || (o.phone || "").toLowerCase().includes(q)
       || (o.businessProfile?.businessName || "").toLowerCase().includes(q)
       || (o.businessProfile?.city || "").toLowerCase().includes(q)
+      || (o.address || o.businessProfile?.businessAddress || "").toLowerCase().includes(q)
+      || (o.pincode || o.businessProfile?.pincode || "").toLowerCase().includes(q)
       || st.toLowerCase().includes(q)
       || shopTypeLabel.toLowerCase().includes(q);
   });
@@ -885,7 +891,11 @@ const AutoShopOwners: React.FC = () => {
     try {
       await axios.post(`${API()}/api/admin/autoshopowners/toggle-status`, { userId: ownerId, disable }, { headers: getToken() });
       await fetchOwners();
-    } catch (e: any) { alert(e?.response?.data?.message || "Error updating status."); }
+      adminNotify.success(disable ? "Auto shop owner set to inactive." : "Auto shop owner activated.");
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Error updating status.";
+      adminNotify.error(msg);
+    }
     finally { setActionBusy(prev => ({ ...prev, [ownerId]: false })); }
   }
 
@@ -897,7 +907,11 @@ const AutoShopOwners: React.FC = () => {
       setAllOwners(prev => prev.map(o => o._id === ownerId ? { ...o, status: "deleted", isDisabled: true } : o));
       setSelectedRows(prev => { const c = new Set(prev); c.delete(ownerId); return c; });
       await fetchOwners();
-    } catch (e: any) { alert(e?.response?.data?.message || "Error deleting."); }
+      adminNotify.success("Auto shop owner deleted.");
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Error deleting.";
+      adminNotify.error(msg);
+    }
     finally { setActionBusy(prev => ({ ...prev, [ownerId]: false })); }
   }
 
@@ -906,23 +920,21 @@ const AutoShopOwners: React.FC = () => {
     try {
       await axios.put(`${API()}/api/admin/autoshopowners/${ownerId}/revive`, {}, { headers: getToken() });
       await fetchOwners();
-    } catch (e: any) { alert(e?.response?.data?.message || "Error restoring."); }
+      adminNotify.success("Auto shop owner restored.");
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Error restoring.";
+      adminNotify.error(msg);
+    }
     finally { setActionBusy(prev => ({ ...prev, [ownerId]: false })); }
   }
 
   function renderCell(owner: AutoShopOwnerType, key: string) {
     switch (key) {
-      case "name":
-        return (
-          <td key={key} className={`${tdClass} font-medium`}>
-            <button type="button" onClick={() => openEdit(owner)} className="text-ad-purple hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">
-              {owner.name}
-            </button>
-          </td>
-        );
+      case "date":
+        return <td key={key} className={tdClass}>{fmtDate(owner.createdAt)}</td>;
       case "phone":
         return <td key={key} className={tdClass}>{owner.countryCode ? `${owner.countryCode} ` : ""}{owner.phone || "-"}</td>;
-      case "shopName":
+      case "businessName":
         return <td key={key} className={tdClass}><button type="button" onClick={() => setBusinessFor(owner)} className={linkClass}>{owner.businessProfile?.businessName || "-"}</button></td>;
       case "shopType":
         return (
@@ -932,16 +944,12 @@ const AutoShopOwners: React.FC = () => {
         );
       case "city":
         return <td key={key} className={tdClass}>{owner.businessProfile?.city || "-"}</td>;
-      case "date":
-        return <td key={key} className={tdClass}>{fmtDate(owner.createdAt)}</td>;
-      case "customers":
-        return <td key={key} className={tdClass}><button type="button" onClick={() => setCustomersFor(owner)} className={linkClass}>{owner.myCustomers?.length ?? 0}</button></td>;
-      case "deals":
-        return <td key={key} className={tdClass}><button type="button" onClick={() => setDealsFor(owner)} className={linkClass}>{owner.deals?.length ?? 0}</button></td>;
-      case "jobCards":
-        return <td key={key} className={tdClass}><button type="button" onClick={() => setJobCardsFor(owner)} className={linkClass}>{owner.jobCards?.length ?? 0}</button></td>;
-      case "status":
-        return <td key={key} className={tdClass}><span style={{ ...getStatusColors(getStatus(owner)), display: "inline-block", padding: "2px 10px", borderRadius: 3, fontSize: 12, fontWeight: 600 }}>{getStatus(owner)}</span></td>;
+      case "address":
+        return <td key={key} className={tdClass}>{owner.address || owner.businessProfile?.businessAddress || "-"}</td>;
+      case "zipCode":
+        return <td key={key} className={tdClass}>{owner.pincode || owner.businessProfile?.pincode || "-"}</td>;
+      case "email":
+        return <td key={key} className={tdClass}>{owner.email || owner.businessProfile?.businessEmail || "-"}</td>;
       default:
         return <td key={key} className={tdClass}>-</td>;
     }
@@ -1004,40 +1012,25 @@ const AutoShopOwners: React.FC = () => {
           <div className="flex flex-wrap gap-1">
             {viewMode === "active" && (
               <>
-                <button type="button" onClick={() => { if (!selCount) { alert("Select at least one."); return; } setNotifOpen(true); }} className={toolbarBtnClass()}>
+                <button type="button" disabled={selCount === 0} onClick={() => setNotifOpen(true)} className={toolbarBtnClass(selCount === 0)}>
                   Send Notification
                 </button>
-                <button type="button" className="bg-[#25d366] px-3 py-1 text-xs font-medium text-white hover:opacity-90">
+                <button type="button" disabled={selCount === 0} className="bg-[#25d366] px-3 py-1 text-xs font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
                   WhatsApp
                 </button>
-                <button type="button" onClick={() => { if (!selCount) { alert("Select at least one."); return; } exportCsv(allOwners.filter(o => selectedRows.has(o._id)), visibleCols); }} className={toolbarBtnClass()}>
+                <button type="button" disabled={selCount === 0} onClick={() => exportCsv(allOwners.filter(o => selectedRows.has(o._id)), visibleCols)} className={toolbarBtnClass(selCount === 0)}>
                   Export
                 </button>
-                <button
-                  type="button"
-                  disabled={selCount !== 1}
-                  onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) openEdit(o); }}
-                  className={toolbarBtnClass(selCount !== 1)}
-                >
-                  Update
+                <button type="button" disabled={selCount === 0} onClick={() => deleteOwner(selected[0])} className={toolbarBtnClass(selCount === 0)}>
+                  Delete
                 </button>
-                <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-                  Shoot
+                <button type="button" disabled={selCount === 0} onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) printOwner(o); }} className={`px-3 py-1 text-xs font-medium text-white whitespace-nowrap ${selCount === 0 ? "bg-gray-400 cursor-not-allowed" : "bg-ad-green hover:bg-ad-green-dark"}`}>
+                  Print
                 </button>
-                {selCount === 1 && (
-                  <button type="button" onClick={() => deleteOwner(selected[0])} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-                    Delete
-                  </button>
-                )}
-                {selCount === 1 && (
-                  <button type="button" onClick={() => { const o = allOwners.find(x => x._id === selected[0]); if (o) printOwner(o); }} className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
-                    Print
-                  </button>
-                )}
               </>
             )}
-            {viewMode === "deleted" && selCount === 1 && (
-              <button type="button" onClick={() => reviveOwner(selected[0])} className={toolbarBtnClass()}>
+            {viewMode === "deleted" && (
+              <button type="button" disabled={selCount === 0} onClick={() => reviveOwner(selected[0])} className={toolbarBtnClass(selCount === 0)}>
                 Restore
               </button>
             )}

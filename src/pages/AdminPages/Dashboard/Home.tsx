@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { adminNotify } from "../../../utils/adminNotify";
 import PageMeta from "../../../components/common/PageMeta";
 import DashboardPanelCard from "../../../components/COMP";
 
@@ -59,7 +60,11 @@ export default function AdminDashboardHome() {
         if (json.success && json.data) setData(json.data);
         else throw new Error(json.message || "Invalid response");
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => {
+        const msg = e.message;
+        setError(msg);
+        adminNotify.error(msg);
+      })
       .finally(() => setLoading(false));
   }, []);
 

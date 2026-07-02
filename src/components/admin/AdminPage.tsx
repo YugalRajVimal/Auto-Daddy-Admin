@@ -35,11 +35,12 @@ export default function AdminPage({
   narrowPanel = false,
 }: AdminPageProps) {
   const useInlineFlow = headerAction !== undefined || between !== undefined;
+  const neutralPanel = title.trim().toLowerCase().startsWith("deleted");
 
   const panel = noPanel || useInlineFlow ? (
     children
   ) : (
-    <ContentPanel title={panelTitle} action={action} footer={footer}>
+    <ContentPanel title={panelTitle} action={action} footer={footer} tone={neutralPanel ? "neutral" : "green"}>
       {children}
     </ContentPanel>
   );

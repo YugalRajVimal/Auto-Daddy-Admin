@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import axios, { AxiosError } from "axios";
+import { adminNotify } from "../../../utils/adminNotify";
 import AdminPage from "../../../components/admin/AdminPage";
 
 interface SectionData { heading: string; desc: string; }
@@ -39,7 +40,9 @@ const DashboardData: React.FC = () => {
       });
     } catch (err) {
       const axiosErr = err as AxiosError<any>;
-      setError(axiosErr?.response?.data?.message || (axiosErr.message as string) || "Failed to fetch dashboard data");
+      const msg = axiosErr?.response?.data?.message || (axiosErr.message as string) || "Failed to fetch dashboard data";
+      setError(msg);
+      adminNotify.error(msg);
     } finally {
       setLoading(false);
     }
@@ -109,13 +112,17 @@ const DashboardData: React.FC = () => {
           ? data.data.sections.map((s: any) => ({ heading: s.heading || "", desc: s.desc || "" }))
           : [],
       });
-      setSuccessMsg(dashboardData ? "Dashboard data updated." : "Dashboard data created.");
+      const successText = dashboardData ? "Dashboard data updated." : "Dashboard data created.";
+      adminNotify.success(successText);
+      setSuccessMsg(successText);
       setShowModal(false);
       setEditData({});
       setModalSection("all");
     } catch (err) {
       const axiosErr = err as AxiosError<any>;
-      setError(axiosErr?.response?.data?.message || (axiosErr.message as string) || "Failed to save dashboard data");
+      const msg = axiosErr?.response?.data?.message || (axiosErr.message as string) || "Failed to save dashboard data";
+      setError(msg);
+      adminNotify.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -128,13 +135,16 @@ const DashboardData: React.FC = () => {
     try {
       await axios.delete(`${API_BASE}/dashboard-data`);
       setDashboardData(null);
+      adminNotify.success("Dashboard data deleted.");
       setSuccessMsg("Dashboard data deleted.");
       setShowModal(false);
       setEditData({});
       setModalSection("all");
     } catch (err) {
       const axiosErr = err as AxiosError<any>;
-      setError(axiosErr?.response?.data?.message || (axiosErr.message as string) || "Failed to delete dashboard data");
+      const msg = axiosErr?.response?.data?.message || (axiosErr.message as string) || "Failed to delete dashboard data";
+      setError(msg);
+      adminNotify.error(msg);
     } finally {
       setDeleting(false);
     }
@@ -417,10 +427,10 @@ const DashboardData: React.FC = () => {
                 >
                   {submitting
                     ? dashboardData
-                      ? (modalSection === "all" ? "Saving All..." : "Saving...")
+                      ? (modalSection === "all" ? "Updating All..." : "Updating...")
                       : (modalSection === "all" ? "Creating All..." : "Creating...")
                     : dashboardData
-                      ? (modalSection === "all" ? "Save All" : "Save")
+                      ? (modalSection === "all" ? "Update All" : "Update")
                       : (modalSection === "all" ? "Create All" : "Create")}
                 </button>
                 <button

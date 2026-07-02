@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
 import { FiPaperclip } from "react-icons/fi";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import ComboSelectWithEditor from "../../../components/admin/ComboSelectWithEditor";
@@ -13,6 +12,7 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
 import {
   DUMMY_BANKS,
   DUMMY_EXPENSES,
@@ -85,7 +85,10 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
 
   const handleNewBankSave = () => {
     const label = bankWalletName.trim();
-    if (!label) return;
+    if (!label) {
+      adminNotify.error("Bank / wallet name is required.");
+      return;
+    }
 
     const parsedBalance = Number.parseFloat(openingBalance);
     const totalBalance = Number.isFinite(parsedBalance) ? parsedBalance : 0;
@@ -105,10 +108,12 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
     setBanks((prev) => [...prev, newRow]);
     resetNewBankForm();
     setShowForm(false);
+    adminNotify.success("Bank account added.");
   };
 
   const handleTableUpdate = () => {
     setBanks(structuredClone(draft));
+    adminNotify.success("Bank accounts updated.");
   };
 
   const handleTableCancel = () => {
@@ -552,6 +557,7 @@ function LedgerPage({
       ]);
     }
 
+    adminNotify.success(editingId != null ? "Entry updated." : "Entry added.");
     resetForm();
     setShowForm(false);
   };
@@ -745,16 +751,16 @@ function LedgerPage({
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
             ↓ Export
           </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
             Archive
           </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
             Delete
           </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
             Copy
           </button>
         </div>
@@ -875,9 +881,6 @@ function LedgerPage({
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
       </div>
     </AdminPage>
   );

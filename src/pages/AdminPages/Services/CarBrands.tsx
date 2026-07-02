@@ -1,21 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { Link } from "react-router";
 import axios, { AxiosError } from "axios";
+import { FiPaperclip } from "react-icons/fi";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
   CompactField,
   CompactFormFooter,
   CompactFormPanel,
-  CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
-import { EyeIcon } from "../../../icons";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 type CarModel = {
   modelName: string;
-  years?: (number | string)[];
 };
 
 type CarCompany = {
@@ -27,7 +26,6 @@ type CarCompany = {
 
 type ModelFormRow = {
   modelName: string;
-  years: string[];
 };
 
 type TableRow = {
@@ -35,11 +33,10 @@ type TableRow = {
   companyId: string;
   make: string;
   model: string;
-  year: string;
   brandLogo?: string | null;
 };
 
-const EMPTY_MODEL: ModelFormRow = { modelName: "", years: [] };
+const EMPTY_MODEL: ModelFormRow = { modelName: "" };
 const uploadBtnClass =
   "rounded border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300";
 const equalThirdFieldClass = "min-w-0 w-full";
@@ -272,35 +269,20 @@ function dedupeStrings(values: string[]): string[] {
 }
 
 function cloneModelRows(rows: ModelFormRow[]): ModelFormRow[] {
-  return rows.map((m) => ({ modelName: m.modelName, years: [...m.years] }));
+  return rows.map((m) => ({ modelName: m.modelName }));
 }
 
 function flattenCompanies(companies: CarCompany[]): TableRow[] {
   const rows: TableRow[] = [];
   for (const company of companies) {
     for (const model of company.models ?? []) {
-      const years = model.years?.length ? model.years : null;
-      if (years) {
-        for (const year of years) {
-          rows.push({
-            rowId: `${company._id}::${model.modelName}::${year}`,
-            companyId: company._id,
-            make: company.companyName,
-            model: model.modelName,
-            year: String(year),
-            brandLogo: company.brandLogo,
-          });
-        }
-      } else {
-        rows.push({
-          rowId: `${company._id}::${model.modelName}::__no_year__`,
-          companyId: company._id,
-          make: company.companyName,
-          model: model.modelName,
-          year: "—",
-          brandLogo: company.brandLogo,
-        });
-      }
+      rows.push({
+        rowId: `${company._id}::${model.modelName}`,
+        companyId: company._id,
+        make: company.companyName,
+        model: model.modelName,
+        brandLogo: company.brandLogo,
+      });
     }
     if (!company.models?.length) {
       rows.push({
@@ -308,7 +290,6 @@ function flattenCompanies(companies: CarCompany[]): TableRow[] {
         companyId: company._id,
         make: company.companyName,
         model: "—",
-        year: "—",
         brandLogo: company.brandLogo,
       });
     }
@@ -342,16 +323,12 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   const brandLogoRef = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview] = useState<{ url: string; title: string } | null>(null);
   const [modelsPopupOpen, setModelsPopupOpen] = useState(false);
-  const [yearsPopupOpen, setYearsPopupOpen] = useState(false);
   const [makesPopupOpen, setMakesPopupOpen] = useState(false);
   const [modelsDraft, setModelsDraft] = useState<string[]>([]);
-  const [yearsDraft, setYearsDraft] = useState<string[]>([]);
   const [makesDraft, setMakesDraft] = useState<string[]>([]);
   const [sessionMakeNames, setSessionMakeNames] = useState<string[]>([]);
   const [selectedModelName, setSelectedModelName] = useState("");
-  const [selectedYear, setSelectedYear] = useState("");
   const modelsSnapshotRef = useRef<ModelFormRow[]>([]);
-  const yearsSnapshotRef = useRef<string[]>([]);
   const makesSnapshotRef = useRef<string[]>([]);
 
   const fetchCompanies = async (q = "") => {
@@ -364,7 +341,9 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
       setCompanies(res.data?.data ?? []);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Error fetching companies");
+      const msg = axErr?.response?.data?.message || axErr?.message || "Error fetching companies";
+      setError(msg);
+      adminNotify.error(msg);
     } finally {
       setLoading(false);
     }
@@ -403,8 +382,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   const filtered = tableRows.filter(
     (r) =>
       r.make.toLowerCase().includes(search.toLowerCase()) ||
-      r.model.toLowerCase().includes(search.toLowerCase()) ||
-      r.year.toLowerCase().includes(search.toLowerCase())
+      r.model.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
@@ -434,11 +412,9 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     setEditingCompany(null);
     setError("");
     setModelsPopupOpen(false);
-    setYearsPopupOpen(false);
     setMakesPopupOpen(false);
     setSessionMakeNames([]);
     setSelectedModelName("");
-    setSelectedYear("");
   };
 
   const populateFormFromCompany = (company: CarCompany) => {
@@ -448,7 +424,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
       company.models?.length
         ? company.models.map((m) => ({
             modelName: m.modelName,
-            years: dedupeStrings((m.years ?? []).map(String)),
           }))
         : [{ ...EMPTY_MODEL }]
     );
@@ -458,7 +433,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     setAttachBrandLogo(false);
     const firstModel = company.models?.find((m) => m.modelName.trim());
     setSelectedModelName(firstModel?.modelName ?? "");
-    setSelectedYear(firstModel?.years?.[0] != null ? String(firstModel.years[0]) : "");
     setError("");
   };
 
@@ -471,7 +445,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     setBrandLogoPreviewUrl(null);
     setAttachBrandLogo(false);
     setSelectedModelName("");
-    setSelectedYear("");
     setError("");
   };
 
@@ -506,7 +479,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     const names = dedupeStrings(modelsDraft);
     const next: ModelFormRow[] = names.map((name) => {
       const existing = modelRows.find((m) => m.modelName.toLowerCase() === name.toLowerCase());
-      return existing ? { ...existing, modelName: name } : { modelName: name, years: [] };
+      return existing ? { ...existing, modelName: name } : { modelName: name };
     });
     setModelRows(next.length ? next : [{ ...EMPTY_MODEL }]);
     if (
@@ -515,7 +488,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     ) {
       const first = next[0];
       setSelectedModelName(first.modelName);
-      setSelectedYear(first.years[0] ?? "");
     }
     setModelsPopupOpen(false);
   };
@@ -586,42 +558,10 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     setMakesPopupOpen(false);
   };
 
-  const openYearsPopup = () => {
-    if (!selectedModelName.trim()) return;
-    const active = modelRows.find((m) => m.modelName === selectedModelName);
-    if (!active) return;
-    yearsSnapshotRef.current = [...active.years];
-    setYearsDraft(active.years.length ? [...active.years] : [""]);
-    setYearsPopupOpen(true);
-  };
-
-  const saveYearsPopup = () => {
-    const cleaned = dedupeStrings(yearsDraft);
-    setModelRows((rows) =>
-      rows.map((m) => (m.modelName === selectedModelName ? { ...m, years: cleaned } : m))
-    );
-    if (!selectedYear || !cleaned.includes(selectedYear)) {
-      setSelectedYear(cleaned[0] ?? "");
-    }
-    setYearsPopupOpen(false);
-  };
-
-  const cancelYearsPopup = () => {
-    setModelRows((rows) =>
-      rows.map((m) =>
-        m.modelName === selectedModelName ? { ...m, years: [...yearsSnapshotRef.current] } : m
-      )
-    );
-    setYearsPopupOpen(false);
-  };
-
   const namedModels = useMemo(
     () => modelRows.filter((m) => m.modelName.trim()),
     [modelRows]
   );
-
-  const activeModel = modelRows.find((m) => m.modelName === selectedModelName);
-  const yearOptions = useMemo(() => activeModel?.years ?? [], [activeModel]);
 
   const handleMakeChange = (makeName: string) => {
     if (!makeName.trim()) {
@@ -629,7 +569,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
       setEditingCompany(null);
       setModelRows([{ ...EMPTY_MODEL }]);
       setSelectedModelName("");
-      setSelectedYear("");
       return;
     }
     const company = companies.find(
@@ -644,8 +583,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
 
   const handleModelChange = (modelName: string) => {
     setSelectedModelName(modelName);
-    const model = modelRows.find((m) => m.modelName === modelName);
-    setSelectedYear(model?.years[0] ?? "");
   };
 
   const makeFilled = make.trim().length > 0;
@@ -666,40 +603,30 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   };
 
   const getProcessedModels = () => {
-    const byName = new Map<string, { modelName: string; years: string[] }>();
+    const byName = new Map<string, { modelName: string }>();
     for (const m of modelRows) {
       const modelName = m.modelName.trim();
       if (!modelName) continue;
       const key = modelName.toLowerCase();
-      const years = dedupeStrings(m.years);
       const existing = byName.get(key);
-      if (existing) {
-        existing.years = dedupeStrings([...existing.years, ...years]);
-      } else {
-        byName.set(key, { modelName, years });
-      }
+      if (existing) continue;
+      byName.set(key, { modelName });
     }
-    return [...byName.values()].map((m) => ({
-      modelName: m.modelName,
-      years: m.years.map((y) => {
-        const n = Number(y);
-        return Number.isFinite(n) && String(n) === y ? n : y;
-      }),
-    }));
+    return [...byName.values()];
   };
 
   const validateForm = () => {
     if (!make.trim()) {
-      setError("Make is required.");
+      const msg = "Make is required.";
+      setError(msg);
+      adminNotify.error(msg);
       return false;
     }
     const processed = getProcessedModels();
     if (processed.length === 0) {
-      setError("Add at least one model.");
-      return false;
-    }
-    if (processed.some((m) => m.years.length === 0)) {
-      setError("Each model must have at least one year.");
+      const msg = "Add at least one model.";
+      setError(msg);
+      adminNotify.error(msg);
       return false;
     }
     return true;
@@ -720,11 +647,13 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
         await axios.patch(`${API_BASE}/admin/car-company/${editingCompany._id}`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
+        adminNotify.success("Car brand updated.");
         setSuccessMsg("Car brand updated.");
       } else {
         await axios.post(`${API_BASE}/admin/car-company`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
+        adminNotify.success("Car brand added.");
         setSuccessMsg("Car brand added.");
       }
       resetForm();
@@ -732,11 +661,12 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
       fetchCompanies(search);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(
+      const msg =
         axErr?.response?.data?.message ||
-          axErr?.message ||
-          (editingCompany ? "Failed to update car brand" : "Failed to add car brand")
-      );
+        axErr?.message ||
+        (editingCompany ? "Failed to update car brand" : "Failed to add car brand");
+      setError(msg);
+      adminNotify.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -749,6 +679,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     setSuccessMsg("");
     try {
       await axios.delete(`${API_BASE}/admin/car-company/${companyId}`);
+      adminNotify.success("Car brand deleted.");
       setSuccessMsg("Car brand deleted.");
       setSelected((prev) => {
         const next = new Set(prev);
@@ -760,7 +691,9 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
       fetchCompanies(search);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Failed to delete car brand");
+      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to delete car brand";
+      setError(msg);
+      adminNotify.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -768,16 +701,20 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
 
   const findRowById = (id: string) => tableRows.find((r) => r.rowId === id);
 
-  const handleToolbarUpdate = () => {
-    if (selected.size !== 1) return;
-    const row = findRowById([...selected][0]);
-    if (row) openEditByRow(row);
-  };
-
   const handleToolbarDelete = () => {
     if (selected.size !== 1) return;
     const row = findRowById([...selected][0]);
     if (row) handleDeleteCompany(row.companyId, row.make);
+  };
+
+  const handleToolbarPrint = () => {
+    printAdminTable({
+      title: "Car Brands",
+      headers: ["Make", "Model", "Logo"],
+      rows: tableRows
+        .filter((row) => selected.has(row.rowId))
+        .map((row) => [row.make, row.model, row.brandLogo ? "Yes" : "—"]),
+    });
   };
 
   const formMessage = editingCompany
@@ -795,7 +732,11 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
               <CompactFormFooter
                 message={formMessage}
                 messageCenter
-                actionLabel={actionLoading ? "Saving..." : "Save"}
+                actionLabel={
+                  actionLoading
+                    ? (editingCompany ? "Updating..." : "Saving...")
+                    : (editingCompany ? "Update" : "Save")
+                }
                 onSave={handleSave}
                 onCancel={handleCancel}
               />
@@ -826,90 +767,80 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
                 onChange={handleModelChange}
                 onEditAddNew={openModelsPopup}
               />
-              <ComboSelectWithEditor
-                label="Years"
-                required
-                value={selectedYear}
-                placeholder="Select year"
-                options={yearOptions}
-                disabled={!modelFilled}
-                onChange={setSelectedYear}
-                onEditAddNew={openYearsPopup}
-              />
-            </div>
-
-            <CompactFormRow className="mt-3 items-start">
-              <div className="min-w-0 w-full">
-                <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                  <input
-                    type="checkbox"
-                    checked={attachBrandLogo}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setAttachBrandLogo(checked);
-                      if (checked) {
-                        if (editingCompany?.brandLogo && !brandLogoFile) {
-                          setBrandLogoPreviewUrl(getBackendImageUrl(editingCompany.brandLogo));
-                        }
-                      } else {
-                        setBrandLogoFile(null);
-                        if (brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(brandLogoPreviewUrl);
-                        setBrandLogoPreviewUrl(null);
-                        if (brandLogoRef.current) brandLogoRef.current.value = "";
-                      }
-                    }}
-                    className="h-3.5 w-3.5 accent-ad-green"
-                  />
-                  Brand Logo
-                </label>
-                {attachBrandLogo ? (
-                  <div className="flex w-full min-w-0 items-center gap-1.5">
-                    {brandLogoPreviewUrl ? (
-                      <img
-                        src={brandLogoPreviewUrl}
-                        alt=""
-                        className="h-[30px] w-[30px] shrink-0 rounded border border-gray-300 object-contain bg-white"
-                      />
-                    ) : null}
+              <CompactField label="Brand Logo" className={equalThirdFieldClass}>
+                <div className="min-w-0 w-full">
+                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
                     <input
-                      readOnly
-                      value={
-                        brandLogoFile?.name ??
-                        (brandLogoPreviewUrl && editingCompany?.brandLogo && !brandLogoFile
-                          ? "Current logo"
-                          : "")
-                      }
-                      placeholder="No file chosen"
-                      tabIndex={-1}
-                      className={`${compactInputClass} min-w-0 flex-1 cursor-default`}
+                      type="checkbox"
+                      checked={attachBrandLogo}
+                      disabled={!modelFilled && !makeFilled}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setAttachBrandLogo(checked);
+                        if (checked) {
+                          if (editingCompany?.brandLogo && !brandLogoFile) {
+                            setBrandLogoPreviewUrl(getBackendImageUrl(editingCompany.brandLogo));
+                          }
+                        } else {
+                          setBrandLogoFile(null);
+                          if (brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(brandLogoPreviewUrl);
+                          setBrandLogoPreviewUrl(null);
+                          if (brandLogoRef.current) brandLogoRef.current.value = "";
+                        }
+                      }}
+                      className="h-3.5 w-3.5 accent-ad-green disabled:opacity-60"
                     />
-                    <button
-                      type="button"
-                      onClick={() => brandLogoRef.current?.click()}
-                      className={`${uploadBtnClass} shrink-0`}
-                    >
-                      Upload
-                    </button>
-                    {brandLogoPreviewUrl && (
+                    Attach logo
+                  </label>
+                  {attachBrandLogo ? (
+                    <div className="flex w-full min-w-0 items-center gap-1.5">
+                      {brandLogoPreviewUrl ? (
+                        <img
+                          src={brandLogoPreviewUrl}
+                          alt=""
+                          className="h-[30px] w-[30px] shrink-0 rounded border border-gray-300 object-contain bg-white"
+                        />
+                      ) : null}
+                      <input
+                        readOnly
+                        value={
+                          brandLogoFile?.name ??
+                          (brandLogoPreviewUrl && editingCompany?.brandLogo && !brandLogoFile
+                            ? "Current logo"
+                            : "")
+                        }
+                        placeholder="No file chosen"
+                        tabIndex={-1}
+                        className={`${compactInputClass} min-w-0 flex-1 cursor-default`}
+                      />
                       <button
                         type="button"
-                        onClick={handleRemoveBrandLogo}
+                        onClick={() => brandLogoRef.current?.click()}
                         className={`${uploadBtnClass} shrink-0`}
                       >
-                        Remove
+                        Upload
                       </button>
-                    )}
-                    <input
-                      ref={brandLogoRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleBrandLogoChange}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            </CompactFormRow>
+                      {brandLogoPreviewUrl && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveBrandLogo}
+                          className={`${uploadBtnClass} shrink-0`}
+                        >
+                          Remove
+                        </button>
+                      )}
+                      <input
+                        ref={brandLogoRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleBrandLogoChange}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </CompactField>
+            </div>
 
             {makesPopupOpen && (
               <ListEditorPopup
@@ -933,17 +864,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
               />
             )}
 
-            {yearsPopupOpen && (
-              <ListEditorPopup
-                title={selectedModelName ? `Years — ${selectedModelName}` : "Years"}
-                items={yearsDraft}
-                onChange={setYearsDraft}
-                onSave={saveYearsPopup}
-                onCancel={cancelYearsPopup}
-                placeholder="e.g. 2020"
-                inputMode="numeric"
-              />
-            )}
           </CompactFormPanel>
         ) : undefined
       }
@@ -963,24 +883,18 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
-            onClick={handleToolbarUpdate}
-            disabled={selected.size !== 1 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-          >
-            Update
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Shoot
-          </button>
-          <button
-            type="button"
             onClick={handleToolbarDelete}
-            disabled={selected.size !== 1 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            disabled={selected.size === 0 || actionLoading}
+            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Delete
           </button>
-          <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+          <button
+            type="button"
+            onClick={handleToolbarPrint}
+            disabled={selected.size === 0}
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Print
           </button>
         </div>
@@ -1044,14 +958,13 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Make</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Model</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Year</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Logo</th>
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                <td colSpan={4} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
                   {loading ? "Loading car brands…" : "No car brands found."}
                 </td>
               </tr>
@@ -1076,7 +989,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
                     </button>
                   </td>
                   <td className="border border-gray-300 px-3 py-2">{row.model}</td>
-                  <td className="border border-gray-300 px-3 py-2">{row.year}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">
                     {row.brandLogo ? (
                       <button
@@ -1091,7 +1003,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
                         aria-label={`View ${row.make} logo`}
                         title="View logo"
                       >
-                        <EyeIcon className="size-5 fill-current" />
+                        <FiPaperclip className="size-5" aria-hidden />
                       </button>
                     ) : (
                       <span className="text-gray-500">--</span>
@@ -1120,9 +1032,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
       </div>
 
       {logoPreview && (

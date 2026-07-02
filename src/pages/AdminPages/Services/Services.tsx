@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 import axios, { AxiosError } from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import {
   CompactField,
   CompactFormFooter,
@@ -9,6 +10,8 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -52,6 +55,21 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
   const [shopType, setShopType] = useState<ShopType>("autoShop");
   const [status, setStatus] = useState<ServiceStatus>("active");
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<Service>({ onToggle: resetTableControls, storageKey: "admin_deleted_view:services" });
+
   useEffect(() => {
     fetchServices();
   }, [filterShopType]);
@@ -64,16 +82,24 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
       if (filterShopType !== "all") url += `?shopType=${filterShopType}`;
       const res = await axios.get<{ success: boolean; data: Service[] }>(url);
       if (res.data.success) setServices(res.data.data || []);
-      else setError("Failed to fetch services.");
+      else {
+        const msg = "Failed to fetch services.";
+        setError(msg);
+        adminNotify.error(msg);
+      }
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Error fetching services");
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Error fetching services";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  const filtered = services.filter((s) =>
+  const displayServices = isDeletedView ? deletedStash : services;
+
+  const filtered = displayServices.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     SHOP_TYPE_OPTIONS.find((o) => o.value === s.shopType)?.label.toLowerCase().includes(search.toLowerCase()) ||
     s.status.toLowerCase().includes(search.toLowerCase())
@@ -125,7 +151,9 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError("Service name is required.");
+      const __adminMsg = "Service name is required.";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
       return;
     }
     setActionLoading(true);
@@ -135,17 +163,21 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
       const payload = { name: name.trim(), shopType, status };
       if (editingId) {
         await axios.put(`${API_BASE}/admin/services/${editingId}`, payload);
-        setSuccessMsg("Service updated successfully.");
+        adminNotify.success("Service updated successfully.");
+      setSuccessMsg("Service updated successfully.");
       } else {
         await axios.post(`${API_BASE}/admin/services`, payload);
-        setSuccessMsg("Service added successfully.");
+        adminNotify.success("Service added successfully.");
+      setSuccessMsg("Service added successfully.");
       }
       resetForm();
       setShowForm(false);
       fetchServices();
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string; error?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.response?.data?.error || "Error saving service");
+      const __adminMsg = axErr?.response?.data?.message || axErr?.response?.data?.error || "Error saving service";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
     } finally {
       setActionLoading(false);
     }
@@ -158,6 +190,8 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     setSuccessMsg("");
     try {
       await axios.delete(`${API_BASE}/admin/services/${service._id}`);
+      stashDeleted(service);
+      adminNotify.success("Service deleted successfully.");
       setSuccessMsg("Service deleted successfully.");
       setSelected((prev) => {
         const next = new Set(prev);
@@ -167,22 +201,62 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
       fetchServices();
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
-      setError(axErr?.response?.data?.message || axErr?.message || "Failed to delete service");
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to delete service";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
     } finally {
       setActionLoading(false);
     }
-  };
-
-  const handleToolbarUpdate = () => {
-    if (selected.size !== 1) return;
-    const service = services.find((s) => s._id === [...selected][0]);
-    if (service) openEdit(service);
   };
 
   const handleToolbarDelete = () => {
     if (selected.size !== 1) return;
     const service = services.find((s) => s._id === [...selected][0]);
     if (service) handleDelete(service);
+  };
+
+  const handleRestore = async () => {
+    if (selected.size !== 1) return;
+    const service = deletedStash.find((s) => s._id === [...selected][0]);
+    if (!service) return;
+    if (!window.confirm(`Restore service "${service.name}"?`)) return;
+    setActionLoading(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      await axios.post(`${API_BASE}/admin/services`, {
+        name: service.name,
+        shopType: service.shopType,
+        status: service.status || "active",
+      });
+      restoreStashed((item) => item._id === service._id);
+      adminNotify.success("Service restored.");
+      setSuccessMsg("Service restored.");
+      setSelected(new Set());
+      fetchServices();
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to restore service";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleToolbarPrint = () => {
+    printAdminTable({
+      title: "Services",
+      headers: ["Name", "Shop Type", "Sub Services", "Status"],
+      rows: services
+        .filter((service) => selected.has(service._id))
+        .map((service) => [
+          service.name,
+          shopTypeLabel(service.shopType),
+          String(service.subServices?.length ?? 0),
+          service.status || "active",
+        ]),
+    });
   };
 
   const shopTypeLabel = (value: ShopType) =>
@@ -192,8 +266,8 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
 
   return (
     <AdminPage
-      title="Services"
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? "Deleted Services" : "Services"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -201,7 +275,11 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
               <CompactFormFooter
                 message={formMessage}
                 messageCenter
-                actionLabel={actionLoading ? "Saving..." : "Save"}
+                actionLabel={
+                  actionLoading
+                    ? (editingId ? "Updating..." : "Saving...")
+                    : (editingId ? "Update" : "Save")
+                }
                 onSave={handleSave}
                 onCancel={handleCancel}
               />
@@ -249,6 +327,9 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="services" />
+      )}
       {successMsg && !showForm && (
         <div className="mb-2 rounded border border-green-200 bg-green-100 px-3 py-2 text-xs text-green-800">
           {successMsg}
@@ -262,26 +343,31 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
+          {!isDeletedView ? (
+            <button
+              type="button"
+              onClick={handleToolbarDelete}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
-            onClick={handleToolbarUpdate}
-            disabled={selected.size !== 1}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            onClick={handleToolbarPrint}
+            disabled={selected.size === 0}
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Update
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Shoot
-          </button>
-          <button
-            type="button"
-            onClick={handleToolbarDelete}
-            disabled={selected.size !== 1 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-          >
-            Delete
-          </button>
-          <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
             Print
           </button>
         </div>
@@ -366,7 +452,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
             ) : paged.length === 0 ? (
               <tr>
                 <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                  No services found.
+                  {isDeletedView ? "No deleted services found." : "No services found."}
                 </td>
               </tr>
             ) : (
@@ -416,9 +502,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
+        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active Services" />
       </div>
     </AdminPage>
   );

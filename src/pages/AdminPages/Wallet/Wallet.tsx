@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { adminNotify } from "../../../utils/adminNotify";
 import AdminPage from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
@@ -56,7 +57,9 @@ const Wallet: React.FC = () => {
       setData(res.data.data || []);
       setTotal(res.data.total || 0);
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to fetch job card payments");
+      const msg = err?.response?.data?.message || "Failed to fetch job card payments";
+      setError(msg);
+      adminNotify.error(msg);
     } finally {
       setLoading(false);
     }

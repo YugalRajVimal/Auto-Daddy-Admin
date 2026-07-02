@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { FiPaperclip } from "react-icons/fi";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
   CompactAutoGrowTextarea,
@@ -9,6 +10,7 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
 
 export type DummyUserRow = {
   _id: string;
@@ -17,13 +19,15 @@ export type DummyUserRow = {
   countryCode: string;
   phone: string;
   pincode: string;
-  address: string;
+  address?: string;
   city: string;
   createdAt: string;
   isDisabled: boolean;
   status?: string;
   primaryLabel: string;
-  region: string;
+  region?: string;
+  websiteUrl?: string;
+  imageUrl?: string;
   countA: number;
   countB: number;
 };
@@ -37,6 +41,8 @@ export type DummyUserListConfig = {
   roleLabel: string;
   primaryFieldLabel: string;
   regionFieldLabel: string;
+  imageFieldLabel?: string;
+  fieldMode?: "location" | "web";
   countALabel: string;
   countBLabel: string;
   columns: ColumnDef[];
@@ -76,7 +82,8 @@ function fmtDate(d?: string): string {
 }
 
 function getStatus(row: DummyUserRow): string {
-  if (row.status === "deleted") return "Deleted";
+  const status = String(row.status ?? "").toLowerCase();
+  if (status === "deleted" || Boolean((row as any).isDeleted) || Boolean((row as any).deleted)) return "Deleted";
   if (row.isDisabled) return "Suspended";
   return "Active";
 }
@@ -138,6 +145,22 @@ function isEmail(e: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 }
 
+function isWebsiteUrl(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  try {
+    const parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+    return !!parsed.hostname;
+  } catch {
+    return false;
+  }
+}
+
+function formatWebsiteUrl(url?: string) {
+  if (!url?.trim()) return "-";
+  return url.trim().replace(/^https?:\/\//i, "");
+}
+
 const DummyUserAddEditForm: React.FC<{
   row?: DummyUserRow | null;
   config: DummyUserListConfig;
@@ -145,14 +168,16 @@ const DummyUserAddEditForm: React.FC<{
   onSaved: (row: DummyUserRow) => void;
 }> = ({ row, config, onCancel, onSaved }) => {
   const isEdit = !!row;
+  const isWebMode = config.fieldMode === "web";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [pincode, setPincode] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [primaryLabel, setPrimaryLabel] = useState("");
   const [region, setRegion] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
@@ -161,20 +186,22 @@ const DummyUserAddEditForm: React.FC<{
       setName(row.name);
       setEmail(row.email);
       setPhone(row.phone);
-      setPincode(row.pincode);
-      setAddress(row.address);
+      setAddress(row.address ?? "");
       setCity(row.city);
       setPrimaryLabel(row.primaryLabel);
-      setRegion(row.region);
+      setRegion(row.region ?? "");
+      setWebsiteUrl(row.websiteUrl ?? "");
+      setImageUrl(row.imageUrl ?? "");
     } else {
       setName("");
       setEmail("");
       setPhone("");
-      setPincode("");
       setAddress("");
       setCity("");
       setPrimaryLabel("");
       setRegion("");
+      setWebsiteUrl("");
+      setImageUrl("");
     }
   }, [isEdit, row]);
 
@@ -182,27 +209,48 @@ const DummyUserAddEditForm: React.FC<{
     name.trim() &&
     isEmail(email) &&
     phone.replace(/\D/g, "").length === 10 &&
-    pincode.trim() &&
     primaryLabel.trim() &&
-    region.trim();
+    (isWebMode ? isWebsiteUrl(websiteUrl) : address.trim() && region.trim());
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      adminNotify.error("Please select an image file.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setImageUrl(typeof reader.result === "string" ? reader.result : "");
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   const handleSave = () => {
     setAttempted(true);
-    if (!isValid) return;
+    if (!isValid) {
+      adminNotify.error("Please fill all required fields.");
+      return;
+    }
+    const normalizedWebsiteUrl = websiteUrl.trim()
+      ? (websiteUrl.trim().startsWith("http") ? websiteUrl.trim() : `https://${websiteUrl.trim()}`)
+      : undefined;
+
     onSaved({
       _id: row ? row._id : `dummy-${Date.now()}`,
       name: name.trim(),
       email: email.trim(),
       countryCode: "",
       phone: phone.replace(/\D/g, ""),
-      pincode: pincode.trim(),
-      address: address.trim(),
+      pincode: row?.pincode ?? "",
+      address: isWebMode ? undefined : address.trim(),
       city: city.trim() || "Toronto",
       createdAt: row ? row.createdAt : new Date().toISOString(),
       isDisabled: row ? row.isDisabled : false,
       status: row ? row.status : undefined,
       primaryLabel: primaryLabel.trim(),
-      region: region.trim(),
+      region: isWebMode ? undefined : region.trim(),
+      websiteUrl: isWebMode ? normalizedWebsiteUrl : undefined,
+      imageUrl: isWebMode ? imageUrl || undefined : undefined,
       countA: row ? row.countA : 0,
       countB: row ? row.countB : 0,
     });
@@ -256,14 +304,43 @@ const DummyUserAddEditForm: React.FC<{
             className={compactInputClass}
           />
         </CompactField>
-        <CompactField label="Zip / Postal Code" required className={compactFixedFieldWidth}>
-          <input
-            type="text"
-            value={pincode}
-            onChange={(e) => setPincode(e.target.value.slice(0, 10))}
-            className={compactInputClass}
-          />
-        </CompactField>
+        {isWebMode ? (
+          <CompactField label={config.imageFieldLabel ?? "Image"} className={compactFixedFieldWidth}>
+            <div className="flex min-w-0 items-center gap-2">
+              {imageUrl ? (
+                <div className="relative shrink-0">
+                  <img
+                    src={imageUrl}
+                    alt="Dealer"
+                    className="h-12 w-16 rounded border border-gray-300 bg-white object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setImageUrl("")}
+                    className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-0 bg-gray-700 text-[10px] leading-none text-white"
+                    aria-label="Remove image"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs italic text-gray-400">No image</span>
+              )}
+              <label className="cursor-pointer rounded border border-[#0073b7] px-2 py-1 text-xs font-semibold text-[#0073b7]">
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                {imageUrl ? "Change" : "Upload"}
+              </label>
+            </div>
+          </CompactField>
+        ) : (
+          <CompactField label="Address" required className="min-w-0 flex-1">
+            <CompactAutoGrowTextarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value.slice(0, 100))}
+              placeholder="Max 100 chars"
+            />
+          </CompactField>
+        )}
         <CompactField label={config.primaryFieldLabel} required className={compactFixedFieldWidth}>
           <input
             type="text"
@@ -272,21 +349,26 @@ const DummyUserAddEditForm: React.FC<{
             className={compactInputClass}
           />
         </CompactField>
-        <CompactField label={config.regionFieldLabel} required className={compactFixedFieldWidth}>
-          <input
-            type="text"
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            className={compactInputClass}
-          />
-        </CompactField>
-        <CompactField label="Address" className="min-w-[200px] flex-1">
-          <CompactAutoGrowTextarea
-            value={address}
-            onChange={(e) => setAddress(e.target.value.slice(0, 100))}
-            placeholder="Max 100 chars"
-          />
-        </CompactField>
+        {isWebMode ? (
+          <CompactField label={config.regionFieldLabel} required className={compactFixedFieldWidth}>
+            <input
+              type="url"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value.slice(0, 120))}
+              placeholder="https://example.com"
+              className={compactInputClass}
+            />
+          </CompactField>
+        ) : (
+          <CompactField label={config.regionFieldLabel} required className={compactFixedFieldWidth}>
+            <input
+              type="text"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className={compactInputClass}
+            />
+          </CompactField>
+        )}
       </CompactFormRow>
       {attempted && !isValid && (
         <p className="text-xs font-semibold text-red-700">Please fill all required fields correctly.</p>
@@ -344,7 +426,9 @@ function exportCsv(rows: DummyUserRow[], config: DummyUserListConfig, visibleCol
     phone: (r) => r.phone,
     primary: (r) => r.primaryLabel,
     city: (r) => r.city,
-    region: (r) => r.region,
+    region: (r) => r.region ?? "-",
+    websiteUrl: (r) => formatWebsiteUrl(r.websiteUrl),
+    image: (r) => (r.imageUrl ? "Yes" : "-"),
     date: (r) => fmtDate(r.createdAt),
     countA: (r) => String(r.countA),
     countB: (r) => String(r.countB),
@@ -375,14 +459,28 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [visibleCols, setVisibleCols] = useState<string[]>(config.defaultVisible);
   const [viewMode, setViewMode] = useState<"active" | "deleted">("active");
+  const [imagePreview, setImagePreview] = useState<{ url: string; title: string } | null>(null);
 
   const [countAFor, setCountAFor] = useState<DummyUserRow | null>(null);
   const [countBFor, setCountBFor] = useState<DummyUserRow | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingRow, setEditingRow] = useState<DummyUserRow | null>(null);
 
-  const activeRows = allRows.filter((r) => r.status !== "deleted");
-  const deletedRows = allRows.filter((r) => r.status === "deleted");
+  useEffect(() => {
+    if (!imagePreview) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setImagePreview(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [imagePreview]);
+
+  const isRowDeleted = (r: DummyUserRow): boolean => {
+    const status = String(r.status ?? "").toLowerCase();
+    return status === "deleted" || Boolean((r as any).isDeleted) || Boolean((r as any).deleted);
+  };
+  const activeRows = allRows.filter((r) => !isRowDeleted(r));
+  const deletedRows = allRows.filter((r) => isRowDeleted(r));
   const displayRows = viewMode === "deleted" ? deletedRows : activeRows;
 
   const filtered = displayRows.filter((r) => {
@@ -393,7 +491,8 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
       r.phone.includes(q) ||
       r.primaryLabel.toLowerCase().includes(q) ||
       r.city.toLowerCase().includes(q) ||
-      r.region.toLowerCase().includes(q)
+      (r.region ?? "").toLowerCase().includes(q) ||
+      (r.websiteUrl ?? "").toLowerCase().includes(q)
     );
   });
 
@@ -413,14 +512,17 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
   }
 
   function handleSaved(row: DummyUserRow) {
+    const isEdit = allRows.some((r) => r._id === row._id);
     setAllRows((prev) => {
       const exists = prev.some((r) => r._id === row._id);
       return exists ? prev.map((r) => (r._id === row._id ? row : r)) : [row, ...prev];
     });
+    adminNotify.success(isEdit ? "Updated." : "Added.");
   }
 
   function toggleSuspend(id: string, disable: boolean) {
     setAllRows((prev) => prev.map((r) => (r._id === id ? { ...r, isDisabled: disable } : r)));
+    adminNotify.success(disable ? "Set to inactive." : "Activated.");
   }
 
   function deleteRow(id: string) {
@@ -431,10 +533,12 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
       c.delete(id);
       return c;
     });
+    adminNotify.success("Deleted.");
   }
 
   function reviveRow(id: string) {
     setAllRows((prev) => prev.map((r) => (r._id === id ? { ...r, status: undefined, isDisabled: false } : r)));
+    adminNotify.success("Restored.");
   }
 
   const openAdd = () => {
@@ -479,7 +583,47 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
       case "city":
         return <td key={key} className={tdClass}>{row.city}</td>;
       case "region":
-        return <td key={key} className={tdClass}>{row.region}</td>;
+        return <td key={key} className={tdClass}>{row.region ?? "-"}</td>;
+      case "websiteUrl":
+        return (
+          <td key={key} className={tdClass}>
+            {row.websiteUrl ? (
+              <a
+                href={row.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-700 hover:underline"
+              >
+                {formatWebsiteUrl(row.websiteUrl)}
+              </a>
+            ) : (
+              "-"
+            )}
+          </td>
+        );
+      case "image":
+        return (
+          <td key={key} className={`${tdClass} text-center`}>
+            {row.imageUrl ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setImagePreview({
+                    url: row.imageUrl!,
+                    title: `${row.name} — ${config.imageFieldLabel ?? "Image"}`,
+                  })
+                }
+                className="inline-flex items-center justify-center rounded p-1 text-ad-purple hover:bg-ad-purple/10 hover:text-ad-purple-dark"
+                aria-label={`View image for ${row.name}`}
+                title="View image"
+              >
+                <FiPaperclip className="size-5" aria-hidden />
+              </button>
+            ) : (
+              <span className="text-gray-500">--</span>
+            )}
+          </td>
+        );
       case "date":
         return <td key={key} className={tdClass}>{fmtDate(row.createdAt)}</td>;
       case "countA":
@@ -570,60 +714,36 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
               <>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!selCount) {
-                      alert("Select at least one.");
-                      return;
-                    }
-                    alert("Notification sent (demo).");
-                  }}
-                  className={toolbarBtnClass()}
+                  disabled={selCount === 0}
+                  onClick={() => adminNotify.success("Notification sent (demo).")}
+                  className={toolbarBtnClass(selCount === 0)}
                 >
                   Send Notification
                 </button>
-                <button type="button" className="bg-[#25d366] px-3 py-1 text-xs font-medium text-white hover:opacity-90">
+                <button type="button" disabled={selCount === 0} className="bg-[#25d366] px-3 py-1 text-xs font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
                   WhatsApp
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!selCount) {
-                      alert("Select at least one.");
-                      return;
-                    }
+                  disabled={selCount === 0}
+                  onClick={() =>
                     exportCsv(
                       allRows.filter((r) => selectedRows.has(r._id)),
                       config,
                       visibleCols
-                    );
-                  }}
-                  className={toolbarBtnClass()}
+                    )
+                  }
+                  className={toolbarBtnClass(selCount === 0)}
                 >
                   Export
                 </button>
-                <button
-                  type="button"
-                  disabled={selCount !== 1}
-                  onClick={() => {
-                    const r = allRows.find((x) => x._id === selected[0]);
-                    if (r) openEdit(r);
-                  }}
-                  className={toolbarBtnClass(selCount !== 1)}
-                >
-                  Update
+                <button type="button" disabled={selCount === 0} onClick={() => deleteRow(selected[0])} className={toolbarBtnClass(selCount === 0)}>
+                  Delete
                 </button>
-                <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-                  Shoot
-                </button>
-                {selCount === 1 && (
-                  <button type="button" onClick={() => deleteRow(selected[0])} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-                    Delete
-                  </button>
-                )}
               </>
             )}
-            {viewMode === "deleted" && selCount === 1 && (
-              <button type="button" onClick={() => reviveRow(selected[0])} className={toolbarBtnClass()}>
+            {viewMode === "deleted" && (
+              <button type="button" disabled={selCount === 0} onClick={() => reviveRow(selected[0])} className={toolbarBtnClass(selCount === 0)}>
                 Restore
               </button>
             )}
@@ -786,6 +906,33 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
           </button>
         </div>
       </AdminPage>
+
+      {imagePreview && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setImagePreview(null)}
+        >
+          <div
+            className="relative max-h-[90vh] max-w-[min(90vw,480px)] rounded border border-gray-300 bg-white p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setImagePreview(null)}
+              className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-sm text-white hover:bg-gray-900"
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <p className="mb-3 text-center text-sm font-semibold text-ad-green-dark">{imagePreview.title}</p>
+            <img
+              src={imagePreview.url}
+              alt={imagePreview.title}
+              className="mx-auto max-h-[70vh] max-w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }

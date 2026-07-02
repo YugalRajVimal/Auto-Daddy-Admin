@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
-import { FiRefreshCw } from "react-icons/fi";
+import { FiPaperclip } from "react-icons/fi";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import {
   CompactAutoGrowTextarea,
@@ -11,6 +10,8 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { adminNotify } from "../../../utils/adminNotify";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 
 const USER_OPTIONS = [
   { value: "car-owner", label: "Car Owner" },
@@ -95,8 +96,25 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   };
 
   const handleSave = () => {
+    adminNotify.success("Saved successfully.");
     resetForm();
     setShowForm(false);
+  };
+
+  const handleToolbarPrint = () => {
+    printAdminTable({
+      title: "Product Features",
+      headers: ["Date", "Country", "User", "Feature", "Clip"],
+      rows: features
+        .filter((featureRow) => selected.has(featureRow.id))
+        .map((featureRow) => [
+          featureRow.date,
+          featureRow.country,
+          featureRow.user,
+          featureRow.feature,
+          featureRow.hasClip ? "Yes" : "—",
+        ]),
+    });
   };
 
   return (
@@ -179,16 +197,15 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Update
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
-            Shoot
-          </button>
-          <button type="button" className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700">
+          <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
             Delete
           </button>
-          <button type="button" className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
+          <button
+            type="button"
+            onClick={handleToolbarPrint}
+            disabled={selected.size === 0}
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Print
           </button>
         </div>
@@ -272,7 +289,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                 <td className="border border-gray-300 px-3 py-2">{row.feature}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {row.hasClip ? (
-                    <FiRefreshCw className="inline text-ad-green" size={16} />
+                    <FiPaperclip className="inline text-ad-green" size={16} aria-hidden />
                   ) : (
                     <span className="text-gray-500">--</span>
                   )}
@@ -299,9 +316,6 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
       </div>
     </AdminPage>
   );

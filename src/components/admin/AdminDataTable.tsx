@@ -6,6 +6,7 @@ import {
   adminPanelRowClass,
   adminPanelTableClasses,
 } from "./adminPanelTableStyles";
+import { adminNotify } from "../../utils/adminNotify";
 
 export const adminPageBtn = (active: boolean, disabled: boolean): React.CSSProperties => ({
   border: "1px solid",
@@ -320,7 +321,7 @@ export function AdminDataTable<T>({
 
   function requireSelection(min = 1): boolean {
     if (selCount < min) {
-      alert(min === 1 ? "Select at least one." : `Select exactly ${min}.`);
+      adminNotify.info(min === 1 ? "Select at least one." : `Select exactly ${min}.`);
       return false;
     }
     return true;
@@ -348,7 +349,7 @@ export function AdminDataTable<T>({
         onClick={() => {
           if (!requireSelection()) return;
           if (onSendNotification) onSendNotification(selected);
-          else alert("Send notification is not configured for this table.");
+          else adminNotify.info("Send notification is not configured for this table.");
         }}
       />
       <ToolbarButton
@@ -379,7 +380,7 @@ export function AdminDataTable<T>({
           onClick={() => {
             if (min > 0 && !requireSelection(min)) return;
             if (max !== undefined && selCount > max) {
-              alert(`Select at most ${max}.`);
+              adminNotify.info(`Select at most ${max}.`);
               return;
             }
             action.onClick(selected);

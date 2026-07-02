@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, ChangeEvent, useMemo } from "react";
 import axios from "axios";
+import { adminNotify } from "../../../utils/adminNotify";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 
@@ -42,7 +43,11 @@ const CarCompany: React.FC = () => {
       if (q) url += `?companyName=${encodeURIComponent(q)}`;
       const res = await axios.get(url);
       setCompanies(res.data?.data ?? []);
-    } catch (err: any) { setError(err?.response?.data?.message || "Error fetching companies"); }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || "Error fetching companies";
+      setError(msg);
+      adminNotify.error(msg);
+    }
     setLoading(false);
   };
 
@@ -115,7 +120,9 @@ const CarCompany: React.FC = () => {
     e.preventDefault();
     clearAlerts();
     if (!form.companyName.trim() || !form.models.length || form.models.some((m) => !m.modelName.trim())) {
-      setError("Company name and model names are required.");
+      const msg = "Company name and model names are required.";
+      setError(msg);
+      adminNotify.error(msg);
       return;
     }
     setLoading(true);
@@ -135,6 +142,7 @@ const CarCompany: React.FC = () => {
           formData,
           { headers: { "Content-Type": "multipart/form-data" } }
         );
+        adminNotify.success("Car company updated successfully.");
         setSuccessMsg("Car company updated successfully.");
       } else {
         await axios.post(
@@ -142,6 +150,7 @@ const CarCompany: React.FC = () => {
           formData,
           { headers: { "Content-Type": "multipart/form-data" } }
         );
+        adminNotify.success("Car company added successfully.");
         setSuccessMsg("Car company added successfully.");
       }
       setShowModal(false);
@@ -149,7 +158,9 @@ const CarCompany: React.FC = () => {
       setEditingCompany(null);
       fetchCompanies();
     } catch (err: any) {
-      setError(err?.response?.data?.message || (editingCompany ? "Failed to update" : "Failed to add") + " car company");
+      const msg = err?.response?.data?.message || (editingCompany ? "Failed to update" : "Failed to add") + " car company";
+      setError(msg);
+      adminNotify.error(msg);
     }
     setLoading(false);
   };
@@ -161,10 +172,13 @@ const CarCompany: React.FC = () => {
     setSuccessMsg("");
     try {
       await axios.delete(`${import.meta.env.VITE_API_URL}/api/admin/car-company/${id}`);
+      adminNotify.success("Car company deleted.");
       setSuccessMsg("Car company deleted.");
       fetchCompanies();
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to delete car company");
+      const msg = err?.response?.data?.message || "Failed to delete car company";
+      setError(msg);
+      adminNotify.error(msg);
     }
     setDeletingId(null);
   };
