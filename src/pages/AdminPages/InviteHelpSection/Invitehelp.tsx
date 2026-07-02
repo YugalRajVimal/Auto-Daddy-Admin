@@ -312,7 +312,7 @@ export default function Invitehelp({
 }: InvitehelpProps) {
   const location = useLocation();
   const navResetToken = (location.state as NavResetLocationState | null)?.navReset;
-  const [inviteHelps, setInviteHelps] = useState<InviteHelp[]>(DUMMY_RECEIVED_NOTIFICATIONS);
+  const [inviteHelps] = useState<InviteHelp[]>(DUMMY_RECEIVED_NOTIFICATIONS);
   const [sentNotifications, setSentNotifications] = useState<SentNotification[]>(DUMMY_SENT_NOTIFICATIONS);
   const [loading] = useState(false);
   const [error, setError] = useState("");
@@ -442,23 +442,6 @@ export default function Invitehelp({
     resetForm();
     setViewingReceived(inv);
     setError("");
-  };
-
-  const applyReceivedStatus = (status: "resolved" | "unresolved") => {
-    if (selected.size === 0) {
-      const msg = "Select at least one notification.";
-      setError(msg);
-      adminNotify.error(msg);
-      return;
-    }
-    setInviteHelps((prev) =>
-      prev.map((inv) => (selected.has(inv._id) ? { ...inv, status } : inv))
-    );
-    if (viewingReceived && selected.has(viewingReceived._id)) {
-      setViewingReceived((prev) => (prev ? { ...prev, status } : null));
-    }
-    setError("");
-    adminNotify.success(status === "resolved" ? "Marked as resolved." : "Marked as unresolved.");
   };
 
   const resetForm = () => {
