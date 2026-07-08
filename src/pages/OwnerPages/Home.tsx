@@ -5,38 +5,29 @@ import OwnerDashboardServicePanel from "../../components/owner/OwnerDashboardSer
 import OwnerHeroPanel from "../../components/owner/OwnerHeroPanel";
 import OwnerPageShell, { OwnerPageSidebar } from "../../components/owner/OwnerPageShell";
 import OwnerServiceSidebar from "../../components/owner/OwnerServiceSidebar";
-import OwnerUpdateOdometerFooter from "../../components/owner/OwnerUpdateOdometerFooter";
-import OwnerUpdateOdometerPanel from "../../components/owner/OwnerUpdateOdometerPanel";
-import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
+import OwnerServiceTilesPanel from "../../components/owner/OwnerServiceTilesPanel";
 import { useCarOwnerDashboard, useCarOwnerServiceSidebar } from "../../hooks/useOwnerPortal";
+
+type OwnerHomeView = "dashboard" | "service" | "shops";
 
 export default function OwnerHomePage() {
   const { token } = useAuth();
   const { thoughtOfTheDay, loading } = useCarOwnerDashboard();
   const { indoor, outdoor, loading: servicesLoading } = useCarOwnerServiceSidebar();
-  const { vehicles, loading: vehiclesLoading, error: vehiclesError, refresh: refreshVehicles } =
-    useCarOwnerVehicles();
-  const [showOdometer, setShowOdometer] = useState(false);
+  const [view, setView] = useState<OwnerHomeView>("dashboard");
   const [selectedService, setSelectedService] = useState<ServiceCategory | null>(null);
   const [selectedSubServiceId, setSelectedSubServiceId] = useState<string | null>(null);
 
   const handleServiceSelect = useCallback((service: ServiceCategory) => {
-    setShowOdometer(false);
     setSelectedService(service);
-    if (service.subServices.length === 0) {
-      setSelectedSubServiceId(null);
-    } else {
-      const first = service.subServices[0];
-      setSelectedSubServiceId(first.id ?? first.name);
-    }
+    setSelectedSubServiceId(null);
+    setView(service.subServices.length > 0 ? "service" : "shops");
   }, []);
 
   const handleSubServiceSelect = useCallback((sub: ServiceSubItem) => {
     setSelectedSubServiceId(sub.id ?? sub.name);
+    setView("shops");
   }, []);
-
-  const closeOdometer = useCallback(() => setShowOdometer(false), []);
-  const toggleOdometer = useCallback(() => setShowOdometer((open) => !open), []);
 
   return (
     <OwnerPageShell
@@ -44,7 +35,7 @@ export default function OwnerHomePage() {
       metaTitle="Home | AutoDaddy"
       metaDescription="Car owner home"
       customSidebar={
-        <OwnerPageSidebar footer={<OwnerUpdateOdometerFooter onClick={toggleOdometer} active={showOdometer} />}>
+        <OwnerPageSidebar>
           <OwnerServiceSidebar
             indoor={indoor}
             outdoor={outdoor}
@@ -62,23 +53,51 @@ export default function OwnerHomePage() {
       contentTopOffset
       contentFillHeight
     >
-      {showOdometer ? (
-        <OwnerUpdateOdometerPanel
-          vehicles={vehicles}
-          loading={vehiclesLoading}
-          error={vehiclesError}
-          token={token}
-          onBack={closeOdometer}
-          onSaved={() => void refreshVehicles()}
-        />
-      ) : selectedService ? (
-        <OwnerDashboardServicePanel
-          service={selectedService}
-          selectedSubServiceId={selectedSubServiceId}
-          token={token}
+      {view === "dashboard" || !selectedService ? (
+        <OwnerHeroPanel thoughtOfTheDay={thoughtOfTheDay} loading={loading} />
+      ) : view === "service" ? (
+        <OwnerServiceTilesPanel
+          indoor={indoor}
+          outdoor={outdoor}
+          selectedService={selectedService}
+          onServiceSelect={handleServiceSelect}
+          onCloseService={() => {
+            setSelectedService(null);
+            setSelectedSubServiceId(null);
+            setView("dashboard");
+          }}
+          onSubServiceSelect={handleSubServiceSelect}
         />
       ) : (
-        <OwnerHeroPanel thoughtOfTheDay={thoughtOfTheDay} loading={loading} />
+        <div className="flex h-full min-h-0 flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setView("service")}
+              className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedService(null);
+                setSelectedSubServiceId(null);
+                setView("dashboard");
+              }}
+              className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Close
+            </button>
+          </div>
+          <div className="min-h-0 flex-1">
+            <OwnerDashboardServicePanel
+              service={selectedService}
+              selectedSubServiceId={selectedSubServiceId}
+              token={token}
+            />
+          </div>
+        </div>
       )}
     </OwnerPageShell>
   );

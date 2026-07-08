@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { toast } from "react-toastify";
-import OwnerPageShell, { OwnerPageRefreshButton } from "../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../components/owner/OwnerPageShell";
 import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import { useCarOwnerDocuments } from "../../hooks/useCarOwnerDocuments";
 import {
@@ -171,7 +171,6 @@ export default function OwnerDigiPursePage() {
       pageHeading="Digi Purse"
       metaTitle="Digi Purse | AutoDaddy"
       metaDescription="Car owner documents"
-      headerAction={<OwnerPageRefreshButton onClick={() => void refresh()} />}
       sidebarItems={DIGI_PURSE_CATEGORIES.map((item) => ({
         id: item.id,
         label: item.label,

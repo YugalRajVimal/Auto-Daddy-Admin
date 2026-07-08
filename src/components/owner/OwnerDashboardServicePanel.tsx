@@ -108,7 +108,12 @@ function OwnerDashboardShopRow({
   const phone = shop.phone.trim() || "Phone not listed";
 
   return (
-    <div className="flex items-center gap-3 border-b border-[#b2e0a0]/60 bg-ad-green-light/50 px-3 py-3 last:border-b-0">
+    <button
+      type="button"
+      onClick={onExpand}
+      className="flex w-full items-center gap-3 border-b border-[#b2e0a0]/60 bg-ad-green-light/50 px-3 py-3 text-left transition-colors hover:bg-ad-green-light/70 last:border-b-0"
+      aria-label={`View ${shop.name}`}
+    >
       <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-200 bg-white">
         {logoUri ? <img src={logoUri} alt="" className="h-full w-full object-cover" /> : null}
       </div>
@@ -123,15 +128,13 @@ function OwnerDashboardShopRow({
       >
         {openToday ? "Shop is Open" : "Shop is Closed"}
       </span>
-      <button
-        type="button"
-        onClick={onExpand}
-        aria-label={`View ${shop.name}`}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-ad-purple text-lg font-bold leading-none text-white shadow-sm transition-colors hover:bg-ad-purple-dark"
+      <span
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-ad-purple text-lg font-bold leading-none text-white shadow-sm"
+        aria-hidden
       >
         <FiPlus aria-hidden />
-      </button>
-    </div>
+      </span>
+    </button>
   );
 }
 

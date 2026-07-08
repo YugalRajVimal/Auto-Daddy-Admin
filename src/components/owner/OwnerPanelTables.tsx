@@ -559,17 +559,18 @@ export function OwnerServiceRequestsTable({ rows }: OwnerServiceRequestsTablePro
         <table className={OWNER_PANEL_TABLE.table}>
           <thead>
             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Service</th>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Date</th>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Subject</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Vehicle</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Auto Shop</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>City</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Status</th>
-              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Sent</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((item, index) => (
               <tr key={item.id} className={adminPanelRowClass(index)}>
+                <td className={OWNER_TABLE_BODY_TD_CLASS}>{formatOwnerTableDateTime(item.sentAt)}</td>
                 <td className={OWNER_TABLE_BODY_TD_CLASS}>
                   <span className="font-semibold text-gray-900">{item.service}</span>
                 </td>
@@ -578,9 +579,6 @@ export function OwnerServiceRequestsTable({ rows }: OwnerServiceRequestsTablePro
                 <td className={OWNER_TABLE_BODY_TD_CLASS}>{item.shopCity}</td>
                 <td className={OWNER_TABLE_BODY_TD_CLASS}>
                   {REQUEST_STATUS_LABELS[item.status]}
-                </td>
-                <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                  {formatOwnerTableDateTime(item.sentAt)}
                 </td>
               </tr>
             ))}
@@ -595,6 +593,17 @@ type OwnerNotificationsTableProps = {
   rows: CarOwnerNotification[];
 };
 
+function notificationStatusLabel(item: CarOwnerNotification): string {
+  const title = item.title.toLowerCase();
+  const message = item.message.toLowerCase();
+  if (title.includes("accepted") || message.includes("accepted")) return "Accepted";
+  if (title.includes("declined") || message.includes("declined")) return "Declined";
+  if (title.includes("approval") || message.includes("approval")) return "Approval";
+  if (title.includes("job card") || message.includes("job card")) return "Approval";
+  if (title.includes("invoice") || message.includes("invoice")) return "Invoice";
+  return "Un-read";
+}
+
 export function OwnerNotificationsTable({ rows }: OwnerNotificationsTableProps) {
   return (
     <motion.div
@@ -606,9 +615,10 @@ export function OwnerNotificationsTable({ rows }: OwnerNotificationsTableProps) 
         <table className={OWNER_PANEL_TABLE.table}>
           <thead>
             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Date</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Title</th>
-              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Details</th>
-              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Received</th>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Description</th>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -616,6 +626,7 @@ export function OwnerNotificationsTable({ rows }: OwnerNotificationsTableProps) 
               const { title, description } = notificationDisplay(item);
               return (
                 <tr key={item.id} className={adminPanelRowClass(index)}>
+                  <td className={OWNER_TABLE_BODY_TD_CLASS}>{formatOwnerTableDateTime(item.time)}</td>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>
                     <span className="font-semibold text-gray-900">{title}</span>
                   </td>
@@ -623,7 +634,7 @@ export function OwnerNotificationsTable({ rows }: OwnerNotificationsTableProps) 
                     {description || "—"}
                   </td>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                    {formatOwnerTableDateTime(item.time)}
+                    {notificationStatusLabel(item)}
                   </td>
                 </tr>
               );

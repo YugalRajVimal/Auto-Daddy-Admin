@@ -9,12 +9,7 @@ export const ownerPrimaryNav: NavItem[] = [
   {
     name: "Profile",
     path: "/owner/profile",
-    matchPaths: ["/owner/profile"],
-  },
-  {
-    name: "Vehicles",
-    path: "/owner/vehicles",
-    matchPaths: ["/owner/vehicles"],
+    matchPaths: ["/owner/profile", "/owner/profile/vehicles"],
   },
   {
     name: "Auto Shops",
@@ -22,18 +17,23 @@ export const ownerPrimaryNav: NavItem[] = [
     matchPaths: ["/owner/auto-shops"],
   },
   {
-    name: "Messages",
-    path: "/owner/messages",
-    matchPaths: ["/owner/messages"],
-  },
-  {
     name: "Deals",
     path: "/owner/deals",
     matchPaths: ["/owner/deals"],
   },
   {
+    name: "Expenses",
+    path: "/owner/expenses",
+    matchPaths: ["/owner/expenses", "/owner/invoices", "/owner/expenses/job-cards"],
+  },
+  {
+    name: "Digital Diary",
+    path: "/owner/digital-diary",
+    matchPaths: ["/owner/digital-diary", "/owner/digital-diary/documents"],
+  },
+  {
     name: "Reports",
     path: "/owner/reports",
-    matchPaths: ["/owner/reports", "/owner/invoices"],
+    matchPaths: ["/owner/reports"],
   },
 ];

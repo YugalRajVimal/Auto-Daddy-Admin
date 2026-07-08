@@ -53,7 +53,7 @@ function ServiceList({
         const key = item.id ?? item.name;
         const hasSubs = item.subServices.length > 0;
         const expanded = expandedServiceKey === key;
-        const selected = Boolean(item.id && selectedServiceId === item.id);
+        const selected = Boolean(selectedServiceId && selectedServiceId === key);
 
         return (
           <OwnerCollapsibleSidebarItem
@@ -129,7 +129,7 @@ export default function OwnerServiceSidebar({
         {allServices.map((item) => {
           const key = item.id ?? item.name;
           const outdoor = isOutdoorServiceCategory(item);
-          const selected = Boolean(item.id && selectedServiceId === item.id);
+          const selected = Boolean(selectedServiceId && selectedServiceId === key);
 
           return (
             <ShopSidebarButton

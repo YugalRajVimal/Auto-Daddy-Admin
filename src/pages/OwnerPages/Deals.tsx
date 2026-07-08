@@ -79,11 +79,6 @@ export default function OwnerDealsPage() {
       pageHeading={CATEGORY_HEADINGS[category]}
       metaTitle="Deals | AutoDaddy"
       metaDescription="Car owner deals"
-      headerAction={
-        !loading && !error ? (
-          <OwnerDealFilters deals={categoryDeals} filters={listFilters} onChange={setListFilters} />
-        ) : null
-      }
       sidebarItems={CATEGORIES.map((item) => ({
         id: item.id,
         label: item.label,
@@ -98,6 +93,9 @@ export default function OwnerDealsPage() {
       contentTopOffset
     >
       <div className="flex flex-col gap-3 overflow-y-auto px-1 pb-2">
+        {!loading && !error ? (
+          <OwnerDealFilters deals={categoryDeals} filters={listFilters} onChange={setListFilters} />
+        ) : null}
         {loading ? (
           <div className="flex flex-1 items-center justify-center py-16">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />

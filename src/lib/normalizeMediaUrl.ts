@@ -1,8 +1,4 @@
-// Fix for VITE_API_URL possibly being undefined
-const rawApiUrl = import.meta.env?.VITE_API_URL;
-const API_BASE = typeof rawApiUrl === "string" && rawApiUrl.length > 0
-  ? rawApiUrl.replace(/\/+$/, "")
-  : "";
+const API_BASE = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
 
 /** Turn relative API paths into absolute URLs for web images. */
 export function normalizeMediaUrl(url?: string | null): string | null {

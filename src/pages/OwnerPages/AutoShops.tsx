@@ -1,17 +1,11 @@
 import { Link } from "react-router";
 import { useCallback, useMemo, useState } from "react";
-import DashboardPanelCard from "../../components/COMP";
+import { FiChevronLeft, FiChevronRight, FiHeart, FiPlus } from "react-icons/fi";
 import OwnerPageShell, { OwnerPageSidebar } from "../../components/owner/OwnerPageShell";
-import { OwnerAutoShopsTable } from "../../components/owner/OwnerPanelTables";
-import {
-  OwnerCollapsibleSidebarItem,
-  OwnerCollapsibleSidebarList,
-} from "../../components/owner/OwnerCollapsibleSidebar";
-import OwnerShopExpandedPanel, { ownerShopServiceRequestKey } from "../../components/owner/OwnerShopExpandedPanel";
 import OwnerVehiclePlateSidebar from "../../components/owner/OwnerVehiclePlateSidebar";
-import { postJson } from "../../api/mobileAuth";
-import { useAuth } from "../../auth";
+import OwnerShopExpandedPanel from "../../components/owner/OwnerShopExpandedPanel";
 import { useCarOwnerAutoShops } from "../../hooks/useCarOwnerAutoShops";
+import { useCarOwnerServiceSidebar } from "../../hooks/useOwnerPortal";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import { useOwnerNavReset, useOwnerSidebarDefault } from "../../hooks/useOwnerNavReset";
 import { isCarOwnerShopOpenToday } from "../../lib/carOwnerAutoShops";
@@ -19,21 +13,21 @@ import { isCarOwnerShopOpenToday } from "../../lib/carOwnerAutoShops";
 const SELECT_VEHICLE_PROMPT = "Select a vehicle from the sidebar to find matching auto shops.";
 
 export default function OwnerAutoShopsPage() {
-  const { token } = useAuth();
-
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
-  const [vehiclesExpanded, setVehiclesExpanded] = useState(true);
+  const [selectedServiceIndex, setSelectedServiceIndex] = useState(0);
   const [expandedShopId, setExpandedShopId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [connectingServiceKey, setConnectingServiceKey] = useState<string | null>(null);
-  const [sentServiceKeys, setSentServiceKeys] = useState<Record<string, boolean>>({});
+
+  const { indoor, outdoor, loading: servicesLoading } = useCarOwnerServiceSidebar();
+  const allServices = useMemo(() => [...indoor, ...outdoor], [indoor, outdoor]);
+  const safeServiceIndex = allServices.length === 0 ? 0 : Math.min(selectedServiceIndex, allServices.length - 1);
+  const selectedService = allServices[safeServiceIndex] ?? null;
 
   const shopFilters = useMemo(
     () => ({
-      serviceIds: [] as string[],
+      serviceIds: selectedService?.id ? [selectedService.id] : ([] as string[]),
       shopType: "autoShops" as const,
     }),
-    []
+    [selectedService?.id]
   );
 
   const { shops, loading, error, refresh } = useCarOwnerAutoShops(shopFilters);
@@ -55,82 +49,15 @@ export default function OwnerAutoShopsPage() {
   const handleVehicleSelect = useCallback((vehicleId: string) => {
     setSelectedVehicleId(vehicleId);
     setExpandedShopId(null);
-    setStatusMessage(null);
-    setSentServiceKeys({});
   }, []);
 
   const resetSidebar = useCallback(() => {
-    setExpandedShopId(null);
-    setStatusMessage(null);
-    setSentServiceKeys({});
-    setConnectingServiceKey(null);
-    setVehiclesExpanded(true);
     setSelectedVehicleId(vehicles[0]?.id ?? null);
+    setExpandedShopId(null);
   }, [vehicles]);
 
   useOwnerSidebarDefault(!vehiclesLoading, resetSidebar);
   useOwnerNavReset(resetSidebar);
-
-  const handleExpandShop = useCallback((shopId: string) => {
-    setExpandedShopId(shopId);
-    setStatusMessage(null);
-  }, []);
-
-  const handleCollapseShop = useCallback(() => {
-    setExpandedShopId(null);
-    setStatusMessage(null);
-  }, []);
-
-  const handleConnect = useCallback(
-    async (serviceId: string, serviceName: string) => {
-      setStatusMessage(null);
-
-      if (!selectedVehicleId) {
-        setStatusMessage("Select a vehicle from the sidebar first.");
-        return;
-      }
-      if (!expandedShopId) {
-        setStatusMessage("Select a shop from the list.");
-        return;
-      }
-      if (!token) {
-        setStatusMessage("You are not signed in.");
-        return;
-      }
-
-      const shop = shops.find((s) => s.id === expandedShopId);
-      if (!shop) {
-        setStatusMessage("Selected shop could not be found.");
-        return;
-      }
-
-      if (!isCarOwnerShopOpenToday(shop)) {
-        setStatusMessage("This shop is closed right now.");
-        return;
-      }
-
-      const requestKey = ownerShopServiceRequestKey(expandedShopId, serviceId, serviceName);
-      setConnectingServiceKey(requestKey);
-      try {
-        const res = await postJson<{ success?: boolean; message?: string }>(
-          "/api/user/connect-autoshopowner",
-          { businessId: expandedShopId, serviceId },
-          token
-        );
-        if (!res.ok || res.data?.success === false) {
-          setStatusMessage(res.data?.message ?? "Could not connect to this service.");
-          return;
-        }
-        setSentServiceKeys((prev) => ({ ...prev, [requestKey]: true }));
-        setStatusMessage(res.data?.message ?? `Request sent to ${shop.name}!`);
-      } catch {
-        setStatusMessage("Network error while connecting.");
-      } finally {
-        setConnectingServiceKey(null);
-      }
-    },
-    [expandedShopId, selectedVehicleId, shops, token]
-  );
 
   const pageHeading = selectedVehicleId
     ? `Auto Repair Shop - ${vehicleMakeLabel}`
@@ -143,35 +70,51 @@ export default function OwnerAutoShopsPage() {
       metaDescription="Find auto shops near you"
       customSidebar={
         <OwnerPageSidebar>
-          <OwnerCollapsibleSidebarList>
-            <OwnerCollapsibleSidebarItem
-              label="Your Vehicles"
-              expanded={vehiclesExpanded}
-              active={Boolean(selectedVehicleId)}
-              onToggle={() => {
-                setVehiclesExpanded((open) => {
-                  const next = !open;
-                  if (next && vehicles[0]) {
-                    handleVehicleSelect(vehicles[0].id);
-                  }
-                  return next;
-                });
-              }}
-            >
-              <OwnerVehiclePlateSidebar
-                vehicles={vehicles}
-                loading={vehiclesLoading}
-                selectedVehicleId={selectedVehicleId}
-                onSelect={handleVehicleSelect}
-              />
-            </OwnerCollapsibleSidebarItem>
-          </OwnerCollapsibleSidebarList>
+          <OwnerVehiclePlateSidebar
+            vehicles={vehicles}
+            loading={vehiclesLoading}
+            selectedVehicleId={selectedVehicleId}
+            onSelect={handleVehicleSelect}
+          />
         </OwnerPageSidebar>
       }
       heroCardFlush
       contentTopOffset
     >
       <div className="flex min-h-[320px] flex-col">
+        <div className="mb-3 overflow-hidden rounded-md border border-ad-purple/30 bg-white">
+          <div className="bg-ad-purple px-4 py-2 text-center font-bold text-white">
+            Auto Mechanics Near by
+          </div>
+          <div className="flex items-center justify-center gap-3 bg-gray-100 px-4 py-2">
+            <button
+              type="button"
+              className="flex h-7 w-7 items-center justify-center rounded bg-gray-600 text-white disabled:opacity-40"
+              onClick={() => setSelectedServiceIndex((i) => Math.max(0, i - 1))}
+              disabled={servicesLoading || allServices.length === 0 || safeServiceIndex === 0}
+              aria-label="Previous service"
+            >
+              <FiChevronLeft />
+            </button>
+            <div className="min-w-[220px] rounded bg-gray-200 px-4 py-1.5 text-center font-semibold text-gray-800">
+              {selectedService?.name ?? "Select a service"}
+            </div>
+            <button
+              type="button"
+              className="flex h-7 w-7 items-center justify-center rounded bg-gray-600 text-white disabled:opacity-40"
+              onClick={() => setSelectedServiceIndex((i) => Math.min(allServices.length - 1, i + 1))}
+              disabled={
+                servicesLoading ||
+                allServices.length === 0 ||
+                safeServiceIndex >= Math.max(0, allServices.length - 1)
+              }
+              aria-label="Next service"
+            >
+              <FiChevronRight />
+            </button>
+          </div>
+        </div>
+
         {vehiclesLoading ? (
           <div className="flex flex-1 items-center justify-center py-16">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
@@ -184,7 +127,7 @@ export default function OwnerAutoShopsPage() {
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-gray-600">
             <p>Add a vehicle before finding auto shops.</p>
             <Link
-              to="/owner/vehicles"
+              to="/owner/profile/vehicles"
               className="rounded-lg bg-ad-purple px-4 py-2 text-sm font-bold text-white hover:bg-ad-purple-dark"
             >
               Add vehicle
@@ -213,22 +156,53 @@ export default function OwnerAutoShopsPage() {
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
             No auto repair shops found in your area yet.
           </div>
+        ) : expandedShop ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-ad-purple/20 bg-white/60">
+            <div className="p-3">
+              <OwnerShopExpandedPanel
+                shop={expandedShop}
+                connectingServiceKey={null}
+                sentServiceKeys={{}}
+                statusMessage={null}
+                onCollapse={() => setExpandedShopId(null)}
+                onConnect={() => {
+                  // Auto Shops page is browse-first; connect flow lives in dashboard.
+                }}
+              />
+            </div>
+          </div>
         ) : (
-          <div className="flex flex-1 flex-col overflow-y-auto">
-            {expandedShop ? (
-              <DashboardPanelCard variant="form" className="mb-0 flex min-h-0 flex-1 flex-col">
-                <OwnerShopExpandedPanel
-                  shop={expandedShop}
-                  connectingServiceKey={connectingServiceKey}
-                  sentServiceKeys={sentServiceKeys}
-                  statusMessage={statusMessage}
-                  onCollapse={handleCollapseShop}
-                  onConnect={(serviceId, serviceName) => void handleConnect(serviceId, serviceName)}
-                />
-              </DashboardPanelCard>
-            ) : (
-              <OwnerAutoShopsTable shops={shops} onRowClick={(shop) => handleExpandShop(shop.id)} />
-            )}
+          <div className="flex flex-1 flex-col overflow-y-auto gap-2">
+            {shops.map((shop) => {
+              const open = isCarOwnerShopOpenToday(shop);
+              const phone = shop.phone.trim();
+              return (
+                <button
+                  key={shop.id}
+                  type="button"
+                  onClick={() => setExpandedShopId(shop.id)}
+                  className="flex w-full items-center gap-3 border border-[#7fbf7f] bg-[#ccffcc] px-3 py-2 text-left hover:bg-[#bdf7bd]"
+                >
+                  <div className="h-9 w-16 border border-[#7fbf7f] bg-white" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-gray-900">{shop.name}</div>
+                    <div className="text-xs font-semibold text-blue-700">{phone || "—"}</div>
+                  </div>
+                  <div className="min-w-[120px]">
+                    <span className="inline-flex w-full items-center justify-center rounded bg-[#008000] px-3 py-1 text-xs font-bold text-white">
+                      {open ? "Shop is Open" : "Closed"}
+                    </span>
+                  </div>
+                  <div className="flex w-10 justify-center">
+                    {open ? (
+                      <FiHeart className="text-red-500" size={22} aria-hidden />
+                    ) : (
+                      <FiPlus className="text-ad-purple" size={22} aria-hidden />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

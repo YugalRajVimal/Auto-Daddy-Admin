@@ -1,4 +1,4 @@
-import { Route } from "react-router";
+import { Navigate, Route } from "react-router";
 import OwnerPageLayout from "../../layout/Owner/OwnerPageLayout";
 import OwnerPanelLayout from "../../layout/Owner/OwnerPanelLayout";
 import ShopPanelLayout from "../../layout/Shop/ShopPanelLayout";
@@ -10,7 +10,8 @@ import OwnerAutoShopsPage from "../../pages/OwnerPages/AutoShops";
 import OwnerInvoicesPage from "../../pages/OwnerPages/Invoices";
 import OwnerReportsPage from "../../pages/OwnerPages/Reports";
 import OwnerJobCardsPage from "../../pages/OwnerPages/JobCards";
-import OwnerDigiPursePage from "../../pages/OwnerPages/DigiPurse";
+import OwnerDigitalDiaryPage from "../../pages/OwnerPages/DigitalDiary";
+import OwnerExpensesJobCardsPage from "../../pages/OwnerPages/ExpensesJobCards";
 import OwnerMessagesPage from "../../pages/OwnerPages/Messages";
 import OwnerVehiclesPage from "../../pages/OwnerPages/Vehicles";
 import OwnerHelpPage from "../../pages/OwnerPages/Help";
@@ -37,13 +38,18 @@ export const ownerRoutes = (
     <Route element={<OwnerPageLayout />}>
       <Route index path="/owner" element={<OwnerHomePage />} />
       <Route path="/owner/profile" element={<OwnerProfilePage />} />
-      <Route path="/owner/vehicles" element={<OwnerVehiclesPage />} />
+      <Route path="/owner/profile/vehicles" element={<OwnerVehiclesPage />} />
+      <Route path="/owner/vehicles" element={<Navigate to="/owner/profile/vehicles" replace />} />
       <Route path="/owner/auto-shops" element={<OwnerAutoShopsPage />} />
       <Route path="/owner/job-cards" element={<OwnerJobCardsPage />} />
+      <Route path="/owner/digital-diary" element={<OwnerDigitalDiaryPage />} />
       <Route path="/owner/reports" element={<OwnerReportsPage />} />
       <Route path="/owner/invoices" element={<OwnerInvoicesPage />} />
+      <Route path="/owner/expenses/job-cards" element={<OwnerExpensesJobCardsPage />} />
+      <Route path="/owner/expenses" element={<Navigate to="/owner/invoices" replace />} />
       <Route path="/owner/messages" element={<OwnerMessagesPage />} />
-      <Route path="/owner/digi-purse" element={<OwnerDigiPursePage />} />
+      <Route path="/owner/digital-diary/documents" element={<Navigate to="/owner/digital-diary" replace />} />
+      <Route path="/owner/digi-purse" element={<Navigate to="/owner/digital-diary/documents" replace />} />
       <Route path="/owner/deals" element={<OwnerDealsPage />} />
       <Route path="/owner/help" element={<OwnerHelpPage />} />
     </Route>

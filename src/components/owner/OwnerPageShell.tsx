@@ -24,7 +24,7 @@ type OwnerPageSidebarProps = {
 export function OwnerPageSidebar({ children, className = "", footer }: OwnerPageSidebarProps) {
   return (
     <aside className={`${ownerPageSidebarClass} lg:!h-auto lg:!max-h-none ${className}`.trim()}>
-      <div className={`min-h-0 flex-1 overflow-y-auto lg:pr-0.5 ${shopSidebarButtonStackClass}`}>
+      <div className={`min-h-0 flex-1 overflow-y-auto pb-28 lg:pr-0.5 ${shopSidebarButtonStackClass}`}>
         {children}
       </div>
       {footer ? <div className={ownerPageSidebarFooterClass}>{footer}</div> : null}

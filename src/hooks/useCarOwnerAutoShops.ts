@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getJson } from "../api/mobileAuth";
 import { normalizeCarOwnerAutoShopsPayload } from "../lib/carOwnerAutoShops";
+import { getDummyCarOwnerAutoShops } from "../lib/dummyCarOwnerAutoShops";
 import type { CarOwnerAutoShopListItem } from "../types/carOwnerAutoShops";
 import { useAuth } from "../auth";
 
@@ -67,7 +68,14 @@ export function useCarOwnerAutoShops(filters: CarOwnerAutoShopsFilters) {
       }
     }
 
-    setShops(normalizeCarOwnerAutoShopsPayload(payload));
+    const next = normalizeCarOwnerAutoShopsPayload(payload);
+    if (next.length === 0 && import.meta.env.DEV) {
+      setShops(getDummyCarOwnerAutoShops(filters));
+      setLoading(false);
+      return;
+    }
+
+    setShops(next);
     setLoading(false);
   }, [token, serviceKey, companyKey, shopType]);
 

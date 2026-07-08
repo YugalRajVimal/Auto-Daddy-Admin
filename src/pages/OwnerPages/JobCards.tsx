@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import OwnerPageShell, {
-  OwnerPageRefreshButton,
   OwnerPageSearchInput,
 } from "../../components/owner/OwnerPageShell";
 import { OwnerJobCardsTable } from "../../components/owner/OwnerPanelTables";
@@ -55,19 +54,11 @@ export default function OwnerJobCardsPage() {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  const headerAction = (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <OwnerPageSearchInput value={search} onChange={setSearch} placeholder="Search job cards…" />
-      <OwnerPageRefreshButton onClick={() => void refresh()} />
-    </div>
-  );
-
   return (
     <OwnerPageShell
       pageHeading="Job Cards"
       metaTitle="Job Cards | AutoDaddy"
       metaDescription="Car owner job cards"
-      headerAction={headerAction}
       heroCardFlush
       contentTopOffset
     >
@@ -92,6 +83,9 @@ export default function OwnerJobCardsPage() {
         </p>
       ) : (
         <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <OwnerPageSearchInput value={search} onChange={setSearch} placeholder="Search job cards…" />
+          </div>
           <OwnerJobCardsTable rows={pageRows} countryCode={countryCode} />
           {totalPages > 1 ? (
             <div className="flex items-center justify-between gap-2 border-t border-gray-200 pt-3 text-xs text-gray-600">

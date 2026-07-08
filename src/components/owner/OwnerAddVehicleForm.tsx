@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { getJson, postFormData } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
-import { getCarBrandName, resolveCarBrandLogo } from "../../lib/dummyCarBrands";
-import OwnerVehicleDetailCard from "./OwnerVehicleDetailCard";
 import {
   type CarCompaniesResponse,
   type CarCompanyCatalogItem,
@@ -36,7 +34,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
   const [year, setYear] = useState("");
   const [odometerReading, setOdometerReading] = useState("");
   const [vehicleImage, setVehicleImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadImage, setUploadImage] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -56,32 +54,9 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
     };
   }, [token]);
 
-  useEffect(() => {
-    if (!vehicleImage) {
-      setImagePreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(vehicleImage);
-    setImagePreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [vehicleImage]);
-
   const selectedCompany = useMemo(
     () => companies.find((c) => (c.companyName ?? "").trim() === name.trim()) ?? null,
     [companies, name]
-  );
-
-  const makeLogo = useMemo(
-    () =>
-      resolveCarBrandLogo(
-        selectedCompany
-          ? {
-              companyName: getCarBrandName(selectedCompany),
-              brandLogo: selectedCompany.brandLogo ?? selectedCompany.logoUrl ?? null,
-            }
-          : null
-      ),
-    [selectedCompany]
   );
 
   const modelOptions = useMemo(() => selectedCompany?.models ?? [], [selectedCompany]);
@@ -103,6 +78,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
     setModel("");
     setYear("");
     setOdometerReading("");
+    setUploadImage(false);
     setVehicleImage(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -186,19 +162,22 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
   };
 
   return (
-    <div className="rounded-[18px] bg-ad-green-light px-5 py-5 md:px-6">
-      <div className="grid w-full grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch lg:gap-8">
-        <div className="min-w-0 w-full space-y-2.5">
-          <input
-            type="text"
-            value={licensePlateNo}
-            onChange={(e) => setLicensePlateNo(e.target.value)}
-            placeholder="License Plate"
-            autoComplete="off"
-            className={ownerVehicleFieldClass}
-          />
+    <div className="overflow-hidden rounded-[18px] bg-ad-green-light">
+      <div className="px-5 py-4 md:px-6">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-5 md:gap-4">
+          <label className="text-xs font-semibold text-gray-700">
+            License Plate
+            <input
+              type="text"
+              value={licensePlateNo}
+              onChange={(e) => setLicensePlateNo(e.target.value)}
+              autoComplete="off"
+              className={`${ownerVehicleFieldClass} mt-1`}
+            />
+          </label>
 
-          <div className="flex gap-2">
+          <label className="text-xs font-semibold text-gray-700">
+            Make
             <select
               value={name}
               onChange={(e) => {
@@ -207,7 +186,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                 setYear("");
               }}
               disabled={companiesLoading}
-              className={`${ownerVehicleSelectClass} flex-1`}
+              className={`${ownerVehicleSelectClass} mt-1`}
             >
               <option value="">{companiesLoading ? "Loading…" : "Make"}</option>
               {companies.map((c) => (
@@ -216,21 +195,10 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                 </option>
               ))}
             </select>
-            <div className="flex h-[36px] w-[56px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#c8c8c8] bg-white p-1">
-              {name.trim() ? (
-                <img
-                  src={makeLogo}
-                  alt=""
-                  className="h-full w-full object-contain"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : null}
-            </div>
-          </div>
+          </label>
 
-          <div className="grid grid-cols-2 gap-2">
+          <label className="text-xs font-semibold text-gray-700">
+            Model
             <select
               value={model}
               onChange={(e) => {
@@ -238,7 +206,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                 setYear("");
               }}
               disabled={!name}
-              className={ownerVehicleSelectClass}
+              className={`${ownerVehicleSelectClass} mt-1`}
             >
               <option value="">Model</option>
               {modelOptions.map((m) => (
@@ -247,11 +215,15 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="text-xs font-semibold text-gray-700">
+            Year
             <select
               value={year}
               onChange={(e) => setYear(e.target.value)}
               disabled={!model}
-              className={ownerVehicleSelectClass}
+              className={`${ownerVehicleSelectClass} mt-1`}
             >
               <option value="">Year</option>
               {yearOptions.map((y) => (
@@ -260,37 +232,68 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                 </option>
               ))}
             </select>
-          </div>
+          </label>
 
-          <input
-            type="text"
-            value={vinNo}
-            onChange={(e) => setVinNo(e.target.value)}
-            placeholder="VIN"
-            maxLength={17}
-            autoComplete="off"
-            className={ownerVehicleFieldClass}
-          />
+          <label className="text-xs font-semibold text-gray-700">
+            Odometer
+            <input
+              type="text"
+              value={odometerReading}
+              onChange={(e) => setOdometerReading(e.target.value.replace(/[^\d]/g, ""))}
+              inputMode="numeric"
+              className={`${ownerVehicleFieldClass} mt-1`}
+            />
+          </label>
 
-          <input
-            type="text"
-            value={odometerReading}
-            onChange={(e) => setOdometerReading(e.target.value.replace(/[^\d]/g, ""))}
-            placeholder="Current Odometer"
-            inputMode="numeric"
-            className={ownerVehicleFieldClass}
-          />
+          {/* VIN below Model (same width) */}
+          <div className="hidden md:block" aria-hidden />
+          <div className="hidden md:block" aria-hidden />
+          <label className="text-xs font-semibold text-gray-700 md:col-start-3">
+            VIN
+            <input
+              type="text"
+              value={vinNo}
+              onChange={(e) => setVinNo(e.target.value)}
+              maxLength={17}
+              autoComplete="off"
+              className={`${ownerVehicleFieldClass} mt-1`}
+            />
+          </label>
+        </div>
 
-          <button
-            type="button"
-            disabled={imageProcessing}
-            onClick={() => fileInputRef.current?.click()}
-            className={`${ownerVehicleFieldClass} cursor-pointer text-left disabled:cursor-wait disabled:opacity-70`}
-          >
-            <span className={`block truncate ${vehicleImage || imageProcessing ? "text-gray-800" : "text-[#b0b0b0]"}`}>
-              {imageProcessing ? "Processing image…" : vehicleImage?.name || "Upload vehicle image"}
-            </span>
-          </button>
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <label className="inline-flex items-center gap-2 text-xs font-semibold text-gray-700">
+            <input
+              type="checkbox"
+              checked={uploadImage}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setUploadImage(next);
+                if (!next) {
+                  setVehicleImage(null);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }
+              }}
+              className="h-4 w-4 accent-ad-green"
+            />
+            Upload Image
+          </label>
+
+          {uploadImage ? (
+            vehicleImage ? (
+              <span className="text-xs font-semibold text-gray-700">{vehicleImage.name}</span>
+            ) : (
+              <button
+                type="button"
+                disabled={imageProcessing}
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded border border-gray-400 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {imageProcessing ? "Processing…" : "Choose image"}
+              </button>
+            )
+          ) : null}
+
           <input
             ref={fileInputRef}
             type="file"
@@ -302,41 +305,29 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
               void handleImagePick(file);
             }}
           />
-
-          <div className="flex flex-col items-center gap-1.5 pt-4">
-            <button
-              type="button"
-              disabled={submitting || imageProcessing}
-              onClick={() => void handleSave()}
-              className="min-w-[128px] rounded-lg bg-[#00a000] px-10 py-2 text-[15px] font-bold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? "Saving…" : "Save"}
-            </button>
-            <p className="text-sm text-gray-700">
-              or{" "}
-              <button
-                type="button"
-                disabled={submitting || imageProcessing}
-                onClick={handleCancel}
-                className="text-[#2563eb] underline hover:text-blue-700 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </p>
-          </div>
         </div>
+      </div>
 
-        <div className="flex h-full min-h-0 w-full flex-col">
-          <OwnerVehicleDetailCard
-            plate={licensePlateNo}
-            make={name}
-            model={model}
-            year={year}
-            vin={vinNo}
-            odometer={odometerReading}
-            imageUri={imagePreview}
-            fullHeight
-          />
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#f4ddc7] px-5 py-2 md:px-6">
+        <p className="text-sm italic text-gray-700">You are creating your Profile page</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={submitting || imageProcessing}
+            onClick={() => void handleSave()}
+            className="min-w-[120px] rounded bg-[#0a7a0a] px-10 py-1.5 text-sm font-bold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting ? "Saving…" : "Save"}
+          </button>
+          <span className="text-sm text-gray-700">or</span>
+          <button
+            type="button"
+            disabled={submitting || imageProcessing}
+            onClick={handleCancel}
+            className="text-sm font-semibold text-blue-700 underline hover:text-blue-800 disabled:opacity-50"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>

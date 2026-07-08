@@ -1,6 +1,11 @@
+import { useCallback, useState } from "react";
 import { Outlet, useLocation } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
+import { useAuth } from "../../auth";
+import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
+import OwnerUpdateOdometerFooter from "../../components/owner/OwnerUpdateOdometerFooter";
+import OwnerUpdateOdometerPanel from "../../components/owner/OwnerUpdateOdometerPanel";
 import ShopHeroCardToolbar from "../../components/shop/ShopHeroCardToolbar";
 import ShopPrimaryNav from "../../components/shop/ShopPrimaryNav";
 import ShopProfileHeroPanel from "../../components/shop/ShopProfileHeroPanel";
@@ -29,6 +34,40 @@ import {
 export default function OwnerPageLayout() {
   const { chrome } = useOwnerPageChromeContext();
   const location = useLocation();
+  const { token } = useAuth();
+  const { vehicles, loading: vehiclesLoading, error: vehiclesError, refresh: refreshVehicles } =
+    useCarOwnerVehicles();
+  const [showOdometer, setShowOdometer] = useState(false);
+
+  const closeOdometer = useCallback(() => setShowOdometer(false), []);
+  const toggleOdometer = useCallback(() => setShowOdometer((open) => !open), []);
+
+  const mainNode = showOdometer ? (
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={closeOdometer}
+          className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+          aria-label="Close odometer"
+        >
+          Close
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <OwnerUpdateOdometerPanel
+          vehicles={vehicles}
+          loading={vehiclesLoading}
+          error={vehiclesError}
+          token={token}
+          onBack={closeOdometer}
+          onSaved={() => void refreshVehicles()}
+        />
+      </div>
+    </div>
+  ) : (
+    <Outlet />
+  );
 
   const activePrimary = getActivePrimaryItem(location.pathname, ownerPrimaryNav, "/owner");
   const pageHeading =
@@ -61,11 +100,11 @@ export default function OwnerPageLayout() {
   );
 
   const scrollRegionClass = chrome.contentFillHeight
-    ? "no-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden"
+    ? "no-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto"
     : shopHeroCardScrollClass;
 
   const scrollBodyClass = chrome.contentFillHeight
-    ? "flex h-full min-h-0 flex-1 flex-col"
+    ? "flex min-h-0 flex-1 flex-col"
     : shopHeroCardScrollBodyClass;
 
   const scrollContentClass = chrome.contentFillHeight
@@ -94,14 +133,14 @@ export default function OwnerPageLayout() {
         <div className={scrollRegionClass}>
           <div className={scrollBodyClass}>
             <div className={scrollContentClass}>
-              <Outlet />
+              {mainNode}
             </div>
           </div>
         </div>
       </div>
     </ShopProfileHeroPanel>
   ) : (
-    <Outlet />
+    mainNode
   );
 
   return (
@@ -126,8 +165,13 @@ export default function OwnerPageLayout() {
           className={`order-2 lg:order-1 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:justify-self-stretch lg:self-center ${shopNavRowNavClass}`}
         />
 
-        <div className="order-3 lg:order-2 lg:col-start-1 lg:row-start-2 lg:self-start">
+        <div className="relative order-3 min-h-0 lg:order-2 lg:col-start-1 lg:row-start-2 lg:self-stretch">
           {sidebarCell}
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+            <div className="pointer-events-auto w-[110px]">
+              <OwnerUpdateOdometerFooter onClick={toggleOdometer} active={showOdometer} />
+            </div>
+          </div>
         </div>
 
         <div className="order-4 flex min-h-0 min-w-0 flex-col overflow-hidden lg:order-3 lg:col-start-2 lg:row-start-2">

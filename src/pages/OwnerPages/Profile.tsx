@@ -7,7 +7,8 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../components/admin/ContentPanel";
-import OwnerPageShell from "../../components/owner/OwnerPageShell";
+import OwnerPageShell, { OwnerPageSidebar } from "../../components/owner/OwnerPageShell";
+import OwnerProfileSidebarNav from "../../components/owner/OwnerProfileSidebarNav";
 import { useAuth } from "../../auth";
 import { useCarOwnerProfile } from "../../hooks/useCarOwnerProfile";
 import { parseCitiesApiResponse, type UserCity } from "../../lib/carOwnerCities";
@@ -93,8 +94,11 @@ export default function OwnerProfilePage() {
       pageHeading="My Profile"
       metaTitle="Profile | AutoDaddy"
       metaDescription="Car owner profile"
-      sidebarItems={[{ id: "personal", label: "Personal Profile", variant: "primary" as const }]}
-      activeSidebarId="personal"
+      customSidebar={
+        <OwnerPageSidebar>
+          <OwnerProfileSidebarNav />
+        </OwnerPageSidebar>
+      }
       heroCardFlush
       contentTopOffset
     >
