@@ -1,0 +1,103 @@
+import { useCallback, useEffect, useState } from "react";
+import { getJson } from "../api/mobileAuth";
+import { useAuth } from "../auth";
+import { extractThought } from "../lib/extractThought";
+import {
+  parseServiceCatalogResponse,
+  partitionOwnerHomeSidebarServices,
+  type ServiceCategory,
+  type ServiceSubItem,
+} from "../lib/serviceCatalog";
+
+export type { ServiceCategory, ServiceSubItem };
+
+export type CarOwnerDashboardData = {
+  success?: boolean;
+  dashboard?: {
+    thoughtOfTheDay?: string | { text?: string; quote?: string; thought?: string };
+    FAQs?: { heading?: string; desc?: string };
+  };
+  userProfile?: {
+    name?: string;
+    phone?: string;
+    city?: string;
+    profilePhoto?: string | null;
+  };
+};
+
+export function useCarOwnerDashboard() {
+  const { token } = useAuth();
+  const [data, setData] = useState<CarOwnerDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    if (!token) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await getJson<CarOwnerDashboardData>("/api/user/dashboard", token);
+      if (res.ok && res.data) setData(res.data);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const thought =
+    extractThought(data?.dashboard?.thoughtOfTheDay) ||
+    "Start each day with a positive thought.";
+
+  const faqs = data?.dashboard?.FAQs;
+
+  return {
+    data,
+    loading,
+    refresh,
+    displayName: data?.userProfile?.name?.trim() || "",
+    city: data?.userProfile?.city?.trim() || "",
+    thoughtOfTheDay: thought,
+    faqsHeading: typeof faqs?.heading === "string" ? faqs.heading.trim() : "FAQs",
+    faqsDescription: typeof faqs?.desc === "string" ? faqs.desc.trim() : "",
+  };
+}
+
+export function useCarOwnerServiceSidebar() {
+  const { token } = useAuth();
+  const [indoor, setIndoor] = useState<ServiceCategory[]>([]);
+  const [outdoor, setOutdoor] = useState<ServiceCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token) {
+      setIndoor([]);
+      setOutdoor([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await getJson<unknown>("/api/auto-shop-owner/services", token);
+        if (cancelled) return;
+        const categories = parseServiceCatalogResponse(res.data);
+        const partitioned = partitionOwnerHomeSidebarServices(categories);
+        setIndoor(partitioned.indoor);
+        setOutdoor(partitioned.outdoor);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  return { indoor, outdoor, loading };
+}

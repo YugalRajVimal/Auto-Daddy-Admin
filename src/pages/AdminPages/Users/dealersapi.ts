@@ -1,0 +1,152 @@
+import { DummyUserRow } from "./DummyUserListPage";
+
+
+const BASE_ADMIN = `${import.meta.env.VITE_API_URL}/api/admin`;
+
+// ---------- Types ----------
+
+export type DealerApiRow = {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  dealership: string;
+  city: string;
+  websiteUrl?: string;
+  dealerImage?: string;
+  status?: string; // "Active" | "Suspended" | "Deleted"
+  isDeleted?: boolean;
+  createdAt: string;
+  listings?: number;
+  leads?: number;
+};
+
+export type DealerListFilters = {
+  name?: string;
+  city?: string;
+  status?: string;
+};
+
+export type DealerPayload = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  dealership?: string;
+  city?: string;
+  websiteUrl?: string;
+  status?: string;
+  listings?: number;
+  leads?: number;
+  dealerImage?: File | null;
+};
+
+// ---------- Mapping: API row -> UI row (DummyUserRow) ----------
+
+export function mapDealerToRow(d: DealerApiRow): DummyUserRow {
+  return {
+    _id: d._id,
+    name: d.name,
+    email: d.email,
+    countryCode: "",
+    phone: d.phone,
+    pincode: "",
+    city: d.city,
+    createdAt: d.createdAt,
+    isDisabled: String(d.status ?? "").toLowerCase() === "suspended",
+    status: d.isDeleted || String(d.status ?? "").toLowerCase() === "deleted" ? "deleted" : undefined,
+    primaryLabel: d.dealership,
+    websiteUrl: d.websiteUrl,
+    imageUrl: d.dealerImage,
+    countA: d.listings ?? 0,
+    countB: d.leads ?? 0,
+  };
+}
+
+// ---------- Helpers ----------
+
+function buildFormData(payload: DealerPayload): FormData {
+  const fd = new FormData();
+  if (payload.name !== undefined) fd.append("name", payload.name);
+  if (payload.email !== undefined) fd.append("email", payload.email);
+  if (payload.phone !== undefined) fd.append("phone", payload.phone);
+  if (payload.dealership !== undefined) fd.append("dealership", payload.dealership);
+  if (payload.city !== undefined) fd.append("city", payload.city);
+  if (payload.websiteUrl !== undefined) fd.append("websiteUrl", payload.websiteUrl);
+  if (payload.status !== undefined) fd.append("status", payload.status);
+  if (payload.listings !== undefined) fd.append("listings", String(payload.listings));
+  if (payload.leads !== undefined) fd.append("leads", String(payload.leads));
+  if (payload.dealerImage) fd.append("dealerImage", payload.dealerImage);
+  return fd;
+}
+
+async function handleResponse<T>(res: Response): Promise<T> {
+  let body: any = null;
+  try {
+    body = await res.json();
+  } catch {
+    // no JSON body
+  }
+  if (!res.ok) {
+    const message = body?.message || body?.error || `Request failed with status ${res.status}`;
+    throw new Error(message);
+  }
+  return body as T;
+}
+
+// ---------- API calls ----------
+
+// GET /dealer  (supports ?name= &city= &status=)
+export async function fetchDealers(filters?: DealerListFilters): Promise<DealerApiRow[]> {
+  const params = new URLSearchParams();
+  if (filters?.name) params.set("name", filters.name);
+  if (filters?.city) params.set("city", filters.city);
+  if (filters?.status) params.set("status", filters.status);
+  const qs = params.toString();
+  const res = await fetch(`${BASE_ADMIN}/dealer${qs ? `?${qs}` : ""}`, {
+    method: "GET",
+    credentials: "include",
+  });
+  const body = await handleResponse<{ data?: DealerApiRow[] } | DealerApiRow[]>(res);
+  return Array.isArray(body) ? body : body.data ?? [];
+}
+
+// GET /dealer/:id
+export async function fetchDealerById(id: string): Promise<DealerApiRow> {
+  const res = await fetch(`${BASE_ADMIN}/dealer/${id}`, {
+    method: "GET",
+    credentials: "include",
+  });
+  const body = await handleResponse<{ data?: DealerApiRow } | DealerApiRow>(res);
+  return (body as any).data ?? (body as DealerApiRow);
+}
+
+// POST /dealer  (multipart/form-data, image optional)
+export async function createDealer(payload: DealerPayload): Promise<DealerApiRow> {
+  const res = await fetch(`${BASE_ADMIN}/dealer`, {
+    method: "POST",
+    credentials: "include",
+    body: buildFormData(payload),
+  });
+  const body = await handleResponse<{ data?: DealerApiRow } | DealerApiRow>(res);
+  return (body as any).data ?? (body as DealerApiRow);
+}
+
+// PATCH /dealer/:id  (multipart/form-data, image optional)
+export async function updateDealer(id: string, payload: DealerPayload): Promise<DealerApiRow> {
+  const res = await fetch(`${BASE_ADMIN}/dealer/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    body: buildFormData(payload),
+  });
+  const body = await handleResponse<{ data?: DealerApiRow } | DealerApiRow>(res);
+  return (body as any).data ?? (body as DealerApiRow);
+}
+
+// DELETE /dealer/:id
+export async function deleteDealer(id: string): Promise<void> {
+  const res = await fetch(`${BASE_ADMIN}/dealer/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  await handleResponse<unknown>(res);
+}

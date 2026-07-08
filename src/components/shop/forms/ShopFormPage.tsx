@@ -1,0 +1,41 @@
+import type { ReactNode } from "react";
+import { Link } from "react-router";
+import { useShopPageChrome } from "../../../context/ShopPageChromeContext";
+
+export function ShopFormPage({
+  title,
+  metaTitle,
+  backTo,
+  children,
+}: {
+  title: string;
+  metaTitle: string;
+  backTo: string;
+  children: ReactNode;
+}) {
+  useShopPageChrome({
+    pageHeading: title,
+    title,
+    metaTitle,
+    metaDescription: title,
+    headerAction: (
+      <Link
+        to={backTo}
+        className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-ad-purple hover:bg-gray-50"
+      >
+        Back
+      </Link>
+    ),
+  });
+
+  return <>{children}</>;
+}
+
+export const shopSaveButtonClass =
+  "rounded-md bg-ad-purple px-5 py-2 text-sm font-semibold text-white hover:bg-ad-purple-dark disabled:opacity-60";
+
+export const shopCancelButtonClass =
+  "rounded-md border border-gray-300 bg-white px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50";
+
+export const shopAddNewButtonClass =
+  "inline-flex min-w-[9rem] items-center justify-center rounded bg-ad-form-save px-5 py-1.5 text-xs font-bold text-white hover:brightness-95";

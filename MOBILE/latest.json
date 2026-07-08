@@ -1,0 +1,2922 @@
+{
+  "info": {
+    "_postman_id": "813c0be0-13fc-401b-9b22-76df912f4917",
+    "name": "Auto Daddy APK APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "38364469",
+    "_collection_link": "https://go.postman.co/collection/38364469-813c0be0-13fc-401b-9b22-76df912f4917?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "SignUp And LoginIn",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"countryCode\":\"+91\",\n    \"phone\":\"9999999911\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{localURL}}/api/auth/sign-up-log-in",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sign-up-log-in"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "VerifyOTP",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"countryCode\":\"+91\",\n    \"phone\":\"9999999911\",\n     \"otp\":\"000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{localURL}}/api/auth/verify-otp",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-otp"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Auth API",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODFiOWEyODE4NWYzOWJmN2U4MDFjNSIsImlhdCI6MTc3MDEwOTM1MSwiZXhwIjoxNzcwMTk1NzUxfQ.9QTPdD6_8n1mtvOUfuq2qBrVYmhLTYd8qFPGk7TxELI",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"countryCode\":\"+91\",\n    \"phone\":\"9999999998\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{localURL}}/api/auth/",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODFiOWEyODE4NWYzOWJmN2U4MDFjNSIsImlhdCI6MTc3MDEwOTM1MSwiZXhwIjoxNzcwMTk1NzUxfQ.9QTPdD6_8n1mtvOUfuq2qBrVYmhLTYd8qFPGk7TxELI",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n     \"name\":\"ABC\", \"email\":\"abc667@gmail.com\", \"pincode\":\"123456\", \"role\":\"autoshopowner\" , \"address\":\"qwertyuiop asghjkl zbnm\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{localURL}}/api/auth/complete-profile",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "complete-profile"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "GetUserProfile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseURL}}/api/user/profile",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "favorite-auto-shops",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzM4MjMxYmU5OTk5OWIxZWVmNWYyNiIsImlhdCI6MTc2OTY3MDUxNiwiZXhwIjoxNzY5NzU2OTE2fQ.t5l_hZKpbNo8uipVjvFeQwxwgZ3fQdaRr5vGLHEnSpY",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseURL}}/api/user/favorite-auto-shops",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "favorite-auto-shops"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ToggleAutShopFav",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzM4MjMxYmU5OTk5OWIxZWVmNWYyNiIsImlhdCI6MTc2OTE4MDI5NSwiZXhwIjoxNzY5MjY2Njk1fQ.UjEhdUvXDBubc6dWaRbVRup4Rrob9vOpB6ptZaX8ok0",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"autoShopId\":\"69738231be99999b1eef5f26\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/user/toggle-auto-shop-fav",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "toggle-auto-shop-fav"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Vehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODA4MjNjZjEzMTNjMzRlZTZkYWQ4MSIsImlhdCI6MTc3MDAyOTc2OCwiZXhwIjoxNzcwMTE2MTY4fQ.nI-B99tlj37GZNQzjzNReQ9u5psy9I5lb8CZAaDHcS4",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "licensePlateNo",
+                  "value": "UK12VD2323",
+                  "type": "text",
+                  "uuid": "1d2b5735-2fb3-4af0-87cf-fb3aa4cef5bd"
+                },
+                {
+                  "key": "licensePlateFrontImage",
+                  "type": "file",
+                  "uuid": "7b026700-a2b2-4eb8-abc2-c5066fcb4add",
+                  "src": "/Users/yugalrajvimal/Downloads/A7.jpeg"
+                },
+                {
+                  "key": "licensePlateBackImage",
+                  "type": "file",
+                  "uuid": "240e8381-65e6-4524-8e0e-2a590212c91e",
+                  "src": "/Users/yugalrajvimal/Downloads/my-earnings.xlsx"
+                },
+                {
+                  "key": "vinNo",
+                  "value": "341232143312",
+                  "type": "text",
+                  "uuid": "8b8c6bf0-5265-455b-b1ac-11bcad81aebc"
+                },
+                {
+                  "key": "name",
+                  "value": "zxcvbnm",
+                  "type": "text",
+                  "uuid": "e676c2f5-f6d9-40c0-aebd-1293741798d6"
+                },
+                {
+                  "key": "model",
+                  "value": "ABC",
+                  "type": "text",
+                  "uuid": "39e8d283-e384-4792-88ae-7f0b2ad83234"
+                },
+                {
+                  "key": "year",
+                  "value": "2002",
+                  "type": "text",
+                  "uuid": "b0dced59-cbdc-4eb9-8d36-e14bc2414fd8"
+                },
+                {
+                  "key": "odometerReading",
+                  "value": "123456789",
+                  "type": "text",
+                  "uuid": "8b707467-22a8-4810-b0ca-7ae0a82d3ce0"
+                },
+                {
+                  "key": "carImages",
+                  "type": "file",
+                  "uuid": "420ff8fd-7d3c-4212-9954-8de18bdc62c6",
+                  "src": [
+                    "/Users/yugalrajvimal/Downloads/A4.jpeg",
+                    "/Users/yugalrajvimal/Downloads/A5.jpeg",
+                    "/Users/yugalrajvimal/Downloads/A6.jpeg",
+                    "/Users/yugalrajvimal/Downloads/A7.jpeg"
+                  ]
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/user/vehicle",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "vehicle"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Edit Vehicle",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzM4MjMxYmU5OTk5OWIxZWVmNWYyNiIsImlhdCI6MTc2OTE4MDI5NSwiZXhwIjoxNzY5MjY2Njk1fQ.UjEhdUvXDBubc6dWaRbVRup4Rrob9vOpB6ptZaX8ok0",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"licensePlateNo\": \"CA-7XK3922\",\n  \"licensePlateImagePath\": \"/uploads/plates/ca_7xk3921.jpg2\",\n  \"vinNo\": \"1HGCM82633A0043522\",\n  \"make\": {\"name\":\"Toyota2\", \"model\":\"T12\"},\n  \"year\": \"2012\",\n  \"odometerReading\": \"452302\",\n  \"carImage\": \"/uploads/cars/toyota_camry_2019.jpg2\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/user/vehicle/69739f37adf02d19c844287a",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "vehicle",
+                "69739f37adf02d19c844287a"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "My Vehicles",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzM4MjMxYmU5OTk5OWIxZWVmNWYyNiIsImlhdCI6MTc2OTE4MDI5NSwiZXhwIjoxNzY5MjY2Njk1fQ.UjEhdUvXDBubc6dWaRbVRup4Rrob9vOpB6ptZaX8ok0",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"licensePlateNo\": \"CA-7XK3922\",\n  \"licensePlateImagePath\": \"/uploads/plates/ca_7xk3921.jpg2\",\n  \"vinNo\": \"1HGCM82633A0043522\",\n  \"make\": {\"name\":\"Toyota2\", \"model\":\"T12\"},\n  \"year\": \"2012\",\n  \"odometerReading\": \"452302\",\n  \"carImage\": \"/uploads/cars/toyota_camry_2019.jpg2\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/user/vehicles",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "vehicles"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GetReports",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzM4MjMxYmU5OTk5OWIxZWVmNWYyNiIsImlhdCI6MTc2OTE4MDI5NSwiZXhwIjoxNzY5MjY2Njk1fQ.UjEhdUvXDBubc6dWaRbVRup4Rrob9vOpB6ptZaX8ok0",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/report/my-vehicle-reports",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "report",
+                "my-vehicle-reports"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GetDeals",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzM4MjMxYmU5OTk5OWIxZWVmNWYyNiIsImlhdCI6MTc2OTE4MDI5NSwiZXhwIjoxNzY5MjY2Njk1fQ.UjEhdUvXDBubc6dWaRbVRup4Rrob9vOpB6ptZaX8ok0",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/discount",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "discount"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GetAllAutoShops",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzM4MjMxYmU5OTk5OWIxZWVmNWYyNiIsImlhdCI6MTc2OTE4MDI5NSwiZXhwIjoxNzY5MjY2Njk1fQ.UjEhdUvXDBubc6dWaRbVRup4Rrob9vOpB6ptZaX8ok0",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseURL}}/api/auto-shop",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "auto-shop"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Edit Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzM4MjMxYmU5OTk5OWIxZWVmNWYyNiIsImlhdCI6MTc2OTc2NTkxMCwiZXhwIjoxNzY5ODUyMzEwfQ.xvCft5hsM4Bgtpvp9PUBdpOFY0OgwiP2lFJ79MHEAqU",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n     \"name\":\"AB9999\", \"email\":\"abc99999@gmail.com\", \"pincode\":\"999999\", \"address\":\"bbbbbbb\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{localURL}}/api/user/edit-profile",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "edit-profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getAllJobCards",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Nzg5NThlNzliMTY4MzJmM2I0NjQ2ZSIsImlhdCI6MTc3MDI5NzYyMywiZXhwIjoxNzcwMzg0MDIzfQ.PkKvxRDKFrv6lfyo6Eiqdh4slEkiaL2ch9ED7tSQHrc",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "customerId",
+                  "value": "6978958e79b16832f3b4646e",
+                  "type": "text",
+                  "uuid": "9e021a5c-033d-491c-976b-ecb90012513a"
+                },
+                {
+                  "key": "vehicleId",
+                  "value": "69809281cc7ce0a25ec23077",
+                  "type": "text",
+                  "uuid": "0b2265bd-e247-4394-ade8-926b847878ca"
+                },
+                {
+                  "key": "odometerReading",
+                  "value": "15000",
+                  "type": "text",
+                  "uuid": "aae585a9-15fc-48f5-8386-495a3de22613"
+                },
+                {
+                  "key": "issueDescription",
+                  "value": "abc",
+                  "type": "text",
+                  "uuid": "8c6b3c74-de97-4777-b715-bb1e2eb354bc"
+                },
+                {
+                  "key": "serviceType",
+                  "value": "Repair",
+                  "type": "text",
+                  "uuid": "7c335597-3334-4de9-b8fb-dfb272dc7339"
+                },
+                {
+                  "key": "priorityLevel",
+                  "value": "Normal",
+                  "type": "text",
+                  "uuid": "0c497d74-09bf-4556-8629-368e73b09849"
+                },
+                {
+                  "key": "services",
+                  "value": "[\n    {\n      \"id\": \"6981ca3f6a3c811e162f9a4b\",\n      \"subServices\": [\n        {\n          \"id\": \"6981cb86db86a150db7449c5\",\n          \"price\": 1200\n        }\n      ]\n    },\n    {\n      \"id\": \"6981ca4c6a3c811e162f9a50\",\n      \"subServices\": [\n        {\n          \"id\": \"6981ca4c6a3c811e162f9a53\",\n          \"price\": 500\n        }\n      ]\n    }\n  ]",
+                  "type": "text",
+                  "uuid": "19f90f1f-719c-438d-903a-c3d63451845b"
+                },
+                {
+                  "key": "additionalNotes",
+                  "value": "asdfghjkl asdfghj",
+                  "type": "text",
+                  "uuid": "04f568f4-9d61-4931-96a5-aac735f7f68b"
+                },
+                {
+                  "key": "vehiclePhotos",
+                  "type": "file",
+                  "uuid": "a8e26540-d614-4961-967f-eb7a7c288254",
+                  "src": [
+                    "/Users/yugalrajvimal/Downloads/2.jpeg",
+                    "/Users/yugalrajvimal/Downloads/3.jpeg",
+                    "/Users/yugalrajvimal/Downloads/4.jpeg",
+                    "/Users/yugalrajvimal/Downloads/5.jpg"
+                  ]
+                },
+                {
+                  "key": "technicalRemarks",
+                  "value": "ghfhgjvhj hhgvhjbv",
+                  "type": "text",
+                  "uuid": "f10928a4-ba2c-4d09-986f-8664f0f96dff"
+                },
+                {
+                  "key": "dealCode",
+                  "value": "FIRST-10",
+                  "type": "text",
+                  "uuid": "21840d40-dc06-47e5-b945-a87b7517e964"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{localURL}}/api/car-owner/job-cards",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "car-owner",
+                "job-cards"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "AutoShop",
+      "item": [
+        {
+          "name": "Team Members",
+          "item": [
+            {
+              "name": "Add Member",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "teamMemberPhoto",
+                      "type": "file",
+                      "uuid": "98d860e3-b85a-4db4-95d4-e2cda5c0a2ed",
+                      "src": "/Users/yugalrajvimal/Downloads/1639484041471.jpg"
+                    },
+                    {
+                      "key": "name",
+                      "value": "ABC",
+                      "type": "text",
+                      "uuid": "4f046945-e7f8-42a3-a24b-1bc7d7672573"
+                    },
+                    {
+                      "key": "email",
+                      "value": "abc@gmail.com",
+                      "type": "text",
+                      "uuid": "0d861488-b762-430e-9995-9a777d4fd70a"
+                    },
+                    {
+                      "key": "phone",
+                      "value": "8888888888",
+                      "type": "text",
+                      "uuid": "fa1212e8-a6e1-43c0-9e53-75865c71392e"
+                    },
+                    {
+                      "key": "designation",
+                      "value": "zxcvbxnnnzmzm",
+                      "type": "text",
+                      "uuid": "b31bf30d-0aee-4ee7-8135-2ead587725b8"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/team-members",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "team-members"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Edit Member",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "teamMemberPhoto",
+                      "type": "file",
+                      "uuid": "98d860e3-b85a-4db4-95d4-e2cda5c0a2ed",
+                      "src": "/Users/yugalrajvimal/Downloads/1639484041471.jpg"
+                    },
+                    {
+                      "key": "name",
+                      "value": "ABCD",
+                      "type": "text",
+                      "uuid": "4f046945-e7f8-42a3-a24b-1bc7d7672573"
+                    },
+                    {
+                      "key": "email",
+                      "value": "abc@gmail.com",
+                      "type": "text",
+                      "uuid": "0d861488-b762-430e-9995-9a777d4fd70a"
+                    },
+                    {
+                      "key": "phone",
+                      "value": "8888888889",
+                      "type": "text",
+                      "uuid": "fa1212e8-a6e1-43c0-9e53-75865c71392e"
+                    },
+                    {
+                      "key": "designation",
+                      "value": "aaaaaaaaaa",
+                      "type": "text",
+                      "uuid": "b31bf30d-0aee-4ee7-8135-2ead587725b8"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/team-members/697c773c77d4b29aef6edf81",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "team-members",
+                    "697c773c77d4b29aef6edf81"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Fetch Member",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": []
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/team-members",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "team-members"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Member",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": []
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/team-members/697c775d77d4b29aef6edf88",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "team-members",
+                    "697c775d77d4b29aef6edf88"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "BussinessProfile",
+          "item": [
+            {
+              "name": "Complete Business Profile",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjA4Nzg0MiwiZXhwIjoxNzcyMTc0MjQyfQ.5Asces9xrNF7x-siHhsIQqDnWQiw5iYZ94zbuMInJj8",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "businessName",
+                      "value": "ABCD 1234 Shop",
+                      "type": "text",
+                      "uuid": "6434800b-3913-41bd-a95b-8c06d80632ae"
+                    },
+                    {
+                      "key": "businessAddress",
+                      "value": "ABCD 1234 Address",
+                      "type": "text",
+                      "uuid": "5b2991ed-7f63-41ba-a2c3-5faca164f907"
+                    },
+                    {
+                      "key": "pincode",
+                      "value": "123456",
+                      "type": "text",
+                      "uuid": "474c7626-945f-419d-b0ba-f988955e96f2"
+                    },
+                    {
+                      "key": "lat",
+                      "value": "231412334213",
+                      "type": "text",
+                      "uuid": "f0a1963b-6d23-4217-9421-4872127859b2"
+                    },
+                    {
+                      "key": "lng",
+                      "value": "2314321431243",
+                      "type": "text",
+                      "uuid": "d20c948d-c25d-4419-aba8-ee355cfd2e1b"
+                    },
+                    {
+                      "key": "businessPhone",
+                      "value": "9999991111",
+                      "type": "text",
+                      "uuid": "c5456b32-569b-4c37-b6da-a9cf8ec8f7b7"
+                    },
+                    {
+                      "key": "businessEmail",
+                      "value": "abc@gmail.com",
+                      "type": "text",
+                      "uuid": "8877c600-2bf9-4789-8ae0-3037e22e49ee"
+                    },
+                    {
+                      "key": "businessHSTNumber",
+                      "value": "1232132131232131",
+                      "type": "text",
+                      "uuid": "64c4a927-ae6f-4e6f-a0bd-258c343dabd3"
+                    },
+                    {
+                      "key": "openHours",
+                      "value": "08:00-20:00",
+                      "type": "text",
+                      "uuid": "3b6df743-256c-42df-961c-c3ef84a9bb0e"
+                    },
+                    {
+                      "key": "openDays",
+                      "value": "[\"Monday\", \"Tuesday\"]",
+                      "type": "text",
+                      "uuid": "3d0ebd0f-6fac-45f7-b9d6-65e0462103e0"
+                    },
+                    {
+                      "key": "businessLogo",
+                      "type": "file",
+                      "uuid": "e7f95cc1-195d-4f60-87d1-9d0cacf5abb6",
+                      "src": "/Users/yugalrajvimal/Desktop/Screenshot/Screenshot 2026-01-12 at 12.13.51 PM.png"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/complete-business-profile",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "complete-business-profile"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Edit Business Profile",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjA4ODEzNiwiZXhwIjoxNzcyMTc0NTM2fQ.lUov_N9trsSQBkr1VcLzjGYy9KNcEENlAqCe9JlJpCk",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "businessName",
+                      "value": "ABC 1234 Shopsdcsdcsdcs",
+                      "type": "text",
+                      "uuid": "6434800b-3913-41bd-a95b-8c06d80632ae"
+                    },
+                    {
+                      "key": "businessAddress",
+                      "value": "ABC1234 Address ",
+                      "type": "text",
+                      "uuid": "5b2991ed-7f63-41ba-a2c3-5faca164f907"
+                    },
+                    {
+                      "key": "pincode",
+                      "value": "123456",
+                      "type": "text",
+                      "uuid": "474c7626-945f-419d-b0ba-f988955e96f2"
+                    },
+                    {
+                      "key": "lng",
+                      "value": "372648763289643",
+                      "type": "text",
+                      "uuid": "f0a1963b-6d23-4217-9421-4872127859b2"
+                    },
+                    {
+                      "key": "lat",
+                      "value": "312432423432432",
+                      "type": "text",
+                      "uuid": "ae333e27-619b-45dd-aed9-6b162c85dc73"
+                    },
+                    {
+                      "key": "businessPhone",
+                      "value": "9999991111",
+                      "type": "text",
+                      "uuid": "c5456b32-569b-4c37-b6da-a9cf8ec8f7b7"
+                    },
+                    {
+                      "key": "businessEmail",
+                      "value": "abc1111@gmail.com",
+                      "type": "text",
+                      "uuid": "8877c600-2bf9-4789-8ae0-3037e22e49ee"
+                    },
+                    {
+                      "key": "businessHSTNumber",
+                      "value": "12321321312111111",
+                      "type": "text",
+                      "uuid": "64c4a927-ae6f-4e6f-a0bd-258c343dabd3"
+                    },
+                    {
+                      "key": "openHours",
+                      "value": "08:00-20:00",
+                      "type": "text",
+                      "uuid": "3b6df743-256c-42df-961c-c3ef84a9bb0e"
+                    },
+                    {
+                      "key": "openDays",
+                      "value": "[\"Monday\", \"Tuesday\"]",
+                      "type": "text",
+                      "uuid": "3d0ebd0f-6fac-45f7-b9d6-65e0462103e0"
+                    },
+                    {
+                      "key": "businessLogo",
+                      "type": "file",
+                      "uuid": "e7f95cc1-195d-4f60-87d1-9d0cacf5abb6",
+                      "src": "/Users/yugalrajvimal/Downloads/WhatsApp Image 2026-02-02 at 15.56.15.jpeg"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/edit-business-profile",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "edit-business-profile"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Whole Profile ( Auto Shop Owner + Business Profile )",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjA4ODEzNiwiZXhwIjoxNzcyMTc0NTM2fQ.lUov_N9trsSQBkr1VcLzjGYy9KNcEENlAqCe9JlJpCk",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": []
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/profile",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "profile"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Edit Auto Shop Owner Profile",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n     \"name\":\"AB9999\", \"email\":\"abc99999@gmail.com\", \"pincode\":\"999999\", \"address\":\"bbbbbbb\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/edit-profile",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "edit-profile"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "My Customers",
+          "item": [
+            {
+              "name": "Search CarOwners",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/search-carowner",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "search-carowner"
+                  ],
+                  "query": [
+                    {
+                      "key": "name",
+                      "value": "abc",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "phone",
+                      "value": "9717088506",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "email",
+                      "value": "abc@gmail.com",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add To My Customers",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"carOwnerId\":\"6978958e79b16832f3b4646e\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-customers",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-customers"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "remove from My Customers",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"carOwnerId\":\"6978958e79b16832f3b4646e\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-customers",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-customers"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Fetch My Customers",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-customers",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-customers"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Onboard CarOwner with multiple vehicles",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"ABC\",\n  \"email\": \"abc22@gmail.com\",\n  \"countryCode\": \"+91\",\n  \"phone\": \"9999999922\",\n  \"pincode\": \"123456\",\n  \"role\": \"carowner\",\n  \"address\": \"qwertyuiop asghjkl zbnm\",\n  \"vehicles\": [\n    {\n      \"licensePlateNo\": \"UH12AB1234\",\n      \"vinNo\": \"VIN123456789\",\n      \"vehicleName\": \"Hyundai\",\n      \"model\": \"i20\",\n      \"year\": \"2015\",\n      \"odometerReading\": \"45000\"\n    },\n    {\n      \"licensePlateNo\": \"DL01CD5678\",\n      \"vinNo\": \"VIN987654321\",\n      \"vehicleName\": \"Honda\",\n      \"model\": \"City\",\n      \"year\": \"2018\",\n      \"odometerReading\": \"32000\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/api/auto-shop-owner/onboard-carowner",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "onboard-carowner"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Edit CarOwner with multiple vehicles Copy",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjA4ODEzNiwiZXhwIjoxNzcyMTc0NTM2fQ.lUov_N9trsSQBkr1VcLzjGYy9KNcEENlAqCe9JlJpCk",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"carOwnerId\":\"697c879028cd8ea8fa04eab9\",\n  \"name\": \"ABC\",\n  \"email\": \"abc22@gmail.com\",\n  \"countryCode\": \"+91\",\n  \"phone\": \"9999999922\",\n  \"pincode\": \"123456\",\n  \"address\": \"qwertyuiop asghjkl zbnm\",\n  \"myVehicles\": [\n    {\n      \"licensePlateNo\": \"UH12AB1234\",\n      \"vinNo\": \"VIN123456789\",\n      \"vehicleName\": \"Hyundai\",\n      \"model\": \"i20\",\n      \"year\": \"2015\",\n      \"odometerReading\": \"45000\"\n    },\n    {\n      \"licensePlateNo\": \"DL01CD5678\",\n      \"vinNo\": \"VIN987654321\",\n      \"vehicleName\": \"Honda\",\n      \"model\": \"City\",\n      \"year\": \"2018\",\n      \"odometerReading\": \"32000\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-customers",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-customers"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "verify Onboarded CarOwner",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n \"phone\": \"9999999966\",\n        \"countryCode\": \"+91\", \"otp\":\"000000\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/verify-onboarded-carowner",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "verify-onboarded-carowner"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "MyServices",
+          "item": [
+            {
+              "name": "Add to My Services",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjE5MjI2OSwiZXhwIjoxNzcyMjc4NjY5fQ.JIBRN1-TmwwoXEK-SCsvS0TifJheP_qmZBGEsGCznZw",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"services\": [\n    {\n      \"id\": \"69a01e990350740b4d61efbb\",\n      \"subServices\": [\n        {\n          \"name\": \"Basic Oil Change\",\n          \"desc\": \"Engine oil + filter replacement\",\n          \"price\": 1200\n        },\n        {\n          \"name\": \"Premium Oil Change\",\n          \"desc\": \"Synthetic oil replacement\",\n          \"price\": 2200\n        }\n      ]\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-services",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-services"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Edit My Services",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjE5MjI2OSwiZXhwIjoxNzcyMjc4NjY5fQ.JIBRN1-TmwwoXEK-SCsvS0TifJheP_qmZBGEsGCznZw",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"services\": [\n    {\n      \"id\": \"65f1c2a8e13b4b0012345678\",\n      \"subServices\": [\n        {\n          \"name\": \"Premium Wash\",\n          \"desc\": \"Interior + exterior\",\n          \"price\": 800\n        }\n      ]\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-services",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-services"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get My Services",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODFiOWEyODE4NWYzOWJmN2U4MDFjNSIsImlhdCI6MTc3MDEwOTM1MSwiZXhwIjoxNzcwMTk1NzUxfQ.9QTPdD6_8n1mtvOUfuq2qBrVYmhLTYd8qFPGk7TxELI",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"services\":[\n{\n\"id\":\"6981ca3f6a3c811e162f9a4b\",\n\"services\":[\"6981cb23db86a150db7449a7\",\"6981cb86db86a150db7449c5\"]\n},\n{\n\"id\":\"6981ca4c6a3c811e162f9a50\",\n\"services\":[\"6981cb23db86a150db7449a7\",\"6981ca4c6a3c811e162f9a53\"]\n}\n] }"
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-services",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-services"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get All Services",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODFiOWEyODE4NWYzOWJmN2U4MDFjNSIsImlhdCI6MTc3MDM3NjU5OCwiZXhwIjoxNzcwNDYyOTk4fQ.HTFmWzywjF6OTkLAOb-L0y7E3HF9oOzypvP84rZbBf0",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"services\":[\n{\n\"id\":\"6981ca3f6a3c811e162f9a4b\",\n\"services\":[\"6981cb23db86a150db7449a7\",\"6981cb86db86a150db7449c5\"]\n},\n{\n\"id\":\"6981ca4c6a3c811e162f9a50\",\n\"services\":[\"6981cb23db86a150db7449a7\",\"6981ca4c6a3c811e162f9a53\"]\n}\n] }"
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/services",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "services"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Deals",
+          "item": [
+            {
+              "name": "Create Deals",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjE5Mjc3OSwiZXhwIjoxNzcyMjc5MTc5fQ.Z_Y1KHacFOyKAcszrceEUowUbXp0I1dL9gZKdsaPeso",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "productImage",
+                      "type": "file",
+                      "uuid": "3eeed82f-90e0-4d1b-bda8-ddbef05fa116",
+                      "src": "/Users/yugalrajvimal/Desktop/Screenshot/Screenshot 2026-02-20 at 7.10.01 PM.png"
+                    },
+                    {
+                      "key": "description",
+                      "value": "ascdc",
+                      "type": "text",
+                      "uuid": "1c84468f-c369-4594-bce8-8f0dbc120eb8"
+                    },
+                    {
+                      "key": "productName",
+                      "value": "dcds",
+                      "type": "text",
+                      "uuid": "3a9b6d42-0e75-4550-8883-f4d85c4999d8"
+                    },
+                    {
+                      "key": "price",
+                      "value": "2314213",
+                      "type": "text",
+                      "uuid": "6d9ad621-0834-4321-b233-45c7e080ddd2"
+                    },
+                    {
+                      "key": "discountedPrice",
+                      "value": "232142",
+                      "type": "text",
+                      "uuid": "b1b8859a-f1db-48e8-af88-bdb036c8d1e1"
+                    },
+                    {
+                      "key": "dealEnabled",
+                      "value": "true",
+                      "type": "text",
+                      "uuid": "81a71809-fec3-4d82-961e-fe02b8bd53bf"
+                    },
+                    {
+                      "key": "offersEndOnDate",
+                      "value": "2026-02-27T12:26:37.514Z",
+                      "type": "text",
+                      "uuid": "bec15725-beca-4422-926f-aff4d1650545"
+                    },
+                    {
+                      "key": "serviceId",
+                      "value": "69a01ea10350740b4d61efbe",
+                      "type": "text",
+                      "uuid": "320efbc8-7f31-4de8-ae8a-b006d7844367"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-deals",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-deals"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get My Deals",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODFiOWEyODE4NWYzOWJmN2U4MDFjNSIsImlhdCI6MTc3MDEwOTM1MSwiZXhwIjoxNzcwMTk1NzUxfQ.9QTPdD6_8n1mtvOUfuq2qBrVYmhLTYd8qFPGk7TxELI",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-deals",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-deals"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "EditDeals",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjE5Mjc3OSwiZXhwIjoxNzcyMjc5MTc5fQ.Z_Y1KHacFOyKAcszrceEUowUbXp0I1dL9gZKdsaPeso",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "productName",
+                      "value": "fscdhjbsdhc",
+                      "type": "text",
+                      "uuid": "514199d5-1f0a-4627-90c2-37bf2e91c08e"
+                    },
+                    {
+                      "key": "productImage",
+                      "value": "dsabchjkasdbc",
+                      "type": "text",
+                      "uuid": "07c8368b-5e4a-4f63-bd46-ed00e0b0d76e"
+                    },
+                    {
+                      "key": "description",
+                      "value": "sajhcbahjsdkbcakdsbc",
+                      "type": "text",
+                      "uuid": "b94f171c-c858-4d01-8b63-3eb2ce068a0d"
+                    },
+                    {
+                      "key": "price",
+                      "value": "2781637821",
+                      "type": "text",
+                      "uuid": "e234d0cd-d156-4a42-bf93-e705d4330a5b"
+                    },
+                    {
+                      "key": "discountedPrice",
+                      "value": "2431432",
+                      "type": "text",
+                      "uuid": "8cc41af6-228c-48a0-8f8c-4c4cff48651f"
+                    },
+                    {
+                      "key": "dealEnabled",
+                      "value": "true",
+                      "type": "text",
+                      "uuid": "8c3fb161-2b2f-4c29-bbda-231376d5e987"
+                    },
+                    {
+                      "key": "offersEndOnDate",
+                      "value": "2026-02-27T12:25:54.665Z",
+                      "type": "text",
+                      "uuid": "c0339b3d-ee91-4778-88a9-898258524195"
+                    },
+                    {
+                      "key": "serviceId",
+                      "value": "69a01ea10350740b4d61efbe",
+                      "type": "text",
+                      "uuid": "36f2be05-8d2f-4da2-bbb1-f04609c01790"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-deals/69a18d7d8d8b8080f24a5520",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-deals",
+                    "69a18d7d8d8b8080f24a5520"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Deals",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODFiOWEyODE4NWYzOWJmN2U4MDFjNSIsImlhdCI6MTc3MDEwOTM1MSwiZXhwIjoxNzcwMTk1NzUxfQ.9QTPdD6_8n1mtvOUfuq2qBrVYmhLTYd8qFPGk7TxELI",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/my-deals/6981dd44abd6b545cda430a0",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "my-deals",
+                    "6981dd44abd6b545cda430a0"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get All Services Copy",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODFiOWEyODE4NWYzOWJmN2U4MDFjNSIsImlhdCI6MTc3MDM3NjU5OCwiZXhwIjoxNzcwNDYyOTk4fQ.HTFmWzywjF6OTkLAOb-L0y7E3HF9oOzypvP84rZbBf0",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"services\":[\n{\n\"id\":\"6981ca3f6a3c811e162f9a4b\",\n\"services\":[\"6981cb23db86a150db7449a7\",\"6981cb86db86a150db7449c5\"]\n},\n{\n\"id\":\"6981ca4c6a3c811e162f9a50\",\n\"services\":[\"6981cb23db86a150db7449a7\",\"6981ca4c6a3c811e162f9a53\"]\n}\n] }"
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/services",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "services"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "getAllVehicleTypes",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NjA3NzA5NywiZXhwIjoxNzc2MTYzNDk3fQ.j1x9ie2u_ii9-U6tM-WTb2qefXy2Ljq4WeXohobNsuo",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "productImage",
+                      "type": "file",
+                      "uuid": "3eeed82f-90e0-4d1b-bda8-ddbef05fa116",
+                      "src": "/Users/yugalrajvimal/Desktop/Screenshot/Screenshot 2026-02-20 at 7.10.01 PM.png"
+                    },
+                    {
+                      "key": "description",
+                      "value": "ascdc",
+                      "type": "text",
+                      "uuid": "1c84468f-c369-4594-bce8-8f0dbc120eb8"
+                    },
+                    {
+                      "key": "productName",
+                      "value": "dcds",
+                      "type": "text",
+                      "uuid": "3a9b6d42-0e75-4550-8883-f4d85c4999d8"
+                    },
+                    {
+                      "key": "price",
+                      "value": "2314213",
+                      "type": "text",
+                      "uuid": "6d9ad621-0834-4321-b233-45c7e080ddd2"
+                    },
+                    {
+                      "key": "discountedPrice",
+                      "value": "232142",
+                      "type": "text",
+                      "uuid": "b1b8859a-f1db-48e8-af88-bdb036c8d1e1"
+                    },
+                    {
+                      "key": "dealEnabled",
+                      "value": "true",
+                      "type": "text",
+                      "uuid": "81a71809-fec3-4d82-961e-fe02b8bd53bf"
+                    },
+                    {
+                      "key": "offersEndOnDate",
+                      "value": "2026-02-27T12:26:37.514Z",
+                      "type": "text",
+                      "uuid": "bec15725-beca-4422-926f-aff4d1650545"
+                    },
+                    {
+                      "key": "serviceId",
+                      "value": "69a01ea10350740b4d61efbe",
+                      "type": "text",
+                      "uuid": "320efbc8-7f31-4de8-ae8a-b006d7844367"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/vehicle-types-and-services",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "vehicle-types-and-services"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "JobCard",
+          "item": [
+            {
+              "name": "GetJobCardPageDetails",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODFiOWEyODE4NWYzOWJmN2U4MDFjNSIsImlhdCI6MTc3MDM3NjU5OCwiZXhwIjoxNzcwNDYyOTk4fQ.HTFmWzywjF6OTkLAOb-L0y7E3HF9oOzypvP84rZbBf0",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/job-card-page",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-card-page"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Job Card",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjE5Mjc3OSwiZXhwIjoxNzcyMjc5MTc5fQ.Z_Y1KHacFOyKAcszrceEUowUbXp0I1dL9gZKdsaPeso",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "customerId",
+                      "value": "697c879028cd8ea8fa04eab9",
+                      "type": "text",
+                      "uuid": "9e021a5c-033d-491c-976b-ecb90012513a"
+                    },
+                    {
+                      "key": "vehicleId",
+                      "value": "69a01b661b41799169954b54",
+                      "type": "text",
+                      "uuid": "0b2265bd-e247-4394-ade8-926b847878ca"
+                    },
+                    {
+                      "key": "odometerReading",
+                      "value": "15000",
+                      "type": "text",
+                      "uuid": "aae585a9-15fc-48f5-8386-495a3de22613"
+                    },
+                    {
+                      "key": "dueOdometerReading",
+                      "value": "20000",
+                      "type": "text",
+                      "uuid": "c8e59ec8-add0-42fc-bf94-63ce418aa9e8"
+                    },
+                    {
+                      "key": "issueDescription",
+                      "value": "abc",
+                      "type": "text",
+                      "uuid": "8c6b3c74-de97-4777-b715-bb1e2eb354bc"
+                    },
+                    {
+                      "key": "serviceType",
+                      "value": "Repair",
+                      "type": "text",
+                      "uuid": "7c335597-3334-4de9-b8fb-dfb272dc7339"
+                    },
+                    {
+                      "key": "priorityLevel",
+                      "value": "Normal",
+                      "type": "text",
+                      "uuid": "0c497d74-09bf-4556-8629-368e73b09849"
+                    },
+                    {
+                      "key": "services",
+                      "value": "[\n  {\n    \"service\": \"69a01e990350740b4d61efbb\",\n    \"subServices\": [\n      {\n        \"name\": \"Basic Oil Change\",\n        \"desc\": \"Replace engine oil and filter\",\n        \"price\": 1500\n      },\n      {\n        \"name\": \"Premium Wash\",\n        \"desc\": \"Fix oil leakage\",\n        \"price\": 2500\n      }\n    ]\n  }\n]",
+                      "type": "text",
+                      "uuid": "19f90f1f-719c-438d-903a-c3d63451845b"
+                    },
+                    {
+                      "key": "additionalNotes",
+                      "value": "asdfghjkl asdfghj",
+                      "type": "text",
+                      "uuid": "04f568f4-9d61-4931-96a5-aac735f7f68b"
+                    },
+                    {
+                      "key": "vehiclePhotos",
+                      "type": "file",
+                      "uuid": "a8e26540-d614-4961-967f-eb7a7c288254",
+                      "src": [
+                        "/Users/yugalrajvimal/Downloads/3.jpeg",
+                        "/Users/yugalrajvimal/Downloads/4.jpeg"
+                      ]
+                    },
+                    {
+                      "key": "technicalRemarks",
+                      "value": "ghfhgjvhj hhgvhjbv",
+                      "type": "text",
+                      "uuid": "f10928a4-ba2c-4d09-986f-8664f0f96dff"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/job-cards",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Edit Job Card",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjE5Mjc3OSwiZXhwIjoxNzcyMjc5MTc5fQ.Z_Y1KHacFOyKAcszrceEUowUbXp0I1dL9gZKdsaPeso",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "customerId",
+                      "value": "697c879028cd8ea8fa04eab9",
+                      "type": "text",
+                      "uuid": "9e021a5c-033d-491c-976b-ecb90012513a"
+                    },
+                    {
+                      "key": "vehicleId",
+                      "value": "69a01b661b41799169954b54",
+                      "type": "text",
+                      "uuid": "0b2265bd-e247-4394-ade8-926b847878ca"
+                    },
+                    {
+                      "key": "odometerReading",
+                      "value": "15000",
+                      "type": "text",
+                      "uuid": "aae585a9-15fc-48f5-8386-495a3de22613"
+                    },
+                    {
+                      "key": "dueOdometerReading",
+                      "value": "20000",
+                      "type": "text",
+                      "uuid": "c8e59ec8-add0-42fc-bf94-63ce418aa9e8"
+                    },
+                    {
+                      "key": "issueDescription",
+                      "value": "abc",
+                      "type": "text",
+                      "uuid": "8c6b3c74-de97-4777-b715-bb1e2eb354bc"
+                    },
+                    {
+                      "key": "serviceType",
+                      "value": "Repair",
+                      "type": "text",
+                      "uuid": "7c335597-3334-4de9-b8fb-dfb272dc7339"
+                    },
+                    {
+                      "key": "priorityLevel",
+                      "value": "Normal",
+                      "type": "text",
+                      "uuid": "0c497d74-09bf-4556-8629-368e73b09849"
+                    },
+                    {
+                      "key": "services",
+                      "value": "[\n  {\n    \"service\": \"69a01e990350740b4d61efbb\",\n    \"subServices\": [\n      {\n        \"name\": \"Basic Oil Change\",\n        \"desc\": \"Replace engine oil and filter\",\n        \"price\": 1500\n      },\n      {\n        \"name\": \"Premium Wash\",\n        \"desc\": \"Fix oil leakage\",\n        \"price\": 2500\n      }\n    ]\n  }\n]",
+                      "type": "text",
+                      "uuid": "19f90f1f-719c-438d-903a-c3d63451845b"
+                    },
+                    {
+                      "key": "additionalNotes",
+                      "value": "asdfghjkl asdfghj",
+                      "type": "text",
+                      "uuid": "04f568f4-9d61-4931-96a5-aac735f7f68b"
+                    },
+                    {
+                      "key": "vehiclePhotos",
+                      "type": "file",
+                      "uuid": "a8e26540-d614-4961-967f-eb7a7c288254",
+                      "src": [
+                        "/Users/yugalrajvimal/Downloads/3.jpeg",
+                        "/Users/yugalrajvimal/Downloads/4.jpeg"
+                      ]
+                    },
+                    {
+                      "key": "technicalRemarks",
+                      "value": "ghfhgjvhj hhgvhjbv",
+                      "type": "text",
+                      "uuid": "f10928a4-ba2c-4d09-986f-8664f0f96dff"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/job-cards/69c63541bc6c58028f9acefa",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards",
+                    "69c63541bc6c58028f9acefa"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Job Card",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3MjE5Mjc3OSwiZXhwIjoxNzcyMjc5MTc5fQ.Z_Y1KHacFOyKAcszrceEUowUbXp0I1dL9gZKdsaPeso",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "customerId",
+                      "value": "697c879028cd8ea8fa04eab9",
+                      "type": "text",
+                      "uuid": "9e021a5c-033d-491c-976b-ecb90012513a"
+                    },
+                    {
+                      "key": "vehicleId",
+                      "value": "69a01b661b41799169954b54",
+                      "type": "text",
+                      "uuid": "0b2265bd-e247-4394-ade8-926b847878ca"
+                    },
+                    {
+                      "key": "odometerReading",
+                      "value": "15000",
+                      "type": "text",
+                      "uuid": "aae585a9-15fc-48f5-8386-495a3de22613"
+                    },
+                    {
+                      "key": "dueOdometerReading",
+                      "value": "20000",
+                      "type": "text",
+                      "uuid": "c8e59ec8-add0-42fc-bf94-63ce418aa9e8"
+                    },
+                    {
+                      "key": "issueDescription",
+                      "value": "abc",
+                      "type": "text",
+                      "uuid": "8c6b3c74-de97-4777-b715-bb1e2eb354bc"
+                    },
+                    {
+                      "key": "serviceType",
+                      "value": "Repair",
+                      "type": "text",
+                      "uuid": "7c335597-3334-4de9-b8fb-dfb272dc7339"
+                    },
+                    {
+                      "key": "priorityLevel",
+                      "value": "Normal",
+                      "type": "text",
+                      "uuid": "0c497d74-09bf-4556-8629-368e73b09849"
+                    },
+                    {
+                      "key": "services",
+                      "value": "[\n  {\n    \"service\": \"69a01e990350740b4d61efbb\",\n    \"subServices\": [\n      {\n        \"name\": \"Basic Oil Change\",\n        \"desc\": \"Replace engine oil and filter\",\n        \"price\": 1500\n      },\n      {\n        \"name\": \"Premium Wash\",\n        \"desc\": \"Fix oil leakage\",\n        \"price\": 2500\n      }\n    ]\n  }\n]",
+                      "type": "text",
+                      "uuid": "19f90f1f-719c-438d-903a-c3d63451845b"
+                    },
+                    {
+                      "key": "additionalNotes",
+                      "value": "asdfghjkl asdfghj",
+                      "type": "text",
+                      "uuid": "04f568f4-9d61-4931-96a5-aac735f7f68b"
+                    },
+                    {
+                      "key": "vehiclePhotos",
+                      "type": "file",
+                      "uuid": "a8e26540-d614-4961-967f-eb7a7c288254",
+                      "src": [
+                        "/Users/yugalrajvimal/Downloads/3.jpeg",
+                        "/Users/yugalrajvimal/Downloads/4.jpeg"
+                      ]
+                    },
+                    {
+                      "key": "technicalRemarks",
+                      "value": "ghfhgjvhj hhgvhjbv",
+                      "type": "text",
+                      "uuid": "f10928a4-ba2c-4d09-986f-8664f0f96dff"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/job-cards/69c63541bc6c58028f9acefa",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards",
+                    "69c63541bc6c58028f9acefa"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get All My Job Card",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODFiOWEyODE4NWYzOWJmN2U4MDFjNSIsImlhdCI6MTc3MDI5NDk3MSwiZXhwIjoxNzcwMzgxMzcxfQ.vWQhK0dqdHZYRkkx_go2MfxdhD6u797fvgZN1Te3egw",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "customerId",
+                      "value": "6978958e79b16832f3b4646e",
+                      "type": "text",
+                      "uuid": "9e021a5c-033d-491c-976b-ecb90012513a"
+                    },
+                    {
+                      "key": "vehicleId",
+                      "value": "69809281cc7ce0a25ec23077",
+                      "type": "text",
+                      "uuid": "0b2265bd-e247-4394-ade8-926b847878ca"
+                    },
+                    {
+                      "key": "odometerReading",
+                      "value": "15000",
+                      "type": "text",
+                      "uuid": "aae585a9-15fc-48f5-8386-495a3de22613"
+                    },
+                    {
+                      "key": "issueDescription",
+                      "value": "abc",
+                      "type": "text",
+                      "uuid": "8c6b3c74-de97-4777-b715-bb1e2eb354bc"
+                    },
+                    {
+                      "key": "serviceType",
+                      "value": "Repair",
+                      "type": "text",
+                      "uuid": "7c335597-3334-4de9-b8fb-dfb272dc7339"
+                    },
+                    {
+                      "key": "priorityLevel",
+                      "value": "Normal",
+                      "type": "text",
+                      "uuid": "0c497d74-09bf-4556-8629-368e73b09849"
+                    },
+                    {
+                      "key": "services",
+                      "value": "[\n    {\n      \"id\": \"6981ca3f6a3c811e162f9a4b\",\n      \"subServices\": [\n        {\n          \"id\": \"6981cb86db86a150db7449c5\",\n          \"price\": 1200\n        }\n      ]\n    },\n    {\n      \"id\": \"6981ca4c6a3c811e162f9a50\",\n      \"subServices\": [\n        {\n          \"id\": \"6981ca4c6a3c811e162f9a53\",\n          \"price\": 500\n        }\n      ]\n    }\n  ]",
+                      "type": "text",
+                      "uuid": "19f90f1f-719c-438d-903a-c3d63451845b"
+                    },
+                    {
+                      "key": "additionalNotes",
+                      "value": "asdfghjkl asdfghj",
+                      "type": "text",
+                      "uuid": "04f568f4-9d61-4931-96a5-aac735f7f68b"
+                    },
+                    {
+                      "key": "vehiclePhotos",
+                      "type": "file",
+                      "uuid": "a8e26540-d614-4961-967f-eb7a7c288254",
+                      "src": [
+                        "/Users/yugalrajvimal/Downloads/2.jpeg",
+                        "/Users/yugalrajvimal/Downloads/3.jpeg",
+                        "/Users/yugalrajvimal/Downloads/4.jpeg",
+                        "/Users/yugalrajvimal/Downloads/5.jpg"
+                      ]
+                    },
+                    {
+                      "key": "technicalRemarks",
+                      "value": "ghfhgjvhj hhgvhjbv",
+                      "type": "text",
+                      "uuid": "f10928a4-ba2c-4d09-986f-8664f0f96dff"
+                    },
+                    {
+                      "key": "dealCode",
+                      "value": "FIRST-10",
+                      "type": "text",
+                      "uuid": "21840d40-dc06-47e5-b945-a87b7517e964"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/job-cards",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "All Payments / Wallet",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ODFiOWEyODE4NWYzOWJmN2U4MDFjNSIsImlhdCI6MTc3MDI5NDk3MSwiZXhwIjoxNzcwMzgxMzcxfQ.vWQhK0dqdHZYRkkx_go2MfxdhD6u797fvgZN1Te3egw",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "customerId",
+                      "value": "6978958e79b16832f3b4646e",
+                      "type": "text",
+                      "uuid": "9e021a5c-033d-491c-976b-ecb90012513a"
+                    },
+                    {
+                      "key": "vehicleId",
+                      "value": "69809281cc7ce0a25ec23077",
+                      "type": "text",
+                      "uuid": "0b2265bd-e247-4394-ade8-926b847878ca"
+                    },
+                    {
+                      "key": "odometerReading",
+                      "value": "15000",
+                      "type": "text",
+                      "uuid": "aae585a9-15fc-48f5-8386-495a3de22613"
+                    },
+                    {
+                      "key": "issueDescription",
+                      "value": "abc",
+                      "type": "text",
+                      "uuid": "8c6b3c74-de97-4777-b715-bb1e2eb354bc"
+                    },
+                    {
+                      "key": "serviceType",
+                      "value": "Repair",
+                      "type": "text",
+                      "uuid": "7c335597-3334-4de9-b8fb-dfb272dc7339"
+                    },
+                    {
+                      "key": "priorityLevel",
+                      "value": "Normal",
+                      "type": "text",
+                      "uuid": "0c497d74-09bf-4556-8629-368e73b09849"
+                    },
+                    {
+                      "key": "services",
+                      "value": "[\n    {\n      \"id\": \"6981ca3f6a3c811e162f9a4b\",\n      \"subServices\": [\n        {\n          \"id\": \"6981cb86db86a150db7449c5\",\n          \"price\": 1200\n        }\n      ]\n    },\n    {\n      \"id\": \"6981ca4c6a3c811e162f9a50\",\n      \"subServices\": [\n        {\n          \"id\": \"6981ca4c6a3c811e162f9a53\",\n          \"price\": 500\n        }\n      ]\n    }\n  ]",
+                      "type": "text",
+                      "uuid": "19f90f1f-719c-438d-903a-c3d63451845b"
+                    },
+                    {
+                      "key": "additionalNotes",
+                      "value": "asdfghjkl asdfghj",
+                      "type": "text",
+                      "uuid": "04f568f4-9d61-4931-96a5-aac735f7f68b"
+                    },
+                    {
+                      "key": "vehiclePhotos",
+                      "type": "file",
+                      "uuid": "a8e26540-d614-4961-967f-eb7a7c288254",
+                      "src": [
+                        "/Users/yugalrajvimal/Downloads/2.jpeg",
+                        "/Users/yugalrajvimal/Downloads/3.jpeg",
+                        "/Users/yugalrajvimal/Downloads/4.jpeg",
+                        "/Users/yugalrajvimal/Downloads/5.jpg"
+                      ]
+                    },
+                    {
+                      "key": "technicalRemarks",
+                      "value": "ghfhgjvhj hhgvhjbv",
+                      "type": "text",
+                      "uuid": "f10928a4-ba2c-4d09-986f-8664f0f96dff"
+                    },
+                    {
+                      "key": "dealCode",
+                      "value": "FIRST-10",
+                      "type": "text",
+                      "uuid": "21840d40-dc06-47e5-b945-a87b7517e964"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/payments",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "payments"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "SeacrhJobCard",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NDU5NDU2OSwiZXhwIjoxNzc0NjgwOTY5fQ.BxtW5K5mdfkxYuO2bqwq9s7SRpIYBtN9M8lwPOT4-Ec",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "customerId",
+                      "value": "6978958e79b16832f3b4646e",
+                      "type": "text",
+                      "uuid": "9e021a5c-033d-491c-976b-ecb90012513a"
+                    },
+                    {
+                      "key": "vehicleId",
+                      "value": "69809281cc7ce0a25ec23077",
+                      "type": "text",
+                      "uuid": "0b2265bd-e247-4394-ade8-926b847878ca"
+                    },
+                    {
+                      "key": "odometerReading",
+                      "value": "15000",
+                      "type": "text",
+                      "uuid": "aae585a9-15fc-48f5-8386-495a3de22613"
+                    },
+                    {
+                      "key": "issueDescription",
+                      "value": "abc",
+                      "type": "text",
+                      "uuid": "8c6b3c74-de97-4777-b715-bb1e2eb354bc"
+                    },
+                    {
+                      "key": "serviceType",
+                      "value": "Repair",
+                      "type": "text",
+                      "uuid": "7c335597-3334-4de9-b8fb-dfb272dc7339"
+                    },
+                    {
+                      "key": "priorityLevel",
+                      "value": "Normal",
+                      "type": "text",
+                      "uuid": "0c497d74-09bf-4556-8629-368e73b09849"
+                    },
+                    {
+                      "key": "services",
+                      "value": "[\n    {\n      \"id\": \"6981ca3f6a3c811e162f9a4b\",\n      \"subServices\": [\n        {\n          \"id\": \"6981cb86db86a150db7449c5\",\n          \"price\": 1200\n        }\n      ]\n    },\n    {\n      \"id\": \"6981ca4c6a3c811e162f9a50\",\n      \"subServices\": [\n        {\n          \"id\": \"6981ca4c6a3c811e162f9a53\",\n          \"price\": 500\n        }\n      ]\n    }\n  ]",
+                      "type": "text",
+                      "uuid": "19f90f1f-719c-438d-903a-c3d63451845b"
+                    },
+                    {
+                      "key": "additionalNotes",
+                      "value": "asdfghjkl asdfghj",
+                      "type": "text",
+                      "uuid": "04f568f4-9d61-4931-96a5-aac735f7f68b"
+                    },
+                    {
+                      "key": "vehiclePhotos",
+                      "type": "file",
+                      "uuid": "a8e26540-d614-4961-967f-eb7a7c288254",
+                      "src": [
+                        "/Users/yugalrajvimal/Downloads/2.jpeg",
+                        "/Users/yugalrajvimal/Downloads/3.jpeg",
+                        "/Users/yugalrajvimal/Downloads/4.jpeg",
+                        "/Users/yugalrajvimal/Downloads/5.jpg"
+                      ]
+                    },
+                    {
+                      "key": "technicalRemarks",
+                      "value": "ghfhgjvhj hhgvhjbv",
+                      "type": "text",
+                      "uuid": "f10928a4-ba2c-4d09-986f-8664f0f96dff"
+                    },
+                    {
+                      "key": "dealCode",
+                      "value": "FIRST-10",
+                      "type": "text",
+                      "uuid": "21840d40-dc06-47e5-b945-a87b7517e964"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/job-cards/search?q=J00001",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards",
+                    "search"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "J00001"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "MarkPaymentPaid/cancelled",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NDU5NDU2OSwiZXhwIjoxNzc0NjgwOTY5fQ.BxtW5K5mdfkxYuO2bqwq9s7SRpIYBtN9M8lwPOT4-Ec",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"paymentStatus\":\"Paid\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/job-cards/69c6348d79c2d6c897224ef2/mark-payment-status",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards",
+                    "69c6348d79c2d6c897224ef2",
+                    "mark-payment-status"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "MarkStatusApproved/Rejected",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NDU5NDU2OSwiZXhwIjoxNzc0NjgwOTY5fQ.BxtW5K5mdfkxYuO2bqwq9s7SRpIYBtN9M8lwPOT4-Ec",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"status\":\"Approved\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/job-cards/69c6348d79c2d6c897224ef2/mark-job-status",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards",
+                    "69c6348d79c2d6c897224ef2",
+                    "mark-job-status"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Wallet&Subscriptions",
+          "item": [
+            {
+              "name": "get All paid JobCards",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NjE5MjkyOCwiZXhwIjoxNzc2Mjc5MzI4fQ.BaNJ2rLxVnvJmS9WoUsPSM3nOj1uO8miarp9bCaLkRA",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/job-cards/paid",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards",
+                    "paid"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "get All Unpaid Jobcards",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NTcxNzc4NiwiZXhwIjoxNzc1ODA0MTg2fQ.koPJm0ZWdyNo1nFsYVuflJtxvq-hQeqpsOQEZgppNUc",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseURL}}/api/auto-shop-owner/job-cards/unpaid",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards",
+                    "unpaid"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Collect Payment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NTU1NTQ0OCwiZXhwIjoxNzc1NjQxODQ4fQ.a3kVWy4UzNRa23Ua6qGLm0vHXklvsVW9wbWmB2jL-Qk",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"jobCardId\":\"\",\n    \"paymentMethod\":\"Online\",\n    \"remark\":\"remark\",\n    \"amount\":679\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/api/auto-shop-owner/job-cards/collect-payment",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards",
+                    "collect-payment"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Mark Unpaid",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NTI4OTQzMiwiZXhwIjoxNzc1Mzc1ODMyfQ.z4TTOGtq35nRtGoORQXtqfqXd6fyJtjfFJQ6eZqynIo",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"jobCardId\":\"69c6ab2ba245a786c71a6fdd\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{localURL}}/api/auto-shop-owner/job-cards/mark-payment-invoice",
+                  "host": [
+                    "{{localURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards",
+                    "mark-payment-invoice"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "getJobCardUsingId",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NTcxNzc4NiwiZXhwIjoxNzc1ODA0MTg2fQ.koPJm0ZWdyNo1nFsYVuflJtxvq-hQeqpsOQEZgppNUc",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/api/auto-shop-owner/job-cards/69d78171209c96d239503ecf",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auto-shop-owner",
+                    "job-cards",
+                    "69d78171209c96d239503ecf"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "GetAllAutoShops",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NzM4MjMxYmU5OTk5OWIxZWVmNWYyNiIsImlhdCI6MTc2OTE4MDI5NSwiZXhwIjoxNzY5MjY2Njk1fQ.UjEhdUvXDBubc6dWaRbVRup4Rrob9vOpB6ptZaX8ok0",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseURL}}/api/auto-shop-owner",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "auto-shop-owner"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update-business-active-status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NjE5MjkyOCwiZXhwIjoxNzc2Mjc5MzI4fQ.BaNJ2rLxVnvJmS9WoUsPSM3nOj1uO8miarp9bCaLkRA",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"isBusinessActive\":true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{localURL}}/api/auto-shop-owner/update-business-active-status",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "auto-shop-owner",
+                "update-business-active-status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Webiste Templates",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NzYyMDQzNCwiZXhwIjoxNzc3NzA2ODM0fQ.hONBAgbSHrAAc5XbDEYE4E9gsXUYxBoCP-PmDjCnZOY",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{localURL}}/api/auto-shop-owner/website-templates",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "auto-shop-owner",
+                "website-templates"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get DashBoard details Copy",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWZlOGMwZDNkOGZmOTNjNzY1Yjk2MCIsImlhdCI6MTc3NzYyMDQzNCwiZXhwIjoxNzc3NzA2ODM0fQ.hONBAgbSHrAAc5XbDEYE4E9gsXUYxBoCP-PmDjCnZOY",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{localURL}}/api/auto-shop-owner/dashboard-details-new",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "auto-shop-owner",
+                "dashboard-details-new"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Add Services",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "  {\n    \"name\": \"Car Wash & Detailing\",\n    \"desc\": \"Interior and exterior cleaning and detailing services.\",\n    \"services\": [\n      {\n        \"name\": \"Basic Wash\",\n        \"desc\": \"Exterior wash and drying.\",\n        \"price\": \"399\"\n      },\n      {\n        \"name\": \"Interior Cleaning\",\n        \"desc\": \"Vacuuming, dashboard polish, and seat cleaning.\",\n        \"price\": \"999\"\n      },\n      {\n        \"name\": \"Full Detailing\",\n        \"desc\": \"Complete interior and exterior detailing with wax.\",\n        \"price\": \"3999\"\n      }\n    ]\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{localURL}}/api/admin/services",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "services"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Edit Services",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "  {\n    \"name\": \"Engine Repair\",\n    \"desc\": \"Diagnosis and repair of engine-related issues.\",\n    \"services\": [\n      {\n        \"name\": \"Engine Diagnostics\",\n        \"desc\": \"Computerized scanning and performance analysis.\",\n        \"price\": \"799\"\n      },\n      {\n        \"name\": \"Minor Engine Repair\",\n        \"desc\": \"Repair of small leaks, sensors, and belts.\",\n        \"price\": \"2499\"\n      },\n      {\n        \"name\": \"Engine Overhaul\",\n        \"desc\": \"Complete engine disassembly and rebuilding.\",\n        \"price\": \"25000\"\n      }\n    ]\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{localURL}}/api/admin/services/6981ca3f6a3c811e162f9a4b",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "services",
+                "6981ca3f6a3c811e162f9a4b"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Fetch all Services",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1YTFiY2MwN2JmMGM0YzdjZTFiNiIsImlhdCI6MTc2OTc1NzIyMywiZXhwIjoxNzY5ODQzNjIzfQ.ZFwJkYSvbjtzjIDIbJYVTD96NPL_LPcnR3Cz244gm2Q",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "  {\n    \"name\": \"Car Wash & Detailing\",\n    \"desc\": \"Interior and exterior cleaning and detailing services.\",\n    \"services\": [\n      {\n        \"name\": \"Basic Wash\",\n        \"desc\": \"Exterior wash and drying.\",\n        \"price\": \"399\"\n      },\n      {\n        \"name\": \"Interior Cleaning\",\n        \"desc\": \"Vacuuming, dashboard polish, and seat cleaning.\",\n        \"price\": \"999\"\n      },\n      {\n        \"name\": \"Full Detailing\",\n        \"desc\": \"Complete interior and exterior detailing with wax.\",\n        \"price\": \"3999\"\n      }\n    ]\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{localURL}}/api/admin/services",
+              "host": [
+                "{{localURL}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "services"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "New Request",
+      "request": {
+        "method": "GET",
+        "header": []
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseURL",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "localURL",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}
