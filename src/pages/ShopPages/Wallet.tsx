@@ -251,6 +251,31 @@ function todayYMD() {
   return `${y}-${m}-${day}`;
 }
 
+function resolveCategoryValue(categories: CategoryOption[], raw: unknown): string {
+  const input = String(raw ?? "").trim();
+  if (!input) return "";
+  const direct = categories.find((c) => c.value === input);
+  if (direct) return direct.value;
+  const byLabel = categories.find((c) => c.label.toLowerCase() === input.toLowerCase());
+  if (byLabel) return byLabel.value;
+  const slug = slugifyLabel(input);
+  const bySlug = categories.find((c) => c.value === slug);
+  return bySlug ? bySlug.value : slug;
+}
+
+function resolveSubcategoryValue(category: CategoryOption | undefined, raw: unknown): string {
+  const input = String(raw ?? "").trim();
+  if (!input) return "";
+  const subs = category?.subcategories ?? [];
+  const direct = subs.find((s) => s.value === input);
+  if (direct) return direct.value;
+  const byLabel = subs.find((s) => s.label.toLowerCase() === input.toLowerCase());
+  if (byLabel) return byLabel.value;
+  const slug = slugifyLabel(input);
+  const bySlug = subs.find((s) => s.value === slug);
+  return bySlug ? bySlug.value : slug;
+}
+
 const SHOP_TABLE_BASE = adminPanelTableClasses(true);
 const SHOP_TABLE: AdminPanelTableClasses = {
   ...SHOP_TABLE_BASE,
@@ -1134,6 +1159,7 @@ export default function ShopWalletPage() {
   const [expenseCategories, setExpenseCategories] = useState<CategoryOption[]>(() =>
     cloneCategories(EXPENSE_CATEGORIES),
   );
+  const effectiveExpenseCategories = expenseCategories.length > 0 ? expenseCategories : EXPENSE_CATEGORIES;
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [expenseAmount, setExpenseAmount] = useState("");
@@ -1175,6 +1201,14 @@ export default function ShopWalletPage() {
   } = useShopWallet();
   const mockLedger = useMockShopInvoiceLedger();
 
+  // Guard: categories must exist even if expenses list is empty.
+  // If some path accidentally cleared categories, re-seed from defaults.
+  useEffect(() => {
+    if (expenseCategories.length === 0) {
+      setExpenseCategories(cloneCategories(EXPENSE_CATEGORIES));
+    }
+  }, [expenseCategories.length]);
+
   const loadAccounts = useCallback(async () => {
     if (USE_DUMMY_SHOP_WALLET) return;
     if (!token) return;
@@ -1204,8 +1238,23 @@ export default function ShopWalletPage() {
               date: String(e.date ?? "").slice(0, 10) || todayYMD(),
               vendor: String(e.vendor ?? ""),
               amount: Number(e.amount ?? 0) || 0,
-              category: String(e.category ?? ""),
-              subcategory: String(e.subCategory ?? e.subcategory ?? ""),
+              category: (() => {
+                const rawCategory = e.category ?? e.Category ?? e.expenseCategory ?? e.expense_category;
+                return resolveCategoryValue(effectiveExpenseCategories, rawCategory);
+              })(),
+              subcategory: (() => {
+                const rawCategory = e.category ?? e.Category ?? e.expenseCategory ?? e.expense_category;
+                const resolvedCategory = resolveCategoryValue(effectiveExpenseCategories, rawCategory);
+                const cat = effectiveExpenseCategories.find((c) => c.value === resolvedCategory);
+                const rawSub =
+                  e.subCategory ??
+                  e.subcategory ??
+                  e.SubCategory ??
+                  e.sub_category ??
+                  e.expenseSubCategory ??
+                  e.expense_subcategory;
+                return resolveSubcategoryValue(cat, rawSub);
+              })(),
               notes: String(e.notes ?? ""),
               gst: Boolean(e.gst),
               billNumber: e.billNumber != null ? String(e.billNumber) : null,
@@ -1219,7 +1268,7 @@ export default function ShopWalletPage() {
     } catch {
       // keep existing state; UI already shows generic error states for wallet
     }
-  }, [token]);
+  }, [effectiveExpenseCategories, token]);
 
   const syncLedgerData = useCallback(async () => {
     await Promise.all([refreshSection("wallet"), refreshSection("jobCards")]);
@@ -1244,8 +1293,8 @@ export default function ShopWalletPage() {
     [invoiceList, search],
   );
   const filteredExpenses = useMemo(
-    () => expenses.filter((row) => matchesExpenseSearch(row, search, expenseCategories)),
-    [expenses, search, expenseCategories],
+    () => expenses.filter((row) => matchesExpenseSearch(row, search, effectiveExpenseCategories)),
+    [expenses, search, effectiveExpenseCategories],
   );
   const filteredBanks = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -1282,12 +1331,12 @@ export default function ShopWalletPage() {
   );
 
   const expenseCategoryLabels = useMemo(
-    () => expenseCategories.map((cat) => cat.label),
-    [expenseCategories],
+    () => effectiveExpenseCategories.map((cat) => cat.label),
+    [effectiveExpenseCategories],
   );
   const selectedExpenseCategory = useMemo(
-    () => expenseCategories.find((cat) => cat.value === expenseCategory),
-    [expenseCategories, expenseCategory],
+    () => effectiveExpenseCategories.find((cat) => cat.value === expenseCategory),
+    [effectiveExpenseCategories, expenseCategory],
   );
   const expenseSubcategoryLabels = useMemo(
     () => selectedExpenseCategory?.subcategories.map((sub) => sub.label) ?? [],
@@ -1340,11 +1389,11 @@ export default function ShopWalletPage() {
         setExpenseSubcategory("");
         return;
       }
-      const match = expenseCategories.find((cat) => cat.label === nextCategoryLabel);
+      const match = effectiveExpenseCategories.find((cat) => cat.label === nextCategoryLabel);
       setExpenseCategory(match?.value ?? slugifyLabel(nextCategoryLabel));
       setExpenseSubcategory("");
     },
-    [expenseCategories],
+    [effectiveExpenseCategories],
   );
 
   const handleExpenseSubcategoryChange = useCallback(
@@ -1360,10 +1409,10 @@ export default function ShopWalletPage() {
   );
 
   const openCategoriesPopup = useCallback(() => {
-    categoriesSnapshotRef.current = cloneCategories(expenseCategories);
+    categoriesSnapshotRef.current = cloneCategories(effectiveExpenseCategories);
     setCategoriesDraft(expenseCategoryLabels.length ? [...expenseCategoryLabels] : [""]);
     setCategoriesPopupOpen(true);
-  }, [expenseCategories, expenseCategoryLabels]);
+  }, [effectiveExpenseCategories, expenseCategoryLabels]);
 
   const saveCategoriesPopup = useCallback(() => {
     const labels = dedupeLabels(categoriesDraft);
@@ -1371,10 +1420,10 @@ export default function ShopWalletPage() {
     const newlyAdded = labels.filter((label) => !previousLabels.has(label.toLowerCase()));
 
     const nextCategories = labels.map((label) => {
-      const existing = expenseCategories.find((cat) => cat.label.toLowerCase() === label.toLowerCase());
+      const existing = effectiveExpenseCategories.find((cat) => cat.label.toLowerCase() === label.toLowerCase());
       if (existing) return { ...existing, label };
       let value = slugifyLabel(label);
-      if (expenseCategories.some((cat) => cat.value === value)) {
+      if (effectiveExpenseCategories.some((cat) => cat.value === value)) {
         value = `${value}-${Date.now()}`;
       }
       return { value, label, subcategories: [] };
@@ -1395,7 +1444,7 @@ export default function ShopWalletPage() {
     categoriesDraft,
     expenseCategory,
     expenseCategoryLabels,
-    expenseCategories,
+    effectiveExpenseCategories,
     handleExpenseCategoryChange,
   ]);
 
@@ -1466,16 +1515,27 @@ export default function ShopWalletPage() {
 
   const openExpenseForm = useCallback(() => {
     resetExpenseForm();
+    // Preselect first category/subcategory so the form is usable
+    // even when there are no expenses yet.
+    const firstCategory = effectiveExpenseCategories[0];
+    if (firstCategory) {
+      setExpenseCategory(firstCategory.value);
+      const firstSub = firstCategory.subcategories?.[0];
+      if (firstSub) setExpenseSubcategory(firstSub.value);
+    }
     setShowExpenseForm(true);
-  }, [resetExpenseForm]);
+  }, [effectiveExpenseCategories, resetExpenseForm]);
 
   const openEditExpenseForm = useCallback((row: ShopWalletExpenseRow) => {
+    const nextCategory = resolveCategoryValue(effectiveExpenseCategories, row.category);
+    const cat = effectiveExpenseCategories.find((c) => c.value === nextCategory);
+    const nextSubcategory = resolveSubcategoryValue(cat, row.subcategory);
     setEditingExpenseId(row.id);
     setExpenseAmount(String(row.amount));
     setExpenseDate(row.date);
     setExpenseVendor(row.vendor);
-    setExpenseCategory(row.category);
-    setExpenseSubcategory(row.subcategory);
+    setExpenseCategory(nextCategory);
+    setExpenseSubcategory(nextSubcategory);
     setExpenseNotes(row.notes);
     setExpenseGst(row.gst);
     setExpenseHasBillNumber(Boolean(row.billNumber));
@@ -1484,7 +1544,7 @@ export default function ShopWalletPage() {
     setExpenseAttachReceipt(row.hasReceipt);
     setExpenseReceiptFile(null);
     setShowExpenseForm(true);
-  }, []);
+  }, [effectiveExpenseCategories]);
 
   const closeExpenseForm = useCallback(() => {
     resetExpenseForm();
@@ -1598,6 +1658,7 @@ export default function ShopWalletPage() {
   const handleSaveExpense = () => {
     const trimmedVendor = expenseVendor.trim();
     const parsedAmount = Number.parseFloat(expenseAmount);
+    const parsedGst = Number.parseFloat(expenseGstAmount);
 
     if (!expenseAmount.trim() || !Number.isFinite(parsedAmount)) {
       toast.error("Amount is required.");
@@ -1677,7 +1738,8 @@ export default function ShopWalletPage() {
           category: expenseCategory,
           subCategory: expenseSubcategory,
           notes: expenseNotes,
-          gst: expenseGst,
+          // Backend schema expects Number (e.g. 13), not boolean.
+          gst: expenseGst ? (Number.isFinite(parsedGst) ? parsedGst : 0) : 0,
           billNumber: expenseHasBillNumber && expenseBillNumber.trim() ? expenseBillNumber.trim() : undefined,
           account: expenseByCheque ? expenseChequeAccount : undefined,
           expenseImage: expenseAttachReceipt ? expenseReceiptFile : null,
@@ -1891,7 +1953,7 @@ export default function ShopWalletPage() {
         <>
           <WalletExpenseTable
             rows={paginatedExpenses}
-            categories={expenseCategories}
+            categories={effectiveExpenseCategories}
             countryCode={session?.meta?.countryCode}
             onEditRow={openEditExpenseForm}
             {...selectionProps}

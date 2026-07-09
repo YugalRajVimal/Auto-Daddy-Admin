@@ -17,7 +17,7 @@ export type ExpensePayload = {
   category: string;
   subCategory: string;
   notes?: string;
-  gst?: boolean;
+  gst?: number | string;
   billNumber?: string;
   account?: string;
   expenseImage?: File | null;
@@ -75,7 +75,7 @@ export function createExpense(token: string, payload: ExpensePayload) {
   appendText(fd, "category", payload.category);
   appendText(fd, "subCategory", payload.subCategory);
   appendText(fd, "notes", payload.notes);
-  appendText(fd, "gst", payload.gst ? "true" : "false");
+  appendText(fd, "gst", payload.gst);
   appendText(fd, "billNumber", payload.billNumber);
   appendText(fd, "account", payload.account);
   if (payload.expenseImage) fd.append("expenseImage", payload.expenseImage);
@@ -90,7 +90,7 @@ export function updateExpense(token: string, expenseId: string, payload: Expense
   appendText(fd, "category", payload.category);
   appendText(fd, "subCategory", payload.subCategory);
   appendText(fd, "notes", payload.notes);
-  appendText(fd, "gst", payload.gst ? "true" : "false");
+  appendText(fd, "gst", payload.gst);
   appendText(fd, "billNumber", payload.billNumber);
   appendText(fd, "account", payload.account);
   if (payload.expenseImage) fd.append("expenseImage", payload.expenseImage);
