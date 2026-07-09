@@ -1137,7 +1137,7 @@ export default function ShopWalletPage() {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [expenseAmount, setExpenseAmount] = useState("");
-  const [expenseDate, setExpenseDate] = useState(todayYMD);
+  const [expenseDate, setExpenseDate] = useState<string>(todayYMD());
   const [expenseVendor, setExpenseVendor] = useState("");
   const [expenseCategory, setExpenseCategory] = useState("");
   const [expenseSubcategory, setExpenseSubcategory] = useState("");
@@ -1201,7 +1201,7 @@ export default function ShopWalletPage() {
           setExpenses(
             raw.map((e: any) => ({
               id: String(e._id ?? e.id ?? ""),
-              date: String(e.date ?? "").slice(0, 10) || todayYMD,
+              date: String(e.date ?? "").slice(0, 10) || todayYMD(),
               vendor: String(e.vendor ?? ""),
               amount: Number(e.amount ?? 0) || 0,
               category: String(e.category ?? ""),

@@ -160,7 +160,7 @@ async function fetchSectionData(
           },
         };
 
-        const mergedDashboard: ShopDashboardData =
+        const mergedDashboard: ShopDashboardData | null =
           homeData != null
             ? {
                 success: true,
