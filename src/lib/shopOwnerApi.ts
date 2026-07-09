@@ -55,15 +55,15 @@ export function buildMyCustomersQuery(period: MyCustomersPeriod): Record<string,
 }
 
 export function fetchMyCustomers(token: string, query?: Record<string, string>) {
-  const path =
-    !query || Object.keys(query).length === 0
-      ? "/api/auto-shop-owner/my-customers"
-      : withQuery("/api/auto-shop-owner/my-customers", query);
-  return getJson<unknown>(path, token);
+  // NEW: customers live under /api/autoshopowner/customer/*
+  // This "my customers" view maps best to the added-customer list.
+  // (The new API doesn't support the legacy date filters; we ignore that query.)
+  void query;
+  return getJson<unknown>("/api/autoshopowner/customer/added", token);
 }
 
 export function searchCarOwners(token: string, search: string) {
-  return getJson<unknown>(withQuery("/api/auto-shop-owner/search-carowner", { search }), token);
+  return getJson<unknown>(withQuery("/api/autoshopowner/customer/search", { search }), token);
 }
 
 export function fetchJobCards(token: string, query?: Record<string, string>) {
@@ -91,7 +91,9 @@ export function fetchMyDeals(token: string) {
 }
 
 export function fetchMyServices(token: string) {
-  return getJson<unknown>("/api/auto-shop-owner/my-services", token);
+  // Prefer the new shop-owner API surface when available.
+  // Falls back to the legacy route shape via the backend router mapping.
+  return getJson<unknown>("/api/autoshopowner/services/my", token);
 }
 
 export function fetchPayments(token: string) {

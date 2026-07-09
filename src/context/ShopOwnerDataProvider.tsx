@@ -109,14 +109,71 @@ async function fetchSectionData(
   try {
     switch (section) {
       case "portal": {
-        const [dashRes, profileRes] = await Promise.all([
-          getJson<ShopDashboardData>("/api/auto-shop-owner/dashboard-details-new", token),
+        const [homeRes, personalRes, businessRes, legacyProfileRes, legacyTeamRes] = await Promise.all([
+          // NEW: Home (thought of the day + subscription days left)
+          getJson<unknown>("/api/autoshopowner/home", token),
+          // NEW: Profile slices
+          getJson<unknown>("/api/autoshopowner/profile/personal", token),
+          getJson<unknown>("/api/autoshopowner/profile/business", token),
+          // LEGACY fallback: still needed for subscriptions and extra profile fields
           getJson<ShopProfileResponse>("/api/auto-shop-owner/profile", token),
+          // LEGACY fallback: team members are not exposed in the new router yet
+          getJson<unknown>("/api/auto-shop-owner/team-members", token),
         ]);
+
+        const homeData =
+          homeRes.ok && homeRes.data && typeof homeRes.data === "object"
+            ? ((homeRes.data as Record<string, unknown>).data as Record<string, unknown> | null)
+            : null;
+
+        const personalData =
+          personalRes.ok && personalRes.data && typeof personalRes.data === "object"
+            ? ((personalRes.data as Record<string, unknown>).data as Record<string, unknown> | null)
+            : null;
+
+        const businessData =
+          businessRes.ok && businessRes.data && typeof businessRes.data === "object"
+            ? ((businessRes.data as Record<string, unknown>).data as Record<string, unknown> | null)
+            : null;
+
+        const legacyProfile = legacyProfileRes.ok ? (legacyProfileRes.data ?? null) : null;
+
+        const teamMembers =
+          legacyTeamRes.ok && legacyTeamRes.data && typeof legacyTeamRes.data === "object"
+            ? (((legacyTeamRes.data as Record<string, unknown>).data as unknown) ??
+                (legacyTeamRes.data as Record<string, unknown>).teamMembers)
+            : null;
+
+        const mergedProfile: ShopProfileResponse = {
+          success: true,
+          data: {
+            ...(legacyProfile?.data ?? {}),
+            userProfile: {
+              ...(legacyProfile?.data?.userProfile ?? {}),
+              ...(personalData ?? {}),
+            },
+            businessProfile: {
+              ...(legacyProfile?.data?.businessProfile ?? {}),
+              ...(businessData ?? {}),
+            },
+            ...(Array.isArray(teamMembers) ? { teamMembers } : {}),
+          },
+        };
+
+        const mergedDashboard: ShopDashboardData =
+          homeData != null
+            ? {
+                success: true,
+                thoughtOfTheDay: homeData.thoughtOfTheDay as ShopDashboardData["thoughtOfTheDay"],
+                businessName: typeof homeData.businessName === "string" ? homeData.businessName : undefined,
+                subscriptionDaysLeftCount:
+                  typeof homeData.daysLeftInSubscription === "number" ? homeData.daysLeftInSubscription : undefined,
+              }
+            : null;
         return {
           data: {
-            dashboard: dashRes.ok ? (dashRes.data ?? null) : null,
-            profile: profileRes.ok ? (profileRes.data ?? null) : null,
+            dashboard: mergedDashboard,
+            profile: mergedProfile,
           },
           error: null,
         };

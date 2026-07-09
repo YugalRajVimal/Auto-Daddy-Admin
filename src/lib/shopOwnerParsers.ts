@@ -211,9 +211,16 @@ export function isPartsDeal(d: ShopDeal) {
 export function parseMyServices(payload: unknown): ShopServiceCategory[] {
   if (!payload || typeof payload !== "object") return [];
   const root = payload as Record<string, unknown>;
+  // Supports both legacy and new shop-owner API envelopes:
+  // - legacy: { services: [...] } OR { data: { services: [...] } }
+  // - new:    { data: [...] }
   const raw =
     root.services ??
-    (root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>).services : null);
+    (Array.isArray(root.data)
+      ? root.data
+      : root.data && typeof root.data === "object"
+        ? (root.data as Record<string, unknown>).services
+        : null);
   if (!Array.isArray(raw)) return [];
   const out: ShopServiceCategory[] = [];
   for (const item of raw) {

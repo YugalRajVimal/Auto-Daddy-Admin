@@ -45,6 +45,7 @@ import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import { collectJobCardPayment, resendJobCardNotification } from "../../lib/shopOwnerMutations";
 import { pickJobCardInvoiceNumber, type JobCardListRow } from "../../lib/shopOwnerJobCards";
 import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
+import { createBank, createExpense, fetchBanks, fetchExpenses, updateBank, updateExpense } from "../../lib/shopOwnerAccountsApi";
 import {
   categoryLabel,
   cloneCategories,
@@ -1174,6 +1175,52 @@ export default function ShopWalletPage() {
   } = useShopWallet();
   const mockLedger = useMockShopInvoiceLedger();
 
+  const loadAccounts = useCallback(async () => {
+    if (USE_DUMMY_SHOP_WALLET) return;
+    if (!token) return;
+    try {
+      const [banksRes, expensesRes] = await Promise.all([fetchBanks(token), fetchExpenses(token)]);
+      if (banksRes.ok) {
+        const raw = (banksRes.data as any)?.data;
+        if (Array.isArray(raw)) {
+          setBanks(
+            raw.map((b: any) => ({
+              id: String(b._id ?? b.id ?? ""),
+              label: String(b.BankName ?? b.bankName ?? "BANK").toUpperCase(),
+              accountName: String(b.AccountName ?? b.accountName ?? "—") || "—",
+              accountNumber: String(b.AccountNumber ?? b.accountNumber ?? "—") || "—",
+              balance: Number(b.totalBalance ?? b.openingBalance ?? 0) || 0,
+              assignToInvoice: Boolean(b.assignToInvoice),
+            })),
+          );
+        }
+      }
+      if (expensesRes.ok) {
+        const raw = (expensesRes.data as any)?.data;
+        if (Array.isArray(raw)) {
+          setExpenses(
+            raw.map((e: any) => ({
+              id: String(e._id ?? e.id ?? ""),
+              date: String(e.date ?? "").slice(0, 10) || todayYMD,
+              vendor: String(e.vendor ?? ""),
+              amount: Number(e.amount ?? 0) || 0,
+              category: String(e.category ?? ""),
+              subcategory: String(e.subCategory ?? e.subcategory ?? ""),
+              notes: String(e.notes ?? ""),
+              gst: Boolean(e.gst),
+              billNumber: e.billNumber != null ? String(e.billNumber) : null,
+              byCheque: false,
+              hasReceipt: Boolean(e.imagePath),
+              attachmentUrl: e.imagePath ? adminClipImageUrl(String(e.imagePath)) : null,
+            })),
+          );
+        }
+      }
+    } catch {
+      // keep existing state; UI already shows generic error states for wallet
+    }
+  }, [token]);
+
   const syncLedgerData = useCallback(async () => {
     await Promise.all([refreshSection("wallet"), refreshSection("jobCards")]);
   }, [refreshSection]);
@@ -1486,30 +1533,66 @@ export default function ShopWalletPage() {
       return;
     }
 
-    const bankId = editingBankId ?? `bank-${Date.now()}`;
-    const nextRow: ShopWalletBankRow = {
-      id: bankId,
-      label: trimmedLabel.toUpperCase(),
-      accountName: bankAccountName.trim() || "—",
-      accountNumber: bankAccountNumber.trim() || "—",
-      balance,
-      assignToInvoice: bankAssignToInvoice,
+    const saveLocal = () => {
+      const bankId = editingBankId ?? `bank-${Date.now()}`;
+      const nextRow: ShopWalletBankRow = {
+        id: bankId,
+        label: trimmedLabel.toUpperCase(),
+        accountName: bankAccountName.trim() || "—",
+        accountNumber: bankAccountNumber.trim() || "—",
+        balance,
+        assignToInvoice: bankAssignToInvoice,
+      };
+      setBanks((prev) => {
+        const updated = editingBankId
+          ? prev.map((row) => (row.id === editingBankId ? nextRow : row))
+          : [nextRow, ...prev];
+        if (!nextRow.assignToInvoice) return updated;
+        return updated.map((row) => ({
+          ...row,
+          assignToInvoice: row.id === bankId,
+        }));
+      });
+      setPage(1);
+      setSelectedRowIds(new Set());
+      toast.success(editingBankId ? "Bank account updated." : "Bank account added.");
+      closeBankForm();
     };
 
-    setBanks((prev) => {
-      const updated = editingBankId
-        ? prev.map((row) => (row.id === editingBankId ? nextRow : row))
-        : [nextRow, ...prev];
-      if (!nextRow.assignToInvoice) return updated;
-      return updated.map((row) => ({
-        ...row,
-        assignToInvoice: row.id === bankId,
-      }));
-    });
-    setPage(1);
-    setSelectedRowIds(new Set());
-    toast.success(editingBankId ? "Bank account updated." : "Bank account added.");
-    closeBankForm();
+    if (USE_DUMMY_SHOP_WALLET || !token) {
+      saveLocal();
+      return;
+    }
+
+    void (async () => {
+      try {
+        if (editingBankId) {
+          const res = await updateBank(token, editingBankId, {
+            bankName: trimmedLabel,
+            openingBalance: balance,
+            totalBalance: balance,
+            accountName: bankAccountName.trim() || undefined,
+            accountNumber: bankAccountNumber.trim() || undefined,
+            assignToInvoice: bankAssignToInvoice,
+          });
+          if (!res.ok) return toast.error("Could not update bank.");
+        } else {
+          const res = await createBank(token, {
+            bankName: trimmedLabel,
+            openingBalance: balance,
+            accountName: bankAccountName.trim() || undefined,
+            accountNumber: bankAccountNumber.trim() || undefined,
+            assignToInvoice: bankAssignToInvoice,
+          });
+          if (!res.ok) return toast.error("Could not add bank.");
+        }
+        await loadAccounts();
+        closeBankForm();
+        toast.success(editingBankId ? "Bank account updated." : "Bank account added.");
+      } catch {
+        toast.error("Network error.");
+      }
+    })();
   };
 
   const handleSaveExpense = () => {
@@ -1560,25 +1643,64 @@ export default function ShopWalletPage() {
       attachmentUrl: nextAttachmentUrl,
     };
 
-    if (editingExpenseId) {
-      setExpenses((prev) =>
-        prev.map((row) => (row.id === editingExpenseId ? { ...row, ...payload } : row)),
-      );
-      toast.success("Expense updated.");
-    } else {
-      setExpenses((prev) => [
-        {
-          id: `exp-${Date.now()}`,
-          ...payload,
-        },
-        ...prev,
-      ]);
-      toast.success("Expense added.");
+    const saveLocal = () => {
+      if (editingExpenseId) {
+        setExpenses((prev) =>
+          prev.map((row) => (row.id === editingExpenseId ? { ...row, ...payload } : row)),
+        );
+        toast.success("Expense updated.");
+      } else {
+        setExpenses((prev) => [
+          {
+            id: `exp-${Date.now()}`,
+            ...payload,
+          },
+          ...prev,
+        ]);
+        toast.success("Expense added.");
+      }
+      setPage(1);
+      closeExpenseForm();
+    };
+
+    if (USE_DUMMY_SHOP_WALLET || !token) {
+      saveLocal();
+      return;
     }
 
-    setPage(1);
-    closeExpenseForm();
+    void (async () => {
+      try {
+        const body = {
+          date: expenseDate,
+          vendor: trimmedVendor,
+          amount: parsedAmount,
+          category: expenseCategory,
+          subCategory: expenseSubcategory,
+          notes: expenseNotes,
+          gst: expenseGst,
+          billNumber: expenseHasBillNumber && expenseBillNumber.trim() ? expenseBillNumber.trim() : undefined,
+          account: expenseByCheque ? expenseChequeAccount : undefined,
+          expenseImage: expenseAttachReceipt ? expenseReceiptFile : null,
+        };
+        if (editingExpenseId) {
+          const res = await updateExpense(token, editingExpenseId, body);
+          if (!res.ok) return toast.error("Could not update expense.");
+        } else {
+          const res = await createExpense(token, body);
+          if (!res.ok) return toast.error("Could not add expense.");
+        }
+        await loadAccounts();
+        closeExpenseForm();
+        toast.success(editingExpenseId ? "Expense updated." : "Expense added.");
+      } catch {
+        toast.error("Network error.");
+      }
+    })();
   };
+
+  useEffect(() => {
+    void loadAccounts();
+  }, [loadAccounts]);
 
   useEffect(() => {
     setShowExpenseForm(false);

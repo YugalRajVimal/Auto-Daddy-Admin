@@ -32,11 +32,11 @@ import {
 } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
+import { updateBusinessProfile } from "../../../lib/autoshopownerApi";
 import {
   addMyCarCompanies,
   apiMessage,
   updateBusinessOpenHours,
-  updateBusinessProfileMultipart,
   updatePersonalProfile,
   updatePersonalProfileMultipart,
   updateServiceWeWorkWith,
@@ -635,18 +635,18 @@ export function ShopBusinessProfileEditor({
     if (!token) return;
     setSaving(true);
     try {
-      const fields: Record<string, string | File> = {
+      const res = await updateBusinessProfile(token, {
         businessName: businessName.trim(),
         businessPhone: phoneDigits(businessPhone),
         city: city.trim(),
         businessAddress: address.trim(),
+        pincode: zip.trim(),
         businessEmail: email.trim(),
         businessHSTNumber: hst.trim(),
         gst: tax.trim() || "0",
-        shopType,
-      };
-      if (logo) fields.businessLogo = logo;
-      const res = await updateBusinessProfileMultipart(token, fields);
+        shopTypes: shopType ? [shopType] : [],
+        businessLogo: logo,
+      });
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save.");
         return;

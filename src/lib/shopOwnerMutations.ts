@@ -118,10 +118,18 @@ export function buildCustomerFormData(
 }
 
 export function onboardCarOwner(token: string, body: OnboardCustomerBody, uploads?: CustomerImageUploads) {
-  return postFormData<ApiEnvelope>(
-    "/api/auto-shop-owner/onboard-carowner",
-    buildCustomerFormData(body, uploads),
-    token
+  // NEW: onboard customer (no account) lives under /api/autoshopowner/customer/onboard
+  // The new backend expects a small JSON payload (no vehicles/photos yet).
+  void uploads;
+  return postJson<ApiEnvelope>(
+    "/api/autoshopowner/customer/onboard",
+    {
+      name: body.name,
+      phone: body.phone,
+      city: body.city,
+      email: body.email,
+    },
+    token,
   );
 }
 
@@ -134,15 +142,13 @@ export function updateMyCustomer(token: string, body: UpdateCustomerBody, upload
 }
 
 export function addCarOwnerToMyCustomers(token: string, carOwnerId: string) {
-  return postJson<ApiEnvelope>("/api/auto-shop-owner/my-customers", { carOwnerId }, token);
+  // NEW: add existing user to my customers list
+  return postJson<ApiEnvelope>("/api/autoshopowner/customer/add", { customerId: carOwnerId }, token);
 }
 
 export function removeCarOwnerFromMyCustomers(token: string, carOwnerId: string) {
-  return deleteJson<ApiEnvelope>(
-    `/api/auto-shop-owner/my-customers?carOwnerId=${encodeURIComponent(carOwnerId)}`,
-    token,
-    { carOwnerId }
-  );
+  // NEW: delete from added customers list
+  return deleteJson<ApiEnvelope>(`/api/autoshopowner/customer/added/${encodeURIComponent(carOwnerId)}`, token);
 }
 
 export function saveMyServices(token: string, services: MyServiceCategoryPayload[]) {
