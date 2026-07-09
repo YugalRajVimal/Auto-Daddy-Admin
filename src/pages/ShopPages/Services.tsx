@@ -18,7 +18,8 @@ import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
 import { getDummyMyServices } from "../../lib/dummyServices";
-import { apiMessage, updateMyServices } from "../../lib/shopOwnerMutations";
+import { deleteSubService } from "../../lib/autoshopownerApi";
+import { apiMessage } from "../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../types/shopOwner";
 
 const PAGE_SIZE = 10;
@@ -291,10 +292,22 @@ export default function ShopServicesPage() {
     if (!token) return;
     setBulkDeleting(true);
     try {
-      const res = await updateMyServices(token, [{ id: activeCategory.id, subServices: remaining }]);
-      if (!res.ok) {
-        toast.error(apiMessage(res.data) || "Could not delete.");
-        return;
+      const indicesToDelete = activeCategory.subServices
+        .map((sub, index) => ({ index, rowId: getSubRowId(sub, index) }))
+        .filter(({ rowId }) => selectedRows.has(rowId))
+        .map(({ index }) => index)
+        .sort((a, b) => b - a);
+
+      for (const subServiceIndex of indicesToDelete) {
+        const res = await deleteSubService(token, {
+          serviceId: activeCategory.id,
+          subServiceIndex,
+        });
+        if (!res.ok) {
+          toast.error(apiMessage(res.data) || "Could not delete.");
+          handleRefresh();
+          return;
+        }
       }
       toast.success("Deleted.");
       if (editIndex != null && selectedRows.has(getSubRowId(activeCategory.subServices[editIndex], editIndex))) {
@@ -375,7 +388,6 @@ export default function ShopServicesPage() {
               <ShopServiceSubDialog
                 category={activeCategory}
                 editIndex={editIndex}
-                hasExistingServices={categories.length > 0 && !usingDummy}
                 demoMode={usingDummy}
                 onDemoSave={(categoryId, subServices) => {
                   setCategories((prev) =>

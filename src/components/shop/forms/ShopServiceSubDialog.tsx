@@ -11,13 +11,13 @@ import {
   shopProfileFormPanelFooterClass,
 } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
-import { apiMessage, saveMyServices, updateMyServices } from "../../../lib/shopOwnerMutations";
+import { addSubServices, editSubService } from "../../../lib/autoshopownerApi";
+import { apiMessage } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
 
 type ShopServiceSubDialogProps = {
   category: ShopServiceCategory | null;
   editIndex: number | null;
-  hasExistingServices: boolean;
   demoMode?: boolean;
   onDemoSave?: (categoryId: string, subServices: ShopServiceCategory["subServices"]) => void;
   onCancel: () => void;
@@ -27,7 +27,6 @@ type ShopServiceSubDialogProps = {
 export default function ShopServiceSubDialog({
   category,
   editIndex,
-  hasExistingServices,
   demoMode = false,
   onDemoSave,
   onCancel,
@@ -99,10 +98,24 @@ export default function ShopServiceSubDialog({
     if (!token) return;
     setSaving(true);
     try {
-      const payload = [{ id: category.id, subServices: nextSubs }];
-      const res = hasExistingServices
-        ? await updateMyServices(token, payload)
-        : await saveMyServices(token, payload);
+      const subPayload = {
+        name: name.trim(),
+        desc: desc.trim(),
+        price: priceNum,
+        quantity: qtyNum,
+        ...(Number.isFinite(taxNum) ? { tax: taxNum } : {}),
+      };
+      const res =
+        editIndex != null
+          ? await editSubService(token, {
+              serviceId: category.id,
+              subServiceIndex: editIndex,
+              update: subPayload,
+            })
+          : await addSubServices(token, {
+              serviceId: category.id,
+              subServices: [subPayload],
+            });
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save.");
         return;

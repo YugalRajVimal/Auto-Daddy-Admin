@@ -48,13 +48,29 @@ function parseVehicles(o: Record<string, unknown>) {
           : v.vehicleMake && typeof v.vehicleMake === "object"
             ? (v.vehicleMake as Record<string, unknown>)
             : null;
+
+      const odo =
+        typeof v.odometerReading === "number"
+          ? String(v.odometerReading)
+          : typeof v.odometerReading === "string"
+            ? v.odometerReading
+            : undefined;
+      const due =
+        typeof v.dueOdometerReading === "number"
+          ? String(v.dueOdometerReading)
+          : typeof v.dueOdometerReading === "string"
+            ? v.dueOdometerReading
+            : undefined;
       return {
         _id: s(v._id) ?? s(v.vId) ?? s(v.id),
         vId: s(v.vId) ?? s(v._id) ?? s(v.id),
         licensePlateNo: s(v.licensePlateNo),
+        vinNo: s(v.vinNo) ?? s(v.vin),
         vehicleName: s(v.vehicleName) ?? s(make?.name) ?? s(v.name),
         model: s(v.model) ?? s(make?.model),
         year: v.year != null ? String(v.year) : undefined,
+        odometerReading: odo?.trim() || undefined,
+        dueOdometerReading: due?.trim() || undefined,
       };
     });
 }

@@ -126,6 +126,12 @@ async function fetchSectionData(
             ? ((homeRes.data as Record<string, unknown>).data as Record<string, unknown> | null)
             : null;
 
+        if (import.meta.env.DEV) {
+          // Use console.log (not debug) so it shows up by default in DevTools.
+          console.log("[shopOwner] /api/autoshopowner/home raw", homeRes);
+          console.log("[shopOwner] /api/autoshopowner/home data", homeData);
+        }
+
         const personalData =
           personalRes.ok && personalRes.data && typeof personalRes.data === "object"
             ? ((personalRes.data as Record<string, unknown>).data as Record<string, unknown> | null)
@@ -134,6 +140,51 @@ async function fetchSectionData(
         const businessData =
           businessRes.ok && businessRes.data && typeof businessRes.data === "object"
             ? ((businessRes.data as Record<string, unknown>).data as Record<string, unknown> | null)
+            : null;
+
+        // Normalize new /api/autoshopowner/profile/business response into legacy-friendly keys
+        // consumed across the shop UI (e.g. ShopBusinessProfileEditor expects `address`, `email`,
+        // `hstNumber`, `gstPercent`).
+        const normalizedBusinessData =
+          businessData && typeof businessData === "object"
+            ? (() => {
+                const d = businessData as Record<string, unknown>;
+                const pickString = (...vals: unknown[]): string | undefined => {
+                  for (const v of vals) {
+                    if (typeof v === "string") {
+                      const s = v.trim();
+                      if (s) return s;
+                    }
+                  }
+                  return undefined;
+                };
+                const pickGst = (...vals: unknown[]): number | string | undefined => {
+                  for (const v of vals) {
+                    if (typeof v === "number" && Number.isFinite(v)) return v;
+                    if (typeof v === "string") {
+                      const s = v.trim();
+                      if (s) return s;
+                    }
+                  }
+                  return undefined;
+                };
+                const pickShopType = (v: unknown): string | undefined => {
+                  if (typeof v === "string" && v.trim()) return v.trim();
+                  if (Array.isArray(v) && v.length > 0) {
+                    const first = v[0];
+                    if (typeof first === "string" && first.trim()) return first.trim();
+                  }
+                  return undefined;
+                };
+                return {
+                  ...d,
+                  address: pickString(d.address, d.businessAddress),
+                  email: pickString(d.email, d.businessEmail),
+                  hstNumber: pickString(d.hstNumber, d.businessHSTNumber),
+                  gstPercent: pickGst(d.gstPercent, d.gst),
+                  shopType: pickShopType(d.shopType ?? d.shopTypes),
+                };
+              })()
             : null;
 
         const legacyProfile = legacyProfileRes.ok ? (legacyProfileRes.data ?? null) : null;
@@ -154,7 +205,7 @@ async function fetchSectionData(
             },
             businessProfile: {
               ...(legacyProfile?.data?.businessProfile ?? {}),
-              ...(businessData ?? {}),
+              ...(normalizedBusinessData ?? {}),
             },
             ...(Array.isArray(teamMembers) ? { teamMembers } : {}),
           },

@@ -42,16 +42,40 @@ import {
   updateMyCustomer,
   type CustomerVehiclePayload,
 } from "../../lib/shopOwnerMutations";
+import { searchCarOwners } from "../../lib/shopOwnerApi";
+import { parseMyCustomers } from "../../lib/shopOwnerParsers";
+import {
+  addVehicleToOnboardedCustomer,
+  fetchOnboardedCustomers,
+  editOnboardedCustomer,
+} from "../../lib/autoshopownerApi";
 import { parseCitiesApiResponse } from "../../lib/carOwnerCities";
 import { formatPhoneDisplay, formatPhoneLabel, phoneDigits } from "../../lib/phoneFormat";
 import { resolveCarBrandLogo } from "../../lib/dummyCarBrands";
-import {
-  DUMMY_SHOP_CUSTOMERS,
-  USE_DUMMY_SHOP_CUSTOMERS,
-} from "../../lib/dummyShopCustomers";
 import type { CustomerVehicle, MyCustomer } from "../../types/shopOwner";
 
 type PeopleSection = "customers" | "my-list" | "approval";
+
+function shouldDebugPeopleApi(): boolean {
+  if (!import.meta.env.DEV) return false;
+  try {
+    return window.localStorage.getItem("debug:people-api") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function logPeopleApi(method: string, path: string, request: unknown, response: unknown) {
+  if (!shouldDebugPeopleApi()) return;
+  // eslint-disable-next-line no-console
+  console.groupCollapsed(`[People API] ${method} ${path}`);
+  // eslint-disable-next-line no-console
+  console.log("request:", request ?? null);
+  // eslint-disable-next-line no-console
+  console.log("response:", response ?? null);
+  // eslint-disable-next-line no-console
+  console.groupEnd();
+}
 
 type DetailView =
   | { kind: "add-to-list"; customer: MyCustomer }
@@ -198,11 +222,13 @@ function customerId(c: MyCustomer) {
 }
 
 type CarCompanyCatalogItem = {
+  _id?: string;
+  id?: string;
   companyName: string;
   models: Array<{ modelName: string; years: Array<string | number> }>;
 };
 
-type VehicleDraft = CustomerVehiclePayload & { dueOdometerReading?: string };
+type VehicleDraft = CustomerVehiclePayload;
 
 const VEHICLE_YEAR_MAX = new Date().getFullYear() + 1;
 
@@ -214,7 +240,6 @@ function emptyVehicleDraft(): VehicleDraft {
     model: "",
     year: "",
     odometerReading: "",
-    dueOdometerReading: "",
   };
 }
 
@@ -478,7 +503,6 @@ function VehicleInfoCard({
             <VehicleInfoField label="License Plate" value={vehicleFieldValue(vehicle.licensePlateNo)} />
             <VehicleInfoField label="VIN" value={vehicleFieldValue(vehicle.vinNo)} />
             <VehicleInfoField label="Current odo" value={vehicleFieldValue(vehicle.odometerReading)} />
-            <VehicleInfoField label="Due service" value={vehicleFieldValue(vehicle.dueOdometerReading)} />
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -565,23 +589,77 @@ function AddVehicleCard({
     setSaving(true);
     setError(null);
     try {
-      const vehicles = [...mapCustomerVehiclesForUpdate(customer), vehicleDraftToPayload(draft)];
-      const res = await updateMyCustomer(token, {
-        carOwnerId: id,
-        name: customer.name?.trim() ?? "",
-        email: customer.email?.trim() ?? "",
-        countryCode,
-        phone: phoneDigits(customer.phone ?? ""),
-        pincode: customer.pincode?.trim() ?? "",
-        address: customer.address?.trim() ?? "",
-        city: customer.city?.trim() ?? "",
-        vehicles,
-      });
-      if (!res.ok) {
-        setError(apiMessage(res.data) || "Could not add vehicle.");
-        return;
+      const isOnboarded = (customer.status ?? "").toLowerCase() === "onboarded";
+
+      if (isOnboarded) {
+        const company = companies.find((c) => c.companyName === draft.vehicleName);
+        const carCompanyId = company?._id ?? company?.id;
+        if (!carCompanyId) {
+          setError("Please select a make from the list.");
+          return;
+        }
+        if (!draft.vinNo?.trim()) {
+          setError("VIN is required.");
+          return;
+        }
+        if (draft.vinNo.trim().length !== 17) {
+          setError("VIN must be exactly 17 characters.");
+          return;
+        }
+        if (!draft.odometerReading?.trim()) {
+          setError("Current odo is required.");
+          return;
+        }
+
+        const res = await addVehicleToOnboardedCustomer(token, id, {
+          carCompanyId,
+          make: draft.vehicleName.trim(),
+          model: draft.model.trim(),
+          year: Number(draft.year.trim()),
+          licensePlateNo: draft.licensePlateNo.trim().slice(0, 14),
+          vinNo: draft.vinNo.trim(),
+          odometerReading: Number(draft.odometerReading.trim()),
+        });
+        logPeopleApi(
+          "POST",
+          `/api/autoshopowner/customer/onboarded/${encodeURIComponent(id)}/vehicles`,
+          {
+            carCompanyId,
+            make: draft.vehicleName.trim(),
+            model: draft.model.trim(),
+            year: Number(draft.year.trim()),
+            licensePlateNo: draft.licensePlateNo.trim().slice(0, 14),
+            vinNo: draft.vinNo.trim(),
+            odometerReading: Number(draft.odometerReading.trim()),
+          },
+          res,
+        );
+        if (!res.ok) {
+          setError(apiMessage(res.data) || "Could not add vehicle.");
+          return;
+        }
+        toast.success(apiMessage(res.data) || "Vehicle added.");
+      } else {
+        const vehicles = [...mapCustomerVehiclesForUpdate(customer), vehicleDraftToPayload(draft)];
+        const res = await updateMyCustomer(token, {
+          carOwnerId: id,
+          name: customer.name?.trim() ?? "",
+          email: customer.email?.trim() ?? "",
+          countryCode,
+          phone: phoneDigits(customer.phone ?? ""),
+          pincode: customer.pincode?.trim() ?? "",
+          address: customer.address?.trim() ?? "",
+          city: customer.city?.trim() ?? "",
+          vehicles,
+        });
+        logPeopleApi("PUT", "/api/auto-shop-owner/my-customers", { carOwnerId: id, vehicles }, res);
+        if (!res.ok) {
+          setError(apiMessage(res.data) || "Could not add vehicle.");
+          return;
+        }
+        toast.success(apiMessage(res.data) || "Vehicle added.");
       }
-      toast.success(apiMessage(res.data) || "Vehicle added.");
+
       onSaved({
         licensePlateNo: draft.licensePlateNo.trim(),
         vinNo: draft.vinNo?.trim(),
@@ -589,7 +667,6 @@ function AddVehicleCard({
         model: draft.model.trim(),
         year: draft.year.trim(),
         odometerReading: draft.odometerReading?.trim(),
-        dueOdometerReading: draft.dueOdometerReading?.trim(),
       });
     } catch {
       setError("Network error.");
@@ -672,12 +749,6 @@ function AddVehicleCard({
               label="Current odo"
               value={draft.odometerReading ?? ""}
               onChange={(odometerReading) => patchDraft({ odometerReading })}
-              inputMode="numeric"
-            />
-            <VehicleInfoInputField
-              label="Due service"
-              value={draft.dueOdometerReading ?? ""}
-              onChange={(dueOdometerReading) => patchDraft({ dueOdometerReading })}
               inputMode="numeric"
             />
           </div>
@@ -769,6 +840,8 @@ function CustomerVehicleListView({
 function CustomerListTable({
   customers,
   onEdit,
+  onAddToList,
+  canAddToList,
   onShowVehicles,
   showCity = false,
   selectedIds,
@@ -777,6 +850,8 @@ function CustomerListTable({
 }: {
   customers: MyCustomer[];
   onEdit: (customer: MyCustomer) => void;
+  onAddToList: (customer: MyCustomer) => void;
+  canAddToList: (customer: MyCustomer) => boolean;
   onShowVehicles: (customer: MyCustomer) => void;
   showCity?: boolean;
   selectedIds: Set<string>;
@@ -848,7 +923,6 @@ function CustomerListTable({
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
                     {(() => {
                       const count = vehicleCount(customer);
-                      if (count === 0) return "0";
                       return (
                         <button
                           type="button"
@@ -864,6 +938,17 @@ function CustomerListTable({
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
                     <div className="inline-flex h-7 items-center justify-center gap-0.5">
                       <CustomerEmailClip email={customer.email} />
+                      {canAddToList(customer) ? (
+                        <button
+                          type="button"
+                          title={`Add ${name} to my list`}
+                          aria-label={`Add ${name} to my list`}
+                          onClick={() => onAddToList(customer)}
+                          className="inline-flex h-7 items-center justify-center rounded px-2 text-xs font-bold text-ad-purple hover:bg-[#f5cce8]"
+                        >
+                          + Add
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         title={`Edit ${name}`}
@@ -1057,6 +1142,7 @@ function AddNewCustomerForm({
         role: "carowner",
         vehicles: [],
       });
+      logPeopleApi("POST", "/api/autoshopowner/customer/onboard", { name, email, phone, city }, res);
       if (!res.ok) {
         setError(apiMessage(res.data) || "Could not add customer.");
         return;
@@ -1204,6 +1290,47 @@ function EditCustomerForm({
     setSubmitting(true);
     setError(null);
     try {
+      const isOnboarded = (customer.status ?? "").toLowerCase() === "onboarded";
+
+      if (addToListAfterSave) {
+        const addRes = await addCarOwnerToMyCustomers(token, id, {
+          name: name.trim(),
+          email: email.trim(),
+          city: city.trim(),
+        });
+        logPeopleApi("POST", "/api/autoshopowner/customer/add", { customerId: id, edits: { name, email, city } }, addRes);
+        if (!addRes.ok) {
+          setError(apiMessage(addRes.data) || "Could not add customer to your list.");
+          return;
+        }
+        onSaved(
+          apiMessage(addRes.data) ||
+          "Notification sent for approval. Pl. wait or contact with Customer",
+        );
+        return;
+      }
+
+      if (isOnboarded) {
+        const res = await editOnboardedCustomer(token, id, {
+          name: name.trim(),
+          phone: phoneDigits(phone),
+          email: email.trim(),
+          city: city.trim(),
+        });
+        logPeopleApi(
+          "PUT",
+          `/api/autoshopowner/customer/onboarded/${encodeURIComponent(id)}`,
+          { name, phone, email, city },
+          res,
+        );
+        if (!res.ok) {
+          setError(apiMessage(res.data) || "Could not update customer.");
+          return;
+        }
+        onSaved(apiMessage(res.data) || "Customer updated.");
+        return;
+      }
+
       const res = await updateMyCustomer(token, {
         carOwnerId: id,
         name: name.trim(),
@@ -1215,21 +1342,9 @@ function EditCustomerForm({
         city: city.trim(),
         vehicles: mapCustomerVehiclesForUpdate(customer),
       });
+      logPeopleApi("PUT", "/api/auto-shop-owner/my-customers", { carOwnerId: id }, res);
       if (!res.ok) {
         setError(apiMessage(res.data) || "Could not update customer.");
-        return;
-      }
-
-      if (addToListAfterSave) {
-        const addRes = await addCarOwnerToMyCustomers(token, id);
-        if (!addRes.ok) {
-          setError(apiMessage(addRes.data) || "Could not add customer to your list.");
-          return;
-        }
-        onSaved(
-          apiMessage(addRes.data) ||
-          "Notification sent for approval. Pl. wait or contact with Customer",
-        );
         return;
       }
 
@@ -1313,7 +1428,7 @@ function AddToListForm({
   onSaved: (message: string) => void;
 }) {
   const { token, session } = useAuth();
-  const countryCode = session?.meta?.countryCode ?? "+1";
+  void session;
   const name = customer.name ?? "";
   const phone = customer.phone ?? "";
   const city = customer.city ?? "";
@@ -1330,23 +1445,12 @@ function AddToListForm({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await updateMyCustomer(token, {
-        carOwnerId: id,
+      const addRes = await addCarOwnerToMyCustomers(token, id, {
         name: name.trim(),
         email: email.trim(),
-        countryCode,
-        phone: phoneDigits(phone),
-        pincode: customer.pincode?.trim() ?? "",
-        address: customer.address?.trim() ?? "",
         city: city.trim(),
-        vehicles: mapCustomerVehiclesForUpdate(customer),
       });
-      if (!res.ok) {
-        setError(apiMessage(res.data) || "Could not update customer.");
-        return;
-      }
-
-      const addRes = await addCarOwnerToMyCustomers(token, id);
+      logPeopleApi("POST", "/api/autoshopowner/customer/add", { customerId: id, edits: { name, email, city } }, addRes);
       if (!addRes.ok) {
         setError(apiMessage(addRes.data) || "Could not add customer to your list.");
         return;
@@ -1489,21 +1593,10 @@ function CustomerInfoView({
               readOnly
             />
           </CompactField>
-          <CompactField label="Due service" className={compactFixedFieldWidth}>
-            <input
-              className={`${shopCompactInputClass} bg-gray-100`}
-              value={vehicle.dueOdometerReading?.trim() || "—"}
-              readOnly
-            />
-          </CompactField>
         </CompactFormRow>
       ) : null}
     </CompactFormPanel>
   );
-}
-
-function usesDummyCustomers(section: PeopleSection): boolean {
-  return USE_DUMMY_SHOP_CUSTOMERS && (section === "customers" || section === "approval");
 }
 
 function customersMatchingSelection(
@@ -1541,8 +1634,13 @@ export default function ShopPeoplePage() {
   const [detailView, setDetailView] = useState<DetailView | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(() => new Set());
-  const [dummyCustomers, setDummyCustomers] = useState(DUMMY_SHOP_CUSTOMERS);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [directoryCustomers, setDirectoryCustomers] = useState<MyCustomer[]>([]);
+  const [directoryLoading, setDirectoryLoading] = useState(false);
+  const [directoryError, setDirectoryError] = useState<string | null>(null);
+  const [onboardedCustomers, setOnboardedCustomers] = useState<MyCustomer[]>([]);
+  const [onboardedLoading, setOnboardedLoading] = useState(false);
+  const [onboardedError, setOnboardedError] = useState<string | null>(null);
 
   const {
     customers: myCustomers,
@@ -1560,7 +1658,72 @@ export default function ShopPeoplePage() {
     return ids;
   }, [myCustomers]);
 
-  const customersSource = usesDummyCustomers(section) ? dummyCustomers : myCustomers;
+  useEffect(() => {
+    if (!token) {
+      setDirectoryCustomers([]);
+      setDirectoryError(null);
+      setDirectoryLoading(false);
+      return;
+    }
+    if (section !== "customers") return;
+
+    setDirectoryLoading(true);
+    setDirectoryError(null);
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await searchCarOwners(token, search.trim());
+          logPeopleApi("GET", `/api/autoshopowner/customer/search?search=${encodeURIComponent(search.trim())}`, null, res);
+          if (!res.ok) {
+            setDirectoryCustomers([]);
+            setDirectoryError("Could not load customers.");
+            return;
+          }
+          setDirectoryCustomers(parseMyCustomers(res.data));
+        } catch {
+          setDirectoryCustomers([]);
+          setDirectoryError("Network error.");
+        } finally {
+          setDirectoryLoading(false);
+        }
+      })();
+    }, 250);
+
+    return () => {
+      window.clearTimeout(handle);
+    };
+  }, [token, section, search]);
+
+  useEffect(() => {
+    if (!token) {
+      setOnboardedCustomers([]);
+      setOnboardedLoading(false);
+      setOnboardedError(null);
+      return;
+    }
+    // Onboarded customers are only shown under "My Customer List".
+    if (section !== "my-list") return;
+
+    setOnboardedLoading(true);
+    setOnboardedError(null);
+    void (async () => {
+      try {
+        const res = await fetchOnboardedCustomers(token);
+        logPeopleApi("GET", "/api/autoshopowner/customer/onboarded", null, res);
+        if (!res.ok) {
+          setOnboardedCustomers([]);
+          setOnboardedError("Could not load onboarded customers.");
+          return;
+        }
+        setOnboardedCustomers(parseMyCustomers(res.data).map((c) => ({ ...c, status: "onboarded" })));
+      } catch {
+        setOnboardedCustomers([]);
+        setOnboardedError("Network error.");
+      } finally {
+        setOnboardedLoading(false);
+      }
+    })();
+  }, [token, section]);
 
   const listCustomers = useMemo(() => {
     const q = search.trim();
@@ -1568,19 +1731,32 @@ export default function ShopPeoplePage() {
       q ? customers.filter((customer) => matchesMyCustomerSearch(customer, q)) : customers;
 
     if (section === "customers") {
-      return filterSearch(customersSource);
+      return filterSearch(directoryCustomers);
     }
     if (section === "my-list") {
-      return filterSearch(myCustomers.filter((customer) => !isPendingApproval(customer)));
+      return filterSearch([
+        ...myCustomers.filter((customer) => !isPendingApproval(customer)),
+        ...onboardedCustomers,
+      ]);
     }
     if (section === "approval") {
-      return filterSearch(customersSource.filter(isPendingApproval));
+      return filterSearch(myCustomers.filter(isPendingApproval));
     }
     return [];
-  }, [section, customersSource, myCustomers, search]);
+  }, [section, directoryCustomers, myCustomers, onboardedCustomers, search]);
 
-  const showListLoading = listLoading && !usesDummyCustomers(section);
-  const showListError = listError && !usesDummyCustomers(section);
+  const showListLoading =
+    section === "customers"
+      ? directoryLoading
+      : section === "my-list"
+        ? listLoading || onboardedLoading
+        : listLoading;
+  const showListError =
+    section === "customers"
+      ? directoryError
+      : section === "my-list"
+        ? onboardedError || listError
+        : listError;
 
   const totalPages = Math.max(1, Math.ceil(listCustomers.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -1686,7 +1862,9 @@ export default function ShopPeoplePage() {
       ? "No customers yet."
       : section === "approval"
         ? "No customers awaiting approval."
-        : "No customers in your list yet.";
+        : myCustomers.some(isPendingApproval)
+          ? "No approved customers in your list yet. Check the Approval tab for pending requests."
+          : "No customers in your list yet.";
 
   const showList = !detailView;
   const showAddNewAction =
@@ -1700,6 +1878,13 @@ export default function ShopPeoplePage() {
     setDetailView(null);
     setStatusMessage(null);
     setEditingCustomer(customer);
+  };
+
+  const handleAddToList = (customer: MyCustomer) => {
+    setShowAddForm(false);
+    setEditingCustomer(null);
+    setStatusMessage(null);
+    setDetailView({ kind: "add-to-list", customer });
   };
 
   const handleShowVehicles = (customer: MyCustomer) => {
@@ -1750,6 +1935,7 @@ export default function ShopPeoplePage() {
 
   const handleBulkDelete = async () => {
     if (!hasBulkSelection || bulkDeleting) return;
+    if (section === "customers") return;
 
     const selectedCustomers = customersMatchingSelection(
       selectedCustomerIds,
@@ -1763,19 +1949,6 @@ export default function ShopPeoplePage() {
 
     setBulkDeleting(true);
     try {
-      if (usesDummyCustomers(section)) {
-        const idsToRemove = new Set(
-          selectedCustomers.map((customer) => customerId(customer)).filter(Boolean),
-        );
-        setDummyCustomers((prev) => prev.filter((customer) => !idsToRemove.has(customerId(customer))));
-        setSelectedCustomerIds(new Set());
-        if (editingCustomer && idsToRemove.has(customerId(editingCustomer))) {
-          setEditingCustomer(null);
-        }
-        toast.success(`Deleted ${count} customer${count === 1 ? "" : "s"}.`);
-        return;
-      }
-
       if (!token) return;
 
       let failed = 0;
@@ -1786,6 +1959,7 @@ export default function ShopPeoplePage() {
           continue;
         }
         const res = await removeCarOwnerFromMyCustomers(token, id);
+        logPeopleApi("DELETE", `/api/autoshopowner/customer/added/${encodeURIComponent(id)}`, null, res);
         if (!res.ok) failed += 1;
       }
 
@@ -1860,14 +2034,16 @@ export default function ShopPeoplePage() {
               onChange={setSearch}
               inputId={PEOPLE_SEARCH_INPUT_ID}
               leading={
-                <button
-                  type="button"
-                  onClick={() => void handleBulkDelete()}
-                  disabled={!hasBulkSelection || bulkDeleting}
-                  className={SHOP_PEOPLE_BULK_DELETE_BUTTON_CLASS}
-                >
-                  {bulkDeleting ? "Deleting…" : "Delete"}
-                </button>
+                section === "customers" ? null : (
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkDelete()}
+                    disabled={!hasBulkSelection || bulkDeleting}
+                    className={SHOP_PEOPLE_BULK_DELETE_BUTTON_CLASS}
+                  >
+                    {bulkDeleting ? "Deleting…" : "Delete"}
+                  </button>
+                )
               }
               trailing={
                 showAddNewAction ? (
@@ -1908,7 +2084,17 @@ export default function ShopPeoplePage() {
             {showListLoading ? (
               <ShopListSkeleton variant="profile-table" className="w-full" />
             ) : showListError ? (
-              <ShopErrorPanel message={listError} onRetry={() => void refresh()} />
+              <ShopErrorPanel
+                message={showListError}
+                onRetry={() => {
+                  if (section === "customers") {
+                    // re-trigger directory fetch by forcing a state update
+                    setDirectoryCustomers((prev) => [...prev]);
+                    return;
+                  }
+                  void refresh();
+                }}
+              />
             ) : listCustomers.length === 0 && !showAddForm ? (
               <p className="text-center text-sm text-gray-600">{emptyMessage}</p>
             ) : listCustomers.length > 0 ? (
@@ -1925,6 +2111,8 @@ export default function ShopPeoplePage() {
                   <CustomerListTable
                     customers={paginatedCustomers}
                     onEdit={handleEditCustomer}
+                    onAddToList={handleAddToList}
+                    canAddToList={(customer) => section === "customers" && !isInMyList(customer)}
                     onShowVehicles={handleShowVehicles}
                     showCity
                     selectedIds={selectedCustomerIds}

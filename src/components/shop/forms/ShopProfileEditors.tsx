@@ -32,13 +32,12 @@ import {
 } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
-import { updateBusinessProfile } from "../../../lib/autoshopownerApi";
+import { updateBusinessProfile, updatePersonalProfile as updatePersonalProfileNew } from "../../../lib/autoshopownerApi";
 import {
   addMyCarCompanies,
   apiMessage,
   updateBusinessOpenHours,
   updatePersonalProfile,
-  updatePersonalProfileMultipart,
   updateServiceWeWorkWith,
 } from "../../../lib/shopOwnerMutations";
 import {
@@ -418,13 +417,26 @@ export function ShopPersonalProfileEditor({
         address: address.trim(),
         city: selectedCity.trim(),
       };
-      const res = profilePhoto
-        ? await updatePersonalProfileMultipart(token, { ...fields, profilePhoto })
-        : await updatePersonalProfile(token, fields);
-      if (!res.ok) {
-        toast.error(apiMessage(res.data) || "Could not save.");
+      // Keep legacy profile endpoint for address/pincode/etc,
+      // but use the new /api/autoshopowner/profile/personal endpoint for photo uploads.
+      const legacyRes = await updatePersonalProfile(token, fields);
+      if (!legacyRes.ok) {
+        toast.error(apiMessage(legacyRes.data) || "Could not save.");
         return;
       }
+
+      if (profilePhoto) {
+        const photoRes = await updatePersonalProfileNew(token, {
+          name: fields.name,
+          city: fields.city,
+          profilePhoto,
+        });
+        if (!photoRes.ok) {
+          toast.error(apiMessage(photoRes.data) || "Could not upload photo.");
+          return;
+        }
+      }
+
       setProfilePhoto(null);
       if (!isUpdating) setSavedOnce(true);
       toast.success(isUpdating ? "Profile updated." : "Profile saved.");

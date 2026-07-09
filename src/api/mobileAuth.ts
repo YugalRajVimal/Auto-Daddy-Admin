@@ -2,6 +2,27 @@ import type { SessionMeta, UserRole } from "../auth/types";
 
 const API_BASE = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
 
+function shouldDebugApi(): boolean {
+  if (!import.meta.env.DEV) return false;
+  try {
+    return window.localStorage.getItem("debug:api") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function debugApi(method: string, url: string, request: unknown, response: unknown) {
+  if (!shouldDebugApi()) return;
+  // eslint-disable-next-line no-console
+  console.groupCollapsed(`[api] ${method} ${url}`);
+  // eslint-disable-next-line no-console
+  console.log("request:", request ?? null);
+  // eslint-disable-next-line no-console
+  console.log("response:", response ?? null);
+  // eslint-disable-next-line no-console
+  console.groupEnd();
+}
+
 export type OtpRequestResponse = { message?: string };
 
 export type VerifyOtpResponse = {
@@ -20,7 +41,8 @@ export type AuthSessionVerifyResponse = {
 };
 
 export async function postJson<T>(path: string, body: Record<string, unknown>, token?: string) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -29,35 +51,46 @@ export async function postJson<T>(path: string, body: Record<string, unknown>, t
     body: JSON.stringify(body),
   });
   const data = (await res.json().catch(() => null)) as T | null;
-  return { ok: res.ok, status: res.status, data };
+  const out = { ok: res.ok, status: res.status, data };
+  debugApi("POST", url, body, out);
+  return out;
 }
 
 export async function getJson<T>(path: string, token: string) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
     headers: { Authorization: token },
   });
   const data = (await res.json().catch(() => null)) as T | null;
-  return { ok: res.ok, status: res.status, data };
+  const out = { ok: res.ok, status: res.status, data };
+  debugApi("GET", url, null, out);
+  return out;
 }
 
 export async function postFormData<T>(path: string, body: FormData, token: string) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
     method: "POST",
     headers: { Authorization: token },
     body,
   });
   const data = (await res.json().catch(() => null)) as T | null;
-  return { ok: res.ok, status: res.status, data };
+  const out = { ok: res.ok, status: res.status, data };
+  debugApi("POST", url, "[form-data]", out);
+  return out;
 }
 
 export async function putFormData<T>(path: string, body: FormData, token: string) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
     method: "PUT",
     headers: { Authorization: token },
     body,
   });
   const data = (await res.json().catch(() => null)) as T | null;
-  return { ok: res.ok, status: res.status, data };
+  const out = { ok: res.ok, status: res.status, data };
+  debugApi("PUT", url, "[form-data]", out);
+  return out;
 }
 
 export async function putJson<T>(
@@ -65,7 +98,8 @@ export async function putJson<T>(
   body: Record<string, unknown>,
   token: string
 ) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -74,7 +108,9 @@ export async function putJson<T>(
     body: JSON.stringify(body),
   });
   const data = (await res.json().catch(() => null)) as T | null;
-  return { ok: res.ok, status: res.status, data };
+  const out = { ok: res.ok, status: res.status, data };
+  debugApi("PUT", url, body, out);
+  return out;
 }
 
 export async function patchJson<T>(
@@ -82,7 +118,8 @@ export async function patchJson<T>(
   body: Record<string, unknown>,
   token: string
 ) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -91,7 +128,9 @@ export async function patchJson<T>(
     body: JSON.stringify(body),
   });
   const data = (await res.json().catch(() => null)) as T | null;
-  return { ok: res.ok, status: res.status, data };
+  const out = { ok: res.ok, status: res.status, data };
+  debugApi("PATCH", url, body, out);
+  return out;
 }
 
 export async function deleteJson<T>(
@@ -99,7 +138,8 @@ export async function deleteJson<T>(
   token: string,
   body?: Record<string, unknown>
 ) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -108,7 +148,9 @@ export async function deleteJson<T>(
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = (await res.json().catch(() => null)) as T | null;
-  return { ok: res.ok, status: res.status, data };
+  const out = { ok: res.ok, status: res.status, data };
+  debugApi("DELETE", url, body ?? null, out);
+  return out;
 }
 
 export function normalizePhoneDigits(phone: string): string {

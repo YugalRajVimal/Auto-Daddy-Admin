@@ -141,9 +141,17 @@ export function updateMyCustomer(token: string, body: UpdateCustomerBody, upload
   );
 }
 
-export function addCarOwnerToMyCustomers(token: string, carOwnerId: string) {
-  // NEW: add existing user to my customers list
-  return postJson<ApiEnvelope>("/api/autoshopowner/customer/add", { customerId: carOwnerId }, token);
+export function addCarOwnerToMyCustomers(
+  token: string,
+  carOwnerId: string,
+  edits?: { name?: string; email?: string; city?: string },
+) {
+  // NEW: add existing user to my customers list (optional pending edits)
+  return postJson<ApiEnvelope>(
+    "/api/autoshopowner/customer/add",
+    { customerId: carOwnerId, ...(edits ? { edits } : {}) },
+    token,
+  );
 }
 
 export function removeCarOwnerFromMyCustomers(token: string, carOwnerId: string) {
@@ -235,7 +243,13 @@ export function updateBusinessOpenHours(token: string, openHoursJson: string) {
 
 export function updateServiceWeWorkWith(token: string, serviceIds: string[]) {
   const fd = new FormData();
-  fd.append("serviceWeWorkWith", JSON.stringify(serviceIds));
+  // Backend expects Mongo ObjectId strings for service IDs.
+  // The UI may contain "dummy-*" placeholder IDs while the new API surface is still being migrated.
+  const cleaned = (serviceIds ?? [])
+    .map((id) => String(id ?? "").trim())
+    .filter(Boolean)
+    .filter((id) => /^[a-f\d]{24}$/i.test(id));
+  fd.append("serviceWeWorkWith", JSON.stringify(cleaned));
   return putFormData<ApiEnvelope>("/api/auto-shop-owner/edit-business-profile", fd, token);
 }
 

@@ -34,6 +34,7 @@ import {
 } from "../../lib/shopOwnerMutations";
 import { fetchMyServices } from "../../lib/shopOwnerApi";
 import { parseMyServices } from "../../lib/shopOwnerParsers";
+import { addMyService, fetchAdminServices } from "../../lib/autoshopownerApi";
 import {
   buildSelectedBrandIds,
   getCarBrandId,
@@ -176,6 +177,8 @@ export default function ShopProfilePage() {
     () => DUMMY_JOB_CARD_TEMPLATES[0]?.id ?? "",
   );
 
+  const shopType = normalizeShopType(user?.shopType ?? business?.shopType);
+
   const refreshMyServices = async () => {
     if (!token) return;
     const res = await fetchMyServices(token);
@@ -229,15 +232,29 @@ export default function ShopProfilePage() {
       return;
     }
 
-    void fetchServiceCatalog(token)
-      .then((res) => {
+    void (async () => {
+      try {
+        // Prefer the new admin services catalog endpoint (supports shopType + name search).
+        const res = await fetchAdminServices(token, { shopType: shopType || undefined, services: undefined });
         const apiList = res.ok ? parseServiceCatalog(res.data) : [];
-        applyCatalog(apiList);
-      })
-      .catch(() => {
+        if (apiList.length > 0) {
+          applyCatalog(apiList);
+          return;
+        }
+      } catch {
+        // fall through to legacy
+      }
+
+      // Legacy fallback (older route shape).
+      try {
+        const legacyRes = await fetchServiceCatalog(token);
+        const legacyList = legacyRes.ok ? parseServiceCatalog(legacyRes.data) : [];
+        applyCatalog(legacyList);
+      } catch {
         applyCatalog([]);
-      });
-  }, [activeId, token]);
+      }
+    })();
+  }, [activeId, token, shopType]);
 
   useEffect(() => {
     if (activeId !== "services") {
@@ -286,7 +303,6 @@ export default function ShopProfilePage() {
   }, [activeId, servicesCatalogLoading, token]);
 
   const selectedBrandList = getSelectedCarBrands(carCompanies, selectedBrands);
-  const shopType = normalizeShopType(user?.shopType ?? business?.shopType);
   const selectedServiceList = useMemo(
     () => resolveProfileSelectedServices(fullServiceCatalog, myServices, selectedServiceIds),
     [fullServiceCatalog, myServices, selectedServiceIds]
@@ -520,7 +536,7 @@ export default function ShopProfilePage() {
             editingId={editingServiceId}
             showAddForm={showAddService}
             onAddFormClose={() => setShowAddService(false)}
-            onSaveService={(id, replacesId, meta) => {
+            onSaveService={async (id, replacesId, meta) => {
               const persistMeta = () => applyServiceMeta(id, meta);
 
               if (usingDummyServices || isDummyServiceId(id)) {
@@ -547,7 +563,26 @@ export default function ShopProfilePage() {
                 (replacesId !== undefined && replacesId === id);
 
               if (isMetaOnly) return true;
-              return false;
+
+              if (!token) return false;
+              const createdAt = meta?.createdAt?.trim() || new Date().toISOString().slice(0, 10);
+              const dateIso = new Date(createdAt).toISOString();
+              const status = meta?.isActive === false ? "Inactive" : "Active";
+
+              const addRes = await addMyService(token, { serviceId: id, status, date: dateIso });
+              if (!addRes.ok) {
+                toast.error(apiMessage(addRes.data) || "Could not add service.");
+                return true; // handled (prevents legacy fallback), but shows error
+              }
+
+              setSelectedServiceIds((prev) => {
+                const next = new Set(prev);
+                if (replacesId) next.delete(replacesId);
+                next.add(id);
+                return next;
+              });
+              toast.success(apiMessage(addRes.data) || "Service added.");
+              return true;
             }}
             onSaved={() => {
               if (!usingDummyServices) {
