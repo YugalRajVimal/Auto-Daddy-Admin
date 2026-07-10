@@ -5,9 +5,9 @@ import useAuth from "../../auth/useAuth";
 import { useShopOwnerCallingCode } from "../../hooks/useShopOwnerCallingCode";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
-import { fetchJobCardById, markJobCardPaymentInvoice } from "../../lib/shopOwnerMutations";
-import { isJobRecordEligibleForInvoiceConversion } from "../../lib/shopOwnerJobCards";
-import { resolveJobCardFromApiResponse } from "../../lib/shopOwnerJobCardsApi";
+import { fetchJobCardRecord, jobCardRecordFromListRow } from "../../lib/shopOwnerJobCardsApi";
+import { isJobRecordEligibleForInvoiceConversion, pickJobCardNoForApi } from "../../lib/shopOwnerJobCards";
+import { updateAutoshopJobCardStatus } from "../../lib/autoshopownerJobCardsApi";
 import { ShopListSkeleton } from "../shop/ShopListSkeletons";
 import { ShopErrorPanel } from "../shop/ShopPanels";
 import {
@@ -124,22 +124,43 @@ export default function ShopJobCardEstimateView({
   const [converting, setConverting] = useState(false);
 
   const load = useCallback(async () => {
-    if (!token || !jobCardId) return;
+    if (!jobCardId) return;
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetchJobCardById(token, jobCardId);
-      if (!res.ok) throw new Error("Could not load job card.");
-      const resolved = resolveJobCardFromApiResponse(res.data);
-      if (!resolved) throw new Error("Could not load job card.");
+
+    const mergeJobNo = (record: Record<string, unknown>) => {
       const listNo = listRow ? pickJobNoFromListRow(listRow) : undefined;
-      const envelopeNo = extractJobNoFromApiEnvelope(res.data);
+      const hintNo = jobNoHint?.trim() || undefined;
+      const mergedNo = listNo ?? hintNo;
+      if (mergedNo && !pickJobNoFromRecord(record)) {
+        record.jobNo = mergedNo;
+      }
+      return record;
+    };
+
+    const bootstrap = jobCardRecordFromListRow(listRow, jobCardId);
+    if (bootstrap) {
+      setJob(mergeJobNo(bootstrap));
+      setLoading(false);
+      return;
+    }
+
+    if (!token) {
+      setLoading(false);
+      setError("Could not load job card.");
+      return;
+    }
+
+    try {
+      const { record, envelope } = await fetchJobCardRecord(token, jobCardId);
+      const listNo = listRow ? pickJobNoFromListRow(listRow) : undefined;
+      const envelopeNo = extractJobNoFromApiEnvelope(envelope);
       const hintNo = jobNoHint?.trim() || undefined;
       const mergedNo = listNo ?? envelopeNo ?? hintNo;
-      if (mergedNo && !pickJobNoFromRecord(resolved)) {
-        resolved.jobNo = mergedNo;
+      if (mergedNo && !pickJobNoFromRecord(record)) {
+        record.jobNo = mergedNo;
       }
-      setJob(resolved);
+      setJob(record);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load job card.");
       setJob(null);
@@ -188,9 +209,14 @@ export default function ShopJobCardEstimateView({
 
   const handleConvertToInvoice = async () => {
     if (!token || converting || !canConvertToInvoice) return;
+    const jobCardNo = pickJobCardNoForApi(listRow) ?? pickJobCardNoForApi(job);
+    if (!jobCardNo) {
+      toast.error("Could not convert to invoice.");
+      return;
+    }
     setConverting(true);
     try {
-      const res = await markJobCardPaymentInvoice(token, jobCardId);
+      const res = await updateAutoshopJobCardStatus(token, jobCardNo, "convertedToInvoice");
       if (!res.ok) {
         toast.error("Could not convert to invoice.");
         return;
@@ -298,7 +324,7 @@ export default function ShopJobCardEstimateView({
               <EstimateMetaRow label="Job Card No. :" value={docNo} />
               <EstimateMetaRow
                 label="Date :"
-                value={formatEstimateDate(job.serviceDate ?? job.jobDate ?? job.createdAt)}
+                value={formatEstimateDate(job.date ?? job.serviceDate ?? job.jobDate ?? job.createdAt)}
               />
               {showHst ? <EstimateMetaRow label="HST No. :" value={hstNumber} /> : null}
             </div>

@@ -195,6 +195,11 @@ function joinServiceNames(raw: unknown): string | undefined {
     if (!o) {
       continue;
     }
+    const flatDesc = s(o.desc) ?? s(o.category);
+    if (flatDesc) {
+      parts.push(flatDesc);
+      continue;
+    }
     const name = s(o.name) ?? s(o.serviceName);
     const subs = o.subServices ?? o.selectedSubServices;
     if (Array.isArray(subs) && subs.length > 0) {
@@ -242,7 +247,9 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     s(o.jobNumber) ??
     s(o.jobCode) ??
     s(o.displayJobNo) ??
-    s(o.jobCardNo);
+    (typeof o.jobCardNo === "number" && Number.isFinite(o.jobCardNo)
+      ? String(o.jobCardNo)
+      : s(o.jobCardNo));
   const invoiceNumber = s(o.invoiceNumber) ?? s(o.invoiceNo) ?? s(o.invoice_number);
   const vehiclePlate =
     s(o.licensePlateNo) ??
@@ -275,7 +282,7 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
   const paymentStatus = s(o.paymentStatus);
   const unpaid = typeof o.unpaid === "boolean" ? o.unpaid : undefined;
   const totalRaw =
-    o.totalPayableAmount ?? o.total ?? o.grandTotal ?? o.amount ?? o.price;
+    o.totalPayableAmount ?? o.totalAmount ?? o.total ?? o.grandTotal ?? o.amount ?? o.price;
   const total =
     typeof totalRaw === "number" || typeof totalRaw === "string" ? totalRaw : undefined;
   const servicesSummary = joinServiceNames(o.services) ?? s(o.servicesSummary) ?? s(o.serviceSummary);
@@ -320,7 +327,13 @@ export function isJobCardPending(row: JobCardListRow): boolean {
   return normalizedJobCardStatus(row) === "pending";
 }
 
+function rowStatusNorm(row: JobCardListRow): string {
+  return normalizedJobCardStatus(row).toLowerCase().replace(/\s+/g, "");
+}
+
 export function isJobCardPaid(row: JobCardListRow): boolean {
+  const norm = rowStatusNorm(row);
+  if (norm === "cashpaid") return true;
   const paymentStatus = (row.paymentStatus ?? "").trim().toLowerCase();
   if (paymentStatus === "paid") return true;
   if (row.unpaid === false) return true;
@@ -333,14 +346,25 @@ export function isJobCardEditable(row: JobCardListRow): boolean {
   return norm === "pending" || norm === "rejected" || norm === "autorejected";
 }
 
-export function isJobCardApproved(row: JobCardListRow): boolean {
+function isApprovedByCustomer(row: JobCardListRow): boolean {
+  const raw = row.raw;
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    if (o.approvedByCustomer === true) return true;
+  }
   return normalizedJobCardStatus(row) === "approved";
 }
 
-/** Approved, unpaid job cards that are not already on invoice payment. */
+export function isJobCardApproved(row: JobCardListRow): boolean {
+  return isApprovedByCustomer(row);
+}
+
+/** Customer-approved, unpaid job cards that are not already converted to invoice. */
 export function isEligibleForInvoiceConversion(row: JobCardListRow): boolean {
-  if (!isJobCardApproved(row)) return false;
+  const norm = rowStatusNorm(row);
+  if (norm === "convertedtoinvoice" || norm === "cashpaid") return false;
   if (isJobCardPaid(row)) return false;
+  if (!isApprovedByCustomer(row)) return false;
   return getWalletLedgerTab(row.raw) !== "invoice";
 }
 
@@ -373,6 +397,12 @@ export function isJobRecordEligibleForInvoiceConversion(
   job: Record<string, unknown>,
   listRow?: JobCardListRow | null,
 ): boolean {
+  if (job.approvedByCustomer === true) {
+    const status = String(job.status ?? "").trim().toLowerCase().replace(/\s+/g, "");
+    if (status === "convertedtoinvoice" || status === "cashpaid") return false;
+    if (listRow && isJobCardPaid(listRow)) return false;
+    return true;
+  }
   return isEligibleForInvoiceConversion(jobCardRowFromRecord(job, listRow));
 }
 
@@ -384,10 +414,11 @@ const JOB_CARD_BUCKET_LABELS: Record<JobCardListBucket, string> = {
 };
 
 export function jobCardStatusLabel(row: JobCardListRow): string {
-  if (getWalletLedgerTab(row.raw) === "invoice") {
+  const norm = rowStatusNorm(row);
+  if (norm === "convertedtoinvoice" || getWalletLedgerTab(row.raw) === "invoice") {
     return "Converted to Invoice";
   }
-  if (isJobCardPaid(row) && getWalletLedgerTab(row.raw) === "cash") {
+  if (norm === "cashpaid" || (isJobCardPaid(row) && getWalletLedgerTab(row.raw) === "cash")) {
     return "Cash Paid";
   }
 
@@ -452,6 +483,59 @@ export function parseJobCardsFromPagePayload(payload: unknown): JobCardListRow[]
   return extractRowsWithBuckets(payload)
     .map(({ raw, bucket }) => toRow(raw, bucket))
     .filter(Boolean) as JobCardListRow[];
+}
+
+/**
+ * Path key for DELETE/PUT/status/send-for-approval:
+ * `{{BASE}}/api/autoshopowner/jobcards/:jobCardNo` (numeric job card number, not Mongo _id).
+ */
+export function pickJobCardNoForApi(
+  source:
+    | { jobNo?: string; raw?: unknown }
+    | Record<string, unknown>
+    | null
+    | undefined,
+): string | null {
+  if (!source) return null;
+
+  const fromDirect = (value: unknown): string | null => {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+      return String(Math.trunc(value));
+    }
+    if (typeof value === "string" && value.trim()) {
+      const digits = value.trim().replace(/^j\s*#?\s*/i, "").replace(/[^\d]/g, "");
+      if (digits && Number.isFinite(Number(digits)) && Number(digits) > 0) {
+        return String(Number(digits));
+      }
+    }
+    return null;
+  };
+
+  if ("jobNo" in source || "raw" in source) {
+    const row = source as { jobNo?: string; raw?: unknown };
+    const fromJobNo = fromDirect(row.jobNo);
+    if (fromJobNo) return fromJobNo;
+    if (row.raw && typeof row.raw === "object") {
+      const raw = row.raw as Record<string, unknown>;
+      return (
+        fromDirect(raw.jobCardNo) ??
+        fromDirect(raw.jobCardNumber) ??
+        fromDirect(raw.jobNo) ??
+        fromDirect(raw.jobNumber) ??
+        null
+      );
+    }
+    return null;
+  }
+
+  const record = source as Record<string, unknown>;
+  return (
+    fromDirect(record.jobCardNo) ??
+    fromDirect(record.jobCardNumber) ??
+    fromDirect(record.jobNo) ??
+    fromDirect(record.jobNumber) ??
+    null
+  );
 }
 
 /** Merge job card lists by id; later entries override earlier ones. */

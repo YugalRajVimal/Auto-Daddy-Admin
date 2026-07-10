@@ -10,11 +10,12 @@ import useAuth from "../../auth/useAuth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopDeals, type DealFilter } from "../../hooks/useShopDeals";
 import {
-  deleteDeal,
-  type DealFormFields,
-  updateDeal,
-} from "../../lib/shopOwnerMutations";
-import { dealId } from "../../lib/shopOwnerParsers";
+  deleteAutoshopDeal,
+  type AutoshopDealFormFields,
+  type AutoshopDealType,
+  updateAutoshopDeal,
+} from "../../lib/autoshopownerDealsApi";
+import { dealId, isSalvagesDeal } from "../../lib/shopOwnerParsers";
 import type { ShopDeal } from "../../types/shopOwner";
 import { printAdminTable } from "../../utils/adminPrintTable";
 
@@ -86,6 +87,7 @@ function dealVehicleYear(deal: ShopDeal): string {
 }
 
 function isSalvageDeal(deal: ShopDeal): boolean {
+  if (isSalvagesDeal(deal)) return true;
   const haystack = [deal.productName, deal.partName, deal.description, deal.dealType, deal.service?.name]
     .filter(Boolean)
     .join(" ")
@@ -93,26 +95,33 @@ function isSalvageDeal(deal: ShopDeal): boolean {
   return /\bsalvage/i.test(haystack);
 }
 
-function dealToFormFields(deal: ShopDeal, overrides?: Partial<DealFormFields>): DealFormFields {
+function dealToFormFields(deal: ShopDeal, overrides?: Partial<AutoshopDealFormFields>): AutoshopDealFormFields {
   const mode = dealMode(deal);
-  const fields: DealFormFields = {
-    dealType: mode === "parts" ? "Parts" : "Service",
+  const dealType: AutoshopDealType = isSalvagesDeal(deal)
+    ? "Salvages"
+    : mode === "parts"
+      ? "Parts"
+      : "Service";
+  const fields: AutoshopDealFormFields = {
+    dealType,
     discountedPrice: deal.discountedPrice != null ? String(deal.discountedPrice) : "",
     description: deal.description ?? "",
     offersEndOnDate: deal.offersEndOnDate?.slice(0, 10) ?? "",
     dealEnabled: deal.dealEnabled === false ? "false" : "true",
     ...overrides,
   };
-  if (mode === "parts") {
+  if (mode === "parts" || dealType === "Salvages") {
     fields.partName = deal.partName ?? deal.productName ?? "";
     fields.vehicleId = deal.vehicleId;
     fields.vehicleName = deal.selectedVehicle?.vehicleName ?? deal.selectedVehicle?.name;
     fields.vehicleModel = deal.selectedVehicle?.model;
     fields.vehicleYear = deal.selectedVehicle?.year;
+    fields.originalPrice =
+      deal.price != null ? String(deal.price) : fields.discountedPrice;
   } else {
     fields.serviceId = deal.serviceId;
-    fields.productName = deal.productName ?? deal.service?.name ?? "";
-    fields.price = deal.price != null ? String(deal.price) : fields.discountedPrice;
+    fields.originalPrice =
+      deal.price != null ? String(deal.price) : fields.discountedPrice;
   }
   return fields;
 }
@@ -249,7 +258,7 @@ export default function ShopDealsPage() {
     try {
       for (const deal of rows) {
         const id = dealId(deal);
-        const res = await deleteDeal(token, id);
+        const res = await deleteAutoshopDeal(token, id);
         if (!res.ok) failed += 1;
       }
       await refresh();
@@ -279,7 +288,7 @@ export default function ShopDealsPage() {
     try {
       for (const deal of rows) {
         const id = dealId(deal);
-        const res = await updateDeal(token, id, dealToFormFields(deal, { dealEnabled: "false" }));
+        const res = await updateAutoshopDeal(token, id, dealToFormFields(deal, { dealEnabled: "false" }));
         if (!res.ok) failed += 1;
       }
       await refresh();
@@ -345,6 +354,7 @@ export default function ShopDealsPage() {
         <ShopReveal show={formOpen}>
           <ShopDealFormDialog
             mode={formMode}
+            section={activeId}
             deal={editingDeal}
             onCancel={closeForm}
             onSaved={() => void refresh()}

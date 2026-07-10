@@ -27,6 +27,10 @@ import {
 import { extractSavedJobCardId, pickJobNoFromRecord } from "./shopJobCardEstimate";
 import { DUMMY_SHOP_BANKS } from "../../lib/dummyShopWallet";
 import {
+  defaultBankIdFromPageDetails,
+  type AutoshopPageDetailsBank,
+} from "../../lib/autoshopownerJobCardsApi";
+import {
   fetchJobCardByIdForForm,
   fetchJobCardFormData,
   normalizeJobCardServiceBlocks,
@@ -74,6 +78,8 @@ const DEFAULT_JOB_CARD_TERMS =
   "Payment is due upon completion unless otherwise agreed. All work is subject to shop terms and applicable taxes.";
 
 const JOB_CARD_FOOTER_LINK_CLASS = "text-sm font-medium text-blue-600 underline hover:text-blue-700";
+const PHONE_COMBO_ACTIVE_ITEM_CLASS = "bg-[#f5cce8] font-semibold text-ad-purple";
+const MIN_PHONE_MATCH_DIGITS = 3;
 
 const META_LABEL_CLASS = "text-sm font-bold text-gray-900";
 const META_LABEL_CELL_CLASS = `${META_LABEL_CLASS} w-[8.5rem] shrink-0 text-left`;
@@ -99,10 +105,16 @@ type ServiceCategory = {
   name?: string;
   desc?: string;
   odoOutRequired?: boolean;
-  subServices: Array<{ name: string; desc?: string; price?: number }>;
+  subServices: Array<{ name: string; desc?: string; price?: number; odoOutRequired?: boolean }>;
 };
 
-function defaultInvoiceBankId() {
+function defaultInvoiceBankId(banks: AutoshopPageDetailsBank[] = DUMMY_SHOP_BANKS.map((b) => ({
+  _id: b.id,
+  BankName: b.label,
+  assignToInvoice: b.assignToInvoice,
+}))) {
+  const fromApi = defaultBankIdFromPageDetails(banks);
+  if (fromApi) return fromApi;
   return DUMMY_SHOP_BANKS.find((bank) => bank.assignToInvoice)?.id ?? DUMMY_SHOP_BANKS[0]?.id ?? "";
 }
 
@@ -217,7 +229,11 @@ function categoryRequiresOdoOut(catId: string, categories: ServiceCategory[]) {
 function lineRequiresOdoOut(line: ServiceLine, categories: ServiceCategory[]) {
   const parsed = parseSubServiceKey(line.subKey);
   if (!parsed) return false;
-  return categoryRequiresOdoOut(parsed.catId, categories);
+  const cat = categories.find((c) => c.id === parsed.catId);
+  if (!cat) return false;
+  if (cat.odoOutRequired) return true;
+  const sub = cat.subServices?.[parsed.subIdx] as { odoOutRequired?: boolean } | undefined;
+  return Boolean(sub?.odoOutRequired);
 }
 
 function defaultOdoOutForCategory(
@@ -311,7 +327,7 @@ function serviceLinesToBlocks(lines: ServiceLine[], categories: ServiceCategory[
     const qty = String(line.qtyStr || "").trim();
     const labourCost = parseNumberFromText(line.labourCostStr);
     const unitPrice = parseNumberFromText(line.unitPriceStr);
-    bucket.push({
+    const entry: Record<string, unknown> = {
       name: sub.name,
       desc: String(line.desc || "").trim(),
       unit: qty,
@@ -320,7 +336,16 @@ function serviceLinesToBlocks(lines: ServiceLine[], categories: ServiceCategory[
       price: calcLinePrice(line),
       labourCharge: labourCost,
       labourCost,
-    });
+    };
+    if (lineRequiresOdoOut(line, categories)) {
+      const odoOutReading = parseNumberFromText(line.odoOutStr);
+      if (odoOutReading > 0) {
+        entry.dueOdometerReading = String(odoOutReading);
+        entry.odoOut = String(odoOutReading);
+        entry.odoOutReading = odoOutReading;
+      }
+    }
+    bucket.push(entry);
     map.set(parsed.catId, bucket);
   }
   return [...map.entries()].map(([service, subServices]) => ({ service, subServices }));
@@ -392,12 +417,22 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function findCustomerByPhone(
+function filterCustomersByPhone(
   customers: JobCardFormCustomer[],
   digits: string,
-): JobCardFormCustomer | null {
-  if (digits.length !== 10) return null;
-  return customers.find((customer) => phoneDigits(customer.phone) === digits) ?? null;
+): JobCardFormCustomer[] {
+  const query = digits.trim();
+  if (query.length < MIN_PHONE_MATCH_DIGITS) return [];
+  return customers
+    .filter((customer) => phoneDigits(customer.phone).includes(query))
+    .sort((a, b) => {
+      const phoneA = phoneDigits(a.phone);
+      const phoneB = phoneDigits(b.phone);
+      const aStarts = phoneA.startsWith(query) ? 0 : 1;
+      const bStarts = phoneB.startsWith(query) ? 0 : 1;
+      if (aStarts !== bStarts) return aStarts - bStarts;
+      return (a.name ?? "").localeCompare(b.name ?? "");
+    });
 }
 
 type JobCardFormProps = {
@@ -405,7 +440,7 @@ type JobCardFormProps = {
   mode?: "add" | "edit";
   jobCardId?: string | null;
   onCancel: () => void;
-  onSaved?: (jobCardId?: string, jobCardNo?: string) => void;
+  onSaved?: (jobCardId?: string, jobCardNo?: string, jobRecord?: Record<string, unknown>) => void;
 };
 
 export default function JobCardForm({
@@ -436,9 +471,13 @@ export default function JobCardForm({
   const [dataError, setDataError] = useState<string | null>(null);
   const [serviceLines, setServiceLines] = useState<ServiceLine[]>([]);
   const [customerPhone, setCustomerPhone] = useState("");
+  const [phoneLookupOpen, setPhoneLookupOpen] = useState(false);
+  const [phoneActiveIndex, setPhoneActiveIndex] = useState(0);
+  const phoneComboRef = useRef<HTMLDivElement>(null);
   const [vehiclePhotoFiles, setVehiclePhotoFiles] = useState<File[]>([]);
   const [keptVehiclePhotoUrls, setKeptVehiclePhotoUrls] = useState<string[]>([]);
-  const [selectedBankId, setSelectedBankId] = useState(defaultInvoiceBankId);
+  const [myBanks, setMyBanks] = useState<AutoshopPageDetailsBank[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState("");
   const [termsNotes, setTermsNotes] = useState("");
   const lineIdRef = useRef(1);
 
@@ -456,6 +495,11 @@ export default function JobCardForm({
     if (!form.customerId) return null;
     return myCustomers.find((x) => x._id === form.customerId) ?? null;
   }, [myCustomers, form.customerId]);
+
+  const matchingCustomers = useMemo(() => {
+    if (formMode === "edit") return [];
+    return filterCustomersByPhone(myCustomers, customerPhone);
+  }, [myCustomers, customerPhone, formMode]);
 
   const formSelectedVehicle = useMemo(() => {
     if (!form.vehicleId || !formSelectedCustomer) return null;
@@ -522,22 +566,45 @@ export default function JobCardForm({
     setDisplayJobNo("");
     setServiceDate(todayIsoDate());
     setCustomerPhone("");
+    setPhoneLookupOpen(false);
+    setPhoneActiveIndex(0);
     setEditPrefillLoading(false);
     setSaveError(null);
     lineIdRef.current = 1;
     setServiceLines([emptyTableLine(mkLineId())]);
     setVehiclePhotoFiles([]);
     setKeptVehiclePhotoUrls([]);
-    setSelectedBankId(defaultInvoiceBankId());
+    setSelectedBankId(defaultInvoiceBankId(myBanks));
     setTermsNotes("");
   }
 
-  function applyCustomerPhoneLookup(digits: string) {
-    const match = findCustomerByPhone(myCustomers, digits);
+  function selectCustomer(customer: JobCardFormCustomer) {
+    const digits = phoneDigits(customer.phone);
+    setCustomerPhone(digits);
     setForm((f) => ({
       ...f,
-      customerId: match?._id ?? "",
-      vehicleId: match ? "" : "",
+      customerId: customer._id,
+      vehicleId: "",
+      odometerReading: "",
+      dueOdometerReading: "",
+    }));
+    setPhoneLookupOpen(false);
+    setPhoneActiveIndex(0);
+  }
+
+  function applyCustomerPhoneLookup(digits: string) {
+    const matches = filterCustomersByPhone(myCustomers, digits);
+    if (digits.length === 10) {
+      const exactMatches = matches.filter((customer) => phoneDigits(customer.phone) === digits);
+      if (exactMatches.length === 1) {
+        selectCustomer(exactMatches[0]);
+        return;
+      }
+    }
+    setForm((f) => ({
+      ...f,
+      customerId: "",
+      vehicleId: "",
       odometerReading: "",
       dueOdometerReading: "",
     }));
@@ -548,7 +615,31 @@ export default function JobCardForm({
     const digits = phoneDigits(raw);
     setCustomerPhone(digits);
     applyCustomerPhoneLookup(digits);
+    setPhoneLookupOpen(digits.length >= MIN_PHONE_MATCH_DIGITS);
+    setPhoneActiveIndex(0);
   }
+
+  useEffect(() => {
+    if (!phoneLookupOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!phoneComboRef.current?.contains(event.target as Node)) {
+        setPhoneLookupOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPhoneLookupOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [phoneLookupOpen]);
+
+  useEffect(() => {
+    setPhoneActiveIndex(0);
+  }, [customerPhone, phoneLookupOpen]);
 
   function handleCancel() {
     if (formLoading || editPrefillLoading) return;
@@ -587,6 +678,8 @@ export default function JobCardForm({
         const data = await fetchJobCardFormData(token);
         setMyCustomers(data.myCustomers);
         setMyServices(data.myServices);
+        setMyBanks(data.myBanks);
+        setSelectedBankId(defaultInvoiceBankId(data.myBanks));
 
         if (modeProp === "edit" && jobCardId) {
           setEditPrefillLoading(true);
@@ -645,7 +738,7 @@ export default function JobCardForm({
               (job.vehicle as { _id?: string } | undefined)?._id ||
               "",
             ),
-            odometerReading: String(job.odometerReading ?? ""),
+            odometerReading: String(job.odoIn ?? job.odometerReading ?? ""),
             dueOdometerReading: String(job.dueOdometerReading ?? ""),
             issueDescription: String(job.issueDescription || ""),
             serviceType: String(job.serviceType || "Repair"),
@@ -667,7 +760,8 @@ export default function JobCardForm({
               : [],
           );
           setServiceLines(loadedLines.length > 0 ? loadedLines : [emptyTableLine(mkLineId())]);
-          setTermsNotes(String(job.additionalNotes ?? ""));
+          setTermsNotes(String(job.terms ?? job.additionalNotes ?? ""));
+          if (job.bank) setSelectedBankId(String(job.bank));
           setEditId(jobCardId);
         }
       } catch (e) {
@@ -712,10 +806,25 @@ export default function JobCardForm({
       setFormLoading(false);
       return;
     }
+    const missingOdoOut = linesToSave.some(
+      (line) =>
+        lineRequiresOdoOut(line, categories) && parseNumberFromText(line.odoOutStr) <= 0,
+    );
+    if (missingOdoOut) {
+      setSaveError("Enter odometer out reading for all services that require it.");
+      setFormLoading(false);
+      return;
+    }
     try {
       const tech = buildLabourTechnicalRemarks(form.labourCharge, form.discount, callingCode);
-      const res = await saveJobCard(token, {
+      const res = await saveJobCard(
+        token,
+        {
         jobCardId: formMode === "edit" ? editId ?? undefined : undefined,
+        jobCardNo: formMode === "edit" ? displayJobNo || undefined : undefined,
+        bankId: selectedBankId || undefined,
+        terms: termsNotes.trim() || shopDefaultTerms,
+        sendForApproval: formMode !== "edit",
         form: {
           ...form,
           dueOdometerReading: resolveDueOdometerReading(linesToSave, categories),
@@ -730,13 +839,15 @@ export default function JobCardForm({
         },
         vehiclePhotoFiles,
         existingVehiclePhotoUrls: keptVehiclePhotoUrls,
-      });
+        },
+        categories,
+      );
       toast.success(formMode === "edit" ? "Job card updated." : "Job card created.");
       const savedJob = resolveJobCardFromApiResponse(res.data);
       const savedId = extractSavedJobCardId(res.data, editId);
       const savedNo = savedJob ? pickJobNoFromRecord(savedJob) : undefined;
       resetForm();
-      onSaved?.(savedId, savedNo);
+      onSaved?.(savedId, savedNo, savedJob ?? undefined);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Error saving job card");
     }
@@ -864,17 +975,90 @@ export default function JobCardForm({
               <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-x-12">
                 <div className={META_ROW_GRID_CLASS}>
                   <span className={META_LABEL_CELL_CLASS}>Customer info</span>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel"
-                    disabled={formMode === "edit"}
-                    value={formatPhoneDisplay(customerPhone)}
-                    onChange={(e) => handleCustomerPhoneChange(e.target.value)}
-                    placeholder="705 991 3785"
-                    aria-label="Customer phone number"
-                    className={META_VALUE_CLASS}
-                  />
+                  <div ref={phoneComboRef} className={`relative ${META_FIELD_CELL_CLASS}`}>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      disabled={formMode === "edit"}
+                      value={formatPhoneDisplay(customerPhone)}
+                      onChange={(e) => handleCustomerPhoneChange(e.target.value)}
+                      onFocus={() => {
+                        if (customerPhone.length >= MIN_PHONE_MATCH_DIGITS) {
+                          setPhoneLookupOpen(true);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (
+                          !phoneLookupOpen &&
+                          (e.key === "ArrowDown" || e.key === "ArrowUp") &&
+                          matchingCustomers.length > 0
+                        ) {
+                          setPhoneLookupOpen(true);
+                          return;
+                        }
+                        if (!phoneLookupOpen || matchingCustomers.length === 0) return;
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setPhoneActiveIndex((index) =>
+                            Math.min(matchingCustomers.length - 1, index + 1),
+                          );
+                        } else if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setPhoneActiveIndex((index) => Math.max(0, index - 1));
+                        } else if (e.key === "Enter") {
+                          const hit = matchingCustomers[phoneActiveIndex];
+                          if (hit) {
+                            e.preventDefault();
+                            selectCustomer(hit);
+                          }
+                        }
+                      }}
+                      placeholder="705 991 3785"
+                      aria-label="Customer phone number"
+                      role="combobox"
+                      aria-expanded={phoneLookupOpen && matchingCustomers.length > 0}
+                      aria-controls="job-card-customer-phone-listbox"
+                      aria-autocomplete="list"
+                      className={`${META_VALUE_CLASS} w-full`}
+                    />
+
+                    {phoneLookupOpen && matchingCustomers.length > 0 && formMode === "add" ? (
+                      <div
+                        id="job-card-customer-phone-listbox"
+                        role="listbox"
+                        className="absolute left-0 right-0 z-50 mt-0.5 max-h-52 overflow-y-auto rounded border border-gray-400 bg-white shadow-lg"
+                      >
+                        {matchingCustomers.map((customer, index) => {
+                          const active = index === phoneActiveIndex;
+                          const plate = customer.myVehicles?.[0]?.licensePlateNo
+                            ?? customer.myVehicles?.[0]?.regNo;
+                          return (
+                            <button
+                              key={customer._id}
+                              type="button"
+                              role="option"
+                              aria-selected={active}
+                              onMouseEnter={() => setPhoneActiveIndex(index)}
+                              onClick={() => selectCustomer(customer)}
+                              className={`block w-full px-2 py-2 text-left hover:bg-gray-100 ${
+                                active ? PHONE_COMBO_ACTIVE_ITEM_CLASS : "text-gray-900"
+                              }`}
+                            >
+                              <span className="block text-sm font-semibold">
+                                {customer.name?.trim() || "Customer"}
+                              </span>
+                              <span className="block text-xs text-gray-600">
+                                {formatPhoneDisplay(customer.phone)}
+                                {plate ? ` · ${plate}` : ""}
+                                {customer.city?.trim() ? ` · ${customer.city.trim()}` : ""}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
 
                   {customerPhone.length === 10 && !formSelectedCustomer ? (
                     <>
@@ -894,12 +1078,20 @@ export default function JobCardForm({
                         <p className="font-bold">{vehiclePlateLabel(formSelectedVehicle)}</p>
                       </div>
                     </>
-                  ) : customerPhone.length > 0 && customerPhone.length < 10 ? (
+                  ) : customerPhone.length > 0 &&
+                    customerPhone.length < MIN_PHONE_MATCH_DIGITS ? (
                     <>
                       <span aria-hidden />
                       <p className="text-xs text-gray-600">
-                        Enter 10 digits to look up the customer.
+                        Enter at least {MIN_PHONE_MATCH_DIGITS} digits to search customers.
                       </p>
+                    </>
+                  ) : customerPhone.length >= MIN_PHONE_MATCH_DIGITS &&
+                    matchingCustomers.length === 0 &&
+                    !phoneLookupOpen ? (
+                    <>
+                      <span aria-hidden />
+                      <p className="text-xs text-gray-600">No matching customers.</p>
                     </>
                   ) : null}
 
@@ -1156,16 +1348,16 @@ export default function JobCardForm({
                 <select
                   id="job-card-bank-select"
                   value={selectedBankId}
-                  disabled={formLoading || DUMMY_SHOP_BANKS.length === 0}
+                  disabled={formLoading || myBanks.length === 0}
                   onChange={(e) => setSelectedBankId(e.target.value)}
                   className={`${formCellInputClass} mt-1 w-full`}
                 >
-                  {DUMMY_SHOP_BANKS.length === 0 ? (
+                  {myBanks.length === 0 ? (
                     <option value="">No bank accounts</option>
                   ) : (
-                    DUMMY_SHOP_BANKS.map((bank) => (
-                      <option key={bank.id} value={bank.id}>
-                        {bank.label}
+                    myBanks.map((bank) => (
+                      <option key={bank._id} value={bank._id}>
+                        {bank.BankName ?? bank.AccountName ?? "Bank"}
                       </option>
                     ))
                   )}

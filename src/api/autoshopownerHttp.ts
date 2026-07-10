@@ -106,6 +106,19 @@ export async function deleteJsonAutoshopowner<T>(
   return out;
 }
 
+export async function postFormAutoshopowner<T>(path: string, body: FormData, token: string) {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: authHeader(token),
+    body,
+  });
+  const data = (await res.json().catch(() => null)) as T | null;
+  const out = { ok: res.ok, status: res.status, data };
+  debugLog("POST", url, "[form-data]", out);
+  return out;
+}
+
 export async function putFormAutoshopowner<T>(path: string, body: FormData, token: string) {
   const url = `${API_BASE}${path}`;
   const res = await fetch(url, {

@@ -1,0 +1,7 @@
+curl -X GET "{{Base}}/api/autoshopowner/website-template" \
+-H "Authorization: Bearer {{token}}"
+
+curl -X POST "{{Base}}/api/autoshopowner/website-template/select" \
+-H "Authorization: Bearer {{token}}" \
+-H "Content-Type: application/json" \
+-d '{"templateId": "665f1a2b3c4d5e6f7a8b9c0d"}'

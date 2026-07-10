@@ -64,26 +64,57 @@ export function extractEstimateLines(job: Record<string, unknown>, hstRate: numb
   for (const svc of services) {
     const block = nested(svc);
     if (!block) continue;
+
     const subs = block.subServices ?? block.selectedSubServices;
-    if (!Array.isArray(subs)) continue;
-    for (const subRaw of subs) {
-      const sub = nested(subRaw);
-      if (!sub) continue;
-      const unitCost = parseNum(sub.unitPrice ?? sub.price);
-      const qty = parseNum(sub.qty ?? sub.unit ?? sub.labourDuration ?? 1) || 1;
-      const labour = parseNum(sub.labourCost ?? sub.labourCharge);
-      const rawPrice = parseNum(sub.price);
-      const price = rawPrice > 0 ? rawPrice : unitCost * qty + labour;
-      const desc = [s(sub.name), s(sub.desc)].filter(Boolean).join(" — ") || "Service";
+    if (Array.isArray(subs)) {
+      for (const subRaw of subs) {
+        const sub = nested(subRaw);
+        if (!sub) continue;
+        const unitCost = parseNum(sub.unitPrice ?? sub.price);
+        const qty = parseNum(sub.qty ?? sub.unit ?? sub.labourDuration ?? 1) || 1;
+        const labour = parseNum(sub.labourCost ?? sub.labourCharge);
+        const rawPrice = parseNum(sub.price);
+        const price = rawPrice > 0 ? rawPrice : unitCost * qty + labour;
+        const desc = [s(sub.name), s(sub.desc)].filter(Boolean).join(" — ") || "Service";
+        lines.push({
+          description: desc,
+          unitCost: unitCost > 0 ? unitCost : Math.max(0, (price - labour) / qty),
+          qty,
+          hstRate,
+          price,
+        });
+      }
+      continue;
+    }
+
+    const category = s(block.category);
+    const desc = s(block.desc) ?? category ?? "Service";
+    const unitCost = parseNum(block.unitCost ?? block.unitPrice);
+    const qty = parseNum(block.qty ?? 1) || 1;
+    const amount = parseNum(block.amount);
+    const price = amount > 0 ? amount : unitCost * qty;
+    if (category || desc || unitCost > 0 || price > 0) {
       lines.push({
-        description: desc,
-        unitCost: unitCost > 0 ? unitCost : Math.max(0, (price - labour) / qty),
+        description: category && desc && category !== desc ? `${category} — ${desc}` : desc,
+        unitCost: unitCost > 0 ? unitCost : price / qty,
         qty,
         hstRate,
         price,
       });
     }
   }
+
+  const labour = parseNum(job.labourCharge);
+  if (labour > 0) {
+    lines.push({
+      description: "Labour",
+      unitCost: labour,
+      qty: 1,
+      hstRate,
+      price: labour,
+    });
+  }
+
   return lines;
 }
 
@@ -247,11 +278,11 @@ export function buildBusinessBlock(business: ShopProfileBusiness | null | undefi
 export function buildCustomerBlock(job: Record<string, unknown>) {
   const customer =
     nested(job.customerId) ?? nested(job.customer) ?? nested(job.carOwner);
-  const name = s(customer?.name) || "—";
+  const name = s(customer?.name) || s(job.customerName) || "—";
   const company = s(customer?.businessName ?? customer?.companyName);
   const address = [
     s(customer?.address),
-    [s(customer?.city), s(customer?.pincode)].filter(Boolean).join(" "),
+    [s(customer?.city ?? job.city), s(customer?.pincode)].filter(Boolean).join(" "),
   ]
     .filter(Boolean)
     .join(", ");
@@ -279,10 +310,12 @@ export function estimateTotals(
   const computedTotal = subtotal + hst + roundOff;
   const apiTotal = includeHst
     ? parseNum(job.totalPayableAmount) ||
+      parseNum(job.totalAmount) ||
       parseNum(payable?.online) ||
       parseNum(payable?.invoiceTotal) ||
       parseNum(payable?.total)
     : parseNum(job.totalPayableAmount) ||
+      parseNum(job.totalAmount) ||
       parseNum(payable?.cash) ||
       parseNum(payable?.total);
   const total =

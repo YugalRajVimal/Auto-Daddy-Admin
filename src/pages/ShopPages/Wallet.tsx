@@ -31,7 +31,7 @@ import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
 import { useShopOwnerData } from "../../context/ShopOwnerDataProvider";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
-import { useShopWallet } from "../../hooks/useShopWallet";
+import { useAutoshopJobCards } from "../../hooks/useAutoshopJobCards";
 import { formatCurrencyAmount } from "../../lib/currency";
 import {
   DUMMY_SHOP_BANKS,
@@ -42,8 +42,11 @@ import {
 } from "../../lib/dummyShopWallet";
 import { useMockShopInvoiceLedger } from "../../lib/mockShopInvoiceLedger";
 import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
-import { collectJobCardPayment, resendJobCardNotification } from "../../lib/shopOwnerMutations";
-import { pickJobCardInvoiceNumber, type JobCardListRow } from "../../lib/shopOwnerJobCards";
+import {
+  sendAutoshopJobCardForApproval,
+  updateAutoshopJobCardStatus,
+} from "../../lib/autoshopownerJobCardsApi";
+import { isJobCardPaid, pickJobCardInvoiceNumber, pickJobCardNoForApi, type JobCardListRow } from "../../lib/shopOwnerJobCards";
 import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
 import { createBank, createExpense, fetchBanks, fetchExpenses, updateBank, updateExpense } from "../../lib/shopOwnerAccountsApi";
 import {
@@ -55,7 +58,6 @@ import {
   type CategoryOption,
 } from "../AdminPages/Accounts/ledgerCategories";
 import {
-  filterWalletInvoiceRows,
   getWalletLedgerTab,
   pickInvoiceUrl,
   shortJobBadgeCode,
@@ -355,33 +357,6 @@ function walletRowsMatchingSelection(
   rows: JobCardListRow[],
 ): JobCardListRow[] {
   return rows.filter((row) => selectedIds.has(row.id));
-}
-
-function pickPaymentAmount(row: JobCardListRow): number {
-  const isInvoice = getWalletLedgerTab(row.raw) === "invoice";
-  const raw = row.raw;
-  if (raw && typeof raw === "object") {
-    const o = raw as Record<string, unknown>;
-    const payable = o.payableAmounts;
-    if (payable && typeof payable === "object") {
-      const p = payable as Record<string, unknown>;
-      if (isInvoice) {
-        const online = Number(p.online ?? p.invoiceTotal);
-        if (Number.isFinite(online) && online > 0) return online;
-      } else {
-        const cash = Number(p.cash);
-        if (Number.isFinite(cash) && cash > 0) return cash;
-      }
-    }
-    const total = Number(o.totalPayableAmount ?? o.total ?? row.total);
-    if (Number.isFinite(total) && total > 0) return total;
-  }
-  const fromRow = Number(row.total);
-  return Number.isFinite(fromRow) && fromRow > 0 ? fromRow : 0;
-}
-
-function paymentMethodForRow(row: JobCardListRow): "Cash" | "Online" {
-  return getWalletLedgerTab(row.raw) === "invoice" ? "Online" : "Cash";
 }
 
 function WalletListFooter({
@@ -1192,13 +1167,11 @@ export default function ShopWalletPage() {
   const [bankAssignToInvoice, setBankAssignToInvoice] = useState(false);
   const { refreshSection } = useShopOwnerData();
   const {
-    paid: apiPaidAll,
-    unpaid: apiUnpaidAll,
-    paidOnline: apiPaidOnline,
-    unpaidOnline: apiUnpaidOnline,
-    loading,
-    error,
-  } = useShopWallet();
+    cards: convertedInvoiceCards,
+    loading: invoiceLoading,
+    error: invoiceError,
+    refresh: refreshInvoices,
+  } = useAutoshopJobCards("convert-invoice", "");
   const mockLedger = useMockShopInvoiceLedger();
 
   // Guard: categories must exist even if expenses list is empty.
@@ -1271,21 +1244,17 @@ export default function ShopWalletPage() {
   }, [effectiveExpenseCategories, token]);
 
   const syncLedgerData = useCallback(async () => {
-    await Promise.all([refreshSection("wallet"), refreshSection("jobCards")]);
-  }, [refreshSection]);
+    await Promise.all([refreshInvoices(), refreshSection("jobCards")]);
+  }, [refreshInvoices, refreshSection]);
 
   const paid = USE_DUMMY_SHOP_WALLET
     ? mockLedger.paid
-    : apiPaidOnline.length > 0
-      ? apiPaidOnline
-      : filterWalletInvoiceRows(apiPaidAll, { paid: true });
+    : convertedInvoiceCards.filter((row) => isJobCardPaid(row));
   const unpaid = USE_DUMMY_SHOP_WALLET
     ? mockLedger.unpaid
-    : apiUnpaidOnline.length > 0
-      ? apiUnpaidOnline
-      : filterWalletInvoiceRows(apiUnpaidAll, { paid: false });
-  const showLoading = !USE_DUMMY_SHOP_WALLET && loading;
-  const showError = !USE_DUMMY_SHOP_WALLET && error;
+    : convertedInvoiceCards.filter((row) => !isJobCardPaid(row));
+  const showLoading = !USE_DUMMY_SHOP_WALLET && invoiceLoading;
+  const showError = !USE_DUMMY_SHOP_WALLET && invoiceError;
 
   const invoiceList = view === "paid" ? paid : view === "unpaid" ? unpaid : [];
   const filteredList = useMemo(
@@ -1852,12 +1821,12 @@ export default function ShopWalletPage() {
         toast.success(`Marked ${count} invoice${count === 1 ? "" : "s"} as paid.`);
       } else {
         for (const row of rows) {
-          const res = await collectJobCardPayment(token!, {
-            jobCardId: row.id,
-            paymentMethod: paymentMethodForRow(row),
-            remark: "",
-            amount: pickPaymentAmount(row),
-          });
+          const jobCardNo = pickJobCardNoForApi(row);
+          if (!jobCardNo) {
+            failed += 1;
+            continue;
+          }
+          const res = await updateAutoshopJobCardStatus(token!, jobCardNo, "CashPaid");
           if (!res.ok) failed += 1;
         }
         await syncLedgerData();
@@ -1893,7 +1862,12 @@ export default function ShopWalletPage() {
         toast.success(`${successLabel} sent for ${rows.length} invoice${rows.length === 1 ? "" : "s"}.`);
       } else {
         for (const row of rows) {
-          const res = await resendJobCardNotification(token!, row.id);
+          const jobCardNo = pickJobCardNoForApi(row);
+          if (!jobCardNo) {
+            failed += 1;
+            continue;
+          }
+          const res = await sendAutoshopJobCardForApproval(token!, jobCardNo);
           if (!res.ok) failed += 1;
         }
         if (failed > 0) {
@@ -1942,7 +1916,7 @@ export default function ShopWalletPage() {
     }
 
     if (showError && (view === "paid" || view === "unpaid")) {
-      return <ShopErrorPanel message={error ?? ""} onRetry={() => void syncLedgerData()} />;
+      return <ShopErrorPanel message={invoiceError ?? ""} onRetry={() => void syncLedgerData()} />;
     }
 
     if (view === "expenses") {

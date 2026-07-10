@@ -16,13 +16,13 @@ import {
   buildMyCustomersQuery,
   fetchJobCards,
   fetchMyCustomers,
-  fetchMyDeals,
   fetchMyServices,
   fetchPaidJobCards,
   fetchPayments,
   fetchUnpaidJobCards,
   type MyCustomersPeriod,
 } from "../lib/shopOwnerApi";
+import { fetchAutoshopMyDeals } from "../lib/autoshopownerDealsApi";
 import {
   getPrefetchSectionForShopPath,
   getSectionsForShopPath,
@@ -289,7 +289,7 @@ async function fetchSectionData(
         };
       }
       case "deals": {
-        const res = await fetchMyDeals(token);
+        const res = await fetchAutoshopMyDeals(token);
         if (!res.ok) return { data: [], error: "Could not load deals." };
         return { data: parseMyDeals(res.data), error: null };
       }

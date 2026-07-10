@@ -65,6 +65,13 @@ export function getWalletLedgerTab(raw: unknown): WalletLedgerTab {
     return "cash";
   }
   const o = raw as Record<string, unknown>;
+  const status = typeof o.status === "string" ? o.status.trim().toLowerCase().replace(/\s+/g, "") : "";
+  if (status === "convertedtoinvoice") {
+    return "invoice";
+  }
+  if (status === "cashpaid") {
+    return "cash";
+  }
   const pm = pickPaymentMethodString(o);
   if (!pm) {
     return "cash";

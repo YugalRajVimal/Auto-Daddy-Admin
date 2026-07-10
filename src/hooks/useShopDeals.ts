@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useAuth from "../auth/useAuth";
-import { fetchMyDeals } from "../lib/shopOwnerApi";
+import { fetchAutoshopMyDeals } from "../lib/autoshopownerDealsApi";
 import { dealId, isPartsDeal, parseMyDeals } from "../lib/shopOwnerParsers";
 import type { ShopDeal } from "../types/shopOwner";
 
@@ -23,7 +23,7 @@ export function useShopDeals(filter: DealFilter = "all") {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchMyDeals(token);
+      const res = await fetchAutoshopMyDeals(token);
       if (!res.ok) {
         setError("Could not load deals.");
         setDeals([]);

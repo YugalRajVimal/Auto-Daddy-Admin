@@ -175,7 +175,7 @@ function toDeal(raw: unknown): ShopDeal | null {
     productName,
     partName: s(o.partName),
     description: s(o.description),
-    price: o.price as ShopDeal["price"],
+    price: (o.price ?? o.originalPrice) as ShopDeal["price"],
     discountedPrice: o.discountedPrice as ShopDeal["discountedPrice"],
     dealEnabled: typeof o.dealEnabled === "boolean" ? o.dealEnabled : undefined,
     offersEndOnDate: s(o.offersEndOnDate) ?? s(o.offerEndsOnDate),
@@ -219,7 +219,13 @@ export function dealId(d: ShopDeal) {
   return d._id ?? d.id ?? "";
 }
 
+export function isSalvagesDeal(d: ShopDeal) {
+  const t = (d.dealType ?? "").toLowerCase();
+  return t.includes("salvage");
+}
+
 export function isPartsDeal(d: ShopDeal) {
+  if (isSalvagesDeal(d)) return false;
   const t = (d.dealType ?? "").toLowerCase();
   return t.includes("part") || Boolean(d.partName);
 }

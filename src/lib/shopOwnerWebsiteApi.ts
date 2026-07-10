@@ -1,4 +1,8 @@
-import { getJson } from "../api/mobileAuth";
+import {
+  getJsonAutoshopowner,
+  postJsonAutoshopowner,
+} from "../api/autoshopownerHttp";
+import type { ApiEnvelope } from "./autoshopownerApi";
 
 export type WebsiteTemplate = {
   id: string;
@@ -78,6 +82,16 @@ export function parseWebsiteTemplatesResponse(payload: unknown): {
   return { hasPurchasedTemplate, templates };
 }
 
+/** GET /api/autoshopowner/website-template */
 export function fetchWebsiteTemplates(token: string) {
-  return getJson<unknown>("/api/auto-shop-owner/website-templates", token);
+  return getJsonAutoshopowner<unknown>("/api/autoshopowner/website-template", token);
+}
+
+/** POST /api/autoshopowner/website-template/select */
+export function selectWebsiteTemplate(token: string, templateId: string) {
+  return postJsonAutoshopowner<ApiEnvelope>(
+    "/api/autoshopowner/website-template/select",
+    { templateId },
+    token,
+  );
 }

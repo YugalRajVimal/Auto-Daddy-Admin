@@ -15,13 +15,22 @@ import {
   shopProfileFormPanelFooterClass,
 } from "../../components/shop/shopLayoutStyles";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
+import { ShopEmptyPanel } from "../../components/shop/ShopPanels";
+import { ShopFormSkeleton } from "../../components/shop/ShopListSkeletons";
+import { Skeleton } from "../../components/common/Skeleton";
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { formatCurrencyAmount } from "../../lib/currency";
 import {
+  addDomainDetails,
+  editDomainDetails,
+  formatDomainApiError,
+  parseDomainDetailsFromProfile,
+} from "../../lib/shopOwnerDomainApi";
+import {
   fetchWebsiteTemplates,
   parseWebsiteTemplatesResponse,
+  selectWebsiteTemplate,
   type WebsiteTemplate,
 } from "../../lib/shopOwnerWebsiteApi";
 import {
@@ -50,20 +59,6 @@ const SECTION_TITLES: Record<ShopWebsiteSection, string> = {
   templates: "My website",
   subscription: "My website",
 };
-
-const TEMPLATE_TAGLINES = [
-  "Business Website means : A digital way to organize your customers",
-  "Website Automation means : Less Stress - More Values",
-  "Business with Website : Tells a whole story with one image",
-  "Business without Website : has no voice in market",
-  "Website pays itself : Never underestimate the power of website",
-];
-
-const FALLBACK_TEMPLATES: WebsiteTemplate[] = TEMPLATE_TAGLINES.map((desc, index) => ({
-  id: `fallback-${index + 1}`,
-  name: `Templet-${index + 1}`,
-  desc,
-}));
 
 const YEARLY_FEATURES: { label: string; note: string }[] = [
   { label: "Website", note: "for 365 days" },
@@ -101,6 +96,7 @@ function WebsiteFormFooter({
   onSave,
   onCancel,
   cancelLabel = "Reset",
+  disabled = false,
 }: {
   message: string;
   saving?: boolean;
@@ -108,7 +104,9 @@ function WebsiteFormFooter({
   onSave: () => void;
   onCancel: () => void;
   cancelLabel?: string;
+  disabled?: boolean;
 }) {
+  const isDisabled = saving || disabled;
   return (
     <div
       className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
@@ -120,7 +118,7 @@ function WebsiteFormFooter({
         <button
           type="button"
           onClick={onSave}
-          disabled={saving}
+          disabled={isDisabled}
           className={websiteFormSaveButtonClass}
         >
           {saving ? "Saving…" : saveLabel}
@@ -130,7 +128,7 @@ function WebsiteFormFooter({
           <button
             type="button"
             onClick={onCancel}
-            disabled={saving}
+            disabled={isDisabled}
             className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
           >
             {cancelLabel}
@@ -225,13 +223,23 @@ function DomainPanel({
   onSaveAndNext,
   onReset,
   saving,
+  loading,
 }: {
   form: DomainForm;
   onChange: (next: DomainForm) => void;
   onSaveAndNext: () => void;
   onReset: () => void;
   saving?: boolean;
+  loading?: boolean;
 }) {
+  if (loading) {
+    return (
+      <CompactFormPanel className={shopProfileFormPanelClass} showBottomBorder={false}>
+        <ShopFormSkeleton />
+      </CompactFormPanel>
+    );
+  }
+
   return (
     <CompactFormPanel
       className={shopProfileFormPanelClass}
@@ -289,6 +297,35 @@ function DomainPanel({
   );
 }
 
+function WebsiteTemplateCardSkeleton() {
+  return (
+    <article className="flex w-full max-w-[260px] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <Skeleton className="aspect-[4/3] w-full rounded-none" />
+      <div className="space-y-2 border-t border-gray-100 px-3 py-2.5 text-center">
+        <Skeleton className="mx-auto h-3 w-24 rounded" />
+        <Skeleton className="mx-auto h-3 w-full rounded" />
+      </div>
+    </article>
+  );
+}
+
+function WebsiteTemplateGridSkeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap justify-center gap-4">
+        {Array.from({ length: 3 }, (_, index) => (
+          <WebsiteTemplateCardSkeleton key={`top-${index}`} />
+        ))}
+      </div>
+      <div className="flex flex-wrap justify-center gap-4">
+        {Array.from({ length: 2 }, (_, index) => (
+          <WebsiteTemplateCardSkeleton key={`bottom-${index}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TemplateCard({
   template,
   tagline,
@@ -340,6 +377,7 @@ function TemplateCard({
 function TemplateSelectionPanel({
   templates,
   loading,
+  loaded,
   selectedId,
   onSelect,
   onPreview,
@@ -348,6 +386,7 @@ function TemplateSelectionPanel({
 }: {
   templates: WebsiteTemplate[];
   loading: boolean;
+  loaded: boolean;
   selectedId: string;
   onSelect: (id: string) => void;
   onPreview: (template: WebsiteTemplate) => void;
@@ -356,6 +395,7 @@ function TemplateSelectionPanel({
 }) {
   const topRow = templates.slice(0, 3);
   const bottomRow = templates.slice(3, 5);
+  const showSkeleton = loading || !loaded;
 
   return (
     <div
@@ -368,16 +408,18 @@ function TemplateSelectionPanel({
       </div>
 
       <div className="px-4 py-5">
-        {loading && templates.length === 0 ? (
-          <ShopLoadingPanel variant="preview-panel" className="min-h-[280px]" />
+        {showSkeleton ? (
+          <WebsiteTemplateGridSkeleton />
+        ) : templates.length === 0 ? (
+          <ShopEmptyPanel message="No website templates are available right now." className="min-h-[280px]" />
         ) : (
           <div className="space-y-5">
             <div className="flex flex-wrap justify-center gap-4">
-              {topRow.map((template, index) => (
+              {topRow.map((template) => (
                 <TemplateCard
                   key={template.id}
                   template={template}
-                  tagline={template.desc ?? TEMPLATE_TAGLINES[index] ?? ""}
+                  tagline={template.desc ?? ""}
                   selected={selectedId === template.id}
                   onSelect={() => onSelect(template.id)}
                   onPreview={() => onPreview(template)}
@@ -386,11 +428,11 @@ function TemplateSelectionPanel({
             </div>
             {bottomRow.length > 0 ? (
               <div className="flex flex-wrap justify-center gap-4">
-                {bottomRow.map((template, index) => (
+                {bottomRow.map((template) => (
                   <TemplateCard
                     key={template.id}
                     template={template}
-                    tagline={template.desc ?? TEMPLATE_TAGLINES[index + 3] ?? ""}
+                    tagline={template.desc ?? ""}
                     selected={selectedId === template.id}
                     onSelect={() => onSelect(template.id)}
                     onPreview={() => onPreview(template)}
@@ -409,6 +451,7 @@ function TemplateSelectionPanel({
         onSave={onSaveAndNext}
         onCancel={() => onSelect("")}
         cancelLabel="Clear selection"
+        disabled={showSkeleton || templates.length === 0}
       />
     </div>
   );
@@ -617,14 +660,16 @@ function WebsiteInvoiceModal({
 
 export default function ShopMyWebsitePage() {
   const { token, profile, session } = useAuth();
-  const { faqsHeading, faqsDescription, business, user } = useShopOwnerPortal();
+  const { faqsHeading, faqsDescription, business, user, refresh, loading: portalLoading } =
+    useShopOwnerPortal();
   const [activeSection, setActiveSection] = useState<ShopWebsiteSection>("domain");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [domainForm, setDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
   const [savedDomainForm, setSavedDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
   const [domainSaving, setDomainSaving] = useState(false);
-  const [templates, setTemplates] = useState<WebsiteTemplate[]>(FALLBACK_TEMPLATES);
+  const [templates, setTemplates] = useState<WebsiteTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [savedTemplateId, setSavedTemplateId] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
@@ -632,46 +677,64 @@ export default function ShopMyWebsitePage() {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
 
-  const displayTemplates = useMemo(() => {
-    const merged = templates.length > 0 ? templates : FALLBACK_TEMPLATES;
-    return merged.slice(0, 5).map((template, index) => ({
-      ...template,
-      name: template.name || `Templet-${index + 1}`,
-      desc: template.desc ?? TEMPLATE_TAGLINES[index] ?? "",
-    }));
-  }, [templates]);
+  const displayTemplates = useMemo(
+    () =>
+      templates.slice(0, 5).map((template, index) => ({
+        ...template,
+        name: template.name || `Template-${index + 1}`,
+        desc: template.desc ?? "",
+      })),
+    [templates],
+  );
+
+  useEffect(() => {
+    const saved = parseDomainDetailsFromProfile(business);
+    if (!saved) return;
+    setDomainForm(saved);
+    setSavedDomainForm(saved);
+  }, [business]);
+
+  useEffect(() => {
+    const templateId = business?.websiteTemplateId?.trim();
+    if (!templateId) return;
+    setSelectedTemplateId((prev) => prev || templateId);
+    setSavedTemplateId((prev) => prev || templateId);
+  }, [business?.websiteTemplateId]);
 
   const loadTemplates = useCallback(async () => {
     if (!token) {
-      setTemplates(FALLBACK_TEMPLATES);
-      setSelectedTemplateId((prev) => prev || FALLBACK_TEMPLATES[0]?.id || "");
+      setTemplates([]);
+      setTemplatesLoaded(true);
       return;
     }
     setTemplatesLoading(true);
     try {
       const res = await fetchWebsiteTemplates(token);
       if (!res.ok) {
-        setTemplates(FALLBACK_TEMPLATES);
+        setTemplates([]);
         return;
       }
       const { templates: list } = parseWebsiteTemplatesResponse(res.data);
-      const next = list.length > 0 ? list : FALLBACK_TEMPLATES;
+      const next = list.slice(0, 5);
       setTemplates(next);
       setSelectedTemplateId((prev) => {
         if (prev && next.some((t) => t.id === prev)) return prev;
         if (savedTemplateId && next.some((t) => t.id === savedTemplateId)) return savedTemplateId;
         return next[0]?.id ?? "";
       });
+    } catch {
+      setTemplates([]);
     } finally {
       setTemplatesLoading(false);
+      setTemplatesLoaded(true);
     }
   }, [savedTemplateId, token]);
 
   useEffect(() => {
-    if (activeSection === "templates") {
+    if (token) {
       void loadTemplates();
     }
-  }, [activeSection, loadTemplates]);
+  }, [token, loadTemplates]);
 
   const selectedTemplate = useMemo(
     () => displayTemplates.find((t) => t.id === selectedTemplateId) ?? null,
@@ -694,6 +757,10 @@ export default function ShopMyWebsitePage() {
   }, [business, profile?.name, user]);
 
   const handleDomainSaveAndNext = async () => {
+    if (!domainForm.domainName.trim()) {
+      toast.error("Please enter the domain name.");
+      return;
+    }
     if (!domainForm.expiryDate.trim()) {
       toast.error("Please enter the domain expiry date.");
       return;
@@ -702,12 +769,45 @@ export default function ShopMyWebsitePage() {
       toast.error("Please enter a valid expiry date.");
       return;
     }
+    if (!token) {
+      toast.error("Please sign in to continue.");
+      return;
+    }
+
     setDomainSaving(true);
     try {
+      const payload = {
+        domainName: domainForm.domainName.trim(),
+        expiryDate: domainForm.expiryDate.trim(),
+        provider: domainForm.provider.trim(),
+        status: domainForm.status.trim() || "Existing",
+      };
+      const isEdit = Boolean(savedDomainForm.domainName.trim());
+      const res = isEdit
+        ? await editDomainDetails(token, {
+            domainName: savedDomainForm.domainName.trim(),
+            expiryDate: payload.expiryDate,
+            provider: payload.provider,
+            status: payload.status,
+          })
+        : await addDomainDetails(token, payload);
+
+      if (!res.ok || res.data?.success === false) {
+        toast.error(formatDomainApiError(res.data, "Could not save domain details."));
+        return;
+      }
+
       setSavedDomainForm(domainForm);
-      toast.success("Domain details saved.");
+      if (res.data?.message?.trim()) {
+        toast.success(res.data.message.trim());
+      } else {
+        toast.success("Domain details saved.");
+      }
+      await refresh();
       setActiveSection("templates");
       void loadTemplates();
+    } catch {
+      toast.error("Network error saving domain details.");
     } finally {
       setDomainSaving(false);
     }
@@ -731,11 +831,31 @@ export default function ShopMyWebsitePage() {
       toast.error("Please select a website template.");
       return;
     }
+    if (!token) {
+      toast.error("Please sign in to continue.");
+      return;
+    }
+
     setTemplateSaving(true);
     try {
+      const res = await selectWebsiteTemplate(token, selectedTemplateId);
+      if (!res.ok || res.data?.success === false) {
+        const msg =
+          res.data?.message?.trim() || "Could not save website template selection.";
+        toast.error(msg);
+        return;
+      }
+
       setSavedTemplateId(selectedTemplateId);
-      toast.success(`Template "${selectedTemplate?.name ?? "selected"}" saved.`);
+      if (res.data?.message?.trim()) {
+        toast.success(res.data.message.trim());
+      } else {
+        toast.success(`Template "${selectedTemplate?.name ?? "selected"}" saved.`);
+      }
+      await refresh();
       setActiveSection("subscription");
+    } catch {
+      toast.error("Network error saving website template.");
     } finally {
       setTemplateSaving(false);
     }
@@ -873,6 +993,7 @@ export default function ShopMyWebsitePage() {
             onSaveAndNext={handleDomainSaveAndNext}
             onReset={handleDomainReset}
             saving={domainSaving}
+            loading={portalLoading}
           />
         );
       case "templates":
@@ -880,6 +1001,7 @@ export default function ShopMyWebsitePage() {
           <TemplateSelectionPanel
             templates={displayTemplates}
             loading={templatesLoading}
+            loaded={templatesLoaded}
             selectedId={selectedTemplateId}
             onSelect={setSelectedTemplateId}
             onPreview={handleTemplatePreview}

@@ -9,12 +9,13 @@ import {
 import { shopCompactInputClass } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import {
-  apiMessage,
-  createDeal,
-  fetchVehicleTypesAndServices,
-  type DealFormFields,
-  updateDeal,
-} from "../../../lib/shopOwnerMutations";
+  apiMessageFromEnvelope,
+  createAutoshopDeal,
+  type AutoshopDealFormFields,
+  type AutoshopDealType,
+  updateAutoshopDeal,
+} from "../../../lib/autoshopownerDealsApi";
+import { fetchVehicleTypesAndServices } from "../../../lib/shopOwnerMutations";
 import { dealId } from "../../../lib/shopOwnerParsers";
 import { useShopServices } from "../../../hooks/useShopServices";
 import type { ShopDeal } from "../../../types/shopOwner";
@@ -26,8 +27,11 @@ const dealFormCol1Class = "min-w-0 flex-[1_1_0%]";
 const dealFormCol3Class = "min-w-0 flex-[3_1_0%]";
 const dealFormCol4Class = "min-w-0 flex-[4_1_0%]";
 
+type DealSectionId = "service" | "parts" | "salvage";
+
 type ShopDealFormDialogProps = {
   mode: DealMode;
+  section?: DealSectionId;
   deal?: ShopDeal | null;
   onCancel: () => void;
   onSaved: () => void;
@@ -69,7 +73,7 @@ function parseVehicleCatalogItem(item: unknown): VehicleCatalogEntry | null {
   return { id, name, models };
 }
 
-export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: ShopDealFormDialogProps) {
+export default function ShopDealFormDialog({ mode, section = "service", deal, onCancel, onSaved }: ShopDealFormDialogProps) {
   const { token } = useAuth();
   const { categories } = useShopServices();
   const [serviceId, setServiceId] = useState("");
@@ -132,18 +136,31 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
 
   const selectedVehicle = vehicleCatalog.find((v) => v.id === vehicleId);
 
+  const resolveDealType = (): AutoshopDealType => {
+    if (deal) {
+      const t = (deal.dealType ?? "").toLowerCase();
+      if (t.includes("salvage")) return "Salvages";
+      if (t.includes("part") || deal.partName) return "Parts";
+      return "Service";
+    }
+    if (section === "salvage") return "Salvages";
+    return mode === "parts" ? "Parts" : "Service";
+  };
+
   const handleSave = async () => {
     if (!token) return;
     if (!discountedPrice.trim()) {
       toast.error("Discounted price is required.");
       return;
     }
-    if (!deal && (!attachDealImage || !dealImage)) {
+    const dealType = resolveDealType();
+    const imageRequired = dealType !== "Parts";
+    if (!deal && imageRequired && (!attachDealImage || !dealImage)) {
       toast.error("Deal image is required.");
       return;
     }
-    const fields: DealFormFields = {
-      dealType: mode === "parts" ? "Parts" : "Service",
+    const fields: AutoshopDealFormFields = {
+      dealType,
       discountedPrice: discountedPrice.trim(),
       description: description.trim(),
       offersEndOnDate: offerEnd || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
@@ -159,25 +176,24 @@ export default function ShopDealFormDialog({ mode, deal, onCancel, onSaved }: Sh
       fields.vehicleName = selectedVehicle?.name;
       fields.vehicleModel = vehicleModel;
       fields.vehicleYear = vehicleYear;
+      fields.originalPrice = price.trim() || discountedPrice.trim();
     } else {
       if (!serviceId) {
         toast.error("Select a service.");
         return;
       }
       fields.serviceId = serviceId;
-      fields.productName = productName.trim() || "Service Deal";
-      fields.price = price.trim() || discountedPrice.trim();
-      fields.dealEnabled = "true";
+      fields.originalPrice = price.trim() || discountedPrice.trim();
     }
     setSaving(true);
     try {
       const id = deal ? dealId(deal) : "";
-      const res = id ? await updateDeal(token, id, fields) : await createDeal(token, fields);
+      const res = id ? await updateAutoshopDeal(token, id, fields) : await createAutoshopDeal(token, fields);
       if (!res.ok) {
-        toast.error(apiMessage(res.data) || "Could not save deal.");
+        toast.error(apiMessageFromEnvelope(res.data) || "Could not save deal.");
         return;
       }
-      toast.success(apiMessage(res.data) || "Deal saved.");
+      toast.success(apiMessageFromEnvelope(res.data) || "Deal saved.");
       onSaved();
       onCancel();
     } finally {

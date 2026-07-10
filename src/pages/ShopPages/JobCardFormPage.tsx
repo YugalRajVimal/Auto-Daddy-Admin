@@ -10,14 +10,7 @@ import {
 } from "../../components/admin/ContentPanel";
 import { shopCompactInputClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
-import { buildMyCustomersQuery, fetchMyCustomers } from "../../lib/shopOwnerApi";
-import {
-  apiMessage,
-  createJobCard,
-  fetchJobCardById,
-  updateJobCard,
-} from "../../lib/shopOwnerMutations";
-import { parseMyCustomers } from "../../lib/shopOwnerParsers";
+import { fetchJobCardFormData, fetchJobCardByIdForForm, resolveJobCardFromApiResponse, saveJobCard, normalizeJobCardServiceBlocks } from "../../lib/shopOwnerJobCardsApi";
 import { useShopServices } from "../../hooks/useShopServices";
 import type { MyCustomer } from "../../types/shopOwner";
 import { ShopFormPage } from "../../components/shop/forms/ShopFormPage";
@@ -101,7 +94,7 @@ function hydrateFromRaw(
     vehicleRef && typeof vehicleRef === "object"
       ? String((vehicleRef as Record<string, unknown>)._id ?? "")
       : String(raw.vehicleId ?? "");
-  const odomIn = String(raw.odometerReading ?? "0");
+  const odomIn = String(raw.odoIn ?? raw.odometerReading ?? "0");
   const odomOut = String(raw.dueOdometerReading ?? "0");
   const discount = String(raw.otherCharges ?? raw.labourDuration ?? "");
   const lines = apiServiceBlocksToLines(raw.services, categories);
@@ -130,16 +123,38 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
 
   useEffect(() => {
     if (!token) return;
-    void fetchMyCustomers(token, buildMyCustomersQuery({ timeFilter: "Monthly", anchorDate: new Date() }))
-      .then((res) => {
-        if (res.ok) setCustomers(parseMyCustomers(res.data));
+    void fetchJobCardFormData(token)
+      .then((data) => {
+        setCustomers(
+          data.myCustomers.map(
+            (c): MyCustomer => ({
+              carOwnerId: c._id,
+              id: c._id,
+              _id: c._id,
+              name: c.name,
+              phone: c.phone,
+              countryCode: c.countryCode,
+              city: c.city,
+              vehicles: (c.myVehicles ?? []).map((v) => ({
+                ...v,
+                vId: v._id,
+                year: v.year != null ? String(v.year) : undefined,
+                odometerReading:
+                  v.odometerReading != null ? String(v.odometerReading) : undefined,
+                dueOdometerReading:
+                  v.dueOdometerReading != null ? String(v.dueOdometerReading) : undefined,
+              })),
+            }),
+          ),
+        );
       })
       .finally(() => setLoading(false));
   }, [token]);
 
   useEffect(() => {
     if (!editRaw || categories.length === 0) return;
-    const h = hydrateFromRaw(editRaw, categories);
+    const services = normalizeJobCardServiceBlocks(editRaw);
+    const h = hydrateFromRaw({ ...editRaw, services }, categories);
     if (h.editingId) setEditingJobCardId(h.editingId);
     setCustomerId(h.customerId);
     setVehicleIdVal(h.vehicleIdVal);
@@ -230,29 +245,33 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
     }
     setSubmitting(true);
     try {
-      const payload = {
-        customerId,
-        vehicleId: vehicleIdVal,
-        odometerReading: odomIn || "0",
-        dueOdometerReading: odomOut || "0",
-        issueDescription: "Walk-in / scheduled service",
-        serviceType: "Repair",
-        priorityLevel: "Normal",
-        servicesJson: buildServicesJson(),
-        labourCharge: String(labourTotal),
-        labourDuration: discount || "0",
-        technicalRemarks: discount ? `Discount: ${discount}` : "",
-        vehiclePhotos: attachVehiclePhotos && vehiclePhotoFile ? [vehiclePhotoFile] : [],
-      };
-      const res = editingJobCardId
-        ? await updateJobCard(token, editingJobCardId, payload)
-        : await createJobCard(token, payload);
-      if (!res.ok) {
-        toast.error(apiMessage(res.data) || `Could not ${isEdit ? "update" : "create"} job card.`);
-        return;
-      }
-      toast.success(apiMessage(res.data) || `Job card ${isEdit ? "updated" : "created"}.`);
+      const services = JSON.parse(buildServicesJson()) as unknown[];
+      await saveJobCard(
+        token,
+        {
+          jobCardId: editingJobCardId ?? undefined,
+          sendForApproval: !isEdit,
+          form: {
+            customerId,
+            vehicleId: vehicleIdVal,
+            odometerReading: odomIn || "0",
+            dueOdometerReading: odomOut || "0",
+            issueDescription: "Walk-in / scheduled service",
+            serviceType: "Repair",
+            priorityLevel: "Normal",
+            services,
+            labourCharge: String(labourTotal),
+            labourDuration: discount || "0",
+            technicalRemarks: discount ? `Discount: ${discount}` : "",
+          },
+          vehiclePhotoFiles: attachVehiclePhotos && vehiclePhotoFile ? [vehiclePhotoFile] : [],
+        },
+        categories,
+      );
+      toast.success(`Job card ${isEdit ? "updated" : "created"}.`);
       navigate("/shop/job-cards");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Could not ${isEdit ? "update" : "create"} job card.`);
     } finally {
       setSubmitting(false);
     }
@@ -425,11 +444,10 @@ export function ShopJobCardEditPage() {
   useEffect(() => {
     if (!token || !id || stateRaw) return;
     setFetching(true);
-    void fetchJobCardById(token, id).then((res) => {
-      if (res.ok && res.data && typeof res.data === "object") {
-        const root = res.data as Record<string, unknown>;
-        const data = root.data && typeof root.data === "object" ? (root.data as JobCardEditRaw) : (root as JobCardEditRaw);
-        setFetchedRaw({ ...data, _id: data._id ?? id });
+    void fetchJobCardByIdForForm(token, id).then((data) => {
+      const job = resolveJobCardFromApiResponse(data);
+      if (job) {
+        setFetchedRaw({ ...job, _id: job._id ?? id });
       }
       setFetching(false);
     });

@@ -16,30 +16,25 @@ import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
-import { useShopJobCards } from "../../hooks/useShopJobCards";
-import { useShopWallet } from "../../hooks/useShopWallet";
+import { useAutoshopJobCards } from "../../hooks/useAutoshopJobCards";
 import { formatCurrencyAmount } from "../../lib/currency";
 import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import {
-  deleteJobCard,
-  collectJobCardPayment,
-  markJobCardPaymentInvoice,
-  resendJobCardNotification,
-} from "../../lib/shopOwnerMutations";
+  deleteAutoshopJobCard,
+  sendAutoshopJobCardForApproval,
+  updateAutoshopJobCardStatus,
+} from "../../lib/autoshopownerJobCardsApi";
 import {
   isJobCardApproved,
   isJobCardEditable,
-  isJobCardPaid,
   isEligibleForInvoiceConversion,
   jobCardStatusClass,
   jobCardStatusLabel,
-  mergeJobCardListRows,
   pickJobCardInvoiceNumber,
+  pickJobCardNoForApi,
+  parseJobCardsFromPagePayload,
   type JobCardListRow,
 } from "../../lib/shopOwnerJobCards";
-import { getWalletLedgerTab, filterWalletInvoiceRows } from "../../lib/shopOwnerWallet";
-import { USE_DUMMY_SHOP_WALLET } from "../../lib/dummyShopWallet";
-import { useMockShopInvoiceLedger } from "../../lib/mockShopInvoiceLedger";
 import useAuth from "../../auth/useAuth";
 
 type JobCardSection = "my-list" | "approvals" | "convert-invoice" | "paid";
@@ -64,7 +59,7 @@ const SECTION_HEADINGS: Record<JobCardSection, string> = {
 
 const EMPTY_MESSAGES: Record<JobCardSection, string> = {
   "my-list": "No job cards yet.",
-  approvals: "No approved job cards yet.",
+  approvals: "No job cards awaiting approval yet.",
   "convert-invoice": "No converted to invoice job cards yet.",
   paid: "No paid cash job cards yet.",
 };
@@ -119,31 +114,12 @@ function matchesJobCardSearch(row: JobCardListRow, query: string): boolean {
 }
 
 function usesJobCardApiSearch(section: JobCardSection): boolean {
-  return section === "my-list" || section === "approvals";
+  return section === "my-list";
 }
 
-/** Approved job cards that can be marked paid by cash. */
+/** Customer-approved, unpaid job cards that can be marked paid by cash. */
 function isEligibleForCashPayment(row: JobCardListRow): boolean {
-  if (!isJobCardApproved(row)) return false;
-  if (isJobCardPaid(row)) return false;
-  return getWalletLedgerTab(row.raw) !== "invoice";
-}
-
-function pickCashPaymentAmount(row: JobCardListRow): number {
-  const raw = row.raw;
-  if (raw && typeof raw === "object") {
-    const o = raw as Record<string, unknown>;
-    const payable = o.payableAmounts;
-    if (payable && typeof payable === "object") {
-      const p = payable as Record<string, unknown>;
-      const cash = Number(p.cash);
-      if (Number.isFinite(cash) && cash > 0) return cash;
-    }
-    const total = Number(o.totalPayableAmount ?? o.total ?? row.total);
-    if (Number.isFinite(total) && total > 0) return total;
-  }
-  const fromRow = Number(row.total);
-  return Number.isFinite(fromRow) && fromRow > 0 ? fromRow : 0;
+  return isEligibleForInvoiceConversion(row);
 }
 
 function AddNewButton({ onClick }: { onClick: () => void }) {
@@ -353,91 +329,23 @@ export default function ShopJobCardsPage() {
   const [selectedJobCardIds, setSelectedJobCardIds] = useState<Set<string>>(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const {
-    cards: apiJobCards,
-    loading: jobCardsLoading,
-    error: jobCardsError,
-    refresh: refreshJobCards,
-  } = useShopJobCards(usesJobCardApiSearch(section) ? search : "");
-  const mockLedger = useMockShopInvoiceLedger();
-  const {
-    paidCash: apiPaidCash,
-    paid: apiPaidAll,
-    unpaid: apiUnpaidAll,
-    paidOnline: apiPaidOnline,
-    unpaidOnline: apiUnpaidOnline,
-    loading: walletLoading,
-    error: walletError,
-    refresh: refreshWallet,
-  } = useShopWallet();
+    cards: listCards,
+    loading,
+    error,
+    refresh,
+  } = useAutoshopJobCards(section, usesJobCardApiSearch(section) ? search : "");
 
-  const jobCards = USE_DUMMY_SHOP_WALLET ? mockLedger.jobCards : apiJobCards;
-  const paidCash = USE_DUMMY_SHOP_WALLET ? [] : apiPaidCash;
+  const filteredListCards = useMemo(() => {
+    if (usesJobCardApiSearch(section) || !search.trim()) return listCards;
+    return listCards.filter((row) => matchesJobCardSearch(row, search));
+  }, [listCards, search, section]);
 
-  const convertedInvoiceCards = useMemo(() => {
-    if (USE_DUMMY_SHOP_WALLET) {
-      return mergeJobCardListRows(mockLedger.unpaid, mockLedger.paid);
-    }
-    const fromWallet = mergeJobCardListRows(
-      apiUnpaidOnline,
-      apiPaidOnline,
-      filterWalletInvoiceRows(apiUnpaidAll),
-      filterWalletInvoiceRows(apiPaidAll),
-    );
-    const fromJobCards = filterWalletInvoiceRows(jobCards);
-    return mergeJobCardListRows(fromWallet, fromJobCards);
-  }, [
-    mockLedger.unpaid,
-    mockLedger.paid,
-    apiUnpaidOnline,
-    apiPaidOnline,
-    apiUnpaidAll,
-    apiPaidAll,
-    jobCards,
-  ]);
-
-  const listCards = useMemo(() => {
-    const filterSearch = (rows: JobCardListRow[]) =>
-      usesJobCardApiSearch(section)
-        ? rows
-        : search.trim()
-          ? rows.filter((row) => matchesJobCardSearch(row, search))
-          : rows;
-
-    if (section === "my-list") {
-      return filterSearch(jobCards);
-    }
-    if (section === "approvals") {
-      return filterSearch(jobCards.filter(isJobCardApproved));
-    }
-    if (section === "convert-invoice") {
-      return filterSearch(convertedInvoiceCards);
-    }
-    return filterSearch(paidCash);
-  }, [section, jobCards, paidCash, convertedInvoiceCards, search]);
-
-  const loading =
-    USE_DUMMY_SHOP_WALLET
-      ? false
-      : section === "my-list" || section === "approvals"
-        ? jobCardsLoading
-        : section === "convert-invoice"
-          ? walletLoading || jobCardsLoading
-          : walletLoading;
-  const error =
-    USE_DUMMY_SHOP_WALLET
-      ? null
-      : section === "my-list" || section === "approvals"
-        ? jobCardsError
-        : section === "convert-invoice"
-          ? walletError ?? jobCardsError
-          : walletError;
-
-  const totalPages = Math.max(1, Math.ceil(listCards.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredListCards.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
 
   const paginatedList = useMemo(
-    () => listCards.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [listCards, safePage],
+    () => filteredListCards.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filteredListCards, safePage],
   );
 
   const pageHeading =
@@ -488,8 +396,8 @@ export default function ShopJobCardsPage() {
   };
 
   const selectedJobCards = useMemo(
-    () => jobCardsMatchingSelection(selectedJobCardIds, listCards),
-    [selectedJobCardIds, listCards],
+    () => jobCardsMatchingSelection(selectedJobCardIds, filteredListCards),
+    [selectedJobCardIds, filteredListCards],
   );
 
   const deletableSelectedJobCards = useMemo(
@@ -557,7 +465,12 @@ export default function ShopJobCardsPage() {
     let failed = 0;
     try {
       for (const row of rows) {
-        const res = await deleteJobCard(token!, row.id);
+        const jobCardNo = pickJobCardNoForApi(row);
+        if (!jobCardNo) {
+          failed += 1;
+          continue;
+        }
+        const res = await deleteAutoshopJobCard(token!, jobCardNo);
         if (!res.ok) failed += 1;
       }
       await refresh();
@@ -578,7 +491,9 @@ export default function ShopJobCardsPage() {
 
   const handleBulkSend = async () => {
     await runBulkAction("Send", async (row) => {
-      const res = await resendJobCardNotification(token!, row.id);
+      const jobCardNo = pickJobCardNoForApi(row);
+      if (!jobCardNo) return false;
+      const res = await sendAutoshopJobCardForApproval(token!, jobCardNo);
       return res.ok;
     });
   };
@@ -589,35 +504,18 @@ export default function ShopJobCardsPage() {
       toast.info("Only approved, unpaid job cards can be converted to invoice.");
       return;
     }
-    if (bulkBusy) return;
+    if (!token || bulkBusy) return;
 
-    if (USE_DUMMY_SHOP_WALLET) {
-      setBulkBusy(true);
-      try {
-        const converted = mockLedger.convertToInvoice(eligible);
-        setSelectedJobCardIds(new Set());
-        const skipped = selectedJobCards.length - eligible.length;
-        if (skipped > 0) {
-          toast.success(
-            `Converted ${converted} job card${converted === 1 ? "" : "s"} to invoice. ${skipped} selected card${skipped === 1 ? " was" : "s were"} not eligible.`,
-          );
-        } else {
-          toast.success(
-            `Converted ${converted} job card${converted === 1 ? "" : "s"} to invoice.`,
-          );
-        }
-      } finally {
-        setBulkBusy(false);
-      }
-      return;
-    }
-
-    if (!token) return;
     setBulkBusy(true);
     let failed = 0;
     try {
       for (const row of eligible) {
-        const res = await markJobCardPaymentInvoice(token, row.id);
+        const jobCardNo = pickJobCardNoForApi(row);
+        if (!jobCardNo) {
+          failed += 1;
+          continue;
+        }
+        const res = await updateAutoshopJobCardStatus(token, jobCardNo, "convertedToInvoice");
         if (!res.ok) failed += 1;
       }
       await refresh();
@@ -658,12 +556,12 @@ export default function ShopJobCardsPage() {
     let failed = 0;
     try {
       for (const row of eligible) {
-        const res = await collectJobCardPayment(token, {
-          jobCardId: row.id,
-          paymentMethod: "Cash",
-          remark: "",
-          amount: pickCashPaymentAmount(row),
-        });
+        const jobCardNo = pickJobCardNoForApi(row);
+        if (!jobCardNo) {
+          failed += 1;
+          continue;
+        }
+        const res = await updateAutoshopJobCardStatus(token, jobCardNo, "CashPaid");
         if (!res.ok) failed += 1;
       }
       await refresh();
@@ -683,9 +581,8 @@ export default function ShopJobCardsPage() {
     }
   };
 
-  const refresh = () => {
-    void refreshJobCards();
-    void refreshWallet();
+  const refreshLists = () => {
+    void refresh();
   };
 
   const openJobCardDetail = (jc: JobCardListRow) => {
@@ -717,15 +614,23 @@ export default function ShopJobCardsPage() {
     setDetailListRow(null);
   };
 
-  const handleJobCardSaved = (jobCardId?: string, jobCardNo?: string) => {
-    void refresh();
+  const handleJobCardSaved = (
+    jobCardId?: string,
+    jobCardNo?: string,
+    jobRecord?: Record<string, unknown>,
+  ) => {
+    void refreshLists();
     if (jobCardId) {
       setDetailJobCardId(jobCardId);
-      setDetailListRow(
-        jobCardNo?.trim()
-          ? { id: jobCardId, raw: { jobNo: jobCardNo.trim() }, jobNo: jobCardNo.trim() }
-          : { id: jobCardId, raw: {} },
-      );
+      const rows = jobRecord
+        ? parseJobCardsFromPagePayload({ success: true, data: [jobRecord] })
+        : [];
+      const row: JobCardListRow =
+        rows[0] ??
+        (jobCardNo?.trim()
+          ? { id: jobCardId, raw: jobRecord ?? { jobNo: jobCardNo.trim() }, jobNo: jobCardNo.trim() }
+          : { id: jobCardId, raw: jobRecord ?? {} });
+      setDetailListRow(row);
       setEditJobCardId(null);
       setView("detail");
       return;
@@ -778,7 +683,7 @@ export default function ShopJobCardsPage() {
               listRow={detailListRow}
               jobNoHint={detailListRow ? pickJobNoFromListRow(detailListRow) ?? null : null}
               onBack={showList}
-              onConverted={() => void refresh()}
+              onConverted={() => void refreshLists()}
             />
           ) : null}
         </ShopReveal>
@@ -836,8 +741,8 @@ export default function ShopJobCardsPage() {
             {loading ? (
               <ShopListSkeleton variant="profile-table" className="w-full" />
             ) : error ? (
-              <ShopErrorPanel message={error} onRetry={() => void refresh()} />
-            ) : listCards.length === 0 ? (
+              <ShopErrorPanel message={error} onRetry={() => void refreshLists()} />
+            ) : filteredListCards.length === 0 ? (
               <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES[section]}</p>
             ) : (
               <>
@@ -855,7 +760,7 @@ export default function ShopJobCardsPage() {
                 />
 
                 <ShopListFooter className="text-sm font-semibold text-gray-600">
-                  <p>{listCards.length} Entries</p>
+                  <p>{filteredListCards.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
