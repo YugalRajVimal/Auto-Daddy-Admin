@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FiPlus } from "react-icons/fi";
+import { toast } from "react-toastify";
 import { getJson, postJson } from "../../api/mobileAuth";
 import DashboardPanelCard from "../COMP";
 import CarBrandLogo from "../shop/CarBrandLogo";
 import { shopMainContentFillClass, shopMainContentShellClass } from "../shop/shopLayoutStyles";
 import { useCarOwnerAutoShops } from "../../hooks/useCarOwnerAutoShops";
+import { useCarOwnerFavoriteShops } from "../../hooks/useCarOwnerFavoriteShops";
 import type { ServiceCategory } from "../../hooks/useOwnerPortal";
 import { isCarOwnerShopOpenToday } from "../../lib/carOwnerAutoShops";
 import { getCarBrandId, getCarBrandName, mergeCarBrandCatalog } from "../../lib/dummyCarBrands";
@@ -24,7 +26,6 @@ type OwnerDashboardServicePanelProps = {
 function serviceShopTypeParam(shopType?: OwnerShopType): string | null {
   switch (shopType) {
     case "autoShop":
-      return "autoShops";
     case "tyreShop":
     case "carWash":
     case "towTruck":
@@ -166,7 +167,28 @@ export default function OwnerDashboardServicePanel({
   );
 
   const { shops, loading: shopsLoading, error: shopsError, refresh } = useCarOwnerAutoShops(shopFilters);
-  const expandedShop = shops.find((shop) => shop.id === expandedShopId) ?? null;
+  const { isFavorite, toggleFavorite } = useCarOwnerFavoriteShops();
+  const [favoriteBusyId, setFavoriteBusyId] = useState<string | null>(null);
+
+  const shopsWithFavorites = useMemo(
+    () => shops.map((shop) => ({ ...shop, isFavorite: isFavorite(shop.id) })),
+    [shops, isFavorite]
+  );
+  const expandedShop = shopsWithFavorites.find((shop) => shop.id === expandedShopId) ?? null;
+
+  const handleToggleFavorite = useCallback(
+    async (shopId: string) => {
+      setFavoriteBusyId(shopId);
+      const result = await toggleFavorite(shopId);
+      setFavoriteBusyId(null);
+      if (!result.ok) {
+        toast.error(result.error ?? "Could not update favorite.");
+        return;
+      }
+      toast.success(result.isFavorite ? "Added to favorites." : "Removed from favorites.");
+    },
+    [toggleFavorite]
+  );
 
   useEffect(() => {
     setSelectedBrand(null);
@@ -305,6 +327,9 @@ export default function OwnerDashboardServicePanel({
               connectingServiceKey={connectingServiceKey}
               sentServiceKeys={sentServiceKeys}
               statusMessage={statusMessage}
+              isFavorite={expandedShop.isFavorite}
+              favoriteBusy={favoriteBusyId === expandedShop.id}
+              onToggleFavorite={() => void handleToggleFavorite(expandedShop.id)}
               onCollapse={handleCollapseShop}
               onConnect={(serviceId, serviceName) => void handleConnect(serviceId, serviceName)}
             />
@@ -324,13 +349,13 @@ export default function OwnerDashboardServicePanel({
               Try again
             </button>
           </div>
-        ) : shops.length === 0 ? (
+        ) : shopsWithFavorites.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
             No shops found for {brandLabel} and {serviceLabel} in your area yet.
           </div>
         ) : (
           <div className="flex flex-col">
-            {shops.map((shop) => (
+            {shopsWithFavorites.map((shop) => (
               <OwnerDashboardShopRow key={shop.id} shop={shop} onExpand={() => handleExpandShop(shop.id)} />
             ))}
           </div>

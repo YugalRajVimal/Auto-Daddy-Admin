@@ -57,6 +57,21 @@ export function isPaidJobCard(jc: CarOwnerJobCard): boolean {
   return (jc.paymentStatus ?? "").trim().toLowerCase() === "paid";
 }
 
+/** Display label — API keeps status "pending" after approval; prefer approvedByCustomer. */
+export function carOwnerJobCardStatusLabel(jc: CarOwnerJobCard): string {
+  const norm = (jc.status ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  if (norm === "convertedtoinvoice") return "Converted to Invoice";
+  if (norm === "cashpaid") return "Cash Paid";
+  if (jc.approvedByCustomer === true || norm === "approved" || norm === "accepted") {
+    return "Approved";
+  }
+  if (norm === "autorejected") return "Auto Rejected";
+  if (norm === "rejected") return "Rejected";
+  if (norm === "pending") return "Pending";
+  const raw = (jc.status ?? "").trim();
+  return raw || "—";
+}
+
 export function resolveJobCardsBuckets(payload: Record<string, unknown> | undefined) {
   if (!payload || typeof payload !== "object") return undefined;
 
@@ -75,11 +90,20 @@ export function resolveJobCardsBuckets(payload: Record<string, unknown> | undefi
 
 export function normalizeJobCardsPayload(payload: Record<string, unknown> | undefined): CarOwnerJobCard[] {
   if (!payload) return [];
-  const pending = (Array.isArray(payload.pending) ? payload.pending : []).map((jc) => ({
-    ...(jc as CarOwnerJobCard),
-    status: (jc as CarOwnerJobCard).status?.trim() ? (jc as CarOwnerJobCard).status : "Pending",
-  }));
-  const approved = Array.isArray(payload.approved) ? (payload.approved as CarOwnerJobCard[]) : [];
+  const pending = (Array.isArray(payload.pending) ? payload.pending : []).map((jc) => {
+    const row = jc as CarOwnerJobCard;
+    return {
+      ...row,
+      status: row.status?.trim() ? row.status : "Pending",
+      approvedByCustomer: row.approvedByCustomer === true,
+    };
+  });
+  const approved = (Array.isArray(payload.approved) ? (payload.approved as CarOwnerJobCard[]) : []).map(
+    (row) => ({
+      ...row,
+      approvedByCustomer: row.approvedByCustomer !== false,
+    }),
+  );
   const rejected = Array.isArray(payload.rejected) ? (payload.rejected as CarOwnerJobCard[]) : [];
   const autoRejected = (Array.isArray(payload.autoRejected) ? payload.autoRejected : []).map((jc) => ({
     ...(jc as CarOwnerJobCard),

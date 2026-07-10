@@ -10,9 +10,11 @@ type State = {
   error: string | null;
 };
 
-export function useCarOwnerDeals() {
+export function useCarOwnerDeals(filters?: { make?: string; model?: string }) {
   const { token } = useAuth();
   const [state, setState] = useState<State>({ deals: [], loading: true, error: null });
+  const make = filters?.make?.trim() ?? "";
+  const model = filters?.model?.trim() ?? "";
 
   const load = useCallback(async () => {
     if (!token) {
@@ -21,7 +23,12 @@ export function useCarOwnerDeals() {
     }
 
     setState((prev) => ({ ...prev, loading: true, error: null }));
-    const res = await getJson<CarOwnerDealsResponse>("/api/user/deals", token);
+    const usp = new URLSearchParams();
+    if (make) usp.set("make", make);
+    if (model) usp.set("model", model);
+    const qs = usp.toString();
+    const path = qs ? `/api/user/deals?${qs}` : "/api/user/deals";
+    const res = await getJson<CarOwnerDealsResponse>(path, token);
 
     if (!res.ok || !res.data?.success) {
       setState({ deals: [], loading: false, error: "Could not load deals." });
@@ -29,7 +36,7 @@ export function useCarOwnerDeals() {
     }
 
     setState({ deals: normalizeCarOwnerDealsList(res.data), loading: false, error: null });
-  }, [token]);
+  }, [token, make, model]);
 
   useEffect(() => {
     void load();

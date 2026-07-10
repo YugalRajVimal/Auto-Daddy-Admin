@@ -323,12 +323,23 @@ function normalizedJobCardStatus(row: JobCardListRow): string {
   return "";
 }
 
-export function isJobCardPending(row: JobCardListRow): boolean {
-  return normalizedJobCardStatus(row) === "pending";
-}
-
 function rowStatusNorm(row: JobCardListRow): string {
   return normalizedJobCardStatus(row).toLowerCase().replace(/\s+/g, "");
+}
+
+function isApprovedByCustomer(row: JobCardListRow): boolean {
+  const raw = row.raw;
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    if (o.approvedByCustomer === true) return true;
+  }
+  const norm = rowStatusNorm(row);
+  return norm === "approved" || norm === "accepted";
+}
+
+export function isJobCardPending(row: JobCardListRow): boolean {
+  if (isApprovedByCustomer(row)) return false;
+  return rowStatusNorm(row) === "pending";
 }
 
 export function isJobCardPaid(row: JobCardListRow): boolean {
@@ -341,18 +352,9 @@ export function isJobCardPaid(row: JobCardListRow): boolean {
 }
 
 export function isJobCardEditable(row: JobCardListRow): boolean {
-  if (isJobCardPaid(row)) return false;
-  const norm = normalizedJobCardStatus(row).toLowerCase().replace(/\s+/g, "");
+  if (isJobCardPaid(row) || isApprovedByCustomer(row)) return false;
+  const norm = rowStatusNorm(row);
   return norm === "pending" || norm === "rejected" || norm === "autorejected";
-}
-
-function isApprovedByCustomer(row: JobCardListRow): boolean {
-  const raw = row.raw;
-  if (raw && typeof raw === "object") {
-    const o = raw as Record<string, unknown>;
-    if (o.approvedByCustomer === true) return true;
-  }
-  return normalizedJobCardStatus(row) === "approved";
 }
 
 export function isJobCardApproved(row: JobCardListRow): boolean {
@@ -422,10 +424,17 @@ export function jobCardStatusLabel(row: JobCardListRow): string {
     return "Cash Paid";
   }
 
+  // New API keeps status "pending" after customer approval; trust approvedByCustomer.
+  if (isApprovedByCustomer(row)) return "Approved";
+
+  if (norm === "autorejected") return "Auto Rejected";
+  if (norm === "rejected") return "Rejected";
+  if (norm === "pending") return "Pending";
+
   const status = (row.status ?? "").trim();
   if (status) return status;
   if (row.listBucket) return JOB_CARD_BUCKET_LABELS[row.listBucket];
-  return isJobCardPending(row) ? "Pending" : "—";
+  return "—";
 }
 
 export function jobCardStatusLabelFromJob(
@@ -460,15 +469,11 @@ export function jobCardStatusClass(row: JobCardListRow): string {
   if (label.includes("cash paid") || label.includes("paid by cash")) {
     return "text-green-700";
   }
-
-  const norm = normalizedJobCardStatus(row);
-  if (norm === "pending") return "text-blue-700";
-  if (norm === "approved" || norm === "accepted") return "text-green-700";
-  if (norm === "rejected" || norm === "autorejected") return "text-red-600";
-
-  if (label.includes("pending")) return "text-blue-700";
-  if (label.includes("approved") || label.includes("accepted")) return "text-green-700";
+  if (label.includes("approved") || label.includes("accepted") || isApprovedByCustomer(row)) {
+    return "text-green-700";
+  }
   if (label.includes("reject")) return "text-red-600";
+  if (label.includes("pending") || isJobCardPending(row)) return "text-blue-700";
   return "text-gray-700";
 }
 

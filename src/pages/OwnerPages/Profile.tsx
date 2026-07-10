@@ -67,17 +67,17 @@ export default function OwnerProfilePage() {
     };
   }, [token]);
 
+  const citySelectValue = editCityId.trim() || editCityName.trim();
+
   const citySelectOptions = useMemo(() => {
     const cities = [...cityOptions];
-    const selectedId = editCityId.trim();
-    const selectedName = editCityName.trim();
-    if (selectedId && !cities.some((c) => c.id === selectedId)) {
-      cities.push({ id: selectedId, name: selectedName || selectedId });
-    } else if (!selectedId && selectedName && !cities.some((c) => c.name === selectedName)) {
-      cities.push({ id: selectedName, name: selectedName });
+    const selectedId = citySelectValue;
+    const selectedName = editCityName.trim() || selectedId;
+    if (selectedId && !cities.some((c) => c.id === selectedId || c.name === selectedName)) {
+      cities.push({ id: selectedId, name: selectedName });
     }
     return cities.sort((a, b) => a.name.localeCompare(b.name));
-  }, [cityOptions, editCityId, editCityName]);
+  }, [cityOptions, citySelectValue, editCityName]);
 
   const onPhotoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -177,12 +177,12 @@ export default function OwnerProfilePage() {
 
                   <CompactField label="City" className="min-w-[120px] flex-1">
                     <select
-                      value={editCityId}
+                      value={citySelectValue}
                       onChange={(e) => {
                         const nextId = e.target.value;
                         const city = citySelectOptions.find((c) => c.id === nextId);
                         setEditCityId(nextId);
-                        setEditCityName(city?.name ?? "");
+                        setEditCityName(city?.name ?? nextId);
                       }}
                       disabled={saving}
                       className={compactInputClass}

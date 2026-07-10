@@ -88,6 +88,8 @@ export type CarOwnerJobCard = {
   labourCharge?: number;
   labourDuration?: string | number;
   status: string;
+  /** Backend often leaves status "pending" after customer approval; trust this flag. */
+  approvedByCustomer?: boolean;
   jobNo: string;
   invoiceNumber?: string;
   createdAt: string;

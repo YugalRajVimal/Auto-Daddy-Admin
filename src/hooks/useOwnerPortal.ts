@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getJson } from "../api/mobileAuth";
+import { getJson, postJson } from "../api/mobileAuth";
 import { useAuth } from "../auth";
 import { extractThought } from "../lib/extractThought";
 import {
@@ -13,6 +13,7 @@ export type { ServiceCategory, ServiceSubItem };
 
 export type CarOwnerDashboardData = {
   success?: boolean;
+  thoughtOfTheDayLiked?: boolean;
   dashboard?: {
     thoughtOfTheDay?: string | { text?: string; quote?: string; thought?: string };
     FAQs?: { heading?: string; desc?: string };
@@ -22,24 +23,40 @@ export type CarOwnerDashboardData = {
     phone?: string;
     city?: string;
     profilePhoto?: string | null;
+    thoughtOfTheDayLiked?: boolean;
   };
+};
+
+type ToggleThoughtLikeResponse = {
+  success?: boolean;
+  message?: string;
+  thoughtOfTheDayLiked?: boolean;
 };
 
 export function useCarOwnerDashboard() {
   const { token } = useAuth();
   const [data, setData] = useState<CarOwnerDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [liked, setLiked] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!token) {
       setData(null);
+      setLiked(false);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
       const res = await getJson<CarOwnerDashboardData>("/api/user/dashboard", token);
-      if (res.ok && res.data) setData(res.data);
+      if (res.ok && res.data) {
+        setData(res.data);
+        const nextLiked =
+          res.data.thoughtOfTheDayLiked === true ||
+          res.data.userProfile?.thoughtOfTheDayLiked === true;
+        setLiked(nextLiked);
+      }
     } finally {
       setLoading(false);
     }
@@ -48,6 +65,35 @@ export function useCarOwnerDashboard() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const toggleThoughtLike = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
+    if (!token) return { ok: false, error: "Not authenticated." };
+    if (likeBusy) return { ok: false, error: "Already updating." };
+
+    const previous = liked;
+    setLiked(!previous);
+    setLikeBusy(true);
+    try {
+      const res = await postJson<ToggleThoughtLikeResponse>(
+        "/api/user/thought-of-the-day/toggle-like",
+        {},
+        token
+      );
+      if (!res.ok || res.data?.success === false) {
+        setLiked(previous);
+        return { ok: false, error: res.data?.message ?? "Could not update like." };
+      }
+      if (typeof res.data?.thoughtOfTheDayLiked === "boolean") {
+        setLiked(res.data.thoughtOfTheDayLiked);
+      }
+      return { ok: true };
+    } catch {
+      setLiked(previous);
+      return { ok: false, error: "Network error while updating like." };
+    } finally {
+      setLikeBusy(false);
+    }
+  }, [likeBusy, liked, token]);
 
   const thought =
     extractThought(data?.dashboard?.thoughtOfTheDay) ||
@@ -62,6 +108,9 @@ export function useCarOwnerDashboard() {
     displayName: data?.userProfile?.name?.trim() || "",
     city: data?.userProfile?.city?.trim() || "",
     thoughtOfTheDay: thought,
+    thoughtOfTheDayLiked: liked,
+    thoughtLikeBusy: likeBusy,
+    toggleThoughtLike,
     faqsHeading: typeof faqs?.heading === "string" ? faqs.heading.trim() : "FAQs",
     faqsDescription: typeof faqs?.desc === "string" ? faqs.desc.trim() : "",
   };

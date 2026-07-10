@@ -51,11 +51,14 @@ function dealRowVehicleLabel(deal: CarOwnerDeal, index: number, vehicles: CarOwn
 export default function OwnerDealsPage() {
   const { session } = useAuth();
   const countryCode = session?.meta?.countryCode;
-  const { deals, loading, error, refresh } = useCarOwnerDeals();
-  const { vehicles } = useCarOwnerVehicles();
-
   const [category, setCategory] = useState<DealCategory>(CATEGORIES[0].id);
   const [listFilters, setListFilters] = useState<DealListFilters>(EMPTY_DEAL_LIST_FILTERS);
+
+  const { deals, loading, error, refresh } = useCarOwnerDeals({
+    make: listFilters.make,
+    model: listFilters.model,
+  });
+  const { vehicles } = useCarOwnerVehicles();
 
   const resetSidebar = useCallback(() => {
     setCategory(CATEGORIES[0].id);

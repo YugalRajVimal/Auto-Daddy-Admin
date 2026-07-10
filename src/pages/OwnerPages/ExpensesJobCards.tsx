@@ -4,9 +4,10 @@ import { toast } from "react-toastify";
 import OwnerPageShell from "../../components/owner/OwnerPageShell";
 import { useAuth } from "../../auth";
 import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
-import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
+import { useCarOwnerJobCardApprovals } from "../../hooks/useCarOwnerJobCardApprovals";
 import {
   businessName,
+  carOwnerJobCardStatusLabel,
   formatBusinessPhone,
   formatJobCardDate,
   jobChipLabel,
@@ -23,15 +24,11 @@ function selectedSetFromArray(ids: string[]): Set<string> {
   return new Set(ids);
 }
 
-function statusText(status: string | null | undefined): string {
-  const s = (status ?? "").trim();
-  return s || "—";
-}
-
 export default function OwnerExpensesJobCardsPage() {
   const { session } = useAuth();
   const countryCode = session?.meta?.countryCode;
-  const { items, loading, error, refresh } = useCarOwnerJobCards(null);
+  const { items, loading, error, acting, refresh, approveMany, rejectMany } =
+    useCarOwnerJobCardApprovals();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -81,6 +78,28 @@ export default function OwnerExpensesJobCardsPage() {
     setSelectedIds([]);
   };
 
+  const handleApprove = async () => {
+    if (selectedIds.length === 0 || acting) return;
+    const result = await approveMany(selectedIds);
+    if (result.ok) {
+      toast.success(result.message);
+      setSelectedIds([]);
+    } else {
+      toast.error(result.message);
+    }
+  };
+
+  const handleDiscard = async () => {
+    if (selectedIds.length === 0 || acting) return;
+    const result = await rejectMany(selectedIds);
+    if (result.ok) {
+      toast.success(result.message);
+      setSelectedIds([]);
+    } else {
+      toast.error(result.message);
+    }
+  };
+
   return (
     <OwnerPageShell
       pageHeading="Expenses"
@@ -116,7 +135,7 @@ export default function OwnerExpensesJobCardsPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
-            No job cards yet.
+            No job cards awaiting approval.
           </div>
         ) : view === "payment" && selectedJobCard ? (
           <div className="flex flex-col">
@@ -226,33 +245,23 @@ export default function OwnerExpensesJobCardsPage() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={selectedIds.length === 0}
-                  onClick={() => {
-                    if (selectedIds.length === 0) return;
-                    toast.success("Approved.");
-                    setSelectedIds([]);
-                    void refresh();
-                  }}
+                  disabled={selectedIds.length === 0 || acting}
+                  onClick={() => void handleApprove()}
                   className="rounded bg-gray-400 px-5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                 >
                   Approve
                 </button>
                 <button
                   type="button"
-                  disabled={selectedIds.length === 0}
-                  onClick={() => {
-                    if (selectedIds.length === 0) return;
-                    toast.success("Discarded.");
-                    setSelectedIds([]);
-                    void refresh();
-                  }}
+                  disabled={selectedIds.length === 0 || acting}
+                  onClick={() => void handleDiscard()}
                   className="rounded bg-red-600 px-5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                 >
                   Discard
                 </button>
                 <button
                   type="button"
-                  disabled={selectedIds.length !== 1}
+                  disabled={selectedIds.length !== 1 || acting}
                   onClick={openPayment}
                   className="rounded bg-gray-400 px-5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                 >
@@ -260,7 +269,7 @@ export default function OwnerExpensesJobCardsPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={selectedIds.length !== 1}
+                  disabled={selectedIds.length !== 1 || acting}
                   onClick={() => {
                     if (selectedIds.length !== 1) return;
                     toast.success("Converted to invoice.");
@@ -338,7 +347,9 @@ export default function OwnerExpensesJobCardsPage() {
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>{businessName(jc.business)}</td>
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>{phone}</td>
                           <td className={`${OWNER_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>{amount}</td>
-                          <td className={OWNER_TABLE_BODY_TD_CLASS}>{statusText(jc.status)}</td>
+                          <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                            {carOwnerJobCardStatusLabel(jc)}
+                          </td>
                         </tr>
                       );
                     })}

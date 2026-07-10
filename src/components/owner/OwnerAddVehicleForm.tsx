@@ -121,8 +121,8 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
       toast.error("Plate, make, model, and year are required.");
       return;
     }
-    if (nextVin && nextVin.length !== 17) {
-      toast.error("VIN must be exactly 17 characters.");
+    if (!nextVin || nextVin.length !== 17) {
+      toast.error("VIN is required and must be exactly 17 characters.");
       return;
     }
     if (!isValidVehicleYear(nextYear)) {

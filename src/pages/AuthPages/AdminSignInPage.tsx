@@ -205,7 +205,11 @@ export default function AdminSignInPage() {
       await enrichMobileProfile(data.token, userRole, data, nationalPhoneDigits, countryCode);
       setStatus("Login successful!");
       setTimeout(() => {
-        navigate(getPostLoginRedirect(userRole), { replace: true });
+        const redirect =
+          userRole === "car_owner" && data.isProfileComplete === false
+            ? "/owner/onboarding"
+            : getPostLoginRedirect(userRole);
+        navigate(redirect, { replace: true });
       }, 800);
     } catch {
       setStatus("An error occurred.");

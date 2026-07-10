@@ -149,6 +149,8 @@ export function estimateStatusRibbon(job: Record<string, unknown>): string {
   if (payment.includes("invoice")) {
     return "Converted to Invoice";
   }
+  // API often leaves status "pending" after customer approval.
+  if (job.approvedByCustomer === true) return "Approved";
   const status = s(job.status ?? job.jobStatus).toLowerCase();
   if (status.includes("approved")) return "Approved";
   if (status.includes("reject")) return "Rejected";

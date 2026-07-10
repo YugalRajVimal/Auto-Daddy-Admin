@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import { useAuth } from "../../auth";
+import { useCarOwnerOdometerReadings } from "../../hooks/useCarOwnerOdometerReadings";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import OwnerUpdateOdometerFooter from "../../components/owner/OwnerUpdateOdometerFooter";
 import OwnerUpdateOdometerPanel from "../../components/owner/OwnerUpdateOdometerPanel";
@@ -30,6 +31,7 @@ import {
   DEFAULT_OWNER_PAGE_CHROME,
   useOwnerPageChromeContext,
 } from "../../context/OwnerPageChromeContext";
+import { mergeVehiclesWithOdometerReadings } from "../../lib/carOwnerOdometer";
 
 export default function OwnerPageLayout() {
   const { chrome } = useOwnerPageChromeContext();
@@ -37,10 +39,29 @@ export default function OwnerPageLayout() {
   const { token } = useAuth();
   const { vehicles, loading: vehiclesLoading, error: vehiclesError, refresh: refreshVehicles } =
     useCarOwnerVehicles();
+  const {
+    readings,
+    loading: readingsLoading,
+    refresh: refreshReadings,
+  } = useCarOwnerOdometerReadings();
   const [showOdometer, setShowOdometer] = useState(false);
+
+  const vehiclesForOdometer = useMemo(
+    () => mergeVehiclesWithOdometerReadings(vehicles, readings),
+    [vehicles, readings]
+  );
 
   const closeOdometer = useCallback(() => setShowOdometer(false), []);
   const toggleOdometer = useCallback(() => setShowOdometer((open) => !open), []);
+
+  useEffect(() => {
+    setShowOdometer(false);
+  }, [location.pathname]);
+
+  const refreshOdometerData = useCallback(() => {
+    void refreshVehicles();
+    void refreshReadings();
+  }, [refreshReadings, refreshVehicles]);
 
   const mainNode = showOdometer ? (
     <div className="flex h-full min-h-0 flex-col gap-2">
@@ -56,12 +77,12 @@ export default function OwnerPageLayout() {
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
         <OwnerUpdateOdometerPanel
-          vehicles={vehicles}
-          loading={vehiclesLoading}
+          vehicles={vehiclesForOdometer}
+          loading={vehiclesLoading || readingsLoading}
           error={vehiclesError}
           token={token}
           onBack={closeOdometer}
-          onSaved={() => void refreshVehicles()}
+          onSaved={refreshOdometerData}
         />
       </div>
     </div>

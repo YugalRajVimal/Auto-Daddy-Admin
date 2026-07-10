@@ -27,5 +27,15 @@ export function parseCitiesApiResponse(payload: unknown): UserCity[] {
     else if (Array.isArray(r.results)) itemsRaw = r.results;
   }
 
-  return itemsRaw.map(pickCityRow).filter((x): x is UserCity => x != null);
+  // API returns plain municipality name strings; the same name can appear more than once.
+  const seen = new Set<string>();
+  const unique: UserCity[] = [];
+  for (const city of itemsRaw.map(pickCityRow)) {
+    if (!city) continue;
+    const key = city.name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(city);
+  }
+  return unique;
 }

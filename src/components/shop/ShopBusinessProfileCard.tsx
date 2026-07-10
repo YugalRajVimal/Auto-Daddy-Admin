@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { FiImage } from "react-icons/fi";
 import { Skeleton } from "../common/Skeleton";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
-import { getShopTypeLabel } from "../../lib/shopTypes";
+import { getShopTypeLabels } from "../../lib/shopTypes";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 
 const CARD_CLASS =
@@ -15,7 +15,9 @@ export default function ShopBusinessProfileCard() {
   const location = business?.city?.trim() || city || "—";
   const phone =
     business?.businessPhone?.trim() || businessPhone?.trim() || user?.phone?.trim();
-  const shopTypeLabel = getShopTypeLabel(user?.shopType ?? business?.shopType);
+  const shopTypeLabel = getShopTypeLabels(
+    business?.shopTypes ?? user?.shopType ?? business?.shopType
+  );
   const bannerSrc = normalizeMediaUrl(business?.bannerImage ?? business?.businessLogo ?? null);
   const website = (business as { businessWebsite?: string })?.businessWebsite?.trim();
   const mapLoc = (business as { businessMapLocation?: { lat: number; lng: number } })

@@ -5,7 +5,7 @@ import {
   InvoiceViewerDialog,
   JobCardViewerDialog,
 } from "../../../invoice-job-card-viewer/InvoiceJobCardViewer.jsx";
-import { putJson } from "../../api/mobileAuth";
+import { deleteJson } from "../../api/mobileAuth";
 import OwnerAddVehicleForm from "../../components/owner/OwnerAddVehicleForm";
 import OwnerEditVehiclePanel from "../../components/owner/OwnerEditVehiclePanel";
 import {
@@ -253,14 +253,14 @@ export default function OwnerVehiclesPage() {
       }
       if (!window.confirm("Remove this vehicle from your list?")) return;
 
-      const res = await putJson<{ success?: boolean; message?: string }>(
-        `/api/user/vehicle/${vehicleId}`,
-        { disabled: true },
-        token
+      const res = await deleteJson<{ success?: boolean; message?: string }>(
+        "/api/user/vehicle",
+        token,
+        { vehicleId }
       );
 
       const message = typeof res.data?.message === "string" ? res.data.message.trim() : "";
-      if (!res.ok) {
+      if (!res.ok || res.data?.success === false) {
         toast.error(message || "Could not remove vehicle.");
         return;
       }

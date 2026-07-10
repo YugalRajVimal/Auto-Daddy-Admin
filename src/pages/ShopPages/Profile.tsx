@@ -448,6 +448,7 @@ export default function ShopProfilePage() {
               business={business}
               zipCode={user?.pincode}
               shopType={user?.shopType ?? business?.shopType}
+              shopTypes={business?.shopTypes}
               onSaved={() => void refresh()}
             />
           </ProfileHeroFormSection>

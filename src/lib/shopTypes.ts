@@ -10,16 +10,50 @@ export const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
   { value: "towTruck", label: "Tow Truck" },
 ];
 
+export function isShopType(value: unknown): value is ShopType {
+  return value === "autoShop" || value === "tyreShop" || value === "carWash" || value === "towTruck";
+}
+
 export function normalizeShopType(value?: string | null): ShopType {
-  if (value === "autoShop" || value === "tyreShop" || value === "carWash" || value === "towTruck") {
-    return value;
+  return isShopType(value) ? value : "autoShop";
+}
+
+/** Accepts a single type, an array, or a JSON-encoded array string from the API. */
+export function normalizeShopTypes(value?: string | string[] | null): ShopType[] {
+  let raw: unknown[] = [];
+  if (Array.isArray(value)) {
+    raw = value;
+  } else if (typeof value === "string" && value.trim()) {
+    const trimmed = value.trim();
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed) as unknown;
+        raw = Array.isArray(parsed) ? parsed : [trimmed];
+      } catch {
+        raw = [trimmed];
+      }
+    } else {
+      raw = [trimmed];
+    }
   }
-  return "autoShop";
+
+  const unique: ShopType[] = [];
+  for (const item of raw) {
+    if (!isShopType(item) || unique.includes(item)) continue;
+    unique.push(item);
+  }
+  return unique.length > 0 ? unique : ["autoShop"];
 }
 
 export function getShopTypeLabel(value?: string | null): string {
   const shopType = normalizeShopType(value);
   return SHOP_TYPE_OPTIONS.find((option) => option.value === shopType)?.label ?? "Mechanic Shop";
+}
+
+export function getShopTypeLabels(value?: string | string[] | null): string {
+  return normalizeShopTypes(value)
+    .map((shopType) => getShopTypeLabel(shopType))
+    .join(", ");
 }
 
 export function serviceMatchesShopType(

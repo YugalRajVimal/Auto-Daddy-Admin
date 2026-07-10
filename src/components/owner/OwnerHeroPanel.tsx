@@ -8,6 +8,9 @@ import { shopMainContentFillClass, shopMainContentShellClass } from "../shop/sho
 
 type OwnerHeroPanelProps = {
   thoughtOfTheDay?: string;
+  thoughtOfTheDayLiked?: boolean;
+  thoughtLikeBusy?: boolean;
+  onToggleThoughtLike?: () => void;
   loading?: boolean;
   className?: string;
   showDueService?: boolean;
@@ -19,6 +22,9 @@ type OwnerHeroPanelProps = {
 
 export default function OwnerHeroPanel({
   thoughtOfTheDay,
+  thoughtOfTheDayLiked,
+  thoughtLikeBusy,
+  onToggleThoughtLike,
   loading,
   className = "",
   showDueService = false,
@@ -65,7 +71,12 @@ export default function OwnerHeroPanel({
               onClose={onDueServiceClose}
             />
           ) : thoughtOfTheDay ? (
-            <ThoughtOfTheDayCard text={thoughtOfTheDay} />
+            <ThoughtOfTheDayCard
+              text={thoughtOfTheDay}
+              liked={thoughtOfTheDayLiked}
+              likeBusy={thoughtLikeBusy}
+              onToggleLike={onToggleThoughtLike}
+            />
           ) : null}
         </>
       )}

@@ -168,21 +168,36 @@ async function fetchSectionData(
                   }
                   return undefined;
                 };
-                const pickShopType = (v: unknown): string | undefined => {
-                  if (typeof v === "string" && v.trim()) return v.trim();
-                  if (Array.isArray(v) && v.length > 0) {
-                    const first = v[0];
-                    if (typeof first === "string" && first.trim()) return first.trim();
+                const pickShopTypes = (v: unknown): string[] | undefined => {
+                  if (Array.isArray(v)) {
+                    const types = v
+                      .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+                      .map((item) => item.trim());
+                    return types.length > 0 ? types : undefined;
+                  }
+                  if (typeof v === "string" && v.trim()) {
+                    const trimmed = v.trim();
+                    if (trimmed.startsWith("[")) {
+                      try {
+                        const parsed = JSON.parse(trimmed) as unknown;
+                        if (Array.isArray(parsed)) return pickShopTypes(parsed);
+                      } catch {
+                        // fall through to single string
+                      }
+                    }
+                    return [trimmed];
                   }
                   return undefined;
                 };
+                const shopTypes = pickShopTypes(d.shopTypes ?? d.shopType);
                 return {
                   ...d,
                   address: pickString(d.address, d.businessAddress),
                   email: pickString(d.email, d.businessEmail),
                   hstNumber: pickString(d.hstNumber, d.businessHSTNumber),
                   gstPercent: pickGst(d.gstPercent, d.gst),
-                  shopType: pickShopType(d.shopType ?? d.shopTypes),
+                  shopTypes,
+                  shopType: shopTypes?.[0],
                 };
               })()
             : null;

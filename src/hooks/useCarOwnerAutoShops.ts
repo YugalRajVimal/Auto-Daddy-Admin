@@ -9,12 +9,14 @@ export type CarOwnerAutoShopsFilters = {
   serviceIds: readonly string[];
   carCompanyIds?: readonly string[];
   shopType?: string | null;
+  search?: string | null;
 };
 
 function autoShopsPath(filters: CarOwnerAutoShopsFilters): string {
   const usp = new URLSearchParams();
   const services = filters.serviceIds.map((id) => id.trim()).filter(Boolean);
   const companies = (filters.carCompanyIds ?? []).map((id) => id.trim()).filter(Boolean);
+  const search = filters.search?.trim();
   if (services.length > 0) {
     usp.set("service", services.join(","));
   }
@@ -23,6 +25,9 @@ function autoShopsPath(filters: CarOwnerAutoShopsFilters): string {
   }
   if (filters.shopType) {
     usp.set("shopType", filters.shopType);
+  }
+  if (search) {
+    usp.set("search", search);
   }
   const qs = usp.toString();
   return qs ? `/api/user/auto-shops?${qs}` : "/api/user/auto-shops";
@@ -37,6 +42,7 @@ export function useCarOwnerAutoShops(filters: CarOwnerAutoShopsFilters) {
   const serviceKey = filters.serviceIds.join(",");
   const companyKey = (filters.carCompanyIds ?? []).join(",");
   const shopType = filters.shopType ?? null;
+  const search = filters.search?.trim() ?? "";
 
   const load = useCallback(async () => {
     if (!token) {
@@ -77,7 +83,7 @@ export function useCarOwnerAutoShops(filters: CarOwnerAutoShopsFilters) {
 
     setShops(next);
     setLoading(false);
-  }, [token, serviceKey, companyKey, shopType]);
+  }, [token, serviceKey, companyKey, shopType, search]);
 
   useEffect(() => {
     void load();

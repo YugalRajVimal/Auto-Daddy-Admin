@@ -1,15 +1,19 @@
-import { useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import {
   FiChevronDown,
   FiClock,
   FiExternalLink,
+  FiHeart,
   FiMapPin,
   FiPhone,
   FiPlus,
   FiStar,
   FiTool,
 } from "react-icons/fi";
+import { toast } from "react-toastify";
+import { useAuth } from "../../auth";
 import { isCarOwnerShopOpenToday } from "../../lib/carOwnerAutoShops";
+import { rateCarOwnerAutoShop } from "../../lib/carOwnerRateShop";
 import type { CarOwnerAutoShopListItem } from "../../types/carOwnerAutoShops";
 
 function mapsUrl(shop: CarOwnerAutoShopListItem): string | null {
@@ -29,17 +33,46 @@ function websiteUrl(shop: CarOwnerAutoShopListItem): string | null {
   return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 }
 
-function CompactStarRating({ rating }: { rating: number }) {
+function CompactStarRating({
+  rating,
+  busy,
+  onRate,
+}: {
+  rating: number;
+  busy?: boolean;
+  onRate?: (value: number) => void;
+}) {
   const clamped = Math.min(5, Math.max(0, rating));
+  const interactive = Boolean(onRate);
   return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <FiStar
-          key={star}
-          size={14}
-          className={star <= Math.round(clamped) ? "fill-blue-500 text-blue-500" : "text-gray-300"}
-        />
-      ))}
+    <div className="flex items-center gap-0.5" role={interactive ? "group" : undefined} aria-label="Shop rating">
+      {[1, 2, 3, 4, 5].map((star) => {
+        const filled = star <= Math.round(clamped);
+        if (!interactive) {
+          return (
+            <FiStar
+              key={star}
+              size={14}
+              className={filled ? "fill-blue-500 text-blue-500" : "text-gray-300"}
+            />
+          );
+        }
+        return (
+          <button
+            key={star}
+            type="button"
+            disabled={busy}
+            aria-label={`Rate ${star} star${star === 1 ? "" : "s"}`}
+            onClick={() => onRate?.(star)}
+            className="rounded p-0.5 transition hover:scale-110 disabled:opacity-50"
+          >
+            <FiStar
+              size={14}
+              className={filled ? "fill-blue-500 text-blue-500" : "text-gray-300"}
+            />
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -95,6 +128,10 @@ type OwnerShopExpandedPanelProps = {
   statusMessage: string | null;
   onCollapse: () => void;
   onConnect: (serviceId: string, serviceName: string) => void;
+  isFavorite?: boolean;
+  favoriteBusy?: boolean;
+  onToggleFavorite?: () => void;
+  onRated?: (rating: number) => void;
 };
 
 export default function OwnerShopExpandedPanel({
@@ -104,9 +141,20 @@ export default function OwnerShopExpandedPanel({
   statusMessage,
   onCollapse,
   onConnect,
+  isFavorite = false,
+  favoriteBusy = false,
+  onToggleFavorite,
+  onRated,
 }: OwnerShopExpandedPanelProps) {
+  const { token } = useAuth();
   const [hoursOpen, setHoursOpen] = useState(false);
   const [brandsOpen, setBrandsOpen] = useState(false);
+  const [localRating, setLocalRating] = useState(shop.rating);
+  const [ratingBusy, setRatingBusy] = useState(false);
+
+  useEffect(() => {
+    setLocalRating(shop.rating);
+  }, [shop.id, shop.rating]);
 
   const openToday = isCarOwnerShopOpenToday(shop);
   const phone = shop.phone.trim();
@@ -116,6 +164,25 @@ export default function OwnerShopExpandedPanel({
   const addressLine = [shop.address, shop.city].filter(Boolean).join(", ") || "Address not available";
   const carBrands = shop.carCompanies;
   const services = shop.mainServiceItems;
+
+  const handleRate = async (rating: number) => {
+    if (!token) {
+      toast.error("Please log in again.");
+      return;
+    }
+    setRatingBusy(true);
+    const previous = localRating;
+    setLocalRating(rating);
+    const result = await rateCarOwnerAutoShop(token, shop.id, rating);
+    setRatingBusy(false);
+    if (!result.ok) {
+      setLocalRating(previous);
+      toast.error(result.message);
+      return;
+    }
+    toast.success(result.message);
+    onRated?.(rating);
+  };
 
   return (
     <>
@@ -134,7 +201,25 @@ export default function OwnerShopExpandedPanel({
           >
             {openToday ? "Open" : "Closed"}
           </span>
-          <CompactStarRating rating={shop.rating} />
+          <div className="flex items-center gap-2">
+            <CompactStarRating rating={localRating} busy={ratingBusy} onRate={(v) => void handleRate(v)} />
+            {onToggleFavorite ? (
+              <button
+                type="button"
+                disabled={favoriteBusy}
+                onClick={onToggleFavorite}
+                aria-pressed={isFavorite}
+                aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                className="rounded-full p-1 text-gray-400 transition hover:text-red-500 disabled:opacity-50"
+              >
+                <FiHeart
+                  size={16}
+                  className={isFavorite ? "fill-red-500 text-red-500" : undefined}
+                  aria-hidden
+                />
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <button

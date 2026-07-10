@@ -12,7 +12,13 @@ type OwnerHomeView = "dashboard" | "service" | "shops";
 
 export default function OwnerHomePage() {
   const { token } = useAuth();
-  const { thoughtOfTheDay, loading } = useCarOwnerDashboard();
+  const {
+    thoughtOfTheDay,
+    thoughtOfTheDayLiked,
+    thoughtLikeBusy,
+    toggleThoughtLike,
+    loading,
+  } = useCarOwnerDashboard();
   const { indoor, outdoor, loading: servicesLoading } = useCarOwnerServiceSidebar();
   const [view, setView] = useState<OwnerHomeView>("dashboard");
   const [selectedService, setSelectedService] = useState<ServiceCategory | null>(null);
@@ -54,7 +60,13 @@ export default function OwnerHomePage() {
       contentFillHeight
     >
       {view === "dashboard" || !selectedService ? (
-        <OwnerHeroPanel thoughtOfTheDay={thoughtOfTheDay} loading={loading} />
+        <OwnerHeroPanel
+          thoughtOfTheDay={thoughtOfTheDay}
+          thoughtOfTheDayLiked={thoughtOfTheDayLiked}
+          thoughtLikeBusy={thoughtLikeBusy}
+          onToggleThoughtLike={() => void toggleThoughtLike()}
+          loading={loading}
+        />
       ) : view === "service" ? (
         <OwnerServiceTilesPanel
           indoor={indoor}

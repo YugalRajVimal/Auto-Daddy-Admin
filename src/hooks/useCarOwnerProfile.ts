@@ -92,7 +92,8 @@ export function useCarOwnerProfile() {
     setEditPhone(formatNationalPhoneDisplay(digitsOnly(display.phone)));
     setEditAddress(display.address);
     setEditPincode(formatPincodeDisplay(display.pincode));
-    setEditCityId(display.cityId);
+    // Profile API stores city as a name string (no cityId). City options use name as id.
+    setEditCityId(display.cityId.trim() || display.city.trim());
     setEditCityName(display.city);
   }, [
     display.address,
@@ -127,7 +128,7 @@ export function useCarOwnerProfile() {
     setEditPhone(formatNationalPhoneDisplay(digitsOnly(display.phone)));
     setEditAddress(display.address);
     setEditPincode(formatPincodeDisplay(display.pincode));
-    setEditCityId(display.cityId);
+    setEditCityId(display.cityId.trim() || display.city.trim());
     setEditCityName(display.city);
   }, [display]);
 
@@ -157,13 +158,13 @@ export function useCarOwnerProfile() {
     const nextPincode = normalizePostalCodeForStorage(editPincode);
     const nextAddress = editAddress.trim().slice(0, PROFILE_ADDRESS_MAX_LENGTH);
 
+    // Backend `edit-profile` only accepts: name, email, countryCode, pincode, address, city (+ profilePhoto).
     const body: Record<string, string> = {
       name: nextName,
       ...(nextEmail ? { email: nextEmail } : {}),
-      ...(nextPhone ? { phone: nextPhone, countryCode: display.countryCode || DEFAULT_CALLING_CODE } : {}),
+      countryCode: display.countryCode || DEFAULT_CALLING_CODE,
       ...(nextAddress ? { address: nextAddress } : {}),
       ...(nextPincode ? { pincode: nextPincode } : {}),
-      ...(editCityId.trim() ? { cityId: editCityId.trim() } : {}),
       ...(editCityName.trim() ? { city: editCityName.trim() } : {}),
     };
 

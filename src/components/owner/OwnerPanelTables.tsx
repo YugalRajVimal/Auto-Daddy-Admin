@@ -14,12 +14,14 @@ import { formatCurrencyAmount } from "../../lib/currency";
 import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
 import { isPaidInvoiceRow, type CarOwnerInvoiceRow } from "../../hooks/useCarOwnerInvoices";
 import type { CarOwnerAutoShopListItem } from "../../types/carOwnerAutoShops";
+import type { CarOwnerCustomerRequest } from "../../types/carOwnerApprovals";
 import type { CarOwnerJobCard } from "../../types/carOwnerJobCards";
 import {
   notificationDisplay,
   type CarOwnerNotification,
 } from "../../types/carOwnerNotifications";
 import type { ServiceSubItem } from "../../hooks/useOwnerPortal";
+import { formatCustomerRequestDate } from "../../lib/carOwnerApprovals";
 import { isCarOwnerShopOpenToday } from "../../lib/carOwnerAutoShops";
 import type { VehicleDocumentFieldKey } from "../../lib/carOwnerDocuments";
 import type { DummyOwnerServiceRequest } from "../../lib/dummyOwnerMessages";
@@ -635,6 +637,87 @@ export function OwnerNotificationsTable({ rows }: OwnerNotificationsTableProps) 
                   </td>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>
                     {notificationStatusLabel(item)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
+  );
+}
+
+type OwnerCustomerRequestsTableProps = {
+  rows: CarOwnerCustomerRequest[];
+  actingId?: string | null;
+  onApprove: (businessId: string) => void;
+  onReject: (businessId: string) => void;
+};
+
+export function OwnerCustomerRequestsTable({
+  rows,
+  actingId,
+  onApprove,
+  onReject,
+}: OwnerCustomerRequestsTableProps) {
+  return (
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+      className={OWNER_TABLE_SURFACE_CLASS}
+    >
+      <div className="overflow-x-auto">
+        <table className={OWNER_PANEL_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Shop</th>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>City</th>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Requested</th>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Name</th>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Email</th>
+              <th className={OWNER_TABLE_HEAD_TH_CLASS}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => {
+              const busy = actingId === row.businessId;
+              const edit = row.pendingEdit;
+              return (
+                <tr key={row.businessId} className={adminPanelRowClass(index)}>
+                  <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-200 bg-white">
+                        {row.businessLogo ? (
+                          <img src={row.businessLogo} alt="" className="h-full w-full object-cover" />
+                        ) : null}
+                      </div>
+                      <span className="font-semibold text-gray-900">{row.businessName}</span>
+                    </div>
+                  </td>
+                  <td className={OWNER_TABLE_BODY_TD_CLASS}>{row.city.trim() || "—"}</td>
+                  <td className={OWNER_TABLE_BODY_TD_CLASS}>{formatCustomerRequestDate(row.addedAt)}</td>
+                  <td className={OWNER_TABLE_BODY_TD_CLASS}>{edit?.name?.trim() || "—"}</td>
+                  <td className={OWNER_TABLE_BODY_TD_CLASS}>{edit?.email?.trim() || "—"}</td>
+                  <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={Boolean(actingId)}
+                        onClick={() => onApprove(row.businessId)}
+                        className="rounded bg-[#008000] px-3 py-1 text-xs font-bold text-white hover:brightness-95 disabled:opacity-50"
+                      >
+                        {busy ? "…" : "Approve"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(actingId)}
+                        onClick={() => onReject(row.businessId)}
+                        className="rounded bg-red-600 px-3 py-1 text-xs font-bold text-white hover:brightness-95 disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

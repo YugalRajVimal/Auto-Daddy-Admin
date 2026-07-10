@@ -54,7 +54,9 @@ import {
 import {
   filterServicesByShopType,
   getShopTypeLabel,
+  getShopTypeLabels,
   normalizeShopType,
+  normalizeShopTypes,
   SHOP_TYPE_OPTIONS,
   type ShopType,
 } from "../../../lib/shopTypes";
@@ -536,11 +538,13 @@ export function ShopBusinessProfileEditor({
   business,
   zipCode,
   shopType: initialShopType,
+  shopTypes: initialShopTypes,
   onSaved,
 }: {
   business?: ShopProfileBusiness;
   zipCode?: string;
   shopType?: string;
+  shopTypes?: string[];
   onSaved: () => void;
 }) {
   const { token, session } = useAuth();
@@ -554,9 +558,11 @@ export function ShopBusinessProfileEditor({
   const [email, setEmail] = useState(business?.email ?? "");
   const [hst, setHst] = useState(business?.hstNumber ?? "");
   const [tax, setTax] = useState(business?.gstPercent != null ? String(business.gstPercent) : "");
-  const [shopType, setShopType] = useState<ShopType>(() =>
-    normalizeShopType(initialShopType ?? business?.shopType)
+  const [shopTypes, setShopTypes] = useState<ShopType[]>(() =>
+    normalizeShopTypes(initialShopTypes ?? business?.shopTypes ?? initialShopType ?? business?.shopType)
   );
+  const [shopTypesOpen, setShopTypesOpen] = useState(false);
+  const shopTypesRef = useRef<HTMLDivElement>(null);
   const [showUploadImage, setShowUploadImage] = useState(false);
   const [logo, setLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -595,7 +601,10 @@ export function ShopBusinessProfileEditor({
     setEmail(business?.email ?? "");
     setHst(business?.hstNumber ?? "");
     setTax(business?.gstPercent != null ? String(business.gstPercent) : "");
-    setShopType(normalizeShopType(initialShopType ?? business?.shopType));
+    setShopTypes(
+      normalizeShopTypes(initialShopTypes ?? business?.shopTypes ?? initialShopType ?? business?.shopType)
+    );
+    setShopTypesOpen(false);
     setShowUploadImage(false);
     setLogo(null);
   };
@@ -603,6 +612,34 @@ export function ShopBusinessProfileEditor({
   const reset = () => {
     syncFromBusiness();
   };
+
+  const toggleShopType = (value: ShopType) => {
+    setShopTypes((prev) => {
+      if (prev.includes(value)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((type) => type !== value);
+      }
+      return [...prev, value];
+    });
+  };
+
+  useEffect(() => {
+    if (!shopTypesOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!shopTypesRef.current?.contains(event.target as Node)) {
+        setShopTypesOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShopTypesOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [shopTypesOpen]);
 
   useEffect(() => {
     syncFromBusiness();
@@ -615,8 +652,10 @@ export function ShopBusinessProfileEditor({
     business?.hstNumber,
     business?.gstPercent,
     business?.shopType,
+    business?.shopTypes,
     business?.businessLogo,
     initialShopType,
+    initialShopTypes,
     zipCode,
   ]);
 
@@ -645,6 +684,10 @@ export function ShopBusinessProfileEditor({
 
   const handleUpdate = async () => {
     if (!token) return;
+    if (shopTypes.length === 0) {
+      toast.error("Select at least one business type.");
+      return;
+    }
     setSaving(true);
     try {
       const res = await updateBusinessProfile(token, {
@@ -656,7 +699,7 @@ export function ShopBusinessProfileEditor({
         businessEmail: email.trim(),
         businessHSTNumber: hst.trim(),
         gst: tax.trim() || "0",
-        shopTypes: shopType ? [shopType] : [],
+        shopTypes,
         businessLogo: logo,
       });
       if (!res.ok) {
@@ -767,7 +810,7 @@ export function ShopBusinessProfileEditor({
             />
           </CompactField>
         </CompactFormRow>
-        <CompactFormRow className="items-start" columns={4}>
+        <CompactFormRow className={`${BUSINESS_PROFILE_FIELD_GRID} items-start`}>
           <div className="min-w-0 w-full">
             <ProfileImageUploadField
               id="shop-business-upload-image"
@@ -785,6 +828,50 @@ export function ShopBusinessProfileEditor({
               }}
             />
           </div>
+          <div className="hidden lg:block" aria-hidden />
+          <div className="hidden lg:block" aria-hidden />
+          <CompactField label="Business Types">
+            <div ref={shopTypesRef} className="relative min-w-0 w-full">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setShopTypesOpen((open) => !open)}
+                className={`${shopCompactInputClass} flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:bg-gray-100`}
+                aria-expanded={shopTypesOpen}
+                aria-haspopup="listbox"
+              >
+                <span className="truncate">{getShopTypeLabels(shopTypes)}</span>
+                <span className="ml-2 shrink-0 text-[10px] text-gray-500">
+                  {shopTypesOpen ? "▲" : "▼"}
+                </span>
+              </button>
+              {shopTypesOpen && !saving ? (
+                <div className="absolute left-0 right-0 z-50 mt-0.5 overflow-hidden rounded border border-gray-400 bg-white shadow-lg">
+                  {SHOP_TYPE_OPTIONS.map((option) => {
+                    const checked = shopTypes.includes(option.value);
+                    const inputId = `shop-business-type-${option.value}`;
+                    return (
+                      <label
+                        key={option.value}
+                        htmlFor={inputId}
+                        className="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-3 py-2 text-xs font-bold text-ad-green-dark last:border-b-0 hover:bg-gray-50"
+                      >
+                        <input
+                          id={inputId}
+                          type="checkbox"
+                          checked={checked}
+                          disabled={checked && shopTypes.length === 1}
+                          onChange={() => toggleShopType(option.value)}
+                          className="h-3.5 w-3.5 accent-ad-green"
+                        />
+                        {option.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          </CompactField>
         </CompactFormRow>
       </div>
     </CompactFormPanel>

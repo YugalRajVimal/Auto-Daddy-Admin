@@ -4,6 +4,7 @@ import useAuth from "../../auth/useAuth";
 import { ownerPrimaryNav } from "../../config/ownerNav";
 import { OwnerPageChromeProvider } from "../../context/OwnerPageChromeContext";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
+import { Navigate } from "react-router";
 
 function OwnerLayoutContent() {
   const { profile, session } = useAuth();
@@ -12,6 +13,10 @@ function OwnerLayoutContent() {
   const city = profile?.city?.trim();
   const displayName = name || loginAs || "Car Owner";
   const headerAvatarSrc = normalizeMediaUrl(profile?.profilePhoto ?? null);
+
+  if (session?.meta?.isProfileComplete === false) {
+    return <Navigate to="/owner/onboarding" replace />;
+  }
 
   return (
     <OwnerPortalShell

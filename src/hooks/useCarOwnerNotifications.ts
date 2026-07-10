@@ -64,7 +64,8 @@ export function useCarOwnerNotifications() {
       if (!res.ok) {
         if (mode === "replace") {
           setItems([]);
-          setError("Could not load notifications.");
+          // Endpoint may be missing on older API deploys — treat as empty, not a hard failure.
+          setError(res.status === 404 ? null : "Could not load notifications.");
         }
         setLoading(false);
         setLoadingMore(false);

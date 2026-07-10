@@ -12,9 +12,10 @@ function authHeader(token: string | null | undefined): Record<string, string> {
 function shouldDebug(): boolean {
   if (!import.meta.env.DEV) return false;
   try {
-    return window.localStorage.getItem("debug:api") === "1";
+    // Off only when explicitly disabled: localStorage.setItem("debug:api", "0")
+    return window.localStorage.getItem("debug:api") !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 

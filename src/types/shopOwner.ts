@@ -111,6 +111,8 @@ export type ShopProfileBusiness = {
   businessHSTNumber?: string;
   gstPercent?: number | string;
   shopType?: string;
+  /** Multiple business types when the shop offers more than one specialty. */
+  shopTypes?: string[];
   websiteTemplateId?: string;
 };
 

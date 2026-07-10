@@ -157,7 +157,7 @@ export default function ShopPortalShell({
                 ) : null}
               </button>
               {headerLogo ? (
-                <Link to={homePath} className="shrink-0">
+                <Link to={profilePath} className="shrink-0" aria-label="Open profile">
                   {headerLogo}
                 </Link>
               ) : null}
