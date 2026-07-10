@@ -1,6 +1,9 @@
 import type { CarOwnerVehicle } from "../../lib/carOwnerVehicles";
 import { resolveCarBrandLogo } from "../../lib/dummyCarBrands";
-import { shopMainContentFillClass, shopMainContentShellClass } from "../shop/shopLayoutStyles";
+import { shopMainContentFillClass } from "../shop/shopLayoutStyles";
+
+const panelShellClass =
+  "flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg bg-white";
 
 function formatUpdatedOn(value: string | null | undefined): string | null {
   const raw = value?.trim();
@@ -70,8 +73,8 @@ export default function OwnerOdometerVehiclePicker({
   const activeVehicles = vehicles.filter((v) => !v.disabled);
 
   return (
-    <div className={`flex flex-col overflow-hidden ${shopMainContentShellClass} ${shopMainContentFillClass}`}>
-      <div className="bg-ad-purple px-4 py-3 text-center">
+    <div className={`${panelShellClass} ${shopMainContentFillClass}`}>
+      <div className="shrink-0 bg-ad-purple px-4 py-3 text-center">
         <h2 className="font-serif text-base font-bold text-white md:text-lg">
           Update Odometer of Your Vehicle
         </h2>

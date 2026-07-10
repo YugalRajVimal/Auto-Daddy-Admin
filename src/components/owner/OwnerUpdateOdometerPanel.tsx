@@ -13,7 +13,11 @@ import {
 import type { CarOwnerVehicle } from "../../lib/carOwnerVehicles";
 import OwnerOdometerVehiclePicker from "./OwnerOdometerVehiclePicker";
 import { Skeleton } from "../common/Skeleton";
-import { shopMainContentFillClass, shopMainContentShellClass } from "../shop/shopLayoutStyles";
+import { shopMainContentFillClass } from "../shop/shopLayoutStyles";
+
+/** Fill parent height so the save footer is not clipped by nested layout chrome. */
+const panelShellClass =
+  "flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg bg-white";
 
 const readOnlyFieldClass =
   "flex h-[30px] w-full items-center border border-gray-400 bg-white px-2 text-sm text-gray-800";
@@ -114,12 +118,12 @@ function OdometerVehicleForm({
   const plate = vehiclePlateLabel(vehicle);
 
   return (
-    <div className={`flex flex-col overflow-hidden ${shopMainContentShellClass} ${shopMainContentFillClass}`}>
-      <div className="bg-ad-purple px-4 py-2.5 text-center">
+    <div className={`${panelShellClass} ${shopMainContentFillClass}`}>
+      <div className="shrink-0 bg-ad-purple px-4 py-2.5 text-center">
         <h2 className="font-serif text-base font-bold text-white md:text-lg">Update Odometer - {plate}</h2>
       </div>
 
-      <div className="flex items-center justify-end border-b border-gray-200 bg-white px-4 py-2">
+      <div className="flex shrink-0 items-center justify-end border-b border-gray-200 bg-white px-4 py-2">
         <button
           type="button"
           onClick={onBack}
@@ -130,7 +134,7 @@ function OdometerVehicleForm({
         </button>
       </div>
 
-      <div className="bg-ad-form-bg px-4 py-4 md:px-6 md:py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-ad-form-bg px-4 py-4 md:px-6 md:py-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="min-w-0">
             <label htmlFor="owner-odometer-current" className="mb-1 block text-sm font-semibold text-gray-900">
@@ -184,7 +188,7 @@ function OdometerVehicleForm({
         {validationError ? <p className="mt-3 text-xs text-red-600">{validationError}</p> : null}
       </div>
 
-      <div className="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-4 py-2.5 md:px-6">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-4 py-2.5 md:px-6">
         <button
           type="button"
           disabled={!canSave}
@@ -232,7 +236,7 @@ export default function OwnerUpdateOdometerPanel({
 
   if (loading) {
     return (
-      <div className={`${shopMainContentShellClass} ${shopMainContentFillClass} p-6`}>
+      <div className={`${panelShellClass} ${shopMainContentFillClass} p-6`}>
         <Skeleton className="mb-4 h-10 w-full rounded" />
         <Skeleton className="h-32 w-full rounded" />
       </div>
@@ -241,7 +245,7 @@ export default function OwnerUpdateOdometerPanel({
 
   if (error) {
     return (
-      <div className={`${shopMainContentShellClass} flex items-center justify-center p-6 text-sm text-gray-600`}>
+      <div className={`${panelShellClass} flex items-center justify-center p-6 text-sm text-gray-600`}>
         {error}
       </div>
     );
@@ -249,7 +253,7 @@ export default function OwnerUpdateOdometerPanel({
 
   if (activeVehicles.length === 0) {
     return (
-      <div className={`${shopMainContentShellClass} flex flex-col items-center justify-center gap-3 p-6 text-center`}>
+      <div className={`${panelShellClass} flex flex-col items-center justify-center gap-3 p-6 text-center`}>
         <p className="text-sm text-gray-600">Add a vehicle before updating the odometer.</p>
         <button
           type="button"

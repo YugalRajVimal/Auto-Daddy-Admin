@@ -9,7 +9,7 @@ import { useCarOwnerAutoShops } from "../../hooks/useCarOwnerAutoShops";
 import { useCarOwnerFavoriteShops } from "../../hooks/useCarOwnerFavoriteShops";
 import type { ServiceCategory } from "../../hooks/useOwnerPortal";
 import { isCarOwnerShopOpenToday } from "../../lib/carOwnerAutoShops";
-import { getCarBrandId, getCarBrandName, mergeCarBrandCatalog } from "../../lib/dummyCarBrands";
+import { getCarBrandId, getCarBrandName } from "../../lib/dummyCarBrands";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import type { OwnerShopType } from "../../lib/serviceCatalog";
 import type { CarOwnerAutoShopListItem } from "../../types/carOwnerAutoShops";
@@ -35,8 +35,8 @@ function serviceShopTypeParam(shopType?: OwnerShopType): string | null {
   }
 }
 
-function resolveServiceFilterId(service: ServiceCategory, selectedSubServiceId?: string | null): string | null {
-  if (selectedSubServiceId?.trim()) return selectedSubServiceId.trim();
+/** Backend filters `service` by main category id (not sub-service id). */
+function resolveServiceFilterId(service: ServiceCategory): string | null {
   if (service.id?.trim()) return service.id.trim();
   return null;
 }
@@ -152,18 +152,31 @@ export default function OwnerDashboardServicePanel({
   const [connectingServiceKey, setConnectingServiceKey] = useState<string | null>(null);
   const [sentServiceKeys, setSentServiceKeys] = useState<Record<string, boolean>>({});
 
-  const serviceFilterId = resolveServiceFilterId(service, selectedSubServiceId);
+  const serviceFilterId = resolveServiceFilterId(service);
   const serviceLabel = service.name.trim() || "Service";
   const brandId = selectedBrand ? getCarBrandId(selectedBrand) : null;
   const brandLabel = selectedBrand ? getCarBrandName(selectedBrand) : "";
 
+  const searchLabel = useMemo(() => {
+    if (selectedSubServiceId?.trim()) {
+      const sub = service.subServices.find(
+        (item) => (item.id ?? item.name) === selectedSubServiceId.trim()
+      );
+      if (sub?.name?.trim()) return sub.name.trim();
+    }
+    return service.name.trim() || null;
+  }, [selectedSubServiceId, service.name, service.subServices]);
+
+  // GET /api/user/auto-shops?search=&service=&carCompanies=&shopType=
   const shopFilters = useMemo(
     () => ({
       serviceIds: serviceFilterId ? [serviceFilterId] : [],
       carCompanyIds: brandId ? [brandId] : [],
       shopType: serviceShopTypeParam(service.shopType),
+      search: searchLabel,
+      enabled: Boolean(brandId),
     }),
-    [brandId, service.shopType, serviceFilterId]
+    [brandId, searchLabel, service.shopType, serviceFilterId]
   );
 
   const { shops, loading: shopsLoading, error: shopsError, refresh } = useCarOwnerAutoShops(shopFilters);
@@ -200,7 +213,7 @@ export default function OwnerDashboardServicePanel({
 
   useEffect(() => {
     if (!token) {
-      setBrands(mergeCarBrandCatalog([]));
+      setBrands([]);
       setBrandsLoading(false);
       return;
     }
@@ -209,7 +222,9 @@ export default function OwnerDashboardServicePanel({
     (async () => {
       setBrandsLoading(true);
       try {
+        // GET /api/user/car-companies (optional ?companyName=)
         const res = await getJson<{
+          success?: boolean;
           data?: Array<{
             _id?: string;
             companyName?: string;
@@ -220,20 +235,28 @@ export default function OwnerDashboardServicePanel({
 
         if (cancelled) return;
 
-        const rows = Array.isArray(res.data?.data) ? res.data.data : [];
-        const apiBrands: ShopCarCompany[] = rows
-          .filter((row) => Boolean(row.companyName?.trim()))
-          .map((row) => ({
-            _id: row._id,
-            companyName: row.companyName,
-            brandLogo: row.brandLogo,
-            logoUrl: row.logoUrl,
-          }));
+        if (!res.ok || res.data?.success === false) {
+          setBrands([]);
+          return;
+        }
 
-        const catalog = mergeCarBrandCatalog(apiBrands).sort((a, b) =>
-          getCarBrandName(a).localeCompare(getCarBrandName(b), undefined, { sensitivity: "base" })
-        );
+        const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+        const catalog = rows
+          .filter((row) => Boolean(row._id?.trim()) && Boolean(row.companyName?.trim()))
+          .map(
+            (row): ShopCarCompany => ({
+              _id: row._id,
+              companyName: row.companyName,
+              brandLogo: row.brandLogo,
+              logoUrl: row.logoUrl,
+            })
+          )
+          .sort((a, b) =>
+            getCarBrandName(a).localeCompare(getCarBrandName(b), undefined, { sensitivity: "base" })
+          );
         setBrands(catalog);
+      } catch {
+        if (!cancelled) setBrands([]);
       } finally {
         if (!cancelled) setBrandsLoading(false);
       }
@@ -332,6 +355,7 @@ export default function OwnerDashboardServicePanel({
               onToggleFavorite={() => void handleToggleFavorite(expandedShop.id)}
               onCollapse={handleCollapseShop}
               onConnect={(serviceId, serviceName) => void handleConnect(serviceId, serviceName)}
+              onRated={() => void refresh()}
             />
           </DashboardPanelCard>
         ) : shopsLoading ? (

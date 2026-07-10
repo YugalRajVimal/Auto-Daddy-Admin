@@ -35,14 +35,7 @@ import {
 import { fetchMyServices } from "../../lib/shopOwnerApi";
 import { parseMyServices } from "../../lib/shopOwnerParsers";
 import { addMyService, fetchAdminServices } from "../../lib/autoshopownerApi";
-import {
-  buildSelectedBrandIds,
-  getCarBrandId,
-  getCarBrandName,
-  getSelectedCarBrands,
-  isDummyCarBrandId,
-  mergeCarBrandCatalog,
-} from "../../lib/dummyCarBrands";
+import { getCarBrandId, getCarBrandName } from "../../lib/dummyCarBrands";
 import {
   getInitialProfileServiceIds,
   getServiceId,
@@ -108,7 +101,34 @@ function parseCompanies(payload: unknown): ShopCarCompany[] {
   const root = payload as Record<string, unknown>;
   const data = root.data;
   const arr = Array.isArray(data) ? data : Array.isArray(root.companies) ? root.companies : [];
-  return arr as ShopCarCompany[];
+  return (arr as ShopCarCompany[]).filter((c) => Boolean(getCarBrandId(c) && getCarBrandName(c) !== "—"));
+}
+
+/** Selected specialist brands live on the business profile (`carCompanies` / legacy `myCarCompanies`). */
+function extractBusinessCarCompanyIds(business: unknown): string[] {
+  if (!business || typeof business !== "object") return [];
+  const raw =
+    (business as Record<string, unknown>).carCompanies ??
+    (business as Record<string, unknown>).myCarCompanies;
+  if (!Array.isArray(raw)) return [];
+  const ids: string[] = [];
+  for (const item of raw) {
+    if (typeof item === "string" && item.trim()) {
+      ids.push(item.trim());
+      continue;
+    }
+    if (item && typeof item === "object") {
+      const obj = item as Record<string, unknown>;
+      const id =
+        typeof obj._id === "string"
+          ? obj._id
+          : typeof obj.id === "string"
+            ? obj.id
+            : "";
+      if (id.trim()) ids.push(id.trim());
+    }
+  }
+  return Array.from(new Set(ids));
 }
 
 function AddNewButton({ onClick }: { onClick: () => void }) {
@@ -149,7 +169,6 @@ export default function ShopProfilePage() {
   const [brandsLoading, setBrandsLoading] = useState(false);
   const [savingBrand, setSavingBrand] = useState<string | null>(null);
   const [showAddBrand, setShowAddBrand] = useState(false);
-  const [usingDummyBrands, setUsingDummyBrands] = useState(false);
   const [fullServiceCatalog, setFullServiceCatalog] = useState<ShopServiceCategory[]>([]);
   const [myServices, setMyServices] = useState<ShopServiceCategory[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
@@ -193,30 +212,34 @@ export default function ShopProfilePage() {
   useEffect(() => {
     if (activeId !== "brands") return;
 
-    const applyCatalog = (apiList: ShopCarCompany[]) => {
-      const catalog = mergeCarBrandCatalog(apiList);
-      const apiSelectedIds = apiList
-        .filter((c) => (c as { selected?: boolean }).selected)
-        .map((c) => getCarBrandId(c))
-        .filter(Boolean);
-
-      setCarCompanies(catalog);
-      setSelectedBrands(buildSelectedBrandIds(catalog, apiSelectedIds));
-      setUsingDummyBrands(apiList.length === 0);
-      setBrandsLoading(false);
-    };
-
     setBrandsLoading(true);
     if (!token) {
-      applyCatalog([]);
+      setCarCompanies([]);
+      setSelectedBrands(new Set());
+      setBrandsLoading(false);
       return;
     }
 
+    let cancelled = false;
     void fetchMainCarCompanies(token).then((res) => {
+      if (cancelled) return;
       const apiList = res.ok ? parseCompanies(res.data) : [];
-      applyCatalog(apiList);
+      const catalog = [...apiList].sort((a, b) =>
+        getCarBrandName(a).localeCompare(getCarBrandName(b), undefined, { sensitivity: "base" })
+      );
+      setCarCompanies(catalog);
+      setBrandsLoading(false);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeId, token]);
+
+  useEffect(() => {
+    if (activeId !== "brands") return;
+    setSelectedBrands(new Set(extractBusinessCarCompanyIds(business)));
+  }, [activeId, business]);
 
   useEffect(() => {
     if (activeId !== "services") return;
@@ -302,7 +325,10 @@ export default function ShopProfilePage() {
     };
   }, [activeId, servicesCatalogLoading, token]);
 
-  const selectedBrandList = getSelectedCarBrands(carCompanies, selectedBrands);
+  const selectedBrandList = useMemo(
+    () => carCompanies.filter((company) => selectedBrands.has(getCarBrandId(company))),
+    [carCompanies, selectedBrands]
+  );
   const selectedServiceList = useMemo(
     () => resolveProfileSelectedServices(fullServiceCatalog, myServices, selectedServiceIds),
     [fullServiceCatalog, myServices, selectedServiceIds]
@@ -353,31 +379,12 @@ export default function ShopProfilePage() {
   };
 
   const toggleBrand = async (id: string, next: boolean) => {
-    if (!next && isDummyCarBrandId(id)) {
-      setSelectedBrands((prev) => {
-        const copy = new Set(prev);
-        copy.delete(id);
-        return copy;
-      });
-      return;
-    }
-    if (usingDummyBrands || isDummyCarBrandId(id)) {
-      setSavingBrand(id);
-      setSelectedBrands((prev) => {
-        const copy = new Set(prev);
-        if (next) copy.add(id);
-        else copy.delete(id);
-        return copy;
-      });
-      setSavingBrand(null);
-      return;
-    }
-    if (!token) return;
+    if (!token || !id.trim()) return;
     setSavingBrand(id);
     try {
       const res = next ? await addMyCarCompanies(token, [id]) : await removeMyCarCompanies(token, [id]);
       if (!res.ok) {
-        toast.error("Could not update.");
+        toast.error(apiMessage(res.data) || "Could not update.");
         return;
       }
       setSelectedBrands((prev) => {
@@ -486,23 +493,9 @@ export default function ShopProfilePage() {
               <ShopCarBrandAddEditor
                 companies={carCompanies}
                 selectedIds={selectedBrands}
-                onSaveBrand={
-                  usingDummyBrands
-                    ? (id) => {
-                      setSelectedBrands((prev) => new Set([...prev, id]));
-                      return true;
-                    }
-                    : (id) => {
-                      if (!isDummyCarBrandId(id)) return false;
-                      setSelectedBrands((prev) => new Set([...prev, id]));
-                      return true;
-                    }
-                }
                 onSaved={(id) => {
-                  if (!usingDummyBrands) {
-                    setSelectedBrands((prev) => new Set([...prev, id]));
-                    void refresh();
-                  }
+                  setSelectedBrands((prev) => new Set([...prev, id]));
+                  void refresh();
                   setShowAddBrand(false);
                 }}
                 onClose={() => setShowAddBrand(false)}
