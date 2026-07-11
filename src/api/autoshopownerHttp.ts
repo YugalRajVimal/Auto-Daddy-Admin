@@ -87,6 +87,26 @@ export async function putJsonAutoshopowner<T>(
   return out;
 }
 
+export async function patchJsonAutoshopowner<T>(
+  path: string,
+  body: Record<string, unknown>,
+  token: string,
+) {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeader(token),
+    },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => null)) as T | null;
+  const out = { ok: res.ok, status: res.status, data };
+  debugLog("PATCH", url, body, out);
+  return out;
+}
+
 export async function deleteJsonAutoshopowner<T>(
   path: string,
   token: string,

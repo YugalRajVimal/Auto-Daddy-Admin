@@ -1,6 +1,7 @@
 import {
   deleteJsonAutoshopowner,
   getJsonAutoshopowner,
+  patchJsonAutoshopowner,
   postJsonAutoshopowner,
   putFormAutoshopowner,
   putJsonAutoshopowner,
@@ -74,6 +75,25 @@ export function updateBusinessProfile(token: string, fields: BusinessProfileFiel
   }
   if (fields.businessLogo) fd.append("businessLogo", fields.businessLogo);
   return putFormAutoshopowner<ApiEnvelope>("/api/autoshopowner/profile/business", fd, token);
+}
+
+export type TemplateSlugsFields = {
+  invoiceTemplateSlug?: string;
+  jobCardTemplateSlug?: string;
+};
+
+/** PATCH /api/autoshopowner/profile/business/template-slugs — partial body supported. */
+export function updateTemplateSlugs(token: string, fields: TemplateSlugsFields) {
+  const body: Record<string, string> = {};
+  const invoice = fields.invoiceTemplateSlug?.trim();
+  const jobCard = fields.jobCardTemplateSlug?.trim();
+  if (invoice) body.invoiceTemplateSlug = invoice;
+  if (jobCard) body.jobCardTemplateSlug = jobCard;
+  return patchJsonAutoshopowner<ApiEnvelope>(
+    "/api/autoshopowner/profile/business/template-slugs",
+    body,
+    token,
+  );
 }
 
 // ---- Services ----

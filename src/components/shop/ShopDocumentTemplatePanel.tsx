@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import {
   shopCompactInputClass,
@@ -11,19 +11,20 @@ export type ShopDocumentTemplate = {
   description: string;
 };
 
+/** Catalog ids must match API `invoiceTemplateSlug` / `jobCardTemplateSlug` values. */
 export const DUMMY_INVOICE_TEMPLATES: ShopDocumentTemplate[] = [
   {
-    id: "inv-1",
+    id: "classic-invoice-v1",
     name: "Invoice Template - 1",
     description: "Classic layout with HST breakdown and payment status chip.",
   },
   {
-    id: "inv-2",
+    id: "modern-invoice-v2",
     name: "Invoice Template - 2",
     description: "Compact single-page invoice with service line items.",
   },
   {
-    id: "inv-3",
+    id: "detailed-invoice-v1",
     name: "Invoice Template - 3",
     description: "Detailed invoice with customer address and round-off row.",
   },
@@ -31,21 +32,31 @@ export const DUMMY_INVOICE_TEMPLATES: ShopDocumentTemplate[] = [
 
 export const DUMMY_JOB_CARD_TEMPLATES: ShopDocumentTemplate[] = [
   {
-    id: "jc-1",
+    id: "classic-jobcard-v1",
     name: "Job Card Template - 1",
     description: "Standard work order with vehicle details and labour rows.",
   },
   {
-    id: "jc-2",
+    id: "modern-jobcard-v1",
     name: "Job Card Template - 2",
     description: "Compact job card with service checklist layout.",
   },
   {
-    id: "jc-3",
+    id: "compact-jobcard-v1",
     name: "Job Card Template - 3",
     description: "Job card with vehicle photo strip and terms block.",
   },
 ];
+
+export function resolveTemplateSlug(
+  templates: ShopDocumentTemplate[],
+  slug: string | undefined | null,
+  fallback = templates[0]?.id ?? "",
+): string {
+  const value = typeof slug === "string" ? slug.trim() : "";
+  if (value && templates.some((template) => template.id === value)) return value;
+  return fallback;
+}
 
 const checkboxBoxClass =
   "inline-block border border-gray-300 bg-gray-100 px-2 py-0.5 text-xs text-gray-800";
@@ -138,7 +149,8 @@ type ShopDocumentTemplatePanelProps = {
   isActive: boolean;
   onToggleActive: (active: boolean) => void;
   savedId: string;
-  onSave: (id: string) => void;
+  /** Return `true` when save succeeded (panel shows success toast). */
+  onSave: (id: string) => boolean | Promise<boolean>;
 };
 
 export default function ShopDocumentTemplatePanel({
@@ -151,6 +163,7 @@ export default function ShopDocumentTemplatePanel({
   savedId,
   onSave,
 }: ShopDocumentTemplatePanelProps) {
+  const [saving, setSaving] = useState(false);
   const selectedTemplate = useMemo(
     () => templates.find((template) => template.id === selectedId) ?? null,
     [selectedId, templates],
@@ -158,13 +171,18 @@ export default function ShopDocumentTemplatePanel({
   const label = kind === "invoice" ? "Invoice Template" : "Job Card Template";
   const hasChanges = selectedId !== savedId;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedId) {
       toast.error(`Select a ${label.toLowerCase()} first.`);
       return;
     }
-    onSave(selectedId);
-    toast.success(`${label} saved.`);
+    setSaving(true);
+    try {
+      const ok = await onSave(selectedId);
+      if (ok) toast.success(`${label} saved.`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -182,7 +200,7 @@ export default function ShopDocumentTemplatePanel({
         <select
           value={selectedId}
           onChange={(e) => onSelect(e.target.value)}
-          disabled={templates.length === 0}
+          disabled={templates.length === 0 || saving}
           className={`min-w-[220px] flex-1 ${shopCompactInputClass}`}
         >
           {templates.length === 0 ? (
@@ -217,11 +235,11 @@ export default function ShopDocumentTemplatePanel({
         </div>
         <button
           type="button"
-          onClick={handleSave}
-          disabled={!hasChanges || !selectedId}
+          onClick={() => void handleSave()}
+          disabled={!hasChanges || !selectedId || saving}
           className={templateSaveButtonClass}
         >
-          Save
+          {saving ? "Saving…" : "Save"}
         </button>
       </div>
     </div>

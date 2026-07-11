@@ -1,4 +1,5 @@
 import {
+  getJsonAutoshopowner,
   postJsonAutoshopowner,
   putJsonAutoshopowner,
 } from "../api/autoshopownerHttp";
@@ -19,6 +20,11 @@ export type EditDomainDetailsInput = {
   status?: string;
 };
 
+/** GET /api/autoshops/domain-details/get */
+export function fetchDomainDetails(token: string) {
+  return getJsonAutoshopowner<unknown>("/api/autoshops/domain-details/get", token);
+}
+
 /** POST /api/autoshopowner/domain-details/add */
 export function addDomainDetails(token: string, body: DomainDetailsInput) {
   return postJsonAutoshopowner<ApiEnvelope>("/api/autoshopowner/domain-details/add", body, token);
@@ -36,7 +42,12 @@ function obj(v: unknown): Record<string, unknown> | null {
 function toDomainForm(raw: unknown): DomainDetailsInput | null {
   const o = obj(raw);
   if (!o) return null;
-  const domainName = typeof o.domainName === "string" ? o.domainName.trim() : "";
+  const domainName =
+    typeof o.domainName === "string"
+      ? o.domainName.trim()
+      : typeof o.domain === "string"
+        ? o.domain.trim()
+        : "";
   if (!domainName) return null;
   const expiryDate =
     typeof o.expiryDate === "string"
@@ -45,9 +56,50 @@ function toDomainForm(raw: unknown): DomainDetailsInput | null {
         ? o.expiry.slice(0, 10)
         : "";
   const provider = typeof o.provider === "string" ? o.provider.trim() : "";
-  const rawStatus = typeof o.status === "string" ? o.status.trim().toLowerCase() : "";
+  const rawStatus =
+    typeof o.status === "string"
+      ? o.status.trim().toLowerCase()
+      : typeof o.domainType === "string"
+        ? o.domainType.trim().toLowerCase()
+        : "";
   const status = rawStatus === "new" ? "New" : "Existing";
   return { domainName, expiryDate, provider, status };
+}
+
+/** Parses GET /api/autoshops/domain-details/get response shapes. */
+export function parseDomainDetailsResponse(payload: unknown): DomainDetailsInput | null {
+  const envelope = obj(payload);
+  if (!envelope) return null;
+
+  const nested = envelope.data;
+  if (Array.isArray(nested) && nested.length > 0) {
+    const parsed = toDomainForm(nested[0]);
+    if (parsed) return parsed;
+  }
+
+  const nestedObj = obj(nested);
+  if (nestedObj) {
+    const list =
+      (Array.isArray(nestedObj.domainDetails) && nestedObj.domainDetails) ||
+      (Array.isArray(nestedObj.domains) && nestedObj.domains) ||
+      null;
+    if (list && list.length > 0) {
+      const parsed = toDomainForm(list[0]);
+      if (parsed) return parsed;
+    }
+    const fromNested =
+      toDomainForm(nestedObj.domainDetails) ||
+      toDomainForm(nestedObj.domain) ||
+      toDomainForm(nestedObj);
+    if (fromNested) return fromNested;
+  }
+
+  if (Array.isArray(envelope.domainDetails) && envelope.domainDetails.length > 0) {
+    const parsed = toDomainForm(envelope.domainDetails[0]);
+    if (parsed) return parsed;
+  }
+
+  return toDomainForm(envelope.domainDetails) || toDomainForm(envelope);
 }
 
 /** Reads the first saved domain from business profile payload shapes. */

@@ -1714,13 +1714,6 @@ export default function ShopPeoplePage() {
     setEditingCustomer(customer);
   };
 
-  const handleAddToList = (customer: MyCustomer) => {
-    setShowAddForm(false);
-    setEditingCustomer(null);
-    setStatusMessage(null);
-    setDetailView({ kind: "add-to-list", customer });
-  };
-
   const handleShowVehicles = (customer: MyCustomer) => {
     setShowAddForm(false);
     setEditingCustomer(null);

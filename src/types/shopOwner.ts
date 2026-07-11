@@ -115,6 +115,8 @@ export type ShopProfileBusiness = {
   /** Multiple business types when the shop offers more than one specialty. */
   shopTypes?: string[];
   websiteTemplateId?: string;
+  invoiceTemplateSlug?: string;
+  jobCardTemplateSlug?: string;
 };
 
 export type ShopProfileUser = {

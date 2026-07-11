@@ -171,6 +171,15 @@ export function sendAutoshopJobCardForApproval(token: string, jobCardNo: string 
   );
 }
 
+/** Mark a converted invoice as paid. Path param is numeric `jobCardNo`, not Mongo `_id`. */
+export function markAutoshopInvoicePaid(token: string, jobCardNo: string | number) {
+  return postJsonAutoshopowner<ApiEnvelope>(
+    `${BASE}/${encodeURIComponent(String(jobCardNo))}/markInvoicePaid`,
+    {},
+    token,
+  );
+}
+
 export function parseAutoshopJobCardPageDetails(payload: unknown): AutoshopJobCardPageDetails | null {
   if (!payload || typeof payload !== "object") return null;
   const root = payload as Record<string, unknown>;

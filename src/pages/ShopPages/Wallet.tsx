@@ -43,8 +43,8 @@ import {
 import { useMockShopInvoiceLedger } from "../../lib/mockShopInvoiceLedger";
 import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import {
+  markAutoshopInvoicePaid,
   sendAutoshopJobCardForApproval,
-  updateAutoshopJobCardStatus,
 } from "../../lib/autoshopownerJobCardsApi";
 import { isJobCardPaid, pickJobCardInvoiceNumber, pickJobCardNoForApi, type JobCardListRow } from "../../lib/shopOwnerJobCards";
 import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
@@ -1826,7 +1826,7 @@ export default function ShopWalletPage() {
             failed += 1;
             continue;
           }
-          const res = await updateAutoshopJobCardStatus(token!, jobCardNo, "CashPaid");
+          const res = await markAutoshopInvoicePaid(token!, jobCardNo);
           if (!res.ok) failed += 1;
         }
         await syncLedgerData();

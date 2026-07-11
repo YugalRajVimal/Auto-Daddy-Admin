@@ -25,6 +25,7 @@ import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
 import ShopDocumentTemplatePanel, {
   DUMMY_INVOICE_TEMPLATES,
   DUMMY_JOB_CARD_TEMPLATES,
+  resolveTemplateSlug,
 } from "../../components/shop/ShopDocumentTemplatePanel";
 import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
 import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
@@ -40,7 +41,11 @@ import {
 } from "../../lib/shopOwnerMutations";
 import { fetchMyServices } from "../../lib/shopOwnerApi";
 import { parseMyServices } from "../../lib/shopOwnerParsers";
-import { addMyService, fetchAdminServices } from "../../lib/autoshopownerApi";
+import {
+  addMyService,
+  fetchAdminServices,
+  updateTemplateSlugs,
+} from "../../lib/autoshopownerApi";
 import { getCarBrandId, getCarBrandName } from "../../lib/dummyCarBrands";
 import {
   getInitialProfileServiceIds,
@@ -241,6 +246,21 @@ export default function ShopProfilePage() {
   );
   const [numbering, setNumbering] = useState(readStoredNumbering);
   const [manageKind, setManageKind] = useState<NumberingKind | null>(null);
+
+  useEffect(() => {
+    const invoiceSlug = resolveTemplateSlug(
+      DUMMY_INVOICE_TEMPLATES,
+      business?.invoiceTemplateSlug,
+    );
+    const jobCardSlug = resolveTemplateSlug(
+      DUMMY_JOB_CARD_TEMPLATES,
+      business?.jobCardTemplateSlug,
+    );
+    setInvoiceTemplateId(invoiceSlug);
+    setSavedInvoiceTemplateId(invoiceSlug);
+    setJobCardTemplateId(jobCardSlug);
+    setSavedJobCardTemplateId(jobCardSlug);
+  }, [business?.invoiceTemplateSlug, business?.jobCardTemplateSlug]);
 
   const shopTypes = useMemo(
     () =>
@@ -701,7 +721,20 @@ export default function ShopProfilePage() {
             isActive={invoiceTemplateActive}
             onToggleActive={setInvoiceTemplateActive}
             savedId={savedInvoiceTemplateId}
-            onSave={setSavedInvoiceTemplateId}
+            onSave={async (id) => {
+              if (!token) {
+                toast.error("Sign in to save template.");
+                return false;
+              }
+              const res = await updateTemplateSlugs(token, { invoiceTemplateSlug: id });
+              if (!res.ok) {
+                toast.error(apiMessage(res.data) || "Could not save invoice template.");
+                return false;
+              }
+              setSavedInvoiceTemplateId(id);
+              void refresh();
+              return true;
+            }}
           />
         );
       case "job-card-templates":
@@ -714,7 +747,20 @@ export default function ShopProfilePage() {
             isActive={jobCardTemplateActive}
             onToggleActive={setJobCardTemplateActive}
             savedId={savedJobCardTemplateId}
-            onSave={setSavedJobCardTemplateId}
+            onSave={async (id) => {
+              if (!token) {
+                toast.error("Sign in to save template.");
+                return false;
+              }
+              const res = await updateTemplateSlugs(token, { jobCardTemplateSlug: id });
+              if (!res.ok) {
+                toast.error(apiMessage(res.data) || "Could not save job card template.");
+                return false;
+              }
+              setSavedJobCardTemplateId(id);
+              void refresh();
+              return true;
+            }}
           />
         );
       case "team":

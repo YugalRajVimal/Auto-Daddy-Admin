@@ -24,8 +24,9 @@ import { formatCurrencyAmount } from "../../lib/currency";
 import {
   addDomainDetails,
   editDomainDetails,
+  fetchDomainDetails,
   formatDomainApiError,
-  parseDomainDetailsFromProfile,
+  parseDomainDetailsResponse,
 } from "../../lib/shopOwnerDomainApi";
 import {
   fetchWebsiteTemplates,
@@ -710,12 +711,12 @@ function WebsiteInvoiceModal({
 
 export default function ShopMyWebsitePage() {
   const { token, profile, session } = useAuth();
-  const { faqsHeading, faqsDescription, business, user, refresh, loading: portalLoading } =
-    useShopOwnerPortal();
+  const { faqsHeading, faqsDescription, business, user, refresh } = useShopOwnerPortal();
   const [activeSection, setActiveSection] = useState<ShopWebsiteSection>("domain");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [domainForm, setDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
   const [savedDomainForm, setSavedDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
+  const [domainLoading, setDomainLoading] = useState(false);
   const [domainSaving, setDomainSaving] = useState(false);
   const [templates, setTemplates] = useState<WebsiteTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -738,18 +739,41 @@ export default function ShopMyWebsitePage() {
   );
 
   useEffect(() => {
-    const saved = parseDomainDetailsFromProfile(business);
-    if (!saved) return;
-    setDomainForm(saved);
-    setSavedDomainForm(saved);
-  }, [business]);
-
-  useEffect(() => {
     const templateId = business?.websiteTemplateId?.trim();
     if (!templateId) return;
     setSelectedTemplateId((prev) => prev || templateId);
     setSavedTemplateId((prev) => prev || templateId);
   }, [business?.websiteTemplateId]);
+
+  const loadDomainDetails = useCallback(async () => {
+    if (!token) {
+      setDomainForm(EMPTY_DOMAIN_FORM);
+      setSavedDomainForm(EMPTY_DOMAIN_FORM);
+      return;
+    }
+    setDomainLoading(true);
+    try {
+      const res = await fetchDomainDetails(token);
+      if (!res.ok) {
+        setDomainForm(EMPTY_DOMAIN_FORM);
+        setSavedDomainForm(EMPTY_DOMAIN_FORM);
+        return;
+      }
+      const saved = parseDomainDetailsResponse(res.data);
+      const next = saved ?? EMPTY_DOMAIN_FORM;
+      setDomainForm(next);
+      setSavedDomainForm(next);
+    } catch {
+      setDomainForm(EMPTY_DOMAIN_FORM);
+      setSavedDomainForm(EMPTY_DOMAIN_FORM);
+    } finally {
+      setDomainLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadDomainDetails();
+  }, [loadDomainDetails]);
 
   const loadTemplates = useCallback(async () => {
     if (!token) {
@@ -857,7 +881,7 @@ export default function ShopMyWebsitePage() {
       } else {
         toast.success("Domain details saved.");
       }
-      await refresh();
+      await loadDomainDetails();
       setActiveSection("templates");
       void loadTemplates();
     } catch {
@@ -1047,7 +1071,7 @@ export default function ShopMyWebsitePage() {
             onSaveAndNext={handleDomainSaveAndNext}
             onReset={handleDomainReset}
             saving={domainSaving}
-            loading={portalLoading}
+            loading={domainLoading}
           />
         );
       case "templates":
