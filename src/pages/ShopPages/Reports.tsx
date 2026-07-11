@@ -14,24 +14,29 @@ import {
   compactFixedFieldWidth,
 } from "../../components/admin/ContentPanel";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopListFooter } from "../../components/shop/ShopPanels";
+import { ShopErrorPanel, ShopListFooter, ShopLoadingPanel } from "../../components/shop/ShopPanels";
 import {
   shopCompactInputClass,
   shopProfileFormPanelClass,
   shopProfileFormPanelFooterClass,
 } from "../../components/shop/shopLayoutStyles";
+import useAuth from "../../auth/useAuth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import {
-  DUMMY_BANKS,
-  DUMMY_EXPENSES,
-  DUMMY_INCOME,
+  asGroupingLedgerRows,
+  loadShopBankReport,
+  loadShopExpenseReport,
+  loadShopGstReport,
+  loadShopIncomeReport,
+  type ShopReportBankRow,
+  type ShopReportGstRow,
+  type ShopReportLedgerRow,
+} from "../../lib/shopOwnerReportsApi";
+import {
   estimateGstAmount,
   formatDisplayDate,
   todayIso,
   type AccountReportTitle,
-  type BankRow,
-  type GstLedgerRow,
-  type LedgerRow,
 } from "../AdminPages/Accounts/accountData";
 import {
   categoryLabel,
@@ -41,7 +46,6 @@ import {
   type CategoryOption,
 } from "../AdminPages/Accounts/ledgerCategories";
 import {
-  buildGstRows,
   filterGstRows,
   filterLedgerRows,
   formatLongDate,
@@ -99,7 +103,7 @@ function CategoryCell({
   row,
 }: {
   categories: CategoryOption[];
-  row: LedgerRow;
+  row: ShopReportLedgerRow;
 }) {
   const labels = categoryLabel(categories, row.category, row.subcategory);
   return (
@@ -162,7 +166,7 @@ function ShopGroupedLedgerReport({
   toDate,
   companyName,
 }: {
-  rows: LedgerRow[];
+  rows: ShopReportLedgerRow[];
   groupBy: GroupBy;
   categories: CategoryOption[];
   reportType: "income" | "expenses";
@@ -171,18 +175,18 @@ function ShopGroupedLedgerReport({
   companyName?: string;
 }) {
   const vendorColumnLabel = reportType === "expenses" ? "Vendor" : "Source";
-  const grandTotal = sumAmounts(rows);
+  const grandTotal = useMemo(() => sumAmounts(asGroupingLedgerRows(rows)), [rows]);
 
   const categoryGroups = useMemo(
-    () => (groupBy === "category" ? groupLedgerByCategory(rows, categories) : []),
+    () => (groupBy === "category" ? groupLedgerByCategory(asGroupingLedgerRows(rows), categories) : []),
     [rows, groupBy, categories],
   );
   const vendorGroups = useMemo(
-    () => (groupBy === "vendor" ? groupLedgerByVendor(rows) : []),
+    () => (groupBy === "vendor" ? groupLedgerByVendor(asGroupingLedgerRows(rows)) : []),
     [rows, groupBy],
   );
   const projectGroups = useMemo(
-    () => (groupBy === "project" ? groupLedgerByProject(rows) : []),
+    () => (groupBy === "project" ? groupLedgerByProject(asGroupingLedgerRows(rows)) : []),
     [rows, groupBy],
   );
 
@@ -236,7 +240,7 @@ function ShopGroupedLedgerReport({
                           </td>
                         </tr>
                         {sub.rows.map((row, idx) => (
-                          <tr key={row.id} className={adminPanelRowClass(idx)}>
+                          <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
                             <td className={ADMIN_PANEL_TD_CLASS}>{formatDisplayDate(row.date)}</td>
                             <td className={`${ADMIN_PANEL_TD_CLASS} uppercase`}>{row.vendor}</td>
                             <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
@@ -260,9 +264,9 @@ function ShopGroupedLedgerReport({
                       </td>
                     </tr>
                     {group.rows.map((row, idx) => (
-                      <tr key={row.id} className={adminPanelRowClass(idx)}>
+                      <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
                         <td className={ADMIN_PANEL_TD_CLASS}>{formatDisplayDate(row.date)}</td>
-                        <CategoryCell categories={categories} row={row} />
+                        <CategoryCell categories={categories} row={row as ShopReportLedgerRow} />
                         <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
                         <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
                           {formatReportAmount(row.amount)}
@@ -282,9 +286,9 @@ function ShopGroupedLedgerReport({
                       </td>
                     </tr>
                     {group.rows.map((row, idx) => (
-                      <tr key={row.id} className={adminPanelRowClass(idx)}>
+                      <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
                         <td className={`${ADMIN_PANEL_TD_CLASS} uppercase`}>{row.vendor}</td>
-                        <CategoryCell categories={categories} row={row} />
+                        <CategoryCell categories={categories} row={row as ShopReportLedgerRow} />
                         <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
                         <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
                           {formatReportAmount(row.amount)}
@@ -319,7 +323,7 @@ function ShopGstReportView({
   incomeCategories,
   companyName,
 }: {
-  rows: GstLedgerRow[];
+  rows: ShopReportGstRow[];
   fromDate: string;
   toDate: string;
   expenseCategories: CategoryOption[];
@@ -414,6 +418,7 @@ function ShopGstReportView({
 }
 
 export default function ShopReportsPage() {
+  const { token } = useAuth();
   const { faqsHeading, faqsDescription, displayName } = useShopOwnerPortal();
   const [activeReport, setActiveReport] = useState<AccountReportTitle>("expenses");
   const [faqsOpen, setFaqsOpen] = useState(false);
@@ -429,6 +434,15 @@ export default function ShopReportsPage() {
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
 
+  const [ledgerRows, setLedgerRows] = useState<ShopReportLedgerRow[]>([]);
+  const [gstRowsRaw, setGstRowsRaw] = useState<ShopReportGstRow[]>([]);
+  const [bankRowsRaw, setBankRowsRaw] = useState<ShopReportBankRow[]>([]);
+  const [bankAccountOptions, setBankAccountOptions] = useState<{ value: string; label: string }[]>(
+    [],
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const expenseCategories = useMemo(() => cloneCategories(EXPENSE_CATEGORIES), []);
   const incomeCategories = useMemo(() => cloneCategories(INCOME_CATEGORIES), []);
   const allCategories = useMemo(() => {
@@ -439,11 +453,6 @@ export default function ShopReportsPage() {
       return true;
     });
   }, [expenseCategories, incomeCategories]);
-
-  const bankAccountOptions = useMemo(
-    () => DUMMY_BANKS.map((bank) => ({ value: String(bank.id), label: bank.label })),
-    [],
-  );
 
   const activeCategories =
     activeReport === "expenses"
@@ -460,8 +469,84 @@ export default function ShopReportsPage() {
     setCategory("");
     setGroupBy("category");
     setApplied(null);
+    setLedgerRows([]);
+    setGstRowsRaw([]);
+    setBankRowsRaw([]);
+    setError(null);
     setPage(1);
   }, [activeReport]);
+
+  useEffect(() => {
+    if (!token || activeReport !== "bank") return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const banks = await loadShopBankReport(token);
+        if (cancelled) return;
+        setBankAccountOptions(banks.map((bank) => ({ value: bank.id, label: bank.label })));
+      } catch {
+        if (!cancelled) setBankAccountOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, activeReport]);
+
+  useEffect(() => {
+    if (!applied) return;
+    if (!token) {
+      setError("Please sign in to load reports.");
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        if (applied.title === "income") {
+          const { rows } = await loadShopIncomeReport(token, applied.fromDate, applied.toDate);
+          if (cancelled) return;
+          setLedgerRows(rows);
+          setGstRowsRaw([]);
+          setBankRowsRaw([]);
+        } else if (applied.title === "expenses") {
+          const rows = await loadShopExpenseReport(token, applied.fromDate, applied.toDate);
+          if (cancelled) return;
+          setLedgerRows(rows);
+          setGstRowsRaw([]);
+          setBankRowsRaw([]);
+        } else if (applied.title === "gst") {
+          const rows = await loadShopGstReport(token, applied.fromDate, applied.toDate);
+          if (cancelled) return;
+          setGstRowsRaw(rows);
+          setLedgerRows([]);
+          setBankRowsRaw([]);
+        } else {
+          const banks = await loadShopBankReport(token);
+          if (cancelled) return;
+          setBankRowsRaw(banks);
+          setBankAccountOptions(banks.map((bank) => ({ value: bank.id, label: bank.label })));
+          setLedgerRows([]);
+          setGstRowsRaw([]);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setLedgerRows([]);
+        setGstRowsRaw([]);
+        setBankRowsRaw([]);
+        setError(err instanceof Error ? err.message : "Failed to load report");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applied, token]);
 
   const handleSearch = () => {
     if (!fromDate || !toDate) return;
@@ -482,30 +567,38 @@ export default function ShopReportsPage() {
     setCategory("");
     setGroupBy("category");
     setApplied(null);
+    setLedgerRows([]);
+    setGstRowsRaw([]);
+    setBankRowsRaw([]);
+    setError(null);
     setPage(1);
   };
 
-  const ledgerRows = useMemo(() => {
+  const filteredLedgerRows = useMemo(() => {
     if (!applied || applied.title === "bank" || applied.title === "gst") return [];
-    const source = applied.title === "expenses" ? DUMMY_EXPENSES : DUMMY_INCOME;
-    return filterLedgerRows(source, applied.fromDate, applied.toDate, applied.category);
-  }, [applied]);
+    return filterLedgerRows(
+      asGroupingLedgerRows(ledgerRows),
+      applied.fromDate,
+      applied.toDate,
+      applied.category,
+    ) as unknown as ShopReportLedgerRow[];
+  }, [applied, ledgerRows]);
 
   const gstRows = useMemo(() => {
     if (applied?.title !== "gst") return [];
     return filterGstRows(
-      buildGstRows(DUMMY_EXPENSES, DUMMY_INCOME),
+      gstRowsRaw as unknown as Parameters<typeof filterGstRows>[0],
       applied.fromDate,
       applied.toDate,
       applied.category,
-    );
-  }, [applied]);
+    ) as unknown as ShopReportGstRow[];
+  }, [applied, gstRowsRaw]);
 
   const bankRows = useMemo(() => {
     if (applied?.title !== "bank") return [];
-    if (!applied.category) return DUMMY_BANKS;
-    return DUMMY_BANKS.filter((bank) => String(bank.id) === applied.category);
-  }, [applied]);
+    if (!applied.category) return bankRowsRaw;
+    return bankRowsRaw.filter((bank) => bank.id === applied.category);
+  }, [applied, bankRowsRaw]);
 
   const bankTotal = bankRows.reduce((sum, row) => sum + row.totalBalance, 0);
   const totalPages = Math.max(1, Math.ceil(bankRows.length / entriesPerPage));
@@ -524,6 +617,21 @@ export default function ShopReportsPage() {
         <p className="shop-hero-surface rounded border border-gray-300 bg-white px-4 py-6 text-center text-sm text-gray-600 shadow-sm">
           Set your filters and click Search to generate the {SECTION_HEADINGS[activeReport].toLowerCase()}.
         </p>
+      );
+    }
+
+    if (loading) {
+      return <ShopLoadingPanel variant="profile-table" count={6} />;
+    }
+
+    if (error) {
+      return (
+        <ShopErrorPanel
+          message={error}
+          onRetry={() => {
+            setApplied({ ...applied });
+          }}
+        />
       );
     }
 
@@ -566,7 +674,7 @@ export default function ShopReportsPage() {
                       </td>
                     </tr>
                   ) : (
-                    pagedBanks.map((row: BankRow, idx) => (
+                    pagedBanks.map((row, idx) => (
                       <tr key={row.id} className={adminPanelRowClass(idx)}>
                         <td className={`${ADMIN_PANEL_TD_CLASS} font-bold uppercase text-blue-700`}>
                           {row.label}
@@ -635,7 +743,7 @@ export default function ShopReportsPage() {
     if (applied.title === "income" || applied.title === "expenses") {
       return (
         <ShopGroupedLedgerReport
-          rows={ledgerRows}
+          rows={filteredLedgerRows}
           groupBy={applied.groupBy}
           categories={ledgerCategories}
           reportType={applied.title}
@@ -696,7 +804,8 @@ export default function ShopReportsPage() {
                 <button
                   type="button"
                   onClick={handleSearch}
-                  className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95"
+                  disabled={loading}
+                  className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
                 >
                   Search
                 </button>

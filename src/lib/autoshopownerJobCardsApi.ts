@@ -180,6 +180,59 @@ export function markAutoshopInvoicePaid(token: string, jobCardNo: string | numbe
   );
 }
 
+/** Paid invoices for GST reports. Optional `startDate` / `endDate` (YYYY-MM-DD). */
+export function fetchAutoshopGstReports(
+  token: string,
+  query?: { startDate?: string; endDate?: string },
+) {
+  return getJsonAutoshopowner<unknown>(
+    withQuery(`${BASE}/gst-reports`, {
+      startDate: query?.startDate,
+      endDate: query?.endDate,
+    }),
+    token,
+  );
+}
+
+/** Paid invoices + CashPaid income. Optional `startDate` / `endDate` (YYYY-MM-DD). */
+export function fetchAutoshopIncomeReport(
+  token: string,
+  query?: { startDate?: string; endDate?: string },
+) {
+  return getJsonAutoshopowner<unknown>(
+    withQuery(`${BASE}/income`, {
+      startDate: query?.startDate,
+      endDate: query?.endDate,
+    }),
+    token,
+  );
+}
+
+/** Current year's job card / estimate prefix. */
+export function fetchAutoshopJobCardPrefix(token: string) {
+  return getJsonAutoshopowner<unknown>(`${BASE}/jobcard-prefix`, token);
+}
+
+/** Set the job card / estimate prefix for the current year. */
+export function updateAutoshopJobCardPrefix(token: string, prefix: string) {
+  return putJsonAutoshopowner<ApiEnvelope>(`${BASE}/jobcard-prefix`, { prefix }, token);
+}
+
+export function parseAutoshopJobCardPrefix(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const root = payload as Record<string, unknown>;
+  const data =
+    root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : root;
+  const raw =
+    data.prefix ??
+    data.jobCardPrefix ??
+    data.jobcardPrefix ??
+    root.prefix ??
+    root.jobCardPrefix ??
+    root.jobcardPrefix;
+  return typeof raw === "string" ? raw.trim() : raw != null ? String(raw).trim() : "";
+}
+
 export function parseAutoshopJobCardPageDetails(payload: unknown): AutoshopJobCardPageDetails | null {
   if (!payload || typeof payload !== "object") return null;
   const root = payload as Record<string, unknown>;

@@ -15,8 +15,10 @@ type ShopManageNumberingDialogProps = {
   open: boolean;
   kind: NumberingKind;
   initial: NumberingValues;
+  loading?: boolean;
   onClose: () => void;
-  onSave: (values: NumberingValues) => void;
+  /** Return `false` to keep the dialog open (e.g. API error). */
+  onSave: (values: NumberingValues) => void | boolean | Promise<void | boolean>;
 };
 
 const COPY: Record<
@@ -53,6 +55,7 @@ export default function ShopManageNumberingDialog({
   open,
   kind,
   initial,
+  loading = false,
   onClose,
   onSave,
 }: ShopManageNumberingDialogProps) {
@@ -68,17 +71,22 @@ export default function ShopManageNumberingDialog({
     setSaving(false);
   }, [open, initial.code, initial.number]);
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
+    const trimmedCode = code.trim();
     const trimmedNumber = number.trim();
     if (!trimmedNumber) {
       toast.error(`${copy.numberLabel} is required.`);
       return;
     }
     setSaving(true);
-    onSave({ code: code.trim(), number: trimmedNumber });
-    toast.success(`${copy.title.replace("Manage ", "")} settings updated.`);
-    setSaving(false);
-    onClose();
+    try {
+      const result = await onSave({ code: trimmedCode, number: trimmedNumber });
+      if (result === false) return;
+      toast.success(`${copy.title.replace("Manage ", "")} settings updated.`);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -96,35 +104,41 @@ export default function ShopManageNumberingDialog({
       </div>
 
       <div className="space-y-4 bg-[#e8ffe8] px-5 py-5">
-        <CompactField label={copy.codeLabel} className="flex-none">
-          <input
-            type="text"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            disabled={saving}
-            className={shopCompactInputClass}
-            autoComplete="off"
-          />
-        </CompactField>
+        {loading ? (
+          <p className="text-sm text-gray-600">Loading…</p>
+        ) : (
+          <>
+            <CompactField label={copy.codeLabel} className="flex-none">
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                disabled={saving || loading}
+                className={shopCompactInputClass}
+                autoComplete="off"
+              />
+            </CompactField>
 
-        <CompactField label={copy.numberLabel} required className="flex-none">
-          <input
-            type="text"
-            inputMode="numeric"
-            value={number}
-            onChange={(e) => setNumber(e.target.value)}
-            disabled={saving}
-            className={shopCompactInputClass}
-            autoComplete="off"
-          />
-        </CompactField>
+            <CompactField label={copy.numberLabel} required className="flex-none">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+                disabled={saving || loading}
+                className={shopCompactInputClass}
+                autoComplete="off"
+              />
+            </CompactField>
+          </>
+        )}
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-[#b2e0a0] bg-[#CCFFCC] px-5 py-3">
         <button
           type="button"
-          onClick={handleUpdate}
-          disabled={saving}
+          onClick={() => void handleUpdate()}
+          disabled={saving || loading}
           className="inline-flex items-center justify-center rounded bg-[#008000] px-5 py-1.5 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
         >
           {saving ? "Updating…" : "Update"}

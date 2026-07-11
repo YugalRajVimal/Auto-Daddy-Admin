@@ -46,6 +46,12 @@ import {
   fetchAdminServices,
   updateTemplateSlugs,
 } from "../../lib/autoshopownerApi";
+import {
+  apiMessageFromEnvelope,
+  fetchAutoshopJobCardPrefix,
+  parseAutoshopJobCardPrefix,
+  updateAutoshopJobCardPrefix,
+} from "../../lib/autoshopownerJobCardsApi";
 import { getCarBrandId, getCarBrandName } from "../../lib/dummyCarBrands";
 import {
   getInitialProfileServiceIds,
@@ -246,6 +252,35 @@ export default function ShopProfilePage() {
   );
   const [numbering, setNumbering] = useState(readStoredNumbering);
   const [manageKind, setManageKind] = useState<NumberingKind | null>(null);
+  const [estimatePrefixLoading, setEstimatePrefixLoading] = useState(false);
+
+  useEffect(() => {
+    if (manageKind !== "estimate" || !token) return;
+    let cancelled = false;
+    setEstimatePrefixLoading(true);
+    void fetchAutoshopJobCardPrefix(token)
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          toast.error(apiMessageFromEnvelope(res.data) || "Could not load estimate prefix.");
+          return;
+        }
+        const prefix = parseAutoshopJobCardPrefix(res.data);
+        setNumbering((prev) => ({
+          ...prev,
+          estimate: { ...prev.estimate, code: prefix },
+        }));
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Could not load estimate prefix.");
+      })
+      .finally(() => {
+        if (!cancelled) setEstimatePrefixLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [manageKind, token]);
 
   useEffect(() => {
     const invoiceSlug = resolveTemplateSlug(
@@ -478,6 +513,32 @@ export default function ShopProfilePage() {
       }
       return next;
     });
+  };
+
+  const saveEstimatePrefix = async (values: NumberingValues): Promise<boolean> => {
+    if (!token) {
+      toast.error("Sign in to update estimate prefix.");
+      return false;
+    }
+    const prefix = values.code.trim();
+    const res = await updateAutoshopJobCardPrefix(token, prefix);
+    if (!res.ok) {
+      toast.error(apiMessageFromEnvelope(res.data) || "Could not update estimate prefix.");
+      return false;
+    }
+    setNumbering((prev) => {
+      const next = {
+        ...prev,
+        estimate: { code: prefix, number: values.number.trim() || prev.estimate.number },
+      };
+      try {
+        localStorage.setItem(NUMBERING_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore quota / private mode
+      }
+      return next;
+    });
+    return true;
   };
 
   const removeBrand = async (company: ShopCarCompany) => {
@@ -828,8 +889,9 @@ export default function ShopProfilePage() {
         open={manageKind === "estimate"}
         kind="estimate"
         initial={numbering.estimate}
+        loading={estimatePrefixLoading}
         onClose={() => setManageKind(null)}
-        onSave={(values) => saveNumbering("estimate", values)}
+        onSave={saveEstimatePrefix}
       />
       <ShopManageNumberingDialog
         open={manageKind === "invoice"}
