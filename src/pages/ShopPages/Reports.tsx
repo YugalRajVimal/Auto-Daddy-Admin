@@ -266,7 +266,10 @@ function ShopGroupedLedgerReport({
                     {group.rows.map((row, idx) => (
                       <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
                         <td className={ADMIN_PANEL_TD_CLASS}>{formatDisplayDate(row.date)}</td>
-                        <CategoryCell categories={categories} row={row as ShopReportLedgerRow} />
+                        <CategoryCell
+                          categories={categories}
+                          row={row as unknown as ShopReportLedgerRow}
+                        />
                         <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
                         <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
                           {formatReportAmount(row.amount)}
@@ -288,7 +291,10 @@ function ShopGroupedLedgerReport({
                     {group.rows.map((row, idx) => (
                       <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
                         <td className={`${ADMIN_PANEL_TD_CLASS} uppercase`}>{row.vendor}</td>
-                        <CategoryCell categories={categories} row={row as ShopReportLedgerRow} />
+                        <CategoryCell
+                          categories={categories}
+                          row={row as unknown as ShopReportLedgerRow}
+                        />
                         <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
                         <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
                           {formatReportAmount(row.amount)}

@@ -20,9 +20,9 @@ export type EditDomainDetailsInput = {
   status?: string;
 };
 
-/** GET /api/autoshops/domain-details/get */
+/** GET /api/autoshopowner/domain-details/get */
 export function fetchDomainDetails(token: string) {
-  return getJsonAutoshopowner<unknown>("/api/autoshops/domain-details/get", token);
+  return getJsonAutoshopowner<unknown>("/api/autoshopowner/domain-details/get", token);
 }
 
 /** POST /api/autoshopowner/domain-details/add */
@@ -66,7 +66,7 @@ function toDomainForm(raw: unknown): DomainDetailsInput | null {
   return { domainName, expiryDate, provider, status };
 }
 
-/** Parses GET /api/autoshops/domain-details/get response shapes. */
+/** Parses GET /api/autoshopowner/domain-details/get response shapes. */
 export function parseDomainDetailsResponse(payload: unknown): DomainDetailsInput | null {
   const envelope = obj(payload);
   if (!envelope) return null;
