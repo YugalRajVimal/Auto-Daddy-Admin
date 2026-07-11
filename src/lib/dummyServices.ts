@@ -150,58 +150,41 @@ export function resolveServiceImage(category?: ShopServiceCategory | null): stri
   return serviceImage(`shop-service-${normalizeServiceName(name) || "generic"}`);
 }
 
-/** Merge API services with dummy catalog for image fallbacks. */
+/**
+ * Enrich API catalog entries with dummy image/sub-service fallbacks.
+ * Does not inject dummy-only rows — those would skip `addMyService` (dummy-* ids).
+ */
 export function mergeServiceCatalog(apiServices: ShopServiceCategory[]): ShopServiceCategory[] {
-  const merged = new Map<string, ShopServiceCategory>();
-
-  for (const dummy of DUMMY_SERVICES) {
-    merged.set(normalizeServiceName(getServiceName(dummy)), { ...dummy });
-  }
-
-  for (const apiService of apiServices) {
-    const key = normalizeServiceName(getServiceName(apiService));
-    const dummy = merged.get(key) ?? findDummyServiceByName(getServiceName(apiService));
-    merged.set(key, {
+  return apiServices.map((apiService) => {
+    const dummy = findDummyServiceByName(getServiceName(apiService));
+    return {
       ...dummy,
       ...apiService,
       id: apiService.id,
       name: apiService.name ?? dummy?.name,
       shopType: apiService.shopType ?? dummy?.shopType,
-      subServices: apiService.subServices.length > 0 ? apiService.subServices : (dummy?.subServices ?? []),
-    });
-  }
-
-  return [...merged.values()];
+      subServices:
+        apiService.subServices.length > 0 ? apiService.subServices : (dummy?.subServices ?? []),
+    };
+  });
 }
 
 export function buildSelectedServiceIds(
   catalog: ShopServiceCategory[],
   apiSelected: ShopServiceCategory[]
 ): Set<string> {
-  const selectedNames = new Set<string>();
-
-  if (apiSelected.length === 0) {
-    for (const service of DUMMY_SERVICES) {
-      if (DUMMY_SELECTED_SERVICE_IDS.includes(getServiceId(service))) {
-        selectedNames.add(normalizeServiceName(getServiceName(service)));
-      }
-    }
-  } else {
-    for (const apiService of apiSelected) {
-      selectedNames.add(normalizeServiceName(getServiceName(apiService)));
-    }
-  }
-
   const ids = new Set<string>();
-  for (const service of catalog) {
-    if (selectedNames.has(normalizeServiceName(getServiceName(service)))) {
-      ids.add(getServiceId(service));
-    }
-  }
 
   for (const apiService of apiSelected) {
     const id = getServiceId(apiService);
-    if (selectedNames.has(normalizeServiceName(getServiceName(apiService)))) {
+    if (id) ids.add(id);
+  }
+
+  if (ids.size > 0) return ids;
+
+  for (const service of catalog) {
+    const id = getServiceId(service);
+    if (id && apiSelected.some((s) => getServiceId(s) === id)) {
       ids.add(id);
     }
   }
@@ -210,10 +193,7 @@ export function buildSelectedServiceIds(
 }
 
 export function getInitialProfileServiceIds(myServices: ShopServiceCategory[]): Set<string> {
-  if (myServices.length > 0) {
-    return new Set(myServices.map((service) => getServiceId(service)));
-  }
-  return new Set(DUMMY_SELECTED_SERVICE_IDS);
+  return new Set(myServices.map((service) => getServiceId(service)).filter(Boolean));
 }
 
 export function resolveProfileSelectedServices(
@@ -223,11 +203,15 @@ export function resolveProfileSelectedServices(
 ): ShopServiceCategory[] {
   if (selectedIds.size === 0) return [];
 
-  const merged = mergeServiceCatalog([...catalog, ...myServices]);
-  const fromMerged = merged.filter((service) => selectedIds.has(getServiceId(service)));
-  if (fromMerged.length > 0) return fromMerged;
+  const byId = new Map<string, ShopServiceCategory>();
+  for (const service of [...catalog, ...myServices]) {
+    const id = getServiceId(service);
+    if (id) byId.set(id, service);
+  }
 
-  return myServices.filter((service) => selectedIds.has(getServiceId(service)));
+  return [...selectedIds]
+    .map((id) => byId.get(id))
+    .filter((service): service is ShopServiceCategory => Boolean(service));
 }
 
 export function getSelectedServices(

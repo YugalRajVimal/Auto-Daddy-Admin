@@ -14,16 +14,25 @@ import {
 } from "../../components/admin/adminPanelTableStyles";
 import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import { ShopReveal } from "../../components/shop/ShopAnimated";
+import ShopManageNumberingDialog, {
+  type NumberingValues,
+} from "../../components/shop/ShopManageNumberingDialog";
 import ShopPageShell from "../../components/shop/ShopPageShell";
+import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
+import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useAutoshopJobCards } from "../../hooks/useAutoshopJobCards";
 import { formatCurrencyAmount } from "../../lib/currency";
 import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import {
+  apiMessageFromEnvelope,
   deleteAutoshopJobCard,
+  fetchAutoshopJobCardPrefix,
+  parseAutoshopJobCardPrefix,
   sendAutoshopJobCardForApproval,
+  updateAutoshopJobCardPrefix,
 } from "../../lib/autoshopownerJobCardsApi";
 import {
   isJobCardApproved,
@@ -43,6 +52,36 @@ type JobCardView = "list" | "form" | "detail";
 
 const PAGE_SIZE = 10;
 const JOB_CARDS_SEARCH_INPUT_ID = "shop-job-cards-search";
+const NUMBERING_STORAGE_KEY = "autodaddy.shop.numbering";
+
+const DEFAULT_ESTIMATE_NUMBERING: NumberingValues = { code: "", number: "1" };
+
+function readStoredEstimateNumbering(): NumberingValues {
+  try {
+    const raw = localStorage.getItem(NUMBERING_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_ESTIMATE_NUMBERING };
+    const parsed = JSON.parse(raw) as { estimate?: Partial<NumberingValues> };
+    return {
+      code: parsed.estimate?.code ?? DEFAULT_ESTIMATE_NUMBERING.code,
+      number: parsed.estimate?.number ?? DEFAULT_ESTIMATE_NUMBERING.number,
+    };
+  } catch {
+    return { ...DEFAULT_ESTIMATE_NUMBERING };
+  }
+}
+
+function writeStoredEstimateNumbering(values: NumberingValues) {
+  try {
+    const raw = localStorage.getItem(NUMBERING_STORAGE_KEY);
+    const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    localStorage.setItem(
+      NUMBERING_STORAGE_KEY,
+      JSON.stringify({ ...prev, estimate: values }),
+    );
+  } catch {
+    // ignore quota / private mode
+  }
+}
 
 const JOB_CARD_SECTIONS = [
   { id: "my-list", label: "My Job Cards", variant: "primary" as const },
@@ -313,6 +352,9 @@ export default function ShopJobCardsPage() {
   const [actionPreviewMode, setActionPreviewMode] = useState<JobCardActionPreview | null>(null);
   const [selectedJobCardIds, setSelectedJobCardIds] = useState<Set<string>>(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [manageEstimatesOpen, setManageEstimatesOpen] = useState(false);
+  const [estimateNumbering, setEstimateNumbering] = useState(readStoredEstimateNumbering);
+  const [estimatePrefixLoading, setEstimatePrefixLoading] = useState(false);
   const {
     cards: listCards,
     loading,
@@ -349,6 +391,63 @@ export default function ShopJobCardsPage() {
   const activeSidebarId = view === "list" ? section : null;
 
   const hasBulkSelection = selectedJobCardIds.size > 0;
+
+  const sidebarFooter = useMemo(
+    () => (
+      <div className={`mt-4 ${shopSidebarButtonStackClass}`}>
+        <ShopSidebarButton
+          label="Manage Estimates"
+          onClick={() => setManageEstimatesOpen(true)}
+        />
+      </div>
+    ),
+    [],
+  );
+
+  useEffect(() => {
+    if (!manageEstimatesOpen || !token) return;
+    let cancelled = false;
+    setEstimatePrefixLoading(true);
+    void fetchAutoshopJobCardPrefix(token)
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          toast.error(apiMessageFromEnvelope(res.data) || "Could not load estimate prefix.");
+          return;
+        }
+        const prefix = parseAutoshopJobCardPrefix(res.data);
+        setEstimateNumbering((prev) => ({ ...prev, code: prefix }));
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Could not load estimate prefix.");
+      })
+      .finally(() => {
+        if (!cancelled) setEstimatePrefixLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [manageEstimatesOpen, token]);
+
+  const saveEstimatePrefix = async (values: NumberingValues): Promise<boolean> => {
+    if (!token) {
+      toast.error("Sign in to update estimate prefix.");
+      return false;
+    }
+    const prefix = values.code.trim();
+    const res = await updateAutoshopJobCardPrefix(token, prefix);
+    if (!res.ok) {
+      toast.error(apiMessageFromEnvelope(res.data) || "Could not update estimate prefix.");
+      return false;
+    }
+    const next = {
+      code: prefix,
+      number: values.number.trim() || estimateNumbering.number,
+    };
+    setEstimateNumbering(next);
+    writeStoredEstimateNumbering(next);
+    return true;
+  };
 
   useEffect(() => {
     setPage(1);
@@ -589,24 +688,26 @@ export default function ShopJobCardsPage() {
   };
 
   return (
-    <ShopPageShell
-      title="Job Cards"
-      pageHeading={pageHeading}
-      metaTitle="Job Cards | AutoDaddy"
-      metaDescription="Auto shop job cards"
-      sidebarVariant="nav"
-      sidebarItems={JOB_CARD_SECTIONS}
-      activeSidebarId={activeSidebarId}
-      onSidebarSelect={selectSection}
-      heroBackgroundImage={false}
-      contentTopOffset
-      heroCardFlush
-      onFaqsOpen={() => setFaqsOpen(true)}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsOpen={faqsOpen}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
-    >
+    <>
+      <ShopPageShell
+        title="Job Cards"
+        pageHeading={pageHeading}
+        metaTitle="Job Cards | AutoDaddy"
+        metaDescription="Auto shop job cards"
+        sidebarVariant="nav"
+        sidebarItems={JOB_CARD_SECTIONS}
+        activeSidebarId={activeSidebarId}
+        onSidebarSelect={selectSection}
+        sidebarFooter={sidebarFooter}
+        heroBackgroundImage={false}
+        contentTopOffset
+        heroCardFlush
+        onFaqsOpen={() => setFaqsOpen(true)}
+        onFaqsClose={() => setFaqsOpen(false)}
+        faqsOpen={faqsOpen}
+        faqsHeading={faqsHeading}
+        faqsDescription={faqsDescription}
+      >
       <div className="space-y-1">
         <ShopReveal show={view === "form"} clipOverflow={false}>
           <JobCardForm
@@ -742,6 +843,16 @@ export default function ShopJobCardsPage() {
           </>
         ) : null}
       </div>
-    </ShopPageShell>
+      </ShopPageShell>
+
+      <ShopManageNumberingDialog
+        open={manageEstimatesOpen}
+        kind="estimate"
+        initial={estimateNumbering}
+        loading={estimatePrefixLoading}
+        onClose={() => setManageEstimatesOpen(false)}
+        onSave={saveEstimatePrefix}
+      />
+    </>
   );
 }

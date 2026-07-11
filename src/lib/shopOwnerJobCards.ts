@@ -71,11 +71,13 @@ function extractJobCardArray(payload: unknown): unknown[] {
   const tryKeys = (obj: Record<string, unknown>): unknown[] | null => {
     for (const k of [
       "jobCards",
+      "jobcards",
       "cards",
       "items",
       "rows",
       "list",
       "results",
+      "docs",
       "data",
       "unpaid",
       "paid",
@@ -137,10 +139,17 @@ function extractRowsWithBuckets(payload: unknown): { raw: unknown; bucket?: JobC
         out.push({ raw, bucket: b });
       }
     }
-    return sawBucketKey ? out : null;
+    // Only treat as grouped when at least one bucket actually has rows.
+    // Empty `pending: []` keys must not hide a flat `data: [...]` list (new API shape).
+    return sawBucketKey && out.length > 0 ? out : null;
   };
   if (!payload || typeof payload !== "object") {
     return [];
+  }
+  // Prefer the new list shape `{ success, data: JobCard[] }` before legacy buckets.
+  const flat = extractJobCardArray(payload);
+  if (flat.length > 0) {
+    return flat.map((raw) => ({ raw }));
   }
   const root = payload as Record<string, unknown>;
   const grouped = collectFrom(root);
@@ -154,7 +163,7 @@ function extractRowsWithBuckets(payload: unknown): { raw: unknown; bucket?: JobC
       return groupedData;
     }
   }
-  return extractJobCardArray(payload).map((raw) => ({ raw }));
+  return [];
 }
 
 function pickCustomerPhone(o: Record<string, unknown>, customer: Record<string, unknown> | null): string | undefined {

@@ -19,7 +19,7 @@ export function useAutoshopJobCards(section: AutoshopJobCardSection, search = ""
   const { token } = useAuth();
   const q = search.trim();
   const [cards, setCards] = useState<JobCardListRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => Boolean(token));
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {

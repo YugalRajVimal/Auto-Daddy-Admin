@@ -16,7 +16,6 @@ import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
-import { getDummyMyServices } from "../../lib/dummyServices";
 import { deleteSubService } from "../../lib/autoshopownerApi";
 import { apiMessage } from "../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../types/shopOwner";
@@ -174,24 +173,13 @@ export default function ShopServicesPage() {
   const [page, setPage] = useState(1);
   const { categories: apiCategories, loading, error, refresh } = useShopServices();
   const [categories, setCategories] = useState<ShopServiceCategory[]>([]);
-  const [usingDummy, setUsingDummy] = useState(false);
 
   useEffect(() => {
     if (loading) return;
-    if (apiCategories.length > 0) {
-      setUsingDummy(false);
-      setCategories(apiCategories);
-      return;
-    }
-    setUsingDummy(true);
-    setCategories(getDummyMyServices());
+    setCategories(apiCategories);
   }, [apiCategories, loading]);
 
   const handleRefresh = () => {
-    if (usingDummy) {
-      setCategories(getDummyMyServices());
-      return;
-    }
     void refresh();
   };
 
@@ -267,24 +255,6 @@ export default function ShopServicesPage() {
     if (!activeCategory || selectedRows.size === 0) return;
     if (!window.confirm(`Delete ${selectedRows.size} selected sub-service(s)?`)) return;
 
-    const remaining = activeCategory.subServices.filter(
-      (sub, index) => !selectedRows.has(getSubRowId(sub, index)),
-    );
-
-    if (usingDummy) {
-      setCategories((prev) =>
-        prev.map((category) =>
-          category.id === activeCategory.id ? { ...category, subServices: remaining } : category,
-        ),
-      );
-      toast.success("Deleted.");
-      if (editIndex != null && selectedRows.has(getSubRowId(activeCategory.subServices[editIndex], editIndex))) {
-        closeForm();
-      }
-      setSelectedRows(new Set());
-      return;
-    }
-
     if (!token) return;
     setBulkDeleting(true);
     try {
@@ -356,7 +326,7 @@ export default function ShopServicesPage() {
       <div className="space-y-1">
         {loading ? (
           <ShopListSkeleton variant="profile-table" className="w-full" />
-        ) : error && !usingDummy ? (
+        ) : error ? (
           <ShopErrorPanel message={error} onRetry={() => void refresh()} />
         ) : categories.length === 0 ? (
           <p className="text-center text-sm text-gray-600">
@@ -384,14 +354,6 @@ export default function ShopServicesPage() {
               <ShopServiceSubDialog
                 category={activeCategory}
                 editIndex={editIndex}
-                demoMode={usingDummy}
-                onDemoSave={(categoryId, subServices) => {
-                  setCategories((prev) =>
-                    prev.map((category) =>
-                      category.id === categoryId ? { ...category, subServices } : category,
-                    ),
-                  );
-                }}
                 onCancel={closeForm}
                 onSaved={() => handleRefresh()}
               />

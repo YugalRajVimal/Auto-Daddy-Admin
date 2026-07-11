@@ -208,6 +208,13 @@ export function formatOpenHoursTimeTable(time24: string): string {
   return `${hour12}.${mm}`;
 }
 
+export function formatLocalDateISO(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 /** Next calendar date for a weekday, formatted `YYYY-MM-DD`. */
 export function nextWeekdayDateISO(day: WeekDay): string {
   const targetIndex = WEEK_DAYS.indexOf(day);
@@ -217,7 +224,73 @@ export function nextWeekdayDateISO(day: WeekDay): string {
   if (diff < 0) diff += 7;
   const next = new Date(today);
   next.setDate(today.getDate() + diff);
-  return next.toISOString().slice(0, 10);
+  return formatLocalDateISO(next);
+}
+
+export type ShopOpenHoursHistoryRow = {
+  dateISO: string;
+  day: WeekDay;
+  enabled: boolean;
+  start: string;
+  end: string;
+};
+
+export type CurrentWeekOpenHoursRow = {
+  day: WeekDay;
+  dateISO: string;
+  entry: DayScheduleEntry;
+};
+
+export function weekDayFromDateISO(dateISO: string): WeekDay {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0, 0);
+  return WEEK_DAYS[(date.getDay() + 6) % 7];
+}
+
+export function sortOpenHoursHistoryDesc(
+  rows: ShopOpenHoursHistoryRow[]
+): ShopOpenHoursHistoryRow[] {
+  return [...rows].sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+}
+
+/**
+ * Current week (Mon–Sun) open/closed rows with calendar dates,
+ * sorted descending so the week's last date (Sunday) is first.
+ */
+export function currentWeekOpenHoursRows(
+  schedule: PerDaySchedule,
+  now = new Date()
+): CurrentWeekOpenHoursRow[] {
+  const todayIndex = (now.getDay() + 6) % 7; // Mon=0 … Sun=6
+  const monday = new Date(now);
+  monday.setHours(12, 0, 0, 0);
+  monday.setDate(now.getDate() - todayIndex);
+
+  const rows = WEEK_DAYS.map((day, i) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    return {
+      day,
+      dateISO: formatLocalDateISO(date),
+      entry: schedule[day],
+    };
+  });
+
+  return rows.reverse();
+}
+
+/** Demo open/closed history for the current week (newest date first). */
+export function createDummyShopOpenHoursHistory(
+  now = new Date()
+): ShopOpenHoursHistoryRow[] {
+  const schedule = createDummyPerDaySchedule();
+  return currentWeekOpenHoursRows(schedule, now).map(({ day, dateISO, entry }) => ({
+    dateISO,
+    day,
+    enabled: entry.enabled,
+    start: entry.start,
+    end: entry.end,
+  }));
 }
 
 export function formatOpenHoursRangeDisplay(start: string, end: string): string {

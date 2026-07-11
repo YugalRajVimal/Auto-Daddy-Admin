@@ -36,19 +36,16 @@ import { updateBusinessProfile, updatePersonalProfile } from "../../../lib/autos
 import {
   addMyCarCompanies,
   apiMessage,
-  updateBusinessOpenHours,
   updateServiceWeWorkWith,
 } from "../../../lib/shopOwnerMutations";
 import {
+  createDummyShopOpenHoursHistory,
+  formatLocalDateISO,
   formatOpenHoursTimeTable,
-  nextWeekdayDateISO,
-  resolveShopOpenHoursSchedule,
-  serializePerDayOpenHoursForApi,
   shortDayLabel,
-  USE_DUMMY_SHOP_OPEN_HOURS,
-  WEEK_DAYS,
-  type PerDaySchedule,
-  type WeekDay,
+  sortOpenHoursHistoryDesc,
+  weekDayFromDateISO,
+  type ShopOpenHoursHistoryRow,
 } from "../../../lib/perDayOpenHours";
 import {
   filterServicesByShopType,
@@ -364,6 +361,14 @@ export function ShopPersonalProfileEditor({
     return hasEstablishedPersonalProfile(user, city);
   }, [savedOnce, session?.meta?.isProfileComplete, user, city]);
 
+  const isDirty = useMemo(() => {
+    return (
+      name !== (user?.name ?? "") ||
+      selectedCity !== (city ?? "") ||
+      profilePhoto !== null
+    );
+  }, [name, selectedCity, profilePhoto, user?.name, city]);
+
   const syncFromUser = () => {
     setName(user?.name ?? "");
     setEmail(user?.email ?? "");
@@ -433,17 +438,19 @@ export function ShopPersonalProfileEditor({
       className={shopProfileFormPanelClass}
       showBottomBorder={false}
       footer={
-        <ProfileFormFooter
-          message={
-            isUpdating
-              ? "You are updating your personal profile"
-              : "You are saving your personal profile"
-          }
-          saving={saving}
-          saveLabel={isUpdating ? "Update" : "Save"}
-          onSave={() => void handleUpdate()}
-          onReset={reset}
-        />
+        isDirty ? (
+          <ProfileFormFooter
+            message={
+              isUpdating
+                ? "You are updating your personal profile"
+                : "You are saving your personal profile"
+            }
+            saving={saving}
+            saveLabel={isUpdating ? "Update" : "Save"}
+            onSave={() => void handleUpdate()}
+            onReset={reset}
+          />
+        ) : undefined
       }
     >
       <div className="space-y-4">
@@ -572,6 +579,53 @@ export function ShopBusinessProfileEditor({
     return hasEstablishedBusinessProfile(business, zipCode);
   }, [savedOnce, session?.meta?.isAutoShopBusinessProfileComplete, business, zipCode]);
 
+  const savedShopTypes = useMemo(
+    () =>
+      normalizeShopTypes(
+        initialShopTypes ?? business?.shopTypes ?? initialShopType ?? business?.shopType
+      ),
+    [initialShopTypes, business?.shopTypes, initialShopType, business?.shopType]
+  );
+
+  const isDirty = useMemo(() => {
+    const savedTax = business?.gstPercent != null ? String(business.gstPercent) : "";
+    const shopTypesChanged =
+      shopTypes.length !== savedShopTypes.length ||
+      shopTypes.some((type) => !savedShopTypes.includes(type));
+    return (
+      businessName !== (business?.businessName ?? "") ||
+      businessPhone !== phoneDigits(business?.businessPhone ?? "") ||
+      city !== (business?.city ?? "") ||
+      zip !== (zipCode ?? "") ||
+      address !== (business?.address ?? "") ||
+      email !== (business?.email ?? "") ||
+      hst !== (business?.hstNumber ?? "") ||
+      tax !== savedTax ||
+      shopTypesChanged ||
+      logo !== null
+    );
+  }, [
+    businessName,
+    businessPhone,
+    city,
+    zip,
+    address,
+    email,
+    hst,
+    tax,
+    shopTypes,
+    logo,
+    business?.businessName,
+    business?.businessPhone,
+    business?.city,
+    business?.address,
+    business?.email,
+    business?.hstNumber,
+    business?.gstPercent,
+    zipCode,
+    savedShopTypes,
+  ]);
+
   const syncFromBusiness = () => {
     setBusinessName(business?.businessName ?? "");
     setBusinessPhone(phoneDigits(business?.businessPhone ?? ""));
@@ -581,9 +635,7 @@ export function ShopBusinessProfileEditor({
     setEmail(business?.email ?? "");
     setHst(business?.hstNumber ?? "");
     setTax(business?.gstPercent != null ? String(business.gstPercent) : "");
-    setShopTypes(
-      normalizeShopTypes(initialShopTypes ?? business?.shopTypes ?? initialShopType ?? business?.shopType)
-    );
+    setShopTypes(savedShopTypes);
     setShopTypesOpen(false);
     setShowUploadImage(false);
     setLogo(null);
@@ -700,17 +752,19 @@ export function ShopBusinessProfileEditor({
       className={shopProfileFormPanelClass}
       showBottomBorder={false}
       footer={
-        <ProfileFormFooter
-          message={
-            isUpdating
-              ? "You are updating your business profile"
-              : "You are saving your business profile"
-          }
-          saving={saving}
-          saveLabel={isUpdating ? "Update" : "Save"}
-          onSave={() => void handleUpdate()}
-          onReset={reset}
-        />
+        isDirty ? (
+          <ProfileFormFooter
+            message={
+              isUpdating
+                ? "You are updating your business profile"
+                : "You are saving your business profile"
+            }
+            saving={saving}
+            saveLabel={isUpdating ? "Update" : "Save"}
+            onSave={() => void handleUpdate()}
+            onReset={reset}
+          />
+        ) : undefined
       }
     >
       <div className="space-y-4">
@@ -887,8 +941,8 @@ function ShopHoursFormFooter({
 }
 
 export function ShopOpenHoursEditor({
-  perDayOpenHours,
-  onSaved,
+  perDayOpenHours: _perDayOpenHours,
+  onSaved: _onSaved,
   showAddForm = false,
   onAddFormClose,
   headerAction,
@@ -899,143 +953,118 @@ export function ShopOpenHoursEditor({
   onAddFormClose?: () => void;
   headerAction?: ReactNode;
 }) {
-  const { token } = useAuth();
-  const [schedule, setSchedule] = useState<PerDaySchedule>(() =>
-    resolveShopOpenHoursSchedule(perDayOpenHours)
+  const [historyRows, setHistoryRows] = useState<ShopOpenHoursHistoryRow[]>(() =>
+    createDummyShopOpenHoursHistory()
   );
   const [formMode, setFormMode] = useState<ShopHoursFormMode | null>(null);
-  const [editingDay, setEditingDay] = useState<WeekDay | null>(null);
-  const [formDay, setFormDay] = useState<WeekDay>("Monday");
+  const [editingDateISO, setEditingDateISO] = useState<string | null>(null);
+  const [formDate, setFormDate] = useState(() => formatLocalDateISO(new Date()));
   const [formOpen, setFormOpen] = useState(true);
   const [formStart, setFormStart] = useState("09:00");
   const [formEnd, setFormEnd] = useState("20:00");
   const [saving, setSaving] = useState(false);
-  const [selectedDays, setSelectedDays] = useState<Set<WeekDay>>(new Set());
+  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const allDaysSelected = WEEK_DAYS.every((day) => selectedDays.has(day));
-  const someDaysSelected = selectedDays.size > 0 && !allDaysSelected;
+  const sortedRows = useMemo(() => sortOpenHoursHistoryDesc(historyRows), [historyRows]);
+  const allDatesSelected =
+    sortedRows.length > 0 && sortedRows.every((row) => selectedDates.has(row.dateISO));
+  const someDatesSelected = selectedDates.size > 0 && !allDatesSelected;
 
   useEffect(() => {
     if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = someDaysSelected;
+      selectAllRef.current.indeterminate = someDatesSelected;
     }
-  }, [someDaysSelected]);
+  }, [someDatesSelected]);
 
-  const resetFormFields = (day: WeekDay = "Monday") => {
-    const entry = schedule[day];
-    setFormDay(day);
-    setFormOpen(entry.enabled);
-    setFormStart(entry.start);
-    setFormEnd(entry.end);
+  const resetFormFields = (dateISO: string) => {
+    const existing = historyRows.find((row) => row.dateISO === dateISO);
+    setFormDate(dateISO);
+    setFormOpen(existing?.enabled ?? true);
+    setFormStart(existing?.start ?? "09:00");
+    setFormEnd(existing?.end ?? "20:00");
   };
 
   useEffect(() => {
-    if (USE_DUMMY_SHOP_OPEN_HOURS) return;
-    setSchedule(resolveShopOpenHoursSchedule(perDayOpenHours));
-  }, [perDayOpenHours]);
-
-  useEffect(() => {
     if (!showAddForm) return;
-    setEditingDay(null);
-    resetFormFields("Monday");
+    setEditingDateISO(null);
+    resetFormFields(formatLocalDateISO(new Date()));
     setFormMode("add");
   }, [showAddForm]);
 
-  const openEditForm = (day: WeekDay) => {
-    setEditingDay(day);
-    resetFormFields(day);
+  const openEditForm = (row: ShopOpenHoursHistoryRow) => {
+    setEditingDateISO(row.dateISO);
+    resetFormFields(row.dateISO);
     setFormMode("edit");
   };
 
   const closeForm = () => {
     const wasAdd = formMode === "add";
-    setEditingDay(null);
+    setEditingDateISO(null);
     setFormMode(null);
     if (wasAdd) onAddFormClose?.();
   };
 
-  const applyFormToSchedule = (): PerDaySchedule => ({
-    ...schedule,
-    [formDay]: {
-      enabled: formOpen,
-      start: formStart,
-      end: formEnd,
-    },
-  });
-
   const handleSave = async () => {
-    const nextSchedule = applyFormToSchedule();
-    if (USE_DUMMY_SHOP_OPEN_HOURS) {
-      setSchedule(nextSchedule);
-      toast.success("Hours updated.");
-      closeForm();
+    if (!formDate.trim()) {
+      toast.error("Select a date.");
       return;
     }
-    if (!token) return;
+
     setSaving(true);
     try {
-      const res = await updateBusinessOpenHours(token, serializePerDayOpenHoursForApi(nextSchedule));
-      if (!res.ok) {
-        toast.error(apiMessage(res.data) || "Could not save hours.");
-        return;
-      }
-      setSchedule(nextSchedule);
-      toast.success("Hours updated.");
-      onSaved();
+      const nextRow: ShopOpenHoursHistoryRow = {
+        dateISO: formDate,
+        day: weekDayFromDateISO(formDate),
+        enabled: formOpen,
+        start: formStart,
+        end: formEnd,
+      };
+
+      setHistoryRows((prev) => {
+        const withoutTarget =
+          formMode === "edit" && editingDateISO
+            ? prev.filter((row) => row.dateISO !== editingDateISO)
+            : prev.filter((row) => row.dateISO !== formDate);
+        return sortOpenHoursHistoryDesc([...withoutTarget, nextRow]);
+      });
+      toast.success(formMode === "edit" ? "Hours updated." : "Hours added.");
       closeForm();
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleDaySelection = (day: WeekDay) => {
-    setSelectedDays((prev) => {
+  const toggleDateSelection = (dateISO: string) => {
+    setSelectedDates((prev) => {
       const next = new Set(prev);
-      if (next.has(day)) next.delete(day);
-      else next.add(day);
+      if (next.has(dateISO)) next.delete(dateISO);
+      else next.add(dateISO);
       return next;
     });
   };
 
-  const toggleAllDays = () => {
-    setSelectedDays(allDaysSelected ? new Set() : new Set(WEEK_DAYS));
+  const toggleAllDates = () => {
+    setSelectedDates(
+      allDatesSelected ? new Set() : new Set(sortedRows.map((row) => row.dateISO))
+    );
   };
 
-  const applyBulkStatus = async (open: boolean) => {
-    if (selectedDays.size === 0) return;
-
-    const nextSchedule = { ...schedule };
-    for (const day of selectedDays) {
-      nextSchedule[day] = { ...nextSchedule[day], enabled: open };
-    }
-
-    if (USE_DUMMY_SHOP_OPEN_HOURS) {
-      setSchedule(nextSchedule);
-      toast.success(open ? "Selected days opened." : "Selected days closed.");
-      setSelectedDays(new Set());
-      return;
-    }
-
-    if (!token) return;
-    setSaving(true);
-    try {
-      const res = await updateBusinessOpenHours(token, serializePerDayOpenHoursForApi(nextSchedule));
-      if (!res.ok) {
-        toast.error(apiMessage(res.data) || "Could not save hours.");
-        return;
-      }
-      setSchedule(nextSchedule);
-      toast.success(open ? "Selected days opened." : "Selected days closed.");
-      onSaved();
-      setSelectedDays(new Set());
-    } finally {
-      setSaving(false);
-    }
+  const applyBulkStatus = (open: boolean) => {
+    if (selectedDates.size === 0) return;
+    setHistoryRows((prev) =>
+      sortOpenHoursHistoryDesc(
+        prev.map((row) =>
+          selectedDates.has(row.dateISO) ? { ...row, enabled: open } : row
+        )
+      )
+    );
+    toast.success(open ? "Selected dates opened." : "Selected dates closed.");
+    setSelectedDates(new Set());
   };
 
   const showForm = formMode === "add" || formMode === "edit";
-  const hasBulkSelection = selectedDays.size > 0;
+  const hasBulkSelection = selectedDates.size > 0;
 
   return (
     <div className="space-y-1">
@@ -1044,7 +1073,7 @@ export function ShopOpenHoursEditor({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => void applyBulkStatus(true)}
+              onClick={() => applyBulkStatus(true)}
               disabled={!hasBulkSelection || saving}
               className={shopHoursBulkButtonClass}
             >
@@ -1052,7 +1081,7 @@ export function ShopOpenHoursEditor({
             </button>
             <button
               type="button"
-              onClick={() => void applyBulkStatus(false)}
+              onClick={() => applyBulkStatus(false)}
               disabled={!hasBulkSelection || saving}
               className={shopHoursBulkButtonClass}
             >
@@ -1076,31 +1105,22 @@ export function ShopOpenHoursEditor({
           }
         >
           <CompactFormRow>
-            <CompactField label="Day">
+            <CompactField label="Date">
               {formMode === "edit" ? (
                 <input
-                  type="text"
+                  type="date"
                   readOnly
-                  value={shortDayLabel(formDay)}
+                  value={formDate}
                   className={`${shopCompactInputClass} bg-gray-50`}
                 />
               ) : (
-                <select
-                  value={formDay}
+                <input
+                  type="date"
+                  value={formDate}
                   disabled={saving}
-                  onChange={(e) => {
-                    const day = e.target.value as WeekDay;
-                    setFormDay(day);
-                    resetFormFields(day);
-                  }}
+                  onChange={(e) => resetFormFields(e.target.value)}
                   className={shopCompactInputClass}
-                >
-                  {WEEK_DAYS.map((day) => (
-                    <option key={day} value={day}>
-                      {shortDayLabel(day)}
-                    </option>
-                  ))}
-                </select>
+                />
               )}
             </CompactField>
             <CompactField label="Opening time">
@@ -1147,9 +1167,9 @@ export function ShopOpenHoursEditor({
                   <input
                     ref={selectAllRef}
                     type="checkbox"
-                    checked={allDaysSelected}
-                    onChange={toggleAllDays}
-                    aria-label="Select all days"
+                    checked={allDatesSelected}
+                    onChange={toggleAllDates}
+                    aria-label="Select all dates"
                     className="h-3.5 w-3.5 accent-ad-purple"
                   />
                 </th>
@@ -1161,13 +1181,12 @@ export function ShopOpenHoursEditor({
               </tr>
             </thead>
             <tbody>
-              {WEEK_DAYS.map((day, index) => {
-                const entry = schedule[day];
-                const isEditingRow = editingDay === day;
-                const isClosed = !entry.enabled;
+              {sortedRows.map((row, index) => {
+                const isEditingRow = editingDateISO === row.dateISO;
+                const isClosed = !row.enabled;
                 return (
                   <tr
-                    key={day}
+                    key={row.dateISO}
                     className={
                       isEditingRow ? shopProfileEditingRowClass : adminPanelRowClass(index)
                     }
@@ -1175,41 +1194,41 @@ export function ShopOpenHoursEditor({
                     <td className={SHOP_TABLE.tdCheckbox}>
                       <input
                         type="checkbox"
-                        checked={selectedDays.has(day)}
-                        onChange={() => toggleDaySelection(day)}
-                        aria-label={`Select ${day}`}
+                        checked={selectedDates.has(row.dateISO)}
+                        onChange={() => toggleDateSelection(row.dateISO)}
+                        aria-label={`Select ${row.dateISO}`}
                         className="h-3.5 w-3.5 accent-ad-purple"
                       />
                     </td>
                     <td className={SHOP_TABLE.td}>
                       <button
                         type="button"
-                        title={`Edit ${day}`}
-                        aria-label={`Edit ${day}`}
+                        title={`Edit ${row.dateISO}`}
+                        aria-label={`Edit ${row.dateISO}`}
                         disabled={saving}
-                        onClick={() => openEditForm(day)}
+                        onClick={() => openEditForm(row)}
                         className={`font-semibold underline disabled:opacity-60 ${
                           isClosed
                             ? "text-ad-purple hover:text-ad-purple-dark"
                             : "text-blue-700 hover:text-blue-800"
                         }`}
                       >
-                        {nextWeekdayDateISO(day)}
+                        {row.dateISO}
                       </button>
                     </td>
                     <td
                       className={`${SHOP_TABLE.td} font-semibold ${isClosed ? "text-ad-purple" : "text-gray-800"}`}
                     >
-                      {shortDayLabel(day)}
+                      {shortDayLabel(row.day)}
                     </td>
                     <td className={`${SHOP_TABLE.td} ${isClosed ? "text-ad-purple" : ""}`}>
-                      {entry.enabled ? formatOpenHoursTimeTable(entry.start) : "—"}
+                      {row.enabled ? formatOpenHoursTimeTable(row.start) : "—"}
                     </td>
                     <td className={`${SHOP_TABLE.td} ${isClosed ? "text-ad-purple" : ""}`}>
-                      {entry.enabled ? formatOpenHoursTimeTable(entry.end) : "—"}
+                      {row.enabled ? formatOpenHoursTimeTable(row.end) : "—"}
                     </td>
                     <td className={`${SHOP_TABLE.td} font-semibold ${isClosed ? "text-ad-purple" : ""}`}>
-                      {entry.enabled ? "Open" : "Closed"}
+                      {row.enabled ? "Open" : "Closed"}
                     </td>
                   </tr>
                 );

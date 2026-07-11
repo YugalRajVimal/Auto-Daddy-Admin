@@ -51,7 +51,7 @@ import { formatPhoneDisplay, formatPhoneLabel, phoneDigits } from "../../lib/pho
 import { resolveCarBrandLogo } from "../../lib/dummyCarBrands";
 import type { CustomerVehicle, MyCustomer } from "../../types/shopOwner";
 
-type PeopleSection = "customers" | "my-list" | "approval";
+type PeopleSection = "my-list" | "approval";
 
 function shouldDebugPeopleApi(): boolean {
   if (!import.meta.env.DEV) return false;
@@ -79,20 +79,16 @@ type DetailView =
   | { kind: "vehicle-list"; customer: MyCustomer };
 
 const PEOPLE_SECTIONS = [
-  { id: "customers", label: "Customers", variant: "primary" as const },
   { id: "my-list", label: "My Customer List", variant: "primary" as const },
   { id: "approval", label: "Approval", variant: "primary" as const },
 ];
 
 /** Maps People tabs to GET /api/autoshopowner/customer/added?status=… */
-function addedCustomersStatusForSection(section: PeopleSection): string | undefined {
-  if (section === "my-list") return "approved";
-  if (section === "approval") return "pending";
-  return undefined;
+function addedCustomersStatusForSection(section: PeopleSection): string {
+  return section === "approval" ? "pending" : "approved";
 }
 
 const SECTION_HEADINGS: Record<PeopleSection, string> = {
-  customers: "Customers",
   "my-list": "My Customer List",
   approval: "Approval",
 };
@@ -194,26 +190,30 @@ function PeopleSearchBar({
   inputId,
   leading,
   trailing,
+  showSearch = true,
 }: {
   value: string;
   onChange: (value: string) => void;
   inputId: string;
   leading?: React.ReactNode;
   trailing?: React.ReactNode;
+  showSearch?: boolean;
 }) {
   return (
     <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 py-1.5 sm:gap-3">
       <div className="flex items-center gap-2">{leading}</div>
       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-        <input
-          id={inputId}
-          type="search"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Search"
-          aria-label="Search"
-          className="h-[26px] min-w-[9rem] border border-gray-400 bg-white px-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none"
-        />
+        {showSearch ? (
+          <input
+            id={inputId}
+            type="search"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Search"
+            aria-label="Search"
+            className="h-[26px] min-w-[9rem] border border-gray-400 bg-white px-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none"
+          />
+        ) : null}
         {trailing}
       </div>
     </div>
@@ -744,6 +744,9 @@ function CustomerListTable({
   onShowVehicles,
   showCity = false,
   showStatus = false,
+  showAction = false,
+  isCustomerAdded,
+  onAddCustomer,
   selectedIds,
   onToggleRow,
   onTogglePage,
@@ -753,6 +756,9 @@ function CustomerListTable({
   onShowVehicles: (customer: MyCustomer) => void;
   showCity?: boolean;
   showStatus?: boolean;
+  showAction?: boolean;
+  isCustomerAdded?: (customer: MyCustomer) => boolean;
+  onAddCustomer?: (customer: MyCustomer) => void;
   selectedIds: Set<string>;
   onToggleRow: (id: string) => void;
   onTogglePage: (ids: string[], checked: boolean) => void;
@@ -795,12 +801,14 @@ function CustomerListTable({
               {showCity ? <th className={SHOP_TABLE_HEAD_TH_CLASS}>City</th> : null}
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Vehicles</th>
               {showStatus ? <th className={SHOP_TABLE_HEAD_TH_CLASS}>Status</th> : null}
+              {showAction ? <th className={SHOP_TABLE_HEAD_TH_CLASS}>Action</th> : null}
             </tr>
           </thead>
           <tbody>
             {customers.map((customer, index) => {
               const name = customer.name ?? "—";
               const rowKey = pageRowKeys[index];
+              const alreadyAdded = showAction ? Boolean(isCustomerAdded?.(customer)) : false;
               return (
                 <tr key={rowKey} className={adminPanelRowClass(index)}>
                   <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
@@ -848,6 +856,21 @@ function CustomerListTable({
                   {showStatus ? (
                     <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
                       {approvalStatusLabel(customer)}
+                    </td>
+                  ) : null}
+                  {showAction ? (
+                    <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                      {alreadyAdded ? (
+                        <span className="text-xs font-semibold text-gray-600">Added</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onAddCustomer?.(customer)}
+                          className="rounded border border-ad-purple bg-white px-3 py-0.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8]"
+                        >
+                          Add
+                        </button>
+                      )}
                     </td>
                   ) : null}
                 </tr>
@@ -1517,7 +1540,7 @@ export default function ShopPeoplePage() {
   const navigate = useNavigate();
   const { token } = useAuth();
   const { faqsHeading, faqsDescription, city: shopCity } = useShopOwnerPortal();
-  const [section, setSection] = useState<PeopleSection>("customers");
+  const [section, setSection] = useState<PeopleSection>("my-list");
   const [showAddForm, setShowAddForm] = useState(false);
   const [search, setSearch] = useState("");
   const [faqsOpen, setFaqsOpen] = useState(false);
@@ -1530,10 +1553,12 @@ export default function ShopPeoplePage() {
   const [sectionCustomers, setSectionCustomers] = useState<MyCustomer[]>([]);
   const [sectionLoading, setSectionLoading] = useState(false);
   const [sectionError, setSectionError] = useState<string | null>(null);
+  const [addedCustomerIds, setAddedCustomerIds] = useState<Set<string>>(() => new Set());
 
   const loadSectionCustomers = useCallback(async () => {
     if (!token) {
       setSectionCustomers([]);
+      setAddedCustomerIds(new Set());
       setSectionLoading(false);
       setSectionError(null);
       return;
@@ -1542,48 +1567,99 @@ export default function ShopPeoplePage() {
     setSectionLoading(true);
     setSectionError(null);
     try {
-      // Customers tab: search API only when the user has typed a query.
-      if (section === "customers") {
+      // My Customer List: search merges directory results with already-added customers.
+      if (section === "my-list") {
         const q = search.trim();
-        if (q) {
-          const res = await searchCarOwners(token, q);
+
+        if (!q) {
+          const approvedRes = await fetchAddedCustomers(token, "approved");
           logPeopleApi(
             "GET",
-            `/api/autoshopowner/customer/search?search=${encodeURIComponent(q)}`,
+            "/api/autoshopowner/customer/added?status=approved",
             null,
-            res,
+            approvedRes,
           );
-          if (!res.ok) {
+          if (!approvedRes.ok) {
             setSectionCustomers([]);
-            setSectionError("Could not load customers.");
+            setAddedCustomerIds(new Set());
+            setSectionError("Could not load approved customers.");
             return;
           }
-          setSectionCustomers(parseMyCustomers(res.data));
+          const approved = parseMyCustomers(approvedRes.data);
+          setAddedCustomerIds(
+            new Set(approved.map((customer) => customerId(customer)).filter(Boolean)),
+          );
+          setSectionCustomers(approved);
           return;
         }
+
+        const [addedRes, approvedRes, searchRes] = await Promise.all([
+          fetchAddedCustomers(token),
+          fetchAddedCustomers(token, "approved"),
+          searchCarOwners(token, q),
+        ]);
+
+        logPeopleApi("GET", "/api/autoshopowner/customer/added", null, addedRes);
+        logPeopleApi(
+          "GET",
+          "/api/autoshopowner/customer/added?status=approved",
+          null,
+          approvedRes,
+        );
+        logPeopleApi(
+          "GET",
+          `/api/autoshopowner/customer/search?search=${encodeURIComponent(q)}`,
+          null,
+          searchRes,
+        );
+
+        if (!addedRes.ok || !approvedRes.ok || !searchRes.ok) {
+          setSectionCustomers([]);
+          setAddedCustomerIds(new Set());
+          setSectionError("Could not search customers.");
+          return;
+        }
+
+        const allAdded = parseMyCustomers(addedRes.data);
+        setAddedCustomerIds(
+          new Set(allAdded.map((customer) => customerId(customer)).filter(Boolean)),
+        );
+
+        const approved = parseMyCustomers(approvedRes.data);
+        const searchHits = parseMyCustomers(searchRes.data);
+        const byId = new Map<string, MyCustomer>();
+        for (const customer of searchHits) {
+          const id = customerId(customer);
+          if (id) byId.set(id, customer);
+          else byId.set(`anon-${byId.size}`, customer);
+        }
+        for (const customer of approved) {
+          if (!matchesMyCustomerSearch(customer, q)) continue;
+          const id = customerId(customer);
+          if (id) byId.set(id, customer);
+          else byId.set(`anon-approved-${byId.size}`, customer);
+        }
+        setSectionCustomers([...byId.values()]);
+        return;
       }
 
       const status = addedCustomersStatusForSection(section);
       const res = await fetchAddedCustomers(token, status);
-      const path =
-        status != null
-          ? `/api/autoshopowner/customer/added?status=${encodeURIComponent(status)}`
-          : "/api/autoshopowner/customer/added";
+      const path = `/api/autoshopowner/customer/added?status=${encodeURIComponent(status)}`;
       logPeopleApi("GET", path, null, res);
       if (!res.ok) {
         setSectionCustomers([]);
         setSectionError(
           section === "approval"
             ? "Could not load customers awaiting approval."
-            : section === "my-list"
-              ? "Could not load approved customers."
-              : "Could not load customers.",
+            : "Could not load approved customers.",
         );
         return;
       }
       setSectionCustomers(parseMyCustomers(res.data));
     } catch {
       setSectionCustomers([]);
+      setAddedCustomerIds(new Set());
       setSectionError("Network error.");
     } finally {
       setSectionLoading(false);
@@ -1591,7 +1667,7 @@ export default function ShopPeoplePage() {
   }, [token, section, search]);
 
   useEffect(() => {
-    if (section === "customers") {
+    if (section === "my-list") {
       const handle = window.setTimeout(() => {
         void loadSectionCustomers();
       }, 250);
@@ -1602,13 +1678,7 @@ export default function ShopPeoplePage() {
     void loadSectionCustomers();
   }, [loadSectionCustomers, section]);
 
-  const listCustomers = useMemo(() => {
-    // Customers tab search is handled by the API.
-    if (section === "customers") return sectionCustomers;
-    const q = search.trim();
-    if (!q) return sectionCustomers;
-    return sectionCustomers.filter((customer) => matchesMyCustomerSearch(customer, q));
-  }, [section, sectionCustomers, search]);
+  const listCustomers = sectionCustomers;
 
   const showListLoading = sectionLoading;
   const showListError = sectionError;
@@ -1650,13 +1720,12 @@ export default function ShopPeoplePage() {
     resetDetail();
   };
 
-  const isInMyList = useCallback(
-    (_customer: MyCustomer) => {
-      // Customers tab searches car owners not yet added.
-      void _customer;
-      return section !== "customers";
+  const isCustomerAlreadyAdded = useCallback(
+    (customer: MyCustomer) => {
+      const id = customerId(customer);
+      return Boolean(id && addedCustomerIds.has(id));
     },
-    [section],
+    [addedCustomerIds],
   );
 
   const handleAddToListSaved = async (message: string) => {
@@ -1676,9 +1745,9 @@ export default function ShopPeoplePage() {
 
   const handleEditSaved = async (message: string) => {
     const addingFromDirectory =
-      section === "customers" &&
+      section === "my-list" &&
       editingCustomer != null &&
-      !isInMyList(editingCustomer);
+      !isCustomerAlreadyAdded(editingCustomer);
     setStatusMessage(message);
     setEditingCustomer(null);
     if (addingFromDirectory) {
@@ -1692,26 +1761,32 @@ export default function ShopPeoplePage() {
   };
 
   const emptyMessage =
-    section === "customers"
-      ? search.trim()
+    section === "approval"
+      ? "No customers awaiting approval."
+      : search.trim()
         ? "No customers found."
-        : "No customers yet."
-      : section === "approval"
-        ? "No customers awaiting approval."
         : "No approved customers in your list yet.";
 
   const showList = !detailView;
   const showAddNewAction =
-    section === "customers" &&
+    section === "my-list" &&
     !detailView &&
     !showAddForm &&
     !editingCustomer;
+  const showMyListSearchActions = section === "my-list" && search.trim().length > 0;
 
   const handleEditCustomer = (customer: MyCustomer) => {
     setShowAddForm(false);
     setDetailView(null);
     setStatusMessage(null);
     setEditingCustomer(customer);
+  };
+
+  const handleAddCustomerFromSearch = (customer: MyCustomer) => {
+    setShowAddForm(false);
+    setEditingCustomer(null);
+    setStatusMessage(null);
+    setDetailView({ kind: "add-to-list", customer });
   };
 
   const handleShowVehicles = (customer: MyCustomer) => {
@@ -1762,7 +1837,6 @@ export default function ShopPeoplePage() {
 
   const handleBulkDelete = async () => {
     if (!hasBulkSelection || bulkDeleting) return;
-    if (section === "customers") return;
 
     const selectedCustomers = customersMatchingSelection(
       selectedCustomerIds,
@@ -1860,17 +1934,16 @@ export default function ShopPeoplePage() {
               value={search}
               onChange={setSearch}
               inputId={PEOPLE_SEARCH_INPUT_ID}
+              showSearch={section === "my-list"}
               leading={
-                section === "customers" ? null : (
-                  <button
-                    type="button"
-                    onClick={() => void handleBulkDelete()}
-                    disabled={!hasBulkSelection || bulkDeleting}
-                    className={SHOP_PEOPLE_BULK_DELETE_BUTTON_CLASS}
-                  >
-                    {bulkDeleting ? "Deleting…" : "Delete"}
-                  </button>
-                )
+                <button
+                  type="button"
+                  onClick={() => void handleBulkDelete()}
+                  disabled={!hasBulkSelection || bulkDeleting}
+                  className={SHOP_PEOPLE_BULK_DELETE_BUTTON_CLASS}
+                >
+                  {bulkDeleting ? "Deleting…" : "Delete"}
+                </button>
               }
               trailing={
                 showAddNewAction ? (
@@ -1898,8 +1971,9 @@ export default function ShopPeoplePage() {
                   customer={editingCustomer}
                   defaultCity={shopCity}
                   addToListAfterSave={
-                    section === "customers" &&
+                    section === "my-list" &&
                     search.trim().length > 0 &&
+                    !isCustomerAlreadyAdded(editingCustomer) &&
                     (editingCustomer.status ?? "").toLowerCase() !== "onboarded"
                   }
                   onCancel={() => {
@@ -1939,7 +2013,10 @@ export default function ShopPeoplePage() {
                     onEdit={handleEditCustomer}
                     onShowVehicles={handleShowVehicles}
                     showCity
-                    showStatus
+                    showStatus={!showMyListSearchActions}
+                    showAction={showMyListSearchActions}
+                    isCustomerAdded={isCustomerAlreadyAdded}
+                    onAddCustomer={handleAddCustomerFromSearch}
                     selectedIds={selectedCustomerIds}
                     onToggleRow={toggleCustomerSelection}
                     onTogglePage={toggleCustomerPageSelection}

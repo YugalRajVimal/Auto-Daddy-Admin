@@ -14,7 +14,6 @@ import { useAuth } from "../auth";
 import type { ShopDashboardData } from "../hooks/useShopPortal";
 import {
   buildMyCustomersQuery,
-  fetchJobCards,
   fetchMyCustomers,
   fetchMyServices,
   fetchPaidJobCards,
@@ -22,6 +21,7 @@ import {
   fetchUnpaidJobCards,
   type MyCustomersPeriod,
 } from "../lib/shopOwnerApi";
+import { fetchAutoshopJobCards } from "../lib/autoshopownerJobCardsApi";
 import { fetchAutoshopMyDeals } from "../lib/autoshopownerDealsApi";
 import {
   getPrefetchSectionForShopPath,
@@ -257,7 +257,7 @@ async function fetchSectionData(
         return { data: parseMyServices(res.data), error: null };
       }
       case "jobCards": {
-        const res = await fetchJobCards(token, buildMyCustomersQuery(DEFAULT_PERIOD));
+        const res = await fetchAutoshopJobCards(token);
         if (!res.ok) return { data: null, error: "Could not load job cards." };
         return { data: res.data ?? null, error: null };
       }

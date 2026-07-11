@@ -24,7 +24,6 @@ import { ShopReveal } from "../../components/shop/ShopAnimated";
 import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
 import ShopDocumentTemplatePanel, {
   DUMMY_INVOICE_TEMPLATES,
-  DUMMY_JOB_CARD_TEMPLATES,
   resolveTemplateSlug,
 } from "../../components/shop/ShopDocumentTemplatePanel";
 import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
@@ -46,18 +45,9 @@ import {
   fetchAdminServices,
   updateTemplateSlugs,
 } from "../../lib/autoshopownerApi";
-import {
-  apiMessageFromEnvelope,
-  fetchAutoshopJobCardPrefix,
-  parseAutoshopJobCardPrefix,
-  updateAutoshopJobCardPrefix,
-} from "../../lib/autoshopownerJobCardsApi";
 import { getCarBrandId, getCarBrandName } from "../../lib/dummyCarBrands";
 import {
-  getInitialProfileServiceIds,
   getServiceId,
-  isDummyServiceId,
-  mergeServiceCatalog,
   parseServiceCatalog,
   resolveProfileSelectedServices,
 } from "../../lib/dummyServices";
@@ -103,7 +93,6 @@ const PROFILE_SECTIONS = [
   { id: "brands", label: "Car Brand Specialist", variant: "primary" as const },
   { id: "services", label: "Operational Services", variant: "primary" as const },
   { id: "invoice-templates", label: "Invoice Templates", variant: "primary" as const },
-  { id: "job-card-templates", label: "Job Card Templates", variant: "primary" as const },
 ];
 
 const SECTION_TITLES: Record<string, string> = {
@@ -113,7 +102,6 @@ const SECTION_TITLES: Record<string, string> = {
   brands: "Car Brand Specialist",
   services: "Operational Services",
   "invoice-templates": "Invoice Templates",
-  "job-card-templates": "Job Card Templates",
   team: "Team Members",
 };
 
@@ -122,7 +110,6 @@ const FLUSH_HERO_SECTIONS = new Set([
   "brands",
   "services",
   "invoice-templates",
-  "job-card-templates",
 ]);
 const TRANSPARENT_HERO_SECTIONS = new Set(["personal", "business"]);
 const TOP_ALIGNED_SECTIONS = new Set([...FLUSH_HERO_SECTIONS, ...TRANSPARENT_HERO_SECTIONS]);
@@ -228,7 +215,6 @@ export default function ShopProfilePage() {
   const [myServices, setMyServices] = useState<ShopServiceCategory[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
   const [servicesCatalogLoading, setServicesCatalogLoading] = useState(false);
-  const [usingDummyServices, setUsingDummyServices] = useState(false);
   const [myServicesLoading, setMyServicesLoading] = useState(false);
   const [showAddService, setShowAddService] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
@@ -239,63 +225,20 @@ export default function ShopProfilePage() {
   const [invoiceTemplateId, setInvoiceTemplateId] = useState(
     () => DUMMY_INVOICE_TEMPLATES[0]?.id ?? "",
   );
-  const [invoiceTemplateActive, setInvoiceTemplateActive] = useState(true);
   const [savedInvoiceTemplateId, setSavedInvoiceTemplateId] = useState(
     () => DUMMY_INVOICE_TEMPLATES[0]?.id ?? "",
   );
-  const [jobCardTemplateId, setJobCardTemplateId] = useState(
-    () => DUMMY_JOB_CARD_TEMPLATES[0]?.id ?? "",
-  );
-  const [jobCardTemplateActive, setJobCardTemplateActive] = useState(true);
-  const [savedJobCardTemplateId, setSavedJobCardTemplateId] = useState(
-    () => DUMMY_JOB_CARD_TEMPLATES[0]?.id ?? "",
-  );
   const [numbering, setNumbering] = useState(readStoredNumbering);
-  const [manageKind, setManageKind] = useState<NumberingKind | null>(null);
-  const [estimatePrefixLoading, setEstimatePrefixLoading] = useState(false);
-
-  useEffect(() => {
-    if (manageKind !== "estimate" || !token) return;
-    let cancelled = false;
-    setEstimatePrefixLoading(true);
-    void fetchAutoshopJobCardPrefix(token)
-      .then((res) => {
-        if (cancelled) return;
-        if (!res.ok) {
-          toast.error(apiMessageFromEnvelope(res.data) || "Could not load estimate prefix.");
-          return;
-        }
-        const prefix = parseAutoshopJobCardPrefix(res.data);
-        setNumbering((prev) => ({
-          ...prev,
-          estimate: { ...prev.estimate, code: prefix },
-        }));
-      })
-      .catch(() => {
-        if (!cancelled) toast.error("Could not load estimate prefix.");
-      })
-      .finally(() => {
-        if (!cancelled) setEstimatePrefixLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [manageKind, token]);
+  const [manageInvoicesOpen, setManageInvoicesOpen] = useState(false);
 
   useEffect(() => {
     const invoiceSlug = resolveTemplateSlug(
       DUMMY_INVOICE_TEMPLATES,
       business?.invoiceTemplateSlug,
     );
-    const jobCardSlug = resolveTemplateSlug(
-      DUMMY_JOB_CARD_TEMPLATES,
-      business?.jobCardTemplateSlug,
-    );
     setInvoiceTemplateId(invoiceSlug);
     setSavedInvoiceTemplateId(invoiceSlug);
-    setJobCardTemplateId(jobCardSlug);
-    setSavedJobCardTemplateId(jobCardSlug);
-  }, [business?.invoiceTemplateSlug, business?.jobCardTemplateSlug]);
+  }, [business?.invoiceTemplateSlug]);
 
   const shopTypes = useMemo(
     () =>
@@ -311,7 +254,6 @@ export default function ShopProfilePage() {
     const res = await fetchMyServices(token);
     const list = res.ok ? parseMyServices(res.data) : [];
     setMyServices(list);
-    setUsingDummyServices(false);
     setSelectedServiceIds(
       list.length > 0 ? new Set(list.map((service) => getServiceId(service))) : new Set()
     );
@@ -353,7 +295,7 @@ export default function ShopProfilePage() {
     if (activeId !== "services") return;
 
     const applyCatalog = (apiList: ShopServiceCategory[]) => {
-      setFullServiceCatalog(mergeServiceCatalog(apiList));
+      setFullServiceCatalog(apiList);
       setServicesCatalogLoading(false);
     };
 
@@ -410,23 +352,16 @@ export default function ShopProfilePage() {
     }
     if (servicesCatalogLoading) return;
 
-    const applyMyServices = (list: ShopServiceCategory[], allowDummy: boolean) => {
+    const applyMyServices = (list: ShopServiceCategory[]) => {
       setMyServices(list);
-      if (list.length > 0) {
-        setUsingDummyServices(false);
-        setSelectedServiceIds(new Set(list.map((service) => getServiceId(service))));
-      } else if (allowDummy) {
-        setUsingDummyServices(true);
-        setSelectedServiceIds(getInitialProfileServiceIds([]));
-      } else {
-        setUsingDummyServices(false);
-        setSelectedServiceIds(new Set());
-      }
+      setSelectedServiceIds(
+        list.length > 0 ? new Set(list.map((service) => getServiceId(service))) : new Set()
+      );
       setMyServicesLoading(false);
     };
 
     if (!token) {
-      applyMyServices([], true);
+      applyMyServices([]);
       return;
     }
 
@@ -435,11 +370,11 @@ export default function ShopProfilePage() {
     void fetchMyServices(token)
       .then((res) => {
         if (cancelled) return;
-        applyMyServices(res.ok ? parseMyServices(res.data) : [], false);
+        applyMyServices(res.ok ? parseMyServices(res.data) : []);
       })
       .catch(() => {
         if (cancelled) return;
-        applyMyServices([], false);
+        applyMyServices([]);
       });
 
     return () => {
@@ -496,8 +431,7 @@ export default function ShopProfilePage() {
   const sidebarFooter = useMemo(
     () => (
       <div className={`mt-4 ${shopSidebarButtonStackClass}`}>
-        <ShopSidebarButton label="Manage Estimates" onClick={() => setManageKind("estimate")} />
-        <ShopSidebarButton label="Manage Invoices" onClick={() => setManageKind("invoice")} />
+        <ShopSidebarButton label="Manage Invoices" onClick={() => setManageInvoicesOpen(true)} />
       </div>
     ),
     [],
@@ -513,32 +447,6 @@ export default function ShopProfilePage() {
       }
       return next;
     });
-  };
-
-  const saveEstimatePrefix = async (values: NumberingValues): Promise<boolean> => {
-    if (!token) {
-      toast.error("Sign in to update estimate prefix.");
-      return false;
-    }
-    const prefix = values.code.trim();
-    const res = await updateAutoshopJobCardPrefix(token, prefix);
-    if (!res.ok) {
-      toast.error(apiMessageFromEnvelope(res.data) || "Could not update estimate prefix.");
-      return false;
-    }
-    setNumbering((prev) => {
-      const next = {
-        ...prev,
-        estimate: { code: prefix, number: values.number.trim() || prev.estimate.number },
-      };
-      try {
-        localStorage.setItem(NUMBERING_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // ignore quota / private mode
-      }
-      return next;
-    });
-    return true;
   };
 
   const removeBrand = async (company: ShopCarCompany) => {
@@ -571,7 +479,6 @@ export default function ShopProfilePage() {
 
   const removeSelectedServices = async (idsToRemove: Set<string>): Promise<boolean> => {
     const nextIds = [...selectedServiceIds].filter((id) => !idsToRemove.has(id));
-    const allDummy = [...idsToRemove].every(isDummyServiceId);
 
     const applyRemoval = () => {
       if (editingServiceId && idsToRemove.has(editingServiceId)) {
@@ -586,11 +493,6 @@ export default function ShopProfilePage() {
       setSelectedServiceIds(new Set(nextIds));
       toast.success("Selected services removed.");
     };
-
-    if (usingDummyServices || allDummy) {
-      applyRemoval();
-      return true;
-    }
 
     if (!token) return false;
     const res = await updateServiceWeWorkWith(token, nextIds);
@@ -704,22 +606,7 @@ export default function ShopProfilePage() {
             onSaveService={async (id, replacesId, meta) => {
               const persistMeta = () => applyServiceMeta(id, meta);
 
-              if (usingDummyServices || isDummyServiceId(id)) {
-                setSelectedServiceIds((prev) => {
-                  const next = new Set(prev);
-                  if (replacesId) next.delete(replacesId);
-                  next.add(id);
-                  return next;
-                });
-                if (replacesId && replacesId !== id) {
-                  setServiceMetaById((prev) => {
-                    const { [replacesId]: _, ...rest } = prev;
-                    return rest;
-                  });
-                }
-                persistMeta();
-                return true;
-              }
+              if (!token) return false;
 
               persistMeta();
 
@@ -729,7 +616,6 @@ export default function ShopProfilePage() {
 
               if (isMetaOnly) return true;
 
-              if (!token) return false;
               const createdAt = meta?.createdAt?.trim() || new Date().toISOString().slice(0, 10);
               const dateIso = new Date(createdAt).toISOString();
               const status = meta?.isActive === false ? "Inactive" : "Active";
@@ -750,9 +636,7 @@ export default function ShopProfilePage() {
               return true;
             }}
             onSaved={() => {
-              if (!usingDummyServices) {
-                void refreshMyServices();
-              }
+              void refreshMyServices();
               setShowAddService(false);
               setEditingServiceId(null);
             }}
@@ -775,12 +659,9 @@ export default function ShopProfilePage() {
       case "invoice-templates":
         return (
           <ShopDocumentTemplatePanel
-            kind="invoice"
             templates={DUMMY_INVOICE_TEMPLATES}
             selectedId={invoiceTemplateId}
             onSelect={setInvoiceTemplateId}
-            isActive={invoiceTemplateActive}
-            onToggleActive={setInvoiceTemplateActive}
             savedId={savedInvoiceTemplateId}
             onSave={async (id) => {
               if (!token) {
@@ -793,32 +674,6 @@ export default function ShopProfilePage() {
                 return false;
               }
               setSavedInvoiceTemplateId(id);
-              void refresh();
-              return true;
-            }}
-          />
-        );
-      case "job-card-templates":
-        return (
-          <ShopDocumentTemplatePanel
-            kind="jobcard"
-            templates={DUMMY_JOB_CARD_TEMPLATES}
-            selectedId={jobCardTemplateId}
-            onSelect={setJobCardTemplateId}
-            isActive={jobCardTemplateActive}
-            onToggleActive={setJobCardTemplateActive}
-            savedId={savedJobCardTemplateId}
-            onSave={async (id) => {
-              if (!token) {
-                toast.error("Sign in to save template.");
-                return false;
-              }
-              const res = await updateTemplateSlugs(token, { jobCardTemplateSlug: id });
-              if (!res.ok) {
-                toast.error(apiMessage(res.data) || "Could not save job card template.");
-                return false;
-              }
-              setSavedJobCardTemplateId(id);
               void refresh();
               return true;
             }}
@@ -875,7 +730,7 @@ export default function ShopProfilePage() {
         heroBackgroundImage={false}
         contentTopOffset={TOP_ALIGNED_SECTIONS.has(activeId)}
         heroCardFlush={TOP_ALIGNED_SECTIONS.has(activeId)}
-        contentFillHeight={activeId === "invoice-templates" || activeId === "job-card-templates"}
+        contentFillHeight={activeId === "invoice-templates"}
         onFaqsOpen={() => setFaqsOpen(true)}
         onFaqsClose={() => setFaqsOpen(false)}
         faqsOpen={faqsOpen}
@@ -886,18 +741,10 @@ export default function ShopProfilePage() {
       </ShopPageShell>
 
       <ShopManageNumberingDialog
-        open={manageKind === "estimate"}
-        kind="estimate"
-        initial={numbering.estimate}
-        loading={estimatePrefixLoading}
-        onClose={() => setManageKind(null)}
-        onSave={saveEstimatePrefix}
-      />
-      <ShopManageNumberingDialog
-        open={manageKind === "invoice"}
+        open={manageInvoicesOpen}
         kind="invoice"
         initial={numbering.invoice}
-        onClose={() => setManageKind(null)}
+        onClose={() => setManageInvoicesOpen(false)}
         onSave={(values) => saveNumbering("invoice", values)}
       />
     </>
