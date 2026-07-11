@@ -210,12 +210,16 @@ export function fetchAutoshopIncomeReport(
 
 /** Current year's job card / estimate prefix. */
 export function fetchAutoshopJobCardPrefix(token: string) {
-  return getJsonAutoshopowner<unknown>(`${BASE}/jobcard-prefix`, token);
+  return getJsonAutoshopowner<unknown>("/api/autoshopowner/jobcard-prefix", token);
 }
 
 /** Set the job card / estimate prefix for the current year. */
 export function updateAutoshopJobCardPrefix(token: string, prefix: string) {
-  return putJsonAutoshopowner<ApiEnvelope>(`${BASE}/jobcard-prefix`, { prefix }, token);
+  return putJsonAutoshopowner<ApiEnvelope>(
+    "/api/autoshopowner/jobcard-prefix",
+    { prefix },
+    token,
+  );
 }
 
 export function parseAutoshopJobCardPrefix(payload: unknown): string {
