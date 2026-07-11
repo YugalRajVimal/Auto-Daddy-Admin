@@ -32,12 +32,11 @@ import {
 } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
-import { updateBusinessProfile, updatePersonalProfile as updatePersonalProfileNew } from "../../../lib/autoshopownerApi";
+import { updateBusinessProfile, updatePersonalProfile } from "../../../lib/autoshopownerApi";
 import {
   addMyCarCompanies,
   apiMessage,
   updateBusinessOpenHours,
-  updatePersonalProfile,
   updateServiceWeWorkWith,
 } from "../../../lib/shopOwnerMutations";
 import {
@@ -256,7 +255,10 @@ function ProfileStatusFooter({
 function hasEstablishedPersonalProfile(user?: ShopProfileUser, city?: string): boolean {
   const phone = phoneDigits(user?.phone ?? "");
   return Boolean(
-    user?.email?.trim() && phone.length >= 10 && (city?.trim() || user?.pincode?.trim())
+    user?.name?.trim() &&
+      user?.email?.trim() &&
+      phone.length >= 10 &&
+      (city?.trim() || user?.city?.trim())
   );
 }
 
@@ -331,8 +333,6 @@ export function ShopPersonalProfileEditor({
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(phoneDigits(user?.phone ?? ""));
-  const [address, setAddress] = useState(user?.address ?? "");
-  const [pincode, setPincode] = useState(user?.pincode ?? "");
   const [selectedCity, setSelectedCity] = useState(city ?? "");
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [showUploadImage, setShowUploadImage] = useState(false);
@@ -368,8 +368,6 @@ export function ShopPersonalProfileEditor({
     setName(user?.name ?? "");
     setEmail(user?.email ?? "");
     setPhone(phoneDigits(user?.phone ?? ""));
-    setAddress(user?.address ?? "");
-    setPincode(user?.pincode ?? "");
     setSelectedCity(city ?? "");
     setShowUploadImage(false);
     setProfilePhoto(null);
@@ -381,7 +379,7 @@ export function ShopPersonalProfileEditor({
 
   useEffect(() => {
     syncFromUser();
-  }, [user?.name, user?.email, user?.phone, user?.address, user?.pincode, user?.profilePhoto, city]);
+  }, [user?.name, user?.email, user?.phone, user?.profilePhoto, city]);
 
   useEffect(() => {
     if (!token) return;
@@ -410,38 +408,20 @@ export function ShopPersonalProfileEditor({
     if (!token) return;
     setSaving(true);
     try {
-      const fields = {
+      // PUT /api/autoshopowner/profile/personal — name, city, profilePhoto only (phone & email locked).
+      const res = await updatePersonalProfile(token, {
         name: name.trim(),
-        email: email.trim(),
-        phone: phoneDigits(phone),
-        countryCode: session?.meta?.countryCode ?? user?.countryCode ?? "+1",
-        pincode: pincode.trim(),
-        address: address.trim(),
         city: selectedCity.trim(),
-      };
-      // Keep legacy profile endpoint for address/pincode/etc,
-      // but use the new /api/autoshopowner/profile/personal endpoint for photo uploads.
-      const legacyRes = await updatePersonalProfile(token, fields);
-      if (!legacyRes.ok) {
-        toast.error(apiMessage(legacyRes.data) || "Could not save.");
+        profilePhoto,
+      });
+      if (!res.ok) {
+        toast.error(apiMessage(res.data) || "Could not save.");
         return;
-      }
-
-      if (profilePhoto) {
-        const photoRes = await updatePersonalProfileNew(token, {
-          name: fields.name,
-          city: fields.city,
-          profilePhoto,
-        });
-        if (!photoRes.ok) {
-          toast.error(apiMessage(photoRes.data) || "Could not upload photo.");
-          return;
-        }
       }
 
       setProfilePhoto(null);
       if (!isUpdating) setSavedOnce(true);
-      toast.success(isUpdating ? "Profile updated." : "Profile saved.");
+      toast.success(apiMessage(res.data) || (isUpdating ? "Profile updated." : "Profile saved."));
       onSaved();
     } finally {
       setSaving(false);
@@ -480,8 +460,8 @@ export function ShopPersonalProfileEditor({
             <input
               className={shopCompactInputClass}
               value={formatPhoneDisplay(phone)}
-              onChange={(e) => setPhone(phoneDigits(e.target.value))}
-              disabled={saving}
+              disabled
+              readOnly
             />
           </CompactField>
           <CompactField label="City">
@@ -504,8 +484,8 @@ export function ShopPersonalProfileEditor({
               type="email"
               className={shopCompactInputClass}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={saving}
+              disabled
+              readOnly
             />
           </CompactField>
         </CompactFormRow>

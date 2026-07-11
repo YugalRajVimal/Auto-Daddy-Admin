@@ -552,7 +552,7 @@ export default function ShopProfilePage() {
           <ProfileHeroFormSection thoughtOfTheDay={thoughtOfTheDay}>
             <ShopPersonalProfileEditor
               user={user}
-              city={business?.city}
+              city={user?.city ?? business?.city}
               onSaved={() => void refresh()}
             />
           </ProfileHeroFormSection>

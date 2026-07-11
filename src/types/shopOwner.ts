@@ -124,6 +124,7 @@ export type ShopProfileUser = {
   email?: string;
   phone?: string;
   countryCode?: string;
+  city?: string;
   address?: string;
   pincode?: string;
   profilePhoto?: string | null;

@@ -29,6 +29,7 @@ export function fetchPersonalProfile(token: string) {
 }
 
 export function updatePersonalProfile(token: string, fields: { name?: string; city?: string; profilePhoto?: File | null }) {
+  // Backend accepts name, city, profilePhoto only (phone & email are locked).
   const fd = new FormData();
   if (fields.name != null) fd.append("name", fields.name);
   if (fields.city != null) fd.append("city", fields.city);
