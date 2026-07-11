@@ -82,12 +82,17 @@ export default function ShopTeamPage() {
               return (
                 <div key={id} className="flex items-center justify-between rounded-md bg-[#CCFFCC] px-4 py-3">
                   <div>
-                    <p className="font-bold text-gray-900">{String(m.name ?? "")}</p>
+                    <Link
+                      to={`/shop/team/${id}/edit`}
+                      className="font-bold text-blue-700 underline hover:text-blue-800"
+                      aria-label={`Edit ${String(m.name ?? "team member")}`}
+                    >
+                      {String(m.name ?? "")}
+                    </Link>
                     <p className="text-sm text-gray-600">{String(m.designation ?? "")}</p>
                     <p className="text-sm text-blue-700">{String(m.phone ?? "")}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Link to={`/shop/team/${id}/edit`} className="text-xs font-semibold text-ad-purple hover:underline">Edit</Link>
                     <button type="button" className="text-xs font-semibold text-red-600" onClick={() => void handleDelete(id)}>Delete</button>
                   </div>
                 </div>

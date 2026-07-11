@@ -227,7 +227,15 @@ export default function ShopCustomerForm({
         focusOnMount
         footer={
           <CompactFormFooter
-            actionLabel={submitting ? "Saving…" : "Save"}
+            actionLabel={
+              submitting
+                ? mode === "edit"
+                  ? "Updating…"
+                  : "Saving…"
+                : mode === "edit"
+                  ? "Update"
+                  : "Save"
+            }
             onSave={() => void handleSubmit()}
             onCancel={() => navigate(backTo)}
           />

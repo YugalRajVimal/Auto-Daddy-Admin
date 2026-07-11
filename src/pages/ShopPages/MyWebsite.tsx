@@ -146,12 +146,54 @@ type DomainForm = {
   status: string;
 };
 
+const DOMAIN_STATUS_OPTIONS = ["Existing", "New"] as const;
+
 const EMPTY_DOMAIN_FORM: DomainForm = {
   domainName: "",
   expiryDate: "",
   provider: "",
   status: "Existing",
 };
+
+function toDateInputValue(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Earliest selectable expiry: tomorrow (must be in the future). */
+function minExpiryDateInput(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 1);
+  return toDateInputValue(d);
+}
+
+function isValidDomainUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  try {
+    const parsed = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
+    const host = parsed.hostname;
+    if (!host || !host.includes(".")) return false;
+    return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i.test(
+      host,
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isValidFutureExpiryDate(expiryDate: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) return false;
+  const end = new Date(`${expiryDate}T00:00:00`);
+  if (Number.isNaN(end.getTime())) return false;
+  // Reject invalid calendar dates (e.g. 2026-02-31 → rolls to March).
+  if (toDateInputValue(end) !== expiryDate) return false;
+  const min = new Date(`${minExpiryDateInput()}T00:00:00`);
+  return end.getTime() >= min.getTime();
+}
 
 function daysUntilExpiry(expiryDate: string): number | null {
   if (!expiryDate) return null;
@@ -260,7 +302,9 @@ function DomainPanel({
             type="text"
             value={form.domainName}
             onChange={(e) => onChange({ ...form, domainName: e.target.value })}
-            placeholder="Auto27.ca"
+            placeholder="https://auto27.ca"
+            inputMode="url"
+            autoComplete="url"
             className={shopCompactInputClass}
           />
         </CompactField>
@@ -268,6 +312,7 @@ function DomainPanel({
           <input
             type="date"
             value={form.expiryDate}
+            min={minExpiryDateInput()}
             onChange={(e) => onChange({ ...form, expiryDate: e.target.value })}
             className={shopCompactInputClass}
           />
@@ -282,12 +327,17 @@ function DomainPanel({
           />
         </CompactField>
         <CompactField label="Status" className={compactFixedFieldWidth}>
-          <input
-            type="text"
+          <select
             value={form.status}
             onChange={(e) => onChange({ ...form, status: e.target.value })}
             className={shopCompactInputClass}
-          />
+          >
+            {DOMAIN_STATUS_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </CompactField>
       </CompactFormRow>
       <div className="mt-4 border-t border-ad-form-border/60 pt-3">
@@ -761,12 +811,16 @@ export default function ShopMyWebsitePage() {
       toast.error("Please enter the domain name.");
       return;
     }
-    if (!domainForm.expiryDate.trim()) {
-      toast.error("Please enter the domain expiry date.");
+    if (!isValidDomainUrl(domainForm.domainName)) {
+      toast.error("Please enter a valid domain URL (e.g. https://auto27.ca).");
       return;
     }
-    if (daysUntilExpiry(domainForm.expiryDate) == null) {
-      toast.error("Please enter a valid expiry date.");
+    if (!domainForm.expiryDate.trim()) {
+      toast.error("Please select the domain expiry date.");
+      return;
+    }
+    if (!isValidFutureExpiryDate(domainForm.expiryDate)) {
+      toast.error("Please select a valid expiry date in the future.");
       return;
     }
     if (!token) {

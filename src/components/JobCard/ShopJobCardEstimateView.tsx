@@ -33,6 +33,10 @@ const OUTLINE_BTN_CLASS =
 const CONVERT_INVOICE_BTN_CLASS =
   "inline-flex items-center gap-1.5 rounded border border-ad-purple bg-white px-3 py-1.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
 
+const CASH_PAID_BTN_CLASS = CONVERT_INVOICE_BTN_CLASS;
+
+export type JobCardActionPreview = "invoice" | "cash";
+
 function EstimateMetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[9.5rem_minmax(0,1fr)] items-baseline gap-x-2">
@@ -98,8 +102,13 @@ type ShopJobCardEstimateViewProps = {
   jobCardId: string;
   listRow?: JobCardListRow | null;
   jobNoHint?: string | null;
+  /** When set, open directly in that action preview (before confirm). */
+  initialActionPreview?: JobCardActionPreview | null;
   onBack?: () => void;
   onConverted?: () => void;
+  onCashPaid?: () => void;
+  /** Called when action preview mode is entered or left. */
+  onActionPreviewChange?: (preview: JobCardActionPreview | null) => void;
 };
 
 function parseHstRate(business: ReturnType<typeof useShopOwnerPortal>["business"]) {
@@ -112,8 +121,11 @@ export default function ShopJobCardEstimateView({
   jobCardId,
   listRow = null,
   jobNoHint = null,
+  initialActionPreview = null,
   onBack,
   onConverted,
+  onCashPaid,
+  onActionPreviewChange,
 }: ShopJobCardEstimateViewProps) {
   const { token } = useAuth();
   const callingCode = useShopOwnerCallingCode();
@@ -121,7 +133,18 @@ export default function ShopJobCardEstimateView({
   const [job, setJob] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [converting, setConverting] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionPreview, setActionPreview] = useState<JobCardActionPreview | null>(
+    initialActionPreview,
+  );
+
+  useEffect(() => {
+    setActionPreview(initialActionPreview);
+  }, [initialActionPreview, jobCardId]);
+
+  useEffect(() => {
+    onActionPreviewChange?.(actionPreview);
+  }, [actionPreview, onActionPreviewChange]);
 
   const load = useCallback(async () => {
     if (!jobCardId) return;
@@ -173,7 +196,9 @@ export default function ShopJobCardEstimateView({
     void load();
   }, [load]);
 
-  const showHst = job ? jobCardShowsInvoiceHst(job) : false;
+  const invoicePreview = actionPreview === "invoice";
+  const cashPreview = actionPreview === "cash";
+  const showHst = job ? jobCardShowsInvoiceHst(job) || invoicePreview : false;
   const hstRate = parseHstRate(business);
   const effectiveHstRate = showHst ? hstRate : 0;
   const lines = useMemo(
@@ -197,24 +222,47 @@ export default function ShopJobCardEstimateView({
   const customerBlock = job ? buildCustomerBlock(job) : { name: "—", company: "", address: "" };
   const logoUrl = normalizeMediaUrl(business?.businessLogo);
   const hstNumber = pickBusinessHstNumber(business, job) || "—";
+  const alreadyInvoiced = job ? jobCardShowsInvoiceHst(job) : false;
+  const documentTitle = invoicePreview && !alreadyInvoiced ? "Invoice Preview" : "Job Card";
+  const documentNoLabel = invoicePreview && !alreadyInvoiced ? "Invoice No. :" : "Job Card No. :";
+  const footerNote = invoicePreview && !alreadyInvoiced
+    ? "Invoice preview — confirm to convert this job card"
+    : cashPreview
+      ? "Job card preview — confirm to mark as paid by cash"
+      : "This estimate was sent using AutoDaddy";
 
   const canConvertToInvoice = useMemo(
     () => (job ? isJobRecordEligibleForInvoiceConversion(job, listRow) : false),
     [job, listRow],
   );
+  const canMarkPaidByCash = canConvertToInvoice;
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleConvertToInvoice = async () => {
-    if (!token || converting || !canConvertToInvoice) return;
+  const enterInvoicePreview = () => {
+    if (!canConvertToInvoice) return;
+    setActionPreview("invoice");
+  };
+
+  const enterCashPreview = () => {
+    if (!canMarkPaidByCash) return;
+    setActionPreview("cash");
+  };
+
+  const exitActionPreview = () => {
+    setActionPreview(null);
+  };
+
+  const handleConfirmConvertToInvoice = async () => {
+    if (!token || actionBusy || !canConvertToInvoice) return;
     const jobCardNo = pickJobCardNoForApi(listRow) ?? pickJobCardNoForApi(job);
     if (!jobCardNo) {
       toast.error("Could not convert to invoice.");
       return;
     }
-    setConverting(true);
+    setActionBusy(true);
     try {
       const res = await updateAutoshopJobCardStatus(token, jobCardNo, "convertedToInvoice");
       if (!res.ok) {
@@ -222,10 +270,34 @@ export default function ShopJobCardEstimateView({
         return;
       }
       toast.success("Converted to invoice.");
+      setActionPreview(null);
       await load();
       onConverted?.();
     } finally {
-      setConverting(false);
+      setActionBusy(false);
+    }
+  };
+
+  const handleConfirmPaidByCash = async () => {
+    if (!token || actionBusy || !canMarkPaidByCash) return;
+    const jobCardNo = pickJobCardNoForApi(listRow) ?? pickJobCardNoForApi(job);
+    if (!jobCardNo) {
+      toast.error("Could not mark as paid by cash.");
+      return;
+    }
+    setActionBusy(true);
+    try {
+      const res = await updateAutoshopJobCardStatus(token, jobCardNo, "CashPaid");
+      if (!res.ok) {
+        toast.error("Could not mark as paid by cash.");
+        return;
+      }
+      toast.success("Marked as paid by cash.");
+      setActionPreview(null);
+      await load();
+      onCashPaid?.();
+    } finally {
+      setActionBusy(false);
     }
   };
 
@@ -244,7 +316,7 @@ export default function ShopJobCardEstimateView({
               </button>
             ) : null}
             <h2 className="truncate text-sm font-bold text-gray-900 sm:text-base">
-              Job Card : {docNo}
+              {documentTitle} : {docNo}
             </h2>
           </div>
         </div>
@@ -271,18 +343,68 @@ export default function ShopJobCardEstimateView({
             </button>
           ) : null}
           <h2 className="truncate text-sm font-bold text-gray-900 sm:text-base">
-            Job Card : {docNo}
+            {documentTitle} : {docNo}
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void handleConvertToInvoice()}
-            disabled={!canConvertToInvoice || converting}
-            className={CONVERT_INVOICE_BTN_CLASS}
-          >
-            {converting ? "Converting…" : "Convert to Invoice"}
-          </button>
+          {invoicePreview && !alreadyInvoiced ? (
+            <>
+              <button
+                type="button"
+                onClick={exitActionPreview}
+                disabled={actionBusy}
+                className={OUTLINE_BTN_CLASS}
+              >
+                Cancel Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmConvertToInvoice()}
+                disabled={!canConvertToInvoice || actionBusy}
+                className={CONVERT_INVOICE_BTN_CLASS}
+              >
+                {actionBusy ? "Converting…" : "Confirm Convert"}
+              </button>
+            </>
+          ) : cashPreview ? (
+            <>
+              <button
+                type="button"
+                onClick={exitActionPreview}
+                disabled={actionBusy}
+                className={OUTLINE_BTN_CLASS}
+              >
+                Cancel Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmPaidByCash()}
+                disabled={!canMarkPaidByCash || actionBusy}
+                className={CASH_PAID_BTN_CLASS}
+              >
+                {actionBusy ? "Marking…" : "Confirm Paid by Cash"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={enterCashPreview}
+                disabled={!canMarkPaidByCash || actionBusy}
+                className={CASH_PAID_BTN_CLASS}
+              >
+                Paid by Cash
+              </button>
+              <button
+                type="button"
+                onClick={enterInvoicePreview}
+                disabled={!canConvertToInvoice || actionBusy}
+                className={CONVERT_INVOICE_BTN_CLASS}
+              >
+                Convert to Invoice
+              </button>
+            </>
+          )}
           <button type="button" onClick={handlePrint} className={OUTLINE_BTN_CLASS}>
             <FiPrinter size={13} aria-hidden />
             Print
@@ -321,7 +443,7 @@ export default function ShopJobCardEstimateView({
 
           <div className="text-sm lg:ml-auto lg:justify-self-end">
             <div className="w-full min-w-[18rem] max-w-[20rem] space-y-1">
-              <EstimateMetaRow label="Job Card No. :" value={docNo} />
+              <EstimateMetaRow label={documentNoLabel} value={docNo} />
               <EstimateMetaRow
                 label="Date :"
                 value={formatEstimateDate(job.date ?? job.serviceDate ?? job.jobDate ?? job.createdAt)}
@@ -397,7 +519,7 @@ export default function ShopJobCardEstimateView({
         </div>
 
         <p className="mt-6 text-right text-[10px] text-gray-500 print:mt-4">
-          This estimate was sent using AutoDaddy
+          {footerNote}
         </p>
       </div>
     </div>

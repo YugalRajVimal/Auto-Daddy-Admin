@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import JobCardForm from "../../components/JobCard/JobCardForm";
-import ShopJobCardEstimateView from "../../components/JobCard/ShopJobCardEstimateView";
+import ShopJobCardEstimateView, {
+  type JobCardActionPreview,
+} from "../../components/JobCard/ShopJobCardEstimateView";
 import { pickJobNoFromListRow } from "../../components/JobCard/shopJobCardEstimate";
 import {
   ADMIN_PANEL_THEAD_ROW_CLASS,
@@ -22,7 +24,6 @@ import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import {
   deleteAutoshopJobCard,
   sendAutoshopJobCardForApproval,
-  updateAutoshopJobCardStatus,
 } from "../../lib/autoshopownerJobCardsApi";
 import {
   isJobCardApproved,
@@ -81,9 +82,6 @@ const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
 
 const SHOP_JOB_CARD_BULK_BUTTON_CLASS =
   "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
-
-const SHOP_JOB_CARD_EDIT_BUTTON_CLASS =
-  "rounded border border-ad-purple bg-white px-2 py-0.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8]";
 
 function displayJobId(jobNo: string | undefined): string {
   const raw = (jobNo ?? "").trim().replace(/^#/, "");
@@ -177,7 +175,6 @@ function JobCardListTable({
   onTogglePage,
   showStatusColumn = false,
   showInvoiceColumn = false,
-  showActions = true,
 }: {
   rows: JobCardListRow[];
   countryCode: string | null | undefined;
@@ -188,10 +185,8 @@ function JobCardListTable({
   onTogglePage: (ids: string[], checked: boolean) => void;
   showStatusColumn?: boolean;
   showInvoiceColumn?: boolean;
-  showActions?: boolean;
 }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
-  const editHeadClass = `${SHOP_TABLE_HEAD_TH_CLASS} text-center`;
   const pageRowIds = rows.map((row) => row.id);
   const allPageSelected = rows.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
   const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
@@ -234,13 +229,13 @@ function JobCardListTable({
               {showStatusColumn ? (
                 <th className={SHOP_TABLE_HEAD_TH_CLASS}>Status</th>
               ) : null}
-              {showActions ? <th className={editHeadClass}>Actions</th> : null}
             </tr>
           </thead>
           <tbody>
             {rows.map((jc, index) => {
               const customerName = jc.customerName?.trim() || "—";
               const invoiceNo = pickJobCardInvoiceNumber(jc);
+              const canEdit = isJobCardEditable(jc);
               return (
                 <tr key={jc.id} className={adminPanelRowClass(index)}>
                   <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
@@ -255,8 +250,12 @@ function JobCardListTable({
                   <td className={SHOP_TABLE_BODY_TD_CLASS}>
                     <button
                       type="button"
-                      onClick={() => onView(jc)}
+                      onClick={() => (canEdit ? onEdit(jc) : onView(jc))}
                       className="font-semibold text-blue-700 underline hover:text-blue-800"
+                      title={canEdit ? `Edit ${displayJobId(jc.jobNo)}` : `View ${displayJobId(jc.jobNo)}`}
+                      aria-label={
+                        canEdit ? `Edit ${displayJobId(jc.jobNo)}` : `View ${displayJobId(jc.jobNo)}`
+                      }
                     >
                       {displayJobId(jc.jobNo)}
                     </button>
@@ -289,21 +288,6 @@ function JobCardListTable({
                       </span>
                     </td>
                   ) : null}
-                  {showActions ? (
-                    <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
-                      {isJobCardEditable(jc) ? (
-                        <button
-                          type="button"
-                          onClick={() => onEdit(jc)}
-                          className={SHOP_JOB_CARD_EDIT_BUTTON_CLASS}
-                        >
-                          Edit
-                        </button>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                  ) : null}
                 </tr>
               );
             })}
@@ -326,6 +310,7 @@ export default function ShopJobCardsPage() {
   const [editJobCardId, setEditJobCardId] = useState<string | null>(null);
   const [detailJobCardId, setDetailJobCardId] = useState<string | null>(null);
   const [detailListRow, setDetailListRow] = useState<JobCardListRow | null>(null);
+  const [actionPreviewMode, setActionPreviewMode] = useState<JobCardActionPreview | null>(null);
   const [selectedJobCardIds, setSelectedJobCardIds] = useState<Set<string>>(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const {
@@ -350,7 +335,11 @@ export default function ShopJobCardsPage() {
 
   const pageHeading =
     view === "detail"
-      ? "Job Card"
+      ? actionPreviewMode === "invoice"
+        ? "Invoice Preview"
+        : actionPreviewMode === "cash"
+          ? "Paid by Cash Preview"
+          : "Job Card"
       : view === "form" && formMode === "add"
       ? "Create New Job Card"
       : view === "form" && formMode === "edit"
@@ -498,87 +487,38 @@ export default function ShopJobCardsPage() {
     });
   };
 
-  const handleBulkConvertToInvoice = async () => {
+  const handleBulkConvertToInvoice = () => {
     const eligible = convertibleSelectedJobCards;
     if (eligible.length === 0) {
       toast.info("Only approved, unpaid job cards can be converted to invoice.");
       return;
     }
-    if (!token || bulkBusy) return;
-
-    setBulkBusy(true);
-    let failed = 0;
-    try {
-      for (const row of eligible) {
-        const jobCardNo = pickJobCardNoForApi(row);
-        if (!jobCardNo) {
-          failed += 1;
-          continue;
-        }
-        const res = await updateAutoshopJobCardStatus(token, jobCardNo, "convertedToInvoice");
-        if (!res.ok) failed += 1;
-      }
-      await refresh();
-      setSelectedJobCardIds(new Set());
-      const skipped = selectedJobCards.length - eligible.length;
-      if (failed > 0) {
-        toast.error(`Convert to invoice failed for ${failed} job card${failed === 1 ? "" : "s"}.`);
-      } else if (skipped > 0) {
-        toast.success(
-          `Converted ${eligible.length} job card${eligible.length === 1 ? "" : "s"} to invoice. ${skipped} selected card${skipped === 1 ? " was" : "s were"} not eligible.`,
-        );
-      } else {
-        toast.success(
-          `Converted ${eligible.length} job card${eligible.length === 1 ? "" : "s"} to invoice.`,
-        );
-      }
-    } finally {
-      setBulkBusy(false);
+    if (eligible.length > 1) {
+      toast.info("Select one job card to preview the invoice before converting.");
+      return;
     }
+    const row = eligible[0];
+    setDetailJobCardId(row.id);
+    setDetailListRow(row);
+    setActionPreviewMode("invoice");
+    setView("detail");
   };
 
-  const handleBulkPaidByCash = async () => {
+  const handleBulkPaidByCash = () => {
     const eligible = cashPayableSelectedJobCards;
     if (eligible.length === 0) {
       toast.info("Only approved, unpaid job cards can be marked paid by cash.");
       return;
     }
-    if (!token || bulkBusy) return;
-    const count = eligible.length;
-    if (
-      !window.confirm(
-        `Mark ${count} selected job card${count === 1 ? "" : "s"} as paid by cash?`,
-      )
-    ) {
+    if (eligible.length > 1) {
+      toast.info("Select one job card to preview before marking as paid by cash.");
       return;
     }
-    setBulkBusy(true);
-    let failed = 0;
-    try {
-      for (const row of eligible) {
-        const jobCardNo = pickJobCardNoForApi(row);
-        if (!jobCardNo) {
-          failed += 1;
-          continue;
-        }
-        const res = await updateAutoshopJobCardStatus(token, jobCardNo, "CashPaid");
-        if (!res.ok) failed += 1;
-      }
-      await refresh();
-      setSelectedJobCardIds(new Set());
-      const skipped = selectedJobCards.length - eligible.length;
-      if (failed > 0) {
-        toast.error(`Paid by cash failed for ${failed} job card${failed === 1 ? "" : "s"}.`);
-      } else if (skipped > 0) {
-        toast.success(
-          `Marked ${count} job card${count === 1 ? "" : "s"} as paid by cash. ${skipped} selected card${skipped === 1 ? " was" : "s were"} not eligible.`,
-        );
-      } else {
-        toast.success(`Marked ${count} job card${count === 1 ? "" : "s"} as paid by cash.`);
-      }
-    } finally {
-      setBulkBusy(false);
-    }
+    const row = eligible[0];
+    setDetailJobCardId(row.id);
+    setDetailListRow(row);
+    setActionPreviewMode("cash");
+    setView("detail");
   };
 
   const refreshLists = () => {
@@ -588,6 +528,7 @@ export default function ShopJobCardsPage() {
   const openJobCardDetail = (jc: JobCardListRow) => {
     setDetailJobCardId(jc.id);
     setDetailListRow(jc);
+    setActionPreviewMode(null);
     setView("detail");
   };
 
@@ -612,6 +553,7 @@ export default function ShopJobCardsPage() {
     setEditJobCardId(null);
     setDetailJobCardId(null);
     setDetailListRow(null);
+    setActionPreviewMode(null);
   };
 
   const handleJobCardSaved = (
@@ -632,6 +574,7 @@ export default function ShopJobCardsPage() {
           : { id: jobCardId, raw: jobRecord ?? {} });
       setDetailListRow(row);
       setEditJobCardId(null);
+      setActionPreviewMode(null);
       setView("detail");
       return;
     }
@@ -682,8 +625,19 @@ export default function ShopJobCardsPage() {
               jobCardId={detailJobCardId}
               listRow={detailListRow}
               jobNoHint={detailListRow ? pickJobNoFromListRow(detailListRow) ?? null : null}
+              initialActionPreview={actionPreviewMode}
               onBack={showList}
-              onConverted={() => void refreshLists()}
+              onActionPreviewChange={setActionPreviewMode}
+              onConverted={() => {
+                setActionPreviewMode(null);
+                setSelectedJobCardIds(new Set());
+                void refreshLists();
+              }}
+              onCashPaid={() => {
+                setActionPreviewMode(null);
+                setSelectedJobCardIds(new Set());
+                void refreshLists();
+              }}
             />
           ) : null}
         </ShopReveal>
@@ -714,7 +668,7 @@ export default function ShopJobCardsPage() {
                   {showPaidByCashButton ? (
                     <button
                       type="button"
-                      onClick={() => void handleBulkPaidByCash()}
+                      onClick={handleBulkPaidByCash}
                       disabled={!canBulkPaidByCash || bulkBusy}
                       className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
                     >
@@ -724,7 +678,7 @@ export default function ShopJobCardsPage() {
                   {showConvertToInvoiceButton ? (
                     <button
                       type="button"
-                      onClick={() => void handleBulkConvertToInvoice()}
+                      onClick={handleBulkConvertToInvoice}
                       disabled={!canBulkConvertToInvoice || bulkBusy}
                       className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
                     >
@@ -756,10 +710,9 @@ export default function ShopJobCardsPage() {
                   onTogglePage={toggleJobCardPageSelection}
                   showStatusColumn
                   showInvoiceColumn={section === "convert-invoice"}
-                  showActions={section !== "approvals"}
                 />
 
-                <ShopListFooter className="text-sm font-semibold text-gray-600">
+                <ShopListFooter>
                   <p>{filteredListCards.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">

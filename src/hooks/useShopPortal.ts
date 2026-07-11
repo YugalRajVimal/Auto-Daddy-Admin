@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth";
-import { extractThought } from "../lib/extractThought";
+import { extractThoughtOfTheDay, type ThoughtOfTheDayView } from "../lib/extractThought";
 import { updateBusinessActiveStatus } from "../lib/shopOwnerApi";
 import { useShopOwnerData } from "../context/ShopOwnerDataProvider";
 import type { DashboardIncomeOverview } from "../types/shopOwner";
@@ -10,15 +10,30 @@ export type ShopContentBlock = {
   desc?: string;
 };
 
+export type ShopThoughtOfTheDayApi =
+  | string
+  | {
+      subject?: string;
+      notes?: string;
+      text?: string;
+      quote?: string;
+      thought?: string;
+    };
+
 export type ShopDashboardData = {
   success?: boolean;
   businessName?: string;
   businessContactNo?: string;
   subscriptionDaysLeftCount?: number;
-  thoughtOfTheDay?: string | { text?: string; quote?: string; thought?: string };
+  thoughtOfTheDay?: ShopThoughtOfTheDayApi;
   incomeOverview?: DashboardIncomeOverview;
   idBusinessActive?: boolean;
   FAQs?: ShopContentBlock;
+};
+
+const DEFAULT_THOUGHT: ThoughtOfTheDayView = {
+  title: "",
+  description: "Start each day with a positive thought.",
 };
 
 export function useShopOwnerPortal() {
@@ -53,8 +68,7 @@ export function useShopOwnerPortal() {
   const city = business?.city?.trim() || "";
   const daysLeft = dashboard?.subscriptionDaysLeftCount;
   const thoughtOfTheDay =
-    extractThought(dashboard?.thoughtOfTheDay) ||
-    "Start each day with a positive thought.";
+    extractThoughtOfTheDay(dashboard?.thoughtOfTheDay) ?? DEFAULT_THOUGHT;
   const faqsHeading = dashboard?.FAQs?.heading?.trim() || "FAQs";
   const faqsDescription = dashboard?.FAQs?.desc?.trim() || "";
   const incomeOverview = dashboard?.incomeOverview ?? null;

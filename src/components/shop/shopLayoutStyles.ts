@@ -78,8 +78,8 @@ export const shopMainContentFillClass = "flex min-h-0 flex-1 flex-col";
 /** Muted copy placed directly on the hero image (not inside a card). */
 export const shopHeroOnImageMutedTextClass = "text-white/85";
 
-/** List footer labels sitting on the hero image. */
-export const shopHeroFooterTextClass = "text-sm font-semibold text-white";
+/** List footer labels below tables (e.g. "9 Entries"). */
+export const shopHeroFooterTextClass = "text-sm font-semibold text-gray-800";
 
 /** Marks an opaque nested card/panel — keeps default dark text inside the hero card. */
 export const shopHeroOpaqueSurfaceClass = "shop-hero-surface";

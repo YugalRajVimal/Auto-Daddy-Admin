@@ -57,9 +57,9 @@ export function buildMyCustomersQuery(period: MyCustomersPeriod): Record<string,
 export function fetchMyCustomers(token: string, query?: Record<string, string>) {
   // NEW: customers live under /api/autoshopowner/customer/*
   // This "my customers" view maps best to the added-customer list.
-  // (The new API doesn't support the legacy date filters; we ignore that query.)
-  void query;
-  return getJson<unknown>("/api/autoshopowner/customer/added", token);
+  // Optional `status` (e.g. "approved" | "pending") is forwarded; legacy date filters are ignored.
+  const status = query?.status?.trim() || undefined;
+  return getJson<unknown>(withQuery("/api/autoshopowner/customer/added", { status }), token);
 }
 
 export function searchCarOwners(token: string, search: string) {

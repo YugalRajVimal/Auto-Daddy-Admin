@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CompactField, compactInputClass } from "./ContentPanel";
 
 type ComboSelectWithEditorProps = {
@@ -31,12 +32,57 @@ export default function ComboSelectWithEditor({
   activeItemClassName = "bg-ad-green-light/60 font-semibold text-ad-green-dark",
 }: ComboSelectWithEditorProps) {
   const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<{ top: number; left: number; width: number } | null>(
+    null,
+  );
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const updatePosition = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const menuHeight = menuRef.current?.offsetHeight ?? 208;
+    const gap = 2;
+    const spaceBelow = window.innerHeight - rect.bottom - gap;
+    const spaceAbove = rect.top - gap;
+
+    let top = rect.bottom + gap;
+    if (spaceBelow < Math.min(menuHeight, 160) && spaceAbove > spaceBelow) {
+      top = Math.max(gap, rect.top - menuHeight - gap);
+    }
+
+    setMenuStyle({
+      top,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setMenuStyle(null);
+      return;
+    }
+    updatePosition();
+    const raf = requestAnimationFrame(() => updatePosition());
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open, options.length, updatePosition]);
 
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -51,23 +97,21 @@ export default function ComboSelectWithEditor({
 
   const displayValue = value || placeholder || "Select";
 
-  return (
-    <CompactField label={label} required={required} className={className}>
-      <div ref={rootRef} className="relative">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setOpen((prev) => !prev)}
-          className={`${inputClassName} flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:bg-gray-100 ${
-            value ? "text-gray-900" : "text-gray-500"
-          }`}
-        >
-          <span className="truncate">{displayValue}</span>
-          <span className="ml-2 shrink-0 text-[10px] text-gray-500">{open ? "▲" : "▼"}</span>
-        </button>
-
-        {open && !disabled && (
-          <div className="absolute left-0 right-0 z-50 mt-0.5 max-h-52 overflow-hidden rounded border border-gray-400 bg-white shadow-lg">
+  const menu =
+    open && !disabled && menuStyle
+      ? createPortal(
+          <div
+            ref={menuRef}
+            role="listbox"
+            style={{
+              position: "fixed",
+              top: menuStyle.top,
+              left: menuStyle.left,
+              width: menuStyle.width,
+              zIndex: 10000,
+            }}
+            className="max-h-52 overflow-hidden rounded border border-gray-400 bg-white shadow-lg"
+          >
             <button
               type="button"
               onClick={() => {
@@ -95,6 +139,8 @@ export default function ComboSelectWithEditor({
                 <button
                   key={opt}
                   type="button"
+                  role="option"
+                  aria-selected={opt === value}
                   onClick={() => {
                     onChange(opt);
                     setOpen(false);
@@ -116,8 +162,33 @@ export default function ComboSelectWithEditor({
                 </button>
               )}
             </div>
-          </div>
-        )}
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <CompactField label={label} required={required} className={className}>
+      <div ref={rootRef} className="relative">
+        <button
+          ref={buttonRef}
+          type="button"
+          disabled={disabled}
+          onClick={() => {
+            setOpen((prev) => {
+              const next = !prev;
+              if (next) updatePosition();
+              return next;
+            });
+          }}
+          className={`${inputClassName} flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:bg-gray-100 ${
+            value ? "text-gray-900" : "text-gray-500"
+          }`}
+        >
+          <span className="truncate">{displayValue}</span>
+          <span className="ml-2 shrink-0 text-[10px] text-gray-500">{open ? "▲" : "▼"}</span>
+        </button>
+        {menu}
       </div>
     </CompactField>
   );

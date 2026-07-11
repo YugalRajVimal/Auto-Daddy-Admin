@@ -88,7 +88,7 @@ export default function OwnerJobCardsPage() {
           </div>
           <OwnerJobCardsTable rows={pageRows} countryCode={countryCode} />
           {totalPages > 1 ? (
-            <div className="flex items-center justify-between gap-2 border-t border-gray-200 pt-3 text-xs text-gray-600">
+            <div className="flex items-center justify-between gap-2 border-t border-gray-200 pt-3 text-xs text-gray-800">
               <span>
                 Page {page} of {totalPages} ({filtered.length} total)
               </span>

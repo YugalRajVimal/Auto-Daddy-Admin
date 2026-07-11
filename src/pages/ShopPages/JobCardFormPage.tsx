@@ -295,7 +295,7 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
         focusOnMount
         footer={
           <CompactFormFooter
-            actionLabel={submitting ? "Saving…" : isEdit ? "Update Job Card" : "Create Job Card"}
+            actionLabel={submitting ? (isEdit ? "Updating…" : "Saving…") : isEdit ? "Update" : "Save"}
             onSave={() => void handleSubmit()}
             onCancel={() => navigate("/shop/job-cards")}
           />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import {
   CompactField,
@@ -11,9 +11,12 @@ import {
   shopProfileFormPanelFooterClass,
 } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
-import { addSubServices, editSubService } from "../../../lib/autoshopownerApi";
+import { addSubServices, editSubService, fetchAdminServices } from "../../../lib/autoshopownerApi";
+import { parseServiceCatalog } from "../../../lib/dummyServices";
 import { apiMessage } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
+
+type CatalogSub = ShopServiceCategory["subServices"][number];
 
 type ShopServiceSubDialogProps = {
   category: ShopServiceCategory | null;
@@ -23,6 +26,10 @@ type ShopServiceSubDialogProps = {
   onCancel: () => void;
   onSaved: () => void;
 };
+
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase();
+}
 
 export default function ShopServiceSubDialog({
   category,
@@ -39,6 +46,9 @@ export default function ShopServiceSubDialog({
   const [tax, setTax] = useState("13");
   const [desc, setDesc] = useState("");
   const [saving, setSaving] = useState(false);
+  const [catalogSubs, setCatalogSubs] = useState<CatalogSub[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const nameFieldRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!category) return;
@@ -56,7 +66,85 @@ export default function ShopServiceSubDialog({
       setQty("1");
       setTax("13");
     }
+    setShowSuggestions(false);
   }, [category, editIndex]);
+
+  useEffect(() => {
+    if (!category || demoMode || !token) {
+      setCatalogSubs([]);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const findMatch = (catalog: ShopServiceCategory[]) =>
+        catalog.find((item) => item.id === category.id) ??
+        catalog.find(
+          (item) =>
+            normalizeName(item.name ?? "") === normalizeName(category.name ?? ""),
+        );
+
+      const first = await fetchAdminServices(token, {
+        shopType: category.shopType || undefined,
+        services: undefined,
+      });
+      if (cancelled) return;
+      let match = first.ok ? findMatch(parseServiceCatalog(first.data)) : undefined;
+
+      if (!match && category.shopType) {
+        const all = await fetchAdminServices(token, { services: undefined });
+        if (cancelled) return;
+        if (all.ok) match = findMatch(parseServiceCatalog(all.data));
+      }
+
+      setCatalogSubs(match?.subServices ?? []);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [category, demoMode, token]);
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      if (!nameFieldRef.current?.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
+
+  const existingNames = useMemo(() => {
+    if (!category) return new Set<string>();
+    return new Set(
+      category.subServices
+        .filter((_, index) => index !== editIndex)
+        .map((sub) => normalizeName(sub.name))
+        .filter(Boolean),
+    );
+  }, [category, editIndex]);
+
+  const suggestions = useMemo(() => {
+    const query = normalizeName(name);
+    return catalogSubs
+      .filter((sub) => {
+        const subName = normalizeName(sub.name);
+        if (!subName || existingNames.has(subName)) return false;
+        if (!query) return true;
+        return subName.includes(query) || normalizeName(sub.desc).includes(query);
+      })
+      .slice(0, 8);
+  }, [catalogSubs, existingNames, name]);
+
+  const applySuggestion = (sub: CatalogSub) => {
+    setName(sub.name);
+    setDesc(sub.desc ?? "");
+    setPrice(String(sub.price ?? ""));
+    setQty(String(sub.qty != null && sub.qty > 0 ? sub.qty : 1));
+    setTax(sub.tax != null ? String(sub.tax) : "13");
+    setShowSuggestions(false);
+  };
 
   const handleSave = async () => {
     if (!category) return;
@@ -175,19 +263,49 @@ export default function ShopServiceSubDialog({
     >
       <CompactFormRow className="flex-nowrap items-end gap-x-3 overflow-x-auto">
         <CompactField label="Name Category" required className="w-[10.5rem] shrink-0">
-          <input
-            className={shopCompactInputClass}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={saving}
-          />
+          <div ref={nameFieldRef} className="relative">
+            <input
+              className={shopCompactInputClass}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              disabled={saving}
+              autoComplete="off"
+            />
+            {showSuggestions && suggestions.length > 0 ? (
+              <ul className="absolute left-0 right-0 z-20 mt-1 max-h-48 overflow-auto rounded border border-gray-300 bg-white shadow-md">
+                {suggestions.map((sub) => (
+                  <li key={`${sub.name}-${sub.desc}`}>
+                    <button
+                      type="button"
+                      className="flex w-full flex-col items-start gap-0.5 px-2.5 py-1.5 text-left hover:bg-[#f5cce8]"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => applySuggestion(sub)}
+                    >
+                      <span className="text-xs font-semibold text-gray-900">{sub.name}</span>
+                      {sub.desc ? (
+                        <span className="line-clamp-1 text-[11px] text-gray-600">{sub.desc}</span>
+                      ) : null}
+                      <span className="text-[11px] font-medium text-gray-700">
+                        ${sub.price}
+                        {sub.qty != null ? ` · qty ${sub.qty}` : ""}
+                        {sub.tax != null ? ` · tax ${sub.tax}%` : ""}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         </CompactField>
         <CompactField label="Description" className="min-w-[12rem] flex-1">
-          <textarea
-            className={`${shopCompactInputClass} resize-none overflow-hidden`}
+          <input
+            className={shopCompactInputClass}
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
-            rows={1}
             disabled={saving}
           />
         </CompactField>

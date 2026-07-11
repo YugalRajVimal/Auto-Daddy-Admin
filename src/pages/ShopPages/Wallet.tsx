@@ -371,7 +371,7 @@ function WalletListFooter({
   onPageChange: (page: number) => void;
 }) {
   return (
-    <ShopListFooter className="text-sm font-semibold text-gray-600">
+    <ShopListFooter>
       <p>{totalEntries} Entries</p>
       {totalPages > 1 ? (
         <div className="flex items-center gap-1">

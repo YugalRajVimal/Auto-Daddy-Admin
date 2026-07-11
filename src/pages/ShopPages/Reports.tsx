@@ -585,7 +585,7 @@ export default function ShopReportsPage() {
           </div>
 
           {bankRows.length > 0 ? (
-            <ShopListFooter className="text-sm font-semibold text-gray-600">
+            <ShopListFooter>
               <div className="flex items-center gap-2 text-xs text-gray-700">
                 <span>Show</span>
                 <select

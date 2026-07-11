@@ -681,6 +681,10 @@ export default function JobCardForm({
         setMyBanks(data.myBanks);
         setSelectedBankId(defaultInvoiceBankId(data.myBanks));
 
+        if (modeProp === "add" && data.nextJobCardNo != null) {
+          setDisplayJobNo(String(data.nextJobCardNo));
+        }
+
         if (modeProp === "edit" && jobCardId) {
           setEditPrefillLoading(true);
           const resp = await fetchJobCardByIdForForm(token, jobCardId);
@@ -940,10 +944,14 @@ export default function JobCardForm({
               className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60"
             >
               {formLoading
-                ? "Saving..."
+                ? formMode === "edit"
+                  ? "Updating…"
+                  : "Saving…"
                 : editPrefillLoading || dataLoading
                   ? "Loading…"
-                  : "Save"}
+                  : formMode === "edit"
+                    ? "Update"
+                    : "Save"}
             </button>
             <span className="text-xs text-gray-700">
               or{" "}

@@ -45,7 +45,8 @@ function toDomainForm(raw: unknown): DomainDetailsInput | null {
         ? o.expiry.slice(0, 10)
         : "";
   const provider = typeof o.provider === "string" ? o.provider.trim() : "";
-  const status = typeof o.status === "string" ? o.status.trim() : "Existing";
+  const rawStatus = typeof o.status === "string" ? o.status.trim().toLowerCase() : "";
+  const status = rawStatus === "new" ? "New" : "Existing";
   return { domainName, expiryDate, provider, status };
 }
 

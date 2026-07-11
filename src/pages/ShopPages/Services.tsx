@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiEdit2 } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import {
@@ -81,7 +80,6 @@ function SubServiceTable({
   onToggleAllChecked: () => void;
   onEdit: (originalIndex: number) => void;
 }) {
-  const editHeadClass = `${SHOP_TABLE.th} text-center`;
   const selectAllRef = useRef<HTMLInputElement>(null);
   const allRowsChecked = allRowIds.length > 0 && allRowIds.every((id) => checkedIds.has(id));
   const someRowsChecked = checkedIds.size > 0 && !allRowsChecked;
@@ -117,7 +115,6 @@ function SubServiceTable({
               <th className={SHOP_TABLE.th}>Unit Cost</th>
               <th className={SHOP_TABLE.th}>Qty</th>
               <th className={SHOP_TABLE.th}>Amount</th>
-              <th className={editHeadClass}>Edit</th>
             </tr>
           </thead>
           <tbody>
@@ -136,7 +133,17 @@ function SubServiceTable({
                       className="h-3.5 w-3.5 accent-ad-purple"
                     />
                   </td>
-                  <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>{sub.name}</td>
+                  <td className={SHOP_TABLE.td}>
+                    <button
+                      type="button"
+                      title={`Edit ${sub.name}`}
+                      aria-label={`Edit ${sub.name}`}
+                      onClick={() => onEdit(originalIndex)}
+                      className="font-semibold text-blue-700 underline hover:text-blue-800"
+                    >
+                      {sub.name}
+                    </button>
+                  </td>
                   <td className={SHOP_TABLE.td}>{sub.desc?.trim() || "—"}</td>
                   <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
                     {formatUnitCost(sub.price)}
@@ -144,17 +151,6 @@ function SubServiceTable({
                   <td className={SHOP_TABLE.td}>{qty}</td>
                   <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>
                     {formatAmount(amount)}
-                  </td>
-                  <td className={`${SHOP_TABLE.td} text-center`}>
-                    <button
-                      type="button"
-                      title={`Edit ${sub.name}`}
-                      aria-label={`Edit ${sub.name}`}
-                      onClick={() => onEdit(originalIndex)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
-                    >
-                      <FiEdit2 size={13} aria-hidden />
-                    </button>
                   </td>
                 </tr>
               );
@@ -414,7 +410,7 @@ export default function ShopServicesPage() {
                   onEdit={openEditForm}
                 />
 
-                <ShopListFooter className="text-sm font-semibold text-gray-600">
+                <ShopListFooter>
                   <p>{allSubs.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">

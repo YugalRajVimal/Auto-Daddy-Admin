@@ -109,7 +109,9 @@ export default function ShopTeamMemberFormPage() {
         focusOnMount
         footer={
           <CompactFormFooter
-            actionLabel={submitting ? "Saving…" : "Save"}
+            actionLabel={
+              submitting ? (isEdit ? "Updating…" : "Saving…") : isEdit ? "Update" : "Save"
+            }
             onSave={() => void handleSave()}
             onCancel={() => navigate("/shop/team")}
           />

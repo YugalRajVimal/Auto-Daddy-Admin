@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getJson, postJson } from "../api/mobileAuth";
 import { useAuth } from "../auth";
-import { extractThought } from "../lib/extractThought";
+import { extractThoughtOfTheDay, type ThoughtOfTheDayView } from "../lib/extractThought";
 import {
   parseServiceCatalogResponse,
   partitionOwnerHomeSidebarServices,
@@ -11,11 +11,21 @@ import {
 
 export type { ServiceCategory, ServiceSubItem };
 
+export type CarOwnerThoughtOfTheDayApi =
+  | string
+  | {
+      subject?: string;
+      notes?: string;
+      text?: string;
+      quote?: string;
+      thought?: string;
+    };
+
 export type CarOwnerDashboardData = {
   success?: boolean;
   thoughtOfTheDayLiked?: boolean;
   dashboard?: {
-    thoughtOfTheDay?: string | { text?: string; quote?: string; thought?: string };
+    thoughtOfTheDay?: CarOwnerThoughtOfTheDayApi;
     FAQs?: { heading?: string; desc?: string };
   };
   userProfile?: {
@@ -25,6 +35,11 @@ export type CarOwnerDashboardData = {
     profilePhoto?: string | null;
     thoughtOfTheDayLiked?: boolean;
   };
+};
+
+const DEFAULT_THOUGHT: ThoughtOfTheDayView = {
+  title: "",
+  description: "Start each day with a positive thought.",
 };
 
 type ToggleThoughtLikeResponse = {
@@ -96,8 +111,7 @@ export function useCarOwnerDashboard() {
   }, [likeBusy, liked, token]);
 
   const thought =
-    extractThought(data?.dashboard?.thoughtOfTheDay) ||
-    "Start each day with a positive thought.";
+    extractThoughtOfTheDay(data?.dashboard?.thoughtOfTheDay) ?? DEFAULT_THOUGHT;
 
   const faqs = data?.dashboard?.FAQs;
 

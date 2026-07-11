@@ -36,6 +36,7 @@ export type MyCustomer = {
   updatedAt?: string;
   status?: string;
   linkStatus?: string;
+  approvalStatus?: string;
 };
 
 export type ShopDeal = {

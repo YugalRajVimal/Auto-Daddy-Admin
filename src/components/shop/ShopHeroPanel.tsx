@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { PartsDealerCard } from "../../hooks/usePartsDealers";
+import type { ThoughtOfTheDayView } from "../../lib/extractThought";
 import type { SalvageDeal } from "../../lib/dummySalvageDeals";
 import { PORTAL_HOME_HERO_IMAGE } from "../../lib/portalHeroImage";
 import { Skeleton } from "../common/Skeleton";
@@ -9,7 +10,7 @@ import ShopMenuDetailContent from "./ShopMenuDetailContent";
 import { shopHeroOpaqueSurfaceClass, shopMainContentShellClass } from "./shopLayoutStyles";
 
 type ShopHeroPanelProps = {
-  thoughtOfTheDay?: string;
+  thoughtOfTheDay?: ThoughtOfTheDayView | string;
   loading?: boolean;
   className?: string;
   partsDealer?: PartsDealerCard | null;
@@ -32,6 +33,13 @@ export default function ShopHeroPanel({
   const showingAd = partsDealer != null || salvageDeal != null;
   const showingOverlay = showingAd || menuOpen;
   const handleOverlayClose = showingAd ? onAdClose : onMenuClose;
+  const thoughtTitle =
+    typeof thoughtOfTheDay === "string" ? "" : thoughtOfTheDay?.title?.trim() || "";
+  const thoughtDescription =
+    typeof thoughtOfTheDay === "string"
+      ? thoughtOfTheDay.trim()
+      : thoughtOfTheDay?.description?.trim() || "";
+  const hasThought = Boolean(thoughtTitle || thoughtDescription);
 
   useEffect(() => {
     if (!showingOverlay || !handleOverlayClose) return;
@@ -77,8 +85,8 @@ export default function ShopHeroPanel({
                 )}
               </div>
             </div>
-          ) : thoughtOfTheDay ? (
-            <ThoughtOfTheDayCard text={thoughtOfTheDay} />
+          ) : hasThought ? (
+            <ThoughtOfTheDayCard title={thoughtTitle} description={thoughtDescription} />
           ) : null}
         </>
       )}

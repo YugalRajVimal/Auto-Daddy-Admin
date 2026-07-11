@@ -1,8 +1,5 @@
 export const currentYear = new Date().getFullYear();
 
-export const PREVIEW_CROP_WIDTH = 1200;
-export const PREVIEW_CROP_HEIGHT = 900;
-
 export const ownerVehicleFieldClass =
   "w-full min-h-[36px] rounded-lg border border-[#c8c8c8] bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-[#b0b0b0] focus:border-ad-green focus:outline-none";
 
@@ -43,48 +40,4 @@ export function isValidVehicleYear(value: string) {
 
 export function trimVehicleApiMessage(payload: VehicleApiEnvelope | null) {
   return typeof payload?.message === "string" ? payload.message.trim() : "";
-}
-
-export async function cropImageToPreviewFrame(file: File): Promise<File> {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error("Could not read image."));
-      el.src = url;
-    });
-
-    const targetRatio = PREVIEW_CROP_WIDTH / PREVIEW_CROP_HEIGHT;
-    const sourceRatio = img.naturalWidth / img.naturalHeight;
-
-    let cropW: number;
-    let cropH: number;
-    if (sourceRatio > targetRatio) {
-      cropH = img.naturalHeight;
-      cropW = cropH * targetRatio;
-    } else {
-      cropW = img.naturalWidth;
-      cropH = cropW / targetRatio;
-    }
-
-    const sx = (img.naturalWidth - cropW) / 2;
-    const sy = (img.naturalHeight - cropH) / 2;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = PREVIEW_CROP_WIDTH;
-    canvas.height = PREVIEW_CROP_HEIGHT;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Could not prepare image.");
-
-    ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, PREVIEW_CROP_WIDTH, PREVIEW_CROP_HEIGHT);
-
-    const mime = file.type.startsWith("image/") ? file.type : "image/jpeg";
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, mime, 0.9));
-    if (!blob) throw new Error("Could not crop image.");
-
-    return new File([blob], file.name || "vehicle.jpg", { type: blob.type || mime });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
 }

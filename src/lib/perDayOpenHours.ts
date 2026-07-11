@@ -35,8 +35,8 @@ export function createDefaultPerDaySchedule(): PerDaySchedule {
   }, {} as PerDaySchedule);
 }
 
-/** Demo schedule until per-day open hours API is reliable. */
-export const USE_DUMMY_SHOP_OPEN_HOURS = true;
+/** When true, ignore API and use a fixed demo schedule. */
+export const USE_DUMMY_SHOP_OPEN_HOURS = false;
 
 export function createDummyPerDaySchedule(): PerDaySchedule {
   const schedule = createDefaultPerDaySchedule();

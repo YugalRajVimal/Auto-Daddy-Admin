@@ -404,8 +404,20 @@ export default function OwnerVehiclesPage() {
                         />
                       </div>
 
-                      <div className="min-w-0 flex-1 text-center text-lg font-bold text-ad-purple">
-                        {plate}
+                      <div className="min-w-0 flex-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedVehicleId(v.id);
+                            setActiveSection("vehicle-details");
+                            setVehicleDetailsMode("edit");
+                          }}
+                          className="text-lg font-bold text-ad-purple underline hover:text-ad-purple-dark"
+                          aria-label={`Edit vehicle ${plate}`}
+                          title="Edit"
+                        >
+                          {plate}
+                        </button>
                       </div>
 
                       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -436,22 +448,6 @@ export default function OwnerVehiclesPage() {
                           </button>
                         ))}
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedVehicleId(v.id);
-                            setActiveSection("vehicle-details");
-                            setVehicleDetailsMode("edit");
-                          }}
-                          className="inline-flex h-8 w-8 items-center justify-center bg-transparent text-blue-700 hover:text-blue-800"
-                          aria-label="Edit vehicle"
-                          title="Edit"
-                        >
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
-                            <path d="M14.69 2.86a1.5 1.5 0 0 1 2.12 2.12l-9.4 9.4-3.2.58.58-3.2 9.4-9.4Z" />
-                            <path d="M3 17h14v1H3v-1Z" />
-                          </svg>
-                        </button>
                         <button
                           type="button"
                           onClick={() => {

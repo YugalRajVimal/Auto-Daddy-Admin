@@ -113,6 +113,7 @@ function toCustomer(raw: unknown): MyCustomer | null {
     updatedAt: s(o.updatedAt),
     status: s(o.status) ?? s(o.approvalStatus),
     linkStatus: s(o.linkStatus),
+    approvalStatus: s(o.approvalStatus),
   };
 }
 

@@ -112,21 +112,30 @@ export function ShopDialogMotion({
   onClose,
   children,
   panelClassName = "",
+  /** `top` pins the panel near the top of the viewport (FreshKhata-style). */
+  placement = "center",
 }: {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
   panelClassName?: string;
+  placement?: "center" | "top";
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   useFormRevealFocus(open, panelRef, 220);
+  const isTop = placement === "top";
+  const enterY = isTop ? -10 : 12;
 
   return (
     <AnimatePresence>
       {open ? (
         <motion.div
           key="dialog"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className={
+            isTop
+              ? "fixed inset-0 z-50 flex items-start justify-center px-4 pt-16 sm:pt-20 md:pt-24"
+              : "fixed inset-0 z-50 flex items-center justify-center p-4"
+          }
           role="dialog"
           aria-modal="true"
           initial={{ opacity: 0 }}
@@ -146,9 +155,9 @@ export function ShopDialogMotion({
           <motion.div
             ref={panelRef}
             className={`relative z-10 ${panelClassName}`}
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            initial={{ opacity: 0, scale: 0.96, y: enterY }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            exit={{ opacity: 0, scale: 0.96, y: enterY }}
             transition={{ duration: 0.22, ease }}
           >
             {children}

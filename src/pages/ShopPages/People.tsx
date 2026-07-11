@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type HTMLAttributes } from "react";
-import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
-import { FiEdit2, FiPaperclip } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { getJson } from "../../api/mobileAuth";
@@ -33,7 +31,6 @@ import {
 } from "../../components/shop/ShopPanels";
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
-import { useShopCustomers } from "../../hooks/useShopCustomers";
 import {
   addCarOwnerToMyCustomers,
   apiMessage,
@@ -46,7 +43,7 @@ import { searchCarOwners } from "../../lib/shopOwnerApi";
 import { parseMyCustomers } from "../../lib/shopOwnerParsers";
 import {
   addVehicleToOnboardedCustomer,
-  fetchOnboardedCustomers,
+  fetchAddedCustomers,
   editOnboardedCustomer,
 } from "../../lib/autoshopownerApi";
 import { parseCitiesApiResponse } from "../../lib/carOwnerCities";
@@ -59,22 +56,21 @@ type PeopleSection = "customers" | "my-list" | "approval";
 function shouldDebugPeopleApi(): boolean {
   if (!import.meta.env.DEV) return false;
   try {
-    return window.localStorage.getItem("debug:people-api") === "1";
+    // On by default in DEV. Off only when explicitly disabled:
+    // localStorage.setItem("debug:people-api", "0") or localStorage.setItem("debug:api", "0")
+    const people = window.localStorage.getItem("debug:people-api");
+    if (people === "0") return false;
+    if (people === "1") return true;
+    return window.localStorage.getItem("debug:api") !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 
 function logPeopleApi(method: string, path: string, request: unknown, response: unknown) {
   if (!shouldDebugPeopleApi()) return;
   // eslint-disable-next-line no-console
-  console.groupCollapsed(`[People API] ${method} ${path}`);
-  // eslint-disable-next-line no-console
-  console.log("request:", request ?? null);
-  // eslint-disable-next-line no-console
-  console.log("response:", response ?? null);
-  // eslint-disable-next-line no-console
-  console.groupEnd();
+  console.log(`[People API] ${method} ${path}`, { request: request ?? null, response: response ?? null });
 }
 
 type DetailView =
@@ -87,6 +83,13 @@ const PEOPLE_SECTIONS = [
   { id: "my-list", label: "My Customer List", variant: "primary" as const },
   { id: "approval", label: "Approval", variant: "primary" as const },
 ];
+
+/** Maps People tabs to GET /api/autoshopowner/customer/added?status=… */
+function addedCustomersStatusForSection(section: PeopleSection): string | undefined {
+  if (section === "my-list") return "approved";
+  if (section === "approval") return "pending";
+  return undefined;
+}
 
 const SECTION_HEADINGS: Record<PeopleSection, string> = {
   customers: "Customers",
@@ -260,25 +263,14 @@ function mapCustomerVehiclesForUpdate(customer: MyCustomer): CustomerVehiclePayl
   }));
 }
 
-function vehicleDraftToPayload(draft: VehicleDraft): CustomerVehiclePayload {
-  return {
-    licensePlateNo: draft.licensePlateNo.trim().slice(0, 14),
-    vinNo: draft.vinNo?.trim() || undefined,
-    vehicleName: draft.vehicleName.trim(),
-    model: draft.model.trim(),
-    year: draft.year.trim(),
-    odometerReading: draft.odometerReading?.trim() || undefined,
-  };
-}
-
 function validateVehicleDraft(draft: VehicleDraft): string | null {
   if (!draft.licensePlateNo.trim()) return "License plate is required.";
   if (!draft.vehicleName.trim()) return "Make is required.";
   if (!draft.model.trim()) return "Model is required.";
   if (!draft.year.trim() || !isValidVehicleYear(draft.year.trim())) return "Enter a valid vehicle year.";
-  if (draft.vinNo?.trim() && draft.vinNo.trim().length !== 17) {
-    return "VIN must be exactly 17 characters when provided.";
-  }
+  if (!draft.vinNo?.trim()) return "VIN is required.";
+  if (draft.vinNo.trim().length !== 17) return "VIN must be exactly 17 characters.";
+  if (!draft.odometerReading?.trim()) return "Current odo is required.";
   return null;
 }
 
@@ -307,12 +299,26 @@ function vehicleFieldValue(value?: string | null) {
   return trimmed || "—";
 }
 
+function customerApprovalStatus(customer: MyCustomer): string {
+  return (customer.status ?? customer.linkStatus ?? customer.approvalStatus ?? "").trim().toLowerCase();
+}
+
 function isPendingApproval(customer: MyCustomer): boolean {
-  const status = (customer.status ?? customer.linkStatus ?? "").trim().toLowerCase();
-  if (status.includes("pending") || status.includes("approval") || status === "sent") {
+  const status = customerApprovalStatus(customer);
+  if (
+    status.includes("pending") ||
+    status === "sent" ||
+    status === "requested" ||
+    status === "awaiting" ||
+    status.includes("awaiting")
+  ) {
     return true;
   }
-  if (status.includes("approved") || status === "active" || status.includes("linked")) {
+  // "pending approval" / similar — but not "approved"
+  if (status.includes("approval") && !status.includes("approved")) {
+    return true;
+  }
+  if (status.includes("approved") || status === "active" || status.includes("linked") || status === "onboarded") {
     return false;
   }
   return !customer.linkedAt?.trim();
@@ -331,7 +337,7 @@ function customerListDate(customer: MyCustomer): string {
 }
 
 function approvalStatusLabel(customer: MyCustomer): string {
-  const status = (customer.status ?? customer.linkStatus ?? "").trim();
+  const status = (customer.status ?? customer.linkStatus ?? customer.approvalStatus ?? "").trim();
   if (status) return status;
   return isPendingApproval(customer) ? "Pending" : "Approved";
 }
@@ -361,71 +367,6 @@ function matchesMyCustomerSearch(customer: MyCustomer, query: string): boolean {
 function StatusBanner({ message }: { message: string }) {
   return (
     <p className="mt-3 text-center text-sm font-semibold text-blue-700">{message}</p>
-  );
-}
-
-const CUSTOMER_EMAIL_TOOLTIP_GAP_PX = 12;
-
-function CustomerEmailClip({ email }: { email?: string | null }) {
-  const label = email?.trim() || "No email on file";
-  const triggerRef = useRef<HTMLSpanElement>(null);
-  const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0 });
-
-  const updatePosition = useCallback((clientX: number, clientY: number) => {
-    setCoords({
-      top: clientY,
-      left: clientX - CUSTOMER_EMAIL_TOOLTIP_GAP_PX,
-    });
-  }, []);
-
-  const showTooltip = (event: React.MouseEvent<HTMLSpanElement>) => {
-    updatePosition(event.clientX, event.clientY);
-    setOpen(true);
-  };
-
-  const moveTooltip = (event: React.MouseEvent<HTMLSpanElement>) => {
-    updatePosition(event.clientX, event.clientY);
-  };
-
-  const showFocusTooltip = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    updatePosition(rect.left, rect.top + rect.height / 2);
-    setOpen(true);
-  };
-
-  const hideTooltip = () => setOpen(false);
-
-  return (
-    <>
-      <span
-        ref={triggerRef}
-        onMouseEnter={showTooltip}
-        onMouseMove={moveTooltip}
-        onMouseLeave={hideTooltip}
-        onFocus={showFocusTooltip}
-        onBlur={hideTooltip}
-        className="inline-flex h-7 w-7 cursor-default items-center justify-center rounded text-blue-600 hover:text-ad-purple"
-        aria-label={`Email: ${label}`}
-        tabIndex={0}
-      >
-        <FiPaperclip size={13} aria-hidden />
-      </span>
-      {open
-        ? createPortal(
-          <div
-            role="tooltip"
-            className="pointer-events-none fixed z-[10000] -translate-x-full -translate-y-1/2 whitespace-nowrap rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-800 shadow-sm"
-            style={{ top: coords.top, left: coords.left }}
-          >
-            {label}
-          </div>,
-          document.body
-        )
-        : null}
-    </>
   );
 }
 
@@ -539,8 +480,7 @@ function AddVehicleCard({
   onCancel: () => void;
   onSaved: (vehicle: CustomerVehicle) => void;
 }) {
-  const { token, session } = useAuth();
-  const countryCode = session?.meta?.countryCode ?? "+1";
+  const { token } = useAuth();
   const [draft, setDraft] = useState<VehicleDraft>(emptyVehicleDraft);
   const [companies, setCompanies] = useState<CarCompanyCatalogItem[]>([]);
   const [saving, setSaving] = useState(false);
@@ -586,79 +526,40 @@ function AddVehicleCard({
       return;
     }
 
+    const company = companies.find((c) => c.companyName === draft.vehicleName);
+    const carCompanyId = company?._id ?? company?.id;
+    if (!carCompanyId) {
+      setError("Please select a make from the list.");
+      return;
+    }
+
+    const vinNo = draft.vinNo?.trim() ?? "";
+    const odometerReading = draft.odometerReading?.trim() ?? "";
+    const payload = {
+      carCompanyId,
+      make: draft.vehicleName.trim(),
+      model: draft.model.trim(),
+      year: Number(draft.year.trim()),
+      licensePlateNo: draft.licensePlateNo.trim().slice(0, 14),
+      vinNo,
+      odometerReading: Number(odometerReading),
+    };
+
     setSaving(true);
     setError(null);
     try {
-      const isOnboarded = (customer.status ?? "").toLowerCase() === "onboarded";
-
-      if (isOnboarded) {
-        const company = companies.find((c) => c.companyName === draft.vehicleName);
-        const carCompanyId = company?._id ?? company?.id;
-        if (!carCompanyId) {
-          setError("Please select a make from the list.");
-          return;
-        }
-        if (!draft.vinNo?.trim()) {
-          setError("VIN is required.");
-          return;
-        }
-        if (draft.vinNo.trim().length !== 17) {
-          setError("VIN must be exactly 17 characters.");
-          return;
-        }
-        if (!draft.odometerReading?.trim()) {
-          setError("Current odo is required.");
-          return;
-        }
-
-        const res = await addVehicleToOnboardedCustomer(token, id, {
-          carCompanyId,
-          make: draft.vehicleName.trim(),
-          model: draft.model.trim(),
-          year: Number(draft.year.trim()),
-          licensePlateNo: draft.licensePlateNo.trim().slice(0, 14),
-          vinNo: draft.vinNo.trim(),
-          odometerReading: Number(draft.odometerReading.trim()),
-        });
-        logPeopleApi(
-          "POST",
-          `/api/autoshopowner/customer/onboarded/${encodeURIComponent(id)}/vehicles`,
-          {
-            carCompanyId,
-            make: draft.vehicleName.trim(),
-            model: draft.model.trim(),
-            year: Number(draft.year.trim()),
-            licensePlateNo: draft.licensePlateNo.trim().slice(0, 14),
-            vinNo: draft.vinNo.trim(),
-            odometerReading: Number(draft.odometerReading.trim()),
-          },
-          res,
-        );
-        if (!res.ok) {
-          setError(apiMessage(res.data) || "Could not add vehicle.");
-          return;
-        }
-        toast.success(apiMessage(res.data) || "Vehicle added.");
-      } else {
-        const vehicles = [...mapCustomerVehiclesForUpdate(customer), vehicleDraftToPayload(draft)];
-        const res = await updateMyCustomer(token, {
-          carOwnerId: id,
-          name: customer.name?.trim() ?? "",
-          email: customer.email?.trim() ?? "",
-          countryCode,
-          phone: phoneDigits(customer.phone ?? ""),
-          pincode: customer.pincode?.trim() ?? "",
-          address: customer.address?.trim() ?? "",
-          city: customer.city?.trim() ?? "",
-          vehicles,
-        });
-        logPeopleApi("PUT", "/api/auto-shop-owner/my-customers", { carOwnerId: id, vehicles }, res);
-        if (!res.ok) {
-          setError(apiMessage(res.data) || "Could not add vehicle.");
-          return;
-        }
-        toast.success(apiMessage(res.data) || "Vehicle added.");
+      const res = await addVehicleToOnboardedCustomer(token, id, payload);
+      logPeopleApi(
+        "POST",
+        `/api/autoshopowner/customer/onboarded/${encodeURIComponent(id)}/vehicles`,
+        payload,
+        res,
+      );
+      if (!res.ok) {
+        setError(apiMessage(res.data) || "Could not add vehicle.");
+        return;
       }
+      toast.success(apiMessage(res.data) || "Vehicle added.");
 
       onSaved({
         licensePlateNo: draft.licensePlateNo.trim(),
@@ -840,26 +741,23 @@ function CustomerVehicleListView({
 function CustomerListTable({
   customers,
   onEdit,
-  onAddToList,
-  canAddToList,
   onShowVehicles,
   showCity = false,
+  showStatus = false,
   selectedIds,
   onToggleRow,
   onTogglePage,
 }: {
   customers: MyCustomer[];
   onEdit: (customer: MyCustomer) => void;
-  onAddToList: (customer: MyCustomer) => void;
-  canAddToList: (customer: MyCustomer) => boolean;
   onShowVehicles: (customer: MyCustomer) => void;
   showCity?: boolean;
+  showStatus?: boolean;
   selectedIds: Set<string>;
   onToggleRow: (id: string) => void;
   onTogglePage: (ids: string[], checked: boolean) => void;
 }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
-  const actionHeadClass = `${SHOP_TABLE_HEAD_TH_CLASS} text-center`;
   const pageRowKeys = customers.map((customer, index) => customerTableRowKey(customer, index));
   const allPageSelected =
     customers.length > 0 && pageRowKeys.every((id) => selectedIds.has(id));
@@ -893,9 +791,10 @@ function CustomerListTable({
               </th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Name</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Phone</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Email</th>
               {showCity ? <th className={SHOP_TABLE_HEAD_TH_CLASS}>City</th> : null}
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Vehicles</th>
-              <th className={actionHeadClass}>Actions</th>
+              {showStatus ? <th className={SHOP_TABLE_HEAD_TH_CLASS}>Status</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -913,10 +812,21 @@ function CustomerListTable({
                       className={SHOP_TABLE_CHECKBOX_CLASS}
                     />
                   </td>
-                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>{name}</td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                    <button
+                      type="button"
+                      title={`Edit ${name}`}
+                      aria-label={`Edit ${name}`}
+                      onClick={() => onEdit(customer)}
+                      className="font-semibold text-blue-700 underline hover:text-blue-800"
+                    >
+                      {name}
+                    </button>
+                  </td>
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
                     {customer.phone ? formatPhoneLabel(customer.phone) : "—"}
                   </td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>{customer.email?.trim() || "—"}</td>
                   {showCity ? (
                     <td className={SHOP_TABLE_BODY_TD_CLASS}>{customer.city?.trim() || "—"}</td>
                   ) : null}
@@ -935,31 +845,11 @@ function CustomerListTable({
                       );
                     })()}
                   </td>
-                  <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
-                    <div className="inline-flex h-7 items-center justify-center gap-0.5">
-                      <CustomerEmailClip email={customer.email} />
-                      {canAddToList(customer) ? (
-                        <button
-                          type="button"
-                          title={`Add ${name} to my list`}
-                          aria-label={`Add ${name} to my list`}
-                          onClick={() => onAddToList(customer)}
-                          className="inline-flex h-7 items-center justify-center rounded px-2 text-xs font-bold text-ad-purple hover:bg-[#f5cce8]"
-                        >
-                          + Add
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        title={`Edit ${name}`}
-                        aria-label={`Edit ${name}`}
-                        onClick={() => onEdit(customer)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple"
-                      >
-                        <FiEdit2 size={13} aria-hidden />
-                      </button>
-                    </div>
-                  </td>
+                  {showStatus ? (
+                    <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+                      {approvalStatusLabel(customer)}
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
@@ -1016,6 +906,7 @@ function ApprovalCustomerListTable({
                 />
               </th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Phone</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Email</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Name Customer</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>City</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
@@ -1051,6 +942,7 @@ function ApprovalCustomerListTable({
                       "—"
                     )}
                   </td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>{customer.email?.trim() || "—"}</td>
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>{name}</td>
                   <td className={SHOP_TABLE_BODY_TD_CLASS}>{customer.city?.trim() || "—"}</td>
                   <td className={SHOP_TABLE_BODY_TD_CLASS}>{customerListDate(customer)}</td>
@@ -1368,8 +1260,8 @@ function EditCustomerForm({
               : "You are editing a customer"
           }
           saving={submitting}
-          saveLabel={addToListAfterSave ? "+ Add" : "Save"}
-          savingLabel={addToListAfterSave ? "Adding…" : "Saving…"}
+          saveLabel={addToListAfterSave ? "+ Add" : "Update"}
+          savingLabel={addToListAfterSave ? "Adding…" : "Updating…"}
           onSave={() => void handleSave()}
           onCancel={onCancel}
         />
@@ -1635,128 +1527,91 @@ export default function ShopPeoplePage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(() => new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [directoryCustomers, setDirectoryCustomers] = useState<MyCustomer[]>([]);
-  const [directoryLoading, setDirectoryLoading] = useState(false);
-  const [directoryError, setDirectoryError] = useState<string | null>(null);
-  const [onboardedCustomers, setOnboardedCustomers] = useState<MyCustomer[]>([]);
-  const [onboardedLoading, setOnboardedLoading] = useState(false);
-  const [onboardedError, setOnboardedError] = useState<string | null>(null);
+  const [sectionCustomers, setSectionCustomers] = useState<MyCustomer[]>([]);
+  const [sectionLoading, setSectionLoading] = useState(false);
+  const [sectionError, setSectionError] = useState<string | null>(null);
 
-  const {
-    customers: myCustomers,
-    loading: listLoading,
-    error: listError,
-    refresh,
-  } = useShopCustomers();
-
-  const myIdSet = useMemo(() => {
-    const ids = new Set<string>();
-    for (const customer of myCustomers) {
-      const id = customerId(customer);
-      if (id) ids.add(id);
-    }
-    return ids;
-  }, [myCustomers]);
-
-  useEffect(() => {
+  const loadSectionCustomers = useCallback(async () => {
     if (!token) {
-      setDirectoryCustomers([]);
-      setDirectoryError(null);
-      setDirectoryLoading(false);
+      setSectionCustomers([]);
+      setSectionLoading(false);
+      setSectionError(null);
       return;
     }
-    if (section !== "customers") return;
 
-    setDirectoryLoading(true);
-    setDirectoryError(null);
-    const handle = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const res = await searchCarOwners(token, search.trim());
-          logPeopleApi("GET", `/api/autoshopowner/customer/search?search=${encodeURIComponent(search.trim())}`, null, res);
+    setSectionLoading(true);
+    setSectionError(null);
+    try {
+      // Customers tab: search API only when the user has typed a query.
+      if (section === "customers") {
+        const q = search.trim();
+        if (q) {
+          const res = await searchCarOwners(token, q);
+          logPeopleApi(
+            "GET",
+            `/api/autoshopowner/customer/search?search=${encodeURIComponent(q)}`,
+            null,
+            res,
+          );
           if (!res.ok) {
-            setDirectoryCustomers([]);
-            setDirectoryError("Could not load customers.");
+            setSectionCustomers([]);
+            setSectionError("Could not load customers.");
             return;
           }
-          setDirectoryCustomers(parseMyCustomers(res.data));
-        } catch {
-          setDirectoryCustomers([]);
-          setDirectoryError("Network error.");
-        } finally {
-          setDirectoryLoading(false);
+          setSectionCustomers(parseMyCustomers(res.data));
+          return;
         }
-      })();
-    }, 250);
+      }
 
-    return () => {
-      window.clearTimeout(handle);
-    };
+      const status = addedCustomersStatusForSection(section);
+      const res = await fetchAddedCustomers(token, status);
+      const path =
+        status != null
+          ? `/api/autoshopowner/customer/added?status=${encodeURIComponent(status)}`
+          : "/api/autoshopowner/customer/added";
+      logPeopleApi("GET", path, null, res);
+      if (!res.ok) {
+        setSectionCustomers([]);
+        setSectionError(
+          section === "approval"
+            ? "Could not load customers awaiting approval."
+            : section === "my-list"
+              ? "Could not load approved customers."
+              : "Could not load customers.",
+        );
+        return;
+      }
+      setSectionCustomers(parseMyCustomers(res.data));
+    } catch {
+      setSectionCustomers([]);
+      setSectionError("Network error.");
+    } finally {
+      setSectionLoading(false);
+    }
   }, [token, section, search]);
 
   useEffect(() => {
-    if (!token) {
-      setOnboardedCustomers([]);
-      setOnboardedLoading(false);
-      setOnboardedError(null);
-      return;
+    if (section === "customers") {
+      const handle = window.setTimeout(() => {
+        void loadSectionCustomers();
+      }, 250);
+      return () => {
+        window.clearTimeout(handle);
+      };
     }
-    // Onboarded customers are only shown under "My Customer List".
-    if (section !== "my-list") return;
-
-    setOnboardedLoading(true);
-    setOnboardedError(null);
-    void (async () => {
-      try {
-        const res = await fetchOnboardedCustomers(token);
-        logPeopleApi("GET", "/api/autoshopowner/customer/onboarded", null, res);
-        if (!res.ok) {
-          setOnboardedCustomers([]);
-          setOnboardedError("Could not load onboarded customers.");
-          return;
-        }
-        setOnboardedCustomers(parseMyCustomers(res.data).map((c) => ({ ...c, status: "onboarded" })));
-      } catch {
-        setOnboardedCustomers([]);
-        setOnboardedError("Network error.");
-      } finally {
-        setOnboardedLoading(false);
-      }
-    })();
-  }, [token, section]);
+    void loadSectionCustomers();
+  }, [loadSectionCustomers, section]);
 
   const listCustomers = useMemo(() => {
+    // Customers tab search is handled by the API.
+    if (section === "customers") return sectionCustomers;
     const q = search.trim();
-    const filterSearch = (customers: MyCustomer[]) =>
-      q ? customers.filter((customer) => matchesMyCustomerSearch(customer, q)) : customers;
+    if (!q) return sectionCustomers;
+    return sectionCustomers.filter((customer) => matchesMyCustomerSearch(customer, q));
+  }, [section, sectionCustomers, search]);
 
-    if (section === "customers") {
-      return filterSearch(directoryCustomers);
-    }
-    if (section === "my-list") {
-      return filterSearch([
-        ...myCustomers.filter((customer) => !isPendingApproval(customer)),
-        ...onboardedCustomers,
-      ]);
-    }
-    if (section === "approval") {
-      return filterSearch(myCustomers.filter(isPendingApproval));
-    }
-    return [];
-  }, [section, directoryCustomers, myCustomers, onboardedCustomers, search]);
-
-  const showListLoading =
-    section === "customers"
-      ? directoryLoading
-      : section === "my-list"
-        ? listLoading || onboardedLoading
-        : listLoading;
-  const showListError =
-    section === "customers"
-      ? directoryError
-      : section === "my-list"
-        ? onboardedError || listError
-        : listError;
+  const showListLoading = sectionLoading;
+  const showListError = sectionError;
 
   const totalPages = Math.max(1, Math.ceil(listCustomers.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -1778,23 +1633,6 @@ export default function ShopPeoplePage() {
   }, [search, section, page]);
 
   useEffect(() => {
-    const q = search.trim();
-    if (!q) return;
-
-    const digits = phoneDigits(q);
-    if (digits.length === 10) {
-      const match = listCustomers.find((c) => phoneDigits(c.phone) === digits);
-      if (match) {
-        setEditingCustomer(match);
-      }
-      return;
-    }
-    if (listCustomers.length === 1) {
-      setEditingCustomer(listCustomers[0]);
-    }
-  }, [search, listCustomers]);
-
-  useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
@@ -1813,23 +1651,19 @@ export default function ShopPeoplePage() {
   };
 
   const isInMyList = useCallback(
-    (customer: MyCustomer) => {
-      const id = customerId(customer);
-      if (id && myIdSet.has(id)) return true;
-      const digits = phoneDigits(customer.phone);
-      if (digits.length === 10) {
-        return myCustomers.some((c) => phoneDigits(c.phone) === digits);
-      }
-      return false;
+    (_customer: MyCustomer) => {
+      // Customers tab searches car owners not yet added.
+      void _customer;
+      return section !== "customers";
     },
-    [myCustomers, myIdSet],
+    [section],
   );
 
   const handleAddToListSaved = async (message: string) => {
     setStatusMessage(message);
     setDetailView(null);
     toast.success("Customer added to your list.");
-    await refresh();
+    await loadSectionCustomers();
     setSection("approval");
   };
 
@@ -1837,7 +1671,7 @@ export default function ShopPeoplePage() {
     setStatusMessage(message);
     setShowAddForm(false);
     toast.success("Customer saved.");
-    await refresh();
+    await loadSectionCustomers();
   };
 
   const handleEditSaved = async (message: string) => {
@@ -1849,22 +1683,22 @@ export default function ShopPeoplePage() {
     setEditingCustomer(null);
     if (addingFromDirectory) {
       toast.success("Customer added to your list.");
-      await refresh();
+      await loadSectionCustomers();
       setSection("approval");
       return;
     }
     toast.success("Customer updated.");
-    await refresh();
+    await loadSectionCustomers();
   };
 
   const emptyMessage =
     section === "customers"
-      ? "No customers yet."
+      ? search.trim()
+        ? "No customers found."
+        : "No customers yet."
       : section === "approval"
         ? "No customers awaiting approval."
-        : myCustomers.some(isPendingApproval)
-          ? "No approved customers in your list yet. Check the Approval tab for pending requests."
-          : "No customers in your list yet.";
+        : "No approved customers in your list yet.";
 
   const showList = !detailView;
   const showAddNewAction =
@@ -1906,9 +1740,9 @@ export default function ShopPeoplePage() {
           },
         };
       });
-      await refresh();
+      await loadSectionCustomers();
     },
-    [refresh],
+    [loadSectionCustomers],
   );
 
   const toggleCustomerSelection = (id: string) => {
@@ -1963,7 +1797,7 @@ export default function ShopPeoplePage() {
         if (!res.ok) failed += 1;
       }
 
-      await refresh();
+      await loadSectionCustomers();
       setSelectedCustomerIds(new Set());
       const removedIds = new Set(
         selectedCustomers.map((customer) => customerId(customer)).filter(Boolean),
@@ -2070,7 +1904,11 @@ export default function ShopPeoplePage() {
                   key={customerId(editingCustomer) || editingCustomer.phone}
                   customer={editingCustomer}
                   defaultCity={shopCity}
-                  addToListAfterSave={section === "customers" && !isInMyList(editingCustomer)}
+                  addToListAfterSave={
+                    section === "customers" &&
+                    search.trim().length > 0 &&
+                    (editingCustomer.status ?? "").toLowerCase() !== "onboarded"
+                  }
                   onCancel={() => {
                     setEditingCustomer(null);
                     setStatusMessage(null);
@@ -2087,12 +1925,7 @@ export default function ShopPeoplePage() {
               <ShopErrorPanel
                 message={showListError}
                 onRetry={() => {
-                  if (section === "customers") {
-                    // re-trigger directory fetch by forcing a state update
-                    setDirectoryCustomers((prev) => [...prev]);
-                    return;
-                  }
-                  void refresh();
+                  void loadSectionCustomers();
                 }}
               />
             ) : listCustomers.length === 0 && !showAddForm ? (
@@ -2111,17 +1944,16 @@ export default function ShopPeoplePage() {
                   <CustomerListTable
                     customers={paginatedCustomers}
                     onEdit={handleEditCustomer}
-                    onAddToList={handleAddToList}
-                    canAddToList={(customer) => section === "customers" && !isInMyList(customer)}
                     onShowVehicles={handleShowVehicles}
                     showCity
+                    showStatus
                     selectedIds={selectedCustomerIds}
                     onToggleRow={toggleCustomerSelection}
                     onTogglePage={toggleCustomerPageSelection}
                   />
                 )}
 
-                <ShopListFooter className="text-sm font-semibold text-gray-600">
+                <ShopListFooter>
                   <p>{listCustomers.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">

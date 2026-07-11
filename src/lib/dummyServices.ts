@@ -248,13 +248,49 @@ export function isDummyServiceId(id: string): boolean {
   return id.startsWith("dummy-");
 }
 
-export function parseServiceCatalog(payload: unknown): ShopServiceCategory[] {
+function extractServiceCatalogArray(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
   if (!payload || typeof payload !== "object") return [];
   const root = payload as Record<string, unknown>;
-  const raw =
-    root.services ??
-    (root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>).services : null);
+  if (Array.isArray(root.data)) return root.data;
+  if (Array.isArray(root.services)) return root.services;
+  const nested =
+    root.data && typeof root.data === "object" && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : null;
+  if (nested && Array.isArray(nested.services)) return nested.services;
+  if (nested && Array.isArray(nested.data)) return nested.data;
+  return [];
+}
+
+function parseCatalogSubServices(raw: unknown): ShopServiceCategory["subServices"] {
   if (!Array.isArray(raw)) return [];
+  const out: ShopServiceCategory["subServices"] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const name = String(o.name ?? "").trim();
+    if (!name) continue;
+    const priceRaw = o.price;
+    const qtyRaw = o.quantity ?? o.qty;
+    const taxRaw = o.tax;
+    const price = typeof priceRaw === "number" ? priceRaw : Number(priceRaw);
+    const qty = typeof qtyRaw === "number" ? qtyRaw : Number(qtyRaw);
+    const tax = typeof taxRaw === "number" ? taxRaw : Number(taxRaw);
+    out.push({
+      id: typeof o._id === "string" ? o._id : typeof o.id === "string" ? o.id : undefined,
+      name,
+      desc: String(o.desc ?? o.description ?? "").trim(),
+      price: Number.isFinite(price) ? price : 0,
+      ...(Number.isFinite(qty) && qty > 0 ? { qty } : {}),
+      ...(Number.isFinite(tax) ? { tax } : {}),
+    });
+  }
+  return out;
+}
+
+export function parseServiceCatalog(payload: unknown): ShopServiceCategory[] {
+  const raw = extractServiceCatalogArray(payload);
   const out: ShopServiceCategory[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
@@ -270,7 +306,13 @@ export function parseServiceCatalog(payload: unknown): ShopServiceCategory[] {
         ? (shopTypeRaw as ShopType)
         : undefined;
     if (!id || !name) continue;
-    out.push({ id, name, shopType, subServices: [] });
+    out.push({
+      id,
+      name,
+      shopType,
+      odoOutRequired: o.odoOutRequired === true,
+      subServices: parseCatalogSubServices(o.subServices),
+    });
   }
   return out;
 }

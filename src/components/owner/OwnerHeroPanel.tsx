@@ -1,13 +1,14 @@
 import { useEffect } from "react";
 import { PORTAL_HOME_HERO_IMAGE } from "../../lib/portalHeroImage";
 import type { CarOwnerVehicle } from "../../lib/carOwnerVehicles";
+import type { ThoughtOfTheDayView } from "../../lib/extractThought";
 import { Skeleton } from "../common/Skeleton";
 import { ThoughtOfTheDayCard } from "../portal/ThoughtOfTheDayCard";
 import OwnerDueServiceHero from "./OwnerDueServiceHero";
 import { shopMainContentFillClass, shopMainContentShellClass } from "../shop/shopLayoutStyles";
 
 type OwnerHeroPanelProps = {
-  thoughtOfTheDay?: string;
+  thoughtOfTheDay?: ThoughtOfTheDayView | string;
   thoughtOfTheDayLiked?: boolean;
   thoughtLikeBusy?: boolean;
   onToggleThoughtLike?: () => void;
@@ -33,6 +34,14 @@ export default function OwnerHeroPanel({
   vehiclesError,
   onDueServiceClose,
 }: OwnerHeroPanelProps) {
+  const thoughtTitle =
+    typeof thoughtOfTheDay === "string" ? "" : thoughtOfTheDay?.title?.trim() || "";
+  const thoughtDescription =
+    typeof thoughtOfTheDay === "string"
+      ? thoughtOfTheDay.trim()
+      : thoughtOfTheDay?.description?.trim() || "";
+  const hasThought = Boolean(thoughtTitle || thoughtDescription);
+
   useEffect(() => {
     if (!showDueService || !onDueServiceClose) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -70,9 +79,10 @@ export default function OwnerHeroPanel({
               error={vehiclesError}
               onClose={onDueServiceClose}
             />
-          ) : thoughtOfTheDay ? (
+          ) : hasThought ? (
             <ThoughtOfTheDayCard
-              text={thoughtOfTheDay}
+              title={thoughtTitle}
+              description={thoughtDescription}
               liked={thoughtOfTheDayLiked}
               likeBusy={thoughtLikeBusy}
               onToggleLike={onToggleThoughtLike}

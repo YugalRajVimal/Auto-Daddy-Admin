@@ -5,7 +5,10 @@ const TORN_PAPER_CLIP =
   "polygon(0% 4%, 3% 0%, 8% 3%, 14% 0%, 22% 4%, 30% 1%, 38% 4%, 46% 0%, 54% 3%, 62% 0%, 70% 4%, 78% 1%, 86% 4%, 94% 0%, 100% 3%, 100% 96%, 97% 100%, 90% 97%, 82% 100%, 74% 96%, 66% 100%, 58% 97%, 50% 100%, 42% 96%, 34% 100%, 26% 97%, 18% 100%, 10% 96%, 4% 100%, 0% 97%)";
 
 type ThoughtOfTheDayCardProps = {
-  text: string;
+  title?: string;
+  description?: string;
+  /** @deprecated Prefer title + description (subject / notes). */
+  text?: string;
   className?: string;
   /** `hero` — anchored to the home hero panel; `inline` — flows below page content. */
   placement?: "hero" | "inline";
@@ -15,13 +18,19 @@ type ThoughtOfTheDayCardProps = {
 };
 
 export function ThoughtOfTheDayCard({
-  text,
+  title = "",
+  description = "",
+  text = "",
   className = "",
   placement = "hero",
   liked = false,
   likeBusy = false,
   onToggleLike,
 }: ThoughtOfTheDayCardProps) {
+  const resolvedTitle = title.trim();
+  const resolvedDescription = (description || text).trim();
+  if (!resolvedTitle && !resolvedDescription) return null;
+
   const interactive = Boolean(onToggleLike);
   const wrapperClass =
     placement === "inline"
@@ -50,10 +59,12 @@ export function ThoughtOfTheDayCard({
             />
           </button>
         ) : null}
-        <p className="mb-2 text-center text-xs font-bold uppercase tracking-wider text-ad-purple">
-          Today&apos;s Tip
-        </p>
-        <ThoughtOfTheDayQuote text={text} />
+        {resolvedTitle ? (
+          <p className="mb-2 text-center text-xs font-bold uppercase tracking-wider text-ad-purple">
+            {resolvedTitle}
+          </p>
+        ) : null}
+        {resolvedDescription ? <ThoughtOfTheDayQuote text={resolvedDescription} /> : null}
       </div>
     </div>
   );

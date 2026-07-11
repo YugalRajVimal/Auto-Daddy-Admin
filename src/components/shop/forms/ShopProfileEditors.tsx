@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router";
-import { FiEdit2, FiPaperclip, FiTrash2 } from "react-icons/fi";
+import { FiPaperclip, FiTrash2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson } from "../../../api/mobileAuth";
 import {
@@ -1178,7 +1178,6 @@ export function ShopOpenHoursEditor({
                 <th className={SHOP_TABLE.th}>Open</th>
                 <th className={SHOP_TABLE.th}>Close</th>
                 <th className={SHOP_TABLE.th}>Status</th>
-                <th className={`${SHOP_TABLE.th} text-center`}>Edit</th>
               </tr>
             </thead>
             <tbody>
@@ -1202,10 +1201,21 @@ export function ShopOpenHoursEditor({
                         className="h-3.5 w-3.5 accent-ad-purple"
                       />
                     </td>
-                    <td
-                      className={`${SHOP_TABLE.td} font-semibold ${isClosed ? "text-ad-purple" : "text-blue-700"}`}
-                    >
-                      {nextWeekdayDateISO(day)}
+                    <td className={SHOP_TABLE.td}>
+                      <button
+                        type="button"
+                        title={`Edit ${day}`}
+                        aria-label={`Edit ${day}`}
+                        disabled={saving}
+                        onClick={() => openEditForm(day)}
+                        className={`font-semibold underline disabled:opacity-60 ${
+                          isClosed
+                            ? "text-ad-purple hover:text-ad-purple-dark"
+                            : "text-blue-700 hover:text-blue-800"
+                        }`}
+                      >
+                        {nextWeekdayDateISO(day)}
+                      </button>
                     </td>
                     <td
                       className={`${SHOP_TABLE.td} font-semibold ${isClosed ? "text-ad-purple" : "text-gray-800"}`}
@@ -1220,18 +1230,6 @@ export function ShopOpenHoursEditor({
                     </td>
                     <td className={`${SHOP_TABLE.td} font-semibold ${isClosed ? "text-ad-purple" : ""}`}>
                       {entry.enabled ? "Open" : "Closed"}
-                    </td>
-                    <td className={`${SHOP_TABLE.td} text-center`}>
-                      <button
-                        type="button"
-                        title={`Edit ${day}`}
-                        aria-label={`Edit ${day}`}
-                        disabled={saving}
-                        onClick={() => openEditForm(day)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple disabled:opacity-60"
-                      >
-                        <FiEdit2 size={13} aria-hidden />
-                      </button>
                     </td>
                   </tr>
                 );
@@ -1573,7 +1571,6 @@ export function ShopServiceList({
       ),
     [services]
   );
-  const editHeadClass = `${SHOP_TABLE.th} text-center`;
   const selectAllRef = useRef<HTMLInputElement>(null);
   const visibleIds = useMemo(
     () => sortedServices.map((service) => getServiceId(service)),
@@ -1613,7 +1610,6 @@ export function ShopServiceList({
               <th className={SHOP_TABLE.th}>Vendor Type</th>
               <th className={SHOP_TABLE.th}>Date</th>
               <th className={SHOP_TABLE.th}>Status</th>
-              <th className={editHeadClass}>Edit</th>
             </tr>
           </thead>
           <tbody>
@@ -1640,10 +1636,21 @@ export function ShopServiceList({
                       className="h-3.5 w-3.5 accent-ad-purple disabled:opacity-60"
                     />
                   </td>
-                  <td
-                    className={`${SHOP_TABLE.td} font-semibold ${isInactive ? "text-ad-purple" : "text-blue-700"}`}
-                  >
-                    {name}
+                  <td className={SHOP_TABLE.td}>
+                    <button
+                      type="button"
+                      title={`Edit ${name}`}
+                      aria-label={`Edit ${name}`}
+                      disabled={isSaving}
+                      onClick={() => onEdit(service)}
+                      className={`font-semibold underline disabled:opacity-60 ${
+                        isInactive
+                          ? "text-ad-purple hover:text-ad-purple-dark"
+                          : "text-blue-700 hover:text-blue-800"
+                      }`}
+                    >
+                      {name}
+                    </button>
                   </td>
                   <td
                     className={`${SHOP_TABLE.td} font-semibold ${isInactive ? "text-ad-purple" : "text-gray-800"}`}
@@ -1657,18 +1664,6 @@ export function ShopServiceList({
                     className={`${SHOP_TABLE.td} font-semibold ${isInactive ? "text-ad-purple" : ""}`}
                   >
                     {getServiceStatusLabel(service)}
-                  </td>
-                  <td className={`${SHOP_TABLE.td} text-center`}>
-                    <button
-                      type="button"
-                      title={`Edit ${name}`}
-                      aria-label={`Edit ${name}`}
-                      disabled={isSaving}
-                      onClick={() => onEdit(service)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded text-blue-600 hover:text-ad-purple disabled:opacity-60"
-                    >
-                      <FiEdit2 size={13} aria-hidden />
-                    </button>
                   </td>
                 </tr>
               );
@@ -1685,6 +1680,7 @@ export function ShopServiceAddEditor({
   selectedIds,
   selectedServices,
   shopType,
+  shopTypes: shopTypesProp,
   editingId,
   onSaved,
   onClose,
@@ -1694,6 +1690,8 @@ export function ShopServiceAddEditor({
   selectedIds: Set<string>;
   selectedServices?: ShopServiceCategory[];
   shopType?: string | null;
+  /** Shop types selected on the business profile — vendor dropdown is limited to these. */
+  shopTypes?: string[] | null;
   editingId?: string | null;
   onSaved: (id: string) => void;
   onClose?: () => void;
@@ -1705,7 +1703,14 @@ export function ShopServiceAddEditor({
   ) => Promise<boolean> | boolean;
 }) {
   const { token } = useAuth();
-  const defaultVendorType = normalizeShopType(shopType);
+  const allowedVendorTypes = useMemo(() => {
+    const selected = normalizeShopTypes(shopTypesProp ?? shopType);
+    return SHOP_TYPE_OPTIONS.filter((option) => selected.includes(option.value));
+  }, [shopType, shopTypesProp]);
+  const defaultVendorType =
+    allowedVendorTypes.find((option) => option.value === normalizeShopType(shopType))?.value ??
+    allowedVendorTypes[0]?.value ??
+    normalizeShopType(shopType);
   const [vendorType, setVendorType] = useState<ShopType>(defaultVendorType);
   const shopTypeFiltered = filterServicesByShopType(services, vendorType);
   const available = shopTypeFiltered.filter((service) => {
@@ -1729,7 +1734,12 @@ export function ShopServiceAddEditor({
       const editing =
         selectedServices?.find((service) => getServiceId(service) === editingId) ??
         services.find((service) => getServiceId(service) === editingId);
-      setVendorType(normalizeShopType(editing?.shopType ?? shopType));
+      const editingType = normalizeShopType(editing?.shopType ?? shopType);
+      setVendorType(
+        allowedVendorTypes.some((option) => option.value === editingType)
+          ? editingType
+          : defaultVendorType
+      );
       resetFormFields(
         editingId,
         formatServiceTableDate(editing ?? { id: editingId, subServices: [] }),
@@ -1739,7 +1749,7 @@ export function ShopServiceAddEditor({
     }
     setVendorType(defaultVendorType);
     resetFormFields();
-  }, [defaultVendorType, editingId, selectedServices, services, shopType]);
+  }, [allowedVendorTypes, defaultVendorType, editingId, selectedServices, services, shopType]);
 
   const handleVendorTypeChange = (nextType: ShopType) => {
     setVendorType(nextType);
@@ -1867,10 +1877,10 @@ export function ShopServiceAddEditor({
           <select
             className={shopCompactInputClass}
             value={vendorType}
-            disabled={saving}
+            disabled={saving || allowedVendorTypes.length === 0}
             onChange={(e) => handleVendorTypeChange(normalizeShopType(e.target.value))}
           >
-            {SHOP_TYPE_OPTIONS.map((option) => (
+            {allowedVendorTypes.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -1899,6 +1909,7 @@ export function ShopOperationalServicesEditor({
   fullServiceCatalog,
   selectedIds,
   shopType,
+  shopTypes,
   editingId,
   showAddForm = false,
   onAddFormClose,
@@ -1914,6 +1925,8 @@ export function ShopOperationalServicesEditor({
   fullServiceCatalog: ShopServiceCategory[];
   selectedIds: Set<string>;
   shopType?: string | null;
+  /** Shop types selected on the business profile — vendor dropdown is limited to these. */
+  shopTypes?: string[] | null;
   editingId?: string | null;
   showAddForm?: boolean;
   onAddFormClose?: () => void;
@@ -1985,6 +1998,7 @@ export function ShopOperationalServicesEditor({
           selectedServices={services}
           selectedIds={selectedIds}
           shopType={shopType}
+          shopTypes={shopTypes}
           editingId={editingId}
           onSaveService={onSaveService}
           onSaved={onSaved}

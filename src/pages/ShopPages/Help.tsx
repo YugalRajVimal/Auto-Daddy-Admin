@@ -337,7 +337,7 @@ export default function ShopHelpPage() {
               <>
                 <HelpTicketTable rows={paginatedList} />
 
-                <ShopListFooter className="text-sm font-semibold text-gray-600">
+                <ShopListFooter>
                   <p>{filteredTickets.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">

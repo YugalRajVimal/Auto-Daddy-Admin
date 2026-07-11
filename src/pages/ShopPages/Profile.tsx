@@ -4,6 +4,10 @@ import { toast } from "react-toastify";
 import DashboardPanelCard from "../../components/COMP";
 import { ThoughtOfTheDayCard } from "../../components/portal/ThoughtOfTheDayCard";
 import ShopBusinessOpenToggle from "../../components/shop/ShopBusinessOpenToggle";
+import ShopManageNumberingDialog, {
+  type NumberingKind,
+  type NumberingValues,
+} from "../../components/shop/ShopManageNumberingDialog";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopBusinessProfileEditor,
@@ -22,6 +26,8 @@ import ShopDocumentTemplatePanel, {
   DUMMY_INVOICE_TEMPLATES,
   DUMMY_JOB_CARD_TEMPLATES,
 } from "../../components/shop/ShopDocumentTemplatePanel";
+import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
+import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
 import { shopHeroOnImageMutedTextClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
 import {
@@ -44,9 +50,40 @@ import {
   parseServiceCatalog,
   resolveProfileSelectedServices,
 } from "../../lib/dummyServices";
-import { normalizeShopType } from "../../lib/shopTypes";
+import { normalizeShopType, normalizeShopTypes } from "../../lib/shopTypes";
 import type { ShopServiceCategory } from "../../types/shopOwner";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
+
+const NUMBERING_STORAGE_KEY = "autodaddy.shop.numbering";
+
+const DEFAULT_NUMBERING: Record<NumberingKind, NumberingValues> = {
+  estimate: { code: "", number: "1" },
+  invoice: { code: "", number: "1" },
+};
+
+function readStoredNumbering(): Record<NumberingKind, NumberingValues> {
+  const fallback = {
+    estimate: { ...DEFAULT_NUMBERING.estimate },
+    invoice: { ...DEFAULT_NUMBERING.invoice },
+  };
+  try {
+    const raw = localStorage.getItem(NUMBERING_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<Record<NumberingKind, NumberingValues>>;
+    return {
+      estimate: {
+        code: parsed.estimate?.code ?? DEFAULT_NUMBERING.estimate.code,
+        number: parsed.estimate?.number ?? DEFAULT_NUMBERING.estimate.number,
+      },
+      invoice: {
+        code: parsed.invoice?.code ?? DEFAULT_NUMBERING.invoice.code,
+        number: parsed.invoice?.number ?? DEFAULT_NUMBERING.invoice.number,
+      },
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 const PROFILE_SECTIONS = [
   { id: "personal", label: "Personal Profile", variant: "primary" as const },
@@ -84,13 +121,20 @@ function ProfileHeroFormSection({
   thoughtOfTheDay,
 }: {
   children: ReactNode;
-  thoughtOfTheDay?: string;
+  thoughtOfTheDay?: { title?: string; description?: string } | string;
 }) {
+  const title =
+    typeof thoughtOfTheDay === "string" ? "" : thoughtOfTheDay?.title?.trim() || "";
+  const description =
+    typeof thoughtOfTheDay === "string"
+      ? thoughtOfTheDay.trim()
+      : thoughtOfTheDay?.description?.trim() || "";
+
   return (
     <div className="w-full min-w-0">
       {children}
-      {thoughtOfTheDay ? (
-        <ThoughtOfTheDayCard text={thoughtOfTheDay} placement="inline" />
+      {title || description ? (
+        <ThoughtOfTheDayCard title={title} description={description} placement="inline" />
       ) : null}
     </div>
   );
@@ -195,8 +239,17 @@ export default function ShopProfilePage() {
   const [savedJobCardTemplateId, setSavedJobCardTemplateId] = useState(
     () => DUMMY_JOB_CARD_TEMPLATES[0]?.id ?? "",
   );
+  const [numbering, setNumbering] = useState(readStoredNumbering);
+  const [manageKind, setManageKind] = useState<NumberingKind | null>(null);
 
-  const shopType = normalizeShopType(user?.shopType ?? business?.shopType);
+  const shopTypes = useMemo(
+    () =>
+      normalizeShopTypes(
+        business?.shopTypes ?? user?.shopType ?? business?.shopType
+      ),
+    [business?.shopType, business?.shopTypes, user?.shopType]
+  );
+  const shopType = shopTypes[0] ?? normalizeShopType(user?.shopType ?? business?.shopType);
 
   const refreshMyServices = async () => {
     if (!token) return;
@@ -258,8 +311,22 @@ export default function ShopProfilePage() {
     void (async () => {
       try {
         // Prefer the new admin services catalog endpoint (supports shopType + name search).
-        const res = await fetchAdminServices(token, { shopType: shopType || undefined, services: undefined });
-        const apiList = res.ok ? parseServiceCatalog(res.data) : [];
+        // Fetch for each shop type the owner selected so the vendor-type dropdown can filter.
+        const typesToFetch = shopTypes.length > 0 ? shopTypes : [shopType];
+        const results = await Promise.all(
+          typesToFetch.map((type) =>
+            fetchAdminServices(token, { shopType: type || undefined, services: undefined })
+          )
+        );
+        const byId = new Map<string, ShopServiceCategory>();
+        for (const res of results) {
+          if (!res.ok) continue;
+          for (const service of parseServiceCatalog(res.data)) {
+            const id = getServiceId(service);
+            if (id && !byId.has(id)) byId.set(id, service);
+          }
+        }
+        const apiList = [...byId.values()];
         if (apiList.length > 0) {
           applyCatalog(apiList);
           return;
@@ -277,7 +344,7 @@ export default function ShopProfilePage() {
         applyCatalog([]);
       }
     })();
-  }, [activeId, token, shopType]);
+  }, [activeId, token, shopType, shopTypes]);
 
   useEffect(() => {
     if (activeId !== "services") {
@@ -370,6 +437,28 @@ export default function ShopProfilePage() {
         return undefined;
     }
   }, [activeId]);
+
+  const sidebarFooter = useMemo(
+    () => (
+      <div className={`mt-4 ${shopSidebarButtonStackClass}`}>
+        <ShopSidebarButton label="Manage Estimates" onClick={() => setManageKind("estimate")} />
+        <ShopSidebarButton label="Manage Invoices" onClick={() => setManageKind("invoice")} />
+      </div>
+    ),
+    [],
+  );
+
+  const saveNumbering = (kind: NumberingKind, values: NumberingValues) => {
+    setNumbering((prev) => {
+      const next = { ...prev, [kind]: values };
+      try {
+        localStorage.setItem(NUMBERING_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore quota / private mode
+      }
+      return next;
+    });
+  };
 
   const removeBrand = async (company: ShopCarCompany) => {
     const id = getCarBrandId(company);
@@ -527,6 +616,7 @@ export default function ShopProfilePage() {
             fullServiceCatalog={fullServiceCatalog}
             selectedIds={selectedServiceIds}
             shopType={shopType}
+            shopTypes={shopTypes}
             editingId={editingServiceId}
             showAddForm={showAddService}
             onAddFormClose={() => setShowAddService(false)}
@@ -664,26 +754,44 @@ export default function ShopProfilePage() {
   };
 
   return (
-    <ShopPageShell
-      pageHeading={SECTION_TITLES[activeId] ?? "Profile"}
-      metaTitle="Profile | AutoDaddy"
-      metaDescription="Auto shop owner profile"
-      sidebarVariant="nav"
-      sidebarItems={PROFILE_SECTIONS}
-      activeSidebarId={activeId}
-      onSidebarSelect={setActiveId}
-      headerAction={headerAction}
-      heroBackgroundImage={false}
-      contentTopOffset={TOP_ALIGNED_SECTIONS.has(activeId)}
-      heroCardFlush={TOP_ALIGNED_SECTIONS.has(activeId)}
-      contentFillHeight={activeId === "invoice-templates" || activeId === "job-card-templates"}
-      onFaqsOpen={() => setFaqsOpen(true)}
-      onFaqsClose={() => setFaqsOpen(false)}
-      faqsOpen={faqsOpen}
-      faqsHeading={faqsHeading}
-      faqsDescription={faqsDescription}
-    >
-      {renderContent()}
-    </ShopPageShell>
+    <>
+      <ShopPageShell
+        pageHeading={SECTION_TITLES[activeId] ?? "Profile"}
+        metaTitle="Profile | AutoDaddy"
+        metaDescription="Auto shop owner profile"
+        sidebarVariant="nav"
+        sidebarItems={PROFILE_SECTIONS}
+        activeSidebarId={activeId}
+        onSidebarSelect={setActiveId}
+        sidebarFooter={sidebarFooter}
+        headerAction={headerAction}
+        heroBackgroundImage={false}
+        contentTopOffset={TOP_ALIGNED_SECTIONS.has(activeId)}
+        heroCardFlush={TOP_ALIGNED_SECTIONS.has(activeId)}
+        contentFillHeight={activeId === "invoice-templates" || activeId === "job-card-templates"}
+        onFaqsOpen={() => setFaqsOpen(true)}
+        onFaqsClose={() => setFaqsOpen(false)}
+        faqsOpen={faqsOpen}
+        faqsHeading={faqsHeading}
+        faqsDescription={faqsDescription}
+      >
+        {renderContent()}
+      </ShopPageShell>
+
+      <ShopManageNumberingDialog
+        open={manageKind === "estimate"}
+        kind="estimate"
+        initial={numbering.estimate}
+        onClose={() => setManageKind(null)}
+        onSave={(values) => saveNumbering("estimate", values)}
+      />
+      <ShopManageNumberingDialog
+        open={manageKind === "invoice"}
+        kind="invoice"
+        initial={numbering.invoice}
+        onClose={() => setManageKind(null)}
+        onSave={(values) => saveNumbering("invoice", values)}
+      />
+    </>
   );
 }
