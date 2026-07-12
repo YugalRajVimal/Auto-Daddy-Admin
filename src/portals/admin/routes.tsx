@@ -34,6 +34,7 @@ import ThoughtOfDayNewPage from "../../pages/AdminPages/Content/ThoughtOfDayNew"
 import Reports from "../../pages/AdminPages/Reports/Reports";
 import LeadsPage from "../../pages/AdminPages/Leads/Leads";
 import AccountsPage from "../../pages/AdminPages/Accounts/Accounts";
+import InvoicesPage from "../../pages/AdminPages/Invoices/Invoices";
 
 /** Permission-guarded route helper — keeps route definitions concise. */
 function P({
@@ -66,6 +67,7 @@ export const adminRoutes = (
     <Route path="/admin/accounts/expenses" element={<P module="dashboard"><AccountsPage title="Expenses" variant="expenses" /></P>} />
     <Route path="/admin/accounts/income" element={<P module="dashboard"><AccountsPage title="Income" variant="income" /></P>} />
     <Route path="/admin/accounts/bank" element={<P module="dashboard"><AccountsPage title="Manage Banks" /></P>} />
+    <Route path="/admin/invoices" element={<P module="dashboard"><InvoicesPage /></P>} />
     <Route path="/admin/messages" element={<Navigate to="/admin/messages/sent" replace />} />
     <Route path="/admin/messages/sent" element={<P module="inviteHelp"><Invitehelp title="Notifications Sent" section="sent" /></P>} />
     <Route path="/admin/messages/received" element={<P module="inviteHelp"><Invitehelp title="Messages Received" section="received" showAddNew={false} /></P>} />

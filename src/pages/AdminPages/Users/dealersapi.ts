@@ -12,11 +12,15 @@ export type DealerApiRow = {
   phone: string;
   dealership: string;
   city: string;
+  address?: string;
+  categories?: string[];
   websiteUrl?: string;
+  image?: string;
   dealerImage?: string;
   status?: string; // "Active" | "Suspended" | "Deleted"
   isDeleted?: boolean;
-  createdAt: string;
+  createdAt?: string;
+  date?: string;
   listings?: number;
   leads?: number;
 };
@@ -33,6 +37,8 @@ export type DealerPayload = {
   phone?: string;
   dealership?: string;
   city?: string;
+  address?: string;
+  categories?: string[];
   websiteUrl?: string;
   status?: string;
   listings?: number;
@@ -50,13 +56,15 @@ export function mapDealerToRow(d: DealerApiRow): DummyUserRow {
     countryCode: "",
     phone: d.phone,
     pincode: "",
+    address: d.address ?? "",
     city: d.city,
-    createdAt: d.createdAt,
+    createdAt: d.createdAt ?? d.date ?? new Date().toISOString(),
     isDisabled: String(d.status ?? "").toLowerCase() === "suspended",
     status: d.isDeleted || String(d.status ?? "").toLowerCase() === "deleted" ? "deleted" : undefined,
     primaryLabel: d.dealership,
     websiteUrl: d.websiteUrl,
-    imageUrl: d.dealerImage,
+    imageUrl: d.dealerImage ?? d.image,
+    categories: Array.isArray(d.categories) ? d.categories : [],
     countA: d.listings ?? 0,
     countB: d.leads ?? 0,
   };
@@ -71,6 +79,8 @@ function buildFormData(payload: DealerPayload): FormData {
   if (payload.phone !== undefined) fd.append("phone", payload.phone);
   if (payload.dealership !== undefined) fd.append("dealership", payload.dealership);
   if (payload.city !== undefined) fd.append("city", payload.city);
+  if (payload.address !== undefined) fd.append("address", payload.address);
+  if (payload.categories !== undefined) fd.append("categories", JSON.stringify(payload.categories));
   if (payload.websiteUrl !== undefined) fd.append("websiteUrl", payload.websiteUrl);
   if (payload.status !== undefined) fd.append("status", payload.status);
   if (payload.listings !== undefined) fd.append("listings", String(payload.listings));

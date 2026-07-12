@@ -29,6 +29,7 @@ export type DummyUserRow = {
   region?: string;
   websiteUrl?: string;
   imageUrl?: string;
+  categories?: string[];
   countA: number;
   countB: number;
 };

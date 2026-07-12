@@ -439,9 +439,8 @@ const AutoShopAddEditForm: React.FC<{
 
   function validate(): string | null {
     if (!businessName.trim()) return "Business name is required.";
-    if (!email.trim() || !isEmail(email)) return "Valid email required.";
+    if (email.trim() && !isEmail(email)) return "Enter a valid email.";
     if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
-    if (!address.trim()) return "Address is required.";
     if (!shopType) return "Shop type required.";
     return null;
   }
@@ -566,7 +565,7 @@ const AutoShopAddEditForm: React.FC<{
             ))}
           </select>
         </CompactField>
-        <CompactField label="Address" required>
+        <CompactField label="Address">
           <input
             type="text"
             value={address}
@@ -574,7 +573,6 @@ const AutoShopAddEditForm: React.FC<{
             placeholder="Street / Area"
             className={compactInputClass}
           />
-          {attempted && !address.trim() && <p className={fieldErrorClass}>Required</p>}
         </CompactField>
         <CompactField label="Zip Code">
           <input
@@ -584,7 +582,7 @@ const AutoShopAddEditForm: React.FC<{
             className={compactInputClass}
           />
         </CompactField>
-        <CompactField label="Email" required>
+        <CompactField label="Email">
           <input
             type="email"
             value={email}
@@ -592,8 +590,8 @@ const AutoShopAddEditForm: React.FC<{
             placeholder="name@example.com"
             className={compactInputClass}
           />
-          {attempted && (!email.trim() || !isEmail(email)) && (
-            <p className={fieldErrorClass}>Valid email required</p>
+          {attempted && email.trim() && !isEmail(email) && (
+            <p className={fieldErrorClass}>Enter a valid email</p>
           )}
         </CompactField>
       </CompactFormRow>

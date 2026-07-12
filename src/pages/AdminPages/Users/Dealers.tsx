@@ -1110,6 +1110,7 @@ export type DummyUserRow = {
   region?: string;
   websiteUrl?: string;
   imageUrl?: string;
+  categories?: string[];
   countA: number;
   countB: number;
 };
@@ -1131,6 +1132,7 @@ export type DummyUserFormValues = {
   phone: string;
   city: string;
   address?: string;
+  categories?: string[];
   primaryLabel: string;
   region?: string;
   websiteUrl?: string;
@@ -1148,6 +1150,10 @@ export type DummyUserListConfig = {
   regionFieldLabel: string;
   imageFieldLabel?: string;
   fieldMode?: "location" | "web";
+  /** Show address field even in web mode (e.g. Dealers). */
+  showAddress?: boolean;
+  /** Multi-select category options. When set, Categories field is shown. */
+  categoryOptions?: string[];
   countALabel: string;
   countBLabel: string;
   columns: ColumnDef[];
@@ -1276,10 +1282,14 @@ const DummyUserAddEditForm: React.FC<{
 }> = ({ row, config, onCancel, onSaved, saving }) => {
   const isEdit = !!row;
   const isWebMode = config.fieldMode === "web";
+  const showAddress = !isWebMode || Boolean(config.showAddress);
+  const categoryOptions = config.categoryOptions ?? [];
+  const showCategories = categoryOptions.length > 0;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
   const [city, setCity] = useState("");
   const [primaryLabel, setPrimaryLabel] = useState("");
   const [region, setRegion] = useState("");
@@ -1296,6 +1306,7 @@ const DummyUserAddEditForm: React.FC<{
       setEmail(row.email);
       setPhone(row.phone);
       setAddress(row.address ?? "");
+      setCategories(Array.isArray(row.categories) ? row.categories : []);
       setCity(row.city);
       setPrimaryLabel(row.primaryLabel);
       setRegion(row.region ?? "");
@@ -1308,6 +1319,7 @@ const DummyUserAddEditForm: React.FC<{
       setEmail("");
       setPhone("");
       setAddress("");
+      setCategories([]);
       setCity("");
       setPrimaryLabel("");
       setRegion("");
@@ -1324,6 +1336,10 @@ const DummyUserAddEditForm: React.FC<{
     phone.replace(/\D/g, "").length === 10 &&
     primaryLabel.trim() &&
     (isWebMode ? isWebsiteUrl(websiteUrl) : address.trim() && region.trim());
+
+  const toggleCategory = (opt: string) => {
+    setCategories((prev) => (prev.includes(opt) ? prev.filter((c) => c !== opt) : [...prev, opt]));
+  };
 
   const handleImageFileChange = (file: File | null) => {
     if (!file) {
@@ -1356,7 +1372,8 @@ const DummyUserAddEditForm: React.FC<{
         name: name.trim(),
         email: email.trim(),
         phone: phone.replace(/\D/g, ""),
-        address: isWebMode ? undefined : address.trim(),
+        address: showAddress ? address.trim() : undefined,
+        categories: showCategories ? categories : undefined,
         city: city.trim() || "Toronto",
         primaryLabel: primaryLabel.trim(),
         region: isWebMode ? undefined : region.trim(),
@@ -1400,7 +1417,7 @@ const DummyUserAddEditForm: React.FC<{
         <CompactField label="City" className={compactFixedFieldWidth}>
           <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className={compactInputClass} />
         </CompactField>
-        {isWebMode ? (
+        {isWebMode && (
           <AttachImageCheckbox
             label={config.imageFieldLabel ?? "Attach Image"}
             checked={attachImage}
@@ -1408,16 +1425,20 @@ const DummyUserAddEditForm: React.FC<{
               setAttachImage(checked);
               if (!checked) {
                 setImageFile(null);
-
               }
             }}
             file={imageFile}
             onFileChange={handleImageFileChange}
             className={compactFixedFieldWidth}
           />
-        ) : (
-          <CompactField label="Address" required className="min-w-0 flex-1">
-            <CompactAutoGrowTextarea value={address} onChange={(e) => setAddress(e.target.value.slice(0, 100))} placeholder="Max 100 chars" />
+        )}
+        {showAddress && (
+          <CompactField label="Address" required={!isWebMode} className="min-w-0 flex-1">
+            <CompactAutoGrowTextarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value.slice(0, 200))}
+              placeholder="Street / Area"
+            />
           </CompactField>
         )}
         <CompactField label={config.primaryFieldLabel} required className={compactFixedFieldWidth}>
@@ -1436,6 +1457,23 @@ const DummyUserAddEditForm: React.FC<{
         ) : (
           <CompactField label={config.regionFieldLabel} required className={compactFixedFieldWidth}>
             <input type="text" value={region} onChange={(e) => setRegion(e.target.value)} className={compactInputClass} />
+          </CompactField>
+        )}
+        {showCategories && (
+          <CompactField label="Categories" className="min-w-0 w-full basis-full">
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5 pt-1">
+              {categoryOptions.map((opt) => (
+                <label key={opt} className="flex cursor-pointer items-center gap-1.5 text-[13px] text-gray-800 select-none">
+                  <input
+                    type="checkbox"
+                    checked={categories.includes(opt)}
+                    onChange={() => toggleCategory(opt)}
+                    className="h-3.5 w-3.5 cursor-pointer accent-[#0073b7]"
+                  />
+                  {opt}
+                </label>
+              ))}
+            </div>
           </CompactField>
         )}
       </CompactFormRow>
@@ -1490,6 +1528,7 @@ function exportCsv(rows: DummyUserRow[], config: DummyUserListConfig, visibleCol
     primary: (r) => r.primaryLabel,
     city: (r) => r.city,
     address: (r) => r.address ?? "-",
+    categories: (r) => (r.categories?.length ? r.categories.join(", ") : "-"),
     region: (r) => r.region ?? "-",
     websiteUrl: (r) => formatWebsiteUrl(r.websiteUrl),
     image: (r) => (r.imageUrl ? "Yes" : "-"),
@@ -1581,6 +1620,8 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
           r.phone.includes(q) ||
           r.primaryLabel.toLowerCase().includes(q) ||
           r.city.toLowerCase().includes(q) ||
+          (r.address ?? "").toLowerCase().includes(q) ||
+          (r.categories ?? []).join(" ").toLowerCase().includes(q) ||
           (r.region ?? "").toLowerCase().includes(q) ||
           (r.websiteUrl ?? "").toLowerCase().includes(q)
         );
@@ -1612,6 +1653,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
         phone: form.phone,
         pincode: "",
         address: form.address,
+        categories: form.categories,
         city: form.city,
         createdAt: existingId ? allRows.find((r) => r._id === existingId)?.createdAt ?? new Date().toISOString() : new Date().toISOString(),
         isDisabled: existingId ? allRows.find((r) => r._id === existingId)?.isDisabled ?? false : false,
@@ -1742,6 +1784,12 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
         return (
           <td key={key} className={`${tdClass} max-w-[180px] truncate`} title={row.address}>
             {row.address || "-"}
+          </td>
+        );
+      case "categories":
+        return (
+          <td key={key} className={`${tdClass} max-w-[200px] truncate`} title={row.categories?.join(", ")}>
+            {row.categories?.length ? row.categories.join(", ") : "-"}
           </td>
         );
       case "region":
@@ -2034,6 +2082,8 @@ const DEALERS_CONFIG: DummyUserListConfig = {
   regionFieldLabel: "Website URL",
   imageFieldLabel: "Image",
   fieldMode: "web",
+  showAddress: true,
+  categoryOptions: ["Parts", "New Vehicles", "Used Vehicles", "OEM", "Aftermarket", "Wholesale"],
   countALabel: "Listings",
   countBLabel: "Leads",
   exportFilePrefix: "dealers",
@@ -2043,6 +2093,8 @@ const DEALERS_CONFIG: DummyUserListConfig = {
     { key: "phone", label: "Phone" },
     { key: "primary", label: "Dealership" },
     { key: "city", label: "City" },
+    { key: "address", label: "Address" },
+    { key: "categories", label: "Categories" },
     { key: "websiteUrl", label: "Website URL" },
     { key: "image", label: "Image" },
     { key: "date", label: "Date" },
@@ -2050,7 +2102,7 @@ const DEALERS_CONFIG: DummyUserListConfig = {
     { key: "countB", label: "Leads" },
     { key: "status", label: "Status" },
   ],
-  defaultVisible: ["name", "email", "phone", "primary", "city", "websiteUrl", "image", "date", "countA", "countB", "status"],
+  defaultVisible: ["name", "email", "phone", "primary", "city", "address", "categories", "websiteUrl", "image", "date", "countA", "countB", "status"],
   initialData: [], // unused when `api` is set
   api: {
     list: async ({ search, viewMode }) => {
@@ -2067,6 +2119,8 @@ const DEALERS_CONFIG: DummyUserListConfig = {
         phone: form.phone,
         dealership: form.primaryLabel,
         city: form.city,
+        address: form.address,
+        categories: form.categories,
         websiteUrl: form.websiteUrl,
         dealerImage: form.imageFile ?? null,
       });
@@ -2079,6 +2133,8 @@ const DEALERS_CONFIG: DummyUserListConfig = {
         phone: form.phone,
         dealership: form.primaryLabel,
         city: form.city,
+        address: form.address,
+        categories: form.categories,
         websiteUrl: form.websiteUrl,
         status: form.status,
         dealerImage: form.imageFile ?? undefined,
