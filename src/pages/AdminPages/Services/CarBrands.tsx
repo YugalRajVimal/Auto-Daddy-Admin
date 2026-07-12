@@ -10,6 +10,12 @@ import {
   CompactFormPanel,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
@@ -45,6 +51,29 @@ type TableRow = {
 
 const EMPTY_MODEL: ModelFormRow = { modelName: "" };
 const equalThirdFieldClass = "min-w-0 w-full";
+
+const CAR_BRAND_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "make", label: "Make" },
+  { key: "model", label: "Model" },
+  {
+    key: "country",
+    label: "Country",
+    type: "select",
+    options: [
+      { value: "Canada", label: "Canada" },
+      { value: "USA", label: "USA" },
+    ],
+  },
+  {
+    key: "logo",
+    label: "Logo",
+    type: "select",
+    options: [
+      { value: "Yes", label: "Yes" },
+      { value: "No", label: "No" },
+    ],
+  },
+];
 
 type ListEditorPopupProps = {
   title: string;
@@ -317,6 +346,9 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(CAR_BRAND_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(CAR_BRAND_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -341,6 +373,10 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(CAR_BRAND_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const {
@@ -373,11 +409,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     }
   };
 
-  const handleSearch = () => {
-    setPage(1);
-    fetchCompanies(search);
-  };
-
   const handleClearSearch = () => {
     setSearch("");
     setPage(1);
@@ -393,12 +424,20 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     [companies, deletedStash, isDeletedView]
   );
 
-  const filtered = tableRows.filter(
-    (r) =>
+  const filtered = tableRows.filter((r) => {
+    const live =
+      !search.trim() ||
       r.make.toLowerCase().includes(search.toLowerCase()) ||
       r.model.toLowerCase().includes(search.toLowerCase()) ||
-      r.country.toLowerCase().includes(search.toLowerCase())
-  );
+      r.country.toLowerCase().includes(search.toLowerCase());
+    if (!live) return false;
+    return (
+      searchIncludes(r.make, searchFilters.make) &&
+      searchIncludes(r.model, searchFilters.model) &&
+      searchEquals(r.country, searchFilters.country) &&
+      searchEquals(r.brandLogo ? "Yes" : "No", searchFilters.logo)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -468,11 +507,13 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
   const openEditCompany = (company: CarCompany) => {
     populateFormFromCompany(company);
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -484,6 +525,27 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   const handleCancel = () => {
     resetForm();
     setShowForm(false);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingCompany(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(CAR_BRAND_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const openModelsPopup = () => {
@@ -774,9 +836,18 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Car Brands" : "Car Brands"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={CAR_BRAND_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -937,8 +1008,10 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
           />
           <button
             type="button"
-            onClick={handleSearch}
-            className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
           >
             Search
           </button>

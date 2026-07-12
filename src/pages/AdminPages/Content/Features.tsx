@@ -12,6 +12,12 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
@@ -29,6 +35,29 @@ const USER_OPTIONS = [
   { value: "associate", label: "Associate" },
   { value: "dealer", label: "Dealer" },
 ];
+
+const FEATURE_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "date", label: "Date", type: "date" },
+  {
+    key: "country",
+    label: "Country",
+    type: "select",
+    options: [
+      { value: "Canada", label: "Canada" },
+      { value: "USA", label: "USA" },
+    ],
+  },
+  {
+    key: "user",
+    label: "User",
+    type: "select",
+    options: USER_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
+  },
+  { key: "feature", label: "Feature" },
+];
+
+const featureUserLabel = (user: string) =>
+  USER_OPTIONS.find((o) => o.value === user)?.label ?? user;
 
 // Unique id type is now string or number to support _id string from BE
 type FeatureRow = {
@@ -62,6 +91,9 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   const [features, setFeatures] = useState<FeatureRow[]>([]);
   const [selected, setSelected] = useState<Set<number | string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(FEATURE_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(FEATURE_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -78,6 +110,10 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(FEATURE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const {
@@ -135,13 +171,24 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
 
   const displayFeatures = isDeletedView ? deletedStash : features;
 
-  const filtered = displayFeatures.filter(
-    (f) =>
+  const filtered = displayFeatures.filter((f) => {
+    const userLabel = featureUserLabel(f.user);
+    const live =
+      !search.trim() ||
       f.date?.toString().includes(search) ||
       f.user?.toLowerCase().includes(search.toLowerCase()) ||
+      userLabel.toLowerCase().includes(search.toLowerCase()) ||
       f.feature?.toLowerCase().includes(search.toLowerCase()) ||
-      f.country?.toLowerCase().includes(search.toLowerCase())
-  );
+      f.country?.toLowerCase().includes(search.toLowerCase());
+    if (!live) return false;
+    const dateStr = f.date ? String(f.date).slice(0, 10) : "";
+    return (
+      searchIncludes(dateStr, searchFilters.date) &&
+      searchEquals(f.country, searchFilters.country) &&
+      searchEquals(userLabel, searchFilters.user) &&
+      searchIncludes(f.feature, searchFilters.feature)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -172,6 +219,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -183,7 +231,29 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
     setAttachImage(!!row.imageUrl);
     setImageFile(null);
     setEditingId(row.id);
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(FEATURE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -313,9 +383,18 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Product Features" : "Product Features"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={FEATURE_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -431,7 +510,13 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

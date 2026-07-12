@@ -1264,6 +1264,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import ComboSelectWithEditor from "../../../components/admin/ComboSelectWithEditor";
 import ListEditorPopup from "../../../components/admin/ListEditorPopup";
@@ -1287,6 +1293,48 @@ import {
   slugifyLabel,
   type CategoryOption,
 } from "./ledgerCategories";
+
+function buildLedgerSearchFields(variant: "expenses" | "income"): AdminSearchField[] {
+  const fields: AdminSearchField[] = [
+    { key: "date", label: "Date", type: "date" },
+    { key: "vendor", label: "Vendor" },
+    { key: "amount", label: "Amount" },
+  ];
+  if (variant === "income") {
+    fields.push(
+      { key: "paymentMode", label: "Payment Mode" },
+      { key: "bank", label: "Bank" }
+    );
+  }
+  fields.push(
+    { key: "category", label: "Category" },
+    { key: "notes", label: "Notes" }
+  );
+  if (variant === "expenses") {
+    fields.push(
+      {
+        key: "gst",
+        label: "GST",
+        type: "select",
+        options: [
+          { value: "Yes", label: "Yes" },
+          { value: "No", label: "No" },
+        ],
+      },
+      { key: "billNumber", label: "Bill Number" },
+      {
+        key: "byCheque",
+        label: "By Cheque",
+        type: "select",
+        options: [
+          { value: "Yes", label: "Yes" },
+          { value: "No", label: "No" },
+        ],
+      }
+    );
+  }
+  return fields;
+}
 
 // ---------------------------------------------------------------------------
 // API base + fetch helpers
@@ -1902,6 +1950,10 @@ function LedgerPage({
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const ledgerSearchFields = useMemo(() => buildLedgerSearchFields(variant), [variant]);
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(buildLedgerSearchFields(variant)));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(buildLedgerSearchFields(variant)));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -1930,6 +1982,10 @@ function LedgerPage({
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(ledgerSearchFields);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const {
@@ -2018,6 +2074,10 @@ function LedgerPage({
   useEffect(() => {
     loadBanks();
     loadRows();
+    const empty = emptyAdminSearchValues(buildLedgerSearchFields(variant));
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant]);
 
@@ -2153,7 +2213,24 @@ function LedgerPage({
     ]
       .join(" ")
       .toLowerCase();
-    return haystack.includes(search.toLowerCase());
+    if (!haystack.includes(search.toLowerCase())) return false;
+
+    const expenseRow = row as ExpenseRow;
+    const incomeRow = row as IncomeRow;
+    const gstLabel = Number(expenseRow.gst ?? 0) > 0 ? "Yes" : "No";
+    const chequeLabel = expenseRow.byCheque ? "Yes" : "No";
+    return (
+      searchIncludes(formatDisplayDate(row.date), searchFilters.date) &&
+      searchIncludes(row.vendor, searchFilters.vendor) &&
+      searchIncludes(String(row.amount), searchFilters.amount) &&
+      searchIncludes(incomeRow.paymentMode ?? "", searchFilters.paymentMode ?? "") &&
+      searchIncludes(incomeRow.bank ?? expenseRow.account ?? "", searchFilters.bank ?? "") &&
+      searchIncludes(`${decoded.category} ${decoded.subcategory}`, searchFilters.category) &&
+      searchIncludes(row.notes ?? "", searchFilters.notes) &&
+      searchEquals(gstLabel, searchFilters.gst ?? "") &&
+      searchIncludes(expenseRow.billNumber ?? "", searchFilters.billNumber ?? "") &&
+      searchEquals(chequeLabel, searchFilters.byCheque ?? "")
+    );
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
@@ -2198,6 +2275,7 @@ function LedgerPage({
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -2232,7 +2310,29 @@ function LedgerPage({
       setAttachmentFile(null);
     }
 
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(ledgerSearchFields);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -2392,9 +2492,18 @@ function LedgerPage({
   return (
     <AdminPage
       title={isDeletedView ? `Deleted ${title}` : title}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm && !isDeletedView ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={ledgerSearchFields}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm && !isDeletedView ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -2695,7 +2804,13 @@ function LedgerPage({
             placeholder="Live search type here..."
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

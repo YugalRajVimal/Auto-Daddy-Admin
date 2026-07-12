@@ -1549,6 +1549,12 @@ import { useCallback, useEffect, useState } from "react";
 import { FiPaperclip } from "react-icons/fi";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
   CompactAutoGrowTextarea,
@@ -1591,6 +1597,23 @@ const STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
   { value: "pending", label: "pending" },
   { value: "visited", label: "visited" },
   { value: "completed", label: "completed" },
+];
+
+const LEAD_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "date", label: "Date", type: "date" },
+  { key: "name", label: "Name" },
+  { key: "phone", label: "Phone" },
+  { key: "city", label: "City" },
+  { key: "email", label: "Email" },
+  { key: "website", label: "Website" },
+  { key: "notes", label: "Notes" },
+  { key: "sentTo", label: "Sent To" },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    options: STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+  },
 ];
 
 type LeadRow = {
@@ -1675,6 +1698,9 @@ export default function LeadsPage({
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(LEAD_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(LEAD_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -1702,6 +1728,10 @@ export default function LeadsPage({
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(LEAD_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
@@ -1756,11 +1786,22 @@ export default function LeadsPage({
   // Section already reflects backend status filtering; use rows as-is.
   const sectionLeads = isDeletedView ? deletedStash : leads;
 
+  const matchesLeadFilters = (lead: LeadRow) =>
+    searchIncludes(formatLeadDate(lead.date), searchFilters.date) &&
+    searchIncludes(lead.name, searchFilters.name) &&
+    searchIncludes(lead.phone, searchFilters.phone) &&
+    searchIncludes(lead.city, searchFilters.city) &&
+    searchIncludes(lead.email, searchFilters.email) &&
+    searchIncludes(lead.website, searchFilters.website) &&
+    searchIncludes(lead.notes, searchFilters.notes) &&
+    searchIncludes(lead.sentTo || "", searchFilters.sentTo) &&
+    searchEquals(lead.status, searchFilters.status);
+
   const filtered = isDeletedView
     ? sectionLeads.filter((lead) => {
         const q = search.toLowerCase();
-        if (!q) return true;
-        return (
+        const live =
+          !q ||
           lead.date.toLowerCase().includes(q) ||
           lead.name.toLowerCase().includes(q) ||
           lead.phone.toLowerCase().includes(q) ||
@@ -1769,10 +1810,11 @@ export default function LeadsPage({
           lead.website.toLowerCase().includes(q) ||
           lead.notes.toLowerCase().includes(q) ||
           (lead.sentTo || "").toLowerCase().includes(q) ||
-          lead.status.toLowerCase().includes(q)
-        );
+          lead.status.toLowerCase().includes(q);
+        if (!live) return false;
+        return matchesLeadFilters(lead);
       })
-    : sectionLeads;
+    : sectionLeads.filter(matchesLeadFilters);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -1812,6 +1854,7 @@ export default function LeadsPage({
   const openAdd = () => {
     resetForm();
     setViewingLead(null);
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -1819,6 +1862,7 @@ export default function LeadsPage({
     setViewingLead(row);
     setViewStatusDraft(row.status);
     setShowForm(false);
+    setShowSearchCard(false);
     resetForm();
   };
 
@@ -1841,7 +1885,30 @@ export default function LeadsPage({
     setAttachImage(Boolean(row.imageUrl));
     setImageFile(null);
     setImageUrl(row.imageUrl ?? null);
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setViewingLead(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+    void loadLeads();
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(LEAD_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const closeView = () => {
@@ -2108,58 +2175,70 @@ export default function LeadsPage({
       title={isDeletedView ? `Deleted ${title}` : title}
       noPanel={!showAddNew}
       headerAction={
-        showAddNew && !showForm && !viewingLead && !isDeletedView ? (
+        showAddNew && !showForm && !showSearchCard && !viewingLead && !isDeletedView ? (
           <AddNewButton onClick={openAdd} />
         ) : undefined
       }
       between={
-        viewDetailPanel ??
-        (!readOnly && showForm ? (
-          <CompactFormPanel
-            footer={
-              <CompactFormFooter
-                message={editingId != null ? "You are editing a 'Lead'" : "You are creating a 'Lead'"}
-                messageCenter
-                actionLabel={saving ? "Saving…" : editingId != null ? "Update" : "Save"}
-                onSave={saving ? () => {} : handleSave}
-                onCancel={handleCancel}
-              />
-            }
-          >
-            <CompactFormRow className="w-full items-start" columns={4}>
-              <CompactField label="Date" required className="w-full min-w-0">
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className={compactInputClass}
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={LEAD_SEARCH_FIELDS.map((field) =>
+              field.key === "sentTo" ? { ...field, label: sentToLabel } : field
+            )}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : (
+          viewDetailPanel ??
+          (!readOnly && showForm ? (
+            <CompactFormPanel
+              footer={
+                <CompactFormFooter
+                  message={editingId != null ? "You are editing a 'Lead'" : "You are creating a 'Lead'"}
+                  messageCenter
+                  actionLabel={saving ? "Saving…" : editingId != null ? "Update" : "Save"}
+                  onSave={saving ? () => {} : handleSave}
+                  onCancel={handleCancel}
                 />
-              </CompactField>
-              <CompactField label="Name" required className="w-full min-w-0">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={compactInputClass}
-                />
-              </CompactField>
-              <CompactField label="Phone" required className="w-full min-w-0">
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className={compactInputClass}
-                />
-              </CompactField>
-              <CompactField label="City" required className="w-full min-w-0">
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className={compactInputClass}
-                />
-              </CompactField>
-            </CompactFormRow>
+              }
+            >
+              <CompactFormRow className="w-full items-start" columns={4}>
+                <CompactField label="Date" required className="w-full min-w-0">
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+                <CompactField label="Name" required className="w-full min-w-0">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+                <CompactField label="Phone" required className="w-full min-w-0">
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+                <CompactField label="City" required className="w-full min-w-0">
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className={compactInputClass}
+                  />
+                </CompactField>
+              </CompactFormRow>
             <CompactFormRow className="w-full items-start" columns={4}>
               <CompactField label="Email" className="w-full min-w-0">
                 <input
@@ -2250,6 +2329,7 @@ export default function LeadsPage({
             )}
           </CompactFormPanel>
         ) : undefined)
+        )
       }
     >
       {isDeletedView && (
@@ -2324,7 +2404,13 @@ export default function LeadsPage({
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" onClick={() => loadLeads()} className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

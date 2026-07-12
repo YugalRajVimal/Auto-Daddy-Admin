@@ -1,6 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+  type AdminSearchValues,
+} from "../../../components/admin/AdminSearchCard";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
   CompactAutoGrowTextarea,
@@ -161,6 +168,74 @@ function isWebsiteUrl(url: string) {
 function formatWebsiteUrl(url?: string) {
   if (!url?.trim()) return "-";
   return url.trim().replace(/^https?:\/\//i, "");
+}
+
+const NON_SEARCHABLE_COLUMN_KEYS = new Set(["image", "photo", "profilePhoto", "action", "checkbox"]);
+
+function buildDummyUserSearchFields(columns: ColumnDef[]): AdminSearchField[] {
+  return columns
+    .filter((col) => !NON_SEARCHABLE_COLUMN_KEYS.has(col.key))
+    .map((col) => {
+      if (col.key === "status") {
+        return {
+          key: col.key,
+          label: col.label,
+          type: "select" as const,
+          options: [
+            { value: "Active", label: "Active" },
+            { value: "Suspended", label: "Suspended" },
+            { value: "Deleted", label: "Deleted" },
+          ],
+        };
+      }
+      if (col.key === "date") {
+        return { key: col.key, label: col.label, type: "date" as const };
+      }
+      return { key: col.key, label: col.label };
+    });
+}
+
+function dummyUserValueByKey(row: DummyUserRow, key: string): string {
+  switch (key) {
+    case "name":
+      return row.name;
+    case "email":
+      return row.email;
+    case "phone":
+      return row.phone;
+    case "primary":
+      return row.primaryLabel;
+    case "city":
+      return row.city;
+    case "address":
+      return row.address ?? "";
+    case "region":
+      return row.region ?? "";
+    case "websiteUrl":
+      return formatWebsiteUrl(row.websiteUrl);
+    case "date":
+      return fmtDate(row.createdAt);
+    case "countA":
+      return String(row.countA);
+    case "countB":
+      return String(row.countB);
+    case "status":
+      return getStatus(row);
+    case "categories":
+      return (row.categories ?? []).join(", ");
+    default:
+      return String((row as Record<string, unknown>)[key] ?? "");
+  }
+}
+
+function matchesDummyUserSearchFilters(row: DummyUserRow, filters: AdminSearchValues, fields: AdminSearchField[]) {
+  return fields.every((field) => {
+    if (field.type === "range") return true;
+    const needle = filters[field.key] ?? "";
+    if (!needle.trim()) return true;
+    const value = dummyUserValueByKey(row, field.key);
+    return field.key === "status" ? searchEquals(value, needle) : searchIncludes(value, needle);
+  });
 }
 
 const DummyUserAddEditForm: React.FC<{
@@ -455,6 +530,10 @@ type DummyUserListPageProps = {
 export default function DummyUserListPage({ config }: DummyUserListPageProps) {
   const [allRows, setAllRows] = useState<DummyUserRow[]>(config.initialData);
   const [search, setSearch] = useState("");
+  const searchFields = useMemo(() => buildDummyUserSearchFields(config.columns), [config.columns]);
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(buildDummyUserSearchFields(config.columns)));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(buildDummyUserSearchFields(config.columns)));
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -476,15 +555,17 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
 
   const filtered = displayRows.filter((r) => {
     const q = search.toLowerCase();
-    return (
+    const live =
+      !q ||
       r.name.toLowerCase().includes(q) ||
       r.email.toLowerCase().includes(q) ||
       r.phone.includes(q) ||
       r.primaryLabel.toLowerCase().includes(q) ||
       r.city.toLowerCase().includes(q) ||
       (r.region ?? "").toLowerCase().includes(q) ||
-      (r.websiteUrl ?? "").toLowerCase().includes(q)
-    );
+      (r.websiteUrl ?? "").toLowerCase().includes(q);
+    if (!live) return false;
+    return matchesDummyUserSearchFilters(r, searchFilters, searchFields);
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -534,12 +615,35 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
 
   const openAdd = () => {
     setEditingRow(null);
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
   const openEdit = (row: DummyUserRow) => {
     setEditingRow(row);
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingRow(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setCurrentPage(1);
+    setSelectedRows(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(searchFields);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setCurrentPage(1);
+    setSelectedRows(new Set());
   };
 
   const handleFormCancel = () => {
@@ -681,12 +785,21 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
       <AdminPage
         title={viewMode === "deleted" ? config.deletedTitle : config.title}
         headerAction={
-          viewMode === "active" && !showForm ? (
+          viewMode === "active" && !showForm && !showSearchCard ? (
             <AddNewButton onClick={openAdd} />
           ) : undefined
         }
         between={
-          showForm ? (
+          showSearchCard ? (
+            <AdminSearchCard
+              fields={searchFields}
+              values={searchDraft}
+              onChange={setSearchDraft}
+              onSearch={handleSearchCardSearch}
+              onReset={handleSearchCardReset}
+              onClose={() => setShowSearchCard(false)}
+            />
+          ) : showForm ? (
             <DummyUserAddEditForm
               key={editingRow?._id ?? "new"}
               row={editingRow}
@@ -756,7 +869,13 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
             />
             {selCount > 0 && <span className="text-xs font-semibold text-gray-600">{selCount} selected</span>}
             {viewMode === "active" && <ColSelector columns={config.columns} visible={visibleCols} onChange={setVisibleCols} />}
-            <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+            <button
+              type="button"
+              onClick={openSearchCard}
+              className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+                showSearchCard ? "bg-gray-700" : "bg-gray-500"
+              }`}
+            >
               Search
             </button>
           </div>
@@ -893,6 +1012,10 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
               setViewMode((v) => (v === "active" ? "deleted" : "active"));
               setSelectedRows(new Set());
               setSearch("");
+              const empty = emptyAdminSearchValues(searchFields);
+              setSearchDraft(empty);
+              setSearchFilters(empty);
+              setShowSearchCard(false);
               setCurrentPage(1);
             }}
             className="text-sm text-blue-700 hover:underline"

@@ -10,6 +10,12 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
@@ -65,6 +71,41 @@ const TYPE_OPTIONS = TYPE_BASE_OPTIONS.flatMap((base) => [
   `${base} - App`,
 ]);
 
+const PRIVACY_SEARCH_FIELDS: AdminSearchField[] = [
+  {
+    key: "date",
+    label: "Date",
+    type: "range",
+    fromKey: "dateFrom",
+    toKey: "dateTo",
+    inputType: "date",
+  },
+  {
+    key: "country",
+    label: "Country",
+    type: "select",
+    options: [
+      { value: "Canada", label: "Canada" },
+      { value: "USA", label: "USA" },
+      { value: "India", label: "India" },
+    ],
+  },
+  {
+    key: "type",
+    label: "Type",
+    type: "select",
+    options: TYPE_OPTIONS.map((opt) => ({ value: opt, label: opt })),
+  },
+  { key: "description", label: "Description" },
+];
+
+const dateInRange = (dateValue: string, from: string, to: string) => {
+  const dateStr = dateValue ? String(dateValue).slice(0, 10) : "";
+  if (from && (!dateStr || dateStr < from)) return false;
+  if (to && (!dateStr || dateStr > to)) return false;
+  return true;
+};
+
 // API model type
 type PrivacyApiRow = {
   _id: string;
@@ -101,6 +142,9 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(PRIVACY_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(PRIVACY_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -115,6 +159,10 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(PRIVACY_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
@@ -137,13 +185,21 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
 
   const displayEntries = isDeletedView ? deletedStash : entries;
 
-  const filtered = displayEntries.filter(
-    (e) =>
+  const filtered = displayEntries.filter((e) => {
+    const live =
+      !search.trim() ||
       e.date.includes(search) ||
       (e.type ?? "").toLowerCase().includes(search.toLowerCase()) ||
       (e.description ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (e.country ?? "").toLowerCase().includes(search.toLowerCase())
-  );
+      (e.country ?? "").toLowerCase().includes(search.toLowerCase());
+    if (!live) return false;
+    return (
+      dateInRange(e.date, searchFilters.dateFrom, searchFilters.dateTo) &&
+      searchEquals(e.country, searchFilters.country) &&
+      searchEquals(e.type, searchFilters.type) &&
+      searchIncludes(e.description, searchFilters.description)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -172,6 +228,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -181,7 +238,29 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
     setType(row.type);
     setDescription(row.description);
     setEditingId(row.id);
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(PRIVACY_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -269,9 +348,18 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Privacy and Disclaimer" : "Privacy and Disclaimer"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={PRIVACY_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -375,7 +463,13 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

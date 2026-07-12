@@ -11,6 +11,12 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
@@ -20,6 +26,28 @@ const USER_TYPE_OPTIONS = [
   { value: "car-washing", label: "Car Washing" },
   { value: "tire-master", label: "Tire Master" },
   { value: "tow-truck", label: "Tow Truck" },
+];
+
+const INVOICE_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "template", label: "Template" },
+  { key: "date", label: "Date", type: "date" },
+  {
+    key: "country",
+    label: "Country",
+    type: "select",
+    options: [
+      { value: "Canada", label: "Canada" },
+      { value: "USA", label: "USA" },
+      { value: "India", label: "India" },
+    ],
+  },
+  {
+    key: "userType",
+    label: "User Type",
+    type: "select",
+    options: USER_TYPE_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
+  },
+  { key: "usedBy", label: "Used by", type: "number" },
 ];
 
 // Mapping local userType value to API shopType
@@ -147,6 +175,9 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(INVOICE_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(INVOICE_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -168,6 +199,10 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(INVOICE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
@@ -192,14 +227,26 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
 
   const displayTemplates = isDeletedView ? deletedStash : templates;
 
-  const filtered = displayTemplates.filter(
-    (t) =>
+  const filtered = displayTemplates.filter((t) => {
+    const userTypeLabel = getUserTypeLabel(t.userType);
+    const live =
       (userTypeFilters[t.userType] ?? true) &&
-      (t.date.includes(search) ||
-        getUserTypeLabel(t.userType).toLowerCase().includes(search.toLowerCase()) ||
+      (!search.trim() ||
+        t.date.includes(search) ||
+        userTypeLabel.toLowerCase().includes(search.toLowerCase()) ||
         t.notes.toLowerCase().includes(search.toLowerCase()) ||
-        t.country.toLowerCase().includes(search.toLowerCase()))
-  );
+        t.country.toLowerCase().includes(search.toLowerCase()) ||
+        String(t.usedBy).includes(search));
+    if (!live) return false;
+    const dateStr = t.date ? String(t.date).slice(0, 10) : "";
+    return (
+      searchIncludes(t.notes, searchFilters.template) &&
+      searchIncludes(dateStr, searchFilters.date) &&
+      searchEquals(t.country, searchFilters.country) &&
+      searchEquals(userTypeLabel, searchFilters.userType) &&
+      searchIncludes(t.usedBy, searchFilters.usedBy)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -235,6 +282,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -246,7 +294,29 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
     setAttachImage(row.hasClip);
     setImageFile(null);
     setEditingId(row.id);
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(INVOICE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -340,9 +410,18 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Inv - Temp" : "Inv - Temp"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={INVOICE_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -470,7 +549,13 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

@@ -10,6 +10,12 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
@@ -23,6 +29,21 @@ const USER_OPTIONS = [
   { value: "associate", label: "Associate", apiValue: "associate" },
   { value: "dealer", label: "Dealer", apiValue: "dealer" },
 ];
+
+const FAQ_SEARCH_FIELDS: AdminSearchField[] = [
+  {
+    key: "user",
+    label: "User",
+    type: "select",
+    options: USER_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
+  },
+  { key: "date", label: "Date", type: "date" },
+  { key: "question", label: "Question" },
+  { key: "answer", label: "Answer" },
+];
+
+const faqUserLabel = (role: string) =>
+  USER_OPTIONS.find((o) => o.apiValue === role || o.value === role)?.label ?? role;
 
 type FaqRow = {
   id: number;
@@ -42,6 +63,9 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   const [faqs, setFaqs] = useState<FaqRow[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(FAQ_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(FAQ_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -56,6 +80,10 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(FAQ_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const {
@@ -94,15 +122,23 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   const displayFaqs = isDeletedView ? deletedStash : faqs;
 
   // Filtering, searching, and pagination
-  const filtered = displayFaqs.filter(
-    (f) =>
+  const filtered = displayFaqs.filter((f) => {
+    const userLabel = faqUserLabel(f.role);
+    const live =
+      !search.trim() ||
       f.date?.includes(search) ||
       f.question?.toLowerCase().includes(search.toLowerCase()) ||
       f.answer?.toLowerCase().includes(search.toLowerCase()) ||
-      (USER_OPTIONS.find((o) => o.apiValue === f.role || o.value === f.role)?.label ?? f.role)
-        .toLowerCase()
-        .includes(search.toLowerCase())
-  );
+      userLabel.toLowerCase().includes(search.toLowerCase());
+    if (!live) return false;
+    const dateStr = f.date ? String(f.date).slice(0, 10) : "";
+    return (
+      searchEquals(userLabel, searchFilters.user) &&
+      searchIncludes(dateStr, searchFilters.date) &&
+      searchIncludes(f.question, searchFilters.question) &&
+      searchIncludes(f.answer, searchFilters.answer)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -131,6 +167,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -140,7 +177,29 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     setQuestion(row.question);
     setAnswer(row.answer);
     setEditingId(row.id);
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(FAQ_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -265,9 +324,18 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   return (
     <AdminPage
       title={isDeletedView ? "Deleted FAQ Management" : "FAQ Management"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={FAQ_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -364,7 +432,13 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

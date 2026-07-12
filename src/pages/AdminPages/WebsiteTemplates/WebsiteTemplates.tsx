@@ -11,6 +11,12 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
@@ -21,6 +27,32 @@ const USER_TYPE_OPTIONS = [
   { value: "tire-master", label: "Tire Master", apiValue: "tire-master" },
   { value: "tow-truck", label: "Tow Truck", apiValue: "tow-truck" },
 ];
+
+const WEBSITE_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "templateName", label: "Template Name" },
+  { key: "url", label: "URL" },
+  { key: "date", label: "Date", type: "date" },
+  {
+    key: "country",
+    label: "Country",
+    type: "select",
+    options: [
+      { value: "Canada", label: "Canada" },
+      { value: "USA", label: "USA" },
+      { value: "India", label: "India" },
+    ],
+  },
+  {
+    key: "userType",
+    label: "User Type",
+    type: "select",
+    options: USER_TYPE_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
+  },
+  { key: "usedBy", label: "Used by", type: "number" },
+];
+
+const websiteUserTypeLabel = (shopType: string) =>
+  USER_TYPE_OPTIONS.find((o) => o.value === shopType)?.label ?? shopType;
 
 // NOTE: The API returns an "_id" string. We should map to `id` for internal row usage.
 type TemplateRow = {
@@ -101,6 +133,9 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const [sites, setSites] = useState<TemplateRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(WEBSITE_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(WEBSITE_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -123,6 +158,10 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(WEBSITE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
@@ -156,17 +195,27 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   // Filtering and pagination (client-side, for live search)
   const displaySites = isDeletedView ? deletedStash : sites;
 
-  const filtered = displaySites.filter(
-    (s) =>
-      (!search ||
-        s.date.includes(search) ||
-        (USER_TYPE_OPTIONS.find((o) => o.value === s.shopType)?.label ?? s.shopType)
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        s.templateName.toLowerCase().includes(search.toLowerCase()) ||
-        s.url.toLowerCase().includes(search.toLowerCase()) ||
-        s.country.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filtered = displaySites.filter((s) => {
+    const userTypeLabel = websiteUserTypeLabel(s.shopType);
+    const live =
+      !search.trim() ||
+      s.date.includes(search) ||
+      userTypeLabel.toLowerCase().includes(search.toLowerCase()) ||
+      s.templateName.toLowerCase().includes(search.toLowerCase()) ||
+      s.url.toLowerCase().includes(search.toLowerCase()) ||
+      s.country.toLowerCase().includes(search.toLowerCase()) ||
+      String(s.usedBy).includes(search);
+    if (!live) return false;
+    const dateStr = s.date ? String(s.date).slice(0, 10) : "";
+    return (
+      searchIncludes(s.templateName, searchFilters.templateName) &&
+      searchIncludes(s.url, searchFilters.url) &&
+      searchIncludes(dateStr, searchFilters.date) &&
+      searchEquals(s.country, searchFilters.country) &&
+      searchEquals(userTypeLabel, searchFilters.userType) &&
+      searchIncludes(s.usedBy, searchFilters.usedBy)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const pageStartIndex = (page - 1) * entriesPerPage;
@@ -200,6 +249,32 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     setTemplateName("");
     setAttachImage(false);
     setImageFile(null);
+  };
+
+  const openAdd = () => {
+    resetForm();
+    setShowSearchCard(false);
+    setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(WEBSITE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -289,9 +364,18 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Web - Temp" : "Web - Temp"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={WEBSITE_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -423,7 +507,13 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600" disabled>
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

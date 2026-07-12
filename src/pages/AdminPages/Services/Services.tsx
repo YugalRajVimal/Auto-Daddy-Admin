@@ -10,6 +10,12 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
@@ -41,6 +47,35 @@ const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
   { value: "towTruck", label: "Tow Truck" },
 ];
 
+const SERVICE_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "name", label: "Name" },
+  {
+    key: "shopType",
+    label: "Shop Type",
+    type: "select",
+    options: SHOP_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+  },
+  { key: "subServices", label: "Sub Services" },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    options: [
+      { value: "Active", label: "Active" },
+      { value: "Inactive", label: "Inactive" },
+    ],
+  },
+  {
+    key: "odoOutRequired",
+    label: "Odo Out Required",
+    type: "select",
+    options: [
+      { value: "Yes", label: "Yes" },
+      { value: "No", label: "No" },
+    ],
+  },
+];
+
 type ServicesPageProps = {
   initialShowForm?: boolean;
 };
@@ -54,6 +89,9 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(SERVICE_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(SERVICE_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [filterShopType, setFilterShopType] = useState<"all" | ShopType>("all");
@@ -68,6 +106,10 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(SERVICE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const {
@@ -108,11 +150,21 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
 
   const displayServices = isDeletedView ? deletedStash : services;
 
-  const filtered = displayServices.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    SHOP_TYPE_OPTIONS.find((o) => o.value === s.shopType)?.label.toLowerCase().includes(search.toLowerCase()) ||
-    (s.status as string).toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = displayServices.filter((s) => {
+    const live =
+      !search.trim() ||
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      SHOP_TYPE_OPTIONS.find((o) => o.value === s.shopType)?.label.toLowerCase().includes(search.toLowerCase()) ||
+      (s.status as string).toLowerCase().includes(search.toLowerCase());
+    if (!live) return false;
+    return (
+      searchIncludes(s.name, searchFilters.name) &&
+      searchEquals(s.shopType, searchFilters.shopType) &&
+      searchIncludes(s.subServices?.length ?? 0, searchFilters.subServices) &&
+      searchEquals(s.status || "Active", searchFilters.status) &&
+      searchEquals(s.odoOutRequired ? "Yes" : "No", searchFilters.odoOutRequired)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -142,6 +194,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -152,7 +205,29 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     setOdoOutRequired(Boolean(service.odoOutRequired));
     setEditingId(service._id);
     setError("");
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(SERVICE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -278,9 +353,18 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Services" : "Services"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={SERVICE_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -422,7 +506,13 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

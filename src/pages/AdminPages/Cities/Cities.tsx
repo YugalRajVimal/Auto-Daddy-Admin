@@ -10,8 +10,37 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+
+const CITY_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "city", label: "City" },
+  { key: "province", label: "Province" },
+  {
+    key: "country",
+    label: "Country",
+    type: "select",
+    options: [
+      { value: "Canada", label: "Canada" },
+      { value: "USA", label: "USA" },
+    ],
+  },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    options: [
+      { value: "Active", label: "Active" },
+      { value: "Inactive", label: "Inactive" },
+    ],
+  },
+];
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -54,6 +83,9 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(CITY_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(CITY_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -67,6 +99,10 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(CITY_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
@@ -120,12 +156,20 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
 
   const displayCities = isDeletedView ? deletedStash : allCities;
 
-  const filtered = displayCities.filter(
-    (c) =>
+  const filtered = displayCities.filter((c) => {
+    const live =
+      !search.trim() ||
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.provinceName.toLowerCase().includes(search.toLowerCase()) ||
-      c.country.toLowerCase().includes(search.toLowerCase())
-  );
+      c.country.toLowerCase().includes(search.toLowerCase());
+    if (!live) return false;
+    return (
+      searchIncludes(c.name, searchFilters.city) &&
+      searchIncludes(c.provinceName, searchFilters.province) &&
+      searchEquals(c.country, searchFilters.country) &&
+      searchEquals(c.status || "Active", searchFilters.status)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -159,6 +203,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -169,7 +214,29 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     setFormCountry(city.country);
     setFormProvinceId(city.provinceId);
     setError("");
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingCity(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(CITY_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCountryChange = (value: Country) => {
@@ -304,9 +371,18 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Cities" : "Cities"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={CITY_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -466,7 +542,13 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

@@ -9,9 +9,38 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+
+const PROVINCE_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "province", label: "Province" },
+  { key: "nickName", label: "Nickname" },
+  {
+    key: "country",
+    label: "Country",
+    type: "select",
+    options: [
+      { value: "Canada", label: "Canada" },
+      { value: "USA", label: "USA" },
+    ],
+  },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    options: [
+      { value: "Active", label: "Active" },
+      { value: "Inactive", label: "Inactive" },
+    ],
+  },
+];
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -41,6 +70,9 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(PROVINCE_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(PROVINCE_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -54,6 +86,10 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(PROVINCE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const {
@@ -90,12 +126,20 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
 
   const displayProvinces = isDeletedView ? deletedStash : provinces;
 
-  const filtered = displayProvinces.filter(
-    (p) =>
+  const filtered = displayProvinces.filter((p) => {
+    const live =
+      !search.trim() ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.nickName || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.country || "Canada").toLowerCase().includes(search.toLowerCase())
-  );
+      (p.country || "Canada").toLowerCase().includes(search.toLowerCase());
+    if (!live) return false;
+    return (
+      searchIncludes(p.name, searchFilters.province) &&
+      searchIncludes(p.nickName, searchFilters.nickName) &&
+      searchEquals(p.country || "Canada", searchFilters.country) &&
+      searchEquals(p.status || "Active", searchFilters.status)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -125,6 +169,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -135,7 +180,29 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     setStatus(province.status || "Active");
     setEditingId(province._id);
     setError("");
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(PROVINCE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -270,9 +337,18 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Provinces" : "Provinces"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={PROVINCE_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -390,7 +466,13 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

@@ -8,6 +8,12 @@ import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admi
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { MoreDotIcon } from "../../../icons";
 import {
   CompactField,
@@ -24,6 +30,49 @@ import {
   PermissionMatrix,
   type Permissions,
 } from "../../../components/admin/PermissionMatrix";
+
+const SUB_ADMIN_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "date", label: "Date", type: "date" },
+  {
+    key: "role",
+    label: "Role",
+    type: "select",
+    options: [
+      { value: "Super Admin", label: "Super Admin" },
+      { value: "Admin", label: "Admin" },
+      { value: "Sub Admin", label: "Sub Admin" },
+      { value: "Business Associate", label: "Business Associate" },
+    ],
+  },
+  { key: "name", label: "Name" },
+  { key: "phone", label: "Phone" },
+  { key: "email", label: "Email" },
+  {
+    key: "city",
+    label: "City",
+    type: "select",
+    options: [
+      "Toronto",
+      "Vancouver",
+      "Montreal",
+      "Calgary",
+      "Ottawa",
+      "Edmonton",
+      "Winnipeg",
+      "Halifax",
+    ].map((c) => ({ value: c, label: c })),
+  },
+  { key: "permissions", label: "Permissions" },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    options: [
+      { value: "Active", label: "Active" },
+      { value: "Inactive", label: "Inactive" },
+    ],
+  },
+];
 
 interface SubAdmin {
   _id: string;
@@ -315,6 +364,9 @@ const SubAdminManagement: React.FC = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(SUB_ADMIN_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(SUB_ADMIN_SEARCH_FIELDS));
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -352,6 +404,10 @@ const SubAdminManagement: React.FC = () => {
     setCurrentPage(1);
     setSelectedIds(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(SUB_ADMIN_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
@@ -398,14 +454,26 @@ const SubAdminManagement: React.FC = () => {
   const filtered = displaySubAdmins.filter((s) => {
     const q = search.toLowerCase();
     const keys = permissionKeysFromPerms(s.permissions);
-    return (
+    const permsLabel = permissionLabels(keys);
+    const live =
+      !q ||
       s.name.toLowerCase().includes(q) ||
       s.email.toLowerCase().includes(q) ||
       (s.phone || "").includes(q) ||
       (s.role || "").toLowerCase().includes(q) ||
       (s.city || "").toLowerCase().includes(q) ||
       formatAdminDate(s.createdAt).includes(search) ||
-      permissionLabels(keys).toLowerCase().includes(q)
+      permsLabel.toLowerCase().includes(q);
+    if (!live) return false;
+    return (
+      searchIncludes(formatAdminDate(s.createdAt), searchFilters.date) &&
+      searchEquals(s.role || "", searchFilters.role) &&
+      searchIncludes(s.name, searchFilters.name) &&
+      searchIncludes(s.phone || "", searchFilters.phone) &&
+      searchIncludes(s.email, searchFilters.email) &&
+      searchEquals(s.city || "", searchFilters.city) &&
+      searchIncludes(permsLabel, searchFilters.permissions) &&
+      searchEquals(s.isActive ? "Active" : "Inactive", searchFilters.status)
     );
   });
 
@@ -431,6 +499,7 @@ const SubAdminManagement: React.FC = () => {
     setEditingSubAdmin(null);
     resetFormFields();
     setFormError("");
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -447,7 +516,29 @@ const SubAdminManagement: React.FC = () => {
     setImageFile(null);
     setImagePreview(existingImage);
     setFormError("");
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingSubAdmin(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(SUB_ADMIN_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setCurrentPage(1);
+    setSelectedIds(new Set());
   };
 
   const handleCancelForm = () => {
@@ -745,9 +836,18 @@ const SubAdminManagement: React.FC = () => {
 
       <AdminPage
         title={isDeletedView ? "Deleted Manage Admin" : "Manage Admin"}
-        headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openCreate} /> : undefined}
+        headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openCreate} /> : undefined}
         between={
-          showForm ? (
+          showSearchCard ? (
+            <AdminSearchCard
+              fields={SUB_ADMIN_SEARCH_FIELDS}
+              values={searchDraft}
+              onChange={setSearchDraft}
+              onSearch={handleSearchCardSearch}
+              onReset={handleSearchCardReset}
+              onClose={() => setShowSearchCard(false)}
+            />
+          ) : showForm ? (
             <CompactFormPanel
               footer={
                 <CompactFormFooter
@@ -949,7 +1049,13 @@ const SubAdminManagement: React.FC = () => {
               placeholder="Live Search here"
               className="border border-gray-400 bg-white px-2 py-1 text-xs"
             />
-            <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+            <button
+              type="button"
+              onClick={openSearchCard}
+              className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+                showSearchCard ? "bg-gray-700" : "bg-gray-500"
+              }`}
+            >
               Search
             </button>
           </div>

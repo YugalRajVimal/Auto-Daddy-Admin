@@ -7,6 +7,12 @@ import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { authHeaders } from "../../../api/client";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import {
   CompactAutoGrowTextarea,
   CompactField,
@@ -73,6 +79,27 @@ const ALL_COLUMNS = [
   { key: "status", label: "Status" },
 ];
 const DEFAULT_VISIBLE = ["name", "phone", "email", "city", "address", "date", "profilePhoto", "documents", "vehicle", "autoShops", "jobCard", "likes", "status"];
+
+const CAR_OWNER_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "name", label: "Name" },
+  { key: "phone", label: "Phone" },
+  { key: "email", label: "Email" },
+  { key: "city", label: "City" },
+  { key: "address", label: "Address" },
+  { key: "date", label: "Date", type: "date" },
+  { key: "vin", label: "VIN" },
+  { key: "likes", label: "Likes" },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    options: [
+      { value: "Active", label: "Active" },
+      { value: "Inactive", label: "Inactive" },
+      { value: "Deleted", label: "Deleted" },
+    ],
+  },
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const API = () => import.meta.env.VITE_API_URL || "";
@@ -1054,6 +1081,9 @@ const CarOwners: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(CAR_OWNER_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(CAR_OWNER_SEARCH_FIELDS));
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -1073,12 +1103,35 @@ const CarOwners: React.FC = () => {
 
   const openAdd = () => {
     setEditingOwner(null);
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
   const openEdit = (owner: CarOwnerType) => {
     setEditingOwner(owner);
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingOwner(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setCurrentPage(1);
+    setSelectedRows(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(CAR_OWNER_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setCurrentPage(1);
+    setSelectedRows(new Set());
   };
 
   const handleFormCancel = () => {
@@ -1125,7 +1178,28 @@ const CarOwners: React.FC = () => {
 
   const filtered = displayOwners.filter(o => {
     const q = search.toLowerCase();
-    return (o.name || "").toLowerCase().includes(q) || (o.phone || "").toLowerCase().includes(q) || (o.email || "").toLowerCase().includes(q) || (o.city || "").toLowerCase().includes(q) || String(getOwnerThoughtLikes(o)).includes(q);
+    const statusRaw = (o.status ?? "active").toLowerCase();
+    const statusLabel =
+      statusRaw === "suspended" ? "Inactive" : statusRaw === "deleted" ? "Deleted" : "Active";
+    const live =
+      !q ||
+      (o.name || "").toLowerCase().includes(q) ||
+      (o.phone || "").toLowerCase().includes(q) ||
+      (o.email || "").toLowerCase().includes(q) ||
+      (o.city || "").toLowerCase().includes(q) ||
+      String(getOwnerThoughtLikes(o)).includes(q);
+    if (!live) return false;
+    return (
+      searchIncludes(o.name || "", searchFilters.name) &&
+      searchIncludes(o.phone || "", searchFilters.phone) &&
+      searchIncludes(o.email || "", searchFilters.email) &&
+      searchIncludes(o.city || "", searchFilters.city) &&
+      searchIncludes(o.address || "", searchFilters.address) &&
+      searchIncludes(fmtDate(o.createdAt), searchFilters.date) &&
+      searchIncludes(primaryVehicle(o)?.vinNo || "", searchFilters.vin) &&
+      searchIncludes(String(getOwnerThoughtLikes(o)), searchFilters.likes) &&
+      searchEquals(statusLabel, searchFilters.status)
+    );
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -1241,12 +1315,21 @@ const CarOwners: React.FC = () => {
       <AdminPage
         title={showDeleted ? "Deleted Car Owners" : "Car Owners"}
         headerAction={
-          !showDeleted && !showForm ? (
+          !showDeleted && !showForm && !showSearchCard ? (
             <AddNewButton onClick={openAdd} />
           ) : undefined
         }
         between={
-          showForm ? (
+          showSearchCard ? (
+            <AdminSearchCard
+              fields={CAR_OWNER_SEARCH_FIELDS}
+              values={searchDraft}
+              onChange={setSearchDraft}
+              onSearch={handleSearchCardSearch}
+              onReset={handleSearchCardReset}
+              onClose={() => setShowSearchCard(false)}
+            />
+          ) : showForm ? (
             <CarOwnerAddEditForm
               key={editingOwner?._id ?? "new"}
               owner={editingOwner}
@@ -1339,7 +1422,13 @@ const CarOwners: React.FC = () => {
             />
             {selCount > 0 && <span className="text-xs font-semibold text-gray-600">{selCount} selected</span>}
             <ColSelector visible={visibleCols} onChange={setVisibleCols} />
-            <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+            <button
+              type="button"
+              onClick={openSearchCard}
+              className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+                showSearchCard ? "bg-gray-700" : "bg-gray-500"
+              }`}
+            >
               Search
             </button>
           </div>
@@ -1437,6 +1526,10 @@ const CarOwners: React.FC = () => {
                 setCurrentPage(1);
                 setSelectedRows(new Set());
                 setSearch("");
+                const empty = emptyAdminSearchValues(CAR_OWNER_SEARCH_FIELDS);
+                setSearchDraft(empty);
+                setSearchFilters(empty);
+                setShowSearchCard(false);
               }}
               className="text-sm text-blue-700 hover:underline"
             >

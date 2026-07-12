@@ -4,6 +4,12 @@ import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { authHeaders } from "../../../api/client";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import {
   CompactField,
   CompactFormFooter,
@@ -71,6 +77,26 @@ const ALL_COLUMNS = [
   { key: "email", label: "Email" },
 ];
 const DEFAULT_VISIBLE = ["date", "phone", "businessName", "shopType", "city", "dealsPosted", "email"];
+
+const AUTO_SHOP_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "date", label: "Date", type: "date" },
+  { key: "phone", label: "Phone" },
+  { key: "businessName", label: "Business Name" },
+  {
+    key: "shopType",
+    label: "Shop Type",
+    type: "select",
+    options: [
+      { value: "Mechanic Shop", label: "Mechanic Shop" },
+      { value: "Car Washing", label: "Car Washing" },
+      { value: "Tire Master", label: "Tire Master" },
+      { value: "Tow Truck", label: "Tow Truck" },
+    ],
+  },
+  { key: "city", label: "City" },
+  { key: "dealsPosted", label: "Deals Posted" },
+  { key: "email", label: "Email" },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const API = () => (import.meta.env.VITE_API_URL as string) || "";
@@ -605,6 +631,9 @@ const AutoShopOwners: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(AUTO_SHOP_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(AUTO_SHOP_SEARCH_FIELDS));
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -660,12 +689,35 @@ const AutoShopOwners: React.FC = () => {
 
   const openAdd = () => {
     setEditingOwner(null);
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
   const openEdit = (owner: AutoShopOwnerType) => {
     setEditingOwner(owner);
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingOwner(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setCurrentPage(1);
+    setSelectedRows(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(AUTO_SHOP_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setCurrentPage(1);
+    setSelectedRows(new Set());
   };
 
   const handleFormCancel = () => {
@@ -684,14 +736,30 @@ const AutoShopOwners: React.FC = () => {
     if (!(shopTypeFilters[st] ?? true)) return false;
     const q = search.toLowerCase();
     const shopTypeLabel = SHOP_TYPE_OPTIONS.find(x => x.value === st)?.label ?? "";
-    return (o.email || "").toLowerCase().includes(q)
-      || (o.phone || "").toLowerCase().includes(q)
-      || (o.businessProfile?.businessName || "").toLowerCase().includes(q)
-      || (o.businessProfile?.city || "").toLowerCase().includes(q)
-      || (o.address || o.businessProfile?.businessAddress || "").toLowerCase().includes(q)
-      || (o.pincode || o.businessProfile?.pincode || "").toLowerCase().includes(q)
-      || st.toLowerCase().includes(q)
-      || shopTypeLabel.toLowerCase().includes(q);
+    const phone = `${o.countryCode ? `${o.countryCode} ` : ""}${o.phone || ""}`;
+    const businessName = o.businessProfile?.businessName || o.name || "";
+    const city = o.businessProfile?.city || "";
+    const dealsPosted = String(ownerDealsList(o).length);
+    const live =
+      !q ||
+      (o.email || "").toLowerCase().includes(q) ||
+      (o.phone || "").toLowerCase().includes(q) ||
+      businessName.toLowerCase().includes(q) ||
+      city.toLowerCase().includes(q) ||
+      (o.address || o.businessProfile?.businessAddress || "").toLowerCase().includes(q) ||
+      (o.pincode || o.businessProfile?.pincode || "").toLowerCase().includes(q) ||
+      st.toLowerCase().includes(q) ||
+      shopTypeLabel.toLowerCase().includes(q);
+    if (!live) return false;
+    return (
+      searchIncludes(fmtDate(o.createdAt), searchFilters.date) &&
+      searchIncludes(phone, searchFilters.phone) &&
+      searchIncludes(businessName, searchFilters.businessName) &&
+      searchEquals(shopTypeLabel, searchFilters.shopType) &&
+      searchIncludes(city, searchFilters.city) &&
+      searchIncludes(dealsPosted, searchFilters.dealsPosted) &&
+      searchIncludes(o.email || "", searchFilters.email)
+    );
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -822,12 +890,21 @@ const AutoShopOwners: React.FC = () => {
       <AdminPage
         title={viewMode === "deleted" ? "Deleted Auto Shop Owners" : "Auto Shop Owners"}
         headerAction={
-          viewMode === "active" && !showForm ? (
+          viewMode === "active" && !showForm && !showSearchCard ? (
             <AddNewButton onClick={openAdd} />
           ) : undefined
         }
         between={
-          showForm ? (
+          showSearchCard ? (
+            <AdminSearchCard
+              fields={AUTO_SHOP_SEARCH_FIELDS}
+              values={searchDraft}
+              onChange={setSearchDraft}
+              onSearch={handleSearchCardSearch}
+              onReset={handleSearchCardReset}
+              onClose={() => setShowSearchCard(false)}
+            />
+          ) : showForm ? (
             <AutoShopAddEditForm
               key={editingOwner?._id ?? "new"}
               owner={editingOwner}
@@ -894,7 +971,13 @@ const AutoShopOwners: React.FC = () => {
             />
             {selCount > 0 && <span className="text-xs font-semibold text-gray-600">{selCount} selected</span>}
             {viewMode === "active" && <ColSelector visible={visibleCols} onChange={setVisibleCols} />}
-            <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+            <button
+              type="button"
+              onClick={openSearchCard}
+              className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+                showSearchCard ? "bg-gray-700" : "bg-gray-500"
+              }`}
+            >
               Search
             </button>
           </div>
@@ -1032,6 +1115,10 @@ const AutoShopOwners: React.FC = () => {
                 setViewMode((v) => (v === "active" ? "deleted" : "active"));
                 setSelectedRows(new Set());
                 setSearch("");
+                const empty = emptyAdminSearchValues(AUTO_SHOP_SEARCH_FIELDS);
+                setSearchDraft(empty);
+                setSearchFilters(empty);
+                setShowSearchCard(false);
                 setCurrentPage(1);
               }}
               className="text-sm text-blue-700 hover:underline"

@@ -9,6 +9,12 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
@@ -36,6 +42,26 @@ const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
   { value: "towTruck", label: "Tow Truck" },
 ];
 
+const CATEGORY_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "name", label: "Name" },
+  { key: "service", label: "Service" },
+  {
+    key: "shopType",
+    label: "Shop Type",
+    type: "select",
+    options: SHOP_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+  },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    options: [
+      { value: "active", label: "Active" },
+      { value: "inactive", label: "Inactive" },
+    ],
+  },
+];
+
 const getRowId = (row: SubServiceRow) => `${row.categoryId}::${row.name}`;
 
 type SubServicesPageProps = {
@@ -51,6 +77,9 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(CATEGORY_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(CATEGORY_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [filterShopType, setFilterShopType] = useState<"all" | ShopType>("all");
@@ -65,6 +94,10 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(CATEGORY_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const {
@@ -121,13 +154,21 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   const tableRows = (filterServiceId
     ? displayRows.filter((r) => r.categoryId === filterServiceId)
     : displayRows
-  ).filter(
-    (r) =>
+  ).filter((r) => {
+    const live =
+      !search.trim() ||
       r.name.toLowerCase().includes(search.toLowerCase()) ||
       r.categoryName.toLowerCase().includes(search.toLowerCase()) ||
       SHOP_TYPE_OPTIONS.find((o) => o.value === r.shopType)?.label.toLowerCase().includes(search.toLowerCase()) ||
-      r.status.toLowerCase().includes(search.toLowerCase())
-  );
+      r.status.toLowerCase().includes(search.toLowerCase());
+    if (!live) return false;
+    return (
+      searchIncludes(r.name, searchFilters.name) &&
+      searchIncludes(r.categoryName, searchFilters.service) &&
+      searchEquals(r.shopType, searchFilters.shopType) &&
+      searchEquals(r.status || "active", searchFilters.status)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(tableRows.length / entriesPerPage));
   const paged = tableRows.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -156,6 +197,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -165,7 +207,29 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     setFormServiceId(row.categoryId);
     setEditingRow(row);
     setError("");
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingRow(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(CATEGORY_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -325,9 +389,18 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Sub Services" : "Sub Services"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={CATEGORY_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -479,7 +552,13 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

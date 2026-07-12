@@ -8,6 +8,12 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
@@ -31,6 +37,32 @@ const CITY_OPTIONS = [
   "Winnipeg",
   "Halifax",
 ];
+
+const ROLE_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "role", label: "Role" },
+  {
+    key: "city",
+    label: "City",
+    type: "select",
+    options: CITY_OPTIONS.map((c) => ({ value: c, label: c })),
+  },
+  { key: "permissions", label: "Permissions" },
+  {
+    key: "createdDate",
+    label: "Created Date",
+    type: "range",
+    fromKey: "createdFrom",
+    toKey: "createdTo",
+    inputType: "date",
+  },
+];
+
+const dateInRange = (dateValue: string, from: string, to: string) => {
+  const dateStr = dateValue ? String(dateValue).slice(0, 10) : "";
+  if (from && (!dateStr || dateStr < from)) return false;
+  if (to && (!dateStr || dateStr > to)) return false;
+  return true;
+};
 
 const DUMMY_ROLES: RoleRow[] = [
   {
@@ -148,6 +180,9 @@ export default function RoleManager() {
   const [roles, setRoles] = useState(DUMMY_ROLES);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(ROLE_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(ROLE_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(false);
@@ -160,6 +195,10 @@ export default function RoleManager() {
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(ROLE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
@@ -171,12 +210,20 @@ export default function RoleManager() {
   const displayRoles = isDeletedView ? deletedStash : roles;
 
   const filtered = displayRoles.filter((row) => {
+    const perms = permissionLabels(row.permissionKeys);
     const q = search.toLowerCase();
-    return (
+    const live =
+      !search.trim() ||
       row.role.toLowerCase().includes(q) ||
       row.city.toLowerCase().includes(q) ||
-      permissionLabels(row.permissionKeys).toLowerCase().includes(q) ||
-      row.createdDate.includes(search)
+      perms.toLowerCase().includes(q) ||
+      row.createdDate.includes(search);
+    if (!live) return false;
+    return (
+      searchIncludes(row.role, searchFilters.role) &&
+      searchEquals(row.city, searchFilters.city) &&
+      searchIncludes(perms, searchFilters.permissions) &&
+      dateInRange(row.createdDate, searchFilters.createdFrom, searchFilters.createdTo)
     );
   });
 
@@ -206,6 +253,7 @@ export default function RoleManager() {
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -214,7 +262,29 @@ export default function RoleManager() {
     setRole(row.role);
     setCity(row.city);
     setPermissionKeys([...row.permissionKeys]);
+    setShowSearchCard(false);
     setShowForm(true);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(ROLE_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -296,9 +366,18 @@ export default function RoleManager() {
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Role Manager" : "Role Manager"}
-      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={ROLE_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -386,7 +465,13 @@ export default function RoleManager() {
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>

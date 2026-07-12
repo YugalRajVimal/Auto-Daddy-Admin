@@ -4,6 +4,12 @@ import { FiPaperclip } from "react-icons/fi";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
   CompactAutoGrowTextarea,
@@ -19,6 +25,28 @@ import {
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+
+const USER_TYPE_SEARCH_OPTIONS = [
+  { value: "carOwner", label: "Car Owner" },
+  { value: "shopOwner", label: "Shop Owner" },
+];
+
+const SENT_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "date", label: "Date", type: "date" },
+  { key: "title", label: "Title" },
+  { key: "note", label: "Note" },
+  { key: "userType", label: "User Type", type: "select", options: USER_TYPE_SEARCH_OPTIONS },
+  { key: "user", label: "User" },
+];
+
+const RECEIVED_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "date", label: "Date", type: "date" },
+  { key: "title", label: "Title" },
+  { key: "note", label: "Message" },
+  { key: "userType", label: "User Type", type: "select", options: USER_TYPE_SEARCH_OPTIONS },
+  { key: "user", label: "User" },
+  { key: "ticketNo", label: "Ticket No." },
+];
 
 interface InviteHelp {
   _id: string;
@@ -329,6 +357,10 @@ export default function Invitehelp({
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const searchFields = section === "sent" ? SENT_SEARCH_FIELDS : RECEIVED_SEARCH_FIELDS;
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(RECEIVED_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(RECEIVED_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
 
@@ -346,6 +378,10 @@ export default function Invitehelp({
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(searchFields);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
@@ -373,22 +409,42 @@ export default function Invitehelp({
     if (section !== "received") return;
     closeReceivedView();
     setShowForm(false);
+    setShowSearchCard(false);
     setImagePreview(null);
     setError("");
   }, [location.pathname, navResetToken, section]);
+
+  useEffect(() => {
+    const empty = emptyAdminSearchValues(searchFields);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  }, [section]);
 
   const filteredReceived = (isDeletedView
     ? deletedStash.filter((item): item is InviteHelp => !isSentNotification(item))
     : inviteHelps
   ).filter((inv) => {
     const q = search.toLowerCase();
-    return (
+    const live =
+      !q ||
       receivedDate(inv).toLowerCase().includes(q) ||
       receivedTicketNo(inv).toLowerCase().includes(q) ||
       userTypeLabel(receivedUserType(inv)).toLowerCase().includes(q) ||
       receivedUserName(inv).toLowerCase().includes(q) ||
       (inv.title || "").toLowerCase().includes(q) ||
-      (inv.message || "").toLowerCase().includes(q)
+      (inv.message || "").toLowerCase().includes(q);
+    if (!live) return false;
+    return (
+      searchIncludes(receivedDate(inv), searchFilters.date) &&
+      searchIncludes(inv.title || "", searchFilters.title) &&
+      searchIncludes(inv.message || "", searchFilters.note) &&
+      searchEquals(receivedUserType(inv), searchFilters.userType) &&
+      searchIncludes(receivedUserName(inv), searchFilters.user) &&
+      searchIncludes(receivedTicketNo(inv), searchFilters.ticketNo ?? "")
     );
   });
 
@@ -397,12 +453,20 @@ export default function Invitehelp({
     : sentNotifications
   ).filter((n) => {
     const q = search.toLowerCase();
-    return (
+    const live =
+      !q ||
       n.date.toLowerCase().includes(q) ||
       n.title.toLowerCase().includes(q) ||
       n.note.toLowerCase().includes(q) ||
       userTypeLabel(n.userType).toLowerCase().includes(q) ||
-      userScopeLabel(n).toLowerCase().includes(q)
+      userScopeLabel(n).toLowerCase().includes(q);
+    if (!live) return false;
+    return (
+      searchIncludes(n.date, searchFilters.date) &&
+      searchIncludes(n.title, searchFilters.title) &&
+      searchIncludes(n.note, searchFilters.note) &&
+      searchEquals(n.userType, searchFilters.userType) &&
+      searchIncludes(userScopeLabel(n), searchFilters.user)
     );
   });
 
@@ -494,6 +558,7 @@ export default function Invitehelp({
 
   const openReceivedView = (inv: InviteHelp) => {
     setShowForm(false);
+    setShowSearchCard(false);
     resetForm();
     setViewingReceived(inv);
     setError("");
@@ -507,6 +572,27 @@ export default function Invitehelp({
     setNotifImage(null);
     setUserType("carOwner");
     setSelectedUser("");
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    closeReceivedView();
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(searchFields);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -709,11 +795,29 @@ export default function Invitehelp({
       title={isDeletedView ? `Deleted ${title}` : title}
       noPanel
       headerAction={
-        showAddNew && !showForm && !viewingReceived && !isDeletedView ? (
-          <AddNewButton onClick={() => setShowForm(true)} />
+        showAddNew && !showForm && !showSearchCard && !viewingReceived && !isDeletedView ? (
+          <AddNewButton
+            onClick={() => {
+              setShowSearchCard(false);
+              setShowForm(true);
+            }}
+          />
         ) : undefined
       }
-      between={receivedViewPanel ?? addFormPanel}
+      between={
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={searchFields}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : (
+          receivedViewPanel ?? addFormPanel
+        )
+      }
     >
       {isDeletedView && (
         <AdminDeletedBanner
@@ -771,7 +875,13 @@ export default function Invitehelp({
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <button type="button" className="bg-gray-500 px-3 py-1 text-xs font-medium text-white hover:bg-gray-600">
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
             Search
           </button>
         </div>
