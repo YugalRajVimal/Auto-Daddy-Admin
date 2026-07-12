@@ -7,23 +7,6 @@ import ShopTicketRow, { type ShopTicket } from "../shop/ShopTicketRow";
 import { ShopEmptyPanel, ShopListPanel } from "../shop/ShopPanels";
 import { useWebVoiceRecorder } from "../../hooks/useWebVoiceRecorder";
 
-const DEMO_TICKETS: ShopTicket[] = [
-  {
-    id: "demo-1",
-    ticketNo: "123456",
-    date: "2026-06-21",
-    subject: "Subject",
-    status: "active",
-  },
-  {
-    id: "demo-2",
-    ticketNo: "123456",
-    date: "2026-06-21",
-    subject: "Subject",
-    status: "resolved",
-  },
-];
-
 const HELP_SECTIONS = [
   { id: "ticket-raised", label: "Ticket Raised", variant: "primary" as const },
   { id: "resolved", label: "Resolved", variant: "primary" as const },
@@ -65,7 +48,7 @@ export default function PortalHelpPage({
 
   const [activeSection, setActiveSection] = useState<HelpSection>("ticket-raised");
   const [showForm, setShowForm] = useState(false);
-  const [tickets, setTickets] = useState<ShopTicket[]>(DEMO_TICKETS);
+  const [tickets, setTickets] = useState<ShopTicket[]>([]);
   const [draftTicketNo, setDraftTicketNo] = useState(nextTicketNo);
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [saving, setSaving] = useState(false);

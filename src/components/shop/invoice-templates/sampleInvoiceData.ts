@@ -143,17 +143,11 @@ export function calcInvoiceTotals(data: InvoicePreviewData) {
   return { subTotal, discount, tax, total };
 }
 
-export function formatInvoiceMoney(amount: number, currency = "CAD") {
-  try {
-    return new Intl.NumberFormat("en-CA", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toFixed(2)}`;
-  }
+export function formatInvoiceMoney(amount: number, _currency = "CAD") {
+  return new Intl.NumberFormat("en-CA", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 export function currencyCodeFromCallingCode(callingCode: string | null | undefined): string {

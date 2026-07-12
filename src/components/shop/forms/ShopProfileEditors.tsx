@@ -55,7 +55,6 @@ import {
   perDayOpenHoursFromSchedule,
   resolveShopOpenHoursSchedule,
   shortDayLabel,
-  weekDayFromDateISO,
   type PerDaySchedule,
   type ShopOpenHoursHistoryRow,
   type WeekDay,
@@ -939,7 +938,7 @@ function ShopHoursFormFooter({
     <ProfileFormFooter
       message={
         mode === "add"
-          ? "You are setting the default working schedule for a day of the week"
+          ? "You are setting the default weekly working schedule for your Workshop"
           : "You are updating opening timings for this specific date"
       }
       saving={saving}
@@ -948,6 +947,13 @@ function ShopHoursFormFooter({
       onReset={onCancel}
     />
   );
+}
+
+function clonePerDaySchedule(schedule: PerDaySchedule): PerDaySchedule {
+  return WEEK_DAYS.reduce((acc, day) => {
+    acc[day] = { ...schedule[day] };
+    return acc;
+  }, {} as PerDaySchedule);
 }
 
 export function ShopOpenHoursEditor({
@@ -967,11 +973,13 @@ export function ShopOpenHoursEditor({
   const [schedule, setSchedule] = useState<PerDaySchedule>(() =>
     resolveShopOpenHoursSchedule(perDayOpenHours)
   );
+  const [formSchedule, setFormSchedule] = useState<PerDaySchedule>(() =>
+    resolveShopOpenHoursSchedule(perDayOpenHours)
+  );
   const [tableRows, setTableRows] = useState<ShopOpenHoursHistoryRow[]>([]);
   const [loadingHours, setLoadingHours] = useState(true);
   const [formMode, setFormMode] = useState<ShopHoursFormMode | null>(null);
   const [editingDateISO, setEditingDateISO] = useState<string | null>(null);
-  const [formDay, setFormDay] = useState<WeekDay>("Monday");
   const [formDate, setFormDate] = useState(() => formatLocalDateISO(new Date()));
   const [formOpen, setFormOpen] = useState(true);
   const [formStart, setFormStart] = useState("09:00");
@@ -1027,17 +1035,18 @@ export function ShopOpenHoursEditor({
     }
   }, [someDatesSelected]);
 
-  const resetAddFormFields = (day: WeekDay) => {
-    const entry = schedule[day];
-    setFormDay(day);
-    setFormOpen(entry.enabled);
-    setFormStart(entry.start);
-    setFormEnd(entry.end);
+  const updateFormDay = (
+    day: WeekDay,
+    patch: Partial<{ enabled: boolean; start: string; end: string }>
+  ) => {
+    setFormSchedule((prev) => ({
+      ...prev,
+      [day]: { ...prev[day], ...patch },
+    }));
   };
 
   const resetEditFormFields = (row: ShopOpenHoursHistoryRow) => {
     setFormDate(row.dateISO);
-    setFormDay(row.day);
     setFormOpen(row.enabled);
     setFormStart(row.start);
     setFormEnd(row.end);
@@ -1046,9 +1055,10 @@ export function ShopOpenHoursEditor({
   useEffect(() => {
     if (!showAddForm) return;
     setEditingDateISO(null);
-    resetAddFormFields(weekDayFromDateISO(todayISO));
+    setFormSchedule(clonePerDaySchedule(schedule));
     setFormMode("add");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- open add form from parent toggle
+    // Only seed when Add New opens — don't reset while editing if schedule refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAddForm]);
 
   const openEditForm = (row: ShopOpenHoursHistoryRow) => {
@@ -1073,24 +1083,16 @@ export function ShopOpenHoursEditor({
     setSaving(true);
     try {
       if (formMode === "add") {
-        const nextSchedule: PerDaySchedule = {
-          ...schedule,
-          [formDay]: {
-            enabled: formOpen,
-            start: formStart,
-            end: formEnd,
-          },
-        };
         const res = await updateWeeklyOpenHours(
           token,
-          perDayOpenHoursFromSchedule(nextSchedule)
+          perDayOpenHoursFromSchedule(formSchedule)
         );
         if (!res.ok) {
           toast.error(apiMessage(res.data) || "Could not save weekly hours.");
           return;
         }
-        setSchedule(nextSchedule);
-        toast.success(apiMessage(res.data) || `${formDay} default hours saved.`);
+        setSchedule(clonePerDaySchedule(formSchedule));
+        toast.success(apiMessage(res.data) || "Weekly default hours saved.");
         onSaved();
         await reloadHours();
         closeForm();
@@ -1184,7 +1186,7 @@ export function ShopOpenHoursEditor({
               disabled={!hasBulkSelection || saving}
               className={shopHoursBulkButtonClass}
             >
-              Open All
+              Open
             </button>
             <button
               type="button"
@@ -1192,7 +1194,7 @@ export function ShopOpenHoursEditor({
               disabled={!hasBulkSelection || saving}
               className={shopHoursBulkButtonClass}
             >
-              Close All
+              Close
             </button>
           </div>
           {headerAction ? <div className="flex shrink-0 items-center">{headerAction}</div> : null}
@@ -1211,8 +1213,8 @@ export function ShopOpenHoursEditor({
             />
           }
         >
-          <CompactFormRow>
-            {formMode === "edit" ? (
+          {formMode === "edit" ? (
+            <CompactFormRow>
               <CompactField label="Date">
                 <input
                   type="date"
@@ -1221,50 +1223,82 @@ export function ShopOpenHoursEditor({
                   className={`${shopCompactInputClass} bg-gray-50`}
                 />
               </CompactField>
-            ) : (
-              <CompactField label="Day">
+              <CompactField label="Opening time">
+                <OpenHoursTimePicker
+                  id="shop-hours-opening"
+                  value={formStart}
+                  disabled={!formOpen || saving}
+                  onChange={setFormStart}
+                />
+              </CompactField>
+              <CompactField label="Closing Time">
+                <OpenHoursTimePicker
+                  id="shop-hours-closing"
+                  value={formEnd}
+                  disabled={!formOpen || saving}
+                  onChange={setFormEnd}
+                />
+              </CompactField>
+              <CompactField label="Status">
                 <select
-                  value={formDay}
+                  value={formOpen ? "open" : "closed"}
                   disabled={saving}
-                  onChange={(e) => resetAddFormFields(e.target.value as WeekDay)}
+                  onChange={(e) => setFormOpen(e.target.value === "open")}
                   className={shopCompactInputClass}
                 >
-                  {WEEK_DAYS.map((day) => (
-                    <option key={day} value={day}>
-                      {day}
-                    </option>
-                  ))}
+                  <option value="open">Open</option>
+                  <option value="closed">Closed</option>
                 </select>
               </CompactField>
-            )}
-            <CompactField label="Opening time">
-              <OpenHoursTimePicker
-                id="shop-hours-opening"
-                value={formStart}
-                disabled={!formOpen || saving}
-                onChange={setFormStart}
-              />
-            </CompactField>
-            <CompactField label="Closing Time">
-              <OpenHoursTimePicker
-                id="shop-hours-closing"
-                value={formEnd}
-                disabled={!formOpen || saving}
-                onChange={setFormEnd}
-              />
-            </CompactField>
-            <CompactField label="Status">
-              <select
-                value={formOpen ? "open" : "closed"}
-                disabled={saving}
-                onChange={(e) => setFormOpen(e.target.value === "open")}
-                className={shopCompactInputClass}
-              >
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
-              </select>
-            </CompactField>
-          </CompactFormRow>
+            </CompactFormRow>
+          ) : (
+            <div className="space-y-2">
+              {WEEK_DAYS.map((day) => {
+                const entry = formSchedule[day];
+                return (
+                  <CompactFormRow key={day}>
+                    <CompactField label="Day">
+                      <input
+                        type="text"
+                        readOnly
+                        value={day}
+                        className={`${shopCompactInputClass} bg-gray-50 font-semibold`}
+                      />
+                    </CompactField>
+                    <CompactField label="Opening time">
+                      <OpenHoursTimePicker
+                        id={`shop-hours-opening-${day}`}
+                        value={entry.start}
+                        disabled={!entry.enabled || saving}
+                        onChange={(start) => updateFormDay(day, { start })}
+                      />
+                    </CompactField>
+                    <CompactField label="Closing Time">
+                      <OpenHoursTimePicker
+                        id={`shop-hours-closing-${day}`}
+                        value={entry.end}
+                        disabled={!entry.enabled || saving}
+                        onChange={(end) => updateFormDay(day, { end })}
+                      />
+                    </CompactField>
+                    <CompactField label="Status">
+                      <select
+                        value={entry.enabled ? "open" : "closed"}
+                        disabled={saving}
+                        onChange={(e) =>
+                          updateFormDay(day, { enabled: e.target.value === "open" })
+                        }
+                        className={shopCompactInputClass}
+                      >
+                        <option value="open">Open</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </CompactField>
+                  </CompactFormRow>
+                );
+              })}
+            </div>
+          )}
         </CompactFormPanel>
       </ShopReveal>
 
@@ -1298,7 +1332,7 @@ export function ShopOpenHoursEditor({
               {tableRows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className={`${SHOP_TABLE.td} text-center text-gray-500`}>
-                    No open hours yet. Click &ldquo;+ Add New&rdquo; to set a weekday default.
+                    No open hours yet. Click &ldquo;+ Add New&rdquo; to set weekly defaults.
                   </td>
                 </tr>
               ) : (

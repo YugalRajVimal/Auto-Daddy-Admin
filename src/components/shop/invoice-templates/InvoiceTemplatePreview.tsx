@@ -9,18 +9,21 @@ import {
 function EstimateStyleInvoice({
   data,
   templateId,
+  compact = false,
 }: {
   data: InvoicePreviewData;
   templateId: string;
+  compact?: boolean;
 }) {
   const theme = resolveInvoiceTheme(templateId);
   const { subTotal, tax, total } = calcInvoiceTotals(data);
   const { shop, customer, items, currency } = data;
+  const pad = compact ? "px-4 py-3" : "px-6 py-5";
 
   return (
     <article className="bg-white text-[#1a1a1a]">
       <div className="h-1.5" style={{ backgroundColor: theme.accent }} />
-      <div className="px-6 py-5">
+      <div className={pad}>
         <div className="mb-4 flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             {shop.logoUrl ? (
@@ -115,31 +118,46 @@ function EstimateStyleInvoice({
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={2} className="border-0 p-0" />
+                <td
+                  colSpan={4}
+                  className="border border-gray-300 px-2 py-1.5 text-xs text-gray-800"
+                >
+                  <div className="flex items-center justify-between gap-4 font-semibold">
+                    <span>Subtotal :</span>
+                    <span className="tabular-nums">{formatInvoiceMoney(subTotal, currency)}</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td colSpan={2} className="border-0 p-0" />
+                <td
+                  colSpan={4}
+                  className="border border-gray-300 px-2 py-1.5 text-xs text-gray-800"
+                >
+                  <div className="flex items-center justify-between gap-4 font-semibold">
+                    <span>HST :</span>
+                    <span className="tabular-nums">{formatInvoiceMoney(tax, currency)}</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td colSpan={2} className="border-0 p-0" />
+                <td
+                  colSpan={4}
+                  className="border border-gray-300 px-2 py-2 text-xs font-bold"
+                  style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Total ({currency}) :</span>
+                    <span className="tabular-nums">{formatInvoiceMoney(total, currency)}</span>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
           </table>
-        </div>
-
-        <div className="mt-4 flex justify-end">
-          <div className="w-[19rem] text-sm sm:w-[21rem]">
-            <div className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-1">
-              <span className="text-right font-semibold text-gray-800">Subtotal :</span>
-              <span className="text-right tabular-nums text-gray-800">
-                {formatInvoiceMoney(subTotal, currency)}
-              </span>
-              <span className="text-right font-semibold text-gray-800">HST :</span>
-              <span className="text-right tabular-nums text-gray-800">
-                {formatInvoiceMoney(tax, currency)}
-              </span>
-              <div
-                className="col-span-2 grid grid-cols-subgrid gap-x-6 py-2 font-bold"
-                style={{ backgroundColor: theme.accent, color: theme.accentText }}
-              >
-                <span className="text-right">Total ({currency}) :</span>
-                <span className="text-right tabular-nums">
-                  {formatInvoiceMoney(total, currency)}
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
 
         <p className="mt-6 text-right text-[10px] text-gray-500">
@@ -162,20 +180,27 @@ export function InvoiceTemplatePreview({
   mode?: "thumbnail" | "full";
   className?: string;
 }) {
-  const invoice = <EstimateStyleInvoice data={data} templateId={templateId} />;
+  const invoice = (
+    <EstimateStyleInvoice
+      data={data}
+      templateId={templateId}
+      compact={mode === "thumbnail"}
+    />
+  );
 
   if (mode === "thumbnail") {
+    /**
+     * `zoom` scales layout size (unlike transform), so the card height
+     * matches the invoice — no empty gap under the preview.
+     */
+    const thumbScale = 0.38;
     return (
       <div
-        className={`pointer-events-none relative overflow-hidden bg-[#ececec] ${className}`}
+        className={`pointer-events-none w-full overflow-hidden bg-white ${className}`}
         aria-hidden
+        style={{ zoom: thumbScale }}
       >
-        <div
-          className="absolute left-0 top-0 origin-top-left"
-          style={{ width: 680, transform: "scale(0.36)" }}
-        >
-          {invoice}
-        </div>
+        <div style={{ width: `${100 / thumbScale}%` }}>{invoice}</div>
       </div>
     );
   }

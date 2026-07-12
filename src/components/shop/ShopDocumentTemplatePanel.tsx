@@ -40,11 +40,11 @@ function InvoiceTemplateCard({
 }) {
   return (
     <article
-      className={`flex w-full max-w-[260px] flex-col overflow-hidden rounded-lg border bg-white shadow-sm transition-shadow ${
+      className={`flex w-full max-w-[300px] flex-col overflow-hidden rounded-lg border bg-white shadow-sm transition-shadow ${
         selected ? "border-ad-purple ring-2 ring-ad-purple/30" : "border-gray-200 hover:shadow-md"
       }`}
     >
-      <div className="relative aspect-[3/4] overflow-hidden bg-[#ececec]">
+      <div className="relative overflow-hidden bg-white">
         <button
           type="button"
           onClick={onPreview}
@@ -57,27 +57,29 @@ function InvoiceTemplateCard({
             <FiCheck className="text-base" strokeWidth={3} aria-hidden />
           </div>
         ) : null}
+
+        {/* Height follows the scaled invoice — no fixed aspect gap. */}
+        <InvoiceTemplatePreview
+          templateId={template.id}
+          data={previewData}
+          mode="thumbnail"
+        />
+
         <button
           type="button"
           onClick={onSelect}
-          className="relative h-full w-full overflow-hidden text-left"
+          className="absolute inset-0 z-[1] text-left"
           aria-pressed={selected}
           aria-label={`Select ${template.name}`}
         >
-          <InvoiceTemplatePreview
-            templateId={template.id}
-            data={previewData}
-            mode="thumbnail"
-            className="h-full w-full"
-          />
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/40 to-transparent px-2 pb-2 pt-8 text-center text-[10px] font-semibold text-white">
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 via-black/15 to-transparent px-2 pb-1.5 pt-8 text-center text-[10px] font-semibold text-white">
             {selected ? "Selected" : "Click to select"}
           </span>
         </button>
       </div>
-      <div className="border-t border-gray-100 px-3 py-2.5 text-center">
+      <div className="border-t border-gray-100 px-3 py-2 text-center">
         <p className="text-xs font-bold text-ad-purple">{template.name}</p>
-        <p className="mt-1 text-[11px] leading-snug text-gray-700">{template.description}</p>
+        <p className="mt-0.5 text-[11px] leading-snug text-gray-700">{template.description}</p>
       </div>
     </article>
   );

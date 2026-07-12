@@ -17,7 +17,14 @@ import type { ShopTicket } from "../../components/shop/ShopTicketRow";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
 import { useWebVoiceRecorder } from "../../hooks/useWebVoiceRecorder";
-import { apiMessage, submitEnquiry } from "../../lib/shopOwnerMutations";
+import {
+  apiMessage,
+  audioBlobToFile,
+  fetchInviteHelpToShopOwner,
+  inviteHelpAdminShopOwner,
+  parseInviteHelpTickets,
+  updateInviteHelpStatus,
+} from "../../lib/inviteHelpApi";
 
 const PAGE_SIZE = 10;
 const HELP_SEARCH_INPUT_ID = "shop-help-search";
@@ -38,23 +45,6 @@ const EMPTY_MESSAGES: Record<HelpSection, string> = {
   "ticket-raised": "No active tickets. Raise a ticket to get help.",
   resolved: "No resolved tickets yet.",
 };
-
-const DEMO_TICKETS: ShopTicket[] = [
-  {
-    id: "demo-1",
-    ticketNo: "123456",
-    date: "2026-06-21",
-    subject: "Subject",
-    status: "active",
-  },
-  {
-    id: "demo-2",
-    ticketNo: "123456",
-    date: "2026-06-21",
-    subject: "Subject",
-    status: "resolved",
-  },
-];
 
 const SHOP_TABLE_BASE = adminPanelTableClasses(true);
 const SHOP_TABLE: AdminPanelTableClasses = {
@@ -127,7 +117,15 @@ function HelpSearchBar({
   );
 }
 
-function HelpTicketTable({ rows }: { rows: ShopTicket[] }) {
+function HelpTicketTable({
+  rows,
+  resolvingId,
+  onResolve,
+}: {
+  rows: ShopTicket[];
+  resolvingId: string | null;
+  onResolve: (ticket: ShopTicket) => void;
+}) {
   return (
     <motion.div
       layout
@@ -142,6 +140,7 @@ function HelpTicketTable({ rows }: { rows: ShopTicket[] }) {
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Subject</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Status</th>
+              <th className={SHOP_TABLE_HEAD_TH_CLASS}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -156,6 +155,20 @@ function HelpTicketTable({ rows }: { rows: ShopTicket[] }) {
                 <td className={SHOP_TABLE_BODY_TD_CLASS}>{ticket.date}</td>
                 <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
                   {ticketStatusLabel(ticket.status)}
+                </td>
+                <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                  {ticket.status === "active" ? (
+                    <button
+                      type="button"
+                      onClick={() => onResolve(ticket)}
+                      disabled={resolvingId === ticket.id}
+                      className="text-sm font-semibold text-blue-700 underline-offset-2 hover:underline disabled:opacity-60"
+                    >
+                      {resolvingId === ticket.id ? "Resolving…" : "Resolve"}
+                    </button>
+                  ) : (
+                    <span className="text-sm text-gray-500">—</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -178,20 +191,53 @@ export default function ShopHelpPage() {
   const [page, setPage] = useState(1);
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [tickets, setTickets] = useState<ShopTicket[]>(DEMO_TICKETS);
+  const [tickets, setTickets] = useState<ShopTicket[]>([]);
+  const [listLoading, setListLoading] = useState(true);
   const [draftTicketNo, setDraftTicketNo] = useState(nextTicketNo);
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   const services = useMemo(
     () =>
       categories
         .map((c) => ({ id: c.id, name: c.name?.trim() || "" }))
-        .filter((s) => s.id && s.name),
+        .filter((s): s is { id: string; name: string } => Boolean(s.id && s.name)),
     [categories],
   );
 
   const resolvedServiceId = selectedServiceId || services[0]?.id || "";
+
+  const loadTickets = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!token) {
+      setTickets([]);
+      setListLoading(false);
+      return;
+    }
+    if (!opts?.silent) setListLoading(true);
+    try {
+      const res = await fetchInviteHelpToShopOwner(token);
+      if (!res.ok) {
+        if (!opts?.silent) {
+          toast.error(apiMessage(res.data as { message?: string }) || "Could not load help tickets.");
+        }
+        if (!opts?.silent) setTickets([]);
+        return;
+      }
+      setTickets(parseInviteHelpTickets(res.data));
+    } catch {
+      if (!opts?.silent) {
+        toast.error("Network error loading help tickets.");
+        setTickets([]);
+      }
+    } finally {
+      if (!opts?.silent) setListLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadTickets();
+  }, [loadTickets]);
 
   const filteredTickets = useMemo(() => {
     const sectionTickets = tickets.filter((t) =>
@@ -241,6 +287,26 @@ export default function ShopHelpPage() {
     reset();
   };
 
+  const handleResolve = async (ticket: ShopTicket) => {
+    if (!token || ticket.status !== "active") return;
+    setResolvingId(ticket.id);
+    try {
+      const res = await updateInviteHelpStatus(token, ticket.id, "resolved");
+      if (!res.ok) {
+        toast.error(apiMessage(res.data) || "Could not resolve ticket.");
+        return;
+      }
+      setTickets((prev) =>
+        prev.map((t) => (t.id === ticket.id ? { ...t, status: "resolved" as const } : t)),
+      );
+      toast.success("Ticket marked resolved.");
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setResolvingId(null);
+    }
+  };
+
   const handleSave = async () => {
     const service = services.find((s) => s.id === resolvedServiceId);
     if (!service) {
@@ -258,25 +324,30 @@ export default function ShopHelpPage() {
 
     setSaving(true);
     try {
-      const ext = audioBlob.type.includes("webm") ? "webm" : "m4a";
-      const file = new File([audioBlob], `enquiry.${ext}`, { type: audioBlob.type });
-      const res = await submitEnquiry(token, service.id, service.name, file);
+      const file = audioBlobToFile(audioBlob);
+      const res = await inviteHelpAdminShopOwner(token, service.id, service.name, file);
       if (!res.ok) {
-        toast.error(apiMessage(res.data) || "Could not submit your enquiry.");
+        toast.error(apiMessage(res.data) || "Could not submit your help request.");
         return;
       }
 
-      const newTicket: ShopTicket = {
-        id: `ticket-${Date.now()}`,
-        ticketNo: draftTicketNo,
-        date: todayYMD(),
-        subject: service.name,
-        status: "active",
-      };
-      setTickets((prev) => [newTicket, ...prev]);
       toast.success("Support ticket raised.");
       closeForm();
       setActiveId("ticket-raised");
+      await loadTickets({ silent: true });
+      setTickets((prev) => {
+        if (prev.some((t) => t.subject === service.name && t.status === "active")) return prev;
+        return [
+          {
+            id: `ticket-${Date.now()}`,
+            ticketNo: draftTicketNo,
+            date: todayYMD(),
+            subject: service.name,
+            status: "active" as const,
+          },
+          ...prev,
+        ];
+      });
     } catch {
       toast.error("Network error. Please try again.");
     } finally {
@@ -331,11 +402,17 @@ export default function ShopHelpPage() {
               }
             />
 
-            {filteredTickets.length === 0 ? (
+            {listLoading ? (
+              <p className="text-center text-sm text-gray-600">Loading tickets…</p>
+            ) : filteredTickets.length === 0 ? (
               <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES[activeId]}</p>
             ) : (
               <>
-                <HelpTicketTable rows={paginatedList} />
+                <HelpTicketTable
+                  rows={paginatedList}
+                  resolvingId={resolvingId}
+                  onResolve={(ticket) => void handleResolve(ticket)}
+                />
 
                 <ShopListFooter>
                   <p>{filteredTickets.length} Entries</p>
