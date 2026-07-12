@@ -14,7 +14,7 @@ export type LeadApiRow = {
   name: string;
   phone: string;
   city: string;
-  email: string;
+  email?: string;
   website?: string;
   notes?: string;
   sentTo?: string | null;
@@ -35,7 +35,7 @@ export type LeadCreatePayload = {
   name: string;
   phone: string;
   city: string;
-  email: string;
+  email?: string;
   website?: string;
   notes?: string;
   sentTo?: string | null;

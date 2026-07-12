@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios, { AxiosError } from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactField,
   CompactFormFooter,
@@ -8,6 +9,7 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import type { ShopType, Service } from "./Services";
@@ -59,6 +61,24 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   const [formStatus, setFormStatus] = useState<SubServiceStatus>("active");
   const [formServiceId, setFormServiceId] = useState("");
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<SubServiceRow>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:categories",
+  });
+
   useEffect(() => {
     fetchServices();
   }, [filterShopType]);
@@ -96,9 +116,11 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     }))
   );
 
+  const displayRows = isDeletedView ? deletedStash : allRows;
+
   const tableRows = (filterServiceId
-    ? allRows.filter((r) => r.categoryId === filterServiceId)
-    : allRows
+    ? displayRows.filter((r) => r.categoryId === filterServiceId)
+    : displayRows
   ).filter(
     (r) =>
       r.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -215,6 +237,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       if (!parent) return;
       const updated = (parent.subServices || []).filter((s) => s.name !== row.name);
       await axios.put(`${API_BASE}/admin/services/${row.categoryId}`, { subServices: updated });
+      stashDeleted(row);
       adminNotify.success("Sub service deleted successfully.");
       setSuccessMsg("Sub service deleted successfully.");
       setSelected((prev) => {
@@ -233,7 +256,8 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     }
   };
 
-  const findRowById = (id: string) => tableRows.find((r) => getRowId(r) === id);
+  const findRowById = (id: string) =>
+    (isDeletedView ? deletedStash : allRows).find((r) => getRowId(r) === id);
 
   const handleToolbarDelete = () => {
     if (selected.size !== 1) return;
@@ -241,9 +265,46 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     if (row) handleDelete(row);
   };
 
+  const handleRestore = async () => {
+    if (selected.size !== 1) return;
+    const row = deletedStash.find((r) => getRowId(r) === [...selected][0]);
+    if (!row) return;
+    if (!window.confirm(`Restore sub service "${row.name}"?`)) return;
+    setActionLoading(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      const parent = services.find((s) => s._id === row.categoryId);
+      if (!parent) {
+        const __adminMsg = "Parent service not found.";
+        setError(__adminMsg);
+        adminNotify.error(__adminMsg);
+        return;
+      }
+      const existing: SubService[] = (parent.subServices || []).map((s) => ({
+        name: s.name,
+        status: (s.status as SubServiceStatus) || "active",
+      }));
+      const updated = [...existing, { name: row.name, status: row.status || "active" }];
+      await axios.put(`${API_BASE}/admin/services/${row.categoryId}`, { subServices: updated });
+      restoreStashed((item) => getRowId(item) === getRowId(row));
+      adminNotify.success("Sub service restored.");
+      setSuccessMsg("Sub service restored.");
+      setSelected(new Set());
+      fetchServices();
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to restore sub service";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Sub Services",
+      title: isDeletedView ? "Deleted Sub Services" : "Sub Services",
       headers: ["Name", "Service", "Shop Type", "Status"],
       rows: tableRows.map((row) => [
           row.name,
@@ -263,8 +324,8 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
   return (
     <AdminPage
-      title="Sub Services"
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? "Deleted Sub Services" : "Sub Services"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -325,6 +386,9 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="sub services" />
+      )}
       {successMsg && !showForm && (
         <div className="mb-2 rounded border border-green-200 bg-green-100 px-3 py-2 text-xs text-green-800">
           {successMsg}
@@ -338,14 +402,25 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={handleToolbarDelete}
-            disabled={selected.size === 0 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              onClick={handleToolbarDelete}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -455,7 +530,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
             ) : paged.length === 0 ? (
               <tr>
                 <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                  No sub services found.
+                  {isDeletedView ? "No deleted sub services found." : "No sub services found."}
                 </td>
               </tr>
             ) : (
@@ -507,6 +582,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
             </button>
           ))}
         </div>
+        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active Sub Services" />
       </div>
     </AdminPage>
   );

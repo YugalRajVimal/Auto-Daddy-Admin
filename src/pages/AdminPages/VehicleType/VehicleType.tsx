@@ -4,6 +4,8 @@ import { adminNotify } from "../../../utils/adminNotify";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { authHeaders } from "../../../api/client";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 
 // Representation according to CarDetails.schema.js (companyName, models)
 interface CarModel {
@@ -42,6 +44,24 @@ const VehicleType: React.FC = () => {
   const [visibleCols, setVisibleCols] = useState(["companyName", "models"]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const companyNameInputRef = useRef<HTMLInputElement>(null);
+
+  const resetTableControls = () => {
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+    setSearch("");
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<CarDetailsItem>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:vehicle-type",
+  });
 
   useEffect(() => {
     fetchCarDetails();
@@ -250,6 +270,7 @@ const VehicleType: React.FC = () => {
       )
     )
       return;
+    const row = carDetails.find((c) => c._id === id);
     setDeletingId(id);
     clearAlerts();
     const baseURL = import.meta.env.VITE_API_URL;
@@ -263,8 +284,14 @@ const VehicleType: React.FC = () => {
           }
         }
       );
+      if (row) stashDeleted(row);
       adminNotify.success("Car details entry deleted.");
       setSuccessMsg("Car details entry deleted.");
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       fetchCarDetails();
     } catch (err: any) {
       const msg =
@@ -277,7 +304,45 @@ const VehicleType: React.FC = () => {
     setDeletingId(null);
   };
 
-  const filtered = carDetails.filter((cd) => {
+  const handleRestore = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const toRestore = deletedStash.filter((c) => ids.includes(c._id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} compan${toRestore.length === 1 ? "y" : "ies"}?`)) return;
+    clearAlerts();
+    const baseURL = import.meta.env.VITE_API_URL;
+    const token = getToken();
+    let allSucceeded = true;
+    for (const car of toRestore) {
+      try {
+        await axios.post(
+          `${baseURL}/api/auto-shop-owner/car-details`,
+          {
+            companyName: car.companyName,
+            models: car.models,
+          },
+          {
+            headers: {
+              Authorization: `${token}`,
+            },
+          }
+        );
+        restoreStashed((item) => item._id === car._id);
+      } catch {
+        allSucceeded = false;
+      }
+    }
+    setSelectedIds(new Set());
+    adminNotify[allSucceeded ? "success" : "error"](
+      allSucceeded ? "Restored successfully." : "Some entries failed to restore."
+    );
+    if (allSucceeded) setSuccessMsg("Restored successfully.");
+    fetchCarDetails();
+  };
+
+  const sourceList = isDeletedView ? deletedStash : carDetails;
+
+  const filtered = sourceList.filter((cd) => {
     const q = search.toLowerCase();
     return (
       cd.companyName.toLowerCase().includes(q) ||
@@ -331,9 +396,9 @@ const VehicleType: React.FC = () => {
 
   return (
     <AdminPage
-      title="Car Companies & Models"
+      title={isDeletedView ? "Deleted Car Companies & Models" : "Car Companies & Models"}
       noPanel
-      headerAction={<AddNewButton onClick={openAddModal} />}
+      headerAction={!isDeletedView ? <AddNewButton onClick={openAddModal} /> : undefined}
     >
       {error && (
         <div className="mb-4 text-sm rounded bg-red-100 text-red-800 px-3 py-2 border border-red-200 shadow">
@@ -351,9 +416,14 @@ const VehicleType: React.FC = () => {
           items={filtered}
           columns={tableColumns}
           getRowId={(cd) => cd._id}
-          loading={loading}
+          loading={loading && !isDeletedView}
           error={error || null}
-          emptyMessage="No car companies found."
+          emptyMessage={isDeletedView ? "No deleted car companies found." : "No car companies found."}
+          banner={
+            isDeletedView ? (
+              <AdminDeletedBanner count={deletedStash.length} entityLabel="companies" />
+            ) : undefined
+          }
           search={search}
           onSearchChange={setSearch}
           pageSize={pageSize}
@@ -365,40 +435,68 @@ const VehicleType: React.FC = () => {
           selectedIds={selectedIds}
           onSelectedIdsChange={setSelectedIds}
           exportFilename="vehicle-types"
-          totalBeforeFilter={carDetails.length}
-          extraToolbarActions={[
-            {
-              label: "✏️ Update",
-              color: "#0073b7",
-              minSelected: 1,
-              maxSelected: 1,
-              onClick: (ids) => {
-                const car = carDetails.find((c) => c._id === ids[0]);
-                if (car) openEditModal(car);
-              },
-            },
-          ]}
-          renderActions={(cd) => (
-            <div className="flex gap-2 items-center">
+          totalBeforeFilter={sourceList.length}
+          extraToolbarActions={
+            isDeletedView
+              ? [
+                  {
+                    label: "Restore",
+                    color: "#27ae60",
+                    minSelected: 1,
+                    onClick: (ids) => handleRestore(ids),
+                  },
+                ]
+              : [
+                  {
+                    label: "✏️ Update",
+                    color: "#0073b7",
+                    minSelected: 1,
+                    maxSelected: 1,
+                    onClick: (ids) => {
+                      const car = carDetails.find((c) => c._id === ids[0]);
+                      if (car) openEditModal(car);
+                    },
+                  },
+                ]
+          }
+          footerRight={
+            <AdminDeletedToggle
+              viewMode={viewMode}
+              onToggle={toggleViewMode}
+              activeLabel="Active Companies"
+            />
+          }
+          renderActions={(cd) =>
+            isDeletedView ? (
               <button
-                onClick={() => openEditModal(cd)}
-                className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-3 py-1 rounded transition shadow-sm"
-                aria-label={`Edit ${cd.companyName}`}
+                onClick={() => handleRestore([cd._id])}
+                className="bg-ad-green hover:bg-ad-green-dark text-white font-semibold px-3 py-1 rounded transition shadow-sm"
                 type="button"
               >
-                Edit
+                Restore
               </button>
-              <button
-                onClick={() => handleDelete(cd._id)}
-                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition shadow-sm disabled:opacity-60"
-                disabled={!!deletingId}
-                aria-label={`Delete ${cd.companyName}`}
-                type="button"
-              >
-                Delete
-              </button>
-            </div>
-          )}
+            ) : (
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => openEditModal(cd)}
+                  className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold px-3 py-1 rounded transition shadow-sm"
+                  aria-label={`Edit ${cd.companyName}`}
+                  type="button"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(cd._id)}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition shadow-sm disabled:opacity-60"
+                  disabled={!!deletingId}
+                  aria-label={`Delete ${cd.companyName}`}
+                  type="button"
+                >
+                  Delete
+                </button>
+              </div>
+            )
+          }
         />
       </div>
 

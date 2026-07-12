@@ -67,11 +67,10 @@ const ALL_COLUMNS = [
   { key: "businessName", label: "Business Name" },
   { key: "shopType", label: "Shop Type" },
   { key: "city", label: "City" },
-  { key: "address", label: "Address" },
-  { key: "zipCode", label: "Zip Code" },
+  { key: "dealsPosted", label: "Deals Posted" },
   { key: "email", label: "Email" },
 ];
-const DEFAULT_VISIBLE = ["date", "phone", "businessName", "shopType", "city", "address", "zipCode", "email"];
+const DEFAULT_VISIBLE = ["date", "phone", "businessName", "shopType", "city", "dealsPosted", "email"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const API = () => (import.meta.env.VITE_API_URL as string) || "";
@@ -129,6 +128,14 @@ const DEFAULT_SHOP_TYPE_FILTERS: Record<ShopType, boolean> = {
 
 function ownerShopType(owner: AutoShopOwnerType): ShopType {
   return (owner.shopType as ShopType) || "autoShop";
+}
+
+function ownerDealsList(owner: AutoShopOwnerType): DealType[] {
+  if (Array.isArray(owner.deals) && owner.deals.length > 0) return owner.deals;
+  if (Array.isArray(owner.businessProfile?.myDeals) && owner.businessProfile.myDeals.length > 0) {
+    return owner.businessProfile.myDeals as DealType[];
+  }
+  return [];
 }
 
 // ─── BASE MODAL ───────────────────────────────────────────────────────────────
@@ -246,26 +253,29 @@ const CustomersModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => void }
 );
 
 // ─── DEALS MODAL ─────────────────────────────────────────────────────────────
-const DealsModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => void }> = ({ owner, onClose }) => (
-  <BaseModal isOpen wide onClose={onClose} title={`Deals — ${owner.name}`}>
-    {!owner.deals?.length
-      ? <p style={{ textAlign: "center", color: "#aaa" }}>No deals found.</p>
-      : owner.deals.map(deal => (
-        <div key={deal._id} style={GREEN_CARD}>
-          <h3 style={{ fontFamily: "serif", fontWeight: 700, fontSize: 16, marginBottom: 10 }}>{deal.name || deal.dealType || "Deal"}</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <GCRow label="Type" value={deal.dealType} />
-            <GCRow label="Description" value={deal.description} />
-            <GCRow label="Discount" value={deal.discountedPrice != null ? `$${deal.discountedPrice}` : deal.percentageDiscount != null ? `${deal.percentageDiscount}%` : undefined} />
-            <GCRow label="Coupon" value={deal.couponCode} />
-            <GCRow label="Ends On" value={deal.offerEndsOnDate ? fmtDate(deal.offerEndsOnDate) : deal.endDate ? fmtDate(deal.endDate) : undefined} />
-            <GCRow label="Status" value={deal.dealEnabled ? "Enabled" : "Disabled"} />
+const DealsModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => void }> = ({ owner, onClose }) => {
+  const deals = ownerDealsList(owner);
+  return (
+    <BaseModal isOpen wide onClose={onClose} title={`Deals — ${owner.name}`}>
+      {!deals.length
+        ? <p style={{ textAlign: "center", color: "#aaa" }}>No deals found.</p>
+        : deals.map(deal => (
+          <div key={deal._id} style={GREEN_CARD}>
+            <h3 style={{ fontFamily: "serif", fontWeight: 700, fontSize: 16, marginBottom: 10 }}>{deal.name || deal.dealType || "Deal"}</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <GCRow label="Type" value={deal.dealType} />
+              <GCRow label="Description" value={deal.description} />
+              <GCRow label="Discount" value={deal.discountedPrice != null ? `$${deal.discountedPrice}` : deal.percentageDiscount != null ? `${deal.percentageDiscount}%` : undefined} />
+              <GCRow label="Coupon" value={deal.couponCode} />
+              <GCRow label="Ends On" value={deal.offerEndsOnDate ? fmtDate(deal.offerEndsOnDate) : deal.endDate ? fmtDate(deal.endDate) : undefined} />
+              <GCRow label="Status" value={deal.dealEnabled ? "Enabled" : "Disabled"} />
+            </div>
+            {deal.dealImage && <div style={{ marginTop: 10 }}><img src={mediaUrl(deal.dealImage)} alt="deal" style={{ maxWidth: 160, maxHeight: 90, objectFit: "cover", borderRadius: 6, border: "1px solid #b2e0a0" }} /></div>}
           </div>
-          {deal.dealImage && <div style={{ marginTop: 10 }}><img src={mediaUrl(deal.dealImage)} alt="deal" style={{ maxWidth: 160, maxHeight: 90, objectFit: "cover", borderRadius: 6, border: "1px solid #b2e0a0" }} /></div>}
-        </div>
-      ))}
-  </BaseModal>
-);
+        ))}
+    </BaseModal>
+  );
+};
 
 // ─── JOB CARDS MODAL ─────────────────────────────────────────────────────────
 const JobCardsModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => void }> = ({ owner, onClose }) => {
@@ -491,8 +501,7 @@ function autoShopOwnerPrintColMap(): Record<string, (o: AutoShopOwnerType) => st
     shopType: o => SHOP_TYPE_OPTIONS.find(x => x.value === ownerShopType(o))?.label || "-",
     city: o => o.businessProfile?.city || "-",
     date: o => fmtDate(o.createdAt),
-    address: o => o.address || o.businessProfile?.businessAddress || "-",
-    zipCode: o => o.pincode || o.businessProfile?.pincode || "-",
+    dealsPosted: o => String(ownerDealsList(o).length),
     email: o => o.email || o.businessProfile?.businessEmail || "-",
   };
 }
@@ -766,7 +775,6 @@ const AutoShopOwners: React.FC = () => {
   const [viewMode, setViewMode] = useState<"active" | "deleted">("active");
 
   // Modals
-  const [businessFor, setBusinessFor] = useState<AutoShopOwnerType | null>(null);
   const [customersFor, setCustomersFor] = useState<AutoShopOwnerType | null>(null);
   const [dealsFor, setDealsFor] = useState<AutoShopOwnerType | null>(null);
   const [jobCardsFor, setJobCardsFor] = useState<AutoShopOwnerType | null>(null);
@@ -811,6 +819,11 @@ const AutoShopOwners: React.FC = () => {
 
   const openAdd = () => {
     setEditingOwner(null);
+    setShowForm(true);
+  };
+
+  const openEdit = (owner: AutoShopOwnerType) => {
+    setEditingOwner(owner);
     setShowForm(true);
   };
 
@@ -906,8 +919,24 @@ const AutoShopOwners: React.FC = () => {
         return <td key={key} className={tdClass}>{fmtDate(owner.createdAt)}</td>;
       case "phone":
         return <td key={key} className={tdClass}>{owner.countryCode ? `${owner.countryCode} ` : ""}{owner.phone || "-"}</td>;
-      case "businessName":
-        return <td key={key} className={tdClass}><button type="button" onClick={() => setBusinessFor(owner)} className={linkClass}>{owner.businessProfile?.businessName || "-"}</button></td>;
+      case "businessName": {
+        const label = owner.businessProfile?.businessName || owner.name || "-";
+        return (
+          <td key={key} className={`${tdClass} text-center font-medium`}>
+            {viewMode === "active" && label !== "-" ? (
+              <button
+                type="button"
+                onClick={() => openEdit(owner)}
+                className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-ad-purple hover:underline"
+              >
+                {label}
+              </button>
+            ) : (
+              label
+            )}
+          </td>
+        );
+      }
       case "shopType":
         return (
           <td key={key} className={tdClass}>
@@ -916,10 +945,18 @@ const AutoShopOwners: React.FC = () => {
         );
       case "city":
         return <td key={key} className={tdClass}>{owner.businessProfile?.city || "-"}</td>;
-      case "address":
-        return <td key={key} className={tdClass}>{owner.address || owner.businessProfile?.businessAddress || "-"}</td>;
-      case "zipCode":
-        return <td key={key} className={tdClass}>{owner.pincode || owner.businessProfile?.pincode || "-"}</td>;
+      case "dealsPosted": {
+        const count = ownerDealsList(owner).length;
+        return (
+          <td key={key} className={tdClass}>
+            {count > 0 ? (
+              <button type="button" onClick={() => setDealsFor(owner)} className={linkClass}>{count}</button>
+            ) : (
+              "0"
+            )}
+          </td>
+        );
+      }
       case "email":
         return <td key={key} className={tdClass}>{owner.email || owner.businessProfile?.businessEmail || "-"}</td>;
       default:
@@ -936,7 +973,6 @@ const AutoShopOwners: React.FC = () => {
 
   return (
     <>
-      {businessFor && <BusinessProfileModal owner={businessFor} onClose={() => setBusinessFor(null)} />}
       {customersFor && <CustomersModal owner={customersFor} onClose={() => setCustomersFor(null)} />}
       {dealsFor && <DealsModal owner={dealsFor} onClose={() => setDealsFor(null)} />}
       {jobCardsFor && <JobCardsModal owner={jobCardsFor} onClose={() => setJobCardsFor(null)} />}

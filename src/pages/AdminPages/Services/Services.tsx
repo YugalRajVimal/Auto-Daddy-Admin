@@ -24,7 +24,14 @@ export interface Service {
   status: ServiceStatus;
   shopType: ShopType;
   odoOutRequired?: boolean;
-  subServices?: { name: string; status?: ServiceStatus }[];
+  subServices?: {
+    name: string;
+    status?: ServiceStatus | string;
+    createdBy?: string;
+    shopkeeperName?: string;
+    phone?: string;
+    [key: string]: unknown;
+  }[];
 }
 
 const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [

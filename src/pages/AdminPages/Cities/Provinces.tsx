@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 import axios, { AxiosError } from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactField,
   CompactFormFooter,
@@ -9,6 +9,7 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
@@ -49,6 +50,24 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
   const [country, setCountry] = useState<Country>("Canada");
   const [status, setStatus] = useState<ProvinceStatus>("Active");
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<Province>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:provinces",
+  });
+
   useEffect(() => {
     fetchProvinces();
   }, []);
@@ -69,7 +88,9 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     }
   };
 
-  const filtered = provinces.filter(
+  const displayProvinces = isDeletedView ? deletedStash : provinces;
+
+  const filtered = displayProvinces.filter(
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.nickName || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -172,6 +193,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     setSuccessMsg("");
     try {
       await axios.delete(`${API_BASE}/admin/provinces/${province._id}`);
+      stashDeleted(province);
       adminNotify.success("Province deleted successfully.");
       setSuccessMsg("Province deleted successfully.");
       setSelected((prev) => {
@@ -197,9 +219,39 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     if (province) handleDelete(province);
   };
 
+  const handleRestore = async () => {
+    if (selected.size !== 1) return;
+    const province = deletedStash.find((p) => p._id === [...selected][0]);
+    if (!province) return;
+    if (!window.confirm(`Restore province "${province.name}"?`)) return;
+    setActionLoading(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      await axios.post(`${API_BASE}/admin/provinces`, {
+        name: province.name,
+        nickName: province.nickName || "",
+        country: province.country || "Canada",
+        status: province.status || "Active",
+      });
+      restoreStashed((item) => item._id === province._id);
+      adminNotify.success("Province restored.");
+      setSuccessMsg("Province restored.");
+      setSelected(new Set());
+      fetchProvinces();
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to restore province";
+      setError(msg);
+      adminNotify.error(msg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Provinces",
+      title: isDeletedView ? "Deleted Provinces" : "Provinces",
       headers: ["Province Name", "Country", "Nickname", "Cities", "Status"],
       rows: filtered.map((province) => [
           province.name,
@@ -217,8 +269,8 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
 
   return (
     <AdminPage
-      title="Provinces"
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? "Deleted Provinces" : "Provinces"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -283,6 +335,9 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="provinces" />
+      )}
       {successMsg && !showForm && (
         <div className="mb-2 rounded border border-green-200 bg-green-100 px-3 py-2 text-xs text-green-800">
           {successMsg}
@@ -297,14 +352,25 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
       {/* Toolbar */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={handleToolbarDelete}
-            disabled={selected.size === 0 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              onClick={handleToolbarDelete}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -377,7 +443,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
             ) : paged.length === 0 ? (
               <tr>
                 <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                  No provinces found.
+                  {isDeletedView ? "No deleted provinces found." : "No provinces found."}
                 </td>
               </tr>
             ) : (
@@ -431,16 +497,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
             </button>
           ))}
         </div>
-        <Link
-          to="#"
-          onClick={(e) => {
-            e.preventDefault();
-            adminNotify.info("Deleted view is not available on Provinces yet.");
-          }}
-          className="text-sm text-blue-700 hover:underline"
-        >
-          Deleted
-        </Link>
+        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active Provinces" />
       </div>
     </AdminPage>
   );

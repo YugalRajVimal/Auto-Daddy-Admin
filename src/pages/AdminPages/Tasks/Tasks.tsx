@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { adminNotify } from "../../../utils/adminNotify";
 import AdminPage from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 
 const API_BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api/admin/tasks`
@@ -43,6 +45,25 @@ const Tasks: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState<boolean>(false);
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelectedIds(new Set());
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<TaskType>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:tasks",
+  });
+
+  const displayTasks = isDeletedView ? deletedStash : tasks;
+
   const fetchTasks = async (pg = page) => {
     setLoading(true);
     setError(null);
@@ -63,9 +84,10 @@ const Tasks: React.FC = () => {
   };
 
   useEffect(() => {
+    if (isDeletedView) return;
     fetchTasks(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page, isDeletedView]);
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,6 +176,7 @@ const Tasks: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Delete this task?")) return;
+    const row = tasks.find((t) => t._id === id);
     setDeleting(true);
     setError(null);
     try {
@@ -163,6 +186,7 @@ const Tasks: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to delete");
+      if (row) stashDeleted(row);
       adminNotify.success("Task deleted.");
       fetchTasks(page);
     } catch (err: unknown) {
@@ -177,6 +201,7 @@ const Tasks: React.FC = () => {
   const handleBulkDelete = async (ids: string[]) => {
     if (ids.length === 0) return;
     if (!window.confirm(`Delete ${ids.length} selected tasks?`)) return;
+    const toStash = tasks.filter((t) => ids.includes(t._id));
     setDeleting(true);
     setError(null);
     try {
@@ -188,11 +213,54 @@ const Tasks: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Bulk delete failed");
+      if (toStash.length > 0) stashDeleted(toStash);
       adminNotify.success(`${ids.length} task(s) deleted.`);
       setSelectedIds(new Set());
       fetchTasks(page);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not bulk delete";
+      setError(message);
+      adminNotify.error(message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleRestore = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const toRestore = deletedStash.filter((t) => ids.includes(t._id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} task(s)?`)) return;
+    setDeleting(true);
+    setError(null);
+    let allSucceeded = true;
+    try {
+      for (const task of toRestore) {
+        try {
+          const res = await fetch(API_BASE, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              name: task.name,
+              description: task.description || "",
+              link: task.link,
+            }),
+          });
+          if (!res.ok) throw new Error();
+          restoreStashed((item) => item._id === task._id);
+        } catch {
+          allSucceeded = false;
+        }
+      }
+      setSelectedIds(new Set());
+      adminNotify[allSucceeded ? "success" : "error"](
+        allSucceeded ? "Task(s) restored." : "Some tasks failed to restore."
+      );
+      if (!isDeletedView) fetchTasks(page);
+      else fetchTasks(1);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not restore";
       setError(message);
       adminNotify.error(message);
     } finally {
@@ -265,29 +333,31 @@ const Tasks: React.FC = () => {
 
   return (
     <AdminPage
-      title="Manage Tasks"
+      title={isDeletedView ? "Deleted Tasks" : "Manage Tasks"}
       noPanel
       headerAction={
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-            onClick={() => setShowAdd((show) => !show)}
-          >
-            {showAdd ? "Close Add Form" : "Add Task"}
-          </button>
-          {tasks.length > 0 ? (
+        !isDeletedView ? (
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              className="rounded bg-rose-700 px-3 py-1.5 text-sm text-white hover:bg-rose-800"
-              onClick={handleDeleteAll}
-              disabled={deleting}
+              className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+              onClick={() => setShowAdd((show) => !show)}
             >
-              Delete All
+              {showAdd ? "Close Add Form" : "Add Task"}
             </button>
-          ) : null}
-        </div>
+            {tasks.length > 0 ? (
+              <button
+                className="rounded bg-rose-700 px-3 py-1.5 text-sm text-white hover:bg-rose-800"
+                onClick={handleDeleteAll}
+                disabled={deleting}
+              >
+                Delete All
+              </button>
+            ) : null}
+          </div>
+        ) : undefined
       }
     >
-      {showAdd && (
+      {showAdd && !isDeletedView && (
         <div className="mb-6">
           <form
             onSubmit={handleAddTask}
@@ -361,13 +431,18 @@ const Tasks: React.FC = () => {
       )}
 
       <AdminDataTable
-        items={tasks}
+        items={displayTasks}
         columns={tableColumns}
         getRowId={(task) => task._id}
-        loading={loading}
-        emptyMessage="No tasks found."
-        serverPaginated
-        totalItemCount={pagination?.total ?? 0}
+        loading={loading && !isDeletedView}
+        emptyMessage={isDeletedView ? "No deleted tasks found." : "No tasks found."}
+        banner={
+          isDeletedView ? (
+            <AdminDeletedBanner count={deletedStash.length} entityLabel="tasks" />
+          ) : undefined
+        }
+        serverPaginated={!isDeletedView}
+        totalItemCount={isDeletedView ? deletedStash.length : pagination?.total ?? 0}
         currentPage={page}
         onCurrentPageChange={setPage}
         pageSize={limit}
@@ -375,24 +450,53 @@ const Tasks: React.FC = () => {
         selectedIds={selectedIds}
         onSelectedIdsChange={setSelectedIds}
         exportFilename="tasks"
-        extraToolbarActions={[
-          {
-            label: "Delete Selected",
-            color: "#e74c3c",
-            minSelected: 1,
-            onClick: (ids) => handleBulkDelete(ids),
-          },
-        ]}
-        renderActions={(task) => (
-          <button
-            type="button"
-            className="text-rose-700 hover:underline"
-            disabled={deleting}
-            onClick={() => handleDelete(task._id)}
-          >
-            Delete
-          </button>
-        )}
+        extraToolbarActions={
+          isDeletedView
+            ? [
+                {
+                  label: "Restore",
+                  color: "#27ae60",
+                  minSelected: 1,
+                  onClick: (ids) => handleRestore(ids),
+                },
+              ]
+            : [
+                {
+                  label: "Delete Selected",
+                  color: "#e74c3c",
+                  minSelected: 1,
+                  onClick: (ids) => handleBulkDelete(ids),
+                },
+              ]
+        }
+        footerRight={
+          <AdminDeletedToggle
+            viewMode={viewMode}
+            onToggle={toggleViewMode}
+            activeLabel="Active Tasks"
+          />
+        }
+        renderActions={(task) =>
+          isDeletedView ? (
+            <button
+              type="button"
+              className="text-ad-green hover:underline"
+              disabled={deleting}
+              onClick={() => handleRestore([task._id])}
+            >
+              Restore
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="text-rose-700 hover:underline"
+              disabled={deleting}
+              onClick={() => handleDelete(task._id)}
+            >
+              Delete
+            </button>
+          )
+        }
       />
     </AdminPage>
   );

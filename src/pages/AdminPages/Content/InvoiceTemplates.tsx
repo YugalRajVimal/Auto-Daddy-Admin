@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
   CompactField,
@@ -10,6 +11,7 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
@@ -61,6 +63,7 @@ type TemplateRow = {
   userType: string;
   notes: string;
   country: string;
+  usedBy: number;
   hasClip: boolean;
   imageUrl?: string | null;
 };
@@ -87,11 +90,12 @@ async function apiFetchTemplates(country: string, userTypeFilters: Record<string
     // Normalize response to TemplateRow[]
     if (Array.isArray(json)) {
       const mapped = json.map((tpl: any) => ({
-        id: tpl.id?.toString() ?? "",
+        id: tpl.id?.toString() ?? tpl._id?.toString() ?? "",
         date: tpl.date ?? "",
         userType: fromShopTypeApi(tpl.shopType ?? ""),
         notes: tpl.templateName ?? "",
         country: tpl.country ?? "",
+        usedBy: Number(tpl.usedBy ?? tpl.usedCount ?? tpl.usageCount ?? 0) || 0,
         hasClip: !!tpl.image,
         imageUrl: tpl.image ?? null,
       }));
@@ -160,6 +164,18 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   const [attachImage, setAttachImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
+    useAdminDeletedView<TemplateRow>({
+      onToggle: resetTableControls,
+      storageKey: "admin_deleted_view:invoice-templates",
+    });
+
   // You may want to also support fetch status and errors, skipped here for clarity
 
   // Fetch templates when country or userTypeFilters changes or on mount
@@ -174,7 +190,9 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
     return () => { ignore = true; controller.abort(); };
   }, [country, userTypeFilters]);
 
-  const filtered = templates.filter(
+  const displayTemplates = isDeletedView ? deletedStash : templates;
+
+  const filtered = displayTemplates.filter(
     (t) =>
       (userTypeFilters[t.userType] ?? true) &&
       (t.date.includes(search) ||
@@ -281,12 +299,13 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   const handleToolbarPrint = () => {
     printAdminTable({
       title: "Invoice Templates",
-      headers: ["Template", "Date", "Country", "User Type", "Clip"],
+      headers: ["Template", "Date", "Country", "User Type", "Used by", "Clip"],
       rows: filtered.map((template) => [
         template.notes,
         template.date,
         template.country,
         getUserTypeLabel(template.userType),
+        String(template.usedBy),
         template.hasClip ? "Yes" : "—",
       ]),
     });
@@ -295,8 +314,10 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   // Delete single or multiple
   const handleDelete = async () => {
     if (selected.size === 0) return;
+    const toDelete = templates.filter((t) => selected.has(t.id));
     try {
       await Promise.all(Array.from(selected).map(apiDeleteTemplate));
+      stashDeleted(toDelete);
       adminNotify.success("Deleted selected template(s).");
       setSelected(new Set());
       apiFetchTemplates(country, userTypeFilters).then(setTemplates);
@@ -305,10 +326,21 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
     }
   };
 
+  const handleRestore = () => {
+    if (selected.size === 0) return;
+    const toRestore = deletedStash.filter((t) => selected.has(t.id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} template(s)?`)) return;
+    restoreStashed((item) => selected.has(item.id));
+    setTemplates((prev) => [...toRestore, ...prev.filter((t) => !selected.has(t.id))]);
+    setSelected(new Set());
+    adminNotify.success("Template(s) restored.");
+  };
+
   return (
     <AdminPage
-      title="Inv - Temp"
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? "Deleted Inv - Temp" : "Inv - Temp"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -381,6 +413,9 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="invoice templates" />
+      )}
       <div className="mb-2 flex flex-wrap items-center gap-4 border-b border-gray-300 bg-gray-100 px-3 py-2">
         {USER_TYPE_OPTIONS.map((option) => (
           <label key={option.value} className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
@@ -397,14 +432,25 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            disabled={selected.size === 0}
-            onClick={handleDelete}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={handleDelete}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={handleRestore}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -463,11 +509,18 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User Type</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Used by</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Clip</th>
             </tr>
           </thead>
           <tbody>
-            {paged.map((row, idx) => (
+            {paged.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                  {isDeletedView ? "No deleted invoice templates found." : "No invoice templates found."}
+                </td>
+              </tr>
+            ) : paged.map((row, idx) => (
               <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
                 <td className="border border-gray-300 px-2 py-2 text-center">
                   <input
@@ -478,13 +531,17 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                   />
                 </td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(row)}
-                    className="text-blue-700 hover:underline"
-                  >
-                    {row.notes}
-                  </button>
+                  {!isDeletedView ? (
+                    <button
+                      type="button"
+                      onClick={() => openEdit(row)}
+                      className="text-blue-700 hover:underline"
+                    >
+                      {row.notes}
+                    </button>
+                  ) : (
+                    row.notes
+                  )}
                 </td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {row.date ? new Date(row.date).toLocaleDateString() : "--"}
@@ -494,6 +551,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {getUserTypeLabel(row.userType)}
                 </td>
+                <td className="border border-gray-300 px-3 py-2 text-center">{row.usedBy}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {row.imageUrl ? (
                     <ClipImageHover
@@ -526,6 +584,11 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
             </button>
           ))}
         </div>
+        <AdminDeletedToggle
+          viewMode={viewMode}
+          onToggle={toggleViewMode}
+          activeLabel="Active Templates"
+        />
       </div>
     </AdminPage>
   );

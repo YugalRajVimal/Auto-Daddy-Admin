@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactField,
   CompactFormFooter,
@@ -7,6 +8,7 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { MODULES } from "../../../components/admin/PermissionMatrix";
@@ -154,7 +156,21 @@ export default function RoleManager() {
   const [city, setCity] = useState("");
   const [permissionKeys, setPermissionKeys] = useState<string[]>([]);
 
-  const filtered = roles.filter((row) => {
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
+    useAdminDeletedView<RoleRow>({
+      onToggle: resetTableControls,
+      storageKey: "admin_deleted_view:role-manager",
+    });
+
+  const displayRoles = isDeletedView ? deletedStash : roles;
+
+  const filtered = displayRoles.filter((row) => {
     const q = search.toLowerCase();
     return (
       row.role.toLowerCase().includes(q) ||
@@ -246,14 +262,27 @@ export default function RoleManager() {
   const handleDeleteSelected = () => {
     if (selected.size === 0) return;
     if (!window.confirm(`Delete ${selected.size} selected role(s)?`)) return;
+    const toDelete = roles.filter((r) => selected.has(r.id));
+    stashDeleted(toDelete);
     setRoles((prev) => prev.filter((r) => !selected.has(r.id)));
     setSelected(new Set());
     adminNotify.success("Selected role(s) deleted.");
   };
 
+  const handleRestore = () => {
+    if (selected.size === 0) return;
+    const toRestore = deletedStash.filter((r) => selected.has(r.id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} role(s)?`)) return;
+    restoreStashed((item) => selected.has(item.id));
+    setRoles((prev) => [...toRestore, ...prev.filter((r) => !selected.has(r.id))]);
+    setSelected(new Set());
+    adminNotify.success("Role(s) restored.");
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Role Manager",
+      title: isDeletedView ? "Deleted Role Manager" : "Role Manager",
       headers: ["Role", "City", "Permissions", "Created Date"],
       rows: filtered.map((role) => [
           role.role,
@@ -266,8 +295,8 @@ export default function RoleManager() {
 
   return (
     <AdminPage
-      title="Role Manager"
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? "Deleted Role Manager" : "Role Manager"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -314,16 +343,30 @@ export default function RoleManager() {
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="roles" />
+      )}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={handleDeleteSelected}
-            disabled={selected.size === 0}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              onClick={handleDeleteSelected}
+              disabled={selected.size === 0}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={selected.size === 0}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -388,7 +431,7 @@ export default function RoleManager() {
             {paged.length === 0 ? (
               <tr>
                 <td colSpan={5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
-                  No roles found.
+                  {isDeletedView ? "No deleted roles found." : "No roles found."}
                 </td>
               </tr>
             ) : (
@@ -403,13 +446,17 @@ export default function RoleManager() {
                     />
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(row)}
-                      className="text-blue-700 hover:underline"
-                    >
-                      {row.role}
-                    </button>
+                    {!isDeletedView ? (
+                      <button
+                        type="button"
+                        onClick={() => openEdit(row)}
+                        className="text-blue-700 hover:underline"
+                      >
+                        {row.role}
+                      </button>
+                    ) : (
+                      row.role
+                    )}
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.city}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">
@@ -440,6 +487,11 @@ export default function RoleManager() {
             </button>
           ))}
         </div>
+        <AdminDeletedToggle
+          viewMode={viewMode}
+          onToggle={toggleViewMode}
+          activeLabel="Active Roles"
+        />
       </div>
     </AdminPage>
   );

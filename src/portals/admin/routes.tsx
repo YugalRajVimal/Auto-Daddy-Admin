@@ -17,7 +17,7 @@ import Cities from "../../pages/AdminPages/Cities/Cities";
 import Domain from "../../pages/AdminPages/Domain/Domain";
 import RunningDeals from "../../pages/AdminPages/Deals/RunningDeals";
 import Wallet from "../../pages/AdminPages/Wallet/Wallet";
-import SubServicesPage from "../../pages/AdminPages/Services/Categories";
+import SubServicesPage from "../../pages/AdminPages/Services/SubServices";
 import CarBrandsPage from "../../pages/AdminPages/Services/CarBrands";
 import CarBrandsNewPage from "../../pages/AdminPages/Services/CarBrandsNew";
 import Provinces from "../../pages/AdminPages/Cities/Provinces";

@@ -6,6 +6,8 @@ import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import { adminNotify } from "../../../utils/adminNotify";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 
 // --- Types ---
 interface CarModel { modelName: string; } // years REMOVED
@@ -35,6 +37,24 @@ const CarCompany: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [attachBrandLogo, setAttachBrandLogo] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const resetTableControls = () => {
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+    setQuery("");
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<CarCompanyType>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:car-company",
+  });
 
   const clearAlerts = () => { setError(""); setSuccessMsg(""); };
 
@@ -164,13 +184,20 @@ const CarCompany: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Delete this car company?")) return;
+    const row = companies.find((c) => c._id === id);
     setDeletingId(id);
     setError("");
     setSuccessMsg("");
     try {
       await axios.delete(`${import.meta.env.VITE_API_URL}/api/admin/car-company/${id}`);
+      if (row) stashDeleted(row);
       adminNotify.success("Car company deleted.");
       setSuccessMsg("Car company deleted.");
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       fetchCompanies();
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Failed to delete car company";
@@ -180,13 +207,49 @@ const CarCompany: React.FC = () => {
     setDeletingId(null);
   };
 
+  const handleRestore = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const toRestore = deletedStash.filter((c) => ids.includes(c._id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} compan${toRestore.length === 1 ? "y" : "ies"}?`)) return;
+    setError("");
+    setSuccessMsg("");
+    let allSucceeded = true;
+    for (const company of toRestore) {
+      try {
+        const formData = new FormData();
+        formData.append("companyName", company.companyName);
+        formData.append(
+          "models",
+          JSON.stringify(company.models.map((m) => ({ modelName: m.modelName })))
+        );
+        await axios.post(
+          `${import.meta.env.VITE_API_URL}/api/admin/car-company`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+        restoreStashed((item) => item._id === company._id);
+      } catch {
+        allSucceeded = false;
+      }
+    }
+    setSelectedIds(new Set());
+    adminNotify[allSucceeded ? "success" : "error"](
+      allSucceeded ? "Restored successfully." : "Some companies failed to restore."
+    );
+    if (allSucceeded) setSuccessMsg("Restored successfully.");
+    fetchCompanies();
+  };
+
   useEffect(() => {
     return () => {
       if (form.brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(form.brandLogoPreviewUrl);
     };
   }, [showModal]);
 
-  const filtered = companies.filter((c) =>
+  const sourceList = isDeletedView ? deletedStash : companies;
+
+  const filtered = sourceList.filter((c) =>
     c.companyName.toLowerCase().includes(query.toLowerCase()) ||
     c.models.some((m) => m.modelName.toLowerCase().includes(query.toLowerCase()))
   );
@@ -328,10 +391,16 @@ const CarCompany: React.FC = () => {
       )}
 
       {/* ── Page ──────────────────────────────────────────────────────────── */}
-      <AdminPage title="Car Companies" noPanel headerAction={<AddNewButton onClick={openAddModal} />}>
+      <AdminPage
+        title={isDeletedView ? "Deleted Car Companies" : "Car Companies"}
+        noPanel
+        headerAction={!isDeletedView ? <AddNewButton onClick={openAddModal} /> : undefined}
+      >
         <div className="mb-10" style={{ background: "#fff", border: "1px solid #d2d6de", borderRadius: 3, boxShadow: "0 1px 1px rgba(0,0,0,.1)" }}>
           <div style={{ padding: "14px 22px", borderBottom: "1px solid #f4f4f4" }}>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: "#444" }}>Company List</h3>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: "#444" }}>
+              {isDeletedView ? "Deleted Company List" : "Company List"}
+            </h3>
           </div>
 
           {/* Alerts */}
@@ -345,8 +414,13 @@ const CarCompany: React.FC = () => {
               items={filtered}
               columns={tableColumns}
               getRowId={(c) => c._id}
-              loading={loading}
-              emptyMessage="No car companies found."
+              loading={loading && !isDeletedView}
+              emptyMessage={isDeletedView ? "No deleted car companies found." : "No car companies found."}
+              banner={
+                isDeletedView ? (
+                  <AdminDeletedBanner count={deletedStash.length} entityLabel="companies" />
+                ) : undefined
+              }
               search={query}
               onSearchChange={setQuery}
               searchPlaceholder="Search by company or model…"
@@ -359,31 +433,59 @@ const CarCompany: React.FC = () => {
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
               exportFilename="car-companies"
-              totalBeforeFilter={companies.length}
-              extraToolbarActions={[
-                {
-                  label: "✏️ Update",
-                  color: "#0073b7",
-                  minSelected: 1,
-                  maxSelected: 1,
-                  onClick: (ids) => {
-                    const company = companies.find((c) => c._id === ids[0]);
-                    if (company) openEditModal(company);
-                  },
-                },
-              ]}
-              renderActions={(company) => (
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button type="button" onClick={() => openEditModal(company)}
-                    style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #0073b7", background: "#fff", color: "#0073b7", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
-                    Edit
+              totalBeforeFilter={sourceList.length}
+              extraToolbarActions={
+                isDeletedView
+                  ? [
+                      {
+                        label: "Restore",
+                        color: "#27ae60",
+                        minSelected: 1,
+                        onClick: (ids) => handleRestore(ids),
+                      },
+                    ]
+                  : [
+                      {
+                        label: "✏️ Update",
+                        color: "#0073b7",
+                        minSelected: 1,
+                        maxSelected: 1,
+                        onClick: (ids) => {
+                          const company = companies.find((c) => c._id === ids[0]);
+                          if (company) openEditModal(company);
+                        },
+                      },
+                    ]
+              }
+              footerRight={
+                <AdminDeletedToggle
+                  viewMode={viewMode}
+                  onToggle={toggleViewMode}
+                  activeLabel="Active Companies"
+                />
+              }
+              renderActions={(company) =>
+                isDeletedView ? (
+                  <button
+                    type="button"
+                    onClick={() => handleRestore([company._id])}
+                    style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #27ae60", background: "#fff", color: "#27ae60", fontSize: 16, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Restore
                   </button>
-                  <button type="button" disabled={deletingId === company._id} onClick={() => handleDelete(company._id)}
-                    style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #d2d6de", background: deletingId === company._id ? "#f4f4f4" : "#f2dede", color: deletingId === company._id ? "#aaa" : "#a94442", fontSize: 16, fontWeight: 700, cursor: deletingId === company._id ? "not-allowed" : "pointer" }}>
-                    {deletingId === company._id ? "Deleting…" : "Delete"}
-                  </button>
-                </div>
-              )}
+                ) : (
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button type="button" onClick={() => openEditModal(company)}
+                      style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #0073b7", background: "#fff", color: "#0073b7", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
+                      Edit
+                    </button>
+                    <button type="button" disabled={deletingId === company._id} onClick={() => handleDelete(company._id)}
+                      style={{ padding: "7px 19px", borderRadius: 3, border: "1px solid #d2d6de", background: deletingId === company._id ? "#f4f4f4" : "#f2dede", color: deletingId === company._id ? "#aaa" : "#a94442", fontSize: 16, fontWeight: 700, cursor: deletingId === company._id ? "not-allowed" : "pointer" }}>
+                      {deletingId === company._id ? "Deleting…" : "Delete"}
+                    </button>
+                  </div>
+                )
+              }
             />
           </div>
         </div>

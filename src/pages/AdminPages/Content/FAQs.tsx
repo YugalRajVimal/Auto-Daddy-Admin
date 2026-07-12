@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
-import ClipImageHover, { adminClipImageUrl } from "../../../components/admin/ClipImageHover";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactAutoGrowTextarea,
   CompactField,
@@ -11,6 +10,7 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
@@ -30,8 +30,6 @@ type FaqRow = {
   question: string;
   answer: string;
   role: string;
-  hasClip?: boolean; // just for consistency, not present in API, derive below
-  imageUrl?: string | null;
 };
 
 const DEFAULT_ANSWER = "Answer";
@@ -52,9 +50,25 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   const [user, setUser] = useState("car-owner");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(DEFAULT_ANSWER);
-  const [attachImage, setAttachImage] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<FaqRow>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:faqs",
+  });
 
   // Fetching all FAQs -- optionally by role
   const fetchFaqs = useCallback(async () => {
@@ -77,25 +91,10 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     fetchFaqs();
   }, [fetchFaqs]);
 
-  // Prepare fields for UI (sort-of normalize to FaqRow)
-  const faqsWithExtras: FaqRow[] = faqs.map((faq) => {
-    // Simulate attachments for display only. In real case, check for image in API.
-    let imageUrl: string | undefined = undefined;
-    let hasClip = false;
-    // Just as a demo: fakes for entries with even ids
-    if (attachImage && (editingId === faq.id)) {
-      hasClip = !!imageFile;
-      // ignore imageUrl, this is only during editing
-    } else if (faq.id % 2 === 0) {
-      // dummy display for every second FAQ, for illustration! Replace as needed.
-      hasClip = true;
-      imageUrl = adminClipImageUrl(`faq-${faq.id}`);
-    }
-    return { ...faq, hasClip, imageUrl };
-  });
+  const displayFaqs = isDeletedView ? deletedStash : faqs;
 
   // Filtering, searching, and pagination
-  const filtered = faqsWithExtras.filter(
+  const filtered = displayFaqs.filter(
     (f) =>
       f.date?.includes(search) ||
       f.question?.toLowerCase().includes(search.toLowerCase()) ||
@@ -127,8 +126,6 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     setUser("car-owner");
     setQuestion("");
     setAnswer(DEFAULT_ANSWER);
-    setAttachImage(false);
-    setImageFile(null);
     setEditingId(null);
   };
 
@@ -142,8 +139,6 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     setUser(USER_OPTIONS.find((o) => o.apiValue === row.role)?.value ?? row.role);
     setQuestion(row.question);
     setAnswer(row.answer);
-    setAttachImage(!!row.hasClip);
-    setImageFile(null);
     setEditingId(row.id);
     setShowForm(true);
   };
@@ -198,11 +193,11 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   };
 
   const handleDelete = async () => {
-    // bulk delete
     if (selected.size === 0) return;
     const ids = Array.from(selected);
+    const toStash = faqs.filter((f) => ids.includes(f.id));
     let allSucceeded = true;
-    for (let id of ids) {
+    for (const id of ids) {
       try {
         const res = await fetch(`${API_BASE}/faqs/${id}`, {
           method: "DELETE",
@@ -212,29 +207,65 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
         allSucceeded = false;
       }
     }
+    if (toStash.length > 0) stashDeleted(toStash);
     await fetchFaqs();
     setSelected(new Set());
     adminNotify[allSucceeded ? "success" : "error"](allSucceeded ? "Deleted." : "Some failed to delete.");
   };
 
+  const handleRestore = async () => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected);
+    const toRestore = deletedStash.filter((f) => ids.includes(f.id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} FAQ(s)?`)) return;
+    let allSucceeded = true;
+    for (const row of toRestore) {
+      try {
+        const roleForApi =
+          USER_OPTIONS.find((o) => o.apiValue === row.role || o.value === row.role)?.apiValue ||
+          row.role ||
+          "car_owner";
+        const res = await fetch(`${API_BASE}/faqs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: roleForApi,
+            date: row.date,
+            question: row.question,
+            answer: row.answer,
+          }),
+        });
+        if (!res.ok) throw new Error();
+        restoreStashed((item) => item.id === row.id);
+      } catch (_) {
+        allSucceeded = false;
+      }
+    }
+    await fetchFaqs();
+    setSelected(new Set());
+    adminNotify[allSucceeded ? "success" : "error"](
+      allSucceeded ? "Restored successfully." : "Some FAQs failed to restore."
+    );
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "FAQ Management",
-      headers: ["User", "Date", "Question", "Answer", "Clip"],
+      title: isDeletedView ? "Deleted FAQ Management" : "FAQ Management",
+      headers: ["User", "Date", "Question", "Answer"],
       rows: filtered.map((faq) => [
           USER_OPTIONS.find((option) => option.apiValue === faq.role || option.value === faq.role)?.label ?? faq.role,
           faq.date,
           faq.question,
           faq.answer,
-          faq.hasClip ? "Yes" : "—",
         ]),
     });
   };
 
   return (
     <AdminPage
-      title="FAQ Management"
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? "Deleted FAQ Management" : "FAQ Management"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -286,28 +317,34 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                 />
               </CompactField>
             </CompactFormRow>
-            <CompactFormRow className="items-start justify-start">
-              <AttachImageCheckbox
-                checked={attachImage}
-                onCheckedChange={setAttachImage}
-                file={imageFile}
-                onFileChange={setImageFile}
-              />
-            </CompactFormRow>
           </CompactFormPanel>
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="FAQs" />
+      )}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            disabled={selected.size === 0}
-            onClick={handleDelete}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={handleDelete}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={handleRestore}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -366,47 +403,43 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Question</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Answer</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Clip</th>
             </tr>
           </thead>
           <tbody>
-            {paged.map((row, idx) => (
-              <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                <td className="border border-gray-300 px-2 py-2 text-center">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(row.id)}
-                    onChange={() => toggleSelect(row.id)}
-                    className="accent-ad-purple"
-                  />
-                </td>
-                <td className="border border-gray-300 px-3 py-2 text-center">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(row)}
-                    className="text-blue-700 hover:underline"
-                  >
-                    {USER_OPTIONS.find((o) => o.apiValue === row.role || o.value === row.role)?.label ?? row.role}
-                  </button>
-                </td>
-                <td className="border border-gray-300 px-3 py-2 text-center">
-                  {row.date ? new Date(row.date).toISOString().slice(0, 10) : ""}
-                </td>
-           
-                <td className="border border-gray-300 px-3 py-2 text-center">{row.question}</td>
-                <td className="border border-gray-300 px-3 py-2 text-center">{row.answer}</td>
-                <td className="border border-gray-300 px-3 py-2 text-center">
-                  {row.imageUrl ? (
-                    <ClipImageHover
-                      imageUrl={row.imageUrl}
-                      alt={`Attachment for ${row.question}`}
-                    />
-                  ) : (
-                    <span className="text-gray-500">--</span>
-                  )}
+            {paged.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                  {isDeletedView ? "No deleted FAQs found." : "No FAQs found."}
                 </td>
               </tr>
-            ))}
+            ) : (
+              paged.map((row, idx) => (
+                <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                  <td className="border border-gray-300 px-2 py-2 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(row.id)}
+                      onChange={() => toggleSelect(row.id)}
+                      className="accent-ad-purple"
+                    />
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => !isDeletedView && openEdit(row)}
+                      className="text-blue-700 hover:underline"
+                    >
+                      {USER_OPTIONS.find((o) => o.apiValue === row.role || o.value === row.role)?.label ?? row.role}
+                    </button>
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2 text-center">
+                    {row.date ? new Date(row.date).toISOString().slice(0, 10) : ""}
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2 text-center">{row.question}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-center">{row.answer}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -427,6 +460,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
             </button>
           ))}
         </div>
+        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active FAQs" />
       </div>
     </AdminPage>
   );

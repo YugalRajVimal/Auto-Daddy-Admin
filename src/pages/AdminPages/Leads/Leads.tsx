@@ -1562,6 +1562,8 @@ import {
 } from "../../../components/admin/ContentPanel";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import {
   createLead,
   deleteLead,
@@ -1606,6 +1608,15 @@ type LeadRow = {
   imageUrl?: string | null;
 };
 
+function formatLeadDate(value?: string | null): string {
+  if (!value) return "-";
+  const ymd = value.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return ymd;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toISOString().slice(0, 10);
+}
+
 // The backend has no image upload endpoint for leads. Any image attached
 // here stays client-side only (object URL) and is never sent to the API.
 function mapLeadFromApi(row: LeadApiRow): LeadRow {
@@ -1618,7 +1629,7 @@ function mapLeadFromApi(row: LeadApiRow): LeadRow {
     name: row.name,
     phone: row.phone,
     city: row.city,
-    email: row.email,
+    email: row.email ?? "",
     website: row.website ?? "",
     sentTo: row.sentTo ?? null,
     personContacted: status === "completed" ? row.sentTo ?? null : undefined,
@@ -1687,6 +1698,18 @@ export default function LeadsPage({
   const [bulkStatus, setBulkStatus] = useState<LeadStatus>("visited");
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
+    useAdminDeletedView<LeadRow>({
+      onToggle: resetTableControls,
+      storageKey: "admin_deleted_view:leads",
+    });
+
   useEffect(() => {
     if (!imagePreview) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1731,9 +1754,25 @@ export default function LeadsPage({
   }, [search]);
 
   // Section already reflects backend status filtering; use rows as-is.
-  const sectionLeads = leads;
+  const sectionLeads = isDeletedView ? deletedStash : leads;
 
-  const filtered = sectionLeads;
+  const filtered = isDeletedView
+    ? sectionLeads.filter((lead) => {
+        const q = search.toLowerCase();
+        if (!q) return true;
+        return (
+          lead.date.toLowerCase().includes(q) ||
+          lead.name.toLowerCase().includes(q) ||
+          lead.phone.toLowerCase().includes(q) ||
+          lead.city.toLowerCase().includes(q) ||
+          lead.email.toLowerCase().includes(q) ||
+          lead.website.toLowerCase().includes(q) ||
+          lead.notes.toLowerCase().includes(q) ||
+          (lead.sentTo || "").toLowerCase().includes(q) ||
+          lead.status.toLowerCase().includes(q)
+        );
+      })
+    : sectionLeads;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -1790,7 +1829,7 @@ export default function LeadsPage({
     }
     setViewingLead(null);
     setEditingId(row.id);
-    setDate(row.date);
+    setDate(row.date?.slice(0, 10) || "");
     setName(row.name);
     setPhone(row.phone);
     setCity(row.city);
@@ -1863,13 +1902,43 @@ export default function LeadsPage({
   const handleDeleteSelected = async () => {
     if (selected.size === 0) return;
     if (!window.confirm(`Delete ${selected.size} selected lead(s)?`)) return;
+    const toDelete = leads.filter((l) => selected.has(l.id));
     try {
       await Promise.all(Array.from(selected).map((id) => deleteLead(id)));
+      stashDeleted(toDelete);
       adminNotify.success("Deleted.");
       setSelected(new Set());
       await loadLeads();
     } catch (err: any) {
       adminNotify.error(err?.message || "Delete failed.");
+    }
+  };
+
+  const handleRestore = async () => {
+    if (selected.size === 0) return;
+    const toRestore = deletedStash.filter((l) => selected.has(l.id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} lead(s)?`)) return;
+    try {
+      for (const lead of toRestore) {
+        await createLead({
+          date: lead.date,
+          name: lead.name,
+          phone: lead.phone,
+          city: lead.city,
+          email: lead.email,
+          website: lead.website,
+          notes: lead.notes,
+          sentTo: lead.sentTo,
+          status: uiStatusToApi(lead.status),
+        });
+      }
+      restoreStashed((item) => selected.has(item.id));
+      setSelected(new Set());
+      adminNotify.success("Lead(s) restored.");
+      await loadLeads();
+    } catch (err: any) {
+      adminNotify.error(err?.message || "Restore failed.");
     }
   };
 
@@ -1908,16 +1977,16 @@ export default function LeadsPage({
     ];
 
     printAdminTable({
-      title: "Leads",
+      title: isDeletedView ? `Deleted ${title}` : title,
       headers,
       rows: filtered.map((lead) => [
-          lead.date,
+          formatLeadDate(lead.date),
           lead.name,
           lead.phone,
           lead.city,
-          lead.email,
-          lead.website,
-          lead.notes,
+          lead.email || "-",
+          lead.website || "-",
+          lead.notes || "-",
           lead.sentTo || "-",
           lead.status || "-",
           lead.imageUrl ? "Yes" : "—",
@@ -1956,7 +2025,7 @@ export default function LeadsPage({
     >
       <CompactFormRow className="w-full items-start" columns={4}>
         <CompactField label="Date" className="w-full min-w-0">
-          <div className={compactReadOnlyValueClass}>{viewingLead.date}</div>
+          <div className={compactReadOnlyValueClass}>{formatLeadDate(viewingLead.date)}</div>
         </CompactField>
         <CompactField label="Name" className="w-full min-w-0">
           <div className={compactReadOnlyValueClass}>{viewingLead.name}</div>
@@ -2036,9 +2105,13 @@ export default function LeadsPage({
 
   return (
     <AdminPage
-      title={title}
+      title={isDeletedView ? `Deleted ${title}` : title}
       noPanel={!showAddNew}
-      headerAction={showAddNew && !showForm && !viewingLead ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={
+        showAddNew && !showForm && !viewingLead && !isDeletedView ? (
+          <AddNewButton onClick={openAdd} />
+        ) : undefined
+      }
       between={
         viewDetailPanel ??
         (!readOnly && showForm ? (
@@ -2088,7 +2161,7 @@ export default function LeadsPage({
               </CompactField>
             </CompactFormRow>
             <CompactFormRow className="w-full items-start" columns={4}>
-              <CompactField label="Email" required className="w-full min-w-0">
+              <CompactField label="Email" className="w-full min-w-0">
                 <input
                   type="email"
                   value={email}
@@ -2096,7 +2169,7 @@ export default function LeadsPage({
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Website" required className="w-full min-w-0">
+              <CompactField label="Website" className="w-full min-w-0">
                 <input
                   type="text"
                   value={website}
@@ -2104,7 +2177,7 @@ export default function LeadsPage({
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Notes" required className="w-full min-w-0">
+              <CompactField label="Notes" className="w-full min-w-0">
                 <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
               </CompactField>
               <CompactField label={sentToLabel} className="w-full min-w-0">
@@ -2179,19 +2252,33 @@ export default function LeadsPage({
         ) : undefined)
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="leads" />
+      )}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
           {!readOnly && (
             <>
-              <button
-                type="button"
-                disabled={selected.size === 0}
-                onClick={handleDeleteSelected}
-                className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Delete
-              </button>
-              {selected.size > 0 && (
+              {!isDeletedView ? (
+                <button
+                  type="button"
+                  disabled={selected.size === 0}
+                  onClick={handleDeleteSelected}
+                  className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={selected.size === 0}
+                  onClick={handleRestore}
+                  className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Restore
+                </button>
+              )}
+              {!isDeletedView && selected.size > 0 && (
                 <div className="flex items-center gap-1 rounded border border-gray-400 bg-white px-1.5 py-0.5">
                   <span className="text-xs font-semibold text-gray-600">{selected.size} selected</span>
                   <select
@@ -2294,7 +2381,7 @@ export default function LeadsPage({
             ) : paged.length === 0 ? (
               <tr>
                 <td colSpan={11} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
-                  No leads found.
+                  {isDeletedView ? "No deleted leads found." : "No leads found."}
                 </td>
               </tr>
             ) : (
@@ -2314,7 +2401,7 @@ export default function LeadsPage({
                       onClick={() => (readOnly ? openView(row) : openEdit(row))}
                       className="text-blue-700 hover:underline"
                     >
-                      {row.date}
+                      {formatLeadDate(row.date)}
                     </button>
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.name}</td>
@@ -2360,6 +2447,11 @@ export default function LeadsPage({
             </button>
           ))}
         </div>
+        <AdminDeletedToggle
+          viewMode={viewMode}
+          onToggle={toggleViewMode}
+          activeLabel="Active Leads"
+        />
       </div>
 
       {imagePreview && (

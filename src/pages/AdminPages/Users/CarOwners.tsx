@@ -38,6 +38,8 @@ type JobCardType = {
   vehicleId?: { licensePlateNo?: string }; customerId?: any;
   vehiclePhotos?: string[]; createdAt?: string; updatedAt?: string;[key: string]: any;
 };
+type OwnerDocumentItem = { label: string; url: string };
+
 type CarOwnerType = {
   _id: string; name: string; email?: string; countryCode?: string; phone?: string;
   address?: string; pincode?: string; city?: string; status?: string;
@@ -46,6 +48,7 @@ type CarOwnerType = {
   favoriteAutoShops?: BusinessProfileType[];
   autoshopsReceivedServiceFrom?: BusinessProfileType[];
   jobCards?: JobCardType[]; profilePhoto?: string; profileImage?: string;
+  documents?: unknown;
   thoughtOfTheDayLiked?: boolean;
   thoughtOfTheDayLikes?: number;
   createdAt?: string;
@@ -59,11 +62,8 @@ const ALL_COLUMNS = [
   { key: "city", label: "City" },
   { key: "address", label: "Address" },
   { key: "date", label: "Date" },
-  { key: "profilePhoto", label: "Photo" },
-  { key: "vehicleMake", label: "Make" },
-  { key: "vehicleModel", label: "Model" },
-  { key: "vehicleYear", label: "Year" },
-  { key: "licensePlate", label: "License Plate" },
+  { key: "profilePhoto", label: "Profile Image" },
+  { key: "documents", label: "Documents" },
   { key: "vin", label: "VIN" },
   { key: "vehicle", label: "Vehicle" },
   { key: "autoShops", label: "Auto Shops" },
@@ -72,7 +72,7 @@ const ALL_COLUMNS = [
   { key: "likes", label: "Likes" },
   { key: "status", label: "Status" },
 ];
-const DEFAULT_VISIBLE = ["name", "phone", "email", "city", "address", "date", "vehicleMake", "vehicleModel", "vehicleYear", "licensePlate", "vehicle", "autoShops", "jobCard", "likes", "status"];
+const DEFAULT_VISIBLE = ["name", "phone", "email", "city", "address", "date", "profilePhoto", "documents", "vehicle", "autoShops", "jobCard", "likes", "status"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const API = () => import.meta.env.VITE_API_URL || "";
@@ -101,6 +101,61 @@ function getMakeModel(v: VehicleType): string {
 }
 function primaryVehicle(owner: CarOwnerType): VehicleType | undefined {
   return owner.myVehicles?.[0];
+}
+
+const VEHICLE_DOC_FIELDS: { key: string; label: string }[] = [
+  { key: "licensePlateFrontImagePath", label: "License plate (front)" },
+  { key: "licensePlateBackImagePath", label: "License plate (back)" },
+  { key: "carOwnershipCertificate", label: "Ownership certificate" },
+  { key: "insuranceCertificate", label: "Insurance certificate" },
+  { key: "drivingLicenseFront", label: "Driving license (front)" },
+  { key: "drivingLicenseBack", label: "Driving license (back)" },
+];
+
+function pushDoc(docs: OwnerDocumentItem[], label: string, path?: string | null) {
+  const url = mediaUrl(path || "");
+  if (!url) return;
+  if (docs.some((d) => d.url === url)) return;
+  docs.push({ label, url });
+}
+
+function ownerDocuments(owner: CarOwnerType): OwnerDocumentItem[] {
+  const docs: OwnerDocumentItem[] = [];
+  const raw = owner.documents;
+  if (Array.isArray(raw)) {
+    raw.forEach((item, i) => {
+      if (typeof item === "string") {
+        pushDoc(docs, `Document ${i + 1}`, item);
+        return;
+      }
+      if (!item || typeof item !== "object") return;
+      const rec = item as Record<string, unknown>;
+      const path =
+        (typeof rec.url === "string" && rec.url) ||
+        (typeof rec.path === "string" && rec.path) ||
+        (typeof rec.document === "string" && rec.document) ||
+        (typeof rec.file === "string" && rec.file) ||
+        "";
+      const label =
+        (typeof rec.label === "string" && rec.label) ||
+        (typeof rec.name === "string" && rec.name) ||
+        (typeof rec.type === "string" && rec.type) ||
+        `Document ${i + 1}`;
+      pushDoc(docs, label, path);
+      for (const field of VEHICLE_DOC_FIELDS) {
+        const value = rec[field.key];
+        if (typeof value === "string") pushDoc(docs, field.label, value);
+      }
+    });
+  }
+  for (const v of owner.myVehicles ?? []) {
+    const plate = v.licensePlateNo ? ` (${v.licensePlateNo})` : "";
+    for (const field of VEHICLE_DOC_FIELDS) {
+      const value = v[field.key];
+      if (typeof value === "string") pushDoc(docs, `${field.label}${plate}`, value);
+    }
+  }
+  return docs;
 }
 function getToken(): Record<string, string> {
   return authHeaders();
@@ -202,6 +257,29 @@ const VehiclesModal: React.FC<{ owner: CarOwnerType; onClose: () => void }> = ({
             </div>
           </div>
         ))}
+    </BaseModal>
+  );
+};
+
+// ─── DOCUMENTS MODAL ──────────────────────────────────────────────────────────
+const DocumentsModal: React.FC<{ owner: CarOwnerType; onClose: () => void }> = ({ owner, onClose }) => {
+  const docs = ownerDocuments(owner);
+  return (
+    <BaseModal isOpen wide onClose={onClose} title={`Documents — ${owner.name}`}>
+      {docs.length === 0 ? (
+        <p style={{ textAlign: "center", color: "#aaa" }}>No documents found.</p>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+          {docs.map((doc) => (
+            <div key={`${doc.label}-${doc.url}`} style={GREEN_CARD}>
+              <div style={{ background: "#fff", border: "1px solid #ccc", borderRadius: 6, width: "100%", paddingBottom: "75%", position: "relative", overflow: "hidden", marginBottom: 8 }}>
+                <img src={doc.url} alt={doc.label} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#333", textAlign: "center" }}>{doc.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </BaseModal>
   );
 };
@@ -941,19 +1019,10 @@ function ownerPrintColMap(): Record<string, (o: CarOwnerType) => string> {
     address: o => o.address || "-",
     date: o => fmtDate(o.createdAt),
     profilePhoto: o => (ownerProfileImg(o) ? "Yes" : "-"),
-    vehicleMake: o => {
-      const v = primaryVehicle(o);
-      return v ? getMakeName(v) : "-";
+    documents: o => {
+      const n = ownerDocuments(o).length;
+      return n > 0 ? String(n) : "-";
     },
-    vehicleModel: o => {
-      const v = primaryVehicle(o);
-      return v ? getMakeModel(v) : "-";
-    },
-    vehicleYear: o => {
-      const v = primaryVehicle(o);
-      return v?.year != null ? String(v.year) : "-";
-    },
-    licensePlate: o => primaryVehicle(o)?.licensePlateNo || "-",
     vin: o => primaryVehicle(o)?.vinNo || "-",
     vehicle: o => (o.myVehicles ?? []).map(v => `${getMakeName(v)} ${getMakeModel(v)} ${v.year ?? ""}`).join("; ") || "-",
     autoShops: o => (o.autoshopsReceivedServiceFrom ?? []).map(s => s.businessName).join("; ") || "-",
@@ -995,6 +1064,7 @@ const CarOwners: React.FC = () => {
 
   // Modal states
   const [vehiclesFor, setVehiclesFor] = useState<CarOwnerType | null>(null);
+  const [documentsFor, setDocumentsFor] = useState<CarOwnerType | null>(null);
   const [shopsFor, setShopsFor] = useState<CarOwnerType | null>(null);
   const [jobCardsFor, setJobCardsFor] = useState<CarOwnerType | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -1108,26 +1178,27 @@ const CarOwners: React.FC = () => {
         return (
           <td key={key} className={tdClass}>
             {img ? (
-              <ClipImageHover imageUrl={img} alt={`Photo for ${owner.name}`} size={20} iconClassName="text-ad-purple" />
+              <ClipImageHover imageUrl={img} alt={`Profile image for ${owner.name}`} size={20} iconClassName="text-ad-purple" />
             ) : (
               "-"
             )}
           </td>
         );
       }
-      case "vehicleMake": {
-        const v = primaryVehicle(owner);
-        return <td key={key} className={tdClass}>{v ? getMakeName(v) : "-"}</td>;
+      case "documents": {
+        const docs = ownerDocuments(owner);
+        return (
+          <td key={key} className={tdClass}>
+            {docs.length > 0 ? (
+              <button type="button" onClick={() => setDocumentsFor(owner)} className={linkClass}>
+                {docs.length}
+              </button>
+            ) : (
+              "-"
+            )}
+          </td>
+        );
       }
-      case "vehicleModel": {
-        const v = primaryVehicle(owner);
-        return <td key={key} className={tdClass}>{v ? getMakeModel(v) : "-"}</td>;
-      }
-      case "vehicleYear": {
-        const v = primaryVehicle(owner);
-        return <td key={key} className={tdClass}>{v?.year != null ? String(v.year) : "-"}</td>;
-      }
-      case "licensePlate": return <td key={key} className={tdClass}>{primaryVehicle(owner)?.licensePlateNo || "-"}</td>;
       case "vin": return <td key={key} className={tdClass}>{primaryVehicle(owner)?.vinNo || "-"}</td>;
       case "vehicle": return <td key={key} className={tdClass}>{owner.myVehicles && owner.myVehicles.length > 0 ? <button type="button" onClick={() => setVehiclesFor(owner)} className={linkClass}>{owner.myVehicles.length}</button> : "-"}</td>;
       case "autoShops": return <td key={key} className={tdClass}>{shops.length > 0 ? <button type="button" onClick={() => setShopsFor(owner)} className={linkClass}>{shops.length}</button> : "-"}</td>;
@@ -1161,6 +1232,7 @@ const CarOwners: React.FC = () => {
     <>
       {/* ── MODALS ── */}
       {vehiclesFor && <VehiclesModal owner={vehiclesFor} onClose={() => setVehiclesFor(null)} />}
+      {documentsFor && <DocumentsModal owner={documentsFor} onClose={() => setDocumentsFor(null)} />}
       {shopsFor && <AutoShopsModal owner={shopsFor} onClose={() => setShopsFor(null)} />}
       {jobCardsFor && <JobCardsModal owner={jobCardsFor} onClose={() => setJobCardsFor(null)} />}
 

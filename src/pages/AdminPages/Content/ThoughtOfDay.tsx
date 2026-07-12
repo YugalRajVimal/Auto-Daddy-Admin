@@ -10,6 +10,7 @@ import {
   CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
+  compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 import { adminNotify } from "../../../utils/adminNotify";
@@ -30,9 +31,6 @@ type NoteRow = {
   imageUrl?: string | null;
   likes: number;
 };
-
-const DEFAULT_NOTE =
-  "A goodman is always a best friend and, soonest to be choosen, longer to be retained it in-deed and, never to be parted with.";
 
 type ThoughtOfDayPageProps = {
   initialShowForm?: boolean;
@@ -59,8 +57,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const [date, setDate] = useState("");
   const [country, setCountry] = useState("India");
   const [title, setTitle] = useState("");
-  const [note, setNote] = useState(DEFAULT_NOTE);
-  const [likes, setLikes] = useState(0);
+  const [note, setNote] = useState("");
   const [attachImage, setAttachImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
@@ -167,8 +164,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setDate(new Date().toISOString().slice(0, 10));
     setCountry("India");
     setTitle("");
-    setNote(DEFAULT_NOTE);
-    setLikes(0);
+    setNote("");
     setAttachImage(false);
     setImageFile(null);
     setEditingKey(null);
@@ -185,7 +181,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setCountry(row.country);
     setTitle(row.subject);
     setNote(row.notes);
-    setLikes(row.likes ?? 0);
     setAttachImage(Boolean(row.imageUrl));
     setImageFile(null);
     setEditingKey(getRowKey(row));
@@ -205,7 +200,9 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     formData.append("country", country);
     formData.append("subject", title);
     if (note) formData.append("notes", note);
-    formData.append("likes", String(likes || 0));
+    const existingLikes =
+      editingKey != null ? findNoteByKey(editingKey)?.likes ?? 0 : 0;
+    formData.append("likes", String(existingLikes));
     // For ADD, always add image if attachImage && imageFile
     // For EDIT, only send 'thoughtImage' if user provided a new image
     if (editingKey == null) {
@@ -357,7 +354,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
             }
           >
             <CompactFormRow className="items-start">
-              <CompactField label="Date" required>
+              <CompactField label="Date" required className={compactFixedFieldWidth}>
                 <input
                   type="date"
                   value={date}
@@ -365,7 +362,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   className={compactInputClass}
                 />
               </CompactField>
-              <CompactField label="Country" required>
+              <CompactField label="Country" required className={compactFixedFieldWidth}>
                 <select
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
@@ -376,7 +373,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   <option value="USA">USA</option>
                 </select>
               </CompactField>
-              <CompactField label="Title" required>
+              <CompactField label="Title" required className={compactFixedFieldWidth}>
                 <input
                   type="text"
                   value={title}
@@ -385,19 +382,10 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   required
                 />
               </CompactField>
-              <CompactField label="Note">
+              <CompactField label="Note" className="min-w-0 flex-1">
                 <CompactAutoGrowTextarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                />
-              </CompactField>
-              <CompactField label="Likes">
-                <input
-                  type="number"
-                  value={likes}
-                  min={0}
-                  onChange={(e) => setLikes(+e.target.value)}
-                  className={compactInputClass}
                 />
               </CompactField>
             </CompactFormRow>
@@ -582,8 +570,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Subject</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Notes</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" style={{ width: "26%" }}>Subject</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" style={{ width: "36%" }}>Notes</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Likes</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Image</th>
             </tr>
@@ -618,8 +606,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   </button>
                 </td>
                 <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
-                <td className="border border-gray-300 px-3 py-2 text-center">{row.subject}</td>
-                <td className="border border-gray-300 px-3 py-2 text-center">{row.notes}</td>
+                <td className="border border-gray-300 px-3 py-2 text-center" style={{ width: "26%" }}>{row.subject}</td>
+                <td className="border border-gray-300 px-3 py-2 text-center" style={{ width: "36%" }}>{row.notes}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">{row.likes ?? 0}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {(row.imageUrl || row.image) ? (

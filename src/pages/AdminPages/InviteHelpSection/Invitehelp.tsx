@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { useLocation } from "react-router";
 import { FiPaperclip } from "react-icons/fi";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
   CompactAutoGrowTextarea,
@@ -15,6 +16,7 @@ import {
   compactReadOnlyMultilineClass,
   compactReadOnlyValueClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
@@ -307,6 +309,10 @@ function receivedAudioUrl(inv: InviteHelp) {
   return null;
 }
 
+function isSentNotification(item: InviteHelp | SentNotification): item is SentNotification {
+  return "userScope" in item && "note" in item;
+}
+
 export default function Invitehelp({
   title = "Messages",
   section = "received",
@@ -314,7 +320,7 @@ export default function Invitehelp({
 }: InvitehelpProps) {
   const location = useLocation();
   const navResetToken = (location.state as NavResetLocationState | null)?.navReset;
-  const [inviteHelps] = useState<InviteHelp[]>(DUMMY_RECEIVED_NOTIFICATIONS);
+  const [inviteHelps, setInviteHelps] = useState<InviteHelp[]>(DUMMY_RECEIVED_NOTIFICATIONS);
   const [sentNotifications, setSentNotifications] = useState<SentNotification[]>(DUMMY_SENT_NOTIFICATIONS);
   const [loading] = useState(false);
   const [error, setError] = useState("");
@@ -335,6 +341,18 @@ export default function Invitehelp({
   const [selectedUser, setSelectedUser] = useState("");
 
   const [viewingReceived, setViewingReceived] = useState<InviteHelp | null>(null);
+
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
+    useAdminDeletedView<InviteHelp | SentNotification>({
+      onToggle: resetTableControls,
+      storageKey: "admin_deleted_view:invite-help",
+    });
 
   const closeReceivedView = () => {
     setViewingReceived(null);
@@ -359,7 +377,10 @@ export default function Invitehelp({
     setError("");
   }, [location.pathname, navResetToken, section]);
 
-  const filteredReceived = inviteHelps.filter((inv) => {
+  const filteredReceived = (isDeletedView
+    ? deletedStash.filter((item): item is InviteHelp => !isSentNotification(item))
+    : inviteHelps
+  ).filter((inv) => {
     const q = search.toLowerCase();
     return (
       receivedDate(inv).toLowerCase().includes(q) ||
@@ -371,7 +392,10 @@ export default function Invitehelp({
     );
   });
 
-  const filteredSent = sentNotifications.filter((n) => {
+  const filteredSent = (isDeletedView
+    ? deletedStash.filter(isSentNotification)
+    : sentNotifications
+  ).filter((n) => {
     const q = search.toLowerCase();
     return (
       n.date.toLowerCase().includes(q) ||
@@ -404,7 +428,7 @@ export default function Invitehelp({
   const handleToolbarPrint = () => {
     if (section === "sent") {
       printAdminTable({
-        title: "Sent Notifications",
+        title: isDeletedView ? "Deleted Sent Notifications" : "Sent Notifications",
         headers: ["Date", "Title", "Note", "User Type", "User", "Attachment"],
         rows: filteredSent.map((notification) => [
             notification.date,
@@ -419,7 +443,7 @@ export default function Invitehelp({
     }
 
     printAdminTable({
-      title: "Messages Received",
+      title: isDeletedView ? "Deleted Messages Received" : "Messages Received",
       headers: ["Date", "Ticket No.", "User Type", "User Name", "Title", "Audio", "Message", "Attachment"],
       rows: filteredReceived.map((invite) => [
           receivedDate(invite),
@@ -432,6 +456,40 @@ export default function Invitehelp({
           receivedImageUrl(invite) ? "Yes" : "—",
         ]),
     });
+  };
+
+  const handleDeleteSelected = () => {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Delete ${selected.size} selected item(s)?`)) return;
+    if (section === "sent") {
+      const toDelete = sentNotifications.filter((n) => selected.has(n._id));
+      stashDeleted(toDelete);
+      setSentNotifications((prev) => prev.filter((n) => !selected.has(n._id)));
+    } else {
+      const toDelete = inviteHelps.filter((n) => selected.has(n._id));
+      stashDeleted(toDelete);
+      setInviteHelps((prev) => prev.filter((n) => !selected.has(n._id)));
+    }
+    setSelected(new Set());
+    adminNotify.success("Deleted.");
+  };
+
+  const handleRestore = () => {
+    if (selected.size === 0) return;
+    const toRestore = deletedStash.filter((item) => selected.has(item._id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} item(s)?`)) return;
+    const sent = toRestore.filter(isSentNotification);
+    const received = toRestore.filter((item): item is InviteHelp => !isSentNotification(item));
+    if (sent.length) {
+      setSentNotifications((prev) => [...sent, ...prev.filter((n) => !selected.has(n._id))]);
+    }
+    if (received.length) {
+      setInviteHelps((prev) => [...received, ...prev.filter((n) => !selected.has(n._id))]);
+    }
+    restoreStashed((item) => selected.has(item._id));
+    setSelected(new Set());
+    adminNotify.success("Restored.");
   };
 
   const openReceivedView = (inv: InviteHelp) => {
@@ -648,11 +706,25 @@ export default function Invitehelp({
 
   return (
     <AdminPage
-      title={title}
+      title={isDeletedView ? `Deleted ${title}` : title}
       noPanel
-      headerAction={showAddNew && !showForm && !viewingReceived ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
+      headerAction={
+        showAddNew && !showForm && !viewingReceived && !isDeletedView ? (
+          <AddNewButton onClick={() => setShowForm(true)} />
+        ) : undefined
+      }
       between={receivedViewPanel ?? addFormPanel}
     >
+      {isDeletedView && (
+        <AdminDeletedBanner
+          count={
+            section === "sent"
+              ? deletedStash.filter(isSentNotification).length
+              : deletedStash.filter((item) => !isSentNotification(item)).length
+          }
+          entityLabel={section === "sent" ? "sent notifications" : "messages"}
+        />
+      )}
       {error && (
         <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
           {error}
@@ -661,9 +733,25 @@ export default function Invitehelp({
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={handleDeleteSelected}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={handleRestore}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -751,7 +839,13 @@ export default function Invitehelp({
             ) : paged.length === 0 ? (
               <tr>
                 <td colSpan={section === "sent" ? 7 : 9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                  {section === "sent" ? "No sent notifications found." : "No received notifications found."}
+                  {isDeletedView
+                    ? section === "sent"
+                      ? "No deleted sent notifications found."
+                      : "No deleted received notifications found."
+                    : section === "sent"
+                      ? "No sent notifications found."
+                      : "No received notifications found."}
                 </td>
               </tr>
             ) : section === "sent" ? (
@@ -875,9 +969,11 @@ export default function Invitehelp({
             </button>
           ))}
         </div>
-        <Link to="#" className="text-sm text-blue-700 hover:underline">
-          Deleted
-        </Link>
+        <AdminDeletedToggle
+          viewMode={viewMode}
+          onToggle={toggleViewMode}
+          activeLabel="Active Messages"
+        />
       </div>
 
       {imagePreview && (

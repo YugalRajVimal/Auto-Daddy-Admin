@@ -212,6 +212,8 @@ export type AdminDataTableProps<T> = {
   toolbarLeft?: React.ReactNode;
   toolbarRight?: React.ReactNode;
   banner?: React.ReactNode;
+  /** Optional slot to the right of pagination (e.g. AdminDeletedToggle) */
+  footerRight?: React.ReactNode;
   renderActions?: (row: T) => React.ReactNode;
   actionsColumnLabel?: string;
   totalBeforeFilter?: number;
@@ -253,6 +255,7 @@ export function AdminDataTable<T>({
   toolbarLeft,
   toolbarRight,
   banner,
+  footerRight,
   renderActions,
   actionsColumnLabel = "Action",
   totalBeforeFilter,
@@ -590,36 +593,39 @@ export function AdminDataTable<T>({
                   : ""
                 }`}
             </p>
-            <div style={{ display: "flex" }}>
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-                style={adminPageBtn(false, safePage === 1)}
-              >
-                Previous
-              </button>
-              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map((pg) => (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex" }}>
                 <button
-                  key={pg}
                   type="button"
-                  onClick={() => setCurrentPage(pg)}
-                  style={adminPageBtn(pg === safePage, false)}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  style={adminPageBtn(false, safePage === 1)}
                 >
-                  {pg}
+                  Previous
                 </button>
-              ))}
-              {totalPages > 7 && (
-                <span style={{ padding: "6px 8px", fontSize: 13 }}>…</span>
-              )}
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage === totalPages}
-                style={adminPageBtn(false, safePage === totalPages)}
-              >
-                Next
-              </button>
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map((pg) => (
+                  <button
+                    key={pg}
+                    type="button"
+                    onClick={() => setCurrentPage(pg)}
+                    style={adminPageBtn(pg === safePage, false)}
+                  >
+                    {pg}
+                  </button>
+                ))}
+                {totalPages > 7 && (
+                  <span style={{ padding: "6px 8px", fontSize: 13 }}>…</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  style={adminPageBtn(false, safePage === totalPages)}
+                >
+                  Next
+                </button>
+              </div>
+              {footerRight}
             </div>
           </div>
         )}

@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import axios from "axios";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
@@ -15,6 +16,7 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import {
   ACTIONS,
   DEFAULT_PERMS,
@@ -346,6 +348,18 @@ const SubAdminManagement: React.FC = () => {
   const [editPerms, setEditPerms] = useState<Permissions>(DEFAULT_PERMS());
   const [permLoading, setPermLoading] = useState(false);
 
+  const resetTableControls = () => {
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+    setSearch("");
+  };
+
+  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
+    useAdminDeletedView<SubAdmin>({
+      onToggle: resetTableControls,
+      storageKey: "admin_deleted_view:sub-admins",
+    });
+
   const token = localStorage.getItem("admin-token");
   const headers = { Authorization: token || "" };
 
@@ -379,7 +393,9 @@ const SubAdminManagement: React.FC = () => {
   };
 
   // Filter + paginate
-  const filtered = subAdmins.filter((s) => {
+  const displaySubAdmins = isDeletedView ? deletedStash : subAdmins;
+
+  const filtered = displaySubAdmins.filter((s) => {
     const q = search.toLowerCase();
     const keys = permissionKeysFromPerms(s.permissions);
     return (
@@ -548,10 +564,12 @@ const SubAdminManagement: React.FC = () => {
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
     if (!window.confirm(`Delete ${selectedIds.size} selected sub-admin(s)?`)) return;
+    const toDelete = subAdmins.filter((s) => selectedIds.has(s._id));
     try {
       await Promise.all(
         [...selectedIds].map((id) => axios.delete(`${API}/api/admin/subadmins/${id}`, { headers }))
       );
+      stashDeleted(toDelete);
       showMsg("Selected sub-admins deleted.");
       setSelectedIds(new Set());
       fetchSubAdmins();
@@ -562,9 +580,41 @@ const SubAdminManagement: React.FC = () => {
     }
   };
 
+  const handleRestore = async () => {
+    if (selectedIds.size === 0) return;
+    const toRestore = deletedStash.filter((s) => selectedIds.has(s._id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} sub-admin(s)?`)) return;
+    try {
+      for (const sa of toRestore) {
+        await axios.post(
+          `${API}/api/admin/subadmins`,
+          {
+            name: sa.name,
+            email: sa.email,
+            phone: sa.phone || "",
+            role: sa.role || "Sub Admin",
+            city: sa.city || "",
+            isActive: sa.isActive,
+            permissions: sa.permissions,
+          },
+          { headers }
+        );
+      }
+      restoreStashed((item) => selectedIds.has(item._id));
+      setSelectedIds(new Set());
+      showMsg("Sub-admin(s) restored.");
+      fetchSubAdmins();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Failed to restore.";
+      setError(msg);
+      adminNotify.error(msg);
+    }
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Sub Admin Management",
+      title: isDeletedView ? "Deleted Sub Admin Management" : "Sub Admin Management",
       headers: ["Date", "Role", "Name", "Phone", "Email", "Photo", "City", "Permissions", "Status"],
       rows: filtered.map((subAdmin) => [
           formatAdminDate(subAdmin.createdAt),
@@ -694,8 +744,8 @@ const SubAdminManagement: React.FC = () => {
       </Modal>
 
       <AdminPage
-        title="Manage Admin"
-        headerAction={!showForm ? <AddNewButton onClick={openCreate} /> : undefined}
+        title={isDeletedView ? "Deleted Manage Admin" : "Manage Admin"}
+        headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openCreate} /> : undefined}
         between={
           showForm ? (
             <CompactFormPanel
@@ -845,6 +895,9 @@ const SubAdminManagement: React.FC = () => {
           ) : undefined
         }
       >
+        {isDeletedView && (
+          <AdminDeletedBanner count={deletedStash.length} entityLabel="sub-admins" />
+        )}
         {error && (
           <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
             {error}
@@ -858,14 +911,25 @@ const SubAdminManagement: React.FC = () => {
 
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
           <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              onClick={handleDeleteSelected}
-              disabled={selectedIds.size === 0}
-              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Delete
-            </button>
+            {!isDeletedView ? (
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                disabled={selectedIds.size === 0}
+                className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Delete
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleRestore}
+                disabled={selectedIds.size === 0}
+                className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Restore
+              </button>
+            )}
             <button
               type="button"
               onClick={handleToolbarPrint}
@@ -939,7 +1003,7 @@ const SubAdminManagement: React.FC = () => {
                 {paged.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
-                      No sub admins found.
+                      {isDeletedView ? "No deleted sub admins found." : "No sub admins found."}
                     </td>
                   </tr>
                 ) : (
@@ -960,13 +1024,17 @@ const SubAdminManagement: React.FC = () => {
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-center">{sa.role || "—"}</td>
                       <td className="border border-gray-300 px-3 py-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(sa)}
-                          className="font-medium text-blue-700 hover:underline"
-                        >
-                          {sa.name}
-                        </button>
+                        {!isDeletedView ? (
+                          <button
+                            type="button"
+                            onClick={() => openEdit(sa)}
+                            className="font-medium text-blue-700 hover:underline"
+                          >
+                            {sa.name}
+                          </button>
+                        ) : (
+                          sa.name
+                        )}
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-center">{sa.phone || "—"}</td>
                       <td className="border border-gray-300 px-3 py-2 text-center">{sa.email}</td>
@@ -990,32 +1058,36 @@ const SubAdminManagement: React.FC = () => {
                         {sa.isActive ? "Active" : "Inactive"}
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-center">
-                        <TableRowMenu
-                          open={openMenuId === sa._id}
-                          onToggle={() =>
-                            setOpenMenuId((current) => (current === sa._id ? null : sa._id))
-                          }
-                          onClose={() => setOpenMenuId(null)}
-                          items={[
-                            { label: "View", onClick: () => setShowViewModal(sa) },
-                            { label: "Edit", onClick: () => openEdit(sa) },
-                            {
-                              label: "Permissions",
-                              onClick: () => openPermModal(sa),
-                              className: "text-amber-800",
-                            },
-                            {
-                              label: sa.isActive ? "Disable" : "Enable",
-                              onClick: () => handleToggleStatus(sa),
-                              className: sa.isActive ? "text-red-700" : "text-green-700",
-                            },
-                            {
-                              label: "Activity Logs",
-                              onClick: () => openActivityModal(sa),
-                              className: "text-cyan-800",
-                            },
-                          ]}
-                        />
+                        {!isDeletedView ? (
+                          <TableRowMenu
+                            open={openMenuId === sa._id}
+                            onToggle={() =>
+                              setOpenMenuId((current) => (current === sa._id ? null : sa._id))
+                            }
+                            onClose={() => setOpenMenuId(null)}
+                            items={[
+                              { label: "View", onClick: () => setShowViewModal(sa) },
+                              { label: "Edit", onClick: () => openEdit(sa) },
+                              {
+                                label: "Permissions",
+                                onClick: () => openPermModal(sa),
+                                className: "text-amber-800",
+                              },
+                              {
+                                label: sa.isActive ? "Disable" : "Enable",
+                                onClick: () => handleToggleStatus(sa),
+                                className: sa.isActive ? "text-red-700" : "text-green-700",
+                              },
+                              {
+                                label: "Activity Logs",
+                                onClick: () => openActivityModal(sa),
+                                className: "text-cyan-800",
+                              },
+                            ]}
+                          />
+                        ) : (
+                          "—"
+                        )}
                       </td>
                     </tr>
                     );
@@ -1043,6 +1115,11 @@ const SubAdminManagement: React.FC = () => {
               </button>
             ))}
           </div>
+          <AdminDeletedToggle
+            viewMode={viewMode}
+            onToggle={toggleViewMode}
+            activeLabel="Active Admins"
+          />
         </div>
       </AdminPage>
     </>

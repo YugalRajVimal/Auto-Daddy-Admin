@@ -1263,6 +1263,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import ComboSelectWithEditor from "../../../components/admin/ComboSelectWithEditor";
 import ListEditorPopup from "../../../components/admin/ListEditorPopup";
@@ -1275,6 +1276,7 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { formatDisplayDate } from "./accountData";
 import {
@@ -1924,6 +1926,31 @@ function LedgerPage({
   const [attachAttachment, setAttachAttachment] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<ExpenseRow | IncomeRow>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:accounts-ledger",
+  });
+
+  const variantStash = useMemo(
+    () =>
+      deletedStash.filter((row) =>
+        isExpense ? "byCheque" in row : "paymentMode" in row
+      ),
+    [deletedStash, isExpense]
+  );
 
   const [categoriesPopupOpen, setCategoriesPopupOpen] = useState(false);
   const [subcategoriesPopupOpen, setSubcategoriesPopupOpen] = useState(false);
@@ -2107,7 +2134,9 @@ function LedgerPage({
     setSubcategoriesPopupOpen(false);
   };
 
-  const filtered = rows.filter((row) => {
+  const displayRows = isDeletedView ? variantStash : rows;
+
+  const filtered = displayRows.filter((row) => {
     const decoded = decodeCategory(row.category);
     const haystack = [
       row.date,
@@ -2290,8 +2319,10 @@ function LedgerPage({
 
   const handleDeleteRow = async (id: string) => {
     if (!window.confirm("Delete this entry?")) return;
+    const row = rows.find((r) => r._id === id);
     try {
       await apiJson<any>(`${listPath}/${id}`, { method: "DELETE" });
+      if (row) stashDeleted(row);
       adminNotify.success("Entry deleted.");
       setSelected((prev) => {
         const next = new Set(prev);
@@ -2307,8 +2338,10 @@ function LedgerPage({
   const handleBulkDelete = async () => {
     if (selected.size === 0) return;
     if (!window.confirm(`Delete ${selected.size} selected entr${selected.size === 1 ? "y" : "ies"}?`)) return;
+    const toStash = rows.filter((r) => selected.has(r._id));
     try {
       await Promise.all([...selected].map((id) => apiJson<any>(`${listPath}/${id}`, { method: "DELETE" })));
+      if (toStash.length > 0) stashDeleted(toStash);
       adminNotify.success("Selected entries deleted.");
       setSelected(new Set());
       await loadRows();
@@ -2317,12 +2350,51 @@ function LedgerPage({
     }
   };
 
+  const handleRestore = async (ids?: string[]) => {
+    const selectedIds = ids ?? [...selected];
+    if (selectedIds.length === 0) return;
+    const toRestore = variantStash.filter((r) => selectedIds.includes(r._id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} entr${toRestore.length === 1 ? "y" : "ies"}?`)) return;
+    let allSucceeded = true;
+    for (const row of toRestore) {
+      try {
+        const formData = new FormData();
+        formData.set("date", row.date);
+        formData.set("vendor", row.vendor);
+        formData.set("amount", String(row.amount));
+        formData.set("category", row.category);
+        formData.set("notes", row.notes ?? "");
+        if (isExpense) {
+          const exp = row as ExpenseRow;
+          formData.set("gst", String(exp.gst ?? 0));
+          if (exp.billNumber) formData.set("billNumber", exp.billNumber);
+          formData.set("byCheque", String(Boolean(exp.byCheque)));
+          if (exp.byCheque && exp.account) formData.set("account", exp.account);
+        } else {
+          const inc = row as IncomeRow;
+          formData.set("paymentMode", inc.paymentMode ?? "");
+          if (inc.bank) formData.set("bank", inc.bank);
+        }
+        await apiForm<any>(listPath, "POST", formData);
+        restoreStashed((item) => item._id === row._id);
+      } catch {
+        allSucceeded = false;
+      }
+    }
+    setSelected(new Set());
+    adminNotify[allSucceeded ? "success" : "error"](
+      allSucceeded ? "Restored successfully." : "Some entries failed to restore."
+    );
+    await loadRows();
+  };
+
   return (
     <AdminPage
-      title={title}
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? `Deleted ${title}` : title}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
-        showForm ? (
+        showForm && !isDeletedView ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -2570,6 +2642,9 @@ function LedgerPage({
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={variantStash.length} entityLabel="entries" />
+      )}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
           <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
@@ -2578,14 +2653,25 @@ function LedgerPage({
           <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
             Archive
           </button>
-          <button
-            type="button"
-            disabled={selected.size === 0}
-            onClick={handleBulkDelete}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={handleBulkDelete}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={handleRestore}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
             Copy
           </button>
@@ -2657,11 +2743,13 @@ function LedgerPage({
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
                 {isIncome ? "Attachment" : "Clip"}
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Delete</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+                {isDeletedView ? "Restore" : "Delete"}
+              </th>
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {loading && !isDeletedView ? (
               <tr>
                 <td colSpan={12} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading…
@@ -2670,7 +2758,7 @@ function LedgerPage({
             ) : paged.length === 0 ? (
               <tr>
                 <td colSpan={12} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                  No entries found.
+                  {isDeletedView ? "No deleted entries found." : "No entries found."}
                 </td>
               </tr>
             ) : (
@@ -2693,7 +2781,8 @@ function LedgerPage({
                       <button
                         type="button"
                         onClick={() => openEdit(row)}
-                        className="text-blue-700 hover:underline"
+                        disabled={isDeletedView}
+                        className="text-blue-700 hover:underline disabled:cursor-default disabled:no-underline"
                       >
                         {formatDisplayDate(row.date)}
                       </button>
@@ -2746,13 +2835,23 @@ function LedgerPage({
                       )}
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteRow(row._id)}
-                        className="text-red-600 hover:underline"
-                      >
-                        Delete
-                      </button>
+                      {isDeletedView ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRestore([row._id])}
+                          className="text-ad-green hover:underline"
+                        >
+                          Restore
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRow(row._id)}
+                          className="text-red-600 hover:underline"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -2778,6 +2877,11 @@ function LedgerPage({
             </button>
           ))}
         </div>
+        <AdminDeletedToggle
+          viewMode={viewMode}
+          onToggle={toggleViewMode}
+          activeLabel="Active Entries"
+        />
       </div>
     </AdminPage>
   );

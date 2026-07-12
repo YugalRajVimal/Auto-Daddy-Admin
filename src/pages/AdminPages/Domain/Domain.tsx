@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import axios from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactAutoGrowTextarea,
   CompactField,
@@ -12,6 +13,7 @@ import {
   compactInputClass,
   compactReadOnlyValueClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
@@ -285,6 +287,18 @@ export default function Domain() {
   const [websiteTemplateOpen, setWebsiteTemplateOpen] = useState(false);
   const [activeWebsiteTemplateId, setActiveWebsiteTemplateId] = useState<string>("");
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
+    useAdminDeletedView<DomainRow>({
+      onToggle: resetTableControls,
+      storageKey: "admin_deleted_view:domain",
+    });
+
   useEffect(() => {
     fetchOwners();
     fetchCarOwners();
@@ -451,6 +465,7 @@ export default function Domain() {
     setDomainsError(null);
     try {
       await axios.delete(`${API_URL}/api/admin/domains/${row.id}`);
+      stashDeleted(row);
       adminNotify.success("Domain entry deleted.");
       await refreshDomains();
       // If viewing owner, try to keep pane open
@@ -465,6 +480,74 @@ export default function Domain() {
           : undefined;
       setDomainsError(msg || "Failed to delete domain entry");
       adminNotify.error(msg || "Failed to delete domain entry");
+    } finally {
+      setDomainsLoading(false);
+    }
+  };
+
+  const handleToolbarDelete = async () => {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Delete ${selected.size} selected domain(s)?`)) return;
+    const toDelete = domains.filter((row) => selected.has(row.id));
+    setDomainsLoading(true);
+    setDomainsError(null);
+    try {
+      await Promise.all(
+        toDelete.map((row) => axios.delete(`${API_URL}/api/admin/domains/${row.id}`))
+      );
+      stashDeleted(toDelete);
+      adminNotify.success("Selected domain(s) deleted.");
+      setSelected(new Set());
+      await refreshDomains();
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "response" in err
+          ? (err as any).response?.data?.message
+          : undefined;
+      setDomainsError(msg || "Failed to delete domain entry");
+      adminNotify.error(msg || "Failed to delete domain entry");
+    } finally {
+      setDomainsLoading(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (selected.size === 0) return;
+    const toRestore = deletedStash.filter((row) => selected.has(row.id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} domain(s)?`)) return;
+    setDomainsLoading(true);
+    setDomainsError(null);
+    try {
+      for (const row of toRestore) {
+        const userTypeApi = mapLocalUserTypeToApi(mapApiUserTypeToLocal(row.userType));
+        const userId = row.userId;
+        if (!userId || row.domain === "—") continue;
+        await axios.post(
+          `${API_URL}/api/admin/domains`,
+          {
+            userType: userTypeApi,
+            userId,
+            domain: row.domain,
+            domainType: row.domainType,
+            expiry: row.expiryRaw || row.expiry,
+            provider: row.providerLabel !== "—" ? row.providerLabel : row.provider,
+            dns: row.dns === "—" ? "" : row.dns,
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+      }
+      restoreStashed((item) => selected.has(item.id));
+      setSelected(new Set());
+      adminNotify.success("Domain(s) restored.");
+      await refreshDomains();
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "response" in err
+          ? (err as any).response?.data?.message
+          : undefined;
+      setDomainsError(msg || "Failed to restore domain entry");
+      adminNotify.error(msg || "Failed to restore domain entry");
     } finally {
       setDomainsLoading(false);
     }
@@ -568,13 +651,15 @@ export default function Domain() {
   };
 
   // --- 10. Table display logic ---
+  const sourceDomains = isDeletedView ? deletedStash : domains;
+
   const visibleDomains = viewingOwner
-    ? domains.filter(
+    ? sourceDomains.filter(
         (row) =>
           row.userId === viewingOwner.businessProfile?._id ||
           row.userId === viewingOwner._id
       )
-    : domains;
+    : sourceDomains;
 
   const filteredDomainRows = visibleDomains.filter((row) => {
     const q = search.toLowerCase();
@@ -616,7 +701,7 @@ export default function Domain() {
 
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Domain",
+      title: isDeletedView ? "Deleted Domain" : "Domain",
       headers: [
         "User Type",
         "User Name",
@@ -639,8 +724,8 @@ export default function Domain() {
   };
 
   const selectedRows = useMemo(
-    () => domains.filter((row) => selected.has(row.id)),
-    [domains, selected]
+    () => sourceDomains.filter((row) => selected.has(row.id)),
+    [sourceDomains, selected]
   );
 
   const openWebsiteTemplates = () => {
@@ -753,20 +838,26 @@ export default function Domain() {
           {row.dns}
         </td>
         <td className="border border-gray-300 px-3 py-2 text-center">
-          <button
-            type="button"
-            onClick={() => openEditForm(row)}
-            className="mr-2 text-blue-700 hover:underline"
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => handleDelete(row)}
-            className="text-red-700 hover:underline"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <>
+              <button
+                type="button"
+                onClick={() => openEditForm(row)}
+                className="mr-2 text-blue-700 hover:underline"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(row)}
+                className="text-red-700 hover:underline"
+              >
+                Delete
+              </button>
+            </>
+          ) : (
+            "—"
+          )}
         </td>
       </tr>
     ));
@@ -1063,35 +1154,49 @@ export default function Domain() {
   const toolbar = (
     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
       <div className="flex flex-wrap gap-1">
-        <button
-          type="button"
-          disabled={selected.size === 0}
-          className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Send Notification
-        </button>
-        <button
-          type="button"
-          disabled={selected.size === 0}
-          className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Whatsapp
-        </button>
-        <button
-          type="button"
-          onClick={openWebsiteTemplates}
-          disabled={selected.size === 0}
-          className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Website
-        </button>
-        <button
-          type="button"
-          disabled={selected.size === 0}
-          className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Delete
-        </button>
+        {!isDeletedView ? (
+          <>
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Send Notification
+            </button>
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Whatsapp
+            </button>
+            <button
+              type="button"
+              onClick={openWebsiteTemplates}
+              disabled={selected.size === 0}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Website
+            </button>
+            <button
+              type="button"
+              onClick={handleToolbarDelete}
+              disabled={selected.size === 0}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={handleRestore}
+            disabled={selected.size === 0}
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Restore
+          </button>
+        )}
         <button
           type="button"
           onClick={handleToolbarPrint}
@@ -1239,11 +1344,19 @@ export default function Domain() {
           </button>
         ))}
       </div>
+      <AdminDeletedToggle
+        viewMode={viewMode}
+        onToggle={toggleViewMode}
+        activeLabel="Active Domains"
+      />
     </div>
   );
 
   const renderDomainTable = () => (
     <>
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="domains" />
+      )}
       {domainsError && !showForm && (
         <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">
           {domainsError}
@@ -1255,7 +1368,10 @@ export default function Domain() {
         <table className="w-full border-collapse text-sm">
           {domainTableHead}
           <tbody>
-            {renderDomainTableBody(pagedDomainRows, "No records found.")}
+            {renderDomainTableBody(
+              pagedDomainRows,
+              isDeletedView ? "No deleted domains found." : "No records found."
+            )}
           </tbody>
         </table>
       </div>
@@ -1265,11 +1381,11 @@ export default function Domain() {
 
   return (
     <AdminPage
-      title={PAGE_TITLE}
+      title={isDeletedView ? `Deleted ${PAGE_TITLE}` : PAGE_TITLE}
       noPanel
       onTitleClick={viewingOwner ? closeOwnerView : undefined}
       headerAction={
-        !showForm && !viewingOwner ? <AddNewButton onClick={handleAddNew} /> : undefined
+        !showForm && !viewingOwner && !isDeletedView ? <AddNewButton onClick={handleAddNew} /> : undefined
       }
       between={betweenPanel}
     >

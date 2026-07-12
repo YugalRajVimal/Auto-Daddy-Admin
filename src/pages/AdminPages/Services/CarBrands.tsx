@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import axios, { AxiosError } from "axios";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
   CompactField,
@@ -9,6 +10,7 @@ import {
   CompactFormPanel,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
@@ -335,6 +337,24 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   const modelsSnapshotRef = useRef<ModelFormRow[]>([]);
   const makesSnapshotRef = useRef<string[]>([]);
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<CarCompany>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:car-brands",
+  });
+
   const fetchCompanies = async (q = "") => {
     setLoading(true);
     setError("");
@@ -368,7 +388,10 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     fetchCompanies();
   }, []);
 
-  const tableRows = useMemo(() => flattenCompanies(companies), [companies]);
+  const tableRows = useMemo(
+    () => flattenCompanies(isDeletedView ? deletedStash : companies),
+    [companies, deletedStash, isDeletedView]
+  );
 
   const filtered = tableRows.filter(
     (r) =>
@@ -454,7 +477,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   };
 
   const openEditByRow = (row: TableRow) => {
-    const company = companies.find((c) => c._id === row.companyId);
+    const company = (isDeletedView ? deletedStash : companies).find((c) => c._id === row.companyId);
     if (company) openEditCompany(company);
   };
 
@@ -665,7 +688,9 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     setError("");
     setSuccessMsg("");
     try {
+      const company = companies.find((c) => c._id === companyId);
       await axios.delete(`${API_BASE}/admin/car-company/${companyId}`);
+      if (company) stashDeleted(company);
       adminNotify.success("Car brand deleted.");
       setSuccessMsg("Car brand deleted.");
       setSelected((prev) => {
@@ -694,9 +719,49 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     if (row) handleDeleteCompany(row.companyId, row.make);
   };
 
+  const handleRestore = async () => {
+    if (selected.size !== 1) return;
+    const row = findRowById([...selected][0]);
+    if (!row) return;
+    const company = deletedStash.find((c) => c._id === row.companyId);
+    if (!company) return;
+    if (!window.confirm(`Restore car brand "${company.companyName}"?`)) return;
+    setActionLoading(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      const formData = new FormData();
+      formData.append("companyName", company.companyName);
+      formData.append(
+        "models",
+        JSON.stringify(
+          (company.models || [])
+            .map((m) => ({ modelName: m.modelName.trim() }))
+            .filter((m) => m.modelName)
+        )
+      );
+      formData.append("country", company.country || "Canada");
+      await axios.post(`${API_BASE}/admin/car-company`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      restoreStashed((item) => item._id === company._id);
+      adminNotify.success("Car brand restored.");
+      setSuccessMsg("Car brand restored.");
+      setSelected(new Set());
+      fetchCompanies(search);
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to restore car brand";
+      setError(msg);
+      adminNotify.error(msg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Car Brands",
+      title: isDeletedView ? "Deleted Car Brands" : "Car Brands",
       headers: ["Make", "Model", "Country", "Logo"],
       rows: filtered.map((row) => [row.make, row.model, row.country, row.brandLogo ? "Yes" : "—"]),
     });
@@ -708,8 +773,8 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
 
   return (
     <AdminPage
-      title="Car Brands"
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? "Deleted Car Brands" : "Car Brands"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -816,6 +881,9 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="car brands" />
+      )}
       {successMsg && !showForm && (
         <div className="mb-2 rounded border border-green-200 bg-green-100 px-3 py-2 text-xs text-green-800">
           {successMsg}
@@ -829,14 +897,25 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={handleToolbarDelete}
-            disabled={selected.size === 0 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              onClick={handleToolbarDelete}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -913,7 +992,11 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
             {paged.length === 0 ? (
               <tr>
                 <td colSpan={5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
-                  {loading ? "Loading car brands…" : "No car brands found."}
+                  {loading
+                    ? "Loading car brands…"
+                    : isDeletedView
+                      ? "No deleted car brands found."
+                      : "No car brands found."}
                 </td>
               </tr>
             ) : (
@@ -973,6 +1056,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
             </button>
           ))}
         </div>
+        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active Car Brands" />
       </div>
     </AdminPage>
   );

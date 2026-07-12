@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
   CompactAutoGrowTextarea,
@@ -11,6 +12,7 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
@@ -72,6 +74,24 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<FeatureRow>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:features",
+  });
+
   // ------ Fetch features from API ------
   useEffect(() => {
     const fetchFeatures = async () => {
@@ -113,7 +133,9 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [country]);
 
-  const filtered = features.filter(
+  const displayFeatures = isDeletedView ? deletedStash : features;
+
+  const filtered = displayFeatures.filter(
     (f) =>
       f.date?.toString().includes(search) ||
       f.user?.toLowerCase().includes(search.toLowerCase()) ||
@@ -222,6 +244,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   // Handle multi-delete
   const handleDelete = async () => {
     if (selected.size === 0) return;
+    const toStash = features.filter((f) => selected.has(f.id));
     setLoading(true);
     try {
       await Promise.all(
@@ -231,6 +254,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
           if (!res.ok) throw new Error("Delete failed");
         })
       );
+      if (toStash.length > 0) stashDeleted(toStash);
       adminNotify.success("Deleted successfully.");
       setSelected(new Set());
       // Refetch
@@ -242,9 +266,39 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
     }
   };
 
+  const handleRestore = async () => {
+    if (selected.size === 0) return;
+    const toRestore = deletedStash.filter((f) => selected.has(f.id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} feature(s)?`)) return;
+    setLoading(true);
+    try {
+      for (const row of toRestore) {
+        const formData = new FormData();
+        formData.append("date", row.date);
+        formData.append("country", row.country);
+        formData.append("role", row.user);
+        formData.append("feature", row.feature);
+        const res = await fetch(`${BASE}/product-features`, {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) throw new Error("Restore failed");
+        restoreStashed((item) => item.id === row.id);
+      }
+      adminNotify.success("Restored successfully.");
+      setSelected(new Set());
+      setCountry((prev) => prev);
+    } catch (err: any) {
+      adminNotify.error(err?.message || "Failed to restore.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Product Features",
+      title: isDeletedView ? "Deleted Product Features" : "Product Features",
       headers: ["Date", "Country", "User", "Feature", "Clip"],
       rows: filtered.map((featureRow) => [
         featureRow.date,
@@ -258,8 +312,8 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
 
   return (
     <AdminPage
-      title="Product Features"
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? "Deleted Product Features" : "Product Features"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -334,16 +388,30 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="features" />
+      )}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            disabled={selected.size === 0 || loading}
-            onClick={handleDelete}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              disabled={selected.size === 0 || loading}
+              onClick={handleDelete}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={selected.size === 0 || loading}
+              onClick={handleRestore}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -409,42 +477,50 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
               </tr>
             </thead>
             <tbody>
-              {paged.map((row, idx) => (
-                <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(row.id)}
-                      onChange={() => toggleSelect(row.id)}
-                      className="accent-ad-purple"
-                    />
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(row)}
-                      className="text-blue-700 hover:underline"
-                    >
-                      {row.date?.slice(0, 10)}
-                    </button>
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
-                    {USER_OPTIONS.find((o) => o.value === row.user)?.label ?? row.user}
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.feature}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
-                    {row.imageUrl ? (
-                      <ClipImageHover
-                        imageUrl={row.imageUrl}
-                        alt={`Attachment for ${row.feature}`}
-                      />
-                    ) : (
-                      <span className="text-gray-500">--</span>
-                    )}
+              {paged.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                    {isDeletedView ? "No deleted features found." : "No features found."}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                paged.map((row, idx) => (
+                  <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                    <td className="border border-gray-300 px-2 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleSelect(row.id)}
+                        className="accent-ad-purple"
+                      />
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => !isDeletedView && openEdit(row)}
+                        className="text-blue-700 hover:underline"
+                      >
+                        {row.date?.slice(0, 10)}
+                      </button>
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">
+                      {USER_OPTIONS.find((o) => o.value === row.user)?.label ?? row.user}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">{row.feature}</td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">
+                      {row.imageUrl ? (
+                        <ClipImageHover
+                          imageUrl={row.imageUrl}
+                          alt={`Attachment for ${row.feature}`}
+                        />
+                      ) : (
+                        <span className="text-gray-500">--</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         )}
@@ -467,6 +543,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
             </button>
           ))}
         </div>
+        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active Features" />
       </div>
     </AdminPage>
   );

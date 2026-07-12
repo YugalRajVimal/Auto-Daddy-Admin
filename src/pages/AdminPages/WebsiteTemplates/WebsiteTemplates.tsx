@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
   CompactField,
@@ -10,6 +11,7 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
@@ -28,6 +30,7 @@ type TemplateRow = {
   date: string;
   country: string;
   shopType: string;
+  usedBy: number;
   imageUrl?: string | null;
 };
 
@@ -47,6 +50,7 @@ function mapApiTemplate(t: any): TemplateRow {
     date: t.date ? t.date.slice(0, 10) : "",
     country: t.country,
     shopType: t.shopType,
+    usedBy: Number(t.usedBy ?? t.usedCount ?? t.usageCount ?? 0) || 0,
     imageUrl: t.imageUrl,
   };
 }
@@ -115,6 +119,18 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
+    useAdminDeletedView<TemplateRow>({
+      onToggle: resetTableControls,
+      storageKey: "admin_deleted_view:website-templates",
+    });
+
   // Helper: Convert checked filters to API shopType params
   const getActiveShopTypeFilter = () => {
     return Object.entries(userTypeFilters).find(([_, val]) => val)?.[0];
@@ -138,7 +154,9 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   }, [fetchAndSetTemplates, search, entriesPerPage, page]);
 
   // Filtering and pagination (client-side, for live search)
-  const filtered = sites.filter(
+  const displaySites = isDeletedView ? deletedStash : sites;
+
+  const filtered = displaySites.filter(
     (s) =>
       (!search ||
         s.date.includes(search) ||
@@ -210,10 +228,12 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const handleDelete = async () => {
     if (selected.size === 0) return;
     if (!window.confirm("Are you sure you want to delete selected template(s)?")) return;
+    const toDelete = sites.filter((s) => selected.has(s.id));
     try {
       for (const id of selected) {
         await deleteTemplate(id);
       }
+      stashDeleted(toDelete);
       adminNotify.success("Deleted selected template(s).");
       setSelected(new Set());
       fetchAndSetTemplates();
@@ -222,10 +242,34 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     }
   };
 
+  const handleRestore = async () => {
+    if (selected.size === 0) return;
+    const toRestore = deletedStash.filter((s) => selected.has(s.id));
+    if (toRestore.length === 0) return;
+    if (!window.confirm(`Restore ${toRestore.length} template(s)?`)) return;
+    try {
+      for (const row of toRestore) {
+        await createTemplate({
+          templateName: row.templateName,
+          url: row.url,
+          date: row.date,
+          country: row.country,
+          shopType: row.shopType,
+        });
+      }
+      restoreStashed((item) => selected.has(item.id));
+      setSelected(new Set());
+      adminNotify.success("Template(s) restored.");
+      fetchAndSetTemplates();
+    } catch (e) {
+      adminNotify.error("Failed to restore template(s).");
+    }
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Website Templates",
-      headers: ["Template Name", "URL", "Date", "Country", "User Type", "Clip"],
+      title: isDeletedView ? "Deleted Website Templates" : "Website Templates",
+      headers: ["Template Name", "URL", "Date", "Country", "User Type", "Used by", "Clip"],
       rows: filtered.map((template, idx) => {
         const templateName = template.templateName || `Template ${idx + 1}`;
         return [
@@ -235,6 +279,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
           template.country,
           USER_TYPE_OPTIONS.find((option) => option.value === template.shopType)?.label ??
             template.shopType,
+          String(template.usedBy),
           template.imageUrl ? "Yes" : "—",
         ];
       }),
@@ -243,8 +288,8 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
 
   return (
     <AdminPage
-      title="Web - Temp"
-      headerAction={!showForm ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
+      title={isDeletedView ? "Deleted Web - Temp" : "Web - Temp"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={() => setShowForm(true)} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -321,6 +366,9 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="website templates" />
+      )}
       <div className="mb-2 flex flex-wrap items-center gap-4 border-b border-gray-300 bg-gray-100 px-3 py-2">
         {USER_TYPE_OPTIONS.map((option) => (
           <label key={option.value} className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
@@ -337,14 +385,25 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={selected.size === 0}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={selected.size === 0}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={selected.size === 0}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -406,20 +465,21 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User Type</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Used by</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Clip</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-gray-500">
+                <td colSpan={8} className="py-6 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-gray-500">
-                  No templates found.
+                <td colSpan={8} className="py-6 text-center text-gray-500">
+                  {isDeletedView ? "No deleted templates found." : "No templates found."}
                 </td>
               </tr>
             ) : (
@@ -451,6 +511,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   <td className="border border-gray-300 px-3 py-2 text-center">
                     {USER_TYPE_OPTIONS.find((o) => o.value === row.shopType)?.label ?? row.shopType}
                   </td>
+                  <td className="border border-gray-300 px-3 py-2 text-center">{row.usedBy}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">
                     {row.imageUrl ? (
                       <ClipImageHover
@@ -484,6 +545,11 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
             </button>
           ))}
         </div>
+        <AdminDeletedToggle
+          viewMode={viewMode}
+          onToggle={toggleViewMode}
+          activeLabel="Active Templates"
+        />
       </div>
     </AdminPage>
   );

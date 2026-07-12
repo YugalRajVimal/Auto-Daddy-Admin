@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
-import ClipImageHover from "../../../components/admin/ClipImageHover";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactAutoGrowTextarea,
   CompactField,
@@ -11,6 +10,7 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
@@ -72,7 +72,6 @@ type PrivacyApiRow = {
   country: string;
   type: string;
   description: string;
-  fileUrl?: string | null;
 };
 
 type PrivacyRow = {
@@ -81,7 +80,6 @@ type PrivacyRow = {
   country: string;
   type: string;
   description: string;
-  fileUrl?: string | null;
 };
 
 type PrivacyPageProps = {
@@ -95,7 +93,6 @@ function mapApiRowToRow(apiRow: PrivacyApiRow): PrivacyRow {
     country: apiRow.country || "",
     type: (apiRow.type || "").charAt(0).toUpperCase() + (apiRow.type || "").slice(1) + (apiRow.type?.includes("Web") || apiRow.type?.includes("App") ? "" : ""), // fallback string.
     description: apiRow.description,
-    fileUrl: apiRow.fileUrl,
   };
 }
 
@@ -112,9 +109,19 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   const [country, setCountry] = useState("Canada");
   const [type, setType] = useState(TYPE_OPTIONS[0]);
   const [description, setDescription] = useState("");
-  const [attachFile, setAttachFile] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [refresh, setRefresh] = useState(0);
+
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
+    useAdminDeletedView<PrivacyRow>({
+      onToggle: resetTableControls,
+      storageKey: "admin_deleted_view:privacy",
+    });
 
   useEffect(() => {
     setLoading(true);
@@ -128,7 +135,9 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
     });
   }, [refresh]);
 
-  const filtered = entries.filter(
+  const displayEntries = isDeletedView ? deletedStash : entries;
+
+  const filtered = displayEntries.filter(
     (e) =>
       e.date.includes(search) ||
       (e.type ?? "").toLowerCase().includes(search.toLowerCase()) ||
@@ -158,8 +167,6 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
     setCountry("Canada");
     setType(TYPE_OPTIONS[0]);
     setDescription("");
-    setAttachFile(false);
-    setImageFile(null);
     setEditingId(null);
   };
 
@@ -173,8 +180,6 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
     setCountry(row.country);
     setType(row.type);
     setDescription(row.description);
-    setAttachFile(!!row.fileUrl);
-    setImageFile(null);
     setEditingId(row.id);
     setShowForm(true);
   };
@@ -212,8 +217,10 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   const handleDelete = async () => {
     // multi-delete supported by UI
     try {
-      for (const id of selected) {
-        await deleteEntry(id);
+      const toDelete = entries.filter((e) => selected.has(e.id));
+      for (const row of toDelete) {
+        await deleteEntry(row.id);
+        stashDeleted(row);
       }
       adminNotify.success("Deleted successfully.");
       setSelected(new Set());
@@ -223,24 +230,46 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
     }
   };
 
+  const handleRestore = async () => {
+    if (selected.size !== 1) return;
+    const id = [...selected][0];
+    const row = deletedStash.find((e) => e.id === id);
+    if (!row) return;
+    if (!window.confirm(`Restore "${row.type}" entry for ${row.date}?`)) return;
+    try {
+      const backendType = row.type.split(" - ")[0].toLowerCase();
+      await createEntry({
+        date: row.date || new Date().toISOString().slice(0, 10),
+        country: row.country,
+        type: backendType,
+        description: row.description,
+      });
+      restoreStashed((item) => item.id === id);
+      setSelected(new Set());
+      setRefresh((c) => c + 1);
+      adminNotify.success("Entry restored successfully.");
+    } catch (e: any) {
+      adminNotify.error(e.message || "Restore failed");
+    }
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Privacy",
-      headers: ["Date", "Country", "Type", "Description", "Clip"],
+      title: isDeletedView ? "Deleted Privacy" : "Privacy",
+      headers: ["Date", "Country", "Type", "Description"],
       rows: filtered.map((entry) => [
         entry.date,
         entry.country,
         entry.type,
         entry.description,
-        entry.fileUrl ? "Yes" : "—",
       ]),
     });
   };
 
   return (
     <AdminPage
-      title="Privacy and Disclaimer"
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? "Deleted Privacy and Disclaimer" : "Privacy and Disclaimer"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -299,32 +328,34 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                 />
               </CompactField>
             </CompactFormRow>
-            <CompactFormRow className="items-start justify-start">
-              <AttachImageCheckbox
-                label="Attach File"
-                checked={attachFile}
-                onCheckedChange={setAttachFile}
-                file={imageFile}
-                onFileChange={setImageFile}
-                accept="*/*"
-                // API doesn't support file upload in provided curl
-              />
-     
-            </CompactFormRow>
           </CompactFormPanel>
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="entries" />
+      )}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={selected.size === 0}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={selected.size === 0}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={selected.size === 0}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -383,20 +414,19 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Type</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Description</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Clip</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="text-center py-6">
+                <td colSpan={5} className="text-center py-6">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-6">
-                  No entries found.
+                <td colSpan={5} className="text-center py-6">
+                  {isDeletedView ? "No deleted entries found." : "No entries found."}
                 </td>
               </tr>
             ) : (
@@ -423,16 +453,6 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.type}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.description}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
-                    {row.fileUrl ? (
-                      <ClipImageHover
-                        imageUrl={row.fileUrl}
-                        alt={`Attachment for ${row.type}`}
-                      />
-                    ) : (
-                      <span className="text-gray-500">--</span>
-                    )}
-                  </td>
                 </tr>
               ))
             )}
@@ -456,6 +476,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
             </button>
           ))}
         </div>
+        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active Privacy" />
       </div>
     </AdminPage>
   );

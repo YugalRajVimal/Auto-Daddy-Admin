@@ -69,10 +69,11 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     setSearch("");
   };
 
-  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted } = useAdminDeletedView<CityRow>({
-    onToggle: resetTableControls,
-    storageKey: "admin_deleted_view:cities",
-  });
+  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
+    useAdminDeletedView<CityRow>({
+      onToggle: resetTableControls,
+      storageKey: "admin_deleted_view:cities",
+    });
 
   useEffect(() => {
     fetchProvinces();
@@ -261,9 +262,38 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     if (city) handleDelete(city);
   };
 
+  const handleRestore = async () => {
+    if (selected.size !== 1) return;
+    const id = [...selected][0];
+    const city = deletedStash.find((c) => getCityRowId(c) === id);
+    if (!city) return;
+    if (!window.confirm(`Restore city "${city.name}"?`)) return;
+    setActionLoading(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      await axios.post(`${API_BASE}/admin/provinces/${city.provinceId}/cities`, {
+        name: city.name,
+        status: city.status || "Active",
+      });
+      restoreStashed((item) => getCityRowId(item) === id);
+      adminNotify.success("City restored.");
+      setSuccessMsg("City restored.");
+      setSelected(new Set());
+      fetchProvinces();
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to restore city";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Cities",
+      title: isDeletedView ? "Deleted Cities" : "Cities",
       headers: ["City", "Province", "Country", "Status"],
       rows: filtered.map((city) => [city.name, city.provinceName, city.country, city.status || "Active"]),
     });
@@ -274,7 +304,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Cities" : "Cities"}
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -361,14 +391,25 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
       {/* Toolbar */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={handleToolbarDelete}
-            disabled={selected.size === 0 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              onClick={handleToolbarDelete}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}

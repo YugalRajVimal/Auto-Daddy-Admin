@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios, { AxiosError } from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactField,
   CompactFormFooter,
@@ -8,6 +9,7 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import type { ShopType, Service } from "./Services";
@@ -15,10 +17,14 @@ import type { ShopType, Service } from "./Services";
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 type SubServiceStatus = "active" | "inactive";
+type CreatedBy = "admin" | "shop";
 
 interface SubService {
   name: string;
   status: SubServiceStatus;
+  createdBy?: CreatedBy;
+  shopkeeperName?: string;
+  phone?: string;
 }
 
 type SubServiceRow = SubService & {
@@ -26,6 +32,72 @@ type SubServiceRow = SubService & {
   categoryId: string;
   shopType?: ShopType;
 };
+
+const normalizeCreatedBy = (value: unknown): CreatedBy => {
+  const raw =
+    typeof value === "string"
+      ? value
+      : value && typeof value === "object"
+        ? String(
+            (value as { type?: unknown; role?: unknown; createdBy?: unknown }).type ??
+              (value as { role?: unknown }).role ??
+              (value as { createdBy?: unknown }).createdBy ??
+              ""
+          )
+        : "";
+  const v = raw.trim().toLowerCase();
+  if (v === "shop" || v === "shopkeeper" || v === "owner" || v === "business") return "shop";
+  return "admin";
+};
+
+const pickShopkeeperName = (sub: Record<string, unknown>): string => {
+  const nested =
+    sub.shopkeeper && typeof sub.shopkeeper === "object"
+      ? (sub.shopkeeper as Record<string, unknown>)
+      : sub.createdBy && typeof sub.createdBy === "object"
+        ? (sub.createdBy as Record<string, unknown>)
+        : null;
+  const value =
+    sub.shopkeeperName ??
+    sub.shopKeeperName ??
+    sub.shopOwnerName ??
+    sub.ownerName ??
+    sub.businessName ??
+    nested?.name ??
+    nested?.businessName ??
+    nested?.shopkeeperName ??
+    "";
+  return typeof value === "string" ? value.trim() : "";
+};
+
+const pickPhone = (sub: Record<string, unknown>): string => {
+  const nested =
+    sub.shopkeeper && typeof sub.shopkeeper === "object"
+      ? (sub.shopkeeper as Record<string, unknown>)
+      : sub.createdBy && typeof sub.createdBy === "object"
+        ? (sub.createdBy as Record<string, unknown>)
+        : null;
+  const value =
+    sub.phone ??
+    sub.shopkeeperPhone ??
+    sub.shopKeeperPhone ??
+    sub.ownerPhone ??
+    sub.businessPhone ??
+    nested?.phone ??
+    nested?.businessPhone ??
+    "";
+  return typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
+};
+
+const mapApiSubService = (sub: Record<string, unknown> | SubService): SubService => ({
+  name: String(sub.name ?? "").trim(),
+  status: ((sub.status as SubServiceStatus) || "active"),
+  createdBy: normalizeCreatedBy((sub as Record<string, unknown>).createdBy ?? (sub as Record<string, unknown>).created_by),
+  shopkeeperName: pickShopkeeperName(sub as Record<string, unknown>) || undefined,
+  phone: pickPhone(sub as Record<string, unknown>) || undefined,
+});
+
+const createdByLabel = (value?: CreatedBy) => (value === "shop" ? "Shop" : "Admin");
 
 const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
   { value: "autoShop", label: "Auto Shop" },
@@ -59,6 +131,24 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   const [formStatus, setFormStatus] = useState<SubServiceStatus>("active");
   const [formServiceId, setFormServiceId] = useState("");
 
+  const resetTableControls = () => {
+    setPage(1);
+    setSelected(new Set());
+    setSearch("");
+  };
+
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<SubServiceRow>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:sub-services",
+  });
+
   useEffect(() => {
     fetchServices();
   }, [filterShopType]);
@@ -87,25 +177,34 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   };
 
   const allRows: SubServiceRow[] = services.flatMap((svc) =>
-    (svc.subServices || []).map((sub) => ({
-      name: sub.name,
-      status: (sub.status as SubServiceStatus) || "active",
-      categoryName: svc.name,
-      categoryId: svc._id,
-      shopType: svc.shopType,
-    }))
+    (svc.subServices || []).map((sub) => {
+      const mapped = mapApiSubService(sub as Record<string, unknown>);
+      return {
+        ...mapped,
+        categoryName: svc.name,
+        categoryId: svc._id,
+        shopType: svc.shopType,
+      };
+    })
   );
 
+  const displayRows = isDeletedView ? deletedStash : allRows;
+
   const tableRows = (filterServiceId
-    ? allRows.filter((r) => r.categoryId === filterServiceId)
-    : allRows
-  ).filter(
-    (r) =>
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.categoryName.toLowerCase().includes(search.toLowerCase()) ||
-      SHOP_TYPE_OPTIONS.find((o) => o.value === r.shopType)?.label.toLowerCase().includes(search.toLowerCase()) ||
-      r.status.toLowerCase().includes(search.toLowerCase())
-  );
+    ? displayRows.filter((r) => r.categoryId === filterServiceId)
+    : displayRows
+  ).filter((r) => {
+    const q = search.toLowerCase();
+    return (
+      r.name.toLowerCase().includes(q) ||
+      r.categoryName.toLowerCase().includes(q) ||
+      SHOP_TYPE_OPTIONS.find((o) => o.value === r.shopType)?.label.toLowerCase().includes(q) ||
+      r.status.toLowerCase().includes(q) ||
+      createdByLabel(r.createdBy).toLowerCase().includes(q) ||
+      (r.shopkeeperName || "").toLowerCase().includes(q) ||
+      (r.phone || "").toLowerCase().includes(q)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(tableRows.length / entriesPerPage));
   const paged = tableRows.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -175,19 +274,28 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       adminNotify.error(__adminMsg);
         return;
       }
-      const existing: SubService[] = (parent.subServices || []).map((s) => ({
-        name: s.name,
-        status: (s.status as SubServiceStatus) || "active",
-      }));
+      const existing: SubService[] = (parent.subServices || []).map((s) =>
+        mapApiSubService(s as Record<string, unknown>)
+      );
       let updated: SubService[];
       if (editingRow) {
         updated = existing.map((s) =>
           s.name === editingRow.name
-            ? { name: formName.trim(), status: formStatus }
+            ? {
+                ...s,
+                name: formName.trim(),
+                status: formStatus,
+                createdBy: editingRow.createdBy || s.createdBy || "admin",
+                shopkeeperName: editingRow.shopkeeperName || s.shopkeeperName,
+                phone: editingRow.phone || s.phone,
+              }
             : s
         );
       } else {
-        updated = [...existing, { name: formName.trim(), status: formStatus }];
+        updated = [
+          ...existing,
+          { name: formName.trim(), status: formStatus, createdBy: "admin" },
+        ];
       }
       await axios.put(`${API_BASE}/admin/services/${formServiceId}`, { subServices: updated });
       adminNotify.success(editingRow ? "Sub service updated." : "Sub service added.");
@@ -215,6 +323,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       if (!parent) return;
       const updated = (parent.subServices || []).filter((s) => s.name !== row.name);
       await axios.put(`${API_BASE}/admin/services/${row.categoryId}`, { subServices: updated });
+      stashDeleted(row);
       adminNotify.success("Sub service deleted successfully.");
       setSuccessMsg("Sub service deleted successfully.");
       setSelected((prev) => {
@@ -233,7 +342,8 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     }
   };
 
-  const findRowById = (id: string) => tableRows.find((r) => getRowId(r) === id);
+  const findRowById = (id: string) =>
+    (isDeletedView ? deletedStash : allRows).find((r) => getRowId(r) === id);
 
   const handleToolbarDelete = () => {
     if (selected.size !== 1) return;
@@ -241,15 +351,63 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     if (row) handleDelete(row);
   };
 
+  const handleRestore = async () => {
+    if (selected.size !== 1) return;
+    const row = deletedStash.find((r) => getRowId(r) === [...selected][0]);
+    if (!row) return;
+    if (!window.confirm(`Restore sub service "${row.name}"?`)) return;
+    setActionLoading(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      const parent = services.find((s) => s._id === row.categoryId);
+      if (!parent) {
+        const __adminMsg = "Parent service not found.";
+        setError(__adminMsg);
+        adminNotify.error(__adminMsg);
+        return;
+      }
+      const existing: SubService[] = (parent.subServices || []).map((s) =>
+        mapApiSubService(s as Record<string, unknown>)
+      );
+      const updated = [
+        ...existing,
+        {
+          name: row.name,
+          status: row.status || "active",
+          createdBy: row.createdBy || "admin",
+          shopkeeperName: row.shopkeeperName,
+          phone: row.phone,
+        },
+      ];
+      await axios.put(`${API_BASE}/admin/services/${row.categoryId}`, { subServices: updated });
+      restoreStashed((item) => getRowId(item) === getRowId(row));
+      adminNotify.success("Sub service restored.");
+      setSuccessMsg("Sub service restored.");
+      setSelected(new Set());
+      fetchServices();
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to restore sub service";
+      setError(__adminMsg);
+      adminNotify.error(__adminMsg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: "Sub Services",
-      headers: ["Name", "Service", "Shop Type", "Status"],
+      title: isDeletedView ? "Deleted Sub Services" : "Sub Services",
+      headers: ["Name", "Service", "Shop Type", "Status", "Created By", "Shopkeeper Name", "Phone"],
       rows: tableRows.map((row) => [
           row.name,
           row.categoryName,
           shopTypeLabel(row.shopType),
           row.status || "active",
+          createdByLabel(row.createdBy),
+          row.shopkeeperName || "—",
+          row.phone || "—",
         ]),
     });
   };
@@ -263,8 +421,8 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
   return (
     <AdminPage
-      title="Sub Services"
-      headerAction={!showForm ? <AddNewButton onClick={openAdd} /> : undefined}
+      title={isDeletedView ? "Deleted Sub Services" : "Sub Services"}
+      headerAction={!showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel
@@ -325,6 +483,9 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
         ) : undefined
       }
     >
+      {isDeletedView && (
+        <AdminDeletedBanner count={deletedStash.length} entityLabel="sub services" />
+      )}
       {successMsg && !showForm && (
         <div className="mb-2 rounded border border-green-200 bg-green-100 px-3 py-2 text-xs text-green-800">
           {successMsg}
@@ -338,14 +499,25 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={handleToolbarDelete}
-            disabled={selected.size === 0 || actionLoading}
-            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
+          {!isDeletedView ? (
+            <button
+              type="button"
+              onClick={handleToolbarDelete}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={selected.size === 0 || actionLoading}
+              className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToolbarPrint}
@@ -443,19 +615,22 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Service</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Shop Type</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Created By</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Shopkeeper Name</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Phone</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
-                  No sub services found.
+                <td colSpan={8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                  {isDeletedView ? "No deleted sub services found." : "No sub services found."}
                 </td>
               </tr>
             ) : (
@@ -483,6 +658,13 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{shopTypeLabel(row.shopType)}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center capitalize">{row.status || "active"}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-center capitalize">
+                    {createdByLabel(row.createdBy)}
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2 text-center">
+                    {row.shopkeeperName || "—"}
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2 text-center">{row.phone || "—"}</td>
                 </tr>
               ))
             )}
@@ -507,6 +689,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
             </button>
           ))}
         </div>
+        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active Sub Services" />
       </div>
     </AdminPage>
   );
