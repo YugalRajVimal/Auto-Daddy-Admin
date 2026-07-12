@@ -8,7 +8,7 @@ import { useCarOwnerDeals } from "../../hooks/useCarOwnerDeals";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import {
   EMPTY_DEAL_LIST_FILTERS,
-  matchesDealCategory,
+  dealsForCategory,
   matchesDealListFilters,
   type DealCategory,
   type DealListFilters,
@@ -48,13 +48,43 @@ function dealRowVehicleLabel(deal: CarOwnerDeal, index: number, vehicles: CarOwn
   return `Vehicle -${index + 1}`;
 }
 
+function DealSection({
+  title,
+  deals,
+  vehicles,
+  countryCode,
+  startIndex,
+}: {
+  title: string;
+  deals: CarOwnerDeal[];
+  vehicles: CarOwnerVehicle[];
+  countryCode?: string;
+  startIndex: number;
+}) {
+  if (deals.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="px-1 text-xs font-bold uppercase tracking-wide text-gray-500">{title}</h2>
+      {deals.map((deal, index) => (
+        <OwnerDealRow
+          key={deal._id}
+          deal={deal}
+          vehicleLabel={dealRowVehicleLabel(deal, startIndex + index, vehicles)}
+          countryCode={countryCode}
+        />
+      ))}
+    </section>
+  );
+}
+
 export default function OwnerDealsPage() {
   const { session } = useAuth();
   const countryCode = session?.meta?.countryCode;
   const [category, setCategory] = useState<DealCategory>(CATEGORIES[0].id);
   const [listFilters, setListFilters] = useState<DealListFilters>(EMPTY_DEAL_LIST_FILTERS);
 
-  const { deals, loading, error, refresh } = useCarOwnerDeals({
+  const { grouped, apiFilters, loading, error, refresh } = useCarOwnerDeals({
     make: listFilters.make,
     model: listFilters.model,
   });
@@ -67,15 +97,30 @@ export default function OwnerDealsPage() {
 
   useOwnerNavReset(resetSidebar);
 
+  const categoryBucket = useMemo(() => dealsForCategory(grouped, category), [grouped, category]);
+
   const categoryDeals = useMemo(
-    () => deals.filter((d) => matchesDealCategory(d, category)),
-    [deals, category],
+    () => [...categoryBucket.city, ...categoryBucket.others],
+    [categoryBucket]
   );
 
-  const filteredDeals = useMemo(
-    () => categoryDeals.filter((d) => matchesDealListFilters(d, listFilters)),
-    [categoryDeals, listFilters],
+  // make/model are applied via API query params; only city is filtered client-side
+  const cityOnlyFilters = useMemo(
+    () => ({ make: "", model: "", city: listFilters.city }),
+    [listFilters.city]
   );
+
+  const filteredCity = useMemo(
+    () => categoryBucket.city.filter((d) => matchesDealListFilters(d, cityOnlyFilters)),
+    [categoryBucket.city, cityOnlyFilters]
+  );
+
+  const filteredOthers = useMemo(
+    () => categoryBucket.others.filter((d) => matchesDealListFilters(d, cityOnlyFilters)),
+    [categoryBucket.others, cityOnlyFilters]
+  );
+
+  const filteredTotal = filteredCity.length + filteredOthers.length;
 
   return (
     <OwnerPageShell
@@ -95,9 +140,14 @@ export default function OwnerDealsPage() {
       heroCardFlush
       contentTopOffset
     >
-      <div className="flex flex-col gap-3 overflow-y-auto px-1 pb-2">
+      <div className="flex flex-col gap-4 overflow-y-auto px-1 pb-2">
         {!loading && !error ? (
-          <OwnerDealFilters deals={categoryDeals} filters={listFilters} onChange={setListFilters} />
+          <OwnerDealFilters
+            deals={categoryDeals}
+            filters={listFilters}
+            onChange={setListFilters}
+            apiFilters={apiFilters}
+          />
         ) : null}
         {loading ? (
           <div className="flex flex-1 items-center justify-center py-16">
@@ -114,21 +164,29 @@ export default function OwnerDealsPage() {
               Try again
             </button>
           </div>
-        ) : filteredDeals.length === 0 ? (
+        ) : filteredTotal === 0 ? (
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
             {categoryDeals.length === 0
               ? "No deals in this category right now."
               : "No deals match the selected filters."}
           </div>
         ) : (
-          filteredDeals.map((deal, index) => (
-            <OwnerDealRow
-              key={deal._id}
-              deal={deal}
-              vehicleLabel={dealRowVehicleLabel(deal, index, vehicles)}
+          <>
+            <DealSection
+              title="In your city"
+              deals={filteredCity}
+              vehicles={vehicles}
               countryCode={countryCode}
+              startIndex={0}
             />
-          ))
+            <DealSection
+              title="Other cities"
+              deals={filteredOthers}
+              vehicles={vehicles}
+              countryCode={countryCode}
+              startIndex={filteredCity.length}
+            />
+          </>
         )}
       </div>
     </OwnerPageShell>

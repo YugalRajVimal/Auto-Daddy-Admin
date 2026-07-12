@@ -27,6 +27,22 @@ function actionFailedMessage(
   return null;
 }
 
+function markAccepted(jc: CarOwnerJobCard): CarOwnerJobCard {
+  return {
+    ...jc,
+    approvedByCustomer: true,
+    status: jc.status?.trim() && jc.status.trim().toLowerCase() !== "pending" ? jc.status : "Approved",
+  };
+}
+
+function markRejected(jc: CarOwnerJobCard): CarOwnerJobCard {
+  return {
+    ...jc,
+    approvedByCustomer: false,
+    status: "Rejected",
+  };
+}
+
 export function useCarOwnerJobCardApprovals() {
   const { token } = useAuth();
   const [items, setItems] = useState<CarOwnerJobCard[]>([]);
@@ -88,7 +104,9 @@ export function useCarOwnerJobCardApprovals() {
       setActing(false);
       const fail = actionFailedMessage(res, "Could not approve job card.");
       if (fail) return { ok: false as const, message: fail };
-      setItems((prev) => prev.filter((item) => item._id !== jobCardId));
+      setItems((prev) =>
+        prev.map((item) => (item._id === jobCardId ? markAccepted(item) : item)),
+      );
       return { ok: true as const, message: "Job card approved." };
     },
     [token],
@@ -102,7 +120,9 @@ export function useCarOwnerJobCardApprovals() {
       setActing(false);
       const fail = actionFailedMessage(res, "Could not discard job card.");
       if (fail) return { ok: false as const, message: fail };
-      setItems((prev) => prev.filter((item) => item._id !== jobCardId));
+      setItems((prev) =>
+        prev.map((item) => (item._id === jobCardId ? markRejected(item) : item)),
+      );
       return { ok: true as const, message: "Job card discarded." };
     },
     [token],
@@ -117,6 +137,7 @@ export function useCarOwnerJobCardApprovals() {
       setActing(true);
       let okCount = 0;
       let lastError = "";
+      const acceptedIds = new Set<string>();
       for (const id of ids) {
         const res = await approveCarOwnerJobCard(token, id);
         const fail = actionFailedMessage(res, "Could not approve job card.");
@@ -125,7 +146,12 @@ export function useCarOwnerJobCardApprovals() {
           continue;
         }
         okCount += 1;
-        setItems((prev) => prev.filter((item) => item._id !== id));
+        acceptedIds.add(id);
+      }
+      if (acceptedIds.size > 0) {
+        setItems((prev) =>
+          prev.map((item) => (acceptedIds.has(item._id) ? markAccepted(item) : item)),
+        );
       }
       setActing(false);
 
@@ -153,6 +179,7 @@ export function useCarOwnerJobCardApprovals() {
       setActing(true);
       let okCount = 0;
       let lastError = "";
+      const rejectedIds = new Set<string>();
       for (const id of ids) {
         const res = await rejectCarOwnerJobCard(token, id);
         const fail = actionFailedMessage(res, "Could not discard job card.");
@@ -161,7 +188,12 @@ export function useCarOwnerJobCardApprovals() {
           continue;
         }
         okCount += 1;
-        setItems((prev) => prev.filter((item) => item._id !== id));
+        rejectedIds.add(id);
+      }
+      if (rejectedIds.size > 0) {
+        setItems((prev) =>
+          prev.map((item) => (rejectedIds.has(item._id) ? markRejected(item) : item)),
+        );
       }
       setActing(false);
 

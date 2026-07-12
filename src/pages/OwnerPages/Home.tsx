@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useAuth } from "../../auth";
 import type { ServiceCategory, ServiceSubItem } from "../../hooks/useOwnerPortal";
+import OwnerDashboardHomeExtras from "../../components/owner/OwnerDashboardHomeExtras";
 import OwnerDashboardServicePanel from "../../components/owner/OwnerDashboardServicePanel";
 import OwnerHeroPanel from "../../components/owner/OwnerHeroPanel";
 import OwnerPageShell, { OwnerPageSidebar } from "../../components/owner/OwnerPageShell";
@@ -17,6 +18,8 @@ export default function OwnerHomePage() {
     thoughtOfTheDayLiked,
     thoughtLikeBusy,
     toggleThoughtLike,
+    sections,
+    nextService,
     loading,
   } = useCarOwnerDashboard();
   const { indoor, outdoor, loading: servicesLoading } = useCarOwnerServiceSidebar();
@@ -60,13 +63,20 @@ export default function OwnerHomePage() {
       contentFillHeight
     >
       {view === "dashboard" || !selectedService ? (
-        <OwnerHeroPanel
-          thoughtOfTheDay={thoughtOfTheDay}
-          thoughtOfTheDayLiked={thoughtOfTheDayLiked}
-          thoughtLikeBusy={thoughtLikeBusy}
-          onToggleThoughtLike={() => void toggleThoughtLike()}
-          loading={loading}
-        />
+        <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
+          <div className="min-h-[240px] flex-1">
+            <OwnerHeroPanel
+              thoughtOfTheDay={thoughtOfTheDay}
+              thoughtOfTheDayLiked={thoughtOfTheDayLiked}
+              thoughtLikeBusy={thoughtLikeBusy}
+              onToggleThoughtLike={() => void toggleThoughtLike()}
+              loading={loading}
+            />
+          </div>
+          {!loading ? (
+            <OwnerDashboardHomeExtras sections={sections} nextService={nextService} />
+          ) : null}
+        </div>
       ) : view === "service" ? (
         <OwnerServiceTilesPanel
           indoor={indoor}

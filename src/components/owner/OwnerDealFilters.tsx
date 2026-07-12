@@ -6,28 +6,47 @@ import {
   dealModelOptions,
   type DealListFilters,
 } from "../../lib/carOwnerDeals";
-import type { CarOwnerDeal } from "../../types/carOwnerDeals";
+import type { CarOwnerDeal, CarOwnerDealsApiFilters } from "../../types/carOwnerDeals";
 import { ownerVehicleSelectClass } from "./ownerVehicleFormUtils";
 
 type OwnerDealFiltersProps = {
   deals: CarOwnerDeal[];
   filters: DealListFilters;
   onChange: (next: DealListFilters) => void;
+  apiFilters?: CarOwnerDealsApiFilters;
 };
 
 const selectClass = `${ownerVehicleSelectClass} w-[108px] shrink-0 py-1.5 text-xs sm:w-[118px] sm:text-sm`;
 
-export default function OwnerDealFilters({ deals, filters, onChange }: OwnerDealFiltersProps) {
-  const makeOptions = useMemo(() => dealMakeOptions(deals), [deals]);
-  const modelOptions = useMemo(
-    () => dealModelOptions(deals, filters.make),
-    [deals, filters.make]
-  );
+export default function OwnerDealFilters({
+  deals,
+  filters,
+  onChange,
+  apiFilters,
+}: OwnerDealFiltersProps) {
+  const makeOptions = useMemo(() => {
+    if (apiFilters?.makes?.length) return [...apiFilters.makes].sort((a, b) => a.localeCompare(b));
+    return dealMakeOptions(deals);
+  }, [apiFilters?.makes, deals]);
+
+  const modelOptions = useMemo(() => {
+    if (!filters.make) return [];
+    const fromDeals = dealModelOptions(deals, filters.make);
+    if (fromDeals.length) return fromDeals;
+    if (apiFilters?.models?.length) {
+      return [...apiFilters.models].sort((a, b) => a.localeCompare(b));
+    }
+    return [];
+  }, [apiFilters?.models, deals, filters.make]);
+
   const cityOptions = useMemo(
     () => dealCityOptions(deals, filters.make, filters.model),
     [deals, filters.make, filters.model]
   );
-  const useVehicleCascade = useMemo(() => dealFiltersUseVehicleCascade(deals), [deals]);
+  const useVehicleCascade = useMemo(
+    () => Boolean(apiFilters?.makes?.length) || dealFiltersUseVehicleCascade(deals),
+    [apiFilters?.makes, deals]
+  );
   const cityDisabled = useVehicleCascade ? !filters.make || !filters.model : false;
 
   const hasActiveFilter = Boolean(filters.make || filters.model || filters.city);

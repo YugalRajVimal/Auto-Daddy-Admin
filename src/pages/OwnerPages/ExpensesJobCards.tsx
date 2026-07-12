@@ -5,11 +5,13 @@ import OwnerPageShell from "../../components/owner/OwnerPageShell";
 import { useAuth } from "../../auth";
 import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import { useCarOwnerJobCardApprovals } from "../../hooks/useCarOwnerJobCardApprovals";
+import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
 import {
   businessName,
   carOwnerJobCardStatusLabel,
   formatBusinessPhone,
   formatJobCardDate,
+  isCarOwnerJobCardPendingApproval,
   jobChipLabel,
 } from "../../lib/carOwnerJobCards";
 import { formatCurrencyAmount } from "../../lib/currency";
@@ -24,11 +26,26 @@ function selectedSetFromArray(ids: string[]): Set<string> {
   return new Set(ids);
 }
 
+function statusClassName(label: string): string {
+  const norm = label.toLowerCase();
+  if (norm.includes("approve") || norm.includes("accept") || norm.includes("paid") || norm.includes("converted")) {
+    return "font-bold text-green-700";
+  }
+  if (norm.includes("reject")) return "font-bold text-red-600";
+  if (norm.includes("pending")) return "font-bold text-amber-700";
+  return "font-semibold text-gray-700";
+}
+
 export default function OwnerExpensesJobCardsPage() {
   const { session } = useAuth();
   const countryCode = session?.meta?.countryCode;
-  const { items, loading, error, acting, refresh, approveMany, rejectMany } =
-    useCarOwnerJobCardApprovals();
+  const {
+    items,
+    loading,
+    error,
+    refresh,
+  } = useCarOwnerJobCards();
+  const { acting, approveMany, rejectMany } = useCarOwnerJobCardApprovals();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -41,6 +58,15 @@ export default function OwnerExpensesJobCardsPage() {
     const id = selectedIds[0];
     return items.find((jc) => jc._id === id) ?? null;
   }, [items, selectedIds]);
+
+  const pendingSelectedIds = useMemo(
+    () =>
+      selectedIds.filter((id) => {
+        const jc = items.find((row) => row._id === id);
+        return jc ? isCarOwnerJobCardPendingApproval(jc) : false;
+      }),
+    [items, selectedIds],
+  );
 
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -79,22 +105,34 @@ export default function OwnerExpensesJobCardsPage() {
   };
 
   const handleApprove = async () => {
-    if (selectedIds.length === 0 || acting) return;
-    const result = await approveMany(selectedIds);
+    if (pendingSelectedIds.length === 0 || acting) {
+      if (selectedIds.length > 0 && pendingSelectedIds.length === 0) {
+        toast.info("Selected job cards are already accepted or closed.");
+      }
+      return;
+    }
+    const result = await approveMany(pendingSelectedIds);
     if (result.ok) {
       toast.success(result.message);
       setSelectedIds([]);
+      await refresh();
     } else {
       toast.error(result.message);
     }
   };
 
   const handleDiscard = async () => {
-    if (selectedIds.length === 0 || acting) return;
-    const result = await rejectMany(selectedIds);
+    if (pendingSelectedIds.length === 0 || acting) {
+      if (selectedIds.length > 0 && pendingSelectedIds.length === 0) {
+        toast.info("Selected job cards are already accepted or closed.");
+      }
+      return;
+    }
+    const result = await rejectMany(pendingSelectedIds);
     if (result.ok) {
       toast.success(result.message);
       setSelectedIds([]);
+      await refresh();
     } else {
       toast.error(result.message);
     }
@@ -135,7 +173,7 @@ export default function OwnerExpensesJobCardsPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
-            No job cards awaiting approval.
+            No job cards yet.
           </div>
         ) : view === "payment" && selectedJobCard ? (
           <div className="flex flex-col">
@@ -238,14 +276,14 @@ export default function OwnerExpensesJobCardsPage() {
         ) : (
           <div className="flex flex-col gap-3">
             <div className="rounded border border-gray-300 bg-[#8e2a7c] px-4 py-2 text-center text-sm font-bold text-white">
-              Job Card - GVTY 884
+              Job Cards
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={selectedIds.length === 0 || acting}
+                  disabled={pendingSelectedIds.length === 0 || acting}
                   onClick={() => void handleApprove()}
                   className="rounded bg-gray-400 px-5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                 >
@@ -253,7 +291,7 @@ export default function OwnerExpensesJobCardsPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={selectedIds.length === 0 || acting}
+                  disabled={pendingSelectedIds.length === 0 || acting}
                   onClick={() => void handleDiscard()}
                   className="rounded bg-red-600 px-5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                 >
@@ -321,6 +359,7 @@ export default function OwnerExpensesJobCardsPage() {
                       const isChecked = selected.has(jc._id);
                       const phone = formatBusinessPhone(jc.business) || "—";
                       const amount = formatCurrencyAmount(jc.totalPayableAmount ?? 0, countryCode);
+                      const status = carOwnerJobCardStatusLabel(jc);
                       return (
                         <tr key={jc._id} className={index % 2 === 0 ? "bg-white" : "bg-gray-100"}>
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>
@@ -347,8 +386,8 @@ export default function OwnerExpensesJobCardsPage() {
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>{businessName(jc.business)}</td>
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>{phone}</td>
                           <td className={`${OWNER_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>{amount}</td>
-                          <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                            {carOwnerJobCardStatusLabel(jc)}
+                          <td className={`${OWNER_TABLE_BODY_TD_CLASS} ${statusClassName(status)}`}>
+                            {status}
                           </td>
                         </tr>
                       );
@@ -363,4 +402,3 @@ export default function OwnerExpensesJobCardsPage() {
     </OwnerPageShell>
   );
 }
-

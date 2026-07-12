@@ -20,11 +20,26 @@ function formatInvoiceDate(iso: string): string {
 }
 
 function statusLabel(row: CarOwnerInvoiceRow): { label: string; className: string } {
-  const status = (row.paymentStatus || "Unpaid").trim();
-  const paid = status.toLowerCase() === "paid";
+  const payment = (row.paymentStatus || "Unpaid").trim();
+  const paid = payment.toLowerCase() === "paid";
+  const approval = row.approvalStatus?.trim();
+  const label =
+    approval && approval !== "—"
+      ? paid
+        ? `${approval} · Paid`
+        : approval.toLowerCase().includes("approve") || approval.toLowerCase().includes("accept")
+          ? `${approval} · Unpaid`
+          : approval
+      : paid
+        ? "Paid"
+        : "Unpaid";
   return {
-    label: paid ? "Paid" : "Unpaid",
-    className: paid ? "text-green-700" : "text-red-600",
+    label,
+    className: paid
+      ? "text-green-700"
+      : approval?.toLowerCase().includes("reject")
+        ? "text-red-600"
+        : "text-amber-700",
   };
 }
 

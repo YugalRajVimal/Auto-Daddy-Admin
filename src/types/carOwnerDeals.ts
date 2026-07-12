@@ -59,7 +59,35 @@ export type CarOwnerPartsDeal = CarOwnerDealBase & {
 
 export type CarOwnerDeal = CarOwnerServiceDeal | CarOwnerPartsDeal;
 
+export type CarOwnerDealBucket = {
+  city: CarOwnerDeal[];
+  others: CarOwnerDeal[];
+};
+
+export type CarOwnerDealsGrouped = {
+  Service?: CarOwnerDealBucket;
+  Parts?: CarOwnerDealBucket;
+  service?: CarOwnerDealBucket;
+  parts?: CarOwnerDealBucket;
+};
+
+export type CarOwnerDealsApiFilters = {
+  makes: string[];
+  models: string[];
+};
+
 export type CarOwnerDealsResponse = {
   success: boolean;
-  deals: CarOwnerDeal[];
+  deals: CarOwnerDealsGrouped | CarOwnerDeal[];
+  filters?: {
+    makes?: string[];
+    models?: string[];
+  };
+};
+
+export type NormalizedCarOwnerDeals = {
+  Service: CarOwnerDealBucket;
+  Parts: CarOwnerDealBucket;
+  filters: CarOwnerDealsApiFilters;
+  all: CarOwnerDeal[];
 };

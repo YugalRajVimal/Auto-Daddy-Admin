@@ -57,6 +57,21 @@ export function isPaidJobCard(jc: CarOwnerJobCard): boolean {
   return (jc.paymentStatus ?? "").trim().toLowerCase() === "paid";
 }
 
+/** True when the customer has accepted / approved the job card estimate. */
+export function isCarOwnerJobCardAccepted(jc: CarOwnerJobCard): boolean {
+  if (jc.approvedByCustomer === true) return true;
+  const norm = (jc.status ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  return norm === "approved" || norm === "accepted" || norm === "convertedtoinvoice" || norm === "cashpaid";
+}
+
+/** True when the job card is still awaiting customer action. */
+export function isCarOwnerJobCardPendingApproval(jc: CarOwnerJobCard): boolean {
+  if (isCarOwnerJobCardAccepted(jc)) return false;
+  const norm = (jc.status ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  if (norm === "rejected" || norm === "autorejected" || norm.includes("cancel")) return false;
+  return norm === "pending" || !norm;
+}
+
 /** Display label — API keeps status "pending" after approval; prefer approvedByCustomer. */
 export function carOwnerJobCardStatusLabel(jc: CarOwnerJobCard): string {
   const norm = (jc.status ?? "").trim().toLowerCase().replace(/\s+/g, "");

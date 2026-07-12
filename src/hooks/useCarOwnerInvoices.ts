@@ -4,6 +4,7 @@ import {
   businessName,
   formatBusinessPhone,
   serviceTypeLabel,
+  carOwnerJobCardStatusLabel,
 } from "../lib/carOwnerJobCards";
 import type {
   CarOwnerJobCard,
@@ -46,9 +47,18 @@ function normalizeJobCardsPayload(payload: CarOwnerJobCardsBuckets | undefined):
 }
 
 function isApprovedInvoice(jc: CarOwnerJobCard): boolean {
-  const status = (jc.status ?? "").toLowerCase();
-  if (status.includes("reject") || status.includes("cancel") || status.includes("pending")) return false;
-  return status.includes("approve") || status.includes("complete") || status.includes("done");
+  if (jc.approvedByCustomer === true) return true;
+  const status = (jc.status ?? "").toLowerCase().replace(/\s+/g, "");
+  if (status.includes("reject") || status.includes("cancel")) return false;
+  if (status === "pending") return false;
+  return (
+    status.includes("approve") ||
+    status.includes("accept") ||
+    status.includes("complete") ||
+    status.includes("done") ||
+    status.includes("convertedtoinvoice") ||
+    status.includes("cashpaid")
+  );
 }
 
 function isPaidInvoice(jc: CarOwnerJobCard): boolean {
@@ -74,6 +84,7 @@ export type CarOwnerInvoiceRow = {
   amount: number;
   createdAt: string;
   paymentStatus: string;
+  approvalStatus: string;
   paymentMethod?: string;
   phone?: string;
   service?: string;
@@ -94,6 +105,7 @@ function toInvoiceRow(jc: CarOwnerJobCard): CarOwnerInvoiceRow {
     amount: jc.totalPayableAmount ?? 0,
     createdAt: jc.createdAt,
     paymentStatus: jc.paymentStatus ?? "",
+    approvalStatus: carOwnerJobCardStatusLabel(jc),
     paymentMethod: jc.paymentMethod,
     phone: phone || undefined,
     service: serviceTypeLabel(jc),

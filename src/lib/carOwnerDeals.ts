@@ -1,9 +1,13 @@
 import type {
   CarOwnerDeal,
+  CarOwnerDealBucket,
   CarOwnerDealCreatedBy,
   CarOwnerDealSelectedVehicle,
   CarOwnerDealService,
+  CarOwnerDealsApiFilters,
+  CarOwnerDealsGrouped,
   CarOwnerDealsResponse,
+  NormalizedCarOwnerDeals,
 } from "../types/carOwnerDeals";
 
 function pickString(value: unknown): string | undefined {
@@ -140,11 +144,110 @@ export function normalizeCarOwnerDeal(raw: unknown): CarOwnerDeal | null {
   };
 }
 
+function normalizeDealArray(raw: unknown): CarOwnerDeal[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeCarOwnerDeal).filter((d): d is CarOwnerDeal => d != null);
+}
+
+function normalizeDealBucket(raw: unknown): CarOwnerDealBucket {
+  if (!raw || typeof raw !== "object") return { city: [], others: [] };
+  const o = raw as Record<string, unknown>;
+  return {
+    city: normalizeDealArray(o.city),
+    others: normalizeDealArray(o.others),
+  };
+}
+
+function emptyBucket(): CarOwnerDealBucket {
+  return { city: [], others: [] };
+}
+
+function sortDealsNewestFirst(deals: CarOwnerDeal[]): CarOwnerDeal[] {
+  return [...deals].sort((a, b) => {
+    const at = Date.parse(a.createdAt);
+    const bt = Date.parse(b.createdAt);
+    if (Number.isFinite(at) && Number.isFinite(bt)) return bt - at;
+    return String(b.createdAt).localeCompare(String(a.createdAt));
+  });
+}
+
+function flattenBucket(bucket: CarOwnerDealBucket): CarOwnerDeal[] {
+  return [...bucket.city, ...bucket.others];
+}
+
+function normalizeApiFilters(raw: CarOwnerDealsResponse["filters"] | undefined): CarOwnerDealsApiFilters {
+  const makes = Array.isArray(raw?.makes)
+    ? raw.makes.filter((m): m is string => typeof m === "string" && m.trim().length > 0).map((m) => m.trim())
+    : [];
+  const models = Array.isArray(raw?.models)
+    ? raw.models.filter((m): m is string => typeof m === "string" && m.trim().length > 0).map((m) => m.trim())
+    : [];
+  return { makes, models };
+}
+
+function splitFlatDealsByKind(deals: CarOwnerDeal[]): { Service: CarOwnerDealBucket; Parts: CarOwnerDealBucket } {
+  const service: CarOwnerDeal[] = [];
+  const parts: CarOwnerDeal[] = [];
+  for (const deal of deals) {
+    if (dealKindLabel(deal.dealType) === "Parts") parts.push(deal);
+    else service.push(deal);
+  }
+  return {
+    Service: { city: sortDealsNewestFirst(service), others: [] },
+    Parts: { city: sortDealsNewestFirst(parts), others: [] },
+  };
+}
+
+/** Flattened list (backward compatible). Prefer `normalizeCarOwnerDealsPayload` for city/others. */
 export function normalizeCarOwnerDealsList(
   payload: CarOwnerDealsResponse | null | undefined
 ): CarOwnerDeal[] {
-  if (!payload?.success || !Array.isArray(payload.deals)) return [];
-  return payload.deals.map(normalizeCarOwnerDeal).filter((d): d is CarOwnerDeal => d != null);
+  return normalizeCarOwnerDealsPayload(payload).all;
+}
+
+export function normalizeCarOwnerDealsPayload(
+  payload: CarOwnerDealsResponse | null | undefined
+): NormalizedCarOwnerDeals {
+  const empty: NormalizedCarOwnerDeals = {
+    Service: emptyBucket(),
+    Parts: emptyBucket(),
+    filters: { makes: [], models: [] },
+    all: [],
+  };
+
+  if (!payload?.success || payload.deals == null) return empty;
+
+  const filters = normalizeApiFilters(payload.filters);
+
+  if (Array.isArray(payload.deals)) {
+    const split = splitFlatDealsByKind(
+      payload.deals.map(normalizeCarOwnerDeal).filter((d): d is CarOwnerDeal => d != null)
+    );
+    const all = flattenBucket(split.Service).concat(flattenBucket(split.Parts));
+    return { ...split, filters, all: sortDealsNewestFirst(all) };
+  }
+
+  const grouped = payload.deals as CarOwnerDealsGrouped;
+  const Service = normalizeDealBucket(grouped.Service ?? grouped.service);
+  const Parts = normalizeDealBucket(grouped.Parts ?? grouped.parts);
+  Service.city = sortDealsNewestFirst(Service.city);
+  Service.others = sortDealsNewestFirst(Service.others);
+  Parts.city = sortDealsNewestFirst(Parts.city);
+  Parts.others = sortDealsNewestFirst(Parts.others);
+
+  const all = sortDealsNewestFirst([...flattenBucket(Service), ...flattenBucket(Parts)]);
+  return { Service, Parts, filters, all };
+}
+
+export function dealsForCategory(
+  normalized: NormalizedCarOwnerDeals,
+  category: DealCategory
+): CarOwnerDealBucket {
+  if (category === "service") return normalized.Service;
+  if (category === "parts") return normalized.Parts;
+
+  const all = normalized.all.filter((d) => matchesDealCategory(d, category));
+  return { city: all, others: [] };
 }
 
 export function dealKindLabel(dealType: string | undefined): "Service" | "Parts" {

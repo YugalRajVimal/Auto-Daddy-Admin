@@ -147,7 +147,7 @@ export default function OwnerReportsPage() {
     return [...names].sort((a, b) => a.localeCompare(b));
   }, []);
 
-  const handleSave = () => {
+  const handleSearch = () => {
     if (!fromDate || !toDate) return;
     setApplied({ fromDate, toDate, category, groupBy });
   };
@@ -228,7 +228,7 @@ export default function OwnerReportsPage() {
     if (!applied) {
       return (
         <p className="rounded-md border border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-600">
-          Set your filters and click Save to generate {reportPrompt}.
+          Set your filters and click Search to generate {reportPrompt}.
         </p>
       );
     }
@@ -337,9 +337,9 @@ export default function OwnerReportsPage() {
         <CompactFormPanel
           footer={
             <CompactFormFooter
-              actionLabel="Save"
+              actionLabel="Search"
               cancelLabel="Reset"
-              onSave={handleSave}
+              onSave={handleSearch}
               onCancel={handleReset}
               messageCenter
               message=""

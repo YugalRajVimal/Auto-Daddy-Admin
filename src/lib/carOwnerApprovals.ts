@@ -130,13 +130,7 @@ export function normalizeCarOwnerJobCardApprovalsPayload(payload: unknown): CarO
 
   const buckets = resolveJobCardsBuckets(root);
   if (buckets) {
-    const pendingOnly = Array.isArray(buckets.pending) ? buckets.pending : null;
-    if (pendingOnly) {
-      return pendingOnly
-        .map((item) => asJobCard(item))
-        .filter((item): item is CarOwnerJobCard => Boolean(item));
-    }
-    return normalizeJobCardsPayload(buckets);
+    return normalizeJobCardsPayload(buckets).map((jc) => asJobCard(jc) ?? jc);
   }
 
   const dataObj = asRecord(root.data);
@@ -145,8 +139,7 @@ export function normalizeCarOwnerJobCardApprovalsPayload(payload: unknown): CarO
     (Array.isArray(root.jobCards) ? root.jobCards : null) ??
     (Array.isArray(root.jobcards) ? root.jobcards : null) ??
     (dataObj && Array.isArray(dataObj.jobCards) ? dataObj.jobCards : null) ??
-    (dataObj && Array.isArray(dataObj.jobcards) ? dataObj.jobcards : null) ??
-    (dataObj && Array.isArray(dataObj.pending) ? dataObj.pending : null);
+    (dataObj && Array.isArray(dataObj.jobcards) ? dataObj.jobcards : null);
 
   if (!listCandidate) return [];
 

@@ -11,6 +11,12 @@ import {
 
 export type { ServiceCategory, ServiceSubItem };
 
+export type CarOwnerContentBlock = {
+  _id?: string;
+  heading: string;
+  desc: string;
+};
+
 export type CarOwnerThoughtOfTheDayApi =
   | string
   | {
@@ -19,22 +25,81 @@ export type CarOwnerThoughtOfTheDayApi =
       text?: string;
       quote?: string;
       thought?: string;
+      message?: string;
+      content?: string;
     };
+
+export type CarOwnerDashboardVehicle = {
+  _id: string;
+  licensePlateNo: string;
+  make: { name: string; model: string };
+  year: number;
+};
+
+export type CarOwnerDashboardUserProfile = {
+  _id?: string;
+  role?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  profilePhoto?: string | null;
+  isProfileComplete?: boolean;
+  myVehicles?: CarOwnerDashboardVehicle[];
+  thoughtOfTheDayLiked?: boolean;
+  createdAt?: string;
+};
+
+export type CarOwnerNextServiceSubService = {
+  name: string;
+  desc: string;
+  price: number;
+};
+
+export type CarOwnerNextServiceItem = {
+  service: string;
+  subServices: CarOwnerNextServiceSubService[];
+};
+
+export type CarOwnerNextService = {
+  jobCardId: string;
+  vehicle: CarOwnerDashboardVehicle;
+  customer?: {
+    _id: string;
+    phone: string;
+    email?: string;
+    name: string;
+    profilePhoto?: string | null;
+  };
+  dueOdometerReading: number;
+  createdAt: string;
+  issueDescription: string;
+  serviceType: string;
+  priorityLevel: string;
+  status: string;
+  services: CarOwnerNextServiceItem[];
+};
+
+export type CarOwnerDashboardPayload = {
+  _id?: string;
+  thoughtOfTheDay?: CarOwnerThoughtOfTheDayApi;
+  thoughtOfTheDayLike?: number;
+  sections?: CarOwnerContentBlock[];
+  FAQs?: CarOwnerContentBlock;
+  aboutUs?: CarOwnerContentBlock;
+  privacyPolicy?: CarOwnerContentBlock;
+  documents?: CarOwnerContentBlock;
+  disclaimer?: CarOwnerContentBlock;
+  createdAt?: string;
+  __v?: number;
+};
 
 export type CarOwnerDashboardData = {
   success?: boolean;
   thoughtOfTheDayLiked?: boolean;
-  dashboard?: {
-    thoughtOfTheDay?: CarOwnerThoughtOfTheDayApi;
-    FAQs?: { heading?: string; desc?: string };
-  };
-  userProfile?: {
-    name?: string;
-    phone?: string;
-    city?: string;
-    profilePhoto?: string | null;
-    thoughtOfTheDayLiked?: boolean;
-  };
+  dashboard?: CarOwnerDashboardPayload;
+  userProfile?: CarOwnerDashboardUserProfile;
+  nextService?: CarOwnerNextService | null;
 };
 
 const DEFAULT_THOUGHT: ThoughtOfTheDayView = {
@@ -47,6 +112,29 @@ type ToggleThoughtLikeResponse = {
   message?: string;
   thoughtOfTheDayLiked?: boolean;
 };
+
+function normalizeSections(raw: unknown): CarOwnerContentBlock[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const o = item as Record<string, unknown>;
+      const heading = typeof o.heading === "string" ? o.heading.trim() : "";
+      const desc = typeof o.desc === "string" ? o.desc.trim() : "";
+      if (!heading && !desc) return null;
+      return {
+        _id: typeof o._id === "string" ? o._id : undefined,
+        heading,
+        desc,
+      };
+    })
+    .filter((s): s is CarOwnerContentBlock => s != null);
+}
+
+function normalizeLikeCount(raw: unknown): number {
+  if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) return Math.floor(raw);
+  return 0;
+}
 
 export function useCarOwnerDashboard() {
   const { token } = useAuth();
@@ -114,17 +202,26 @@ export function useCarOwnerDashboard() {
     extractThoughtOfTheDay(data?.dashboard?.thoughtOfTheDay) ?? DEFAULT_THOUGHT;
 
   const faqs = data?.dashboard?.FAQs;
+  const sections = normalizeSections(data?.dashboard?.sections);
+  const thoughtLikeCount = normalizeLikeCount(data?.dashboard?.thoughtOfTheDayLike);
+  const profile = data?.userProfile;
+  const nextService = data?.nextService ?? null;
 
   return {
     data,
     loading,
     refresh,
-    displayName: data?.userProfile?.name?.trim() || "",
-    city: data?.userProfile?.city?.trim() || "",
+    displayName: profile?.name?.trim() || "",
+    city: profile?.city?.trim() || "",
+    profilePhoto: profile?.profilePhoto ?? null,
+    myVehicles: Array.isArray(profile?.myVehicles) ? profile.myVehicles : [],
     thoughtOfTheDay: thought,
     thoughtOfTheDayLiked: liked,
+    thoughtLikeCount,
     thoughtLikeBusy: likeBusy,
     toggleThoughtLike,
+    sections,
+    nextService,
     faqsHeading: typeof faqs?.heading === "string" ? faqs.heading.trim() : "FAQs",
     faqsDescription: typeof faqs?.desc === "string" ? faqs.desc.trim() : "",
   };
