@@ -801,3 +801,8 @@ export function InvoiceViewerDialog(props) {
 export function JobCardViewerDialog(props) {
   return <InvoiceJobCardViewer {...props} variant="jobcard" />;
 }
+
+/** Inline invoice/job-card document (no modal). Use for embedded previews. */
+export function InvoiceDocumentView(props) {
+  return <InvoiceDocument {...props} />;
+}

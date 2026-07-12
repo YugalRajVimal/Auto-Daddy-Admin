@@ -189,3 +189,68 @@ export function deleteAddedCustomer(token: string, customerId: string) {
   );
 }
 
+// ---- Open hours ----
+export type WeeklyOpenHourEntry = {
+  day: string;
+  open?: string;
+  close?: string;
+  isClosed?: boolean;
+};
+
+export type SpecialOpenHourEntry = {
+  date: string;
+  open?: string;
+  close?: string;
+  isClosed?: boolean;
+  reason?: string;
+};
+
+/** GET /api/autoshopowner/profile/business/open-hours — weekly + specials (optional date range). */
+export function fetchOpenHours(
+  token: string,
+  query?: { startDate?: string; endDate?: string },
+) {
+  return getJsonAutoshopowner<unknown>(
+    withQuery("/api/autoshopowner/profile/business/open-hours", {
+      startDate: query?.startDate,
+      endDate: query?.endDate,
+    }),
+    token,
+  );
+}
+
+/** PUT weekly default schedule (full replace). */
+export function updateWeeklyOpenHours(token: string, perDayOpenHours: WeeklyOpenHourEntry[]) {
+  return putJsonAutoshopowner<ApiEnvelope>(
+    "/api/autoshopowner/profile/business/open-hours/weekly",
+    { perDayOpenHours },
+    token,
+  );
+}
+
+/** PUT one-off override for a specific date (upsert). */
+export function upsertSpecialOpenHours(token: string, entry: SpecialOpenHourEntry) {
+  const body: Record<string, unknown> = { date: entry.date };
+  if (entry.isClosed) {
+    body.isClosed = true;
+    if (entry.reason?.trim()) body.reason = entry.reason.trim();
+  } else {
+    body.open = entry.open;
+    body.close = entry.close;
+    if (entry.reason?.trim()) body.reason = entry.reason.trim();
+  }
+  return putJsonAutoshopowner<ApiEnvelope>(
+    "/api/autoshopowner/profile/business/open-hours/special",
+    body,
+    token,
+  );
+}
+
+/** DELETE special override — reverts that date to weekly schedule. */
+export function deleteSpecialOpenHours(token: string, dateISO: string) {
+  return deleteJsonAutoshopowner<ApiEnvelope>(
+    `/api/autoshopowner/profile/business/open-hours/special/${encodeURIComponent(dateISO)}`,
+    token,
+  );
+}
+

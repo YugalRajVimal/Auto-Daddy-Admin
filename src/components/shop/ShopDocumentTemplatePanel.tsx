@@ -7,103 +7,34 @@ import {
   shopHeroOpaqueSurfaceClass,
   shopProfileFormPanelFooterClass,
 } from "./shopLayoutStyles";
+import { InvoiceTemplatePreview } from "./invoice-templates/InvoiceTemplatePreview";
+import {
+  DEFAULT_INVOICE_PREVIEW,
+  mergeInvoicePreviewShop,
+  type InvoicePreviewShop,
+} from "./invoice-templates/sampleInvoiceData";
+import {
+  DUMMY_INVOICE_TEMPLATES,
+  resolveTemplateSlug,
+  type ShopDocumentTemplate,
+} from "./invoice-templates/invoiceTemplateCatalog";
 
-export type ShopDocumentTemplate = {
-  id: string;
-  name: string;
-  description: string;
-};
-
-/** Catalog ids must match API `invoiceTemplateSlug` values. */
-export const DUMMY_INVOICE_TEMPLATES: ShopDocumentTemplate[] = [
-  {
-    id: "classic-invoice-v1",
-    name: "Invoice Template - 1",
-    description: "Classic layout with HST breakdown and payment status chip.",
-  },
-  {
-    id: "modern-invoice-v2",
-    name: "Invoice Template - 2",
-    description: "Compact single-page invoice with service line items.",
-  },
-  {
-    id: "detailed-invoice-v1",
-    name: "Invoice Template - 3",
-    description: "Detailed invoice with customer address and round-off row.",
-  },
-];
-
-export function resolveTemplateSlug(
-  templates: ShopDocumentTemplate[],
-  slug: string | undefined | null,
-  fallback = templates[0]?.id ?? "",
-): string {
-  const value = typeof slug === "string" ? slug.trim() : "";
-  if (value && templates.some((template) => template.id === value)) return value;
-  return fallback;
-}
+export type { ShopDocumentTemplate };
+export { DUMMY_INVOICE_TEMPLATES, resolveTemplateSlug };
 
 const templateSaveButtonClass =
   "inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60";
 
-function TemplatePreviewMock({ template }: { template: ShopDocumentTemplate }) {
-  return (
-    <div className="flex flex-col gap-4 p-5">
-      <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-4">
-        <div className="min-w-0 space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ad-purple">
-            Invoice Preview
-          </p>
-          <h3 className="text-lg font-bold text-gray-900">{template.name}</h3>
-          <p className="text-sm text-gray-600">{template.description}</p>
-        </div>
-        <div className="h-14 w-14 shrink-0 rounded border border-dashed border-gray-300 bg-gray-50" />
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-2 rounded border border-gray-200 bg-gray-50 p-3">
-          <div className="h-3 w-24 rounded bg-gray-200" />
-          <div className="h-2.5 w-full rounded bg-gray-200" />
-          <div className="h-2.5 w-[80%] rounded bg-gray-200" />
-        </div>
-        <div className="space-y-2 rounded border border-gray-200 bg-gray-50 p-3">
-          <div className="h-3 w-20 rounded bg-gray-200" />
-          <div className="h-2.5 w-full rounded bg-gray-200" />
-          <div className="h-2.5 w-[60%] rounded bg-gray-200" />
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 space-y-2 rounded border border-gray-200 bg-white p-3">
-        <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-gray-100 pb-2 text-xs font-semibold text-gray-500">
-          <span>Service / Part</span>
-          <span>Amount</span>
-        </div>
-        {[1, 2, 3].map((row) => (
-          <div key={row} className="grid grid-cols-[1fr_auto] gap-2 text-sm">
-            <div className="h-2.5 rounded bg-gray-100" />
-            <div className="h-2.5 w-16 rounded bg-gray-100" />
-          </div>
-        ))}
-      </div>
-
-      <div className="flex justify-end border-t border-gray-200 pt-3">
-        <div className="space-y-1 text-right">
-          <div className="h-2.5 w-28 rounded bg-gray-100" />
-          <div className="h-3 w-36 rounded bg-gray-200" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function InvoiceTemplateCard({
   template,
   selected,
+  previewData,
   onSelect,
   onPreview,
 }: {
   template: ShopDocumentTemplate;
   selected: boolean;
+  previewData: ReturnType<typeof mergeInvoicePreviewShop>;
   onSelect: () => void;
   onPreview: () => void;
 }) {
@@ -113,7 +44,7 @@ function InvoiceTemplateCard({
         selected ? "border-ad-purple ring-2 ring-ad-purple/30" : "border-gray-200 hover:shadow-md"
       }`}
     >
-      <div className="relative aspect-[4/3] bg-gray-100">
+      <div className="relative aspect-[3/4] overflow-hidden bg-[#ececec]">
         <button
           type="button"
           onClick={onPreview}
@@ -121,17 +52,27 @@ function InvoiceTemplateCard({
         >
           Preview
         </button>
+        {selected ? (
+          <div className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-ad-purple text-white shadow">
+            <FiCheck className="text-base" strokeWidth={3} aria-hidden />
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={onSelect}
-          className="flex h-full w-full items-center justify-center"
+          className="relative h-full w-full overflow-hidden text-left"
           aria-pressed={selected}
+          aria-label={`Select ${template.name}`}
         >
-          {selected ? (
-            <FiCheck className="text-5xl text-gray-900" strokeWidth={3} aria-hidden />
-          ) : (
-            <span className="text-xs font-medium text-gray-400">Click to select</span>
-          )}
+          <InvoiceTemplatePreview
+            templateId={template.id}
+            data={previewData}
+            mode="thumbnail"
+            className="h-full w-full"
+          />
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/40 to-transparent px-2 pb-2 pt-8 text-center text-[10px] font-semibold text-white">
+            {selected ? "Selected" : "Click to select"}
+          </span>
         </button>
       </div>
       <div className="border-t border-gray-100 px-3 py-2.5 text-center">
@@ -197,6 +138,8 @@ type ShopDocumentTemplatePanelProps = {
   selectedId: string;
   onSelect: (id: string) => void;
   savedId: string;
+  /** Optional shop details used to personalize the invoice preview. */
+  shopPreview?: Partial<InvoicePreviewShop> | null;
   /** Return `true` when save succeeded (panel shows success toast). */
   onSave: (id: string) => boolean | Promise<boolean>;
 };
@@ -206,10 +149,15 @@ export default function ShopDocumentTemplatePanel({
   selectedId,
   onSelect,
   savedId,
+  shopPreview,
   onSave,
 }: ShopDocumentTemplatePanelProps) {
   const [saving, setSaving] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<ShopDocumentTemplate | null>(null);
+  const previewData = useMemo(
+    () => mergeInvoicePreviewShop(DEFAULT_INVOICE_PREVIEW, shopPreview),
+    [shopPreview],
+  );
   const selectedTemplate = useMemo(
     () => templates.find((template) => template.id === selectedId) ?? null,
     [selectedId, templates],
@@ -239,15 +187,18 @@ export default function ShopDocumentTemplatePanel({
   return (
     <>
       <div
-        className={`overflow-hidden rounded border border-gray-200 ${shopHeroOpaqueSurfaceClass} bg-white`}
+        className={`flex h-full min-h-0 flex-col overflow-hidden rounded border border-gray-200 ${shopHeroOpaqueSurfaceClass} bg-white`}
       >
-        <div className="border-b border-gray-100 px-4 py-4 text-center">
+        <div className="shrink-0 border-b border-gray-100 px-4 py-4 text-center">
           <h2 className="text-base font-bold text-ad-purple sm:text-lg">
             Choose Your Invoice Template
           </h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Preview a theme, then select and save the template for your shop invoices.
+          </p>
         </div>
 
-        <div className="px-4 py-5">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-5">
           {templates.length === 0 ? (
             <ShopEmptyPanel
               message="No invoice templates are available right now."
@@ -261,6 +212,7 @@ export default function ShopDocumentTemplatePanel({
                     key={template.id}
                     template={template}
                     selected={selectedId === template.id}
+                    previewData={previewData}
                     onSelect={() => onSelect(template.id)}
                     onPreview={() => setPreviewTemplate(template)}
                   />
@@ -273,6 +225,7 @@ export default function ShopDocumentTemplatePanel({
                       key={template.id}
                       template={template}
                       selected={selectedId === template.id}
+                      previewData={previewData}
                       onSelect={() => onSelect(template.id)}
                       onPreview={() => setPreviewTemplate(template)}
                     />
@@ -284,27 +237,44 @@ export default function ShopDocumentTemplatePanel({
         </div>
 
         {hasChanges ? (
-          <TemplateFormFooter
-            message="You are selecting your invoice template"
-            saving={saving}
-            saveLabel="Save"
-            onSave={() => void handleSave()}
-            onCancel={handleCancel}
-            cancelLabel="Cancel"
-            disabled={templates.length === 0 || !selectedId}
-          />
+          <div className="shrink-0">
+            <TemplateFormFooter
+              message="You are selecting your invoice template"
+              saving={saving}
+              saveLabel="Save"
+              onSave={() => void handleSave()}
+              onCancel={handleCancel}
+              cancelLabel="Cancel"
+              disabled={templates.length === 0 || !selectedId}
+            />
+          </div>
         ) : null}
       </div>
 
       <Modal
         isOpen={previewTemplate != null}
         onClose={() => setPreviewTemplate(null)}
-        className="m-4 w-full max-w-2xl rounded-lg bg-white p-0 shadow-xl"
+        className="m-4 w-full max-w-3xl rounded-lg bg-white p-0 shadow-xl"
         showCloseButton
       >
         {previewTemplate ? (
-          <div className="max-h-[80vh] overflow-y-auto">
-            <TemplatePreviewMock template={previewTemplate} />
+          <div className="max-h-[85vh] overflow-y-auto">
+            <div className="border-b border-gray-100 px-5 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ad-purple">
+                Invoice Preview
+              </p>
+              <h3 className="text-base font-bold text-gray-900">{previewTemplate.name}</h3>
+              <p className="text-sm text-gray-600">{previewTemplate.description}</p>
+            </div>
+            <div className="bg-[#f0f0f0] p-4 sm:p-6">
+              <div className="mx-auto max-w-[720px] overflow-hidden rounded shadow-md">
+                <InvoiceTemplatePreview
+                  templateId={previewTemplate.id}
+                  data={previewData}
+                  mode="full"
+                />
+              </div>
+            </div>
             {selectedTemplate?.id !== previewTemplate.id ? (
               <div className="border-t border-gray-100 px-5 py-3 text-right">
                 <button
@@ -318,7 +288,11 @@ export default function ShopDocumentTemplatePanel({
                   Select this template
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <div className="border-t border-gray-100 px-5 py-3 text-right text-xs font-medium text-gray-500">
+                This template is currently selected
+              </div>
+            )}
           </div>
         ) : null}
       </Modal>

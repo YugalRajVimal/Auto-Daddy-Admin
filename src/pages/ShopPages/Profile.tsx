@@ -663,6 +663,16 @@ export default function ShopProfilePage() {
             selectedId={invoiceTemplateId}
             onSelect={setInvoiceTemplateId}
             savedId={savedInvoiceTemplateId}
+            shopPreview={{
+              name: business?.businessName,
+              address:
+                [business?.businessAddress ?? business?.address, business?.city, business?.pincode]
+                  .filter(Boolean)
+                  .join(", ") || undefined,
+              phone: business?.businessPhone,
+              email: business?.email,
+              logoUrl: business?.businessLogo,
+            }}
             onSave={async (id) => {
               if (!token) {
                 toast.error("Sign in to save template.");

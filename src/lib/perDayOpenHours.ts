@@ -233,6 +233,17 @@ export type ShopOpenHoursHistoryRow = {
   enabled: boolean;
   start: string;
   end: string;
+  /** True when this date has a one-off special override. */
+  isSpecial?: boolean;
+  reason?: string;
+};
+
+export type SpecialOpenHourOverride = {
+  dateISO: string;
+  enabled: boolean;
+  start: string;
+  end: string;
+  reason?: string;
 };
 
 export type CurrentWeekOpenHoursRow = {
@@ -247,10 +258,248 @@ export function weekDayFromDateISO(dateISO: string): WeekDay {
   return WEEK_DAYS[(date.getDay() + 6) % 7];
 }
 
+export function addDaysISO(dateISO: string, days: number): string {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return formatLocalDateISO(date);
+}
+
 export function sortOpenHoursHistoryDesc(
   rows: ShopOpenHoursHistoryRow[]
 ): ShopOpenHoursHistoryRow[] {
   return [...rows].sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+}
+
+/**
+ * Table order: next 7 days (today+7 … today+1), then today, then past history.
+ */
+export function sortOpenHoursTableRows(
+  rows: ShopOpenHoursHistoryRow[],
+  todayISO = formatLocalDateISO(new Date())
+): ShopOpenHoursHistoryRow[] {
+  const upcoming: ShopOpenHoursHistoryRow[] = [];
+  const todayRows: ShopOpenHoursHistoryRow[] = [];
+  const history: ShopOpenHoursHistoryRow[] = [];
+
+  for (const row of rows) {
+    if (row.dateISO > todayISO) upcoming.push(row);
+    else if (row.dateISO === todayISO) todayRows.push(row);
+    else history.push(row);
+  }
+
+  upcoming.sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+  history.sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+  return [...upcoming, ...todayRows, ...history];
+}
+
+function pickArray(...candidates: unknown[]): unknown[] | null {
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c;
+  }
+  return null;
+}
+
+function unwrapOpenHoursPayload(payload: unknown): Record<string, unknown> {
+  if (!payload || typeof payload !== "object") return {};
+  const root = payload as Record<string, unknown>;
+  const data = root.data;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    return data as Record<string, unknown>;
+  }
+  return root;
+}
+
+/** Normalize API date values (`YYYY-MM-DD` or ISO datetime) to local calendar `YYYY-MM-DD`. */
+export function normalizeOpenHoursDateISO(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const text = raw.trim();
+  if (!text) return null;
+  // Prefer the calendar date from the string when present (avoids UTC shift on midnight Z).
+  const ymd = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (ymd) return ymd[1];
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return formatLocalDateISO(parsed);
+}
+
+/** Parse special date overrides from GET open-hours response. */
+export function parseSpecialOpenHours(payload: unknown): SpecialOpenHourOverride[] {
+  const root = unwrapOpenHoursPayload(payload);
+  const arr =
+    pickArray(
+      root.specialDayOverrides,
+      root.specialOpenHours,
+      root.specialHours,
+      root.specials,
+      root.overrides,
+      root.specialOpenHour,
+      Array.isArray(root.data) ? root.data : null
+    ) ?? [];
+
+  const out: SpecialOpenHourOverride[] = [];
+  for (const item of arr) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const dateISO = normalizeOpenHoursDateISO(obj.date ?? obj.dateISO ?? obj.specialDate);
+    if (!dateISO) continue;
+    const isClosed = Boolean(obj.isClosed ?? obj.closed);
+    const open =
+      typeof obj.open === "string"
+        ? obj.open
+        : typeof obj.start === "string"
+          ? obj.start
+          : DEFAULT_START;
+    const close =
+      typeof obj.close === "string"
+        ? obj.close
+        : typeof obj.end === "string"
+          ? obj.end
+          : DEFAULT_END;
+    const reason = typeof obj.reason === "string" ? obj.reason : undefined;
+    out.push({
+      dateISO,
+      enabled: !isClosed,
+      start: open || DEFAULT_START,
+      end: close || DEFAULT_END,
+      reason,
+    });
+  }
+  return out;
+}
+
+/** True when the open-hours payload includes an explicit weekly schedule array. */
+export function hasWeeklyScheduleInPayload(payload: unknown): boolean {
+  const root = unwrapOpenHoursPayload(payload);
+  const arr =
+    root.weeklySchedule ??
+    root.perDayOpenHours ??
+    root.weeklyOpenHours ??
+    root.weekly ??
+    root.schedule;
+  return Array.isArray(arr) && arr.length > 0;
+}
+
+/** Parse weekly schedule from GET open-hours (or business profile) payload. */
+export function parseWeeklyOpenHoursFromPayload(payload: unknown): PerDaySchedule {
+  const root = unwrapOpenHoursPayload(payload);
+  const fromPerDay = parsePerDayOpenHoursArray(
+    root.weeklySchedule ??
+      root.perDayOpenHours ??
+      root.weeklyOpenHours ??
+      root.weekly ??
+      root.schedule
+  );
+  if (fromPerDay?.length) return scheduleFromPerDayEntries(fromPerDay);
+  return resolvePerDaySchedule(root);
+}
+
+/** Parse optional effectiveSchedule array from a date-range GET response. */
+export function parseEffectiveOpenHoursSchedule(
+  payload: unknown
+): ShopOpenHoursHistoryRow[] | null {
+  const root = unwrapOpenHoursPayload(payload);
+  const arr = root.effectiveSchedule;
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+
+  const rows: ShopOpenHoursHistoryRow[] = [];
+  for (const item of arr) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const dateISO = normalizeOpenHoursDateISO(obj.date ?? obj.dateISO);
+    if (!dateISO) continue;
+    const day =
+      typeof obj.day === "string"
+        ? normalizeWeekdayName(obj.day) ?? weekDayFromDateISO(dateISO)
+        : weekDayFromDateISO(dateISO);
+    const isClosed = Boolean(obj.isClosed ?? obj.closed);
+    const open =
+      typeof obj.open === "string"
+        ? obj.open
+        : typeof obj.start === "string"
+          ? obj.start
+          : DEFAULT_START;
+    const close =
+      typeof obj.close === "string"
+        ? obj.close
+        : typeof obj.end === "string"
+          ? obj.end
+          : DEFAULT_END;
+    rows.push({
+      dateISO,
+      day,
+      enabled: !isClosed,
+      start: open || DEFAULT_START,
+      end: close || DEFAULT_END,
+      isSpecial: Boolean(obj.isSpecial ?? obj.isOverride),
+      reason: typeof obj.reason === "string" ? obj.reason : undefined,
+    });
+  }
+  return rows.length > 0 ? rows : null;
+}
+
+export function effectiveHoursForDate(
+  dateISO: string,
+  schedule: PerDaySchedule,
+  specialsByDate: Map<string, SpecialOpenHourOverride>
+): ShopOpenHoursHistoryRow {
+  const day = weekDayFromDateISO(dateISO);
+  const special = specialsByDate.get(dateISO);
+  if (special) {
+    return {
+      dateISO,
+      day,
+      enabled: special.enabled,
+      start: special.start,
+      end: special.end,
+      isSpecial: true,
+      reason: special.reason,
+    };
+  }
+  const entry = schedule[day];
+  return {
+    dateISO,
+    day,
+    enabled: entry.enabled,
+    start: entry.start,
+    end: entry.end,
+    isSpecial: false,
+  };
+}
+
+/**
+ * Build table rows: next 7 days (today+7 … today+1) above today,
+ * then history below today from past special overrides only.
+ * Weekly default changes must not rewrite older dates — history never
+ * synthesizes past days from the current weekly schedule.
+ */
+export function buildOpenHoursTableRows(
+  schedule: PerDaySchedule,
+  specials: SpecialOpenHourOverride[],
+  now = new Date()
+): ShopOpenHoursHistoryRow[] {
+  const todayISO = formatLocalDateISO(now);
+  const specialsByDate = new Map(specials.map((s) => [s.dateISO, s]));
+  const upcoming: ShopOpenHoursHistoryRow[] = [];
+  const seen = new Set<string>();
+
+  // Next 7 days above today (weekly defaults + specials)
+  for (let offset = 7; offset >= 1; offset--) {
+    const dateISO = addDaysISO(todayISO, offset);
+    upcoming.push(effectiveHoursForDate(dateISO, schedule, specialsByDate));
+    seen.add(dateISO);
+  }
+
+  const todayRow = effectiveHoursForDate(todayISO, schedule, specialsByDate);
+  seen.add(todayISO);
+
+  // History: past special overrides only (weekly updates never rewrite these)
+  const history = specials
+    .filter((s) => s.dateISO < todayISO && !seen.has(s.dateISO))
+    .sort((a, b) => b.dateISO.localeCompare(a.dateISO))
+    .map((s) => effectiveHoursForDate(s.dateISO, schedule, specialsByDate));
+
+  return [...upcoming, todayRow, ...history];
 }
 
 /**

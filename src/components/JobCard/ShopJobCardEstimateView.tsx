@@ -11,6 +11,12 @@ import { updateAutoshopJobCardStatus } from "../../lib/autoshopownerJobCardsApi"
 import { ShopListSkeleton } from "../shop/ShopListSkeletons";
 import { ShopErrorPanel } from "../shop/ShopPanels";
 import {
+  JOB_CARD_PREVIEW_THEME,
+  resolveInvoiceTheme,
+  type InvoiceThemeTokens,
+} from "../shop/invoice-templates/invoiceTheme";
+import { JobCardDocumentHeaderWave, JobCardDocumentWaves } from "./JobCardDocumentWaves";
+import {
   buildBusinessBlock,
   buildCustomerBlock,
   currencyLabelFromCode,
@@ -49,21 +55,22 @@ function TotalsRow({
   label,
   value,
   strong = false,
+  strongOnAccent = false,
 }: {
   label: string;
   value: string;
   strong?: boolean;
+  strongOnAccent?: boolean;
 }) {
+  const strongClass = strongOnAccent
+    ? "font-bold text-inherit"
+    : strong
+      ? "font-bold text-gray-900"
+      : "font-semibold text-gray-800";
   return (
     <>
-      <span
-        className={`text-right ${strong ? "font-bold text-gray-900" : "font-semibold text-gray-800"}`}
-      >
-        {label}
-      </span>
-      <span className={`text-right tabular-nums ${strong ? "font-bold text-gray-900" : "text-gray-800"}`}>
-        {value}
-      </span>
+      <span className={`text-right ${strongClass}`}>{label}</span>
+      <span className={`text-right tabular-nums ${strongClass}`}>{value}</span>
     </>
   );
 }
@@ -75,6 +82,7 @@ function EstimateTotalsBlock({
   total,
   totalLabel,
   showHst,
+  theme,
 }: {
   subtotal: string;
   hst: string;
@@ -82,6 +90,7 @@ function EstimateTotalsBlock({
   total: string;
   totalLabel: string;
   showHst: boolean;
+  theme?: InvoiceThemeTokens | null;
 }) {
   return (
     <div className="ml-auto w-[19rem] text-sm sm:w-[21rem]">
@@ -89,8 +98,17 @@ function EstimateTotalsBlock({
         <TotalsRow label="Subtotal :" value={subtotal} />
         {showHst ? <TotalsRow label="HST :" value={hst} /> : null}
         {roundOff ? <TotalsRow label="Round Off :" value={roundOff} /> : null}
-        <div className="col-span-2 grid grid-cols-subgrid gap-x-6 bg-gray-100 py-2 font-bold">
-          <TotalsRow label={totalLabel} value={total} strong />
+        <div
+          className={`col-span-2 grid grid-cols-subgrid gap-x-6 py-2 font-bold ${
+            theme ? "" : "bg-gray-100"
+          }`}
+          style={
+            theme
+              ? { backgroundColor: theme.accent, color: theme.accentText }
+              : undefined
+          }
+        >
+          <TotalsRow label={totalLabel} value={total} strong strongOnAccent={Boolean(theme)} />
         </div>
       </div>
     </div>
@@ -232,6 +250,13 @@ export default function ShopJobCardEstimateView({
     : cashPreview
       ? "Job card preview — confirm to mark as paid by cash"
       : "This estimate was sent using AutoDaddy";
+  /** Invoices use the saved Profile template theme; job cards use the viewer-inspired blue. */
+  const isInvoiceDocument =
+    alreadyInvoiced || invoicePreview || showPaymentActions === false;
+  const theme: InvoiceThemeTokens = isInvoiceDocument
+    ? resolveInvoiceTheme(business?.invoiceTemplateSlug)
+    : JOB_CARD_PREVIEW_THEME;
+  const documentHeading = isInvoiceDocument ? "Invoice" : "Job Card";
 
   const canConvertToInvoice = useMemo(
     () => (job ? isJobRecordEligibleForInvoiceConversion(job, listRow) : false),
@@ -418,22 +443,46 @@ export default function ShopJobCardEstimateView({
 
       <div
         id="shop-job-card-estimate-print"
-        className="relative overflow-hidden rounded border border-gray-300 bg-white p-4 shadow-sm sm:p-6 print:border-0 print:p-0 print:shadow-none"
+        className="relative overflow-hidden rounded border bg-white p-4 shadow-sm sm:p-6 print:border-0 print:p-0 print:shadow-none"
+        style={{ borderColor: theme.border }}
       >
-        <div className="mb-4 flex justify-center">
-          {logoUrl ? (
-            <img src={logoUrl} alt="" className="h-12 max-w-[8rem] object-contain" />
-          ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded border border-gray-300 text-xs font-bold text-gray-500">
-              ABC
+        {isInvoiceDocument ? (
+          <div className="mb-4 h-1.5 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6" style={{ backgroundColor: theme.accent }} />
+        ) : (
+          <div className="-mx-4 -mt-4 mb-2 sm:-mx-6 sm:-mt-6">
+            <JobCardDocumentHeaderWave />
+          </div>
+        )}
+
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="h-12 max-w-[8rem] object-contain" />
+            ) : (
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded text-xs font-bold"
+                style={{ backgroundColor: theme.accent, color: theme.accentText }}
+              >
+                AD
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold" style={{ color: theme.title }}>
+                {businessBlock.name}
+              </p>
             </div>
-          )}
+          </div>
+          <h2
+            className="shrink-0 text-2xl font-bold uppercase tracking-wide"
+            style={{ color: theme.title }}
+          >
+            {documentHeading}
+          </h2>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="space-y-4 text-sm text-gray-800">
             <div>
-              <p className="font-bold text-gray-900">{businessBlock.name}</p>
               {businessBlock.address ? <p>{businessBlock.address}</p> : null}
               {businessBlock.phone ? <p>{businessBlock.phone}</p> : null}
             </div>
@@ -460,7 +509,10 @@ export default function ShopJobCardEstimateView({
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
-              <tr className="bg-gray-100 text-left text-xs font-bold text-gray-800">
+              <tr
+                className="text-left text-xs font-bold"
+                style={{ backgroundColor: theme.accent, color: theme.accentText }}
+              >
                 <th className="border border-gray-300 px-2 py-2">S. No.</th>
                 <th className="border border-gray-300 px-2 py-2">Description</th>
                 <th className="border border-gray-300 px-2 py-2 text-right">Unit Cost</th>
@@ -483,7 +535,12 @@ export default function ShopJobCardEstimateView({
                 </tr>
               ) : (
                 lines.map((line, index) => (
-                  <tr key={`${line.description}-${index}`}>
+                  <tr
+                    key={`${line.description}-${index}`}
+                    style={
+                      index % 2 === 1 ? { backgroundColor: theme.stripe } : undefined
+                    }
+                  >
                     <td className="border border-gray-300 px-2 py-2 align-top">{index + 1}.</td>
                     <td className="border border-gray-300 px-2 py-2 align-top">{line.description}</td>
                     <td className="border border-gray-300 px-2 py-2 text-right align-top tabular-nums">
@@ -519,12 +576,21 @@ export default function ShopJobCardEstimateView({
             total={formatEstimateMoney(totals.total, callingCode)}
             totalLabel={`Total (${currencyLabel}) :`}
             showHst={showHst}
+            theme={theme}
           />
         </div>
 
         <p className="mt-6 text-right text-[10px] text-gray-500 print:mt-4">
           {footerNote}
         </p>
+
+        {isInvoiceDocument ? (
+          <div className="mt-4 h-1.5 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6" style={{ backgroundColor: theme.accent }} />
+        ) : (
+          <div className="-mx-4 -mb-4 mt-6 sm:-mx-6 sm:-mb-6">
+            <JobCardDocumentWaves />
+          </div>
+        )}
       </div>
     </div>
   );
