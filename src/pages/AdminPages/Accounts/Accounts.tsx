@@ -2666,7 +2666,7 @@ function LedgerPage({
             <button
               type="button"
               disabled={selected.size === 0}
-              onClick={handleRestore}
+              onClick={() => handleRestore()}
               className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               Restore

@@ -75,16 +75,10 @@ const DEFAULT_VISIBLE = ["date", "phone", "businessName", "shopType", "city", "d
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const API = () => (import.meta.env.VITE_API_URL as string) || "";
 const UPLOADS = () => (import.meta.env.VITE_UPLOADS_URL as string) || "";
-const IMAGE_URL = () => (import.meta.env.VITE_IMAGE_URL as string) || "";
 function mediaUrl(path?: string): string {
   if (!path) return "";
   if (path.startsWith("http")) return path;
   return `${UPLOADS()}/${path.replace(/^\/+/, "")}`;
-}
-function imgUrl(path?: string): string {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  return `${IMAGE_URL()}/${path.replace(/^\/+/, "")}`;
 }
 function fmtDate(d?: string): string {
   if (!d) return "-";
@@ -157,83 +151,8 @@ const BaseModal: React.FC<{
   );
 };
 
-// ─── Open Days helper ─────────────────────────────────────────────────────────
-function parseOpenDays(openDays?: string[]): string {
-  if (!openDays || !openDays.length) return "-";
-  if (openDays.length === 1 && typeof openDays[0] === "string" && openDays[0].trim().startsWith("[")) {
-    try { return JSON.parse(openDays[0]).join(", "); } catch { return openDays.join(", "); }
-  }
-  return openDays.join(", ");
-}
-
 // ─── ADD / EDIT MODAL ────────────────────────────────────────────────────────
 function isEmail(e: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()); }
-
-// ─── SHOP OVERVIEW CARD ───────────────────────────────────────────────────────
-const ShopOverviewCard: React.FC<{ bp: BusinessProfileType }> = ({ bp }) => {
-  const services: string[] = [];
-  if (Array.isArray(bp.myServices)) {
-    for (const ms of bp.myServices) {
-      const n = ms.serviceName || ms.service?.name;
-      if (n) services.push(n);
-    }
-  }
-  if (!services.length) services.push(...["General Repair", "Oil Change", "Brake Service"]);
-  const logoUrl = bp.businessLogo ? imgUrl(bp.businessLogo) : "https://images.unsplash.com/photo-1486006920555-c77dcf18193c?q=80&w=400&auto=format&fit=crop";
-  const openDays = parseOpenDays(bp.openDays);
-  const directionsUrl = bp.businessMapLocation?.lat ? `https://www.google.com/maps/search/?api=1&query=${bp.businessMapLocation.lat},${bp.businessMapLocation.lng}` : "#";
-  const webUrl = (bp.websiteUrl && bp.websiteUrl !== "#") ? bp.websiteUrl : bp.businessEmail ? `mailto:${bp.businessEmail}` : "#";
-  return (
-    <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.06)] mb-7">
-      <div className="grid border-b border-slate-200" style={{ gridTemplateColumns: "minmax(0,1.15fr) minmax(0,0.72fr) minmax(0,0.72fr) minmax(0,1.65fr) minmax(52px,0.55fr)", minHeight: 48 }}>
-        <div className="flex items-center justify-center border-r border-slate-200 bg-emerald-50 px-2 py-2 text-center text-[13px] font-bold text-emerald-800"><span className="truncate">📞 {bp.businessPhone || "-"}</span></div>
-        <a href={directionsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center border-r border-slate-200 bg-sky-50 text-[13px] font-semibold text-blue-600 no-underline hover:bg-sky-100">Directions</a>
-        <a href={webUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center border-r border-slate-200 bg-slate-50 text-[13px] font-semibold text-slate-700 no-underline hover:bg-slate-100">Website</a>
-        <div className="flex min-w-0 items-center justify-between gap-2 border-r border-slate-200 bg-white px-3 py-2">
-          <div className="flex shrink-0 items-center gap-2">
-            <span className={`h-2 w-2 shrink-0 rounded-full ${bp.isOpen ? "bg-emerald-500" : "bg-red-500"}`} />
-            <span className={`whitespace-nowrap text-[12px] font-semibold ${bp.isOpen ? "text-emerald-700" : "text-red-600"}`}>{bp.isOpen ? "OPEN NOW" : "CLOSED"}</span>
-          </div>
-          <div className="text-right text-[11px] leading-snug text-slate-500"><div>{openDays}</div><div className="whitespace-nowrap">{bp.openHours || "-"}</div></div>
-        </div>
-        <div className="flex items-center justify-center gap-1 bg-amber-50 text-[15px] font-bold text-slate-900"><span className="text-amber-500">★</span>{bp.rating ?? 4.8}</div>
-      </div>
-      <div className="grid items-start gap-5 p-5" style={{ gridTemplateColumns: "minmax(120px,150px) minmax(0,1.25fr) minmax(0,1.1fr) minmax(100px,118px)" }}>
-        <img src={logoUrl} alt={bp.businessName} className="h-[108px] w-full rounded-lg object-cover" />
-        <div className="min-w-0">
-          <h2 className="mb-1.5 text-xl font-bold leading-tight text-slate-900">{bp.businessName || "-"}</h2>
-          <p className="mb-3 text-[13px] leading-relaxed text-slate-600">{bp.businessAddress}<br />{bp.city}{bp.pincode && <>, {bp.pincode}</>}</p>
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">{bp.isOpen ? "Open" : "Closed"}</span>
-            <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] text-blue-700">{openDays}</span>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] text-slate-600">{bp.openHours || "-"}</span>
-          </div>
-        </div>
-        <div className="min-w-0">
-          <p className="mb-2.5 text-[13px] font-bold text-slate-900">Services</p>
-          <ul className="grid list-none gap-x-4 gap-y-1.5 p-0" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
-            {services.slice(0, 6).map((s, i) => (
-              <li key={i} className="flex min-w-0 items-start gap-1.5 text-[12px] leading-snug text-slate-600">
-                <span className="mt-px shrink-0 font-bold text-emerald-500">✓</span>
-                <span className="min-w-0">{s}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-3 text-center">
-          <span className="text-[26px] font-bold leading-none text-slate-900">{bp.rating ?? 4.8}</span>
-          <span className="mt-1 text-[13px] tracking-wide text-amber-500">★★★★★</span>
-          <span className="mt-1.5 text-[11px] text-slate-500">{bp.reviewCount ?? 0} Reviews</span>
-        </div>
-      </div>
-      <div className="grid items-center gap-2 bg-slate-900 px-4 py-2.5 text-[12px] text-white" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr)" }}>
-        <span className="truncate font-medium">{bp.businessName}</span>
-        <span className="truncate text-center text-slate-200">{bp.businessAddress} • {bp.city}</span>
-        <span className="truncate text-right text-slate-200">{openDays} | {bp.openHours || "-"}</span>
-      </div>
-    </div>
-  );
-};
 
 // ─── CUSTOMERS MODAL ──────────────────────────────────────────────────────────
 const CustomersModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => void }> = ({ owner, onClose }) => (
@@ -325,82 +244,6 @@ const JobCardsModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => void }>
             <button type="button" onClick={() => setDetailCard(card)} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", fontSize: 26, color: "#1a8a1a", cursor: "pointer", lineHeight: 1 }}>+</button>
           </div>
         ))}
-    </BaseModal>
-  );
-};
-
-// ─── BUSINESS PROFILE MODAL ───────────────────────────────────────────────────
-const BusinessProfileModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => void }> = ({ owner, onClose }) => {
-  const bp = owner.businessProfile;
-  if (!bp) return (
-    <BaseModal isOpen onClose={onClose} title="Business Profile">
-      <p style={{ textAlign: "center", color: "#aaa" }}>No business profile found.</p>
-    </BaseModal>
-  );
-  const serviceMap: Record<string, { service: Service; subServices: IndividualService[] }> = {};
-  (bp.myServices ?? []).forEach((ms: MyService) => {
-    const svc = ms.service; if (!svc?._id) return;
-    if (!serviceMap[svc._id]) serviceMap[svc._id] = { service: svc, subServices: [] };
-    const subIds = (ms.subServices ?? []).map(s => s.subService);
-    if (Array.isArray(svc.services)) {
-      const matched = subIds.length ? svc.services.filter(ss => subIds.includes(ss._id)) : svc.services;
-      serviceMap[svc._id].subServices.push(...matched);
-    }
-  });
-  return (
-    <BaseModal isOpen wide onClose={onClose} title={`Business Profile — ${bp.businessName || "-"}`}>
-      <ShopOverviewCard bp={bp} />
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #9b308d", paddingBottom: 6, color: "#9b308d", marginTop: 16 }}>Team Members</div>
-      {Array.isArray(bp.teamMembers) && bp.teamMembers.length > 0 ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
-          {bp.teamMembers.map((tm: TeamMemberType) => (
-            <div key={tm._id} style={GREEN_CARD}>
-              <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                <div style={{ width: 50, height: 50, borderRadius: "50%", background: "#c8e6b0", border: "2px solid #1a6e1a", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {tm.photo ? <img src={imgUrl(tm.photo)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 18, color: "#1a6e1a" }}>👤</span>}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{tm.name}</div>
-                  <div style={{ fontSize: 12, color: "#555" }}>{tm.designation || "-"}</div>
-                  <div style={{ fontSize: 12, color: "#555" }}>{tm.email || ""} {tm.phone || ""}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : <div style={{ color: "#aaa", fontSize: 13, marginBottom: 20 }}>No team members.</div>}
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #9b308d", paddingBottom: 6, color: "#9b308d" }}>Services</div>
-      {Object.keys(serviceMap).length > 0 ? (
-        <div style={{ marginBottom: 20 }}>
-          {Object.values(serviceMap).map(({ service, subServices }) => (
-            <div key={service._id} style={{ marginBottom: 10 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, color: "#333", marginBottom: 4 }}>{service.name || "-"}</div>
-              {subServices.length > 0 && <ul style={{ paddingLeft: 18, margin: "0 0 4px", fontSize: 12, color: "#555" }}>{subServices.map(ss => <li key={ss._id}>{ss.name}{ss.desc ? ` — ${ss.desc}` : ""}</li>)}</ul>}
-            </div>
-          ))}
-        </div>
-      ) : <div style={{ color: "#aaa", fontSize: 13, marginBottom: 20 }}>No services listed.</div>}
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, borderBottom: "2px solid #9b308d", paddingBottom: 6, color: "#9b308d" }}>My Deals</div>
-      {Array.isArray(bp.myDeals) && bp.myDeals.length > 0 ? (
-        <div style={{ overflowX: "auto", marginBottom: 16 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead><tr>{["Name", "Type", "Discount", "Ends On"].map(h => <th key={h} className="border border-gray-300 bg-gray-100 px-3 py-2 text-center text-xs font-bold">{h}</th>)}</tr></thead>
-            <tbody>
-              {bp.myDeals.map((deal: any, i: number) => {
-                if (typeof deal === "string") return <tr key={i}><td className={tdClass} colSpan={4}>{deal}</td></tr>;
-                return (
-                  <tr key={deal._id ?? i}>
-                    <td className={tdClass}>{deal.name || "-"}</td>
-                    <td className={tdClass}>{deal.dealType || "-"}</td>
-                    <td className={tdClass}>{deal.discountedPrice != null ? `$${deal.discountedPrice}` : deal.percentageDiscount != null ? `${deal.percentageDiscount}%` : "-"}</td>
-                    <td className={tdClass}>{deal.offerEndsOnDate ? fmtDate(deal.offerEndsOnDate) : deal.endDate ? fmtDate(deal.endDate) : "-"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : <div style={{ color: "#aaa", fontSize: 13 }}>No deals linked.</div>}
     </BaseModal>
   );
 };
