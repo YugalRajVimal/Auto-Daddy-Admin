@@ -34,19 +34,24 @@ import {
   type WebsiteTemplate,
 } from "../../lib/shopOwnerWebsiteApi";
 import {
-  buildSubscriptionReferenceId,
-  extractPendingSubscriptionCheckout,
-  extractPurchaseSubscriptionCheckoutSession,
-  fetchAutoShopOwnerProfile,
-  findSubscriptionByOrderId,
-  formatPurchaseSubscriptionError,
-  isSubscriptionPaymentPaid,
-  purchaseWebsiteSubscription,
+  buildSubscriptionReturnUrls,
+  createSubscriptionCheckout,
+  extractCheckoutSession,
+  fetchSubscriptionInvoiceStatus,
+  fetchSubscriptionPlans,
+  fetchSubscriptionStatus,
+  formatSubscriptionApiError,
+  parseInvoicePaymentStatus,
+  parseSubscriptionPlans,
+  parseSubscriptionStatus,
+  purchaseSubscriptionOffline,
+  type SubscriptionPlan,
+  type SubscriptionStatus,
 } from "../../lib/shopOwnerSubscriptionApi";
 import { redirectToStripeCheckout } from "../../lib/stripe";
+import type { SubscriptionPlanId } from "../../types/websiteSubscription";
 
 type ShopWebsiteSection = "domain" | "templates" | "subscription";
-type SubscriptionPlanId = "yearly" | "biweekly";
 
 const WEBSITE_SECTIONS = [
   { id: "domain", label: "Domain Details", variant: "primary" as const },
@@ -68,23 +73,34 @@ const YEARLY_FEATURES: { label: string; note: string }[] = [
   { label: "Mobile App", note: "For You and Customers" },
 ];
 
-const SUBSCRIPTION_PLANS = {
-  yearly: { amount: 365, days: 365 },
-  biweekly: { amount: 390, days: 14 },
-} as const;
-
-const INVOICE_ROWS = {
-  yearly: [
-    { service: "Website", description: "Website subscription for 365 days", amount: 365 },
-  ],
-  biweekly: [
-    {
-      service: "Bi-weekly plan",
-      description: "26 void cheques of CAD 15 for 26 bi-weekly periods",
-      amount: 390,
-    },
-  ],
-} as const;
+const FALLBACK_PLANS: Record<SubscriptionPlanId, SubscriptionPlan> = {
+  yearly: {
+    id: "yearly",
+    title: "$ 365 Yearly plan",
+    amount: 365,
+    days: 365,
+    hst: 49,
+    features: YEARLY_FEATURES,
+    invoiceRows: [
+      { service: "Website", description: "Website subscription for 365 days", amount: 365 },
+    ],
+  },
+  biweekly: {
+    id: "biweekly",
+    title: "$ 15 Bi-weekly plan",
+    amount: 390,
+    days: 14,
+    hst: 51,
+    description: "26 -Void cheques of CAD 15",
+    invoiceRows: [
+      {
+        service: "Bi-weekly plan",
+        description: "26 void cheques of CAD 15 for 26 bi-weekly periods",
+        amount: 390,
+      },
+    ],
+  },
+};
 
 const websiteFormSaveButtonClass =
   "inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60";
@@ -579,7 +595,23 @@ function SubscriptionPlanCard({
   );
 }
 
-function SubscriptionPanel({ onViewInvoice }: { onViewInvoice: (plan: SubscriptionPlanId) => void }) {
+function SubscriptionPanel({
+  plans,
+  status,
+  loading,
+  onViewInvoice,
+}: {
+  plans: Record<SubscriptionPlanId, SubscriptionPlan>;
+  status: SubscriptionStatus | null;
+  loading?: boolean;
+  onViewInvoice: (plan: SubscriptionPlanId) => void;
+}) {
+  const currentLabel =
+    status?.planLabel ||
+    (status?.active ? "Active subscription" : "a day payment for 365 accumulative days");
+  const yearly = plans.yearly;
+  const biweekly = plans.biweekly;
+
   return (
     <div className="space-y-4">
       <div
@@ -589,25 +621,30 @@ function SubscriptionPanel({ onViewInvoice }: { onViewInvoice: (plan: Subscripti
           <span className="text-sm font-bold text-[#006600]">Current Plan</span>
           <GoldCoinIcon />
           <span className="text-center text-sm font-bold leading-snug text-[#006600] sm:text-left">
-            a day payment for 365 accumulative days
+            {loading ? "Loading…" : currentLabel}
+            {!loading && status?.daysLeft != null ? (
+              <span className="ml-1 font-semibold text-[#006600]">
+                ({status.daysLeft} days left)
+              </span>
+            ) : null}
           </span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SubscriptionPlanCard
-          title="$ 365 Yearly plan"
+          title={yearly.title}
           onViewInvoice={() => onViewInvoice("yearly")}
         >
-          <PlanFeatureList items={YEARLY_FEATURES} />
+          <PlanFeatureList items={yearly.features?.length ? yearly.features : YEARLY_FEATURES} />
         </SubscriptionPlanCard>
 
         <SubscriptionPlanCard
-          title="$ 15 Bi-weekly plan"
+          title={biweekly.title}
           onViewInvoice={() => onViewInvoice("biweekly")}
         >
           <p className="text-sm font-semibold text-gray-900">
-            26 -Void cheques of CAD 15
+            {biweekly.description || "26 -Void cheques of CAD 15"}
             <span className="ml-1 text-xs font-medium text-blue-600">(for 26 Bi-weekly)</span>
           </p>
         </SubscriptionPlanCard>
@@ -619,6 +656,7 @@ function SubscriptionPanel({ onViewInvoice }: { onViewInvoice: (plan: Subscripti
 function WebsiteInvoiceModal({
   open,
   plan,
+  planDetails,
   onClose,
   onProceed,
   billToName,
@@ -630,6 +668,7 @@ function WebsiteInvoiceModal({
 }: {
   open: boolean;
   plan: SubscriptionPlanId;
+  planDetails: SubscriptionPlan;
   onClose: () => void;
   onProceed: () => void;
   billToName: string;
@@ -639,12 +678,18 @@ function WebsiteInvoiceModal({
   countryCode: string | null | undefined;
   processing?: boolean;
 }) {
-  const rows = INVOICE_ROWS[plan];
+  const rows =
+    planDetails.invoiceRows?.length
+      ? planDetails.invoiceRows
+      : FALLBACK_PLANS[plan].invoiceRows ?? [];
   const subTotal = rows.reduce((sum, row) => sum + row.amount, 0);
-  const hst = plan === "yearly" ? 49 : 51;
+  const hst = planDetails.hst;
   const totalDue = subTotal + hst;
   const invoiceLabel = plan === "yearly" ? "AD 0001" : "AD 0002";
-  const planTitle = plan === "yearly" ? "Yearly website subscription" : "Bi-weekly website subscription";
+  const planTitle =
+    plan === "yearly" ? "Yearly website subscription" : "Bi-weekly website subscription";
+  const proceedLabel =
+    plan === "biweekly" ? "Submit void cheque purchase" : "Proceed with Payment";
 
   const formatAmount = (amount: number) =>
     formatCurrencyAmount(amount, countryCode, { fallback: "—" });
@@ -726,7 +771,7 @@ function WebsiteInvoiceModal({
             disabled={processing}
             className={websiteFormSaveButtonClass}
           >
-            {processing ? "Processing…" : "Proceed with Payment"}
+            {processing ? "Processing…" : proceedLabel}
           </button>
         </div>
       </div>
@@ -752,6 +797,10 @@ export default function ShopMyWebsitePage() {
   const [invoicePlan, setInvoicePlan] = useState<SubscriptionPlanId>("yearly");
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [subscriptionPlans, setSubscriptionPlans] =
+    useState<Record<SubscriptionPlanId, SubscriptionPlan>>(FALLBACK_PLANS);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
   const displayTemplates = useMemo(
     () =>
@@ -762,6 +811,8 @@ export default function ShopMyWebsitePage() {
       })),
     [templates],
   );
+
+  const invoicePlanDetails = subscriptionPlans[invoicePlan] ?? FALLBACK_PLANS[invoicePlan];
 
   useEffect(() => {
     const templateId = business?.websiteTemplateId?.trim();
@@ -834,6 +885,53 @@ export default function ShopMyWebsitePage() {
       void loadTemplates();
     }
   }, [token, loadTemplates]);
+
+  const loadSubscription = useCallback(async () => {
+    if (!token) {
+      setSubscriptionPlans(FALLBACK_PLANS);
+      setSubscriptionStatus(null);
+      return;
+    }
+    setSubscriptionLoading(true);
+    try {
+      const [plansRes, statusRes] = await Promise.all([
+        fetchSubscriptionPlans(token),
+        fetchSubscriptionStatus(token),
+      ]);
+
+      if (plansRes.ok) {
+        const parsed = parseSubscriptionPlans(plansRes.data);
+        if (parsed.length > 0) {
+          const next: Record<SubscriptionPlanId, SubscriptionPlan> = { ...FALLBACK_PLANS };
+          for (const plan of parsed) {
+            next[plan.id] = {
+              ...FALLBACK_PLANS[plan.id],
+              ...plan,
+              features: plan.features?.length ? plan.features : FALLBACK_PLANS[plan.id].features,
+              invoiceRows: plan.invoiceRows?.length
+                ? plan.invoiceRows
+                : FALLBACK_PLANS[plan.id].invoiceRows,
+            };
+          }
+          setSubscriptionPlans(next);
+        }
+      }
+
+      if (statusRes.ok) {
+        setSubscriptionStatus(parseSubscriptionStatus(statusRes.data));
+      }
+    } catch {
+      // Keep fallbacks; toast only when user is on subscription tab via refresh.
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (token && activeSection === "subscription") {
+      void loadSubscription();
+    }
+  }, [token, activeSection, loadSubscription]);
 
   const selectedTemplate = useMemo(
     () => displayTemplates.find((t) => t.id === selectedTemplateId) ?? null,
@@ -974,52 +1072,50 @@ export default function ShopMyWebsitePage() {
       return;
     }
 
-    const plan = SUBSCRIPTION_PLANS[invoicePlan];
-
     setPaymentProcessing(true);
     try {
-      const profileRes = await fetchAutoShopOwnerProfile(token);
-      const pending = extractPendingSubscriptionCheckout(
-        profileRes.data?.data?.businessProfile
-      );
-      if (pending) {
-        toast.info("Opening pending payment…");
-        const { error } = await redirectToStripeCheckout(pending);
-        if (error) {
-          toast.error(error);
+      if (invoicePlan === "biweekly") {
+        const res = await purchaseSubscriptionOffline(token, {
+          planId: "biweekly",
+          paymentMethod: "Void Cheque",
+          remarks: "26 void cheques of CAD 15",
+        });
+        const data = res.data;
+        const succeeded = res.ok && data?.success !== false;
+        if (!succeeded) {
+          toast.error(formatSubscriptionApiError(data, "Could not submit void cheque purchase."));
+          return;
         }
+        const invoiceNo =
+          data?.invoiceNo?.trim() || data?.data?.invoiceNo?.trim() || "";
+        toast.success(
+          data?.message?.trim() ||
+            (invoiceNo
+              ? `Void cheque purchase submitted (${invoiceNo}).`
+              : "Void cheque purchase submitted."),
+        );
+        setInvoiceOpen(false);
+        await loadSubscription();
         return;
       }
 
-      const websiteTemplateId =
-        savedTemplateId.trim() ||
-        selectedTemplateId.trim() ||
-        business?.websiteTemplateId?.trim() ||
-        "";
-      if (!websiteTemplateId) {
-        toast.error("Please select and save a website template before payment.");
-        return;
-      }
-
-      const res = await purchaseWebsiteSubscription(token, {
-        amount: plan.amount,
-        days: plan.days,
-        paymentMethod: "stripe",
-        referenceId: buildSubscriptionReferenceId(),
-        year: String(new Date().getFullYear()),
-        websiteTemplateId,
+      const { successUrl, cancelUrl } = buildSubscriptionReturnUrls("yearly");
+      const res = await createSubscriptionCheckout(token, {
+        planId: "yearly",
+        successUrl,
+        cancelUrl,
       });
 
       const data = res.data;
       const succeeded = res.ok && data?.success !== false;
       if (!succeeded) {
-        toast.error(formatPurchaseSubscriptionError(data));
+        toast.error(formatSubscriptionApiError(data));
         return;
       }
 
-      const session = extractPurchaseSubscriptionCheckoutSession(data);
-      if (!session) {
-        toast.error(data?.message?.trim() || "Payment session not returned.");
+      const session = extractCheckoutSession(data);
+      if (!session?.checkoutUrl && !session?.stripeSessionId) {
+        toast.error(data?.message?.trim() || "Checkout URL not returned.");
         return;
       }
 
@@ -1027,7 +1123,7 @@ export default function ShopMyWebsitePage() {
         toast.info(data.message.trim());
       }
 
-      const { error } = await redirectToStripeCheckout(session);
+      const { error } = await redirectToStripeCheckout(session!);
       if (error) {
         toast.error(error);
         return;
@@ -1045,19 +1141,43 @@ export default function ShopMyWebsitePage() {
     if (!token) return;
     const params = new URLSearchParams(window.location.search);
     const payment = params.get("payment")?.toLowerCase();
-    const orderId = params.get("order_id")?.trim();
+    const invoiceNo =
+      params.get("invoiceNo")?.trim() ||
+      params.get("invoice_no")?.trim() ||
+      params.get("order_id")?.trim() ||
+      "";
+
     if (payment !== "success" && payment !== "cancel") return;
 
-    if (payment === "cancel") {
-      toast.info("Payment was cancelled.");
+    setActiveSection("subscription");
+
+    const clearPaymentParams = () => {
       params.delete("payment");
+      params.delete("plan");
+      params.delete("invoiceNo");
+      params.delete("invoice_no");
       params.delete("order_id");
+      params.delete("session_id");
       const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
       window.history.replaceState({}, "", next);
+    };
+
+    if (payment === "cancel") {
+      toast.info(
+        invoiceNo
+          ? `Payment was cancelled (${invoiceNo}).`
+          : "Payment was cancelled.",
+      );
+      clearPaymentParams();
       return;
     }
 
-    if (!orderId) return;
+    if (!invoiceNo) {
+      toast.info("Payment returned, but invoice number was missing. Refresh subscription status shortly.");
+      clearPaymentParams();
+      void loadSubscription();
+      return;
+    }
 
     void (async () => {
       const pollDelaysMs = [0, 2000, 4000, 6000];
@@ -1065,25 +1185,26 @@ export default function ShopMyWebsitePage() {
         if (delayMs > 0) {
           await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
-        const profileRes = await fetchAutoShopOwnerProfile(token);
-        const sub = findSubscriptionByOrderId(
-          profileRes.data?.data?.businessProfile?.subscriptions,
-          orderId
-        );
-        if (sub && isSubscriptionPaymentPaid(sub.paymentStatus)) {
-          toast.success(`Payment successful (${orderId}).`);
-          params.delete("payment");
-          params.delete("order_id");
-          const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
-          window.history.replaceState({}, "", next);
-          return;
+        try {
+          const statusRes = await fetchSubscriptionInvoiceStatus(token, invoiceNo);
+          const parsed = parseInvoicePaymentStatus(statusRes.data);
+          if (parsed?.paid) {
+            toast.success(`Payment successful (${invoiceNo}).`);
+            clearPaymentParams();
+            await loadSubscription();
+            return;
+          }
+        } catch {
+          // Retry on next poll.
         }
       }
       toast.info(
-        "Payment not confirmed yet. Your backend must receive the Stripe webhook to mark the order Paid."
+        "Payment not confirmed yet. Your backend must receive the Stripe webhook to mark the invoice Paid.",
       );
+      clearPaymentParams();
+      await loadSubscription();
     })();
-  }, [token]);
+  }, [token, loadSubscription]);
 
   const renderContent = () => {
     switch (activeSection) {
@@ -1114,7 +1235,14 @@ export default function ShopMyWebsitePage() {
           />
         );
       case "subscription":
-        return <SubscriptionPanel onViewInvoice={handleViewInvoice} />;
+        return (
+          <SubscriptionPanel
+            plans={subscriptionPlans}
+            status={subscriptionStatus}
+            loading={subscriptionLoading}
+            onViewInvoice={handleViewInvoice}
+          />
+        );
       default:
         return null;
     }
@@ -1145,6 +1273,7 @@ export default function ShopMyWebsitePage() {
       <WebsiteInvoiceModal
         open={invoiceOpen}
         plan={invoicePlan}
+        planDetails={invoicePlanDetails}
         onClose={() => setInvoiceOpen(false)}
         onProceed={handleProceedPayment}
         billToName={billTo.name}
