@@ -115,20 +115,18 @@ type ToggleThoughtLikeResponse = {
 
 function normalizeSections(raw: unknown): CarOwnerContentBlock[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const o = item as Record<string, unknown>;
-      const heading = typeof o.heading === "string" ? o.heading.trim() : "";
-      const desc = typeof o.desc === "string" ? o.desc.trim() : "";
-      if (!heading && !desc) return null;
-      return {
-        _id: typeof o._id === "string" ? o._id : undefined,
-        heading,
-        desc,
-      };
-    })
-    .filter((s): s is CarOwnerContentBlock => s != null);
+  const out: CarOwnerContentBlock[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const heading = typeof o.heading === "string" ? o.heading.trim() : "";
+    const desc = typeof o.desc === "string" ? o.desc.trim() : "";
+    if (!heading && !desc) continue;
+    const block: CarOwnerContentBlock = { heading, desc };
+    if (typeof o._id === "string") block._id = o._id;
+    out.push(block);
+  }
+  return out;
 }
 
 function normalizeLikeCount(raw: unknown): number {
