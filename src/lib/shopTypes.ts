@@ -6,7 +6,7 @@ export type ShopType = OwnerShopType;
 export const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
   { value: "autoShop", label: "Mechanic Shop" },
   { value: "carWash", label: "Car Washing" },
-  { value: "tyreShop", label: "Tire Master" },
+  { value: "tyreShop", label: "Tire Services" },
   { value: "towTruck", label: "Tow Truck" },
 ];
 

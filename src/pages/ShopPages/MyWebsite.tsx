@@ -23,7 +23,6 @@ import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { formatCurrencyAmount } from "../../lib/currency";
 import {
   addDomainDetails,
-  editDomainDetails,
   fetchDomainDetails,
   formatDomainApiError,
   parseDomainDetailsResponse,
@@ -98,14 +97,16 @@ function WebsiteFormFooter({
   onCancel,
   cancelLabel = "Reset",
   disabled = false,
+  hideCancel = false,
 }: {
   message: string;
   saving?: boolean;
   saveLabel: string;
   onSave: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
   cancelLabel?: string;
   disabled?: boolean;
+  hideCancel?: boolean;
 }) {
   const isDisabled = saving || disabled;
   return (
@@ -124,17 +125,19 @@ function WebsiteFormFooter({
         >
           {saving ? "Saving…" : saveLabel}
         </button>
-        <span className="text-xs text-gray-700">
-          or{" "}
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isDisabled}
-            className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
-          >
-            {cancelLabel}
-          </button>
-        </span>
+        {!hideCancel && onCancel ? (
+          <span className="text-xs text-gray-700">
+            or{" "}
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isDisabled}
+              className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+            >
+              {cancelLabel}
+            </button>
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -264,16 +267,20 @@ function DomainPanel({
   form,
   onChange,
   onSaveAndNext,
+  onNext,
   onReset,
   saving,
   loading,
+  readOnly = false,
 }: {
   form: DomainForm;
   onChange: (next: DomainForm) => void;
   onSaveAndNext: () => void;
+  onNext: () => void;
   onReset: () => void;
   saving?: boolean;
   loading?: boolean;
+  readOnly?: boolean;
 }) {
   if (loading) {
     return (
@@ -283,18 +290,31 @@ function DomainPanel({
     );
   }
 
+  const inputClass = readOnly
+    ? `${shopCompactInputClass} cursor-default bg-gray-50 text-gray-700`
+    : shopCompactInputClass;
+
   return (
     <CompactFormPanel
       className={shopProfileFormPanelClass}
       showBottomBorder={false}
       footer={
-        <WebsiteFormFooter
-          message="You are saving your domain details"
-          saveLabel="Save and Next"
-          saving={saving}
-          onSave={onSaveAndNext}
-          onCancel={onReset}
-        />
+        readOnly ? (
+          <WebsiteFormFooter
+            message="Your domain details are already saved"
+            saveLabel="Next"
+            onSave={onNext}
+            hideCancel
+          />
+        ) : (
+          <WebsiteFormFooter
+            message="You are saving your domain details"
+            saveLabel="Save and Next"
+            saving={saving}
+            onSave={onSaveAndNext}
+            onCancel={onReset}
+          />
+        )
       }
     >
       <CompactFormRow>
@@ -306,16 +326,19 @@ function DomainPanel({
             placeholder="https://auto27.ca"
             inputMode="url"
             autoComplete="url"
-            className={shopCompactInputClass}
+            readOnly={readOnly}
+            className={inputClass}
           />
         </CompactField>
         <CompactField label="Expiry Date" className={compactFixedFieldWidth}>
           <input
             type="date"
             value={form.expiryDate}
-            min={minExpiryDateInput()}
+            min={readOnly ? undefined : minExpiryDateInput()}
             onChange={(e) => onChange({ ...form, expiryDate: e.target.value })}
-            className={shopCompactInputClass}
+            readOnly={readOnly}
+            disabled={readOnly}
+            className={inputClass}
           />
         </CompactField>
         <CompactField label="Provider" className={compactFixedFieldWidth}>
@@ -324,14 +347,16 @@ function DomainPanel({
             value={form.provider}
             onChange={(e) => onChange({ ...form, provider: e.target.value })}
             placeholder="Name Silo"
-            className={shopCompactInputClass}
+            readOnly={readOnly}
+            className={inputClass}
           />
         </CompactField>
         <CompactField label="Status" className={compactFixedFieldWidth}>
           <select
             value={form.status}
             onChange={(e) => onChange({ ...form, status: e.target.value })}
-            className={shopCompactInputClass}
+            disabled={readOnly}
+            className={inputClass}
           >
             {DOMAIN_STATUS_OPTIONS.map((option) => (
               <option key={option} value={option}>
@@ -860,15 +885,7 @@ export default function ShopMyWebsitePage() {
         provider: domainForm.provider.trim(),
         status: domainForm.status.trim() || "Existing",
       };
-      const isEdit = Boolean(savedDomainForm.domainName.trim());
-      const res = isEdit
-        ? await editDomainDetails(token, {
-            domainName: savedDomainForm.domainName.trim(),
-            expiryDate: payload.expiryDate,
-            provider: payload.provider,
-            status: payload.status,
-          })
-        : await addDomainDetails(token, payload);
+      const res = await addDomainDetails(token, payload);
 
       if (!res.ok || res.data?.success === false) {
         toast.error(formatDomainApiError(res.data, "Could not save domain details."));
@@ -893,6 +910,13 @@ export default function ShopMyWebsitePage() {
 
   const handleDomainReset = () => {
     setDomainForm(savedDomainForm);
+  };
+
+  const hasExistingDomain = Boolean(savedDomainForm.domainName.trim());
+
+  const handleDomainNext = () => {
+    setActiveSection("templates");
+    void loadTemplates();
   };
 
   const handleTemplatePreview = (template: WebsiteTemplate) => {
@@ -1069,9 +1093,11 @@ export default function ShopMyWebsitePage() {
             form={domainForm}
             onChange={setDomainForm}
             onSaveAndNext={handleDomainSaveAndNext}
+            onNext={handleDomainNext}
             onReset={handleDomainReset}
             saving={domainSaving}
             loading={domainLoading}
+            readOnly={hasExistingDomain}
           />
         );
       case "templates":

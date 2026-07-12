@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type HTMLAttributes } from "react";
+import { useCallback, useEffect, useMemo, useState, type HTMLAttributes } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
@@ -35,7 +35,6 @@ import {
   addCarOwnerToMyCustomers,
   apiMessage,
   onboardCarOwner,
-  removeCarOwnerFromMyCustomers,
   updateMyCustomer,
   type CustomerVehiclePayload,
 } from "../../lib/shopOwnerMutations";
@@ -100,20 +99,11 @@ const SHOP_TABLE_BASE = adminPanelTableClasses(true);
 const SHOP_TABLE: AdminPanelTableClasses = {
   ...SHOP_TABLE_BASE,
   th: SHOP_TABLE_BASE.th.replace("px-2", "px-4"),
-  thCheckbox: SHOP_TABLE_BASE.thCheckbox.replace("px-2", "px-4"),
   td: SHOP_TABLE_BASE.td.replace("px-2", "px-4"),
-  tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
 };
 
 const SHOP_TABLE_HEAD_TH_CLASS = `${SHOP_TABLE.th} h-9 py-0 align-middle`;
-const SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS = `${SHOP_TABLE.thCheckbox} h-9 py-0 align-middle`;
 const SHOP_TABLE_BODY_TD_CLASS = `${SHOP_TABLE.td} h-9 py-0 align-middle whitespace-nowrap`;
-const SHOP_TABLE_BODY_TD_CHECKBOX_CLASS = `${SHOP_TABLE.tdCheckbox} h-9 py-0 align-middle`;
-
-const SHOP_PEOPLE_BULK_DELETE_BUTTON_CLASS =
-  "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
-
-const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
 
 function customerTableRowKey(customer: MyCustomer, index: number) {
   return customerId(customer) || `row-${index}`;
@@ -747,9 +737,6 @@ function CustomerListTable({
   showAction = false,
   isCustomerAdded,
   onAddCustomer,
-  selectedIds,
-  onToggleRow,
-  onTogglePage,
 }: {
   customers: MyCustomer[];
   onEdit: (customer: MyCustomer) => void;
@@ -759,22 +746,7 @@ function CustomerListTable({
   showAction?: boolean;
   isCustomerAdded?: (customer: MyCustomer) => boolean;
   onAddCustomer?: (customer: MyCustomer) => void;
-  selectedIds: Set<string>;
-  onToggleRow: (id: string) => void;
-  onTogglePage: (ids: string[], checked: boolean) => void;
 }) {
-  const selectAllRef = useRef<HTMLInputElement>(null);
-  const pageRowKeys = customers.map((customer, index) => customerTableRowKey(customer, index));
-  const allPageSelected =
-    customers.length > 0 && pageRowKeys.every((id) => selectedIds.has(id));
-  const somePageSelected = pageRowKeys.some((id) => selectedIds.has(id));
-
-  useEffect(() => {
-    if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
-    }
-  }, [somePageSelected, allPageSelected]);
-
   return (
     <motion.div
       layout
@@ -785,16 +757,6 @@ function CustomerListTable({
         <table className={SHOP_TABLE.table}>
           <thead>
             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-              <th className={SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS}>
-                <input
-                  ref={selectAllRef}
-                  type="checkbox"
-                  checked={allPageSelected}
-                  onChange={(e) => onTogglePage(pageRowKeys, e.target.checked)}
-                  aria-label="Select all customers on this page"
-                  className={SHOP_TABLE_CHECKBOX_CLASS}
-                />
-              </th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Name</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Phone</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Email</th>
@@ -807,19 +769,10 @@ function CustomerListTable({
           <tbody>
             {customers.map((customer, index) => {
               const name = customer.name ?? "—";
-              const rowKey = pageRowKeys[index];
+              const rowKey = customerTableRowKey(customer, index);
               const alreadyAdded = showAction ? Boolean(isCustomerAdded?.(customer)) : false;
               return (
                 <tr key={rowKey} className={adminPanelRowClass(index)}>
-                  <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(rowKey)}
-                      onChange={() => onToggleRow(rowKey)}
-                      aria-label={`Select ${name}`}
-                      className={SHOP_TABLE_CHECKBOX_CLASS}
-                    />
-                  </td>
                   <td className={SHOP_TABLE_BODY_TD_CLASS}>
                     <button
                       type="button"
@@ -886,28 +839,10 @@ function CustomerListTable({
 function ApprovalCustomerListTable({
   customers,
   onEdit,
-  selectedIds,
-  onToggleRow,
-  onTogglePage,
 }: {
   customers: MyCustomer[];
   onEdit: (customer: MyCustomer) => void;
-  selectedIds: Set<string>;
-  onToggleRow: (id: string) => void;
-  onTogglePage: (ids: string[], checked: boolean) => void;
 }) {
-  const selectAllRef = useRef<HTMLInputElement>(null);
-  const pageRowKeys = customers.map((customer, index) => customerTableRowKey(customer, index));
-  const allPageSelected =
-    customers.length > 0 && pageRowKeys.every((id) => selectedIds.has(id));
-  const somePageSelected = pageRowKeys.some((id) => selectedIds.has(id));
-
-  useEffect(() => {
-    if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
-    }
-  }, [somePageSelected, allPageSelected]);
-
   return (
     <motion.div
       layout
@@ -918,16 +853,6 @@ function ApprovalCustomerListTable({
         <table className={SHOP_TABLE.table}>
           <thead>
             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-              <th className={SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS}>
-                <input
-                  ref={selectAllRef}
-                  type="checkbox"
-                  checked={allPageSelected}
-                  onChange={(e) => onTogglePage(pageRowKeys, e.target.checked)}
-                  aria-label="Select all customers on this page"
-                  className={SHOP_TABLE_CHECKBOX_CLASS}
-                />
-              </th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Phone</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Email</th>
               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Name Customer</th>
@@ -939,19 +864,10 @@ function ApprovalCustomerListTable({
           <tbody>
             {customers.map((customer, index) => {
               const name = customer.name ?? "—";
-              const rowKey = pageRowKeys[index];
+              const rowKey = customerTableRowKey(customer, index);
               const phoneLabel = customer.phone ? formatPhoneLabel(customer.phone) : "—";
               return (
                 <tr key={rowKey} className={adminPanelRowClass(index)}>
-                  <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(rowKey)}
-                      onChange={() => onToggleRow(rowKey)}
-                      aria-label={`Select ${name}`}
-                      className={SHOP_TABLE_CHECKBOX_CLASS}
-                    />
-                  </td>
                   <td className={SHOP_TABLE_BODY_TD_CLASS}>
                     {customer.phone ? (
                       <button
@@ -1514,28 +1430,6 @@ function CustomerInfoView({
   );
 }
 
-function customersMatchingSelection(
-  selectedIds: Set<string>,
-  listCustomers: MyCustomer[],
-  paginatedCustomers: MyCustomer[],
-): MyCustomer[] {
-  const found = new Map<string, MyCustomer>();
-  for (const customer of listCustomers) {
-    const id = customerId(customer);
-    if (id && selectedIds.has(id)) {
-      found.set(id, customer);
-    }
-  }
-  for (let index = 0; index < paginatedCustomers.length; index++) {
-    const customer = paginatedCustomers[index];
-    const key = customerTableRowKey(customer, index);
-    if (selectedIds.has(key)) {
-      found.set(key, customer);
-    }
-  }
-  return [...found.values()];
-}
-
 export default function ShopPeoplePage() {
   const navigate = useNavigate();
   const { token } = useAuth();
@@ -1548,8 +1442,6 @@ export default function ShopPeoplePage() {
   const [editingCustomer, setEditingCustomer] = useState<MyCustomer | null>(null);
   const [detailView, setDetailView] = useState<DetailView | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(() => new Set());
-  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [sectionCustomers, setSectionCustomers] = useState<MyCustomer[]>([]);
   const [sectionLoading, setSectionLoading] = useState(false);
   const [sectionError, setSectionError] = useState<string | null>(null);
@@ -1695,10 +1587,6 @@ export default function ShopPeoplePage() {
   }, [search, section, detailView, editingCustomer]);
 
   useEffect(() => {
-    setSelectedCustomerIds(new Set());
-  }, [search, section]);
-
-  useEffect(() => {
     setEditingCustomer(null);
   }, [search, section, page]);
 
@@ -1813,78 +1701,6 @@ export default function ShopPeoplePage() {
     [loadSectionCustomers],
   );
 
-  const toggleCustomerSelection = (id: string) => {
-    setSelectedCustomerIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleCustomerPageSelection = (ids: string[], checked: boolean) => {
-    setSelectedCustomerIds((prev) => {
-      const next = new Set(prev);
-      for (const id of ids) {
-        if (checked) next.add(id);
-        else next.delete(id);
-      }
-      return next;
-    });
-  };
-
-  const hasBulkSelection = selectedCustomerIds.size > 0;
-
-  const handleBulkDelete = async () => {
-    if (!hasBulkSelection || bulkDeleting) return;
-
-    const selectedCustomers = customersMatchingSelection(
-      selectedCustomerIds,
-      listCustomers,
-      paginatedCustomers,
-    );
-    if (selectedCustomers.length === 0) return;
-
-    const count = selectedCustomers.length;
-    if (!window.confirm(`Delete ${count} selected customer${count === 1 ? "" : "s"}?`)) return;
-
-    setBulkDeleting(true);
-    try {
-      if (!token) return;
-
-      let failed = 0;
-      for (const customer of selectedCustomers) {
-        const id = customerId(customer);
-        if (!id) {
-          failed += 1;
-          continue;
-        }
-        const res = await removeCarOwnerFromMyCustomers(token, id);
-        logPeopleApi("DELETE", `/api/autoshopowner/customer/added/${encodeURIComponent(id)}`, null, res);
-        if (!res.ok) failed += 1;
-      }
-
-      await loadSectionCustomers();
-      setSelectedCustomerIds(new Set());
-      const removedIds = new Set(
-        selectedCustomers.map((customer) => customerId(customer)).filter(Boolean),
-      );
-      if (editingCustomer && removedIds.has(customerId(editingCustomer))) {
-        setEditingCustomer(null);
-      }
-
-      if (failed > 0) {
-        toast.error(`Could not delete ${failed} customer${failed === 1 ? "" : "s"}.`);
-      } else {
-        toast.success(`Deleted ${count} customer${count === 1 ? "" : "s"}.`);
-      }
-    } catch {
-      toast.error("Network error.");
-    } finally {
-      setBulkDeleting(false);
-    }
-  };
-
   return (
     <ShopPageShell
       title="Customers"
@@ -1936,14 +1752,11 @@ export default function ShopPeoplePage() {
               inputId={PEOPLE_SEARCH_INPUT_ID}
               showSearch={section === "my-list"}
               leading={
-                <button
-                  type="button"
-                  onClick={() => void handleBulkDelete()}
-                  disabled={!hasBulkSelection || bulkDeleting}
-                  className={SHOP_PEOPLE_BULK_DELETE_BUTTON_CLASS}
-                >
-                  {bulkDeleting ? "Deleting…" : "Delete"}
-                </button>
+                showMyListSearchActions ? (
+                  <p className="text-sm font-serif italic text-gray-800">
+                    Press on &apos;add&apos; button, to add as customer
+                  </p>
+                ) : null
               }
               trailing={
                 showAddNewAction ? (
@@ -2003,9 +1816,6 @@ export default function ShopPeoplePage() {
                   <ApprovalCustomerListTable
                     customers={paginatedCustomers}
                     onEdit={handleEditCustomer}
-                    selectedIds={selectedCustomerIds}
-                    onToggleRow={toggleCustomerSelection}
-                    onTogglePage={toggleCustomerPageSelection}
                   />
                 ) : (
                   <CustomerListTable
@@ -2017,9 +1827,6 @@ export default function ShopPeoplePage() {
                     showAction={showMyListSearchActions}
                     isCustomerAdded={isCustomerAlreadyAdded}
                     onAddCustomer={handleAddCustomerFromSearch}
-                    selectedIds={selectedCustomerIds}
-                    onToggleRow={toggleCustomerSelection}
-                    onTogglePage={toggleCustomerPageSelection}
                   />
                 )}
 

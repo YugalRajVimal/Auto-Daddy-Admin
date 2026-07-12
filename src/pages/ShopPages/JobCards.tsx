@@ -122,6 +122,9 @@ const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
 const SHOP_JOB_CARD_BULK_BUTTON_CLASS =
   "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
 
+const SHOP_JOB_CARD_EDIT_BUTTON_CLASS =
+  "rounded border border-ad-purple bg-white px-2 py-0.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8]";
+
 function displayJobId(jobNo: string | undefined): string {
   const raw = (jobNo ?? "").trim().replace(/^#/, "");
   if (!raw) return "—";
@@ -214,6 +217,7 @@ function JobCardListTable({
   onTogglePage,
   showStatusColumn = false,
   showInvoiceColumn = false,
+  showActions = true,
 }: {
   rows: JobCardListRow[];
   countryCode: string | null | undefined;
@@ -224,8 +228,10 @@ function JobCardListTable({
   onTogglePage: (ids: string[], checked: boolean) => void;
   showStatusColumn?: boolean;
   showInvoiceColumn?: boolean;
+  showActions?: boolean;
 }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const editHeadClass = `${SHOP_TABLE_HEAD_TH_CLASS} text-center`;
   const pageRowIds = rows.map((row) => row.id);
   const allPageSelected = rows.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
   const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
@@ -268,13 +274,13 @@ function JobCardListTable({
               {showStatusColumn ? (
                 <th className={SHOP_TABLE_HEAD_TH_CLASS}>Status</th>
               ) : null}
+              {showActions ? <th className={editHeadClass}>Actions</th> : null}
             </tr>
           </thead>
           <tbody>
             {rows.map((jc, index) => {
               const customerName = jc.customerName?.trim() || "—";
               const invoiceNo = pickJobCardInvoiceNumber(jc);
-              const canEdit = isJobCardEditable(jc);
               return (
                 <tr key={jc.id} className={adminPanelRowClass(index)}>
                   <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
@@ -289,12 +295,10 @@ function JobCardListTable({
                   <td className={SHOP_TABLE_BODY_TD_CLASS}>
                     <button
                       type="button"
-                      onClick={() => (canEdit ? onEdit(jc) : onView(jc))}
+                      onClick={() => onView(jc)}
                       className="font-semibold text-blue-700 underline hover:text-blue-800"
-                      title={canEdit ? `Edit ${displayJobId(jc.jobNo)}` : `View ${displayJobId(jc.jobNo)}`}
-                      aria-label={
-                        canEdit ? `Edit ${displayJobId(jc.jobNo)}` : `View ${displayJobId(jc.jobNo)}`
-                      }
+                      title={`View ${displayJobId(jc.jobNo)}`}
+                      aria-label={`View ${displayJobId(jc.jobNo)}`}
                     >
                       {displayJobId(jc.jobNo)}
                     </button>
@@ -327,6 +331,21 @@ function JobCardListTable({
                       </span>
                     </td>
                   ) : null}
+                  {showActions ? (
+                    <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
+                      {isJobCardEditable(jc) ? (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(jc)}
+                          className={SHOP_JOB_CARD_EDIT_BUTTON_CLASS}
+                        >
+                          Edit
+                        </button>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
@@ -347,6 +366,8 @@ export default function ShopJobCardsPage() {
   const [view, setView] = useState<JobCardView>("list");
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
   const [editJobCardId, setEditJobCardId] = useState<string | null>(null);
+  const [editJobCardNo, setEditJobCardNo] = useState<string | null>(null);
+  const [editListRow, setEditListRow] = useState<JobCardListRow | null>(null);
   const [detailJobCardId, setDetailJobCardId] = useState<string | null>(null);
   const [detailListRow, setDetailListRow] = useState<JobCardListRow | null>(null);
   const [actionPreviewMode, setActionPreviewMode] = useState<JobCardActionPreview | null>(null);
@@ -388,7 +409,12 @@ export default function ShopJobCardsPage() {
         ? "Edit Job Card"
         : SECTION_HEADINGS[section];
 
-  const activeSidebarId = view === "list" ? section : null;
+  const activeSidebarId =
+    view === "list" || view === "form"
+      ? formMode === "add" && view === "form"
+        ? "my-list"
+        : section
+      : null;
 
   const hasBulkSelection = selectedJobCardIds.size > 0;
 
@@ -638,18 +664,25 @@ export default function ShopJobCardsPage() {
     }
     setFormMode("edit");
     setEditJobCardId(jc.id);
+    setEditJobCardNo(pickJobCardNoForApi(jc));
+    setEditListRow(jc);
     setView("form");
   };
 
   const openNewJobCard = () => {
+    setSection("my-list");
     setFormMode("add");
     setEditJobCardId(null);
+    setEditJobCardNo(null);
+    setEditListRow(null);
     setView("form");
   };
 
   const showList = () => {
     setView("list");
     setEditJobCardId(null);
+    setEditJobCardNo(null);
+    setEditListRow(null);
     setDetailJobCardId(null);
     setDetailListRow(null);
     setActionPreviewMode(null);
@@ -673,6 +706,8 @@ export default function ShopJobCardsPage() {
           : { id: jobCardId, raw: jobRecord ?? {} });
       setDetailListRow(row);
       setEditJobCardId(null);
+      setEditJobCardNo(null);
+      setEditListRow(null);
       setActionPreviewMode(null);
       setView("detail");
       return;
@@ -710,13 +745,31 @@ export default function ShopJobCardsPage() {
       >
       <div className="space-y-1">
         <ShopReveal show={view === "form"} clipOverflow={false}>
-          <JobCardForm
-            active={view === "form"}
-            mode={formMode}
-            jobCardId={editJobCardId}
-            onCancel={showList}
-            onSaved={handleJobCardSaved}
-          />
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={showList}
+                className="text-xs font-semibold text-blue-700 hover:text-blue-800"
+                aria-label="Back to job cards"
+              >
+                {"<<"}
+              </button>
+            </div>
+            <JobCardForm
+              active={view === "form"}
+              mode={formMode}
+              jobCardId={editJobCardId}
+              jobCardNo={editJobCardNo}
+              initialJobRecord={
+                editListRow?.raw && typeof editListRow.raw === "object"
+                  ? (editListRow.raw as Record<string, unknown>)
+                  : null
+              }
+              onCancel={showList}
+              onSaved={handleJobCardSaved}
+            />
+          </div>
         </ShopReveal>
 
         <ShopReveal show={view === "detail" && detailJobCardId != null}>
@@ -811,6 +864,7 @@ export default function ShopJobCardsPage() {
                   onTogglePage={toggleJobCardPageSelection}
                   showStatusColumn
                   showInvoiceColumn={section === "convert-invoice"}
+                  showActions={section !== "approvals"}
                 />
 
                 <ShopListFooter>

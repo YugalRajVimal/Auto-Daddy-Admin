@@ -16,6 +16,8 @@ import {
   CompactFormRow,
 } from "../../components/admin/ContentPanel";
 import ListEditorPopup from "../../components/admin/ListEditorPopup";
+import ShopJobCardEstimateView from "../../components/JobCard/ShopJobCardEstimateView";
+import { pickJobNoFromListRow } from "../../components/JobCard/shopJobCardEstimate";
 import { ShopReveal } from "../../components/shop/ShopAnimated";
 import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import ShopPageShell from "../../components/shop/ShopPageShell";
@@ -31,7 +33,7 @@ import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
 import { useShopOwnerData } from "../../context/ShopOwnerDataProvider";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
-import { useAutoshopJobCards } from "../../hooks/useAutoshopJobCards";
+import { useShopWallet } from "../../hooks/useShopWallet";
 import { formatCurrencyAmount } from "../../lib/currency";
 import {
   DUMMY_SHOP_BANKS,
@@ -46,7 +48,11 @@ import {
   markAutoshopInvoicePaid,
   sendAutoshopJobCardForApproval,
 } from "../../lib/autoshopownerJobCardsApi";
-import { isJobCardPaid, pickJobCardInvoiceNumber, pickJobCardNoForApi, type JobCardListRow } from "../../lib/shopOwnerJobCards";
+import {
+  pickJobCardInvoiceNumber,
+  pickJobCardNoForApi,
+  type JobCardListRow,
+} from "../../lib/shopOwnerJobCards";
 import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
 import { createBank, createExpense, fetchBanks, fetchExpenses, updateBank, updateExpense } from "../../lib/shopOwnerAccountsApi";
 import {
@@ -59,7 +65,6 @@ import {
 } from "../AdminPages/Accounts/ledgerCategories";
 import {
   getWalletLedgerTab,
-  pickInvoiceUrl,
   shortJobBadgeCode,
 } from "../../lib/shopOwnerWallet";
 import useAuth from "../../auth/useAuth";
@@ -826,6 +831,7 @@ function WalletInvoiceTable({
   selectedIds,
   onToggleRow,
   onTogglePage,
+  onPreviewRow,
 }: {
   rows: JobCardListRow[];
   isPaid: boolean;
@@ -833,6 +839,7 @@ function WalletInvoiceTable({
   selectedIds: Set<string>;
   onToggleRow: (id: string) => void;
   onTogglePage: (ids: string[], checked: boolean) => void;
+  onPreviewRow: (row: JobCardListRow) => void;
 }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
   const idHeader = isPaid ? "Bill No." : "Job No.";
@@ -889,10 +896,22 @@ function WalletInvoiceTable({
                     />
                   </td>
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
-                    {displayBillId(row, isPaid)}
+                    <button
+                      type="button"
+                      onClick={() => onPreviewRow(row)}
+                      className="font-semibold text-blue-700 hover:underline"
+                    >
+                      {displayBillId(row, isPaid)}
+                    </button>
                   </td>
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
-                    {customerName}
+                    <button
+                      type="button"
+                      onClick={() => onPreviewRow(row)}
+                      className="font-semibold text-blue-700 hover:underline"
+                    >
+                      {customerName}
+                    </button>
                   </td>
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
                     {formatPhoneWithCountryCode(
@@ -1165,13 +1184,15 @@ export default function ShopWalletPage() {
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [bankBalance, setBankBalance] = useState("");
   const [bankAssignToInvoice, setBankAssignToInvoice] = useState(false);
+  const [previewInvoice, setPreviewInvoice] = useState<JobCardListRow | null>(null);
   const { refreshSection } = useShopOwnerData();
   const {
-    cards: convertedInvoiceCards,
-    loading: invoiceLoading,
-    error: invoiceError,
-    refresh: refreshInvoices,
-  } = useAutoshopJobCards("convert-invoice", "");
+    paidOnline,
+    unpaidOnline,
+    loading: walletLoading,
+    error: walletError,
+    refresh: refreshWallet,
+  } = useShopWallet();
   const mockLedger = useMockShopInvoiceLedger();
 
   // Guard: categories must exist even if expenses list is empty.
@@ -1244,17 +1265,13 @@ export default function ShopWalletPage() {
   }, [effectiveExpenseCategories, token]);
 
   const syncLedgerData = useCallback(async () => {
-    await Promise.all([refreshInvoices(), refreshSection("jobCards")]);
-  }, [refreshInvoices, refreshSection]);
+    await Promise.all([refreshWallet(), refreshSection("jobCards")]);
+  }, [refreshWallet, refreshSection]);
 
-  const paid = USE_DUMMY_SHOP_WALLET
-    ? mockLedger.paid
-    : convertedInvoiceCards.filter((row) => isJobCardPaid(row));
-  const unpaid = USE_DUMMY_SHOP_WALLET
-    ? mockLedger.unpaid
-    : convertedInvoiceCards.filter((row) => !isJobCardPaid(row));
-  const showLoading = !USE_DUMMY_SHOP_WALLET && invoiceLoading;
-  const showError = !USE_DUMMY_SHOP_WALLET && invoiceError;
+  const paid = USE_DUMMY_SHOP_WALLET ? mockLedger.paid : paidOnline;
+  const unpaid = USE_DUMMY_SHOP_WALLET ? mockLedger.unpaid : unpaidOnline;
+  const showLoading = !USE_DUMMY_SHOP_WALLET && walletLoading;
+  const showError = !USE_DUMMY_SHOP_WALLET && walletError;
 
   const invoiceList = view === "paid" ? paid : view === "unpaid" ? unpaid : [];
   const filteredList = useMemo(
@@ -1737,6 +1754,7 @@ export default function ShopWalletPage() {
     setShowExpenseForm(false);
     setShowBankForm(false);
     setEditingBankId(null);
+    setPreviewInvoice(null);
     resetExpenseForm();
   }, [view, resetExpenseForm]);
 
@@ -1797,14 +1815,14 @@ export default function ShopWalletPage() {
 
   const hasUnpaidSelection = selectedUnpaidRows.length > 0;
   const hasSingleBankSelection = selectedBankRows.length === 1;
-  const invoiceUrlRows = useMemo(
-    () => selectedUnpaidRows.filter((row) => pickInvoiceUrl(row.raw)),
-    [selectedUnpaidRows],
-  );
-  const paidInvoiceUrlRows = useMemo(
-    () => selectedPaidRows.filter((row) => pickInvoiceUrl(row.raw)),
-    [selectedPaidRows],
-  );
+
+  const openInvoicePreview = useCallback((row: JobCardListRow) => {
+    setPreviewInvoice(row);
+  }, []);
+
+  const closeInvoicePreview = useCallback(() => {
+    setPreviewInvoice(null);
+  }, []);
 
   const runCollectPayment = async (rows: JobCardListRow[], label: string) => {
     if (rows.length === 0 || bulkBusy) return;
@@ -1885,14 +1903,12 @@ export default function ShopWalletPage() {
   const handleSendReminder = () => void handleSendNotification(selectedUnpaidRows, "Reminder");
 
   const handleViewInvoice = (rows: JobCardListRow[]) => {
-    const withUrl = rows.filter((row) => pickInvoiceUrl(row.raw));
-    if (withUrl.length === 0) {
-      toast.info("No invoice PDF is available for the selected row(s).");
+    if (rows.length === 0) {
+      toast.info("Select one invoice to preview.");
       return;
     }
-    const url = pickInvoiceUrl(withUrl[0].raw);
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
-    if (withUrl.length > 1) {
+    openInvoicePreview(rows[0]);
+    if (rows.length > 1) {
       toast.info("Opened the first selected invoice. Select one row to open a specific invoice.");
     }
   };
@@ -1900,7 +1916,9 @@ export default function ShopWalletPage() {
   const handleClearSelection = () => setSelectedRowIds(new Set());
 
   const pageHeading =
-    showExpenseForm && view === "expenses"
+    previewInvoice
+      ? "Invoice Preview"
+      : showExpenseForm && view === "expenses"
       ? editingExpenseId
         ? "Edit Expense"
         : "Add Expense"
@@ -1916,7 +1934,7 @@ export default function ShopWalletPage() {
     }
 
     if (showError && (view === "paid" || view === "unpaid")) {
-      return <ShopErrorPanel message={invoiceError ?? ""} onRetry={() => void syncLedgerData()} />;
+      return <ShopErrorPanel message={walletError ?? ""} onRetry={() => void syncLedgerData()} />;
     }
 
     if (view === "expenses") {
@@ -1973,6 +1991,7 @@ export default function ShopWalletPage() {
           rows={paginatedList}
           isPaid={view === "paid"}
           countryCode={session?.meta?.countryCode}
+          onPreviewRow={openInvoicePreview}
           {...selectionProps}
         />
         <WalletListFooter
@@ -2029,7 +2048,20 @@ export default function ShopWalletPage() {
       faqsDescription={faqsDescription}
     >
       <div className="space-y-3">
-        <ShopReveal show={showExpenseForm && view === "expenses"} clipOverflow={false}>
+        <ShopReveal show={previewInvoice != null} clipOverflow={false}>
+          {previewInvoice ? (
+            <ShopJobCardEstimateView
+              key={previewInvoice.id}
+              jobCardId={previewInvoice.id}
+              listRow={previewInvoice}
+              jobNoHint={pickJobNoFromListRow(previewInvoice) ?? null}
+              showPaymentActions={false}
+              onBack={closeInvoicePreview}
+            />
+          ) : null}
+        </ShopReveal>
+
+        <ShopReveal show={previewInvoice == null && showExpenseForm && view === "expenses"} clipOverflow={false}>
           <WalletExpenseForm
             mode={editingExpenseId ? "edit" : "add"}
             amount={expenseAmount}
@@ -2094,7 +2126,7 @@ export default function ShopWalletPage() {
           ) : null}
         </ShopReveal>
 
-        <ShopReveal show={showBankForm && view === "banks"} clipOverflow={false}>
+        <ShopReveal show={previewInvoice == null && showBankForm && view === "banks"} clipOverflow={false}>
           <WalletBankForm
             mode={editingBankId ? "edit" : "add"}
             label={bankLabel}
@@ -2112,102 +2144,106 @@ export default function ShopWalletPage() {
           />
         </ShopReveal>
 
-        <WalletSearchBar
-          value={search}
-          onChange={setSearch}
-          leading={
-            view === "unpaid" ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void handleMarkAsPaid()}
-                  disabled={!hasUnpaidSelection || bulkBusy}
-                  className={WALLET_BULK_BUTTON_CLASS}
-                >
-                  Mark as Paid
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSendReminder}
-                  disabled={!hasUnpaidSelection || bulkBusy}
-                  className={WALLET_BULK_BUTTON_CLASS}
-                >
-                  Send Reminder
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleViewInvoice(selectedUnpaidRows)}
-                  disabled={invoiceUrlRows.length === 0 || bulkBusy}
-                  className={WALLET_BULK_BUTTON_CLASS}
-                >
-                  View Invoice
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearSelection}
-                  disabled={!hasUnpaidSelection || bulkBusy}
-                  className={WALLET_BULK_BUTTON_CLASS}
-                >
-                  Clear Selection
-                </button>
-              </>
-            ) : view === "paid" ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleViewInvoice(selectedPaidRows)}
-                  disabled={paidInvoiceUrlRows.length === 0 || bulkBusy}
-                  className={WALLET_BULK_BUTTON_CLASS}
-                >
-                  View Invoice
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleSendNotification(selectedPaidRows, "Receipt")}
-                  disabled={selectedPaidRows.length === 0 || bulkBusy}
-                  className={WALLET_BULK_BUTTON_CLASS}
-                >
-                  Send Receipt
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearSelection}
-                  disabled={selectedPaidRows.length === 0 || bulkBusy}
-                  className={WALLET_BULK_BUTTON_CLASS}
-                >
-                  Clear Selection
-                </button>
-              </>
-            ) : view === "banks" ? (
-              <>
-                <button
-                  type="button"
-                  onClick={openEditBankForm}
-                  disabled={!hasSingleBankSelection}
-                  className={WALLET_BULK_BUTTON_CLASS}
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearSelection}
-                  disabled={selectedBankRows.length === 0}
-                  className={WALLET_BULK_BUTTON_CLASS}
-                >
-                  Clear Selection
-                </button>
-              </>
-            ) : null
-          }
-          trailing={
-            view === "expenses" && !showExpenseForm ? (
-              <AddNewButton onClick={openExpenseForm} />
-            ) : view === "banks" && !showBankForm ? (
-              <AddNewButton onClick={openAddBankForm} />
-            ) : null
-          }
-        />
-        {renderListContent()}
+        {previewInvoice == null ? (
+          <>
+            <WalletSearchBar
+              value={search}
+              onChange={setSearch}
+              leading={
+                view === "unpaid" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleMarkAsPaid()}
+                      disabled={!hasUnpaidSelection || bulkBusy}
+                      className={WALLET_BULK_BUTTON_CLASS}
+                    >
+                      Mark as Paid
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendReminder}
+                      disabled={!hasUnpaidSelection || bulkBusy}
+                      className={WALLET_BULK_BUTTON_CLASS}
+                    >
+                      Send Reminder
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleViewInvoice(selectedUnpaidRows)}
+                      disabled={!hasUnpaidSelection || bulkBusy}
+                      className={WALLET_BULK_BUTTON_CLASS}
+                    >
+                      View Invoice
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearSelection}
+                      disabled={!hasUnpaidSelection || bulkBusy}
+                      className={WALLET_BULK_BUTTON_CLASS}
+                    >
+                      Clear Selection
+                    </button>
+                  </>
+                ) : view === "paid" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleViewInvoice(selectedPaidRows)}
+                      disabled={selectedPaidRows.length === 0 || bulkBusy}
+                      className={WALLET_BULK_BUTTON_CLASS}
+                    >
+                      View Invoice
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSendNotification(selectedPaidRows, "Receipt")}
+                      disabled={selectedPaidRows.length === 0 || bulkBusy}
+                      className={WALLET_BULK_BUTTON_CLASS}
+                    >
+                      Send Receipt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearSelection}
+                      disabled={selectedPaidRows.length === 0 || bulkBusy}
+                      className={WALLET_BULK_BUTTON_CLASS}
+                    >
+                      Clear Selection
+                    </button>
+                  </>
+                ) : view === "banks" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={openEditBankForm}
+                      disabled={!hasSingleBankSelection}
+                      className={WALLET_BULK_BUTTON_CLASS}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearSelection}
+                      disabled={selectedBankRows.length === 0}
+                      className={WALLET_BULK_BUTTON_CLASS}
+                    >
+                      Clear Selection
+                    </button>
+                  </>
+                ) : null
+              }
+              trailing={
+                view === "expenses" && !showExpenseForm ? (
+                  <AddNewButton onClick={openExpenseForm} />
+                ) : view === "banks" && !showBankForm ? (
+                  <AddNewButton onClick={openAddBankForm} />
+                ) : null
+              }
+            />
+            {renderListContent()}
+          </>
+        ) : null}
       </div>
     </ShopPageShell>
   );

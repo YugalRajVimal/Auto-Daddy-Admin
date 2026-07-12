@@ -122,9 +122,17 @@ function cloneRowAsConvertedInvoice(row: JobCardListRow): JobCardListRow {
     row.raw && typeof row.raw === "object" ? { ...(row.raw as Record<string, unknown>) } : {};
   return {
     ...row,
+    status: "convertedToInvoice",
     paymentStatus: "Unpaid",
     unpaid: true,
-    raw: { ...rawBase, paymentMethod: "Online", paymentStatus: "Unpaid" },
+    invoicePaid: false,
+    raw: {
+      ...rawBase,
+      status: "convertedToInvoice",
+      paymentMethod: "Online",
+      paymentStatus: "Unpaid",
+      invoicePaid: false,
+    },
   };
 }
 
@@ -133,9 +141,17 @@ function cloneRowAsPaidInvoice(row: JobCardListRow): JobCardListRow {
     row.raw && typeof row.raw === "object" ? { ...(row.raw as Record<string, unknown>) } : {};
   return {
     ...row,
+    status: "convertedToInvoice",
     paymentStatus: "Paid",
     unpaid: false,
-    raw: { ...rawBase, paymentMethod: "Online", paymentStatus: "Paid" },
+    invoicePaid: true,
+    raw: {
+      ...rawBase,
+      status: "convertedToInvoice",
+      paymentMethod: "Online",
+      paymentStatus: "Paid",
+      invoicePaid: true,
+    },
   };
 }
 

@@ -30,6 +30,8 @@ export type JobCardListRow = {
   issueDescription?: string;
   /** Present on some list payloads when payment still due */
   unpaid?: boolean;
+  /** True when a converted invoice has been marked paid (`invoicePaid` on API). */
+  invoicePaid?: boolean;
 };
 
 function s(v: unknown): string | undefined {
@@ -290,6 +292,7 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
   const status = s(o.status) ?? s(o.jobStatus);
   const paymentStatus = s(o.paymentStatus);
   const unpaid = typeof o.unpaid === "boolean" ? o.unpaid : undefined;
+  const invoicePaid = typeof o.invoicePaid === "boolean" ? o.invoicePaid : undefined;
   const totalRaw =
     o.totalPayableAmount ?? o.totalAmount ?? o.total ?? o.grandTotal ?? o.amount ?? o.price;
   const total =
@@ -317,6 +320,7 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     total,
     issueDescription,
     unpaid,
+    invoicePaid,
   };
 }
 
@@ -352,6 +356,11 @@ export function isJobCardPending(row: JobCardListRow): boolean {
 }
 
 export function isJobCardPaid(row: JobCardListRow): boolean {
+  if (row.invoicePaid === true) return true;
+  const raw = row.raw;
+  if (raw && typeof raw === "object" && (raw as Record<string, unknown>).invoicePaid === true) {
+    return true;
+  }
   const norm = rowStatusNorm(row);
   if (norm === "cashpaid") return true;
   const paymentStatus = (row.paymentStatus ?? "").trim().toLowerCase();
@@ -401,6 +410,9 @@ export function jobCardRowFromRecord(
     unpaid:
       listRow?.unpaid ??
       (typeof job.unpaid === "boolean" ? job.unpaid : undefined),
+    invoicePaid:
+      listRow?.invoicePaid ??
+      (typeof job.invoicePaid === "boolean" ? job.invoicePaid : undefined),
   };
 }
 

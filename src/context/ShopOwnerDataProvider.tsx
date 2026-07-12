@@ -16,9 +16,7 @@ import {
   buildMyCustomersQuery,
   fetchMyCustomers,
   fetchMyServices,
-  fetchPaidJobCards,
   fetchPayments,
-  fetchUnpaidJobCards,
   type MyCustomersPeriod,
 } from "../lib/shopOwnerApi";
 import { fetchAutoshopJobCards } from "../lib/autoshopownerJobCardsApi";
@@ -28,7 +26,11 @@ import {
   getSectionsForShopPath,
   type ShopDataSection,
 } from "../lib/shopDataSections";
-import { parseJobCardsFromPagePayload, type JobCardListRow } from "../lib/shopOwnerJobCards";
+import {
+  isJobCardPaid,
+  parseJobCardsFromPagePayload,
+  type JobCardListRow,
+} from "../lib/shopOwnerJobCards";
 import {
   customerKey,
   dealId,
@@ -38,7 +40,6 @@ import {
   parsePayments,
 } from "../lib/shopOwnerParsers";
 import { FALLBACK_PARTS_DEALERS, resolvePartsDealersFromPayload, type PartsDealerCard } from "../lib/shopPartsDealers";
-import { parsePaidWalletPayload, parseUnpaidWalletPayload } from "../lib/shopOwnerWallet";
 import {
   fetchWebsiteTemplates,
   parseWebsiteTemplatesResponse,
@@ -262,23 +263,9 @@ async function fetchSectionData(
         return { data: res.data ?? null, error: null };
       }
       case "wallet": {
-        const [paidRes, unpaidRes] = await Promise.all([
-          fetchPaidJobCards(token),
-          fetchUnpaidJobCards(token),
-        ]);
-        const paid = paidRes.ok
-          ? (() => {
-              const { cash, online } = parsePaidWalletPayload(paidRes.data);
-              return { all: [...cash, ...online], cash, online };
-            })()
-          : { all: [] as JobCardListRow[], cash: [] as JobCardListRow[], online: [] as JobCardListRow[] };
-        const unpaid = unpaidRes.ok
-          ? (() => {
-              const { cash, online } = parseUnpaidWalletPayload(unpaidRes.data);
-              return { all: [...cash, ...online], cash, online };
-            })()
-          : { all: [] as JobCardListRow[], cash: [] as JobCardListRow[], online: [] as JobCardListRow[] };
-        if (!paidRes.ok && !unpaidRes.ok) {
+        // Wallet invoices: only convertedToInvoice. Paid when invoicePaid === true.
+        const convertedRes = await fetchAutoshopJobCards(token, { status: "convertedToInvoice" });
+        if (!convertedRes.ok) {
           return {
             data: {
               paid: [],
@@ -291,14 +278,19 @@ async function fetchSectionData(
             error: "Could not load wallet data.",
           };
         }
+        const converted = parseJobCardsFromPagePayload(convertedRes.data);
+        const unpaidOnline = converted.filter((row) => !isJobCardPaid(row));
+        const paidOnline = converted.filter((row) => isJobCardPaid(row));
+        const paidCash: JobCardListRow[] = [];
+        const unpaidCash: JobCardListRow[] = [];
         return {
           data: {
-            paid: paid.all,
-            unpaid: unpaid.all,
-            paidCash: paid.cash,
-            paidOnline: paid.online,
-            unpaidCash: unpaid.cash,
-            unpaidOnline: unpaid.online,
+            paid: paidOnline,
+            unpaid: unpaidOnline,
+            paidCash,
+            paidOnline,
+            unpaidCash,
+            unpaidOnline,
           },
           error: null,
         };

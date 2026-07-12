@@ -17,7 +17,6 @@ import {
   estimateDocumentNo,
   estimateTotals,
   extractEstimateLines,
-  extractJobNoFromApiEnvelope,
   formatEstimateDate,
   formatEstimateMoney,
   jobCardShowsInvoiceHst,
@@ -104,6 +103,8 @@ type ShopJobCardEstimateViewProps = {
   jobNoHint?: string | null;
   /** When set, open directly in that action preview (before confirm). */
   initialActionPreview?: JobCardActionPreview | null;
+  /** Hide convert / cash-paid actions (e.g. wallet invoice preview). */
+  showPaymentActions?: boolean;
   onBack?: () => void;
   onConverted?: () => void;
   onCashPaid?: () => void;
@@ -122,6 +123,7 @@ export default function ShopJobCardEstimateView({
   listRow = null,
   jobNoHint = null,
   initialActionPreview = null,
+  showPaymentActions = true,
   onBack,
   onConverted,
   onCashPaid,
@@ -168,6 +170,7 @@ export default function ShopJobCardEstimateView({
       return;
     }
 
+    // No GET-by-id API — only list/search. Prefer held list row; otherwise resolve via search/list.
     if (!token) {
       setLoading(false);
       setError("Could not load job card.");
@@ -175,15 +178,10 @@ export default function ShopJobCardEstimateView({
     }
 
     try {
-      const { record, envelope } = await fetchJobCardRecord(token, jobCardId);
-      const listNo = listRow ? pickJobNoFromListRow(listRow) : undefined;
-      const envelopeNo = extractJobNoFromApiEnvelope(envelope);
-      const hintNo = jobNoHint?.trim() || undefined;
-      const mergedNo = listNo ?? envelopeNo ?? hintNo;
-      if (mergedNo && !pickJobNoFromRecord(record)) {
-        record.jobNo = mergedNo;
-      }
-      setJob(record);
+      const { record } = await fetchJobCardRecord(token, jobCardId, {
+        jobCardNo: listRow ? pickJobNoFromListRow(listRow) : jobNoHint,
+      });
+      setJob(mergeJobNo(record));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load job card.");
       setJob(null);
@@ -223,8 +221,12 @@ export default function ShopJobCardEstimateView({
   const logoUrl = normalizeMediaUrl(business?.businessLogo);
   const hstNumber = pickBusinessHstNumber(business, job) || "—";
   const alreadyInvoiced = job ? jobCardShowsInvoiceHst(job) : false;
-  const documentTitle = invoicePreview && !alreadyInvoiced ? "Invoice Preview" : "Job Card";
-  const documentNoLabel = invoicePreview && !alreadyInvoiced ? "Invoice No. :" : "Job Card No. :";
+  const documentTitle = alreadyInvoiced
+    ? "Invoice"
+    : invoicePreview
+      ? "Invoice Preview"
+      : "Job Card";
+  const documentNoLabel = alreadyInvoiced || invoicePreview ? "Invoice No. :" : "Job Card No. :";
   const footerNote = invoicePreview && !alreadyInvoiced
     ? "Invoice preview — confirm to convert this job card"
     : cashPreview
@@ -347,64 +349,66 @@ export default function ShopJobCardEstimateView({
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {invoicePreview && !alreadyInvoiced ? (
-            <>
-              <button
-                type="button"
-                onClick={exitActionPreview}
-                disabled={actionBusy}
-                className={OUTLINE_BTN_CLASS}
-              >
-                Cancel Preview
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleConfirmConvertToInvoice()}
-                disabled={!canConvertToInvoice || actionBusy}
-                className={CONVERT_INVOICE_BTN_CLASS}
-              >
-                {actionBusy ? "Converting…" : "Confirm Convert"}
-              </button>
-            </>
-          ) : cashPreview ? (
-            <>
-              <button
-                type="button"
-                onClick={exitActionPreview}
-                disabled={actionBusy}
-                className={OUTLINE_BTN_CLASS}
-              >
-                Cancel Preview
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleConfirmPaidByCash()}
-                disabled={!canMarkPaidByCash || actionBusy}
-                className={CASH_PAID_BTN_CLASS}
-              >
-                {actionBusy ? "Marking…" : "Confirm Paid by Cash"}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={enterCashPreview}
-                disabled={!canMarkPaidByCash || actionBusy}
-                className={CASH_PAID_BTN_CLASS}
-              >
-                Paid by Cash
-              </button>
-              <button
-                type="button"
-                onClick={enterInvoicePreview}
-                disabled={!canConvertToInvoice || actionBusy}
-                className={CONVERT_INVOICE_BTN_CLASS}
-              >
-                Convert to Invoice
-              </button>
-            </>
-          )}
+          {showPaymentActions ? (
+            invoicePreview && !alreadyInvoiced ? (
+              <>
+                <button
+                  type="button"
+                  onClick={exitActionPreview}
+                  disabled={actionBusy}
+                  className={OUTLINE_BTN_CLASS}
+                >
+                  Cancel Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmConvertToInvoice()}
+                  disabled={!canConvertToInvoice || actionBusy}
+                  className={CONVERT_INVOICE_BTN_CLASS}
+                >
+                  {actionBusy ? "Converting…" : "Confirm Convert"}
+                </button>
+              </>
+            ) : cashPreview ? (
+              <>
+                <button
+                  type="button"
+                  onClick={exitActionPreview}
+                  disabled={actionBusy}
+                  className={OUTLINE_BTN_CLASS}
+                >
+                  Cancel Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmPaidByCash()}
+                  disabled={!canMarkPaidByCash || actionBusy}
+                  className={CASH_PAID_BTN_CLASS}
+                >
+                  {actionBusy ? "Marking…" : "Confirm Paid by Cash"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={enterCashPreview}
+                  disabled={!canMarkPaidByCash || actionBusy}
+                  className={CASH_PAID_BTN_CLASS}
+                >
+                  Paid by Cash
+                </button>
+                <button
+                  type="button"
+                  onClick={enterInvoicePreview}
+                  disabled={!canConvertToInvoice || actionBusy}
+                  className={CONVERT_INVOICE_BTN_CLASS}
+                >
+                  Convert to Invoice
+                </button>
+              </>
+            )
+          ) : null}
           <button type="button" onClick={handlePrint} className={OUTLINE_BTN_CLASS}>
             <FiPrinter size={13} aria-hidden />
             Print

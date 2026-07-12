@@ -84,9 +84,20 @@ export type AutoshopPageDetailsBank = {
   assignToInvoice?: boolean;
 };
 
+export type AutoshopNextJobCard = {
+  jobCardNo?: number;
+  jobCardId?: string;
+  prefixSet?: boolean;
+  year?: number;
+};
+
 export type AutoshopJobCardPageDetails = {
   myCustomers: JobCardFormCustomer[];
-  nextJobCardNo?: number;
+  /** Display id from API (e.g. `"JBNO-7"`). */
+  nextJobCardNo?: string;
+  /** Numeric sequence used by PUT/DELETE path params. */
+  nextJobCardNumber?: number;
+  nextJobCard?: AutoshopNextJobCard;
   myAllSubServices: AutoshopPageDetailsSubService[];
   myAllBanks: AutoshopPageDetailsBank[];
 };
@@ -252,12 +263,58 @@ export function parseAutoshopJobCardPageDetails(payload: unknown): AutoshopJobCa
   const myAllBanks = Array.isArray(data.myAllBanks)
     ? (data.myAllBanks as AutoshopPageDetailsBank[])
     : [];
-  const nextJobCardNo =
-    typeof data.nextJobCardNo === "number" && Number.isFinite(data.nextJobCardNo)
-      ? data.nextJobCardNo
+  const nextJobCardObj =
+    data.nextJobCard && typeof data.nextJobCard === "object"
+      ? (data.nextJobCard as Record<string, unknown>)
+      : null;
+
+  const fromObjId =
+    nextJobCardObj && typeof nextJobCardObj.jobCardId === "string"
+      ? nextJobCardObj.jobCardId.trim()
+      : "";
+  const fromObjNo =
+    nextJobCardObj && typeof nextJobCardObj.jobCardNo === "number" && Number.isFinite(nextJobCardObj.jobCardNo)
+      ? nextJobCardObj.jobCardNo
       : undefined;
 
-  return { myCustomers, nextJobCardNo, myAllSubServices, myAllBanks };
+  const nextJobCardNoRaw = data.nextJobCardNo ?? data.nextJobNo ?? data.nextJobCardNumber;
+  let nextJobCardNo: string | undefined;
+  let nextJobCardNumber: number | undefined = fromObjNo;
+
+  if (fromObjId) {
+    nextJobCardNo = fromObjId;
+  } else if (typeof nextJobCardNoRaw === "string" && nextJobCardNoRaw.trim()) {
+    nextJobCardNo = nextJobCardNoRaw.trim();
+    const digits = nextJobCardNoRaw.replace(/[^\d]/g, "");
+    if (digits && nextJobCardNumber == null) {
+      const n = Number(digits);
+      if (Number.isFinite(n) && n > 0) nextJobCardNumber = n;
+    }
+  } else if (typeof nextJobCardNoRaw === "number" && Number.isFinite(nextJobCardNoRaw)) {
+    nextJobCardNo = String(nextJobCardNoRaw);
+    nextJobCardNumber = nextJobCardNoRaw;
+  }
+
+  const nextJobCard: AutoshopNextJobCard | undefined = nextJobCardObj
+    ? {
+        jobCardNo: fromObjNo,
+        jobCardId: fromObjId || undefined,
+        prefixSet: typeof nextJobCardObj.prefixSet === "boolean" ? nextJobCardObj.prefixSet : undefined,
+        year:
+          typeof nextJobCardObj.year === "number" && Number.isFinite(nextJobCardObj.year)
+            ? nextJobCardObj.year
+            : undefined,
+      }
+    : undefined;
+
+  return {
+    myCustomers,
+    nextJobCardNo,
+    nextJobCardNumber,
+    nextJobCard,
+    myAllSubServices,
+    myAllBanks,
+  };
 }
 
 export function pageDetailsSubServicesToCategories(subs: AutoshopPageDetailsSubService[]) {

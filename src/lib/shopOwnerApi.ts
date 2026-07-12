@@ -1,4 +1,5 @@
 import { getJson, putJson } from "../api/mobileAuth";
+import { fetchAutoshopJobCards } from "./autoshopownerJobCardsApi";
 
 export type MyCustomersPeriod = {
   timeFilter: "All" | "Daily" | "Weekly" | "Monthly";
@@ -78,12 +79,14 @@ export function searchJobCards(token: string, q: string) {
   return getJson<unknown>(withQuery("/api/auto-shop-owner/job-cards/search", { q }), token);
 }
 
+/** Prefer CashPaid job-card list via fetchAutoshopJobCards({ status: "CashPaid" }). */
 export function fetchPaidJobCards(token: string) {
-  return getJson<unknown>("/api/auto-shop-owner/job-cards/paid", token);
+  return fetchAutoshopJobCards(token, { status: "CashPaid" });
 }
 
+/** Converted invoices via fetchAutoshopJobCards({ status: "convertedToInvoice" }). */
 export function fetchUnpaidJobCards(token: string) {
-  return getJson<unknown>("/api/auto-shop-owner/job-cards/unpaid", token);
+  return fetchAutoshopJobCards(token, { status: "convertedToInvoice" });
 }
 
 export function fetchMyDeals(token: string) {

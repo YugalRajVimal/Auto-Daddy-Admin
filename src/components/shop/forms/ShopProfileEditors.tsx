@@ -58,10 +58,7 @@ import {
 } from "../../../lib/shopTypes";
 import type { ShopProfileBusiness, ShopProfileUser, ShopServiceCategory } from "../../../types/shopOwner";
 import OpenHoursTimePicker from "./OpenHoursTimePicker";
-import CarBrandLogo, {
-  CAR_BRAND_EMBLEM_ADD_SLOT_CLASS,
-  CAR_BRAND_EMBLEM_LOGO_CLASS,
-} from "../CarBrandLogo";
+import CarBrandLogo from "../CarBrandLogo";
 import { getCarBrandId, getCarBrandName } from "../../../lib/dummyCarBrands";
 import { getServiceId, getServiceName } from "../../../lib/dummyServices";
 import { parseCitiesApiResponse } from "../../../lib/carOwnerCities";
@@ -1426,8 +1423,6 @@ export function ShopCarBrandAddEditor({
   const [brandId, setBrandId] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const selected = companies.find((c) => String(c._id ?? c.id ?? "") === brandId);
-
   const reset = () => {
     setBrandId("");
     onClose?.();
@@ -1478,50 +1473,28 @@ export function ShopCarBrandAddEditor({
         />
       }
     >
-      <CompactFormRow className="grid-cols-3 items-stretch">
-        <div className="flex min-w-0 items-center justify-center">
-          <img
-            src="/logo.png"
-            alt="AutoDaddy"
-            className="h-14 w-auto object-contain"
-          />
-        </div>
-        <div className="flex min-w-0 items-start justify-center">
-          <CompactField label="Name" className="w-40 sm:w-48">
-            <select
-              className={shopCompactInputClass}
-              value={brandId}
-              onChange={(e) => setBrandId(e.target.value)}
-              disabled={available.length === 0}
-            >
-              <option value="">
-                {available.length === 0 ? "All brands already added" : "Select brand"}
-              </option>
-              {available.map((company) => {
-                const id = String(company._id ?? company.id ?? "");
-                const name = company.name ?? company.companyName ?? "—";
-                return (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                );
-              })}
-            </select>
-          </CompactField>
-        </div>
-        <div className="flex min-w-0 items-start justify-center">
-          <CompactField label="Amblem" className="w-auto shrink-0">
-            <div className={CAR_BRAND_EMBLEM_ADD_SLOT_CLASS}>
-              {brandId ? (
-                <CarBrandLogo company={selected} className={CAR_BRAND_EMBLEM_LOGO_CLASS} />
-              ) : (
-                <span className="text-xs text-gray-400" aria-hidden>
-                  —
-                </span>
-              )}
-            </div>
-          </CompactField>
-        </div>
+      <CompactFormRow>
+        <CompactField label="Name" className="w-full max-w-xs">
+          <select
+            className={shopCompactInputClass}
+            value={brandId}
+            onChange={(e) => setBrandId(e.target.value)}
+            disabled={available.length === 0}
+          >
+            <option value="">
+              {available.length === 0 ? "All brands already added" : "Select brand"}
+            </option>
+            {available.map((company) => {
+              const id = String(company._id ?? company.id ?? "");
+              const name = company.name ?? company.companyName ?? "—";
+              return (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              );
+            })}
+          </select>
+        </CompactField>
       </CompactFormRow>
     </CompactFormPanel>
   );

@@ -1,7 +1,6 @@
 import {
   apiMessageFromEnvelope,
   createAutoshopJobCard,
-  fetchAutoshopJobCardById,
   fetchAutoshopJobCardPageDetails,
   fetchAutoshopJobCards,
   fetchAutoshopPendingApprovalJobCards,
@@ -166,45 +165,23 @@ export async function fetchJobCardFormData(token: string) {
     myServices: pageDetailsSubServicesToCategories(parsed.myAllSubServices),
     myBanks: parsed.myAllBanks,
     nextJobCardNo: parsed.nextJobCardNo,
+    nextJobCardNumber: parsed.nextJobCardNumber,
+    nextJobCard: parsed.nextJobCard,
   };
 }
 
-export async function fetchJobCardByIdForForm(token: string, jobCardId: string) {
-  const res = await fetchAutoshopJobCardById(token, jobCardId);
-  if (!res.ok) throw new Error("Could not load job card.");
-  return res.data;
-}
-
-export function isJobCardPreviewPayload(raw: unknown): raw is Record<string, unknown> {
-  if (!raw || typeof raw !== "object") return false;
-  const o = raw as Record<string, unknown>;
-  return (
-    Array.isArray(o.services) ||
-    o.totalAmount != null ||
-    o.customerName != null ||
-    o.labourCharge != null
-  );
-}
-
-export function jobCardRecordFromListRow(
-  listRow: { raw?: unknown } | null | undefined,
+async function findJobCardListRow(
+  token: string,
   jobCardId: string,
-): Record<string, unknown> | null {
-  const raw = listRow?.raw;
-  if (!isJobCardPreviewPayload(raw)) return null;
-  const record = { ...raw };
-  if (!record._id && !record.id) record._id = jobCardId;
-  return record;
-}
-
-export async function fetchJobCardRecord(token: string, jobCardId: string) {
-  const byId = await fetchAutoshopJobCardById(token, jobCardId);
-  if (byId.ok) {
-    const record = resolveJobCardFromApiResponse(byId.data);
-    if (record) return { record, envelope: byId.data };
-  }
+  jobCardNoHint?: string | number | null,
+) {
+  const searchHint =
+    jobCardNoHint != null && String(jobCardNoHint).trim() !== ""
+      ? String(jobCardNoHint).trim()
+      : pickJobCardNoForApi({ jobNo: jobCardId });
 
   const listSources = [
+    ...(searchHint ? [fetchAutoshopJobCards(token, { search: searchHint })] : []),
     fetchAutoshopJobCards(token),
     fetchAutoshopPendingApprovalJobCards(token),
     fetchAutoshopJobCards(token, { status: "convertedToInvoice" }),
@@ -214,14 +191,71 @@ export async function fetchJobCardRecord(token: string, jobCardId: string) {
   for (const promise of listSources) {
     const res = await promise;
     if (!res.ok) continue;
-    const row = parseJobCardsFromPagePayload(res.data).find((item) => item.id === jobCardId);
-    if (!row?.raw || !isJobCardPreviewPayload(row.raw)) continue;
-    const record = { ...(row.raw as Record<string, unknown>) };
-    if (!record._id && !record.id) record._id = jobCardId;
-    return { record, envelope: res.data };
+    const rows = parseJobCardsFromPagePayload(res.data);
+    const row =
+      rows.find((item) => item.id === jobCardId) ??
+      (searchHint
+        ? rows.find((item) => pickJobCardNoForApi(item) === pickJobCardNoForApi({ jobNo: searchHint }))
+        : undefined);
+    if (row) return row;
   }
+  return null;
+}
 
-  throw new Error("Could not load job card.");
+/**
+ * There is no GET-by-id for a single job card.
+ * Detail/edit must use list/search payload rows (or an already-held list row).
+ */
+export async function fetchJobCardByIdForForm(
+  token: string,
+  jobCardId: string,
+  jobCardNoHint?: string | number | null,
+) {
+  const row = await findJobCardListRow(token, jobCardId, jobCardNoHint);
+  if (!row?.raw || typeof row.raw !== "object") {
+    throw new Error("Could not load job card.");
+  }
+  return { success: true, data: row.raw };
+}
+
+export function isJobCardPreviewPayload(raw: unknown): raw is Record<string, unknown> {
+  if (!raw || typeof raw !== "object") return false;
+  const o = raw as Record<string, unknown>;
+  return (
+    Array.isArray(o.services) ||
+    o.totalAmount != null ||
+    o.customerName != null ||
+    o.labourCharge != null ||
+    o.jobCardNo != null ||
+    o._id != null ||
+    o.id != null
+  );
+}
+
+export function jobCardRecordFromListRow(
+  listRow: { raw?: unknown } | null | undefined,
+  jobCardId: string,
+): Record<string, unknown> | null {
+  const raw = listRow?.raw;
+  if (!raw || typeof raw !== "object") return null;
+  const record = { ...(raw as Record<string, unknown>) };
+  if (!record._id && !record.id) record._id = jobCardId;
+  return record;
+}
+
+/** Load a job card record from list/search only — no GET `/jobcards/:id`. */
+export async function fetchJobCardRecord(
+  token: string,
+  jobCardId: string,
+  options?: { jobCardNo?: string | number | null },
+) {
+  const row = await findJobCardListRow(token, jobCardId, options?.jobCardNo);
+  if (!row?.raw || typeof row.raw !== "object") {
+    throw new Error("Could not load job card.");
+  }
+  const record = { ...(row.raw as Record<string, unknown>) };
+  if (!record._id && !record.id) record._id = jobCardId;
+  return { record, envelope: { success: true, data: [row.raw] } };
 }
 
 export function resolveJobCardFromApiResponse(resp: unknown): Record<string, unknown> | null {
@@ -303,6 +337,3 @@ export async function saveJobCard(
   }
   return res;
 }
-
-// Re-export for detail views
-export { fetchAutoshopJobCardById as fetchJobCardById } from "./autoshopownerJobCardsApi";

@@ -145,11 +145,14 @@ function vehicleOdometerPlaceholders(vehicle: JobCardFormCustomer["myVehicles"][
 function displayJobCardNo(jobNo: string | undefined): string {
   const raw = (jobNo ?? "").trim().replace(/^#/, "");
   if (!raw) return "J # ——";
-  const stripped = raw.replace(/^job\s*#?\s*/i, "").trim();
-  if (!stripped) return "J # ——";
-  if (/^j/i.test(stripped)) {
-    return stripped.replace(/^j/i, "J # ");
+
+  // Prefixed API ids (e.g. "JBNO-7") — show unchanged.
+  if (/[a-z]/i.test(raw) && !/^j\s*#?\s*\d+$/i.test(raw) && !/^job\s*#?\s*\d+$/i.test(raw)) {
+    return raw;
   }
+
+  const stripped = raw.replace(/^job\s*#?\s*/i, "").replace(/^j\s*#?\s*/i, "").trim();
+  if (!stripped) return "J # ——";
   return `J # ${stripped}`;
 }
 
@@ -439,6 +442,10 @@ type JobCardFormProps = {
   active: boolean;
   mode?: "add" | "edit";
   jobCardId?: string | null;
+  /** Numeric job card number for PUT/DELETE `/jobcards/:jobCardNo` (not Mongo `_id`). */
+  jobCardNo?: string | number | null;
+  /** Prefer this over list/search fetch when opening edit from the table. */
+  initialJobRecord?: Record<string, unknown> | null;
   onCancel: () => void;
   onSaved?: (jobCardId?: string, jobCardNo?: string, jobRecord?: Record<string, unknown>) => void;
 };
@@ -447,6 +454,8 @@ export default function JobCardForm({
   active,
   mode: modeProp = "add",
   jobCardId = null,
+  jobCardNo = null,
+  initialJobRecord = null,
   onCancel,
   onSaved,
 }: JobCardFormProps) {
@@ -668,6 +677,7 @@ export default function JobCardForm({
 
   useEffect(() => {
     if (!active || !token) return;
+    let cancelled = false;
     setFormMode(modeProp);
     resetForm();
     setDataLoading(true);
@@ -676,18 +686,28 @@ export default function JobCardForm({
     void (async () => {
       try {
         const data = await fetchJobCardFormData(token);
+        if (cancelled) return;
         setMyCustomers(data.myCustomers);
         setMyServices(data.myServices);
         setMyBanks(data.myBanks);
         setSelectedBankId(defaultInvoiceBankId(data.myBanks));
 
-        if (modeProp === "add" && data.nextJobCardNo != null) {
-          setDisplayJobNo(String(data.nextJobCardNo));
+        if (modeProp === "add") {
+          const displayNo =
+            data.nextJobCardNo?.trim() ||
+            data.nextJobCard?.jobCardId?.trim() ||
+            (data.nextJobCardNumber != null ? String(data.nextJobCardNumber) : "");
+          if (displayNo) {
+            setDisplayJobNo(displayNo);
+          }
         }
 
         if (modeProp === "edit" && jobCardId) {
           setEditPrefillLoading(true);
-          const resp = await fetchJobCardByIdForForm(token, jobCardId);
+          const resp = initialJobRecord
+            ? { success: true, data: initialJobRecord }
+            : await fetchJobCardByIdForForm(token, jobCardId, jobCardNo);
+          if (cancelled) return;
           const job = resolveJobCardFromApiResponse(resp);
           if (!job) throw new Error("Could not load job card.");
 
@@ -769,6 +789,7 @@ export default function JobCardForm({
           setEditId(jobCardId);
         }
       } catch (e) {
+        if (cancelled) return;
         const message = e instanceof Error ? e.message : "Could not load form.";
         setDataError(message);
         if (modeProp === "edit") {
@@ -776,12 +797,18 @@ export default function JobCardForm({
           handleCancel();
         }
       } finally {
-        setDataLoading(false);
-        setEditPrefillLoading(false);
+        if (!cancelled) {
+          setDataLoading(false);
+          setEditPrefillLoading(false);
+        }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, modeProp, jobCardId, token]);
+  }, [active, modeProp, jobCardId, jobCardNo, initialJobRecord, token]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
