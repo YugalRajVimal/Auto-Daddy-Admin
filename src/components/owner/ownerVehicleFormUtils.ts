@@ -1,12 +1,15 @@
 export const currentYear = new Date().getFullYear();
 
-export const ownerVehicleFieldClass =
-  "w-full min-h-[36px] rounded-lg border border-[#c8c8c8] bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-[#b0b0b0] focus:border-ad-green focus:outline-none";
+export const ownerVehicleLabelClass =
+  "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500";
 
-export const ownerVehicleSelectClass = `${ownerVehicleFieldClass} appearance-none bg-[length:10px] bg-[right_12px_center] bg-no-repeat pr-9 [background-image:url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2210%22%20height%3D%2210%22%20viewBox%3D%220%200%2010%2010%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M1.5%203.5l3.5%204%203.5-4z%22/%3E%3C/svg%3E')]`;
+export const ownerVehicleFieldClass =
+  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70";
+
+export const ownerVehicleSelectClass = `${ownerVehicleFieldClass} appearance-none bg-[length:10px] bg-[right_12px_center] bg-no-repeat pr-9 [background-image:url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2210%22%20height%3D%2210%22%20viewBox%3D%220%200%2010%2010%22%3E%3Cpath%20fill%3D%22%2364758b%22%20d%3D%22M1.5%203.5l3.5%204%203.5-4z%22/%3E%3C/svg%3E')]`;
 
 export const ownerVehicleReadOnlyFieldClass =
-  "w-full min-h-[36px] rounded-lg border border-[#d4d4d4] bg-[#ececec] px-3 py-2 text-sm text-gray-600 cursor-default focus:outline-none disabled:cursor-default disabled:border-[#d4d4d4] disabled:bg-[#ececec] disabled:text-gray-600 disabled:opacity-100";
+  "h-10 w-full cursor-default rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600 shadow-sm outline-none disabled:cursor-default disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-600 disabled:opacity-100";
 
 export const ownerVehicleReadOnlySelectClass = `${ownerVehicleReadOnlyFieldClass} appearance-none pr-3`;
 

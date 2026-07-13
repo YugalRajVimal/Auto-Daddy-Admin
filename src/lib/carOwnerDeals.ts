@@ -243,8 +243,23 @@ export function dealsForCategory(
   normalized: NormalizedCarOwnerDeals,
   category: DealCategory
 ): CarOwnerDealBucket {
-  if (category === "service") return normalized.Service;
-  if (category === "parts") return normalized.Parts;
+  if (category === "completed") {
+    const all = normalized.all.filter((d) => !isDealActive(d));
+    return { city: all, others: [] };
+  }
+
+  if (category === "service") {
+    return {
+      city: normalized.Service.city.filter(isDealActive),
+      others: normalized.Service.others.filter(isDealActive),
+    };
+  }
+  if (category === "parts") {
+    return {
+      city: normalized.Parts.city.filter(isDealActive),
+      others: normalized.Parts.others.filter(isDealActive),
+    };
+  }
 
   const all = normalized.all.filter((d) => matchesDealCategory(d, category));
   return { city: all, others: [] };
@@ -274,7 +289,7 @@ export function isDealActive(d: CarOwnerDeal): boolean {
   return !Number.isFinite(ends) || ends >= Date.now();
 }
 
-export type DealCategory = "service" | "parts" | "tire" | "salvage";
+export type DealCategory = "service" | "parts" | "tire" | "salvage" | "completed";
 
 export function matchesDealCategory(d: CarOwnerDeal, category: DealCategory): boolean {
   const haystack = [
@@ -288,10 +303,11 @@ export function matchesDealCategory(d: CarOwnerDeal, category: DealCategory): bo
     .join(" ")
     .toLowerCase();
 
-  if (category === "service") return dealKindLabel(d.dealType) === "Service";
-  if (category === "parts") return dealKindLabel(d.dealType) === "Parts";
-  if (category === "tire") return /\b(tire|tyre)\b/i.test(haystack);
-  if (category === "salvage") return /\bsalvage/i.test(haystack);
+  if (category === "completed") return !isDealActive(d);
+  if (category === "service") return dealKindLabel(d.dealType) === "Service" && isDealActive(d);
+  if (category === "parts") return dealKindLabel(d.dealType) === "Parts" && isDealActive(d);
+  if (category === "tire") return /\b(tire|tyre)\b/i.test(haystack) && isDealActive(d);
+  if (category === "salvage") return /\bsalvage/i.test(haystack) && isDealActive(d);
   return true;
 }
 

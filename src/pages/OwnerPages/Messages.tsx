@@ -129,8 +129,6 @@ export default function OwnerMessagesPage() {
       }))}
       activeSidebarId={tab}
       onSidebarSelect={(id) => setTab(id as MessagesTab)}
-      heroCardFlush
-      contentTopOffset
     >
       <div className="overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
         <div className="flex flex-wrap items-center gap-2 bg-ad-purple px-3 py-2">

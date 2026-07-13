@@ -59,8 +59,6 @@ export default function OwnerJobCardsPage() {
       pageHeading="Job Cards"
       metaTitle="Job Cards | AutoDaddy"
       metaDescription="Car owner job cards"
-      heroCardFlush
-      contentTopOffset
     >
       {loading ? (
         <div className="flex items-center justify-center py-16">

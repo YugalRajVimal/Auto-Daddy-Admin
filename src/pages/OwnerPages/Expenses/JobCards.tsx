@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { toast } from "react-toastify";
-import OwnerPageShell from "../../components/owner/OwnerPageShell";
-import { useAuth } from "../../auth";
-import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
-import { useCarOwnerJobCardApprovals } from "../../hooks/useCarOwnerJobCardApprovals";
-import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import { useAuth } from "../../../auth";
+import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
+import { useCarOwnerJobCardApprovals } from "../../../hooks/useCarOwnerJobCardApprovals";
+import { useCarOwnerJobCards } from "../../../hooks/useCarOwnerJobCards";
 import {
   businessName,
   carOwnerJobCardStatusLabel,
@@ -13,14 +13,14 @@ import {
   formatJobCardDate,
   isCarOwnerJobCardPendingApproval,
   jobChipLabel,
-} from "../../lib/carOwnerJobCards";
-import { formatCurrencyAmount } from "../../lib/currency";
+} from "../../../lib/carOwnerJobCards";
+import { formatCurrencyAmount } from "../../../lib/currency";
 import {
   OWNER_PANEL_TABLE,
   OWNER_TABLE_BODY_TD_CLASS,
   OWNER_TABLE_HEAD_TH_CLASS,
   OWNER_TABLE_SURFACE_CLASS,
-} from "../../components/owner/ownerPanelTableStyles";
+} from "../../../components/owner/ownerPanelTableStyles";
 
 function selectedSetFromArray(ids: string[]): Set<string> {
   return new Set(ids);
@@ -47,7 +47,6 @@ export default function OwnerExpensesJobCardsPage() {
   } = useCarOwnerJobCards();
   const { acting, approveMany, rejectMany } = useCarOwnerJobCardApprovals();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [view, setView] = useState<"list" | "payment">("list");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -78,11 +77,6 @@ export default function OwnerExpensesJobCardsPage() {
     setView("list");
   }, []);
   useOwnerNavReset(reset);
-
-  const activeSidebarId = useMemo(() => {
-    if (location.pathname.includes("/owner/invoices")) return "invoices";
-    return "job-cards";
-  }, [location.pathname]);
 
   const openPayment = () => {
     if (selectedIds.length !== 1 || !selectedJobCard) {
@@ -143,17 +137,6 @@ export default function OwnerExpensesJobCardsPage() {
       pageHeading="Expenses"
       metaTitle="Expenses | Job Cards | AutoDaddy"
       metaDescription="Car owner job cards for expenses"
-      sidebarItems={[
-        { id: "job-cards", label: "Job Cards", variant: "primary" as const },
-        { id: "invoices", label: "Invoices", variant: "primary" as const },
-      ]}
-      activeSidebarId={activeSidebarId}
-      onSidebarSelect={(id) => {
-        if (id === "job-cards") navigate("/owner/expenses/job-cards");
-        if (id === "invoices") navigate("/owner/invoices");
-      }}
-      heroCardFlush
-      contentTopOffset
     >
       <div className="flex flex-col gap-3">
         {loading ? (
@@ -312,7 +295,7 @@ export default function OwnerExpensesJobCardsPage() {
                     if (selectedIds.length !== 1) return;
                     toast.success("Converted to invoice.");
                     setSelectedIds([]);
-                    navigate("/owner/invoices");
+                    navigate("/owner/expenses/invoices");
                   }}
                   className="rounded bg-gray-400 px-5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                 >
@@ -322,7 +305,7 @@ export default function OwnerExpensesJobCardsPage() {
 
               <button
                 type="button"
-                onClick={() => navigate("/owner/invoices")}
+                onClick={() => navigate("/owner/expenses/invoices")}
                 className="text-3xl font-black leading-none text-blue-700"
                 aria-label="Back"
               >

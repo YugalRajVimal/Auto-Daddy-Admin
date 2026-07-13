@@ -1,9 +1,11 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { Navigate, useParams } from "react-router";
 import { toast } from "react-toastify";
-import OwnerPageShell from "../../components/owner/OwnerPageShell";
-import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
-import { useCarOwnerDocuments } from "../../hooks/useCarOwnerDocuments";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
+import { useCarOwnerDocuments } from "../../../hooks/useCarOwnerDocuments";
+import { useCarOwnerVehicles } from "../../../hooks/useCarOwnerVehicles";
 import {
   DIGI_PURSE_CATEGORIES,
   fieldLabelForCategory,
@@ -11,7 +13,7 @@ import {
   type DigiPurseCategoryId,
   type VehicleDocumentFieldKey,
   type VehicleDocumentsSection,
-} from "../../lib/carOwnerDocuments";
+} from "../../../lib/carOwnerDocuments";
 
 function DocumentFieldPanel({
   category,
@@ -101,36 +103,34 @@ function VehicleDocumentRow({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between bg-[#CCFFCC] px-4 py-3 text-left transition-colors hover:bg-[#b8f0b8]"
+        className="flex w-full items-center justify-between gap-3 bg-[#006600] px-4 py-3 text-left text-white"
       >
-        <span className="text-sm font-bold text-[#006600]">{section.title}</span>
-        {expanded ? (
-          <FiChevronUp className="shrink-0 text-[#006600]" aria-hidden />
-        ) : (
-          <FiChevronDown className="shrink-0 text-[#006600]" aria-hidden />
-        )}
+        <span className="min-w-0 truncate font-semibold">
+          {section.title || section.subtitle || "Vehicle"}
+        </span>
+        {expanded ? <FiChevronUp /> : <FiChevronDown />}
       </button>
-
       {expanded ? (
-        <div className="border-t border-[#b2e0a0] bg-[#e8ffe8]">
-          {category === "other-documents" ? (
-            <p className="px-4 py-4 text-sm text-gray-600">No other documents for this vehicle.</p>
+        <div className="border border-t-0 border-[#b2e0a0] bg-[#f3fbf0]">
+          {visibleFields.length === 0 ? (
+            category === "other-documents" ? (
+              <p className="px-4 py-4 text-sm text-gray-600">No other documents for this vehicle.</p>
+            ) : (
+              <p className="px-4 py-4 text-sm text-gray-600">No documents in this category yet.</p>
+            )
           ) : (
-            visibleFields.map((field) => {
-              const fieldBusy = busyField === `${section.vehicleId}:${field.key}`;
-              return (
-                <DocumentFieldPanel
-                  key={field.key}
-                  category={category}
-                  vehicleId={section.vehicleId}
-                  fieldKey={field.key}
-                  uri={field.uri}
-                  busy={fieldBusy}
-                  disabled={mutating && !fieldBusy}
-                  onUpload={onUpload}
-                />
-              );
-            })
+            visibleFields.map((field) => (
+              <DocumentFieldPanel
+                key={field.key}
+                category={category}
+                vehicleId={section.vehicleId}
+                fieldKey={field.key}
+                uri={field.uri}
+                busy={busyField === `${section.vehicleId}:${field.key}`}
+                disabled={mutating}
+                onUpload={onUpload}
+              />
+            ))
           )}
         </div>
       ) : null}
@@ -138,27 +138,44 @@ function VehicleDocumentRow({
   );
 }
 
-export default function OwnerDigiPursePage() {
+export default function OwnerDocumentsPage() {
+  const { vehicleId } = useParams<{ vehicleId?: string }>();
+  const { vehicles, loading: vehiclesLoading } = useCarOwnerVehicles();
   const { sections, loading, error, mutating, busyField, refresh, uploadDocumentField } =
     useCarOwnerDocuments();
 
   const [category, setCategory] = useState<DigiPurseCategoryId>(DIGI_PURSE_CATEGORIES[0].id);
   const [expandedVehicleId, setExpandedVehicleId] = useState<string | null>(null);
 
+  const firstVehicleId = vehicles[0]?.id;
+
+  useEffect(() => {
+    if (vehicleId) setExpandedVehicleId(vehicleId);
+  }, [vehicleId]);
+
   const resetSidebar = useCallback(() => {
     setCategory(DIGI_PURSE_CATEGORIES[0].id);
-    setExpandedVehicleId(null);
-  }, []);
+    setExpandedVehicleId(vehicleId ?? null);
+  }, [vehicleId]);
 
   useOwnerNavReset(resetSidebar);
 
+  const visibleSections = useMemo(() => {
+    if (!vehicleId) return sections;
+    return sections.filter((s) => s.vehicleId === vehicleId);
+  }, [sections, vehicleId]);
+
+  const vehicleIndex = vehicles.findIndex((v) => v.id === vehicleId);
+  const pageHeading =
+    vehicleIndex >= 0 ? `Vehicle ${vehicleIndex + 1} Documents` : "Documents";
+
   const handleCategoryChange = (next: DigiPurseCategoryId) => {
     setCategory(next);
-    setExpandedVehicleId(null);
+    setExpandedVehicleId(vehicleId ?? null);
   };
 
-  const handleUpload = async (vehicleId: string, field: VehicleDocumentFieldKey, file: File) => {
-    const res = await uploadDocumentField(vehicleId, field, file);
+  const handleUpload = async (id: string, field: VehicleDocumentFieldKey, file: File) => {
+    const res = await uploadDocumentField(id, field, file);
     if (res.ok) {
       toast.success(res.message ?? "Document saved.");
     } else {
@@ -166,10 +183,14 @@ export default function OwnerDigiPursePage() {
     }
   };
 
+  if (!vehiclesLoading && !vehicleId && firstVehicleId) {
+    return <Navigate to={`/owner/documents/${firstVehicleId}`} replace />;
+  }
+
   return (
     <OwnerPageShell
-      pageHeading="Digi Purse"
-      metaTitle="Digi Purse | AutoDaddy"
+      pageHeading={pageHeading}
+      metaTitle="Documents | AutoDaddy"
       metaDescription="Car owner documents"
       sidebarItems={DIGI_PURSE_CATEGORIES.map((item) => ({
         id: item.id,
@@ -178,11 +199,9 @@ export default function OwnerDigiPursePage() {
       }))}
       activeSidebarId={category}
       onSidebarSelect={(id) => handleCategoryChange(id as DigiPurseCategoryId)}
-      heroCardFlush
-      contentTopOffset
     >
       <div className="flex flex-col gap-3">
-        {loading ? (
+        {loading || vehiclesLoading ? (
           <div className="flex flex-1 items-center justify-center py-16">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
           </div>
@@ -197,23 +216,23 @@ export default function OwnerDigiPursePage() {
               Try again
             </button>
           </div>
-        ) : sections.length === 0 ? (
+        ) : visibleSections.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
             No vehicles on file. Add a vehicle to upload documents.
           </div>
         ) : (
-          sections.map((section) => (
+          visibleSections.map((section) => (
             <VehicleDocumentRow
               key={section.vehicleId}
               section={section}
               category={category}
-              expanded={expandedVehicleId === section.vehicleId}
+              expanded={expandedVehicleId === section.vehicleId || visibleSections.length === 1}
               onToggle={() =>
                 setExpandedVehicleId((cur) => (cur === section.vehicleId ? null : section.vehicleId))
               }
               busyField={busyField}
               mutating={mutating}
-              onUpload={(vehicleId, field, file) => void handleUpload(vehicleId, field, file)}
+              onUpload={(id, field, file) => void handleUpload(id, field, file)}
             />
           ))
         )}

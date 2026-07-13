@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router";
 import {
   CompactField,
   CompactFormFooter,
@@ -6,22 +7,22 @@ import {
   CompactFormRow,
   compactFixedFieldWidth,
   compactInputClass,
-} from "../../components/admin/ContentPanel";
-import OwnerPageShell from "../../components/owner/OwnerPageShell";
+} from "../../../components/admin/ContentPanel";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
 import {
   OwnerFlatReportTable,
   OwnerGroupedReportTable,
-} from "../../components/owner/OwnerReportTableView";
-import type { OwnerReportType } from "../../components/owner/OwnerReportsSidebar";
-import { useCarOwnerDashboard } from "../../hooks/useOwnerPortal";
-import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
+} from "../../../components/owner/OwnerReportTableView";
+import type { OwnerReportType } from "../../../components/owner/OwnerReportsSidebar";
+import { useCarOwnerDashboard } from "../../../hooks/useOwnerPortal";
+import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import {
   DUMMY_REPORT_INVOICES,
   DUMMY_REPORT_JOB_CARDS,
   DUMMY_REPORT_SHOPS,
   DUMMY_REPORT_TICKETS_RAISED,
   DUMMY_REPORT_TICKETS_RESOLVED,
-} from "../../lib/dummyOwnerReports";
+} from "../../../lib/dummyOwnerReports";
 import {
   invoiceToReportRow,
   jobCardToReportRow,
@@ -29,9 +30,9 @@ import {
   shopToReportRow,
   ticketToReportRow,
   type GroupBy,
-} from "../../lib/ownerReportGrouping";
-import type { CarOwnerJobCard } from "../../types/carOwnerJobCards";
-import { formatJobCardDate, serviceTypeLabel } from "../../lib/carOwnerJobCards";
+} from "../../../lib/ownerReportGrouping";
+import type { CarOwnerJobCard } from "../../../types/carOwnerJobCards";
+import { formatJobCardDate, serviceTypeLabel } from "../../../lib/carOwnerJobCards";
 
 type AppliedFilters = {
   fromDate: string;
@@ -46,14 +47,13 @@ const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "project", label: "Project" },
 ];
 
-const REPORT_SECTIONS: { id: OwnerReportType; label: string }[] = [
-  { id: "service", label: "Service Reports" },
-  { id: "job-card", label: "Job Card Reports" },
-  { id: "invoice", label: "Invoice Reports" },
-  { id: "auto-shop", label: "Auto Shop Reports" },
-  { id: "ticket-raised", label: "Ticket Raised" },
-  { id: "ticket-resolved", label: "Resolved" },
-];
+const REPORT_BY_PATH: Record<string, OwnerReportType> = {
+  "/owner/reports": "job-card",
+  "/owner/reports/job-cards": "job-card",
+  "/owner/reports/invoices": "invoice",
+  "/owner/reports/auto-shops": "auto-shop",
+  "/owner/reports/tickets-raised": "ticket-raised",
+};
 
 const REPORT_PAGE_HEADINGS: Record<OwnerReportType, string> = {
   service: "Service Reports",
@@ -113,19 +113,23 @@ function filterJobCards(items: CarOwnerJobCard[], filters: AppliedFilters): CarO
 
 export default function OwnerReportsPage() {
   const { displayName } = useCarOwnerDashboard();
+  const location = useLocation();
+  const activeReport = REPORT_BY_PATH[location.pathname] ?? "job-card";
 
   const defaultToDate = todayIso();
   const defaultFromDate = `${defaultToDate.slice(0, 4)}-01-01`;
 
-  const [activeReport, setActiveReport] = useState<OwnerReportType>(REPORT_SECTIONS[0].id);
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
   const [category, setCategory] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("category");
   const [applied, setApplied] = useState<AppliedFilters | null>(null);
 
+  useEffect(() => {
+    setApplied(null);
+  }, [activeReport]);
+
   const resetSidebar = useCallback(() => {
-    setActiveReport(REPORT_SECTIONS[0].id);
     setFromDate(defaultFromDate);
     setToDate(defaultToDate);
     setCategory("");
@@ -320,18 +324,6 @@ export default function OwnerReportsPage() {
       pageHeading={REPORT_PAGE_HEADINGS[activeReport]}
       metaTitle="Reports | AutoDaddy"
       metaDescription="Car owner reports"
-      sidebarItems={REPORT_SECTIONS.map((item) => ({
-        id: item.id,
-        label: item.label,
-        variant: "primary" as const,
-      }))}
-      activeSidebarId={activeReport}
-      onSidebarSelect={(id) => {
-        setActiveReport(id as OwnerReportType);
-        setApplied(null);
-      }}
-      heroCardFlush
-      contentTopOffset
     >
       <div className="space-y-4">
         <CompactFormPanel

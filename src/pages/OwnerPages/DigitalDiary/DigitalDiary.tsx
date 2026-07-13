@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { FiCalendar, FiChevronLeft, FiChevronRight, FiMenu } from "react-icons/fi";
 import { toast } from "react-toastify";
-import OwnerPageShell from "../../components/owner/OwnerPageShell";
-import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 
 type DiaryNote = {
   id: string;
@@ -356,18 +356,16 @@ export default function OwnerDigitalDiaryPage() {
       pageHeading="Digital Diary"
       metaTitle="Digital Diary | AutoDaddy"
       metaDescription="Car owner digital diary notes"
-      heroCardFlush
-      contentTopOffset
-    >
-      <div className="mb-4 flex items-center justify-end">
+      headerAction={
         <button
           type="button"
           onClick={openCreate}
-          className={`rounded-md ${GREEN_BTN} px-4 py-2 text-sm font-bold text-white shadow-sm`}
+          className="shrink-0 rounded bg-ad-green px-4 py-2 text-sm font-bold text-white hover:bg-ad-green-dark"
         >
           + New Note
         </button>
-      </div>
+      }
+    >
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* Notes column */}

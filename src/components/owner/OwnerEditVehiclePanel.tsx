@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { FiEdit2, FiSave, FiTruck, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson, putJson } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
@@ -8,6 +9,7 @@ import {
   type CarCompanyCatalogItem,
   isValidVehicleYear,
   ownerVehicleFieldClass,
+  ownerVehicleLabelClass,
   ownerVehicleReadOnlyFieldClass,
   ownerVehicleReadOnlySelectClass,
   ownerVehicleSelectClass,
@@ -192,146 +194,197 @@ export default function OwnerEditVehiclePanel({
   const fieldsDisabled = !editing || submitting;
   const fieldClass = editing ? ownerVehicleFieldClass : ownerVehicleReadOnlyFieldClass;
   const selectClass = editing ? ownerVehicleSelectClass : ownerVehicleReadOnlySelectClass;
+  const vinLen = vinNo.trim().length;
+  const platePreview = licensePlateNo.trim().toUpperCase() || "—";
+  const titlePreview = [name, model, year].filter(Boolean).join(" · ") || "Vehicle details";
 
   return (
-    <div className="overflow-hidden rounded-[18px] bg-ad-green-light">
-      <div className="px-5 py-4 md:px-6">
-        <div className="mb-3 flex justify-end">
-          {!editing && !startEditing ? (
+    <div className="overflow-hidden rounded-2xl border border-white/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50 shadow-[0_10px_28px_rgba(15,23,42,0.06)] ring-1 ring-emerald-100">
+      <div className="border-b border-emerald-100/80 bg-white/70 px-4 py-4 sm:px-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 shadow-sm ring-1 ring-emerald-100">
+              <FiTruck size={20} />
+            </span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-emerald-700">
+                {editing ? "Editing" : "Details"}
+              </p>
+              <h3 className="mt-0.5 text-lg font-bold tracking-tight text-slate-900">{platePreview}</h3>
+              <p className="mt-1 text-sm text-slate-600">{titlePreview}</p>
+            </div>
+          </div>
+          {!editing ? (
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="rounded border border-gray-400 bg-white px-3 py-1 text-xs font-semibold text-ad-purple hover:bg-gray-50"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
             >
-              Edit
+              <FiEdit2 size={15} /> Edit
             </button>
           ) : null}
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-5 md:gap-4">
-          <label className="text-xs font-semibold text-gray-700">
-            License Plate
-            <input
-              type="text"
-              value={licensePlateNo}
-              onChange={(e) => setLicensePlateNo(e.target.value)}
-              disabled={fieldsDisabled}
-              autoComplete="off"
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
+      <div className="space-y-4 p-4 sm:p-5">
+        <section className="rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
+          <h4 className="mb-3 text-sm font-bold text-slate-900">Identity</h4>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className={ownerVehicleLabelClass}>License plate *</span>
+              <input
+                type="text"
+                value={licensePlateNo}
+                onChange={(e) => setLicensePlateNo(e.target.value)}
+                disabled={fieldsDisabled}
+                autoComplete="off"
+                placeholder="ABC 1234"
+                className={fieldClass}
+              />
+            </label>
+            <label className="block">
+              <span className={ownerVehicleLabelClass}>
+                VIN{" "}
+                {editing ? (
+                  <span className={vinLen === 17 || vinLen === 0 ? "text-emerald-600" : "text-amber-600"}>
+                    ({vinLen}/17)
+                  </span>
+                ) : null}
+              </span>
+              <input
+                type="text"
+                value={vinNo}
+                onChange={(e) => setVinNo(e.target.value.toUpperCase())}
+                maxLength={17}
+                disabled={fieldsDisabled}
+                autoComplete="off"
+                placeholder="17-character VIN"
+                className={`${fieldClass} font-mono tracking-wide`}
+              />
+            </label>
+          </div>
+        </section>
 
-          <label className="text-xs font-semibold text-gray-700">
-            Make
-            <select
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setModel("");
-                setYear("");
-              }}
-              disabled={fieldsDisabled || companiesLoading}
-              className={`${selectClass} mt-1`}
-            >
-              <option value="">{companiesLoading ? "Loading…" : "Make"}</option>
-              {companies.map((c) => (
-                <option key={c.companyName} value={c.companyName}>
-                  {c.companyName}
-                </option>
-              ))}
-              {name && !companies.some((c) => c.companyName === name) ? <option value={name}>{name}</option> : null}
-            </select>
-          </label>
+        <section className="rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
+          <h4 className="mb-3 text-sm font-bold text-slate-900">Vehicle details</h4>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className={ownerVehicleLabelClass}>Make *</span>
+              <select
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setModel("");
+                  setYear("");
+                }}
+                disabled={fieldsDisabled || companiesLoading}
+                className={selectClass}
+              >
+                <option value="">{companiesLoading ? "Loading…" : "Select make"}</option>
+                {companies.map((c) => (
+                  <option key={c.companyName} value={c.companyName}>
+                    {c.companyName}
+                  </option>
+                ))}
+                {name && !companies.some((c) => c.companyName === name) ? (
+                  <option value={name}>{name}</option>
+                ) : null}
+              </select>
+            </label>
 
-          <label className="text-xs font-semibold text-gray-700">
-            Model
-            <select
-              value={model}
-              onChange={(e) => {
-                setModel(e.target.value);
-                setYear("");
-              }}
-              disabled={fieldsDisabled || !name}
-              className={`${selectClass} mt-1`}
-            >
-              <option value="">Model</option>
-              {modelOptions.map((m) => (
-                <option key={m.modelName} value={m.modelName}>
-                  {m.modelName}
-                </option>
-              ))}
-              {model && !modelOptions.some((m) => m.modelName === model) ? <option value={model}>{model}</option> : null}
-            </select>
-          </label>
+            <label className="block">
+              <span className={ownerVehicleLabelClass}>Model *</span>
+              <select
+                value={model}
+                onChange={(e) => {
+                  setModel(e.target.value);
+                  setYear("");
+                }}
+                disabled={fieldsDisabled || !name}
+                className={selectClass}
+              >
+                <option value="">Select model</option>
+                {modelOptions.map((m) => (
+                  <option key={m.modelName} value={m.modelName}>
+                    {m.modelName}
+                  </option>
+                ))}
+                {model && !modelOptions.some((m) => m.modelName === model) ? (
+                  <option value={model}>{model}</option>
+                ) : null}
+              </select>
+            </label>
 
-          <label className="text-xs font-semibold text-gray-700">
-            Year
-            <select
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              disabled={fieldsDisabled || !model}
-              className={`${selectClass} mt-1`}
-            >
-              <option value="">Year</option>
-              {yearOptions.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-              {year && !yearOptions.includes(year) ? <option value={year}>{year}</option> : null}
-            </select>
-          </label>
+            <label className="block">
+              <span className={ownerVehicleLabelClass}>Year *</span>
+              <select
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+                disabled={fieldsDisabled || !model}
+                className={selectClass}
+              >
+                <option value="">Select year</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+                {year && !yearOptions.includes(year) ? <option value={year}>{year}</option> : null}
+              </select>
+            </label>
+          </div>
+        </section>
 
-          <label className="text-xs font-semibold text-gray-700">
-            Odometer
-            <input
-              type="text"
-              value={odometerReading}
-              onChange={(e) => setOdometerReading(e.target.value.replace(/[^\d]/g, ""))}
-              inputMode="numeric"
-              disabled={fieldsDisabled}
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
-
-          {/* VIN below Model (same width) */}
-          <div className="hidden md:block" aria-hidden />
-          <div className="hidden md:block" aria-hidden />
-          <label className="text-xs font-semibold text-gray-700 md:col-start-3">
-            VIN
-            <input
-              type="text"
-              value={vinNo}
-              onChange={(e) => setVinNo(e.target.value)}
-              maxLength={17}
-              disabled={fieldsDisabled}
-              autoComplete="off"
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
-        </div>
+        <section className="rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
+          <h4 className="mb-3 text-sm font-bold text-slate-900">Odometer</h4>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className={ownerVehicleLabelClass}>Current reading (km)</span>
+              <input
+                type="text"
+                value={odometerReading}
+                onChange={(e) => setOdometerReading(e.target.value.replace(/[^\d]/g, ""))}
+                inputMode="numeric"
+                disabled={fieldsDisabled}
+                placeholder="e.g. 18450"
+                className={fieldClass}
+              />
+            </label>
+            <label className="block">
+              <span className={ownerVehicleLabelClass}>Service due (km)</span>
+              <input
+                type="text"
+                value={dueOdometerReading}
+                onChange={(e) => setDueOdometerReading(e.target.value.replace(/[^\d]/g, ""))}
+                inputMode="numeric"
+                disabled={fieldsDisabled}
+                placeholder="e.g. 20000"
+                className={fieldClass}
+              />
+            </label>
+          </div>
+        </section>
       </div>
 
       {editing ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-[#f4ddc7] px-5 py-2 md:px-6">
-          <p className="text-sm italic text-gray-700">You are creating your Profile page</p>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={() => void handleUpdate()}
-              className="min-w-[120px] rounded bg-[#0a7a0a] px-10 py-1.5 text-sm font-bold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? "Updating…" : "Update"}
-            </button>
-            <span className="text-sm text-gray-700">or</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-100/80 bg-white/80 px-4 py-3 sm:px-5">
+          <p className="text-xs text-slate-500 sm:text-sm">Changes save to this vehicle in your garage.</p>
+          <div className="flex items-center gap-2">
             <button
               type="button"
               disabled={submitting}
               onClick={handleCancelEdit}
-              className="text-sm font-semibold text-blue-700 underline hover:text-blue-800 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
-              Cancel
+              <FiX size={15} /> Cancel
+            </button>
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => void handleUpdate()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <FiSave size={15} /> {submitting ? "Updating…" : "Save changes"}
             </button>
           </div>
         </div>

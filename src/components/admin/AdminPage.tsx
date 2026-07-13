@@ -45,7 +45,7 @@ export default function AdminPage({
     </ContentPanel>
   );
 
-  const showPageTitle = noPanel || !panelTitle || useInlineFlow;
+  const showPageTitle = (noPanel || !panelTitle || useInlineFlow) && title.trim().length > 0;
 
   return (
     <div className="bg-ad-app-bg py-4 md:py-5">

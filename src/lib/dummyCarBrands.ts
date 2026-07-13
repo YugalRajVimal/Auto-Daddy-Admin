@@ -17,6 +17,7 @@ export const DUMMY_CAR_BRANDS: ShopCarCompany[] = [
   { _id: "dummy-mazda", companyName: "Mazda", brandLogo: `${WVL}/mazda-6.svg` },
   { _id: "dummy-subaru", companyName: "Subaru", brandLogo: `${WVL}/subaru-2.svg` },
   { _id: "dummy-volkswagen", companyName: "Volkswagen", brandLogo: `${WVL}/volkswagen-9.svg` },
+  { _id: "dummy-tesla", companyName: "Tesla", brandLogo: `${WVL}/tesla-9.svg` },
 ];
 
 /** Sample brands shown on the shop profile for demo purposes. */

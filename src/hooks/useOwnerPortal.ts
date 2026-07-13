@@ -200,6 +200,7 @@ export function useCarOwnerDashboard() {
     extractThoughtOfTheDay(data?.dashboard?.thoughtOfTheDay) ?? DEFAULT_THOUGHT;
 
   const faqs = data?.dashboard?.FAQs;
+  const privacy = data?.dashboard?.privacyPolicy;
   const sections = normalizeSections(data?.dashboard?.sections);
   const thoughtLikeCount = normalizeLikeCount(data?.dashboard?.thoughtOfTheDayLike);
   const profile = data?.userProfile;
@@ -222,6 +223,8 @@ export function useCarOwnerDashboard() {
     nextService,
     faqsHeading: typeof faqs?.heading === "string" ? faqs.heading.trim() : "FAQs",
     faqsDescription: typeof faqs?.desc === "string" ? faqs.desc.trim() : "",
+    privacyHeading: typeof privacy?.heading === "string" ? privacy.heading.trim() : "Privacy Policy",
+    privacyDescription: typeof privacy?.desc === "string" ? privacy.desc.trim() : "",
   };
 }
 

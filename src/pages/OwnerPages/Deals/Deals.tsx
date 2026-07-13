@@ -1,34 +1,41 @@
 import { useCallback, useMemo, useState } from "react";
-import OwnerDealFilters from "../../components/owner/OwnerDealFilters";
-import OwnerDealRow from "../../components/owner/OwnerDealRow";
-import OwnerPageShell from "../../components/owner/OwnerPageShell";
-import { useAuth } from "../../auth";
-import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
-import { useCarOwnerDeals } from "../../hooks/useCarOwnerDeals";
-import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
+import { useLocation } from "react-router";
+import OwnerDealFilters from "../../../components/owner/OwnerDealFilters";
+import OwnerDealRow from "../../../components/owner/OwnerDealRow";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import { useAuth } from "../../../auth";
+import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
+import { useCarOwnerDeals } from "../../../hooks/useCarOwnerDeals";
+import { useCarOwnerVehicles } from "../../../hooks/useCarOwnerVehicles";
 import {
   EMPTY_DEAL_LIST_FILTERS,
   dealsForCategory,
   matchesDealListFilters,
   type DealCategory,
   type DealListFilters,
-} from "../../lib/carOwnerDeals";
-import type { CarOwnerDeal } from "../../types/carOwnerDeals";
-import type { CarOwnerVehicle } from "../../lib/carOwnerVehicles";
+} from "../../../lib/carOwnerDeals";
+import type { CarOwnerDeal } from "../../../types/carOwnerDeals";
+import type { CarOwnerVehicle } from "../../../lib/carOwnerVehicles";
 
-const CATEGORIES: { id: DealCategory; label: string }[] = [
-  { id: "service", label: "Service Deals" },
-  { id: "tire", label: "Tires and Alloy wheels" },
-  { id: "parts", label: "Spare Part Deal" },
-  { id: "salvage", label: "Salvages" },
-];
+const CATEGORY_BY_PATH: Record<string, DealCategory> = {
+  "/owner/deals": "parts",
+  "/owner/deals/spare-parts": "parts",
+  "/owner/deals/service": "service",
+  "/owner/deals/salvage": "salvage",
+  "/owner/deals/completed": "completed",
+};
 
 const CATEGORY_HEADINGS: Record<DealCategory, string> = {
   service: "Service Deals",
   tire: "Tires and Alloy wheels",
-  parts: "Spare Part Deal",
-  salvage: "Salvages",
+  parts: "Spare Parts Deals",
+  salvage: "Salvage Deals",
+  completed: "Completed Deals",
 };
+
+function dealCategoryFromPath(pathname: string): DealCategory {
+  return CATEGORY_BY_PATH[pathname] ?? "parts";
+}
 
 function dealRowVehicleLabel(deal: CarOwnerDeal, index: number, vehicles: CarOwnerVehicle[]): string {
   if ("selectedVehicle" in deal && deal.selectedVehicle) {
@@ -81,7 +88,8 @@ function DealSection({
 export default function OwnerDealsPage() {
   const { session } = useAuth();
   const countryCode = session?.meta?.countryCode;
-  const [category, setCategory] = useState<DealCategory>(CATEGORIES[0].id);
+  const location = useLocation();
+  const category = dealCategoryFromPath(location.pathname);
   const [listFilters, setListFilters] = useState<DealListFilters>(EMPTY_DEAL_LIST_FILTERS);
 
   const { grouped, apiFilters, loading, error, refresh } = useCarOwnerDeals({
@@ -91,7 +99,6 @@ export default function OwnerDealsPage() {
   const { vehicles } = useCarOwnerVehicles();
 
   const resetSidebar = useCallback(() => {
-    setCategory(CATEGORIES[0].id);
     setListFilters(EMPTY_DEAL_LIST_FILTERS);
   }, []);
 
@@ -104,7 +111,6 @@ export default function OwnerDealsPage() {
     [categoryBucket]
   );
 
-  // make/model are applied via API query params; only city is filtered client-side
   const cityOnlyFilters = useMemo(
     () => ({ make: "", model: "", city: listFilters.city }),
     [listFilters.city]
@@ -127,18 +133,6 @@ export default function OwnerDealsPage() {
       pageHeading={CATEGORY_HEADINGS[category]}
       metaTitle="Deals | AutoDaddy"
       metaDescription="Car owner deals"
-      sidebarItems={CATEGORIES.map((item) => ({
-        id: item.id,
-        label: item.label,
-        variant: "primary" as const,
-      }))}
-      activeSidebarId={category}
-      onSidebarSelect={(id) => {
-        setCategory(id as DealCategory);
-        setListFilters(EMPTY_DEAL_LIST_FILTERS);
-      }}
-      heroCardFlush
-      contentTopOffset
     >
       <div className="flex flex-col gap-4 overflow-y-auto px-1 pb-2">
         {!loading && !error ? (

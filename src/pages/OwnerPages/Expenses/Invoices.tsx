@@ -1,17 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { useLocation, useNavigate } from "react-router";
-import OwnerPageShell from "../../components/owner/OwnerPageShell";
-import { useAuth } from "../../auth";
-import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
-import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "../../hooks/useCarOwnerInvoices";
-import { formatCurrencyAmount } from "../../lib/currency";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import { useAuth } from "../../../auth";
+import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
+import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "../../../hooks/useCarOwnerInvoices";
+import { formatCurrencyAmount } from "../../../lib/currency";
 import {
   OWNER_PANEL_TABLE,
   OWNER_TABLE_BODY_TD_CLASS,
   OWNER_TABLE_HEAD_TH_CLASS,
   OWNER_TABLE_SURFACE_CLASS,
-} from "../../components/owner/ownerPanelTableStyles";
+} from "../../../components/owner/ownerPanelTableStyles";
 
 function formatInvoiceDate(iso: string): string {
   const d = new Date(iso);
@@ -51,8 +50,6 @@ export default function OwnerInvoicesPage() {
   const { session } = useAuth();
   const countryCode = session?.meta?.countryCode;
   const { loading, error, refresh, invoiceRows } = useCarOwnerInvoices();
-  const navigate = useNavigate();
-  const location = useLocation();
 
   const [view, setView] = useState<"list" | "payment">("list");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -97,27 +94,11 @@ export default function OwnerInvoicesPage() {
     setSelectedIds([]);
   };
 
-  const activeSidebarId = useMemo(() => {
-    if (location.pathname.includes("/owner/expenses/job-cards")) return "job-cards";
-    return "invoices";
-  }, [location.pathname]);
-
   return (
     <OwnerPageShell
       pageHeading="Expenses"
       metaTitle="Expenses | AutoDaddy"
       metaDescription="Car owner expenses"
-      sidebarItems={[
-        { id: "job-cards", label: "Job Cards", variant: "primary" as const },
-        { id: "invoices", label: "Invoices", variant: "primary" as const },
-      ]}
-      activeSidebarId={activeSidebarId}
-      onSidebarSelect={(id) => {
-        if (id === "job-cards") navigate("/owner/expenses/job-cards");
-        if (id === "invoices") navigate("/owner/invoices");
-      }}
-      heroCardFlush
-      contentTopOffset
     >
       <div className="flex flex-col gap-3">
         {loading ? (

@@ -143,9 +143,6 @@ export default function PortalHelpPage({
       sidebarItems={HELP_SECTIONS}
       activeSidebarId={activeSection}
       onSidebarSelect={(id) => handleSectionChange(id as HelpSection)}
-      heroBackgroundImage={false}
-      heroCardFlush
-      contentTopOffset
     >
       {showForm ? (
         <ShopSupportPanel

@@ -1,26 +1,27 @@
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useCallback, useMemo, useState } from "react";
 import { FiChevronLeft, FiChevronRight, FiHeart, FiPlus } from "react-icons/fi";
 import { toast } from "react-toastify";
-import OwnerPageShell, { OwnerPageSidebar } from "../../components/owner/OwnerPageShell";
-import OwnerVehiclePlateSidebar from "../../components/owner/OwnerVehiclePlateSidebar";
-import OwnerShopExpandedPanel from "../../components/owner/OwnerShopExpandedPanel";
-import { OwnerCustomerRequestsTable } from "../../components/owner/OwnerPanelTables";
-import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
-import { useCarOwnerAutoShops } from "../../hooks/useCarOwnerAutoShops";
-import { useCarOwnerCustomerRequests } from "../../hooks/useCarOwnerCustomerRequests";
-import { useCarOwnerFavoriteShops } from "../../hooks/useCarOwnerFavoriteShops";
-import { useCarOwnerServiceSidebar } from "../../hooks/useOwnerPortal";
-import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
-import { useOwnerNavReset, useOwnerSidebarDefault } from "../../hooks/useOwnerNavReset";
-import { isCarOwnerShopOpenToday } from "../../lib/carOwnerAutoShops";
+import OwnerPageShell, { OwnerPageSidebar } from "../../../components/owner/OwnerPageShell";
+import OwnerVehiclePlateSidebar from "../../../components/owner/OwnerVehiclePlateSidebar";
+import OwnerShopExpandedPanel from "../../../components/owner/OwnerShopExpandedPanel";
+import { OwnerCustomerRequestsTable } from "../../../components/owner/OwnerPanelTables";
+import { useCarOwnerAutoShops } from "../../../hooks/useCarOwnerAutoShops";
+import { useCarOwnerCustomerRequests } from "../../../hooks/useCarOwnerCustomerRequests";
+import { useCarOwnerFavoriteShops } from "../../../hooks/useCarOwnerFavoriteShops";
+import { useCarOwnerServiceSidebar } from "../../../hooks/useOwnerPortal";
+import { useCarOwnerVehicles } from "../../../hooks/useCarOwnerVehicles";
+import { useOwnerNavReset, useOwnerSidebarDefault } from "../../../hooks/useOwnerNavReset";
+import { isCarOwnerShopOpenToday } from "../../../lib/carOwnerAutoShops";
 
 const SELECT_VEHICLE_PROMPT = "Select a vehicle from the sidebar to find matching auto shops.";
 
 type AutoShopsSection = "auto-shops" | "approvals";
 
 export default function OwnerAutoShopsPage() {
-  const [section, setSection] = useState<AutoShopsSection>("auto-shops");
+  const location = useLocation();
+  const section: AutoShopsSection =
+    location.pathname.includes("/approvals") ? "approvals" : "auto-shops";
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [selectedServiceIndex, setSelectedServiceIndex] = useState(0);
   const [expandedShopId, setExpandedShopId] = useState<string | null>(null);
@@ -73,13 +74,11 @@ export default function OwnerAutoShopsPage() {
   const showShopList = Boolean(selectedVehicleId);
 
   const handleVehicleSelect = useCallback((vehicleId: string) => {
-    setSection("auto-shops");
     setSelectedVehicleId(vehicleId);
     setExpandedShopId(null);
   }, []);
 
   const resetSidebar = useCallback(() => {
-    setSection("auto-shops");
     setSelectedVehicleId(vehicles[0]?.id ?? null);
     setExpandedShopId(null);
   }, [vehicles]);
@@ -123,25 +122,17 @@ export default function OwnerAutoShopsPage() {
       metaTitle="Auto Shops | AutoDaddy"
       metaDescription="Find auto shops near you"
       customSidebar={
-        <OwnerPageSidebar>
-          <ShopSidebarButton
-            label="Approvals"
-            active={section === "approvals"}
-            onClick={() => {
-              setSection("approvals");
-              setExpandedShopId(null);
-            }}
-          />
-          <OwnerVehiclePlateSidebar
-            vehicles={vehicles}
-            loading={vehiclesLoading}
-            selectedVehicleId={section === "auto-shops" ? selectedVehicleId : null}
-            onSelect={handleVehicleSelect}
-          />
-        </OwnerPageSidebar>
+        section === "auto-shops" ? (
+          <OwnerPageSidebar>
+            <OwnerVehiclePlateSidebar
+              vehicles={vehicles}
+              loading={vehiclesLoading}
+              selectedVehicleId={selectedVehicleId}
+              onSelect={handleVehicleSelect}
+            />
+          </OwnerPageSidebar>
+        ) : undefined
       }
-      heroCardFlush
-      contentTopOffset
     >
       {section === "approvals" ? (
         <div className="flex min-h-[320px] flex-col gap-3">
