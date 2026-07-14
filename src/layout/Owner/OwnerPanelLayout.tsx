@@ -22,7 +22,7 @@ function OwnerLayoutContent() {
       buildOwnerPrimaryNav(
         vehicles.map((v, index) => ({
           id: v.id,
-          label: `Vehicle ${index + 1}`,
+          label: v.licensePlateNo?.trim() || `Vehicle ${index + 1}`,
         }))
       ),
     [vehicles]

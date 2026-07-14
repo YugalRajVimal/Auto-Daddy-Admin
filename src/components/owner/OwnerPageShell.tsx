@@ -116,7 +116,7 @@ export default function OwnerPageShell({
         footer={chrome.sidebarFooter}
         loading={chrome.sidebarLoading}
         skeletonCount={chrome.sidebarSkeletonCount}
-        shopStyle
+        ownerStyle
         className="lg:!h-auto lg:!max-h-none"
       >
         {chrome.sidebarExtra}

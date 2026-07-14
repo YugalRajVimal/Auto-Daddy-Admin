@@ -10,10 +10,16 @@ export default function OwnerProfileSidebarNav() {
 
   return (
     <div className="flex flex-col gap-2">
-      <ShopSidebarButton label="Profile" active={onProfile} onClick={() => navigate("/owner/profile")} />
+      <ShopSidebarButton
+        label="Profile"
+        active={onProfile}
+        ownerStyle
+        onClick={() => navigate("/owner/profile")}
+      />
       <ShopSidebarButton
         label="My Vehicles"
         active={onVehicles}
+        ownerStyle
         onClick={() => navigate("/owner/profile/vehicles")}
       />
     </div>

@@ -34,6 +34,7 @@ export default function OwnerVehiclePlateSidebar({
           key={vehicle.id}
           label={vehiclePlateLabel(vehicle)}
           active={selectedVehicleId === vehicle.id}
+          ownerStyle
           onClick={() => onSelect(vehicle.id)}
         />
       ))}

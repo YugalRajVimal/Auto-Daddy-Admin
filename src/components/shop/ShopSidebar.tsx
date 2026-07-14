@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import PortalSidebarButton from "../admin/PortalSidebarButton";
 import { Skeleton } from "../common/Skeleton";
 import {
+  ownerSidebarButtonClass,
+  ownerSidebarButtonStackClass,
   shopSidebarButtonClass,
   shopSidebarButtonStackClass,
   shopSidebarOutdoorButtonClass,
@@ -28,6 +30,8 @@ export type ShopSidebarButtonProps = {
   trailing?: ReactNode;
   className?: string;
   "aria-expanded"?: boolean;
+  /** Soft glass owner-portal pills (modern theme). */
+  ownerStyle?: boolean;
 };
 
 export function ShopSidebarButton({
@@ -37,11 +41,14 @@ export function ShopSidebarButton({
   trailing,
   className = "",
   outdoor = false,
+  ownerStyle = false,
   "aria-expanded": ariaExpanded,
 }: ShopSidebarButtonProps & { outdoor?: boolean }) {
   const toneClass = outdoor
     ? shopSidebarOutdoorButtonClass(active)
-    : shopSidebarButtonClass(active);
+    : ownerStyle
+      ? ownerSidebarButtonClass(active)
+      : shopSidebarButtonClass(active);
   return (
     <button
       type="button"
@@ -63,14 +70,21 @@ export type ShopSidebarItem = {
   variant?: "primary" | "secondary";
 };
 
-export function ShopSidebarButtonSkeleton({ className = "" }: { className?: string }) {
+export function ShopSidebarButtonSkeleton({
+  className = "",
+  ownerStyle = false,
+}: {
+  className?: string;
+  ownerStyle?: boolean;
+}) {
+  const shell = ownerStyle
+    ? ownerSidebarButtonClass(false, `pointer-events-none animate-pulse ${className}`)
+    : shopSidebarButtonClass(false, `pointer-events-none animate-pulse ${className}`);
+  const bone = ownerStyle ? "bg-ad-purple/15" : "bg-[#f5cce8]";
   return (
-    <div
-      className={shopSidebarButtonClass(false, `pointer-events-none animate-pulse ${className}`)}
-      aria-hidden="true"
-    >
-      <Skeleton className="h-4 w-4 shrink-0 rounded-full bg-[#f5cce8]" pulse={false} />
-      <Skeleton className="h-3 min-w-0 flex-1 rounded bg-[#f5cce8]" pulse={false} />
+    <div className={shell} aria-hidden="true">
+      <Skeleton className={`h-4 w-4 shrink-0 rounded-full ${bone}`} pulse={false} />
+      <Skeleton className={`h-3 min-w-0 flex-1 rounded ${bone}`} pulse={false} />
     </div>
   );
 }
@@ -78,18 +92,21 @@ export function ShopSidebarButtonSkeleton({ className = "" }: { className?: stri
 export function ShopSidebarButtonsSkeleton({
   count = 4,
   className = "",
+  ownerStyle = false,
 }: {
   count?: number;
   className?: string;
+  ownerStyle?: boolean;
 }) {
+  const stack = ownerStyle ? ownerSidebarButtonStackClass : shopSidebarButtonStackClass;
   return (
     <div
-      className={`${shopSidebarButtonStackClass} ${className}`.trim()}
+      className={`${stack} ${className}`.trim()}
       aria-busy="true"
       aria-label="Loading navigation"
     >
       {Array.from({ length: count }, (_, index) => (
-        <ShopSidebarButtonSkeleton key={index} />
+        <ShopSidebarButtonSkeleton key={index} ownerStyle={ownerStyle} />
       ))}
     </div>
   );
@@ -106,6 +123,8 @@ type ShopSidebarProps = {
   className?: string;
   /** Purple/peach pill buttons matching shop mockups. */
   shopStyle?: boolean;
+  /** Soft glass pills for the modern owner portal. */
+  ownerStyle?: boolean;
   /** Placeholder pills while dynamic nav items load. */
   loading?: boolean;
   skeletonCount?: number;
@@ -121,27 +140,43 @@ export default function ShopSidebar({
   footer,
   className = "",
   shopStyle = false,
+  ownerStyle = false,
   loading = false,
   skeletonCount = 4,
 }: ShopSidebarProps) {
+  const useOwner = ownerStyle;
+  const useShop = shopStyle && !ownerStyle;
+  const stackClass = useOwner ? ownerSidebarButtonStackClass : shopSidebarButtonStackClass;
+
   return (
     <aside className={`${shopSidebarShellClass} ${className}`}>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:pr-0.5">
-        {heading ? <h2 className={headingClassName}>{heading}</h2> : null}
+      <div
+        className={
+          useOwner
+            ? "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-2xl border border-white/70 bg-white/45 p-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] backdrop-blur-xl lg:pr-2.5"
+            : "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:pr-0.5"
+        }
+      >
+        {heading ? (
+          <h2 className={useOwner ? `${headingClassName} px-1.5 pt-1 text-slate-500` : headingClassName}>
+            {heading}
+          </h2>
+        ) : null}
 
         {children ? <div className="min-w-0">{children}</div> : null}
 
         {loading ? (
-          <ShopSidebarButtonsSkeleton count={skeletonCount} />
+          <ShopSidebarButtonsSkeleton count={skeletonCount} ownerStyle={useOwner} />
         ) : (
-          <div className={shopSidebarButtonStackClass}>
+          <div className={stackClass}>
             {items.map((item) =>
-              shopStyle ? (
+              useOwner || useShop ? (
                 <ShopSidebarButton
                   key={item.id}
                   label={item.label}
                   active={activeId === item.id}
                   onClick={() => onSelect?.(item.id)}
+                  ownerStyle={useOwner}
                 />
               ) : (
                 <PortalSidebarButton

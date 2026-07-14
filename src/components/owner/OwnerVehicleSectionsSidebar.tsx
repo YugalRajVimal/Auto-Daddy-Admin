@@ -92,6 +92,7 @@ export default function OwnerVehicleSectionsSidebar({
                     key={vehicle.id}
                     label={vehiclePlateLabel(vehicle)}
                     active={selectedVehicleId === vehicle.id}
+                    ownerStyle
                     onClick={() => onVehicleSelect(vehicle.id)}
                   />
                 ))

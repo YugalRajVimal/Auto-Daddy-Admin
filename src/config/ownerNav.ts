@@ -91,7 +91,7 @@ export const ownerPrimaryNav: NavItem[] = [
   },
 ];
 
-/** Build Documents sub-nav from the owner's vehicles (Vehicle 1, Vehicle 2, …). */
+/** Build Documents sub-nav from the owner's vehicles (prefer number plate labels). */
 export function ownerDocumentsSubItems(
   vehicles: { id: string; label?: string }[]
 ): NavSubItem[] {

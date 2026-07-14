@@ -39,6 +39,7 @@ export function OwnerCollapsibleSidebarItem({
         label={label}
         active={active || (collapsible && expanded)}
         onClick={onToggle}
+        ownerStyle
         aria-expanded={collapsible ? expanded : undefined}
         trailing={
           collapsible ? (

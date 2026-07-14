@@ -89,6 +89,7 @@ function ServiceList({
                       key={subKey}
                       label={sub.name}
                       active={subSelected}
+                      ownerStyle
                       onClick={() => onSubServiceSelect?.(sub)}
                     />
                   );
@@ -137,6 +138,7 @@ export default function OwnerServiceSidebar({
               label={item.name}
               active={selected}
               outdoor={outdoor}
+              ownerStyle={!outdoor}
               onClick={() => onServiceSelect?.(item)}
             />
           );
