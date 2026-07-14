@@ -305,6 +305,35 @@
   }
 }
 
+/* Owner portal: mild chrome trim on short laptop heights (e.g. 1366×768). */
+@layer components {
+  @media (max-height: 800px) {
+    .owner-portal .owner-chrome-header {
+      padding-top: 0.5rem;
+      padding-bottom: 0.375rem;
+    }
+
+    .owner-portal .owner-chrome-logo {
+      max-height: 3rem;
+      max-width: 9rem;
+    }
+
+    .owner-portal .owner-chrome-mist {
+      height: 8rem;
+    }
+
+    .owner-portal .owner-primary-tab {
+      padding-top: 0.45rem;
+      padding-bottom: 0.45rem;
+    }
+
+    .owner-portal .owner-subnav-link {
+      padding-top: 0.35rem;
+      padding-bottom: 0.35rem;
+    }
+  }
+}
+
 @layer components {
   .rounded-md.border.border-gray-200.bg-white,
   .rounded-lg.border.border-gray-200.bg-white,

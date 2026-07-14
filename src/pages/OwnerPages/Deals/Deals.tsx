@@ -1,5 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { FiMapPin, FiTag } from "react-icons/fi";
 import { useLocation } from "react-router";
+import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerDealFilters from "../../../components/owner/OwnerDealFilters";
 import OwnerDealRow from "../../../components/owner/OwnerDealRow";
 import OwnerPageShell from "../../../components/owner/OwnerPageShell";
@@ -33,6 +35,14 @@ const CATEGORY_HEADINGS: Record<DealCategory, string> = {
   completed: "Completed Deals",
 };
 
+const CATEGORY_SUBTITLES: Record<DealCategory, string> = {
+  service: "Active service offers from nearby shops",
+  tire: "Tire and alloy wheel offers for your vehicle",
+  parts: "Spare parts and accessory deals matched to you",
+  salvage: "Salvage and recovery offers",
+  completed: "Offers that have already ended",
+};
+
 function dealCategoryFromPath(pathname: string): DealCategory {
   return CATEGORY_BY_PATH[pathname] ?? "parts";
 }
@@ -55,14 +65,27 @@ function dealRowVehicleLabel(deal: CarOwnerDeal, index: number, vehicles: CarOwn
   return `Vehicle -${index + 1}`;
 }
 
+function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ad-purple/20 bg-white/60 px-6 py-14 text-center shadow-sm backdrop-blur-sm">
+      <span className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-ad-bg-purple text-ad-purple">
+        <FiTag size={22} aria-hidden />
+      </span>
+      <div className="max-w-sm text-sm text-slate-600">{children}</div>
+    </div>
+  );
+}
+
 function DealSection({
   title,
+  icon: Icon,
   deals,
   vehicles,
   countryCode,
   startIndex,
 }: {
   title: string;
+  icon: typeof FiMapPin;
   deals: CarOwnerDeal[];
   vehicles: CarOwnerVehicle[];
   countryCode?: string;
@@ -72,7 +95,15 @@ function DealSection({
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="px-1 text-xs font-bold uppercase tracking-wide text-gray-500">{title}</h2>
+      <div className="flex items-center gap-2 px-0.5">
+        <span className="flex size-7 items-center justify-center rounded-lg bg-sky-50 text-sky-700">
+          <Icon size={14} aria-hidden />
+        </span>
+        <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{title}</h2>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+          {deals.length}
+        </span>
+      </div>
       {deals.map((deal, index) => (
         <OwnerDealRow
           key={deal._id}
@@ -130,44 +161,65 @@ export default function OwnerDealsPage() {
 
   return (
     <OwnerPageShell
-      pageHeading={CATEGORY_HEADINGS[category]}
+      pageHeading=""
       metaTitle="Deals | AutoDaddy"
       metaDescription="Car owner deals"
+      noPanel
     >
-      <div className="flex flex-col gap-4 overflow-y-auto px-1 pb-2">
+      <div className="flex flex-col gap-4">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-sm text-slate-500">{CATEGORY_SUBTITLES[category]}</p>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+              {CATEGORY_HEADINGS[category]}
+            </h1>
+          </div>
+          {!loading && !error && filteredTotal > 0 ? (
+            <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
+              {filteredTotal} deal{filteredTotal === 1 ? "" : "s"}
+            </p>
+          ) : null}
+        </header>
+
         {!loading && !error ? (
-          <OwnerDealFilters
-            deals={categoryDeals}
-            filters={listFilters}
-            onChange={setListFilters}
-            apiFilters={apiFilters}
-          />
+          <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/90 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] ring-1 ring-black/5 sm:p-4">
+            <OwnerDealFilters
+              deals={categoryDeals}
+              filters={listFilters}
+              onChange={setListFilters}
+              apiFilters={apiFilters}
+            />
+          </div>
         ) : null}
+
         {loading ? (
-          <div className="flex flex-1 items-center justify-center py-16">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
+          <div className="space-y-3">
+            <Skeleton className="h-14 w-full rounded-2xl" />
+            <Skeleton className="h-52 w-full rounded-2xl" />
+            <Skeleton className="h-52 w-full rounded-2xl" />
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
-            <p className="text-sm font-semibold text-gray-800">{error}</p>
+          <EmptyState>
+            <span className="mb-3 block font-semibold text-slate-800">{error}</span>
             <button
               type="button"
               onClick={() => void refresh()}
-              className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
+              className="rounded-xl bg-ad-purple px-4 py-2 text-sm font-semibold text-white shadow-sm"
             >
               Try again
             </button>
-          </div>
+          </EmptyState>
         ) : filteredTotal === 0 ? (
-          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
+          <EmptyState>
             {categoryDeals.length === 0
               ? "No deals in this category right now."
               : "No deals match the selected filters."}
-          </div>
+          </EmptyState>
         ) : (
-          <>
+          <div className="flex flex-col gap-5">
             <DealSection
               title="In your city"
+              icon={FiMapPin}
               deals={filteredCity}
               vehicles={vehicles}
               countryCode={countryCode}
@@ -175,12 +227,13 @@ export default function OwnerDealsPage() {
             />
             <DealSection
               title="Other cities"
+              icon={FiTag}
               deals={filteredOthers}
               vehicles={vehicles}
               countryCode={countryCode}
               startIndex={filteredCity.length}
             />
-          </>
+          </div>
         )}
       </div>
     </OwnerPageShell>

@@ -1,5 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { FiChevronLeft, FiCreditCard, FiFileText, FiTrash2 } from "react-icons/fi";
 import { toast } from "react-toastify";
+import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerPageShell from "../../../components/owner/OwnerPageShell";
 import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
@@ -11,6 +13,11 @@ import {
   OWNER_TABLE_HEAD_TH_CLASS,
   OWNER_TABLE_SURFACE_CLASS,
 } from "../../../components/owner/ownerPanelTableStyles";
+import {
+  ownerVehicleFieldClass,
+  ownerVehicleLabelClass,
+  ownerVehicleSelectClass,
+} from "../../../components/owner/ownerVehicleFormUtils";
 
 function formatInvoiceDate(iso: string): string {
   const d = new Date(iso);
@@ -35,15 +42,55 @@ function statusLabel(row: CarOwnerInvoiceRow): { label: string; className: strin
   return {
     label,
     className: paid
-      ? "text-green-700"
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
       : approval?.toLowerCase().includes("reject")
-        ? "text-red-600"
-        : "text-amber-700",
+        ? "bg-rose-50 text-rose-700 ring-rose-100"
+        : "bg-amber-50 text-amber-800 ring-amber-100",
   };
 }
 
 function selectedSetFromArray(ids: string[]): Set<string> {
   return new Set(ids);
+}
+
+function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ad-purple/20 bg-white/60 px-6 py-14 text-center shadow-sm backdrop-blur-sm">
+      <span className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-ad-bg-purple text-ad-purple">
+        <FiFileText size={22} aria-hidden />
+      </span>
+      <div className="max-w-sm text-sm text-slate-600">{children}</div>
+    </div>
+  );
+}
+
+function ToolbarButton({
+  children,
+  onClick,
+  disabled,
+  variant = "muted",
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: "muted" | "danger" | "primary";
+}) {
+  const styles =
+    variant === "danger"
+      ? "bg-rose-600 text-white hover:bg-rose-700"
+      : variant === "primary"
+        ? "bg-gradient-to-br from-ad-purple to-ad-purple-dark text-white shadow-[0_6px_14px_rgba(155,48,141,0.22)] hover:brightness-105"
+        : "bg-slate-600 text-white hover:bg-slate-700";
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition disabled:opacity-40 ${styles}`}
+    >
+      {children}
+    </button>
+  );
 }
 
 export default function OwnerInvoicesPage() {
@@ -96,119 +143,129 @@ export default function OwnerInvoicesPage() {
 
   return (
     <OwnerPageShell
-      pageHeading="Expenses"
+      pageHeading=""
       metaTitle="Expenses | AutoDaddy"
       metaDescription="Car owner expenses"
+      noPanel
     >
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-sm text-slate-500">Track shop invoices and record payments</p>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+              {view === "payment" ? "Enter Payment" : "Invoices"}
+            </h1>
+          </div>
+          {!loading && !error && view === "list" && invoiceRows.length > 0 ? (
+            <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
+              {invoiceRows.length} invoice{invoiceRows.length === 1 ? "" : "s"}
+            </p>
+          ) : null}
+        </header>
+
         {loading ? (
-          <div className="flex flex-1 items-center justify-center py-16">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full rounded-2xl" />
+            <Skeleton className="h-64 w-full rounded-2xl" />
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
-            <p className="text-sm font-semibold text-gray-800">{error}</p>
+          <EmptyState>
+            <span className="mb-3 block font-semibold text-slate-800">{error}</span>
             <button
               type="button"
               onClick={() => void refresh()}
-              className="rounded-md bg-ad-purple px-4 py-2 text-sm font-semibold text-white"
+              className="rounded-xl bg-ad-purple px-4 py-2 text-sm font-semibold text-white shadow-sm"
             >
               Try again
             </button>
-          </div>
+          </EmptyState>
         ) : invoiceRows.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-600">
-            No invoices right now.
-          </div>
+          <EmptyState>No invoices right now.</EmptyState>
         ) : view === "payment" && paymentRow ? (
-          <div className="flex flex-col">
-            <div className="rounded border border-gray-300 bg-[#8e2a7c] px-4 py-2 text-center text-sm font-bold text-white">
-              Job Card - {paymentRow.jobNo}
-            </div>
-
-            <div className="flex items-center justify-between px-1 py-3">
-              <div className="text-xl font-bold text-blue-700">Enter Payment</div>
+          <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/95 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5">
+            <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-ad-purple/95 to-ad-purple-dark px-4 py-3.5 text-white sm:px-5">
+              <div>
+                <p className="text-xs text-white/70">Job card</p>
+                <p className="font-semibold tracking-wide">#{paymentRow.jobNo}</p>
+              </div>
               <button
                 type="button"
                 onClick={cancelPayment}
-                className="text-3xl font-black leading-none text-blue-700"
+                className="inline-flex items-center gap-1 rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold ring-1 ring-white/25 transition hover:bg-white/25"
                 aria-label="Back"
               >
-                &laquo;
+                <FiChevronLeft size={16} />
+                Back
               </button>
             </div>
 
-            <div className="rounded border border-[#b2e0a0] bg-[#CCFFCC] p-6">
-              <div className="mb-4 rounded bg-[#d9ead3] px-4 py-2 text-center text-sm font-bold text-gray-700">
+            <div className="space-y-4 bg-gradient-to-b from-emerald-50/50 to-white p-4 sm:p-5">
+              <div className="rounded-xl bg-emerald-100/70 px-4 py-2.5 text-center text-sm font-semibold text-emerald-900 ring-1 ring-emerald-200/70">
                 {paymentRow.shopName}
               </div>
 
-              <div className="mx-auto max-w-3xl rounded border border-[#b2e0a0] bg-[#e8ffe8] p-6">
+              <div className="rounded-2xl border border-emerald-100 bg-white/90 p-4 sm:p-5">
                 <div className="text-center">
-                  <div className="text-base font-bold text-gray-800">Job Card # {paymentRow.jobNo}</div>
-                  <div className="mt-1 text-xs text-gray-600">The balance due on this job is paid</div>
+                  <p className="text-base font-bold text-slate-900">Job Card # {paymentRow.jobNo}</p>
+                  <p className="mt-1 text-xs text-slate-500">Record the balance due on this job</p>
                 </div>
 
-                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
+                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700">Amount</label>
+                    <label className={ownerVehicleLabelClass}>Amount</label>
                     <input
                       type="number"
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(e.target.value)}
-                      className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                      className={ownerVehicleFieldClass}
                     />
                   </div>
-
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700">Date</label>
+                    <label className={ownerVehicleLabelClass}>Date</label>
                     <input
                       type="date"
                       value={paymentDate}
                       onChange={(e) => setPaymentDate(e.target.value)}
-                      className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                      className={ownerVehicleFieldClass}
                     />
                   </div>
-
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700">Method</label>
+                    <label className={ownerVehicleLabelClass}>Method</label>
                     <select
                       value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value as "Partial" | "Full")}
-                      className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                      className={ownerVehicleSelectClass}
                     >
                       <option value="Partial">Partial</option>
                       <option value="Full">Full</option>
                     </select>
                   </div>
-
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700">Note</label>
+                    <label className={ownerVehicleLabelClass}>Note</label>
                     <input
                       type="text"
                       value={paymentNote}
                       onChange={(e) => setPaymentNote(e.target.value)}
-                      className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                      className={ownerVehicleFieldClass}
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded bg-[#f7e1cc] px-6 py-3 text-sm">
-                <div className="text-gray-700 italic">You are entering Payment of Job Card</div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50/80 px-4 py-3 text-sm ring-1 ring-amber-100">
+                <p className="italic text-slate-600">You are entering payment for this job card</p>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={savePayment}
-                    className="min-w-[96px] rounded bg-[#b6f2b6] px-6 py-1.5 text-sm font-bold text-[#006600] shadow-sm hover:brightness-95"
+                    className="min-w-[96px] rounded-xl bg-emerald-500 px-5 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-600"
                   >
                     Save
                   </button>
-                  <span className="text-gray-700">or</span>
                   <button
                     type="button"
                     onClick={cancelPayment}
-                    className="text-sm font-semibold text-blue-700 hover:underline"
+                    className="text-sm font-semibold text-sky-700 hover:underline"
                   >
                     Cancel
                   </button>
@@ -218,38 +275,34 @@ export default function OwnerInvoicesPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            <div className="rounded border border-gray-300 bg-[#8e2a7c] px-4 py-2 text-center text-sm font-bold text-white">
-              Invoice
-            </div>
-
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
+              <ToolbarButton
+                variant="danger"
                 disabled={selectedIds.length === 0}
                 onClick={() => {
                   if (selectedIds.length === 0) return;
                   toast.success("Deleted.");
                   setSelectedIds([]);
                 }}
-                className="rounded bg-gray-400 px-6 py-1.5 text-xs font-bold text-white disabled:opacity-50"
               >
+                <FiTrash2 size={13} aria-hidden />
                 Delete
-              </button>
-              <button
-                type="button"
+              </ToolbarButton>
+              <ToolbarButton
+                variant="primary"
                 disabled={selectedIds.length !== 1}
                 onClick={enterPayment}
-                className="rounded bg-gray-400 px-6 py-1.5 text-xs font-bold text-white disabled:opacity-50"
               >
+                <FiCreditCard size={13} aria-hidden />
                 Enter Payment
-              </button>
+              </ToolbarButton>
             </div>
 
             <div className={OWNER_TABLE_SURFACE_CLASS}>
               <div className="overflow-x-auto">
                 <table className={OWNER_PANEL_TABLE.table}>
                   <thead>
-                    <tr className="bg-[#b55aa8] text-white">
+                    <tr className="bg-gradient-to-r from-ad-purple to-ad-purple-dark text-white">
                       <th className={`${OWNER_TABLE_HEAD_TH_CLASS} w-10`}>
                         <input
                           type="checkbox"
@@ -276,7 +329,10 @@ export default function OwnerInvoicesPage() {
                       const status = statusLabel(row);
                       const amount = formatCurrencyAmount(row.amount, countryCode);
                       return (
-                        <tr key={row.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                        <tr
+                          key={row.id}
+                          className={index % 2 === 0 ? "bg-white/90" : "bg-slate-50/80"}
+                        >
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>
                             <input
                               type="checkbox"
@@ -295,7 +351,7 @@ export default function OwnerInvoicesPage() {
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>
                             <button
                               type="button"
-                              className="font-semibold text-blue-700 hover:underline"
+                              className="font-semibold text-sky-700 hover:underline"
                               onClick={() => {
                                 setSelectedIds([row.id]);
                                 enterPayment();
@@ -304,13 +360,23 @@ export default function OwnerInvoicesPage() {
                               # {row.jobNo}
                             </button>
                           </td>
-                          <td className={OWNER_TABLE_BODY_TD_CLASS}>{formatInvoiceDate(row.createdAt)}</td>
+                          <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                            {formatInvoiceDate(row.createdAt)}
+                          </td>
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>{row.shopName}</td>
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>J # {row.jobNo}</td>
-                          <td className={`${OWNER_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>{amount}</td>
-                          <td className={`${OWNER_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>$ 0</td>
-                          <td className={`${OWNER_TABLE_BODY_TD_CLASS} font-bold ${status.className}`}>
-                            {status.label}
+                          <td className={`${OWNER_TABLE_BODY_TD_CLASS} font-semibold text-slate-900`}>
+                            {amount}
+                          </td>
+                          <td className={`${OWNER_TABLE_BODY_TD_CLASS} font-semibold text-slate-600`}>
+                            $ 0
+                          </td>
+                          <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${status.className}`}
+                            >
+                              {status.label}
+                            </span>
                           </td>
                         </tr>
                       );

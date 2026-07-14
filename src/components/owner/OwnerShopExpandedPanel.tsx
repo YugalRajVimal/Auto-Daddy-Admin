@@ -53,7 +53,7 @@ function CompactStarRating({
             <FiStar
               key={star}
               size={14}
-              className={filled ? "fill-blue-500 text-blue-500" : "text-gray-300"}
+              className={filled ? "fill-amber-400 text-amber-400" : "text-slate-300"}
             />
           );
         }
@@ -68,7 +68,7 @@ function CompactStarRating({
           >
             <FiStar
               size={14}
-              className={filled ? "fill-blue-500 text-blue-500" : "text-gray-300"}
+              className={filled ? "fill-amber-400 text-amber-400" : "text-slate-300"}
             />
           </button>
         );
@@ -89,12 +89,12 @@ function ContactActionButton({
   icon: ComponentType<{ size?: number; className?: string }>;
 }) {
   const className =
-    "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-center text-xs font-semibold text-gray-700 shadow-sm transition-all hover:border-ad-green/40 hover:bg-ad-green-light/30 disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-center text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-sky-200 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50";
 
   if (disabled || !href) {
     return (
       <span className={className} aria-disabled>
-        <Icon size={14} className="shrink-0 text-gray-400" />
+        <Icon size={14} className="shrink-0 text-slate-400" />
         {label}
       </span>
     );
@@ -107,7 +107,7 @@ function ContactActionButton({
       rel={href.startsWith("tel:") ? undefined : "noopener noreferrer"}
       className={className}
     >
-      <Icon size={14} className="shrink-0 text-ad-green-dark" />
+      <Icon size={14} className="shrink-0 text-sky-700" />
       {label}
     </a>
   );
@@ -186,17 +186,17 @@ export default function OwnerShopExpandedPanel({
 
   return (
     <>
-      <div className="flex items-start gap-4 border-b border-ad-form-border pb-4">
+      <div className="flex items-start gap-4 border-b border-slate-100 pb-4">
         <div className="min-w-0 flex-1">
-          <p className="text-lg font-bold text-gray-900">{shop.name}</p>
-          <p className="mt-0.5 text-sm font-medium text-blue-600">{phone || "Phone not listed"}</p>
-          {shop.city ? <p className="mt-1 text-xs text-gray-500">{shop.city}</p> : null}
+          <p className="text-lg font-bold tracking-tight text-slate-900">{shop.name}</p>
+          <p className="mt-0.5 text-sm font-medium text-sky-700">{phone || "Phone not listed"}</p>
+          {shop.city ? <p className="mt-1 text-xs text-slate-500">{shop.city}</p> : null}
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-2 pt-1">
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm ${
-              openToday ? "bg-ad-green" : "bg-gray-400"
+              openToday ? "bg-emerald-600" : "bg-slate-400"
             }`}
           >
             {openToday ? "Open" : "Closed"}
@@ -210,11 +210,11 @@ export default function OwnerShopExpandedPanel({
                 onClick={onToggleFavorite}
                 aria-pressed={isFavorite}
                 aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                className="rounded-full p-1 text-gray-400 transition hover:text-red-500 disabled:opacity-50"
+                className="rounded-full p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:opacity-50"
               >
                 <FiHeart
                   size={16}
-                  className={isFavorite ? "fill-red-500 text-red-500" : undefined}
+                  className={isFavorite ? "fill-rose-500 text-rose-500" : undefined}
                   aria-hidden
                 />
               </button>
@@ -226,17 +226,17 @@ export default function OwnerShopExpandedPanel({
           type="button"
           onClick={onCollapse}
           aria-label="Close shop details"
-          className="flex h-9 w-9 shrink-0 rotate-45 items-center justify-center rounded-full bg-white/80 text-2xl font-bold leading-none text-ad-purple shadow-sm ring-1 ring-ad-purple/20 transition-colors hover:bg-white"
+          className="flex size-9 shrink-0 rotate-45 items-center justify-center rounded-full bg-white text-xl font-bold leading-none text-ad-purple shadow-sm ring-1 ring-ad-purple/20 transition hover:bg-ad-bg-purple"
         >
           <FiPlus aria-hidden />
         </button>
       </div>
 
       <div className="grid gap-5 pt-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-white/80 bg-white/70 p-4 shadow-sm backdrop-blur-sm">
-          <p className="mb-4 flex items-center gap-2 text-sm font-bold text-gray-800">
+        <div className="rounded-2xl border border-white/80 bg-slate-50/60 p-4 shadow-sm ring-1 ring-black/5">
+          <p className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800">
             <FiMapPin size={15} className="text-ad-purple" />
-            Contact Info :
+            Contact Info
           </p>
 
           <div className="space-y-3">
@@ -244,59 +244,59 @@ export default function OwnerShopExpandedPanel({
               <button
                 type="button"
                 onClick={() => setHoursOpen((open) => !open)}
-                className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-ad-green/30"
+                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm transition hover:border-sky-200"
               >
                 <span className="flex items-center gap-2">
-                  <FiClock size={15} className="text-ad-green-dark" />
+                  <FiClock size={15} className="text-sky-700" />
                   Open Hours
                 </span>
                 <FiChevronDown
                   size={16}
-                  className={`text-gray-500 transition-transform ${hoursOpen ? "rotate-180" : ""}`}
+                  className={`text-slate-400 transition-transform ${hoursOpen ? "rotate-180" : ""}`}
                 />
               </button>
               {hoursOpen ? (
-                <div className="mt-2 rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-xs leading-relaxed text-gray-700 shadow-inner">
+                <div className="mt-2 rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-xs leading-relaxed text-slate-600">
                   <p>{hoursText}</p>
-                  {shop.openDaysText ? <p className="mt-1 text-ad-green-dark">Open: {shop.openDaysText}</p> : null}
+                  {shop.openDaysText ? <p className="mt-1 text-emerald-700">Open: {shop.openDaysText}</p> : null}
                   {shop.closedScheduleText ? (
-                    <p className="mt-1 text-gray-500">Closed: {shop.closedScheduleText}</p>
+                    <p className="mt-1 text-slate-500">Closed: {shop.closedScheduleText}</p>
                   ) : null}
                 </div>
               ) : null}
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-700 shadow-sm">
-              <span className="font-semibold text-gray-900">Contact :</span> {addressLine}
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-700 shadow-sm">
+              <span className="font-semibold text-slate-900">Contact :</span> {addressLine}
             </div>
 
             <div>
               <button
                 type="button"
                 onClick={() => setBrandsOpen((open) => !open)}
-                className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-ad-green/30"
+                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm transition hover:border-sky-200"
               >
-                <span>Specilist of Car Brands</span>
+                <span>Specialist of Car Brands</span>
                 <FiChevronDown
                   size={16}
-                  className={`text-gray-500 transition-transform ${brandsOpen ? "rotate-180" : ""}`}
+                  className={`text-slate-400 transition-transform ${brandsOpen ? "rotate-180" : ""}`}
                 />
               </button>
               {brandsOpen ? (
-                <div className="mt-2 rounded-lg border border-gray-100 bg-white px-3 py-3 shadow-inner">
+                <div className="mt-2 rounded-xl border border-slate-100 bg-white px-3 py-3">
                   {carBrands.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {carBrands.map((brand) => (
                         <span
                           key={brand}
-                          className="rounded-full border border-ad-green/30 bg-ad-green-light/60 px-3 py-1 text-xs font-semibold text-ad-green-dark"
+                          className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800 ring-1 ring-sky-100"
                         >
                           {brand}
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-500">No car brands listed for this shop yet.</p>
+                    <p className="text-xs text-slate-500">No car brands listed for this shop yet.</p>
                   )}
                 </div>
               ) : null}
@@ -326,7 +326,7 @@ export default function OwnerShopExpandedPanel({
         </div>
 
         <div>
-          <p className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-800">
+          <p className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
             <FiTool size={15} className="text-ad-purple" />
             Services Offered
           </p>
@@ -340,20 +340,20 @@ export default function OwnerShopExpandedPanel({
               return (
                 <div
                   key={requestKey}
-                  className="flex items-center gap-3 rounded-xl border border-[#b2e0a0] bg-white px-3 py-2.5 shadow-sm transition-shadow hover:shadow-md"
+                  className="flex items-center gap-3 rounded-xl border border-white/80 bg-white px-3 py-2.5 shadow-sm ring-1 ring-black/5 transition hover:shadow-md"
                 >
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-ad-green/20 bg-ad-green-light/40">
-                    <FiTool size={16} className="text-ad-green-dark" />
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-ad-bg-purple text-ad-purple">
+                    <FiTool size={16} />
                   </div>
-                  <p className="min-w-0 flex-1 text-sm font-semibold text-ad-green-dark">{service.name}</p>
+                  <p className="min-w-0 flex-1 text-sm font-semibold text-slate-800">{service.name}</p>
                   <button
                     type="button"
                     disabled={!canConnect || busy || sent}
                     onClick={() => onConnect(service.id, service.name)}
-                    className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-bold shadow-sm transition-all disabled:cursor-not-allowed ${
+                    className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-bold shadow-sm transition disabled:cursor-not-allowed ${
                       sent
-                        ? "bg-gray-300 text-gray-600"
-                        : "bg-ad-green text-white hover:bg-ad-green-dark hover:shadow disabled:opacity-50"
+                        ? "bg-slate-200 text-slate-600"
+                        : "bg-gradient-to-br from-ad-purple to-ad-purple-dark text-white hover:brightness-105 disabled:opacity-50"
                     }`}
                   >
                     {sent ? "Request sent" : busy ? "Connecting…" : "Connect"}
@@ -362,7 +362,7 @@ export default function OwnerShopExpandedPanel({
               );
             })}
             {services.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-gray-300 bg-white/60 px-3 py-4 text-center text-sm text-gray-500">
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-4 text-center text-sm text-slate-500">
                 This shop has not listed any services yet.
               </p>
             ) : null}
@@ -372,10 +372,10 @@ export default function OwnerShopExpandedPanel({
 
       {statusMessage ? (
         <p
-          className={`border-t border-ad-form-border pt-3 text-center text-xs font-semibold ${
+          className={`border-t border-slate-100 pt-3 text-center text-xs font-semibold ${
             statusMessage.includes("sent") || statusMessage.includes("Connected") || statusMessage.includes("Request")
-              ? "text-ad-green"
-              : "text-red-600"
+              ? "text-emerald-600"
+              : "text-rose-600"
           }`}
         >
           {statusMessage}

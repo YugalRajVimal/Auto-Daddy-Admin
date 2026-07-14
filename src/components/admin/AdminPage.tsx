@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { twMerge } from "tailwind-merge";
 import { ContentPanel } from "./ContentPanel";
 
 export const adminPageTitleClass = "text-xl font-bold text-ad-green md:text-2xl";
@@ -20,6 +21,8 @@ type AdminPageProps = {
   noPanel?: boolean;
   /** Constrain the green content panel to ~55% width, centered */
   narrowPanel?: boolean;
+  /** Extra classes on the page root (e.g. denser owner padding). */
+  className?: string;
 };
 
 export default function AdminPage({
@@ -33,6 +36,7 @@ export default function AdminPage({
   footer,
   noPanel = false,
   narrowPanel = false,
+  className = "",
 }: AdminPageProps) {
   const useInlineFlow = headerAction !== undefined || between !== undefined;
   const neutralPanel = title.trim().toLowerCase().startsWith("deleted");
@@ -48,7 +52,7 @@ export default function AdminPage({
   const showPageTitle = (noPanel || !panelTitle || useInlineFlow) && title.trim().length > 0;
 
   return (
-    <div className="bg-ad-app-bg py-4 md:py-5">
+    <div className={twMerge("bg-ad-app-bg py-4 md:py-5", className)}>
       <div className={narrowPanel ? "mx-auto w-full sm:w-[55%] sm:min-w-[320px]" : undefined}>
         {showPageTitle && (
           <div className={adminPageHeaderClass}>

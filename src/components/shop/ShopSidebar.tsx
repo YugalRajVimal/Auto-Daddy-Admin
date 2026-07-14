@@ -58,7 +58,7 @@ export function ShopSidebarButton({
       className={`${toneClass} ${className}`.trim()}
     >
       <ShopSidebarListIcon />
-      <span className="min-w-0 flex-1 text-left">{label}</span>
+      <span className="min-w-0 flex-1 truncate text-left">{label}</span>
       {trailing}
     </button>
   );
@@ -149,7 +149,13 @@ export default function ShopSidebar({
   const stackClass = useOwner ? ownerSidebarButtonStackClass : shopSidebarButtonStackClass;
 
   return (
-    <aside className={`${shopSidebarShellClass} ${className}`}>
+    <aside
+      className={
+        useOwner
+          ? `flex w-full shrink-0 flex-col ${className}`
+          : `${shopSidebarShellClass} ${className}`
+      }
+    >
       <div
         className={
           useOwner

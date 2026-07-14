@@ -5,8 +5,13 @@ import type { OwnerPageChromeConfig } from "../../context/OwnerPageChromeContext
 import { useOwnerPageChrome } from "../../context/OwnerPageChromeContext";
 import ShopSidebar from "../shop/ShopSidebar";
 import { ownerPageSidebarFooterClass } from "./OwnerFaqsButton";
-import { shopSidebarButtonStackClass } from "../shop/shopSidebarStyles";
-import { ownerPageSidebarClass } from "./ownerLayoutStyles";
+import { ownerSidebarButtonStackClass } from "../shop/shopSidebarStyles";
+import {
+  ownerPageOuterClass,
+  ownerPageShellGridClass,
+  ownerPageSidebarClass,
+  ownerPageSidebarPanelClass,
+} from "./ownerLayoutStyles";
 
 export {
   ownerPageAddFormSubtitleClass,
@@ -26,8 +31,8 @@ type OwnerPageSidebarProps = {
 
 export function OwnerPageSidebar({ children, className = "", footer }: OwnerPageSidebarProps) {
   return (
-    <aside className={`${ownerPageSidebarClass} lg:!h-auto lg:!max-h-none ${className}`.trim()}>
-      <div className={`min-h-0 flex-1 overflow-y-auto lg:pr-0.5 ${shopSidebarButtonStackClass}`}>
+    <aside className={`${ownerPageSidebarClass} ${className}`.trim()}>
+      <div className={`${ownerPageSidebarPanelClass} ${ownerSidebarButtonStackClass}`}>
         {children}
       </div>
       {footer ? <div className={ownerPageSidebarFooterClass}>{footer}</div> : null}
@@ -126,8 +131,14 @@ export default function OwnerPageShell({
 
   if (showSidebar && sidebar) {
     return (
-      <AdminPage title={title} headerAction={chrome.headerAction} between={chrome.pageHeader} noPanel>
-        <div className="grid min-h-0 gap-4 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]">
+      <AdminPage
+        title={title}
+        headerAction={chrome.headerAction}
+        between={chrome.pageHeader}
+        noPanel
+        className={ownerPageOuterClass}
+      >
+        <div className={ownerPageShellGridClass}>
           <div className="min-w-0">{sidebar}</div>
           {noPanel ? (
             <div className="min-w-0">{children}</div>
@@ -145,6 +156,7 @@ export default function OwnerPageShell({
       headerAction={chrome.headerAction}
       between={chrome.pageHeader}
       noPanel={noPanel}
+      className={ownerPageOuterClass}
     >
       {children}
     </AdminPage>

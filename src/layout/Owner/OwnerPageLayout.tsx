@@ -5,6 +5,7 @@ import {
   DEFAULT_OWNER_PAGE_CHROME,
   useOwnerPageChromeContext,
 } from "../../context/OwnerPageChromeContext";
+import { ownerPortalContentPadClass } from "../../components/owner/ownerLayoutStyles";
 
 export default function OwnerPageLayout() {
   const { chrome } = useOwnerPageChromeContext();
@@ -13,7 +14,7 @@ export default function OwnerPageLayout() {
   const metaDescription = chrome.metaDescription ?? DEFAULT_OWNER_PAGE_CHROME.metaDescription!;
 
   return (
-    <PortalPageContent className="relative py-0 md:py-0">
+    <PortalPageContent className={`relative py-0 md:py-0 ${ownerPortalContentPadClass}`}>
       <PageMeta title={metaTitle} description={metaDescription} />
       <Outlet />
     </PortalPageContent>

@@ -4,8 +4,6 @@ import {
   ADMIN_PANEL_TABLE_CLASS,
   ADMIN_PANEL_TD_CLASS,
   ADMIN_PANEL_TH_CLASS,
-  ADMIN_PANEL_THEAD_ROW_CLASS,
-  adminPanelRowClass,
 } from "../admin/adminPanelTableStyles";
 import {
   cellValueForHeader,
@@ -21,7 +19,7 @@ import {
 function GroupTotalRow({ colSpan, total }: { colSpan: number; total: number }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="border border-gray-300 px-3 py-2 text-right font-bold">
+      <td colSpan={colSpan} className="border border-slate-200 px-3 py-2 text-right text-sm font-bold text-slate-800">
         Total : {formatReportAmount(total)}
       </td>
     </tr>
@@ -75,14 +73,14 @@ export function OwnerGroupedReportTable({
   return (
     <OwnerReportShell title={title} ownerName={ownerName} fromDate={fromDate} toDate={toDate}>
       {rows.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-gray-600">
+        <p className="px-4 py-8 text-center text-sm text-slate-600">
           No records found for the selected filters.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-xl ring-1 ring-slate-200/80">
           <table className={ADMIN_PANEL_TABLE_CLASS}>
             <thead>
-              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <tr className="bg-gradient-to-r from-ad-purple to-ad-purple-dark text-white">
                 {headers.map((header) => (
                   <th
                     key={header}
@@ -97,13 +95,13 @@ export function OwnerGroupedReportTable({
             <tbody>
               {groups.map((group) => (
                 <Fragment key={group.key}>
-                  <tr className="bg-gray-300">
-                    <td colSpan={headers.length} className="border border-gray-300 px-3 py-2 font-bold uppercase">
+                  <tr className="bg-slate-100">
+                    <td colSpan={headers.length} className="border border-slate-200 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-700">
                       {group.label}
                     </td>
                   </tr>
                   {group.rows.map((row, rowIdx) => (
-                    <tr key={row.id} className={adminPanelRowClass(rowIdx)}>
+                    <tr key={row.id} className={rowIdx % 2 === 0 ? "bg-white/90" : "bg-slate-50/80"}>
                       {headers.map((header) => (
                         <td
                           key={`${row.id}-${header}`}
@@ -118,11 +116,11 @@ export function OwnerGroupedReportTable({
                   <GroupTotalRow colSpan={headers.length} total={group.total} />
                 </Fragment>
               ))}
-              <tr className="bg-gray-100">
-                <td colSpan={headers.length - 1} className="border border-gray-300 px-3 py-2 text-right font-bold">
+              <tr className="bg-slate-50">
+                <td colSpan={headers.length - 1} className="border border-slate-200 px-3 py-2.5 text-right font-bold text-slate-900">
                   Grand Total
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-right font-bold">
+                <td className="border border-slate-200 px-3 py-2.5 text-right font-bold text-slate-900">
                   {formatReportAmount(grandTotal)}
                 </td>
               </tr>
@@ -156,14 +154,14 @@ export function OwnerFlatReportTable({
   return (
     <OwnerReportShell title={title} ownerName={ownerName} fromDate={fromDate} toDate={toDate}>
       {rows.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-gray-600">
+        <p className="px-4 py-8 text-center text-sm text-slate-600">
           No records found for the selected filters.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-xl ring-1 ring-slate-200/80">
           <table className={ADMIN_PANEL_TABLE_CLASS}>
             <thead>
-              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <tr className="bg-gradient-to-r from-ad-purple to-ad-purple-dark text-white">
                 {headers.map((header) => (
                   <th
                     key={header}
@@ -177,7 +175,7 @@ export function OwnerFlatReportTable({
             </thead>
             <tbody>
               {rows.map((row, idx) => (
-                <tr key={row.id} className={adminPanelRowClass(idx)}>
+                <tr key={row.id} className={idx % 2 === 0 ? "bg-white/90" : "bg-slate-50/80"}>
                   {headers.map((header) => (
                     <td
                       key={`${row.id}-${header}`}
@@ -211,23 +209,26 @@ function OwnerReportShell({
   children: ReactNode;
 }) {
   return (
-    <div id="report-print-area" className="rounded border border-gray-300 bg-white p-4">
+    <div
+      id="report-print-area"
+      className="overflow-hidden rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5 sm:p-5"
+    >
       <div className="mb-4 flex items-start justify-between gap-3 print:hidden">
         <div className="flex-1" />
         <button
           type="button"
           onClick={() => window.print()}
-          className="inline-flex items-center gap-1.5 rounded border border-gray-400 bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-300"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
         >
           <FiPrinter size={14} aria-hidden />
           Print Report
         </button>
       </div>
 
-      <div className="mb-4 text-center">
-        <h3 className="text-xl font-bold text-gray-900">{title}</h3>
-        {ownerName ? <p className="mt-1 text-sm font-semibold text-gray-800">{ownerName}</p> : null}
-        <p className="mt-1 text-sm text-gray-700">
+      <div className="mb-5 text-center">
+        <h3 className="text-xl font-bold tracking-tight text-slate-900">{title}</h3>
+        {ownerName ? <p className="mt-1 text-sm font-semibold text-slate-700">{ownerName}</p> : null}
+        <p className="mt-1 text-sm text-slate-500">
           Between {formatLongDate(fromDate)} and {formatLongDate(toDate)}
         </p>
       </div>

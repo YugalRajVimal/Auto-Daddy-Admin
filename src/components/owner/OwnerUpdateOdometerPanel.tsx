@@ -135,7 +135,7 @@ function OdometerVehicleForm({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-ad-form-bg px-4 py-4 md:px-6 md:py-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           <div className="min-w-0">
             <label htmlFor="owner-odometer-current" className="mb-1 block text-sm font-semibold text-gray-900">
               Current Odometer

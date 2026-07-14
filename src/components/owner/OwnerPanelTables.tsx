@@ -267,6 +267,12 @@ const REQUEST_STATUS_LABELS: Record<DummyOwnerServiceRequest["status"], string> 
   Declined: "Declined",
 };
 
+const REQUEST_STATUS_PILL: Record<DummyOwnerServiceRequest["status"], string> = {
+  Pending: "bg-amber-50 text-amber-800 ring-amber-100",
+  Accepted: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+  Declined: "bg-rose-50 text-rose-700 ring-rose-100",
+};
+
 function formatOwnerTableDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
@@ -277,6 +283,32 @@ function formatOwnerTableDateTime(iso: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function StatusPill({ label, className }: { label: string; className: string }) {
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${className}`}>
+      {label}
+    </span>
+  );
+}
+
+function notificationStatusMeta(item: CarOwnerNotification): { label: string; className: string } {
+  const title = item.title.toLowerCase();
+  const message = item.message.toLowerCase();
+  if (title.includes("accepted") || message.includes("accepted")) {
+    return { label: "Accepted", className: "bg-emerald-50 text-emerald-700 ring-emerald-100" };
+  }
+  if (title.includes("declined") || message.includes("declined")) {
+    return { label: "Declined", className: "bg-rose-50 text-rose-700 ring-rose-100" };
+  }
+  if (title.includes("approval") || message.includes("approval") || title.includes("job card") || message.includes("job card")) {
+    return { label: "Approval", className: "bg-sky-50 text-sky-700 ring-sky-100" };
+  }
+  if (title.includes("invoice") || message.includes("invoice")) {
+    return { label: "Invoice", className: "bg-violet-50 text-violet-700 ring-violet-100" };
+  }
+  return { label: "Unread", className: "bg-slate-100 text-slate-600 ring-slate-200" };
 }
 
 function DocumentUploadButton({
@@ -560,7 +592,7 @@ export function OwnerServiceRequestsTable({ rows }: OwnerServiceRequestsTablePro
       <div className="overflow-x-auto">
         <table className={OWNER_PANEL_TABLE.table}>
           <thead>
-            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+            <tr className="bg-gradient-to-r from-ad-purple to-ad-purple-dark text-white">
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Date</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Subject</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Vehicle</th>
@@ -571,16 +603,19 @@ export function OwnerServiceRequestsTable({ rows }: OwnerServiceRequestsTablePro
           </thead>
           <tbody>
             {rows.map((item, index) => (
-              <tr key={item.id} className={adminPanelRowClass(index)}>
+              <tr key={item.id} className={index % 2 === 0 ? "bg-white/90" : "bg-slate-50/80"}>
                 <td className={OWNER_TABLE_BODY_TD_CLASS}>{formatOwnerTableDateTime(item.sentAt)}</td>
                 <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                  <span className="font-semibold text-gray-900">{item.service}</span>
+                  <span className="font-semibold text-slate-900">{item.service}</span>
                 </td>
                 <td className={OWNER_TABLE_BODY_TD_CLASS}>{item.plate}</td>
                 <td className={OWNER_TABLE_BODY_TD_CLASS}>{item.shopName}</td>
                 <td className={OWNER_TABLE_BODY_TD_CLASS}>{item.shopCity}</td>
                 <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                  {REQUEST_STATUS_LABELS[item.status]}
+                  <StatusPill
+                    label={REQUEST_STATUS_LABELS[item.status]}
+                    className={REQUEST_STATUS_PILL[item.status]}
+                  />
                 </td>
               </tr>
             ))}
@@ -595,17 +630,6 @@ type OwnerNotificationsTableProps = {
   rows: CarOwnerNotification[];
 };
 
-function notificationStatusLabel(item: CarOwnerNotification): string {
-  const title = item.title.toLowerCase();
-  const message = item.message.toLowerCase();
-  if (title.includes("accepted") || message.includes("accepted")) return "Accepted";
-  if (title.includes("declined") || message.includes("declined")) return "Declined";
-  if (title.includes("approval") || message.includes("approval")) return "Approval";
-  if (title.includes("job card") || message.includes("job card")) return "Approval";
-  if (title.includes("invoice") || message.includes("invoice")) return "Invoice";
-  return "Un-read";
-}
-
 export function OwnerNotificationsTable({ rows }: OwnerNotificationsTableProps) {
   return (
     <motion.div
@@ -616,7 +640,7 @@ export function OwnerNotificationsTable({ rows }: OwnerNotificationsTableProps) 
       <div className="overflow-x-auto">
         <table className={OWNER_PANEL_TABLE.table}>
           <thead>
-            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+            <tr className="bg-gradient-to-r from-ad-purple to-ad-purple-dark text-white">
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Date</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Title</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Description</th>
@@ -626,17 +650,18 @@ export function OwnerNotificationsTable({ rows }: OwnerNotificationsTableProps) 
           <tbody>
             {rows.map((item, index) => {
               const { title, description } = notificationDisplay(item);
+              const status = notificationStatusMeta(item);
               return (
-                <tr key={item.id} className={adminPanelRowClass(index)}>
+                <tr key={item.id} className={index % 2 === 0 ? "bg-white/90" : "bg-slate-50/80"}>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>{formatOwnerTableDateTime(item.time)}</td>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                    <span className="font-semibold text-gray-900">{title}</span>
+                    <span className="font-semibold text-slate-900">{title}</span>
                   </td>
-                  <td className={`${OWNER_TABLE_BODY_TD_CLASS} max-w-md whitespace-normal`}>
+                  <td className={`${OWNER_TABLE_BODY_TD_CLASS} max-w-md whitespace-normal text-slate-600`}>
                     {description || "—"}
                   </td>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                    {notificationStatusLabel(item)}
+                    <StatusPill label={status.label} className={status.className} />
                   </td>
                 </tr>
               );
@@ -670,7 +695,7 @@ export function OwnerCustomerRequestsTable({
       <div className="overflow-x-auto">
         <table className={OWNER_PANEL_TABLE.table}>
           <thead>
-            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+            <tr className="bg-gradient-to-r from-ad-purple to-ad-purple-dark text-white">
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Shop</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>City</th>
               <th className={OWNER_TABLE_HEAD_TH_CLASS}>Requested</th>
@@ -684,15 +709,15 @@ export function OwnerCustomerRequestsTable({
               const busy = actingId === row.businessId;
               const edit = row.pendingEdit;
               return (
-                <tr key={row.businessId} className={adminPanelRowClass(index)}>
+                <tr key={row.businessId} className={index % 2 === 0 ? "bg-white/90" : "bg-slate-50/80"}>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>
                     <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-200 bg-white">
+                      <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
                         {row.businessLogo ? (
                           <img src={row.businessLogo} alt="" className="h-full w-full object-cover" />
                         ) : null}
                       </div>
-                      <span className="font-semibold text-gray-900">{row.businessName}</span>
+                      <span className="font-semibold text-slate-900">{row.businessName}</span>
                     </div>
                   </td>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>{row.city.trim() || "—"}</td>
@@ -705,7 +730,7 @@ export function OwnerCustomerRequestsTable({
                         type="button"
                         disabled={Boolean(actingId)}
                         onClick={() => onApprove(row.businessId)}
-                        className="rounded bg-[#008000] px-3 py-1 text-xs font-bold text-white hover:brightness-95 disabled:opacity-50"
+                        className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         {busy ? "…" : "Approve"}
                       </button>
@@ -713,7 +738,7 @@ export function OwnerCustomerRequestsTable({
                         type="button"
                         disabled={Boolean(actingId)}
                         onClick={() => onReject(row.businessId)}
-                        className="rounded bg-red-600 px-3 py-1 text-xs font-bold text-white hover:brightness-95 disabled:opacity-50"
+                        className="rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50"
                       >
                         Reject
                       </button>

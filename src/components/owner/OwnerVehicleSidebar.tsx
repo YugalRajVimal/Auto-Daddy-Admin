@@ -2,7 +2,7 @@ import { FiCheck } from "react-icons/fi";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import { vehicleSidebarLabel, type CarOwnerVehicle } from "../../lib/carOwnerVehicles";
 import { OwnerFaqsButton, ownerPageSidebarFooterClass } from "./OwnerFaqsButton";
-import { ownerPageSidebarClass } from "./ownerLayoutStyles";
+import { ownerPageSidebarClass, ownerPageSidebarPanelClass } from "./ownerLayoutStyles";
 
 type OwnerVehicleSidebarProps = {
   vehicles: CarOwnerVehicle[];
@@ -62,12 +62,12 @@ export default function OwnerVehicleSidebar({
   onFaqsClick,
 }: OwnerVehicleSidebarProps) {
   return (
-    <aside className={`${ownerPageSidebarClass} lg:!h-auto lg:!max-h-none`}>
-      <div className="flex flex-col gap-4">
+    <aside className={ownerPageSidebarClass}>
+      <div className={`${ownerPageSidebarPanelClass} gap-4`}>
         {loading ? (
-          <p className="px-1 text-xs text-gray-500">Loading vehicles…</p>
+          <p className="px-1 text-xs text-slate-500">Loading vehicles…</p>
         ) : vehicles.length === 0 ? (
-          <p className="px-1 text-xs text-gray-500">No vehicles on file.</p>
+          <p className="px-1 text-xs text-slate-500">No vehicles on file.</p>
         ) : (
           vehicles.map((vehicle) => (
             <VehicleRow

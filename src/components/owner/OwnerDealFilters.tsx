@@ -16,7 +16,7 @@ type OwnerDealFiltersProps = {
   apiFilters?: CarOwnerDealsApiFilters;
 };
 
-const selectClass = `${ownerVehicleSelectClass} w-[108px] shrink-0 py-1.5 text-xs sm:w-[118px] sm:text-sm`;
+const selectClass = `${ownerVehicleSelectClass} min-w-[7.5rem] flex-1 py-2 text-xs sm:min-w-[8.5rem] sm:text-sm`;
 
 export default function OwnerDealFilters({
   deals,
@@ -52,68 +52,81 @@ export default function OwnerDealFilters({
   const hasActiveFilter = Boolean(filters.make || filters.model || filters.city);
 
   return (
-    <div className="flex shrink-0 flex-nowrap items-center gap-2">
-      {hasActiveFilter ? (
-        <button
-          type="button"
-          onClick={() => onChange({ make: "", model: "", city: "" })}
-          className="shrink-0 whitespace-nowrap text-xs font-semibold text-blue-700 hover:underline"
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+          Filter deals
+        </p>
+        <p className="mt-0.5 text-xs text-slate-500">Narrow by make, model, or city</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {hasActiveFilter ? (
+          <button
+            type="button"
+            onClick={() => onChange({ make: "", model: "", city: "" })}
+            className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200/80 transition hover:bg-slate-200/70"
+          >
+            Clear
+          </button>
+        ) : null}
+
+        <select
+          value={filters.make}
+          aria-label="Make"
+          onChange={(e) => {
+            const make = e.target.value;
+            onChange({ make, model: "", city: "" });
+          }}
+          className={selectClass}
         >
-          Clear
-        </button>
-      ) : null}
+          <option value="">All makes</option>
+          {makeOptions.map((make) => (
+            <option key={make} value={make}>
+              {make}
+            </option>
+          ))}
+        </select>
 
-      <select
-        value={filters.make}
-        aria-label="Make"
-        onChange={(e) => {
-          const make = e.target.value;
-          onChange({ make, model: "", city: "" });
-        }}
-        className={selectClass}
-      >
-        <option value="">All makes</option>
-        {makeOptions.map((make) => (
-          <option key={make} value={make}>
-            {make}
-          </option>
-        ))}
-      </select>
+        <select
+          value={filters.model}
+          aria-label="Model"
+          disabled={!filters.make}
+          onChange={(e) => {
+            const model = e.target.value;
+            onChange({ ...filters, model, city: "" });
+          }}
+          className={`${selectClass} disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400`}
+        >
+          <option value="">{filters.make ? "All models" : "Model"}</option>
+          {modelOptions.map((model) => (
+            <option key={model} value={model}>
+              {model}
+            </option>
+          ))}
+        </select>
 
-      <select
-        value={filters.model}
-        aria-label="Model"
-        disabled={!filters.make}
-        onChange={(e) => {
-          const model = e.target.value;
-          onChange({ ...filters, model, city: "" });
-        }}
-        className={`${selectClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500`}
-      >
-        <option value="">{filters.make ? "All models" : "Model"}</option>
-        {modelOptions.map((model) => (
-          <option key={model} value={model}>
-            {model}
+        <select
+          value={filters.city}
+          aria-label="City"
+          disabled={cityDisabled}
+          onChange={(e) => onChange({ ...filters, city: e.target.value })}
+          className={`${selectClass} disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400`}
+        >
+          <option value="">
+            {useVehicleCascade
+              ? filters.make && filters.model
+                ? "All cities"
+                : "City"
+              : "All cities"}
           </option>
-        ))}
-      </select>
-
-      <select
-        value={filters.city}
-        aria-label="City"
-        disabled={cityDisabled}
-        onChange={(e) => onChange({ ...filters, city: e.target.value })}
-        className={`${selectClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500`}
-      >
-        <option value="">
-          {useVehicleCascade ? (filters.make && filters.model ? "All cities" : "City") : "All cities"}
-        </option>
-        {cityOptions.map((city) => (
-          <option key={city} value={city}>
-            {city}
-          </option>
-        ))}
-      </select>
+          {cityOptions.map((city) => (
+            <option key={city} value={city}>
+              {city}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

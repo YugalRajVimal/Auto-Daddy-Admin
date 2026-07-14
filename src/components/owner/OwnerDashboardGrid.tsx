@@ -86,33 +86,33 @@ function StatCard({
   return (
     <Link
       to={to}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-white/80 bg-white/90 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5 transition duration-200 hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(15,23,42,0.1)] hover:ring-2 ${accent.ring}`}
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-white/80 bg-white/90 p-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(15,23,42,0.1)] hover:ring-2 md:p-3 2xl:p-4 ${accent.ring}`}
     >
-      <div className={`pointer-events-none absolute -right-6 -top-6 size-24 rounded-full ${accent.soft} opacity-80 transition group-hover:scale-110`} />
-      <div className="relative flex items-start justify-between gap-3">
+      <div className={`pointer-events-none absolute -right-6 -top-6 size-20 rounded-full ${accent.soft} opacity-80 transition group-hover:scale-110 md:size-24`} />
+      <div className="relative flex items-start justify-between gap-2 md:gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 md:text-[11px]">{label}</p>
           {loading ? (
-            <Skeleton className="mt-2 h-8 w-14 rounded" />
+            <Skeleton className="mt-1.5 h-7 w-12 rounded md:mt-2 md:h-8 md:w-14" />
           ) : (
-            <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-slate-900">{value}</p>
+            <p className="mt-0.5 text-xl font-bold tabular-nums tracking-tight text-slate-900 md:text-2xl 2xl:text-3xl">{value}</p>
           )}
         </div>
         <span
-          className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${accent.soft} ${accent.tint} transition group-hover:scale-105`}
+          className={`flex size-8 shrink-0 items-center justify-center rounded-xl ${accent.soft} ${accent.tint} transition group-hover:scale-105 md:size-9 2xl:size-10`}
         >
           {icon}
         </span>
       </div>
       {pct != null ? (
-        <div className="relative mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div className="relative mt-2 h-1 overflow-hidden rounded-full bg-slate-100 md:mt-2.5 md:h-1.5 2xl:mt-3">
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{ width: `${pct}%`, backgroundColor: accent.bar }}
           />
         </div>
       ) : null}
-      <div className="relative mt-3 flex items-center justify-between gap-2">
+      <div className="relative mt-2 flex items-center justify-between gap-2 md:mt-2.5 2xl:mt-3">
         {hint ? <p className="truncate text-xs text-slate-500">{hint}</p> : <span />}
         <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${accent.text} opacity-0 transition group-hover:opacity-100`}>
           Open <FiArrowUpRight size={12} />
@@ -211,7 +211,7 @@ function OdometerQuickUpdate({
   };
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-sky-100">
+    <div className="flex h-full flex-col rounded-2xl border border-white/80 bg-white/95 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-sky-100 2xl:p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Odometer</p>
@@ -460,8 +460,8 @@ export default function OwnerDashboardGrid() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="space-y-3 2xl:space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-2 2xl:gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-medium text-slate-500">
@@ -473,7 +473,7 @@ export default function OwnerDashboardGrid() {
               </span>
             ) : null}
           </div>
-          <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 md:text-2xl">
+          <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 2xl:text-2xl">
             Garage overview
           </h2>
         </div>
@@ -482,7 +482,7 @@ export default function OwnerDashboardGrid() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-4 md:gap-2.5 2xl:gap-3">
         <StatCard
           to="/owner/profile/vehicles"
           label="Vehicles"
@@ -573,8 +573,8 @@ export default function OwnerDashboardGrid() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className="rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-emerald-100">
+      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3 2xl:gap-3">
+        <div className="rounded-2xl border border-white/80 bg-white/95 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-emerald-100 2xl:p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
             Invoice mix
           </p>
@@ -593,7 +593,7 @@ export default function OwnerDashboardGrid() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-indigo-100">
+        <div className="rounded-2xl border border-white/80 bg-white/95 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-indigo-100 2xl:p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Deals</p>
           <h3 className="mt-0.5 text-base font-bold text-slate-900">Service vs parts</h3>
           {dealsLoading ? (
@@ -620,8 +620,8 @@ export default function OwnerDashboardGrid() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className="rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-sky-100 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3 2xl:gap-3">
+        <div className="rounded-2xl border border-white/80 bg-white/95 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-sky-100 2xl:p-4 md:col-span-2">
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
@@ -653,7 +653,7 @@ export default function OwnerDashboardGrid() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="rounded-2xl border border-white/80 bg-gradient-to-br from-amber-50 via-white to-rose-50 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-amber-100">
+          <div className="rounded-2xl border border-white/80 bg-gradient-to-br from-amber-50 via-white to-rose-50 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-amber-100 2xl:p-4">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700/80">
@@ -684,7 +684,7 @@ export default function OwnerDashboardGrid() {
             )}
           </div>
 
-          <div className="flex-1 rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-orange-100">
+          <div className="flex-1 rounded-2xl border border-white/80 bg-white/95 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-orange-100 2xl:p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
               Next service
             </p>

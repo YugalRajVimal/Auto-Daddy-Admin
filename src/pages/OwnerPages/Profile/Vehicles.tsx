@@ -557,9 +557,7 @@ export default function OwnerVehiclesPage() {
                             toast.info("Demo vehicle — documents open for real vehicles.");
                             return;
                           }
-                          setSelectedVehicleId(v.id);
-                          setActiveSection("documents");
-                          setVehicleDetailsMode("view");
+                          navigate(`/owner/documents/${v.id}`);
                         }}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 ring-1 ring-teal-100 transition hover:bg-teal-100"
                       >

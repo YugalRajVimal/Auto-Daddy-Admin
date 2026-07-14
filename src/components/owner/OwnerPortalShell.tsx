@@ -5,14 +5,18 @@ import useAuth from "../../auth/useAuth";
 import { getActivePrimaryItem, type NavItem, type NavSubItem } from "../../config/adminNav";
 import { useCarOwnerNotifications } from "../../hooks/useCarOwnerNotifications";
 import ShopBrandLogo from "../shop/ShopBrandLogo";
-import { shopNavVerticalGapClass, shopPortalHorizPaddingClass } from "../shop/shopLayoutStyles";
+import { shopPortalHorizPaddingClass } from "../shop/shopLayoutStyles";
+import {
+  ownerChromeHeaderPadClass,
+  ownerChromeLogoClass,
+  ownerChromeNameClass,
+  ownerChromePrimaryTabClass,
+  ownerChromeSubNavLinkClass,
+} from "./ownerLayoutStyles";
 
 const LOGO = "/logo.png";
 const OWNER_MESSAGES_PATH = "/owner/messages";
 const OWNER_LAST_SEEN_KEY = "ad:lastSeen:owner-notifications";
-
-const logoImageClass =
-  "block h-auto w-auto max-h-12 max-w-[140px] object-contain drop-shadow-sm sm:max-h-14 sm:max-w-[170px] md:max-h-[4.25rem] md:max-w-[200px]";
 
 function isPathActive(pathname: string, path: string, homePath: string) {
   if (path === homePath) return pathname === homePath;
@@ -106,12 +110,10 @@ export default function OwnerPortalShell({
   const helpLinkActiveClass =
     "rounded-full bg-ad-green-light/80 px-2.5 py-1 text-[11px] font-semibold text-ad-green-dark ring-1 ring-ad-green/25 sm:px-3 sm:text-xs";
 
-  const subNavLinkClass =
-    "relative mx-auto block max-w-[11rem] rounded-full px-3 py-1.5 text-center text-xs font-medium leading-snug text-gray-600 transition-all hover:bg-white/70 hover:text-ad-purple lg:text-[13px] lg:leading-snug lg:whitespace-normal";
   const subNavActiveClass =
     "bg-white font-semibold text-ad-purple shadow-sm ring-1 ring-ad-purple/15";
 
-  const headerStackGapClass = shopNavVerticalGapClass;
+  const headerStackGapClass = "gap-2";
   const loginAsDisplay = loginAs?.trim() || displayName;
 
   const headerAvatar = headerAvatarSrc?.trim() ? (
@@ -132,19 +134,18 @@ export default function OwnerPortalShell({
   }, [location.pathname]);
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-ad-app-bg font-sans">
-      {/* Brand mist behind chrome — ties header to the page gradient */}
+    <div className="owner-portal relative flex min-h-screen flex-col bg-ad-app-bg font-sans">
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-44 bg-[radial-gradient(ellipse_80%_70%_at_50%_-10%,rgba(155,48,141,0.18),transparent_65%),radial-gradient(ellipse_50%_50%_at_8%_20%,rgba(44,140,44,0.12),transparent_55%)]"
+        className="owner-chrome-mist pointer-events-none absolute inset-x-0 top-0 z-0 h-40 bg-[radial-gradient(ellipse_80%_70%_at_50%_-10%,rgba(155,48,141,0.18),transparent_65%),radial-gradient(ellipse_50%_50%_at_8%_20%,rgba(44,140,44,0.12),transparent_55%)] 2xl:h-44"
         aria-hidden
       />
 
-      <header className={`relative z-20 ${shopPortalHorizPaddingClass} pt-3 pb-2 sm:pt-3.5 sm:pb-2.5`}>
+      <header className={`relative z-20 ${shopPortalHorizPaddingClass} ${ownerChromeHeaderPadClass}`}>
         <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 md:grid-cols-[auto_1fr_auto] md:gap-x-5">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="rounded-xl border border-white/70 bg-white/55 p-2 text-gray-600 shadow-sm backdrop-blur-md lg:hidden"
+              className="rounded-xl border border-white/70 bg-white/55 p-2 text-gray-600 shadow-sm backdrop-blur-md md:hidden"
               onClick={() => setMobileOpen(!mobileOpen)}
               aria-label="Toggle menu"
             >
@@ -155,12 +156,12 @@ export default function OwnerPortalShell({
               </svg>
             </button>
             <Link to={homePath} className="shrink-0" onClick={(e) => handleNavLinkClick(homePath, e)}>
-              <img src={LOGO} alt="AutoDaddy" className={logoImageClass} />
+              <img src={LOGO} alt="AutoDaddy" className={ownerChromeLogoClass} />
             </Link>
           </div>
 
           <div className="col-span-2 flex items-center justify-center md:col-span-1">
-            <p className="text-center font-outfit text-base tracking-tight md:text-lg lg:text-xl">
+            <p className={ownerChromeNameClass}>
               <Link
                 to={homePath}
                 className="bg-gradient-to-r from-ad-purple to-ad-pink-dark bg-clip-text font-semibold text-transparent transition-opacity hover:opacity-80"
@@ -187,7 +188,7 @@ export default function OwnerPortalShell({
             className={`col-span-2 flex flex-col items-end md:col-span-1 md:col-start-3 md:row-start-1 ${headerStackGapClass}`}
           >
             <nav
-              className="flex shrink-0 items-center gap-0.5 rounded-full border border-white/60 bg-white/45 px-1 py-0.5 shadow-sm backdrop-blur-md sm:gap-1"
+              className="flex shrink-0 items-center gap-1 rounded-full border border-white/60 bg-white/45 px-1.5 py-0.5 shadow-sm backdrop-blur-md"
               aria-label="Account actions"
             >
               <span className={`${utilityLinkClass} cursor-default text-gray-400 hover:bg-transparent hover:text-gray-400`}>
@@ -204,7 +205,7 @@ export default function OwnerPortalShell({
               </button>
             </nav>
 
-            <div className="relative z-10 flex items-center justify-end gap-2">
+            <div className="relative z-10 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 className="relative rounded-xl border border-white/70 bg-white/55 p-2 text-ad-blue-dark/80 shadow-sm backdrop-blur-md transition-colors hover:bg-white/85 hover:text-ad-blue-dark"
@@ -228,7 +229,7 @@ export default function OwnerPortalShell({
 
       <nav
         className={`relative z-20 ${shopPortalHorizPaddingClass} pb-0 ${
-          mobileOpen ? "block" : "hidden lg:block"
+          mobileOpen ? "block" : "hidden md:block"
         }`}
         aria-label="Owner sections"
       >
@@ -237,14 +238,14 @@ export default function OwnerPortalShell({
             hasSubNav ? "rounded-t-2xl border-b-0" : "rounded-2xl"
           }`}
         >
-          <ul className="flex flex-col gap-1 lg:flex-row lg:gap-1">
+          <ul className="flex flex-col gap-1 md:flex-row md:gap-1">
             {primaryNav.map((item) => {
               const isActive = activePrimary?.name === item.name;
               const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
-              const itemClass = `w-full rounded-xl px-3 py-2 text-center text-sm font-semibold tracking-wide transition-all lg:px-2.5 lg:py-2 lg:text-[13px] xl:px-3 xl:text-sm ${
+              const itemClass = `${ownerChromePrimaryTabClass} ${
                 isActive
                   ? "bg-gradient-to-br from-ad-purple to-ad-purple-dark text-white shadow-[0_6px_16px_rgba(155,48,141,0.35)]"
-                  : "text-ad-purple/75 hover:bg-white/60 hover:text-ad-purple"
+                  : "text-ad-purple/80 hover:bg-white/70 hover:text-ad-purple"
               }`;
               return (
                 <li key={item.name} className="min-w-0 flex-1">
@@ -269,11 +270,9 @@ export default function OwnerPortalShell({
       </nav>
 
       {hasSubNav ? (
-        <div
-          className={`relative z-10 ${shopPortalHorizPaddingClass}`}
-        >
-          <div className="rounded-b-2xl border border-t-0 border-white/50 bg-white/40 px-1 pb-1.5 pt-0.5 shadow-[0_10px_24px_rgba(100,130,170,0.06)] backdrop-blur-xl">
-            <ul className="hidden w-full items-center lg:flex">
+        <div className={`relative z-10 ${shopPortalHorizPaddingClass}`}>
+          <div className="rounded-b-2xl border border-t-0 border-white/50 bg-white/45 px-1.5 pb-1.5 pt-1 shadow-[0_10px_24px_rgba(100,130,170,0.06)] backdrop-blur-xl">
+            <ul className="hidden w-full items-center md:flex">
               {primaryNav.map((item, colIndex) => {
                 const sub = colIndex < displaySubItems.length ? displaySubItems[colIndex] : null;
                 const active = sub ? sub.path === activeSubItemPath : false;
@@ -283,7 +282,7 @@ export default function OwnerPortalShell({
                       <Link
                         to={sub.path}
                         onClick={(e) => handleNavLinkClick(sub.path, e)}
-                        className={`${subNavLinkClass} ${active ? subNavActiveClass : ""}`}
+                        className={`${ownerChromeSubNavLinkClass} ${active ? subNavActiveClass : ""}`}
                       >
                         {sub.name}
                       </Link>
@@ -292,7 +291,7 @@ export default function OwnerPortalShell({
                 );
               })}
             </ul>
-            <ul className="flex flex-col gap-0.5 p-1 lg:hidden">
+            <ul className="flex flex-col gap-1 p-1 md:hidden">
               {displaySubItems.map((sub) => {
                 const active = sub.path === activeSubItemPath;
                 return (
@@ -300,7 +299,9 @@ export default function OwnerPortalShell({
                     <Link
                       to={sub.path}
                       onClick={(e) => handleNavLinkClick(sub.path, e)}
-                      className={`${subNavLinkClass} max-w-none text-left ${active ? subNavActiveClass : ""}`}
+                      className={`${ownerChromeSubNavLinkClass} max-w-none text-left ${
+                        active ? subNavActiveClass : ""
+                      }`}
                     >
                       {sub.name}
                     </Link>
