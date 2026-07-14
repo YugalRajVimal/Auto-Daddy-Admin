@@ -1117,7 +1117,6 @@ export type DummyUserRow = {
   region?: string;
   websiteUrl?: string;
   imageUrl?: string;
-  categories?: string[];
   countA: number;
   countB: number;
 };
@@ -1139,7 +1138,6 @@ export type DummyUserFormValues = {
   phone: string;
   city: string;
   address?: string;
-  categories?: string[];
   primaryLabel: string;
   region?: string;
   websiteUrl?: string;
@@ -1159,8 +1157,6 @@ export type DummyUserListConfig = {
   fieldMode?: "location" | "web";
   /** Show address field even in web mode (e.g. Dealers). */
   showAddress?: boolean;
-  /** Multi-select category options. When set, Categories field is shown. */
-  categoryOptions?: string[];
   countALabel: string;
   countBLabel: string;
   columns: ColumnDef[];
@@ -1331,8 +1327,7 @@ function dummyUserValueByKey(row: DummyUserRow, key: string): string {
       return String(row.countB);
     case "status":
       return getStatus(row);
-    case "categories":
-      return (row.categories ?? []).join(", ");
+    // "categories" removed
     default:
       return String((row as Record<string, unknown>)[key] ?? "");
   }
@@ -1358,13 +1353,11 @@ const DummyUserAddEditForm: React.FC<{
   const isEdit = !!row;
   const isWebMode = config.fieldMode === "web";
   const showAddress = !isWebMode || Boolean(config.showAddress);
-  const categoryOptions = config.categoryOptions ?? [];
-  const showCategories = categoryOptions.length > 0;
+  // Removed all categoryOptions code
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [categories, setCategories] = useState<string[]>([]);
   const [city, setCity] = useState("");
   const [primaryLabel, setPrimaryLabel] = useState("");
   const [region, setRegion] = useState("");
@@ -1381,27 +1374,23 @@ const DummyUserAddEditForm: React.FC<{
       setEmail(row.email);
       setPhone(row.phone);
       setAddress(row.address ?? "");
-      setCategories(Array.isArray(row.categories) ? row.categories : []);
       setCity(row.city);
       setPrimaryLabel(row.primaryLabel);
       setRegion(row.region ?? "");
       setWebsiteUrl(row.websiteUrl ?? "");
       setAttachImage(Boolean(row.imageUrl));
       setImageFile(null);
-
     } else {
       setName("");
       setEmail("");
       setPhone("");
       setAddress("");
-      setCategories([]);
       setCity("");
       setPrimaryLabel("");
       setRegion("");
       setWebsiteUrl("");
       setAttachImage(false);
       setImageFile(null);
-
     }
   }, [isEdit, row]);
 
@@ -1411,10 +1400,6 @@ const DummyUserAddEditForm: React.FC<{
     phone.replace(/\D/g, "").length === 10 &&
     primaryLabel.trim() &&
     (isWebMode ? isWebsiteUrl(websiteUrl) : address.trim() && region.trim());
-
-  const toggleCategory = (opt: string) => {
-    setCategories((prev) => (prev.includes(opt) ? prev.filter((c) => c !== opt) : [...prev, opt]));
-  };
 
   const handleImageFileChange = (file: File | null) => {
     if (!file) {
@@ -1448,7 +1433,6 @@ const DummyUserAddEditForm: React.FC<{
         email: email.trim(),
         phone: phone.replace(/\D/g, ""),
         address: showAddress ? address.trim() : undefined,
-        categories: showCategories ? categories : undefined,
         city: city.trim() || "Toronto",
         primaryLabel: primaryLabel.trim(),
         region: isWebMode ? undefined : region.trim(),
@@ -1534,23 +1518,6 @@ const DummyUserAddEditForm: React.FC<{
             <input type="text" value={region} onChange={(e) => setRegion(e.target.value)} className={compactInputClass} />
           </CompactField>
         )}
-        {showCategories && (
-          <CompactField label="Categories" className="min-w-0 w-full basis-full">
-            <div className="flex flex-wrap gap-x-3 gap-y-1.5 pt-1">
-              {categoryOptions.map((opt) => (
-                <label key={opt} className="flex cursor-pointer items-center gap-1.5 text-[13px] text-gray-800 select-none">
-                  <input
-                    type="checkbox"
-                    checked={categories.includes(opt)}
-                    onChange={() => toggleCategory(opt)}
-                    className="h-3.5 w-3.5 cursor-pointer accent-[#0073b7]"
-                  />
-                  {opt}
-                </label>
-              ))}
-            </div>
-          </CompactField>
-        )}
       </CompactFormRow>
       {attempted && !isValid && <p className="text-xs font-semibold text-red-700">Please fill all required fields correctly.</p>}
     </CompactFormPanel>
@@ -1603,7 +1570,6 @@ function exportCsv(rows: DummyUserRow[], config: DummyUserListConfig, visibleCol
     primary: (r) => r.primaryLabel,
     city: (r) => r.city,
     address: (r) => r.address ?? "-",
-    categories: (r) => (r.categories?.length ? r.categories.join(", ") : "-"),
     region: (r) => r.region ?? "-",
     websiteUrl: (r) => formatWebsiteUrl(r.websiteUrl),
     image: (r) => (r.imageUrl ? "Yes" : "-"),
@@ -1611,6 +1577,7 @@ function exportCsv(rows: DummyUserRow[], config: DummyUserListConfig, visibleCol
     countA: (r) => String(r.countA),
     countB: (r) => String(r.countB),
     status: (r) => getStatus(r),
+    // "categories" removed
   };
   const cols = config.columns.filter((c) => visibleCols.includes(c.key));
   const esc = (v: string) => (/[,"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
@@ -1700,7 +1667,6 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
           r.primaryLabel.toLowerCase().includes(q) ||
           r.city.toLowerCase().includes(q) ||
           (r.address ?? "").toLowerCase().includes(q) ||
-          (r.categories ?? []).join(" ").toLowerCase().includes(q) ||
           (r.region ?? "").toLowerCase().includes(q) ||
           (r.websiteUrl ?? "").toLowerCase().includes(q)
         );
@@ -1733,7 +1699,6 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
         phone: form.phone,
         pincode: "",
         address: form.address,
-        categories: form.categories,
         city: form.city,
         createdAt: existingId ? allRows.find((r) => r._id === existingId)?.createdAt ?? new Date().toISOString() : new Date().toISOString(),
         isDisabled: existingId ? allRows.find((r) => r._id === existingId)?.isDisabled ?? false : false,
@@ -1890,12 +1855,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
             {row.address || "-"}
           </td>
         );
-      case "categories":
-        return (
-          <td key={key} className={`${tdClass} whitespace-normal break-words text-left align-top min-w-[200px]`}>
-            {row.categories?.length ? row.categories.join(", ") : "-"}
-          </td>
-        );
+      // Remove categories cell rendering
       case "region":
         return <td key={key} className={tdClass}>{row.region ?? "-"}</td>;
       case "websiteUrl":
@@ -1963,7 +1923,10 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
   const toolbarBtnClass = (disabled = false) =>
     `px-3 py-1 text-xs font-medium text-white whitespace-nowrap ${disabled ? "bg-gray-400 cursor-not-allowed" : "bg-gray-600 hover:bg-gray-700"}`;
 
-  const visibleColumns = config.columns.filter((c) => (viewMode === "active" ? visibleCols.includes(c.key) : config.defaultVisible.includes(c.key)));
+  // Strip "categories" columns from lists
+  const visibleColumns = config.columns.filter(
+    (c) => (viewMode === "active" ? visibleCols.includes(c.key) : config.defaultVisible.includes(c.key)) && c.key !== "categories"
+  );
 
   return (
     <>
@@ -2041,7 +2004,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
               className="border border-gray-400 bg-white px-2 py-1 text-xs"
             />
             {selCount > 0 && <span className="text-xs font-semibold text-gray-600">{selCount} selected</span>}
-            {viewMode === "active" && <ColSelector columns={config.columns} visible={visibleCols} onChange={setVisibleCols} />}
+            {viewMode === "active" && <ColSelector columns={config.columns.filter(c=>c.key!=="categories")} visible={visibleCols.filter(k=>k!=="categories")} onChange={setVisibleCols} />}
             <button
               type="button"
               onClick={openSearchCard}
@@ -2206,7 +2169,7 @@ const DEALERS_CONFIG: DummyUserListConfig = {
   imageFieldLabel: "Image",
   fieldMode: "web",
   showAddress: true,
-  categoryOptions: ["Parts", "New Vehicles", "Used Vehicles", "OEM", "Aftermarket", "Wholesale"],
+  // categoryOptions removed
   countALabel: "Listings",
   countBLabel: "Leads",
   exportFilePrefix: "dealers",
@@ -2217,7 +2180,7 @@ const DEALERS_CONFIG: DummyUserListConfig = {
     { key: "primary", label: "Dealership" },
     { key: "city", label: "City" },
     { key: "address", label: "Address" },
-    { key: "categories", label: "Categories" },
+    // { key: "categories", label: "Categories" }, // removed
     { key: "websiteUrl", label: "Website URL" },
     { key: "image", label: "Image" },
     { key: "date", label: "Date" },
@@ -2225,7 +2188,21 @@ const DEALERS_CONFIG: DummyUserListConfig = {
     { key: "countB", label: "Leads" },
     { key: "status", label: "Status" },
   ],
-  defaultVisible: ["name", "email", "phone", "primary", "city", "address", "categories", "websiteUrl", "image", "date", "countA", "countB", "status"],
+  defaultVisible: [
+    "name",
+    "email",
+    "phone",
+    "primary",
+    "city",
+    "address",
+    // "categories", // removed
+    "websiteUrl",
+    "image",
+    "date",
+    "countA",
+    "countB",
+    "status",
+  ],
   initialData: [], // unused when `api` is set
   api: {
     list: async ({ search, viewMode }) => {
@@ -2243,7 +2220,7 @@ const DEALERS_CONFIG: DummyUserListConfig = {
         dealership: form.primaryLabel,
         city: form.city,
         address: form.address,
-        categories: form.categories,
+        // categories: form.categories, // removed
         websiteUrl: form.websiteUrl,
         dealerImage: form.imageFile ?? null,
       });
@@ -2257,7 +2234,7 @@ const DEALERS_CONFIG: DummyUserListConfig = {
         dealership: form.primaryLabel,
         city: form.city,
         address: form.address,
-        categories: form.categories,
+        // categories: form.categories, // removed
         websiteUrl: form.websiteUrl,
         status: form.status,
         dealerImage: form.imageFile ?? undefined,
