@@ -882,7 +882,7 @@ export default function Invitehelp({
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Search
+            Filters
           </button>
         </div>
       </div>
@@ -905,7 +905,7 @@ export default function Invitehelp({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -973,10 +973,8 @@ export default function Invitehelp({
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-center">{notification.date}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center">{notification.title}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
-                      <span className="line-clamp-2 block max-w-[200px]" title={notification.note}>
-                        {notification.note}
-                      </span>
+                    <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
+                      {notification.note}
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-center">{userTypeLabel(notification.userType)}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center">{userScopeLabel(notification)}</td>
@@ -1034,14 +1032,8 @@ export default function Invitehelp({
                         <span className="text-xs italic text-gray-400">No audio</span>
                       )}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
-                      {invite.message ? (
-                        <span className="line-clamp-2 block max-w-[200px]" title={invite.message}>
-                          {invite.message}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
+                    <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
+                      {invite.message || "—"}
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-center">
                       {imageUrl ? (

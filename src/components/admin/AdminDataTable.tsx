@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ADMIN_PANEL_TD_CLASS,
   ADMIN_PANEL_TD_COMPACT_CLASS,
+  ADMIN_PANEL_TD_WRAP_CLASS,
+  ADMIN_PANEL_TD_WRAP_COMPACT_CLASS,
   ADMIN_PANEL_THEAD_ROW_CLASS,
   adminPanelRowClass,
   adminPanelTableClasses,
@@ -490,60 +492,69 @@ export function AdminDataTable<T>({
           <span>entries</span>
         </div>
 
-        {loading && (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "#888" }}>Loading…</div>
-        )}
-        {error && (
-          <div style={{ textAlign: "center", padding: "30px 0", color: "#c0392b" }}>
-            Error: {error}
-          </div>
-        )}
-
-        {!loading && !error && (
-          <div className="overflow-x-auto">
-            <table className={panelTable.table}>
-              <thead>
-                <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-                  <th className={panelTable.thCheckbox}>
-                    <input
-                      type="checkbox"
-                      checked={allPageSel}
-                      onChange={(e) => {
-                        setSelectedRows((prev) => {
-                          const next = new Set(prev);
-                          paginated.forEach((row) => {
-                            const id = getRowId(row);
-                            if (e.target.checked) next.add(id);
-                            else next.delete(id);
-                          });
-                          return next;
+        <div className="overflow-x-auto">
+          <table className={panelTable.table}>
+            <thead>
+              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                <th className={panelTable.thCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={allPageSel}
+                    onChange={(e) => {
+                      setSelectedRows((prev) => {
+                        const next = new Set(prev);
+                        paginated.forEach((row) => {
+                          const id = getRowId(row);
+                          if (e.target.checked) next.add(id);
+                          else next.delete(id);
                         });
-                      }}
-                      className="accent-white"
-                    />
+                        return next;
+                      });
+                    }}
+                    className="accent-white"
+                  />
+                </th>
+                {activeColumns.map((col) => (
+                  <th key={col.key} className={panelTable.th}>
+                    {col.label}
                   </th>
-                  {activeColumns.map((col) => (
-                    <th key={col.key} className={panelTable.th}>
-                      {col.label}
-                    </th>
-                  ))}
-                  {renderActions && (
-                    <th className={panelTable.th}>{actionsColumnLabel}</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={colSpan}
-                      className={`${panelTable.td} ${compact ? "py-5" : "py-9"} text-center text-gray-400`}
-                    >
-                      {emptyMessage}
-                    </td>
-                  </tr>
+                ))}
+                {renderActions && (
+                  <th className={panelTable.th}>{actionsColumnLabel}</th>
                 )}
-                {paginated.map((row, idx) => {
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={colSpan}
+                    className={`${panelTable.td} ${compact ? "py-5" : "py-9"} text-center text-gray-400`}
+                  >
+                    Loading…
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td
+                    colSpan={colSpan}
+                    className={`${panelTable.td} ${compact ? "py-5" : "py-9"} text-center`}
+                    style={{ color: "#c0392b" }}
+                  >
+                    Error: {error}
+                  </td>
+                </tr>
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={colSpan}
+                    className={`${panelTable.td} ${compact ? "py-5" : "py-9"} text-center text-gray-400`}
+                  >
+                    {emptyMessage}
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((row, idx) => {
                   const id = getRowId(row);
                   const selected = selectedRows.has(id);
                   return (
@@ -568,14 +579,13 @@ export function AdminDataTable<T>({
                       )}
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        {!loading && !error && (
-          <div
+        <div
             style={{
               marginTop: 14,
               display: "flex",
@@ -628,20 +638,28 @@ export function AdminDataTable<T>({
               {footerRight}
             </div>
           </div>
-        )}
       </div>
     </div>
   );
 }
 
-/** Helper for simple text cells */
+/** Helper for simple text cells. Pass `{ wrap: true }` for description/notes/etc. */
 export function tableCell(
   content: React.ReactNode,
   style?: React.CSSProperties,
-  compact = false,
+  options?: boolean | { compact?: boolean; wrap?: boolean },
 ) {
+  const compact = typeof options === "boolean" ? options : options?.compact ?? false;
+  const wrap = typeof options === "object" ? options?.wrap ?? false : false;
+  const className = wrap
+    ? compact
+      ? ADMIN_PANEL_TD_WRAP_COMPACT_CLASS
+      : ADMIN_PANEL_TD_WRAP_CLASS
+    : compact
+      ? ADMIN_PANEL_TD_COMPACT_CLASS
+      : ADMIN_PANEL_TD_CLASS;
   return (
-    <td className={compact ? ADMIN_PANEL_TD_COMPACT_CLASS : ADMIN_PANEL_TD_CLASS} style={style}>
+    <td className={className} style={style}>
       {content}
     </td>
   );

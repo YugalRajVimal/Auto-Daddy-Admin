@@ -203,114 +203,120 @@ function GroupedLedgerReport({
         </p>
       </div>
 
-      {rows.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-gray-600">
-          No records found for the selected filters.
-        </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-ad-purple text-white">
-                {tableHeaders.map((header) => (
-                  <th
-                    key={header}
-                    className="border border-ad-purple-dark px-3 py-2 text-center font-medium"
-                  >
-                    {header}
-                  </th>
-                ))}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
+          <thead>
+            <tr className="bg-ad-purple text-white">
+              {tableHeaders.map((header) => (
+                <th
+                  key={header}
+                  className="border border-ad-purple-dark px-3 py-2 text-center font-medium"
+                >
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={tableHeaders.length}
+                  className="border border-gray-300 px-3 py-6 text-center text-gray-500"
+                >
+                  No records found for the selected filters.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {groupBy === "category" &&
-                categoryGroups.map((group) => (
-                  <Fragment key={`cat-${group.key}`}>
-                    <tr className="bg-gray-300">
-                      <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold uppercase">
-                        {group.label}
-                      </td>
-                    </tr>
-                    {group.subcategories.map((sub) => (
-                      <Fragment key={`sub-${group.key}-${sub.key}`}>
-                        <tr>
-                          <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold uppercase">
-                            {sub.label}
-                          </td>
-                        </tr>
-                        {sub.rows.map((row) => (
-                          <tr key={row.id}>
-                            <td className="border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
-                            <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
-                            <td className="border border-gray-300 px-3 py-2 text-center">{row.notes || ""}</td>
-                            <td className="border border-gray-300 px-3 py-2 text-center">
-                              {formatReportAmount(row.amount)}
+            ) : (
+              <>
+                {groupBy === "category" &&
+                  categoryGroups.map((group) => (
+                    <Fragment key={`cat-${group.key}`}>
+                      <tr className="bg-gray-300">
+                        <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold uppercase">
+                          {group.label}
+                        </td>
+                      </tr>
+                      {group.subcategories.map((sub) => (
+                        <Fragment key={`sub-${group.key}-${sub.key}`}>
+                          <tr>
+                            <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold uppercase">
+                              {sub.label}
                             </td>
                           </tr>
-                        ))}
-                        <GroupTotalRow colSpan={4} total={sub.total} />
-                      </Fragment>
-                    ))}
-                  </Fragment>
-                ))}
+                          {sub.rows.map((row) => (
+                            <tr key={row.id}>
+                              <td className="border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
+                              <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
+                              <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
+                              <td className="border border-gray-300 px-3 py-2 text-center">
+                                {formatReportAmount(row.amount)}
+                              </td>
+                            </tr>
+                          ))}
+                          <GroupTotalRow colSpan={4} total={sub.total} />
+                        </Fragment>
+                      ))}
+                    </Fragment>
+                  ))}
 
-              {groupBy === "vendor" &&
-                vendorGroups.map((group) => (
-                  <Fragment key={`vendor-${group.key}`}>
-                    <tr className="bg-gray-300">
-                      <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold uppercase">
-                        {group.label}
-                      </td>
-                    </tr>
-                    {group.rows.map((row) => (
-                      <tr key={row.id}>
-                        <td className="border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
-                        <CategoryCell categories={categories} row={row as unknown as ReportLedgerRow} />
-                        <td className="border border-gray-300 px-3 py-2 text-center">{row.notes || ""}</td>
-                        <td className="border border-gray-300 px-3 py-2 text-center">
-                          {formatReportAmount(row.amount)}
-                        </td>
-
-                      </tr>
-                    ))}
-                    <GroupTotalRow colSpan={4} total={group.total} />
-                  </Fragment>
-                ))}
-
-              {groupBy === "project" &&
-                projectGroups.map((group) => (
-                  <Fragment key={`project-${group.key}`}>
-                    <tr className="bg-gray-300">
-                      <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold">
-                        {group.label}
-                      </td>
-                    </tr>
-                    {group.rows.map((row) => (
-                      <tr key={row.id}>
-                        <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
-                        <CategoryCell categories={categories} row={row as unknown as ReportLedgerRow} />
-                        <td className="border border-gray-300 px-3 py-2 text-center">{row.notes || ""}</td>
-                        <td className="border border-gray-300 px-3 py-2 text-center">
-                          {formatReportAmount(row.amount)}
+                {groupBy === "vendor" &&
+                  vendorGroups.map((group) => (
+                    <Fragment key={`vendor-${group.key}`}>
+                      <tr className="bg-gray-300">
+                        <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold uppercase">
+                          {group.label}
                         </td>
                       </tr>
-                    ))}
-                    <GroupTotalRow colSpan={4} total={group.total} />
-                  </Fragment>
-                ))}
+                      {group.rows.map((row) => (
+                        <tr key={row.id}>
+                          <td className="border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
+                          <CategoryCell categories={categories} row={row as unknown as ReportLedgerRow} />
+                          <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
+                          <td className="border border-gray-300 px-3 py-2 text-center">
+                            {formatReportAmount(row.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                      <GroupTotalRow colSpan={4} total={group.total} />
+                    </Fragment>
+                  ))}
 
-              <tr className="bg-gray-100">
-                <td colSpan={3} className="border border-gray-300 px-3 py-2 text-center font-bold">
-                  Grand Total
-                </td>
-                <td className="border border-gray-300 px-3 py-2 text-center font-bold">
-                  {formatReportAmount(grandTotal)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
+                {groupBy === "project" &&
+                  projectGroups.map((group) => (
+                    <Fragment key={`project-${group.key}`}>
+                      <tr className="bg-gray-300">
+                        <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold">
+                          {group.label}
+                        </td>
+                      </tr>
+                      {group.rows.map((row) => (
+                        <tr key={row.id}>
+                          <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
+                          <CategoryCell categories={categories} row={row as unknown as ReportLedgerRow} />
+                          <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
+                          <td className="border border-gray-300 px-3 py-2 text-center">
+                            {formatReportAmount(row.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                      <GroupTotalRow colSpan={4} total={group.total} />
+                    </Fragment>
+                  ))}
+
+                <tr className="bg-gray-100">
+                  <td colSpan={3} className="border border-gray-300 px-3 py-2 text-center font-bold">
+                    Grand Total
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2 text-center font-bold">
+                    {formatReportAmount(grandTotal)}
+                  </td>
+                </tr>
+              </>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -371,64 +377,68 @@ function GstReportView({
         </div>
       </div>
 
-      {rows.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-gray-600">
-          No GST records found for the selected date range.
-        </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-ad-purple text-white">
-                {["Date", "Type", "Vendor / Source", "Category", "Amount", "GST", "Notes"].map((header) => (
-                  <th
-                    key={header}
-                    className="border border-ad-purple-dark px-3 py-2 text-center font-medium"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const categories = row.ledgerType === "expenses" ? expenseCategories : incomeCategories;
-                const labels = categoryLabel(categories, row.category, row.subcategory);
-                const gstAmount = estimateGstAmount(row.amount);
-                return (
-                  <tr key={`${row.ledgerType}-${row.id}`}>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-center capitalize">
-                      {row.ledgerType === "expenses" ? "Expense" : "Income"}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
-                      <div className="font-bold leading-tight">{labels.category}</div>
-                      <div className="text-xs text-gray-600">{labels.subcategory}</div>
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
-                      {formatReportAmount(row.amount)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
-                      {formatReportAmount(gstAmount)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{row.notes || ""}</td>
-                  </tr>
-                );
-              })}
-              <tr className="bg-gray-100">
-                <td colSpan={5} className="border border-gray-300 px-3 py-2 text-center font-bold">
-                  Net GST
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
+          <thead>
+            <tr className="bg-ad-purple text-white">
+              {["Date", "Type", "Vendor / Source", "Category", "Amount", "GST", "Notes"].map((header) => (
+                <th
+                  key={header}
+                  className="border border-ad-purple-dark px-3 py-2 text-center font-medium"
+                >
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                  No GST records found for the selected date range.
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-center font-bold">
-                  {formatReportAmount(netGst)}
-                </td>
-                <td className="border border-gray-300 px-3 py-2 text-center" />
               </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
+            ) : (
+              <>
+                {rows.map((row) => {
+                  const categories = row.ledgerType === "expenses" ? expenseCategories : incomeCategories;
+                  const labels = categoryLabel(categories, row.category, row.subcategory);
+                  const gstAmount = estimateGstAmount(row.amount);
+                  return (
+                    <tr key={`${row.ledgerType}-${row.id}`}>
+                      <td className="border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center capitalize">
+                        {row.ledgerType === "expenses" ? "Expense" : "Income"}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center">
+                        <div className="font-bold leading-tight">{labels.category}</div>
+                        <div className="text-xs text-gray-600">{labels.subcategory}</div>
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center">
+                        {formatReportAmount(row.amount)}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center">
+                        {formatReportAmount(gstAmount)}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="bg-gray-100">
+                  <td colSpan={5} className="border border-gray-300 px-3 py-2 text-center font-bold">
+                    Net GST
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2 text-center font-bold">
+                    {formatReportAmount(netGst)}
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2 text-center" />
+                </tr>
+              </>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -748,7 +758,7 @@ export default function Reports() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-sm">
+                <table className="w-full border-collapse text-sm whitespace-nowrap">
                   <thead>
                     <tr className="bg-ad-purple text-white">
                       <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Bank / Wallet</th>

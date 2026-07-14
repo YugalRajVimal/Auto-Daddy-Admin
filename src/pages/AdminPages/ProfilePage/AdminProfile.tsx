@@ -1,125 +1,68 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo } from "react";
+import AdminPage from "../../../components/admin/AdminPage";
 import {
-  Spin,
-  Typography,
-  Descriptions,
-  Divider,
-  Tag,
-  message,
-  Card,
-} from "antd";
-import dayjs from "dayjs";
-import api from "../../../api/client";
+  DEFAULT_PERMS,
+  PermissionMatrix,
+  type Permissions,
+} from "../../../components/admin/PermissionMatrix";
 
-const { Title, Text } = Typography;
+const DUMMY_ADMIN = {
+  name: "John Admin",
+  email: "admin@autodaddy.com",
+  phone: "+1 416 555 0199",
+};
 
-interface AdminDetails {
-  _id: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-  role?: string;
-  status?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  [key: string]: any;
+/** Sample module set until /api/admin/profile is available. */
+function dummyPermissions(): Permissions {
+  const perms = DEFAULT_PERMS();
+  const enabled = [
+    "dashboard",
+    "users",
+    "services",
+    "categories",
+    "websiteTemplates",
+    "carCompanies",
+    "provinces",
+    "cities",
+  ];
+  for (const key of enabled) {
+    if (perms[key]) {
+      perms[key] = { view: true, add: true, edit: true, delete: key !== "dashboard" };
+    }
+  }
+  return perms;
 }
 
-const ADMIN_KEYS: { label: string; key: keyof AdminDetails }[] = [
-  { label: "Name", key: "name" },
-  { label: "Email", key: "email" },
-  { label: "Phone", key: "phone" },
-  { label: "Role", key: "role" },
-  { label: "Status", key: "status" },
-  { label: "Joined On", key: "createdAt" },
-  { label: "Last Updated", key: "updatedAt" },
-];
-
 const AdminProfile: React.FC = () => {
-  const [admin, setAdmin] = useState<AdminDetails | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    api
-      .get("/api/admin/profile")
-      .then((res) => {
-        if (res.data && res.data.success && res.data.data) {
-          setAdmin(res.data.data);
-        } else {
-          setAdmin(null);
-          message.error("Failed to fetch admin profile.");
-        }
-      })
-      .catch(() => {
-        setAdmin(null);
-        message.error("Error fetching admin profile.");
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  function renderAdmin(admin: AdminDetails) {
-    return (
-      <Descriptions
-        bordered
-        size="middle"
-        column={1}
-        style={{
-          marginBottom: 22,
-          background: "#fff",
-          borderRadius: 12,
-          overflow: "hidden",
-        }}
-        labelStyle={{ width: 140 }}
-        className="!rounded-lg"
-      >
-        {ADMIN_KEYS.map((item) => (
-          <Descriptions.Item label={item.label} key={item.key}>
-            {item.key === "createdAt" || item.key === "updatedAt"
-              ? admin[item.key]
-                ? dayjs(admin[item.key]).format("DD MMM, YYYY")
-                : "-"
-              : item.key === "status"
-              ? (
-                <Tag color={admin.status === "active" ? "green" : "red"}>
-                  {admin[item.key]?.charAt(0).toUpperCase() +
-                    (admin[item.key]?.slice(1) || "")}
-                </Tag>
-              )
-              : item.key === "role"
-              ? (
-                <Tag color="blue">
-                  {typeof admin[item.key] === "string"
-                    ? (admin[item.key] as string)
-                        .replace(/\b\w/g, (l: string) => l.toUpperCase())
-                    : "-"}
-                </Tag>
-              )
-              : admin[item.key] || "-"}
-          </Descriptions.Item>
-        ))}
-      </Descriptions>
-    );
-  }
+  const displayPerms = useMemo(() => dummyPermissions(), []);
 
   return (
-    <Spin spinning={loading}>
-      <div style={{ margin: "40px auto 32px auto" }}>
-        <Title level={3} style={{ marginBottom: 6 }}>
-          Admin Profile Details
-        </Title>
-        <Divider style={{ margin: "12px 0 18px 0" }} />
-        {admin ? (
-          <Card style={{ borderRadius: 14, background: "#f7faff" }}>
-            {renderAdmin(admin)}
-          </Card>
-        ) : (
-          !loading && (
-            <Text type="secondary">No admin profile data found.</Text>
-          )
-        )}
+    <AdminPage title="Admin Profile">
+      <div
+        className="mb-4 grid gap-x-5 gap-y-2 rounded border border-gray-300 bg-gray-50 px-4 py-3 text-sm"
+        style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}
+      >
+        {[
+          ["Name", DUMMY_ADMIN.name],
+          ["Email", DUMMY_ADMIN.email],
+          ["Phone", DUMMY_ADMIN.phone],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <span className="font-semibold text-gray-800">{label}:</span>{" "}
+            <span className="text-gray-600">{value}</span>
+          </div>
+        ))}
       </div>
-    </Spin>
+
+      <div className="mb-2.5 border-b-2 border-ad-purple pb-1.5 text-sm font-bold text-ad-purple">
+        Permissions
+      </div>
+      <PermissionMatrix
+        permissions={displayPerms}
+        onChange={() => {}}
+        readOnly
+      />
+    </AdminPage>
   );
 };
 

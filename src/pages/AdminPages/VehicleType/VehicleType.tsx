@@ -383,7 +383,9 @@ const VehicleType: React.FC = () => {
                   </div>
                 ))}
               </div>
-            )
+            ),
+            undefined,
+            { wrap: true },
           ),
         exportValue: (cd: CarDetailsItem) =>
           cd.models

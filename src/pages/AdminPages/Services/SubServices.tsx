@@ -112,9 +112,14 @@ const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
   { value: "towTruck", label: "Tow Truck" },
 ];
 
-const SUB_SERVICE_SEARCH_FIELDS: AdminSearchField[] = [
+const buildSubServiceSearchFields = (services: Service[] = []): AdminSearchField[] => [
   { key: "name", label: "Name" },
-  { key: "service", label: "Service" },
+  {
+    key: "service",
+    label: "Service",
+    type: "select",
+    options: services.map((s) => ({ value: s._id, label: s.name })),
+  },
   {
     key: "shopType",
     label: "Shop Type",
@@ -159,23 +164,23 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [showSearchCard, setShowSearchCard] = useState(false);
-  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(SUB_SERVICE_SEARCH_FIELDS));
-  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(SUB_SERVICE_SEARCH_FIELDS));
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(buildSubServiceSearchFields()));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(buildSubServiceSearchFields()));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
-  const [filterShopType, setFilterShopType] = useState<"all" | ShopType>("all");
-  const [filterServiceId, setFilterServiceId] = useState("");
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingRow, setEditingRow] = useState<SubServiceRow | null>(null);
   const [formName, setFormName] = useState("");
   const [formStatus, setFormStatus] = useState<SubServiceStatus>("active");
   const [formServiceId, setFormServiceId] = useState("");
 
+  const searchFields = buildSubServiceSearchFields(services);
+
   const resetTableControls = () => {
     setPage(1);
     setSelected(new Set());
     setSearch("");
-    const empty = emptyAdminSearchValues(SUB_SERVICE_SEARCH_FIELDS);
+    const empty = emptyAdminSearchValues(searchFields);
     setSearchDraft(empty);
     setSearchFilters(empty);
     setShowSearchCard(false);
@@ -195,15 +200,13 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
   useEffect(() => {
     fetchServices();
-  }, [filterShopType]);
+  }, []);
 
   const fetchServices = async () => {
     setLoading(true);
     setError("");
     try {
-      let url = `${API_BASE}/admin/services`;
-      if (filterShopType !== "all") url += `?shopType=${filterShopType}`;
-      const res = await axios.get<{ success: boolean; data: Service[] }>(url);
+      const res = await axios.get<{ success: boolean; data: Service[] }>(`${API_BASE}/admin/services`);
       if (res.data.success) setServices(res.data.data || []);
       else {
         const msg = "Failed to fetch sub services.";
@@ -234,10 +237,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
   const displayRows = isDeletedView ? deletedStash : allRows;
 
-  const tableRows = (filterServiceId
-    ? displayRows.filter((r) => r.categoryId === filterServiceId)
-    : displayRows
-  ).filter((r) => {
+  const tableRows = displayRows.filter((r) => {
     const q = search.toLowerCase();
     const live =
       !search.trim() ||
@@ -251,7 +251,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     if (!live) return false;
     return (
       searchIncludes(r.name, searchFilters.name) &&
-      searchIncludes(r.categoryName, searchFilters.service) &&
+      searchEquals(r.categoryId, searchFilters.service) &&
       searchEquals(r.shopType, searchFilters.shopType) &&
       searchEquals(r.status || "active", searchFilters.status) &&
       searchEquals(r.createdBy || "admin", searchFilters.createdBy) &&
@@ -280,7 +280,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   const resetForm = () => {
     setFormName("");
     setFormStatus("active");
-    setFormServiceId(filterServiceId);
+    setFormServiceId("");
     setEditingRow(null);
     setError("");
   };
@@ -315,7 +315,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   };
 
   const handleSearchCardReset = () => {
-    const empty = emptyAdminSearchValues(SUB_SERVICE_SEARCH_FIELDS);
+    const empty = emptyAdminSearchValues(searchFields);
     setSearchDraft(empty);
     setSearchFilters(empty);
     setPage(1);
@@ -503,7 +503,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       between={
         showSearchCard ? (
           <AdminSearchCard
-            fields={SUB_SERVICE_SEARCH_FIELDS}
+            fields={searchFields}
             values={searchDraft}
             onChange={setSearchDraft}
             onSearch={handleSearchCardSearch}
@@ -613,45 +613,6 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 text-xs text-gray-700">
-            <span>Shop Type:</span>
-            <select
-              value={filterShopType}
-              onChange={(e) => {
-                setFilterShopType(e.target.value as "all" | ShopType);
-                setFilterServiceId("");
-                setPage(1);
-                setSelected(new Set());
-              }}
-              className="border border-gray-400 bg-white px-2 py-1 text-xs"
-            >
-              <option value="all">All</option>
-              {SHOP_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-gray-700">
-            <span>Service:</span>
-            <select
-              value={filterServiceId}
-              onChange={(e) => {
-                setFilterServiceId(e.target.value);
-                setPage(1);
-                setSelected(new Set());
-              }}
-              className="border border-gray-400 bg-white px-2 py-1 text-xs"
-            >
-              <option value="">All Services</option>
-              {services.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
           <input
             type="text"
             value={search}
@@ -669,7 +630,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Search
+            Filters
           </button>
         </div>
       </div>
@@ -692,7 +653,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -708,8 +669,8 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Shop Type</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Created By</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Shopkeeper Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Phone</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" style={{ width: "14%" }}>Shopkeeper Name</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" style={{ width: "14%" }}>Phone</th>
             </tr>
           </thead>
           <tbody>
@@ -753,10 +714,10 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                   <td className="border border-gray-300 px-3 py-2 text-center capitalize">
                     {createdByLabel(row.createdBy)}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-center" style={{ width: "14%" }}>
                     {row.shopkeeperName || "—"}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.phone || "—"}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-center" style={{ width: "14%" }}>{row.phone || "—"}</td>
                 </tr>
               ))
             )}

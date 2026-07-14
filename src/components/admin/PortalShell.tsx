@@ -40,6 +40,8 @@ export type PortalShellProps = {
   primaryNav: NavItem[];
   utilityNav?: NavSubItem[];
   utilityNavLabel?: string;
+  /** Sub-header tabs shown when on matching paths (e.g. notification messages). */
+  contextualNav?: NavSubItem[];
   /** Shown in the top utility row as `Login as : …` (defaults to role label). */
   loginAs?: string;
   /** When set, replaces the default AutoDaddy logo in the header. */
@@ -61,6 +63,7 @@ export default function PortalShell({
   primaryNav,
   utilityNav = [],
   utilityNavLabel = "Admin",
+  contextualNav = [],
   loginAs,
   brandLogo,
   headerCenter,
@@ -81,10 +84,17 @@ export default function PortalShell({
 
   const activePrimary = getActivePrimaryItem(location.pathname, primaryNav, homePath);
   const onUtilityNav = utilityNav.some((s) => isPathActive(location.pathname, s.path, homePath));
+  const onContextualNav = contextualNav.some((s) => isPathActive(location.pathname, s.path, homePath));
   const onHelpNav = helpPath != null && isPathActive(location.pathname, helpPath, homePath);
   const utilitySubItems = onUtilityNav ? utilityNav : [];
+  const contextualSubItems = onContextualNav ? contextualNav : [];
   const primarySubItems: NavSubItem[] = activePrimary?.subItems ?? [];
-  const displaySubItems = utilitySubItems.length > 0 ? utilitySubItems : primarySubItems;
+  const displaySubItems =
+    utilitySubItems.length > 0
+      ? utilitySubItems
+      : contextualSubItems.length > 0
+        ? contextualSubItems
+        : primarySubItems;
   const activeSubItemPath = getActiveSubItemPath(location.pathname, displaySubItems, homePath);
   const utilityNavPath = utilityNav[0]?.path ?? "#";
 
@@ -339,7 +349,7 @@ export default function PortalShell({
           </ul>
         </nav>
 
-        {displaySubItems.length > 0 && (activePrimary || onUtilityNav) && (
+        {displaySubItems.length > 0 && (activePrimary || onUtilityNav || onContextualNav) && (
           <div className="relative z-10 mt-[3px] bg-white/35 backdrop-blur-xl lg:mt-[5px]">
             <div className="px-3 sm:px-4">
               <ul className="hidden w-full items-stretch overflow-visible lg:flex lg:gap-px lg:pb-[7px]">

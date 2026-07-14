@@ -3,6 +3,7 @@ import {
   primaryNav,
   adminOnlyNav,
   adminUtilityNav,
+  adminMessagesNav,
   type NavItem,
 } from "../../config/adminNav";
 import PortalShell from "./PortalShell";
@@ -36,6 +37,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     ? adminUtilityNav.filter((s) => !s.permissionModule || canView(s.permissionModule))
     : [];
 
+  const visibleMessagesNav = adminMessagesNav.filter(
+    (s) => !s.permissionModule || canView(s.permissionModule)
+  );
+
   return (
     <PortalShell
       homePath="/admin"
@@ -43,6 +48,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       primaryNav={visibleNav}
       utilityNav={visibleUtilityNav}
       utilityNavLabel="Admin"
+      contextualNav={visibleMessagesNav}
     >
       {children}
     </PortalShell>

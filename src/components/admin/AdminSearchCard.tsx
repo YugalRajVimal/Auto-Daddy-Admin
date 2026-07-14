@@ -125,7 +125,7 @@ function SearchFieldRow({
 }
 
 /**
- * Collapsible advanced-search panel (FreshKhata-style), opened from the toolbar Search button.
+ * Collapsible advanced-filter panel (FreshKhata-style), opened from the toolbar Filters button.
  * Place in AdminPage `between` like CompactFormPanel.
  */
 export default function AdminSearchCard({
@@ -151,12 +151,12 @@ export default function AdminSearchCard({
         <button
           type="button"
           onClick={onClose}
-          title="Close search"
-          aria-label="Close search"
+          title="Close filters"
+          aria-label="Close filters"
           className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded border border-gray-400 bg-white text-gray-600 hover:bg-gray-50"
         >
           <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden className="fill-current">
-            <path d="M3 3h4v1H4v3H3V3zm6 0h4v4h-1V4H9V3zM3 9h1v3h3v1H3V9zm9 0h1v4H9v-1h3V9z" />
+            <path d="M3.2 2.3 8 7.1l4.8-4.8.9.9L8.9 8l4.8 4.8-.9.9L8 8.9l-4.8 4.8-.9-.9L7.1 8 2.3 3.2l.9-.9z" />
           </svg>
         </button>
       ) : null}

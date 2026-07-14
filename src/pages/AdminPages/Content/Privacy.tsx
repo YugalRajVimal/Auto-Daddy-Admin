@@ -470,7 +470,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Search
+            Filters
           </button>
         </div>
       </div>
@@ -493,7 +493,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -546,7 +546,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.type}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.description}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[280px]">{row.description}</td>
                 </tr>
               ))
             )}

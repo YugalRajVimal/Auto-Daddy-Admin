@@ -334,7 +334,7 @@
 //       }
 //     >
 //       <div className="overflow-x-auto">
-//         <table className="w-full border-collapse text-sm">
+//         <table className="w-full border-collapse text-sm whitespace-nowrap">
 //           <thead>
 //             <tr className="bg-ad-purple text-white">
 //               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
@@ -1115,7 +1115,7 @@
 //       </div>
 
 //       <div className="overflow-x-auto">
-//         <table className="w-full border-collapse text-sm">
+//         <table className="w-full border-collapse text-sm whitespace-nowrap">
 //           <thead>
 //             <tr className="bg-ad-purple text-white">
 //               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -1779,7 +1779,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
       }
     >
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
@@ -2811,7 +2811,7 @@ function LedgerPage({
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Search
+            Filters
           </button>
         </div>
       </div>
@@ -2834,7 +2834,7 @@ function LedgerPage({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -2926,7 +2926,7 @@ function LedgerPage({
                         <div className="text-xs text-gray-500">{decoded.subcategory}</div>
                       </div>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{row.notes || ""}</td>
+                    <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.notes || ""}</td>
                     {isExpense ? (
                       <>
                         <td className="border border-gray-300 px-3 py-2 text-center">

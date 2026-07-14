@@ -303,7 +303,7 @@ const Tasks: React.FC = () => {
       {
         key: "description",
         label: "Description",
-        render: (task: TaskType) => tableCell(task.description || "-"),
+        render: (task: TaskType) => tableCell(task.description || "-", undefined, { wrap: true }),
         exportValue: (task: TaskType) => task.description || "-",
       },
       {

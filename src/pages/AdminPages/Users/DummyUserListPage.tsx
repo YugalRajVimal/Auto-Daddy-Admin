@@ -685,7 +685,7 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
         return <td key={key} className={tdClass}>{row.city}</td>;
       case "address":
         return (
-          <td key={key} className={`${tdClass} max-w-[180px] truncate`} title={row.address}>
+          <td key={key} className={`${tdClass} whitespace-normal break-words text-left align-top min-w-[240px]`}>
             {row.address || "-"}
           </td>
         );
@@ -876,7 +876,7 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
                 showSearchCard ? "bg-gray-700" : "bg-gray-500"
               }`}
             >
-              Search
+              Filters
             </button>
           </div>
         </div>
@@ -901,7 +901,7 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-collapse text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-ad-purple text-white">
                 <th className="border border-ad-purple-dark px-2 py-2 text-center">

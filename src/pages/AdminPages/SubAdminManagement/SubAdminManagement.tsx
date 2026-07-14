@@ -773,22 +773,30 @@ const SubAdminManagement: React.FC = () => {
       {/* ── Activity Log Modal ───────────────────────────────────────────────── */}
       <Modal isOpen={!!showActivityModal} onClose={() => setShowActivityModal(null)}
         title={`Activity Log — ${showActivityModal?.name}`} wide>
-        {activityLoading ? (
-          <div style={{ textAlign: "center", padding: "30px 0", color: "#888" }}>Loading logs...</div>
-        ) : activityLogs.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "30px 0", color: "#aaa" }}>No activity logs found.</div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, whiteSpace: "nowrap" }}>
+            <thead>
+              <tr>
+                {["Action", "Module", "Description", "Performed By", "IP Address", "Timestamp"].map((h) => (
+                  <th key={h} style={thStyle}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {activityLoading ? (
                 <tr>
-                  {["Action", "Module", "Description", "Performed By", "IP Address", "Timestamp"].map((h) => (
-                    <th key={h} style={thStyle}>{h}</th>
-                  ))}
+                  <td colSpan={6} style={{ ...tdStyle, textAlign: "center", padding: "30px 0", color: "#888" }}>
+                    Loading logs...
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {activityLogs.map((log) => (
+              ) : activityLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ ...tdStyle, textAlign: "center", padding: "30px 0", color: "#aaa" }}>
+                    No activity logs found.
+                  </td>
+                </tr>
+              ) : (
+                activityLogs.map((log) => (
                   <tr key={log._id}>
                     <td style={tdStyle}>
                       <span style={{ padding: "2px 8px", borderRadius: 3, fontSize: 11, fontWeight: 700, background: log.action === "LOGIN" ? "#dff0d8" : log.action === "DELETE" ? "#f2dede" : log.action === "PERMISSION_CHANGE" ? "#d9edf7" : "#fcf8e3", color: log.action === "LOGIN" ? "#3c763d" : log.action === "DELETE" ? "#a94442" : log.action === "PERMISSION_CHANGE" ? "#31708f" : "#8a6d3b" }}>
@@ -796,16 +804,16 @@ const SubAdminManagement: React.FC = () => {
                       </span>
                     </td>
                     <td style={tdStyle}>{log.module || "—"}</td>
-                    <td style={{ ...tdStyle, maxWidth: 240 }}>{log.description || "—"}</td>
+                    <td style={{ ...tdStyle, whiteSpace: "normal", wordBreak: "break-word", textAlign: "left", verticalAlign: "top", minWidth: 240 }}>{log.description || "—"}</td>
                     <td style={tdStyle}>{log.performedByName || "—"}</td>
                     <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: 11 }}>{log.ipAddress || "—"}</td>
                     <td style={tdStyle}>{new Date(log.createdAt).toLocaleString()}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </Modal>
 
       {/* ── View Modal ───────────────────────────────────────────────────────── */}
@@ -1056,7 +1064,7 @@ const SubAdminManagement: React.FC = () => {
                 showSearchCard ? "bg-gray-700" : "bg-gray-500"
               }`}
             >
-              Search
+              Filters
             </button>
           </div>
         </div>
@@ -1082,7 +1090,7 @@ const SubAdminManagement: React.FC = () => {
           {loading ? (
             <p className="py-6 text-center text-sm text-gray-500">Loading sub-admins…</p>
           ) : (
-            <table className="w-full border-collapse text-sm">
+            <table className="w-full border-collapse text-sm whitespace-nowrap">
               <thead>
                 <tr className="bg-ad-purple text-white">
                   <th className="border border-ad-purple-dark px-2 py-2 text-center">

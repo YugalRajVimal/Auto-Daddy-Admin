@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
-import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import AdminPage from "../../../components/admin/AdminPage";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
-import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
   CompactField,
   CompactFormFooter,
@@ -63,7 +61,6 @@ type TemplateRow = {
   country: string;
   shopType: string;
   usedBy: number;
-  imageUrl?: string | null;
 };
 
 type WebsiteTemplatesProps = {
@@ -83,7 +80,6 @@ function mapApiTemplate(t: any): TemplateRow {
     country: t.country,
     shopType: t.shopType,
     usedBy: Number(t.usedBy ?? t.usedCount ?? t.usageCount ?? 0) || 0,
-    imageUrl: t.imageUrl,
   };
 }
 
@@ -150,8 +146,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     "tire-master": false,
     "tow-truck": false,
   });
-  const [attachImage, setAttachImage] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   const resetTableControls = () => {
@@ -247,14 +241,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     setUserType("mechanic-shop");
     setUrl("");
     setTemplateName("");
-    setAttachImage(false);
-    setImageFile(null);
-  };
-
-  const openAdd = () => {
-    resetForm();
-    setShowSearchCard(false);
-    setShowForm(true);
   };
 
   const openSearchCard = () => {
@@ -344,7 +330,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const handleToolbarPrint = () => {
     printAdminTable({
       title: isDeletedView ? "Deleted Website Templates" : "Website Templates",
-      headers: ["Template Name", "URL", "Date", "Country", "User Type", "Used by", "Clip"],
+      headers: ["Template Name", "URL", "Date", "Country", "User Type", "Used by"],
       rows: filtered.map((template, idx) => {
         const templateName = template.templateName || `Template ${idx + 1}`;
         return [
@@ -355,7 +341,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
           USER_TYPE_OPTIONS.find((option) => option.value === template.shopType)?.label ??
             template.shopType,
           String(template.usedBy),
-          template.imageUrl ? "Yes" : "—",
         ];
       }),
     });
@@ -364,7 +349,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Web - Temp" : "Web - Temp"}
-      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showSearchCard ? (
           <AdminSearchCard
@@ -438,14 +422,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                 />
               </CompactField>
             </CompactFormRow>
-            <CompactFormRow className="items-start justify-start">
-              <AttachImageCheckbox
-                checked={attachImage}
-                onCheckedChange={setAttachImage}
-                file={imageFile}
-                onFileChange={setImageFile}
-              />
-            </CompactFormRow>
           </CompactFormPanel>
         ) : undefined
       }
@@ -514,7 +490,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Search
+            Filters
           </button>
         </div>
       </div>
@@ -537,7 +513,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -556,19 +532,18 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User Type</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Used by</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Clip</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="py-6 text-center text-gray-500">
+                <td colSpan={7} className="py-6 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-6 text-center text-gray-500">
+                <td colSpan={7} className="py-6 text-center text-gray-500">
                   {isDeletedView ? "No deleted templates found." : "No templates found."}
                 </td>
               </tr>
@@ -602,16 +577,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                     {USER_TYPE_OPTIONS.find((o) => o.value === row.shopType)?.label ?? row.shopType}
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.usedBy}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
-                    {row.imageUrl ? (
-                      <ClipImageHover
-                        imageUrl={row.imageUrl}
-                        alt={`Attachment for ${row.templateName || row.url}`}
-                      />
-                    ) : (
-                      <span className="text-gray-500">--</span>
-                    )}
-                  </td>
                 </tr>
               ))
             )}

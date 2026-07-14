@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
-import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import AdminPage from "../../../components/admin/AdminPage";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
@@ -280,12 +280,6 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
     setEditingId(null);
   };
 
-  const openAdd = () => {
-    resetForm();
-    setShowSearchCard(false);
-    setShowForm(true);
-  };
-
   const openEdit = (row: TemplateRow) => {
     setDate(row.date);
     setCountry(row.country);
@@ -410,7 +404,6 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Inv - Temp" : "Inv - Temp"}
-      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showSearchCard ? (
           <AdminSearchCard
@@ -556,7 +549,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Search
+            Filters
           </button>
         </div>
       </div>
@@ -579,7 +572,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -615,7 +608,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                     className="accent-ad-purple"
                   />
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-center">
+                <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">
                   {!isDeletedView ? (
                     <button
                       type="button"

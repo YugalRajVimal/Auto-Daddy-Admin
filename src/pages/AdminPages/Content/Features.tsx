@@ -517,7 +517,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Search
+            Filters
           </button>
         </div>
       </div>
@@ -543,7 +543,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
         {loading ? (
           <div className="p-4 text-center text-gray-600">Loading...</div>
         ) : (
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-collapse text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-ad-purple text-white">
                 <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -592,7 +592,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                     <td className="border border-gray-300 px-3 py-2 text-center">
                       {USER_OPTIONS.find((o) => o.value === row.user)?.label ?? row.user}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{row.feature}</td>
+                    <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.feature}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center">
                       {row.imageUrl ? (
                         <ClipImageHover

@@ -3,6 +3,12 @@ import type { ChangeEvent } from "react";
 import axios from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import {
   CompactAutoGrowTextarea,
   CompactField,
@@ -113,15 +119,32 @@ const PROVIDER_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-const DOMAIN_HEADINGS = [
-  { value: "all", label: "Select Heading" },
-  { value: "userType", label: "User Type" },
-  { value: "userName", label: "User Name" },
-  { value: "domain", label: "Domain" },
-  { value: "domainType", label: "Domain Type" },
-  { value: "expiry", label: "Expiry" },
-  { value: "providerLabel", label: "Provider" },
-  { value: "dns", label: "DNS" },
+const DOMAIN_SEARCH_FIELDS: AdminSearchField[] = [
+  {
+    key: "userType",
+    label: "User Type",
+    type: "select",
+    options: USER_TYPE_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
+  },
+  { key: "userName", label: "User Name" },
+  { key: "domain", label: "Domain" },
+  {
+    key: "domainType",
+    label: "Domain Type",
+    type: "select",
+    options: [
+      { value: "New", label: "New" },
+      { value: "Existing", label: "Existing" },
+    ],
+  },
+  { key: "expiry", label: "Expiry", type: "date" },
+  {
+    key: "provider",
+    label: "Provider",
+    type: "select",
+    options: PROVIDER_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
+  },
+  { key: "dns", label: "DNS" },
 ];
 
 const API_URL = import.meta.env.VITE_API_URL 
@@ -279,7 +302,9 @@ export default function Domain() {
   const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [heading, setHeading] = useState("all");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(DOMAIN_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(DOMAIN_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -291,6 +316,10 @@ export default function Domain() {
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    const empty = emptyAdminSearchValues(DOMAIN_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
@@ -392,6 +421,7 @@ export default function Domain() {
     setActiveCarOwner(null);
     setViewingOwner(owner);
     setShowForm(false);
+    setShowSearchCard(false);
     resetForm();
   };
 
@@ -407,6 +437,7 @@ export default function Domain() {
     setActiveOwner(owner ?? null);
     setActiveCarOwner(carOwner ?? null);
     setViewingOwner(null);
+    setShowSearchCard(false);
     setFormMode("CREATE");
     setForm({
       ...EMPTY_DOMAIN_FORM,
@@ -448,6 +479,7 @@ export default function Domain() {
       dns: row.dns === "—" ? "" : row.dns,
     });
     setShowForm(true);
+    setShowSearchCard(false);
     setViewingOwner(null);
     setDomainsError(null);
   };
@@ -664,6 +696,7 @@ export default function Domain() {
   const filteredDomainRows = visibleDomains.filter((row) => {
     const q = search.toLowerCase();
     const matchesSearch =
+      !q ||
       userTypeLabel(row.userType).toLowerCase().includes(q) ||
       row.userName.toLowerCase().includes(q) ||
       row.domain.toLowerCase().includes(q) ||
@@ -673,10 +706,16 @@ export default function Domain() {
       row.dns.toLowerCase().includes(q);
 
     if (!matchesSearch) return false;
-    if (heading === "all" || !q) return true;
 
-    const fieldValue = String(row[heading as keyof DomainRow] ?? "").toLowerCase();
-    return fieldValue.includes(q);
+    return (
+      searchEquals(userTypeLabel(row.userType), searchFilters.userType) &&
+      searchIncludes(row.userName, searchFilters.userName) &&
+      searchIncludes(row.domain, searchFilters.domain) &&
+      searchEquals(domainTypeLabel(row.domainType), searchFilters.domainType) &&
+      searchIncludes(toDateInputValue(row.expiryRaw) || row.expiry, searchFilters.expiry) &&
+      searchEquals(row.providerLabel, searchFilters.provider) &&
+      searchIncludes(row.dns, searchFilters.dns)
+    );
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredDomainRows.length / entriesPerPage));
@@ -748,6 +787,27 @@ export default function Domain() {
 
   const handleAddNew = () => {
     openAddForm();
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setViewingOwner(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(DOMAIN_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   // --- 11. User options for form select
@@ -834,7 +894,7 @@ export default function Domain() {
         </td>
         <td className="border border-gray-300 px-3 py-2 text-center">{row.expiry}</td>
         <td className="border border-gray-300 px-3 py-2 text-center">{row.providerLabel}</td>
-        <td className="border border-gray-300 px-3 py-2 text-center max-w-[200px] truncate" title={row.dns}>
+        <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
           {row.dns}
         </td>
         <td className="border border-gray-300 px-3 py-2 text-center">
@@ -966,7 +1026,7 @@ export default function Domain() {
         )}
 
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-collapse text-sm whitespace-nowrap">
             {domainTableHead}
             <tbody>
               {renderDomainTableBody(
@@ -1148,7 +1208,20 @@ export default function Domain() {
       </CompactFormPanel>
     ) : undefined;
 
-  const betweenPanel = showForm ? adFormPanel : ownerViewPanel;
+  const betweenPanel = showSearchCard ? (
+    <AdminSearchCard
+      fields={DOMAIN_SEARCH_FIELDS}
+      values={searchDraft}
+      onChange={setSearchDraft}
+      onSearch={handleSearchCardSearch}
+      onReset={handleSearchCardReset}
+      onClose={() => setShowSearchCard(false)}
+    />
+  ) : showForm ? (
+    adFormPanel
+  ) : (
+    ownerViewPanel
+  );
 
   // --- 16. Toolbar, table, pagination ---
   const toolbar = (
@@ -1216,17 +1289,15 @@ export default function Domain() {
           placeholder="Live Search here"
           className="border border-gray-400 bg-white px-2 py-1 text-xs"
         />
-        <select
-          value={heading}
-          onChange={(e) => setHeading(e.target.value)}
-          className="border border-gray-400 bg-gray-500 px-2 py-1 text-xs font-medium text-white"
+        <button
+          type="button"
+          onClick={openSearchCard}
+          className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+            showSearchCard ? "bg-gray-700" : "bg-gray-500"
+          }`}
         >
-          {DOMAIN_HEADINGS.map((h) => (
-            <option key={h.value} value={h.value}>
-              {h.label}
-            </option>
-          ))}
-        </select>
+          Filters
+        </button>
       </div>
     </div>
   );
@@ -1365,7 +1436,7 @@ export default function Domain() {
       {toolbar}
       {entriesControl}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           {domainTableHead}
           <tbody>
             {renderDomainTableBody(

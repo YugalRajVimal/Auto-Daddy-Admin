@@ -163,12 +163,7 @@ const RunningDeals: React.FC = () => {
         key: "description",
         label: "Description",
         render: (deal: RunningDeal) =>
-          tableCell(
-            <span title={deal.description}>
-              {deal.description.length > 70 ? `${deal.description.slice(0, 67)}...` : deal.description}
-            </span>,
-            { maxWidth: 260 }
-          ),
+          tableCell(deal.description || "-", undefined, { wrap: true }),
         exportValue: (deal: RunningDeal) => deal.description,
       },
       {

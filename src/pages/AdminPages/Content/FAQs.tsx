@@ -439,7 +439,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Search
+            Filters
           </button>
         </div>
       </div>
@@ -462,7 +462,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -509,8 +509,8 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                   <td className="border border-gray-300 px-3 py-2 text-center">
                     {row.date ? new Date(row.date).toISOString().slice(0, 10) : ""}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.question}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.answer}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[220px]">{row.question}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[280px]">{row.answer}</td>
                 </tr>
               ))
             )}

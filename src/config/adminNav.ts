@@ -113,6 +113,12 @@ export const adminUtilityNav: NavSubItem[] = [
   { name: "Manage Admin", path: "/admin/subadmins", permissionModule: "subAdminManagement" },
 ];
 
+/** Sub-header tabs for the notification bell (/admin/messages/*). */
+export const adminMessagesNav: NavSubItem[] = [
+  { name: "Notifications Sent", path: "/admin/messages/sent", permissionModule: "inviteHelp" },
+  { name: "Messages Received", path: "/admin/messages/received", permissionModule: "inviteHelp" },
+];
+
 /* ── Legacy nav items (commented out — routes still reachable by URL) ──
 export const legacyPrimaryNav: NavItem[] = [
   {

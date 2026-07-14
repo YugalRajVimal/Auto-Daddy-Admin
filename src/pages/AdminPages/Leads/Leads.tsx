@@ -616,7 +616,7 @@
 // //       </div>
 
 // //       <div className="overflow-x-auto">
-// //         <table className="w-full border-collapse text-sm">
+// //         <table className="w-full border-collapse text-sm whitespace-nowrap">
 // //           <thead>
 // //             <tr className="bg-ad-purple text-white">
 // //               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -1414,7 +1414,7 @@
 //       </div>
 
 //       <div className="overflow-x-auto">
-//         <table className="w-full border-collapse text-sm">
+//         <table className="w-full border-collapse text-sm whitespace-nowrap">
 //           <thead>
 //             <tr className="bg-ad-purple text-white">
 //               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -1668,7 +1668,7 @@ function uiStatusToApi(status: LeadStatus): LeadApiStatus {
   return "Pending";
 }
 
-const DEFAULT_NOTES = "Lead notes and follow-up details.";
+const DEFAULT_NOTES = "";
 
 type LeadSection = "all" | "visited" | "completed";
 
@@ -1936,14 +1936,19 @@ export default function LeadsPage({
   };
 
   const handleSave = async () => {
+    if (!date.trim() || !name.trim() || !phone.trim() || !city.trim()) {
+      adminNotify.error("Please fill Date, Name, Phone, and City.");
+      return;
+    }
+
     const basePayload = {
-      date,
-      name,
-      phone,
-      city,
-      email,
-      website,
-      notes,
+      date: date.trim(),
+      name: name.trim(),
+      phone: phone.trim(),
+      city: city.trim(),
+      email: email.trim() || undefined,
+      website: website.trim() || undefined,
+      notes: notes.trim() || undefined,
       sentTo: sentTo || null,
     };
 
@@ -1993,9 +1998,9 @@ export default function LeadsPage({
           name: lead.name,
           phone: lead.phone,
           city: lead.city,
-          email: lead.email,
-          website: lead.website,
-          notes: lead.notes,
+          email: lead.email?.trim() || undefined,
+          website: lead.website?.trim() || undefined,
+          notes: lead.notes?.trim() || undefined,
           sentTo: lead.sentTo,
           status: uiStatusToApi(lead.status),
         });
@@ -2411,7 +2416,7 @@ export default function LeadsPage({
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Search
+            Filters
           </button>
         </div>
       </div>
@@ -2434,7 +2439,7 @@ export default function LeadsPage({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -2495,7 +2500,7 @@ export default function LeadsPage({
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.city}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.email}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.website}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.notes}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.notes}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.sentTo || "-"}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center capitalize">{row.status || "-"}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">

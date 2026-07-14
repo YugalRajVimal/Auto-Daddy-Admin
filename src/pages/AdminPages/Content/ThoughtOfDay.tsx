@@ -13,11 +13,33 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import AdminSearchCard, {
+  emptyAdminSearchValues,
+  searchEquals,
+  searchIncludes,
+  type AdminSearchField,
+} from "../../../components/admin/AdminSearchCard";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
 // Utility to get backend API endpoint
 const API_BASE = (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/admin/common` : "/api");
+
+const THOUGHT_SEARCH_FIELDS: AdminSearchField[] = [
+  { key: "date", label: "Date", type: "date" },
+  {
+    key: "country",
+    label: "Country",
+    type: "select",
+    options: [
+      { value: "India", label: "India" },
+      { value: "Canada", label: "Canada" },
+      { value: "USA", label: "USA" },
+    ],
+  },
+  { key: "subject", label: "Subject" },
+  { key: "notes", label: "Notes" },
+];
 
 // NoteRow type remains the same
 type NoteRow = {
@@ -48,8 +70,9 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
-  const [searchCountry, setSearchCountry] = useState("");
-  const [searchDate, setSearchDate] = useState("");
+  const [showSearchCard, setShowSearchCard] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(THOUGHT_SEARCH_FIELDS));
+  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(THOUGHT_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -67,8 +90,10 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setPage(1);
     setSelected(new Set());
     setSearch("");
-    setSearchCountry("");
-    setSearchDate("");
+    const empty = emptyAdminSearchValues(THOUGHT_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setShowSearchCard(false);
   };
 
   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
@@ -81,23 +106,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
 
   // ---------- Data Fetching ----------
   useEffect(() => {
-    let url = `${API_BASE}/thought-of-the-day`;
-    const params: Record<string, string> = {};
-
-    // Add country/date filter logic
-    if (searchCountry.trim()) params.country = searchCountry;
-    if (searchDate.trim()) params.date = searchDate;
-    if (search.trim()) {
-      if (search.match(/^\d{4}-\d{2}-\d{2}$/)) params.date = search;
-      else params.subject = search;
-    }
-
-    const query = Object.entries(params)
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join("&");
-    if (query) url += `?${query}`;
-
-    fetch(url)
+    fetch(`${API_BASE}/thought-of-the-day`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`Failed to fetch: ${r.statusText}`);
         const data = await r.json();
@@ -119,28 +128,30 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
       .catch(() => {
         setNotes([]);
       });
-    // eslint-disable-next-line
-  }, [search, searchCountry, searchDate]);
+  }, []);
 
   // Utility to get key string for any row (string id: _id or id)
   const getRowKey = (row: NoteRow) => (row._id ? String(row._id) : String(row.id ?? ''));
 
   const findNoteByKey = (key: string) => notes.find((n) => getRowKey(n) === key);
 
-  // Simple frontend filtering for the demo, but prioritize BACKEND filters for date/country/subject (above)
-  const filtered = displayNotes.filter(
-    (n) =>
-      (!searchCountry || n.country.toLowerCase().includes(searchCountry.toLowerCase())) &&
-      (!searchDate || n.date.includes(searchDate)) &&
-      (
-        search === "" ||
-        n.date.includes(search) ||
-        n.subject.toLowerCase().includes(search.toLowerCase()) ||
-        (n.notes ?? "").toLowerCase().includes(search.toLowerCase()) ||
-        n.country.toLowerCase().includes(search.toLowerCase()) ||
-        String(n.likes ?? 0).includes(search)
-      )
-  );
+  const filtered = displayNotes.filter((n) => {
+    const live =
+      !search.trim() ||
+      n.date.includes(search) ||
+      n.subject.toLowerCase().includes(search.toLowerCase()) ||
+      (n.notes ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      n.country.toLowerCase().includes(search.toLowerCase()) ||
+      String(n.likes ?? 0).includes(search);
+    if (!live) return false;
+    const dateStr = n.date ? String(n.date).slice(0, 10) : "";
+    return (
+      searchIncludes(dateStr, searchFilters.date) &&
+      searchEquals(n.country, searchFilters.country) &&
+      searchIncludes(n.subject, searchFilters.subject) &&
+      searchIncludes(n.notes, searchFilters.notes)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -173,6 +184,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
 
   const openAdd = () => {
     resetForm();
+    setShowSearchCard(false);
     setShowForm(true);
   };
 
@@ -184,8 +196,30 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setAttachImage(Boolean(row.imageUrl));
     setImageFile(null);
     setEditingKey(getRowKey(row));
+    setShowSearchCard(false);
     setShowForm(true);
     setPreviewImageUrl(typeof row.imageUrl === "string" ? row.imageUrl : null);
+  };
+
+  const openSearchCard = () => {
+    setShowForm(false);
+    setEditingKey(null);
+    setSearchDraft({ ...searchFilters });
+    setShowSearchCard((open) => !open);
+  };
+
+  const handleSearchCardSearch = () => {
+    setSearchFilters({ ...searchDraft });
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const handleSearchCardReset = () => {
+    const empty = emptyAdminSearchValues(THOUGHT_SEARCH_FIELDS);
+    setSearchDraft(empty);
+    setSearchFilters(empty);
+    setPage(1);
+    setSelected(new Set());
   };
 
   const handleCancel = () => {
@@ -334,10 +368,19 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     <AdminPage
       title={isDeletedView ? "Deleted Today's Tips" : "Today's Tip"}
       headerAction={
-        !showForm && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined
+        !showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined
       }
       between={
-        showForm ? (
+        showSearchCard ? (
+          <AdminSearchCard
+            fields={THOUGHT_SEARCH_FIELDS}
+            values={searchDraft}
+            onChange={setSearchDraft}
+            onSearch={handleSearchCardSearch}
+            onReset={handleSearchCardReset}
+            onClose={() => setShowSearchCard(false)}
+          />
+        ) : showForm ? (
           <CompactFormPanel
             footer={
               <CompactFormFooter
@@ -373,7 +416,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   <option value="USA">USA</option>
                 </select>
               </CompactField>
-              <CompactField label="Title" required className={compactFixedFieldWidth}>
+              <CompactField label="Subject" required className={compactFixedFieldWidth}>
                 <input
                   type="text"
                   value={title}
@@ -504,37 +547,18 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Subject or free search"
+            placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
-          <input
-            type="text"
-            value={searchCountry}
-            onChange={e => {
-              setSearchCountry(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Filter by Country"
-            className="border border-gray-400 bg-white px-2 py-1 text-xs"
-            style={{ minWidth: 100 }}
-            list="country-suggestions"
-          />
-          <datalist id="country-suggestions">
-            <option>India</option>
-            <option>Canada</option>
-            <option>USA</option>
-          </datalist>
-          <input
-            type="date"
-            value={searchDate}
-            onChange={e => {
-              setSearchDate(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Filter by Date"
-            className="border border-gray-400 bg-white px-2 py-1 text-xs"
-            style={{ minWidth: 120 }}
-          />
+          <button
+            type="button"
+            onClick={openSearchCard}
+            className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
+              showSearchCard ? "bg-gray-700" : "bg-gray-500"
+            }`}
+          >
+            Filters
+          </button>
         </div>
       </div>
 
@@ -557,7 +581,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
               <th className="border border-ad-purple-dark px-2 py-2 text-center">
@@ -606,8 +630,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   </button>
                 </td>
                 <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
-                <td className="border border-gray-300 px-3 py-2 text-center" style={{ width: "26%" }}>{row.subject}</td>
-                <td className="border border-gray-300 px-3 py-2 text-center" style={{ width: "36%" }}>{row.notes}</td>
+                <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]" style={{ width: "26%" }}>{row.subject}</td>
+                <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]" style={{ width: "36%" }}>{row.notes}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">{row.likes ?? 0}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {(row.imageUrl || row.image) ? (

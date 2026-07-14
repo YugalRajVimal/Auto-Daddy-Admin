@@ -73,10 +73,11 @@ const ALL_COLUMNS = [
   { key: "businessName", label: "Business Name" },
   { key: "shopType", label: "Shop Type" },
   { key: "city", label: "City" },
+  { key: "customers", label: "No. of Customers" },
   { key: "dealsPosted", label: "Deals Posted" },
   { key: "email", label: "Email" },
 ];
-const DEFAULT_VISIBLE = ["date", "phone", "businessName", "shopType", "city", "dealsPosted", "email"];
+const DEFAULT_VISIBLE = ["date", "phone", "businessName", "shopType", "city", "customers", "dealsPosted", "email"];
 
 const AUTO_SHOP_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "date", label: "Date", type: "date" },
@@ -94,6 +95,7 @@ const AUTO_SHOP_SEARCH_FIELDS: AdminSearchField[] = [
     ],
   },
   { key: "city", label: "City" },
+  { key: "customers", label: "No. of Customers" },
   { key: "dealsPosted", label: "Deals Posted" },
   { key: "email", label: "Email" },
 ];
@@ -363,6 +365,10 @@ function exportCsv(owners: AutoShopOwnerType[], visibleCols: string[]) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+function ownerCustomersCount(owner: AutoShopOwnerType): number {
+  return owner.myCustomers?.length ?? 0;
+}
+
 function autoShopOwnerPrintColMap(): Record<string, (o: AutoShopOwnerType) => string> {
   return {
     phone: o => `${o.countryCode ?? ""} ${o.phone ?? ""}`.trim() || "-",
@@ -370,6 +376,7 @@ function autoShopOwnerPrintColMap(): Record<string, (o: AutoShopOwnerType) => st
     shopType: o => SHOP_TYPE_OPTIONS.find(x => x.value === ownerShopType(o))?.label || "-",
     city: o => o.businessProfile?.city || "-",
     date: o => fmtDate(o.createdAt),
+    customers: o => String(ownerCustomersCount(o)),
     dealsPosted: o => String(ownerDealsList(o).length),
     email: o => o.email || o.businessProfile?.businessEmail || "-",
   };
@@ -739,6 +746,7 @@ const AutoShopOwners: React.FC = () => {
     const phone = `${o.countryCode ? `${o.countryCode} ` : ""}${o.phone || ""}`;
     const businessName = o.businessProfile?.businessName || o.name || "";
     const city = o.businessProfile?.city || "";
+    const customers = String(ownerCustomersCount(o));
     const dealsPosted = String(ownerDealsList(o).length);
     const live =
       !q ||
@@ -757,6 +765,7 @@ const AutoShopOwners: React.FC = () => {
       searchIncludes(businessName, searchFilters.businessName) &&
       searchEquals(shopTypeLabel, searchFilters.shopType) &&
       searchIncludes(city, searchFilters.city) &&
+      searchIncludes(customers, searchFilters.customers) &&
       searchIncludes(dealsPosted, searchFilters.dealsPosted) &&
       searchIncludes(o.email || "", searchFilters.email)
     );
@@ -854,6 +863,18 @@ const AutoShopOwners: React.FC = () => {
         );
       case "city":
         return <td key={key} className={tdClass}>{owner.businessProfile?.city || "-"}</td>;
+      case "customers": {
+        const count = ownerCustomersCount(owner);
+        return (
+          <td key={key} className={tdClass}>
+            {count > 0 ? (
+              <button type="button" onClick={() => setCustomersFor(owner)} className={linkClass}>{count}</button>
+            ) : (
+              "0"
+            )}
+          </td>
+        );
+      }
       case "dealsPosted": {
         const count = ownerDealsList(owner).length;
         return (
@@ -978,7 +999,7 @@ const AutoShopOwners: React.FC = () => {
                 showSearchCard ? "bg-gray-700" : "bg-gray-500"
               }`}
             >
-              Search
+              Filters
             </button>
           </div>
         </div>
@@ -997,103 +1018,111 @@ const AutoShopOwners: React.FC = () => {
           <span>entries</span>
         </div>
 
-        {loading && <div className="py-10 text-center text-sm text-gray-500">Loading shop owners…</div>}
         {error && <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">Error: {error}</div>}
 
-        {!loading && !error && (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-ad-purple text-white">
-                  <th className="border border-ad-purple-dark px-2 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      checked={allPageSel}
-                      onChange={(e) => {
-                        setSelectedRows((prev) => {
-                          const c = new Set(prev);
-                          paginated.forEach((o) => (e.target.checked ? c.add(o._id) : c.delete(o._id)));
-                          return c;
-                        });
-                      }}
-                      className="accent-white"
-                    />
-                  </th>
-                  {visibleColumns.map((c) => (
-                    <th key={c.key} className={thClass}>{c.label}</th>
-                  ))}
-                  {viewMode === "active" && <th className={thClass}>Action</th>}
-                  {viewMode === "deleted" && <th className={thClass}>Restore</th>}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm whitespace-nowrap">
+            <thead>
+              <tr className="bg-ad-purple text-white">
+                <th className="border border-ad-purple-dark px-2 py-2 text-center">
+                  <input
+                    type="checkbox"
+                    checked={allPageSel}
+                    onChange={(e) => {
+                      setSelectedRows((prev) => {
+                        const c = new Set(prev);
+                        paginated.forEach((o) => (e.target.checked ? c.add(o._id) : c.delete(o._id)));
+                        return c;
+                      });
+                    }}
+                    className="accent-white"
+                  />
+                </th>
+                {visibleColumns.map((c) => (
+                  <th key={c.key} className={thClass}>{c.label}</th>
+                ))}
+                {viewMode === "active" && <th className={thClass}>Action</th>}
+                {viewMode === "deleted" && <th className={thClass}>Restore</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                    Loading shop owners…
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 ? (
-                  <tr>
-                    <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
-                      {viewMode === "deleted" ? "No deleted auto shop owners." : "No auto shop owners found."}
-                    </td>
-                  </tr>
-                ) : (
-                  paginated.map((owner, idx) => {
-                    const isSuspended = !!owner.isDisabled;
-                    const busy = !!actionBusy[owner._id];
-                    return (
-                      <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                        <td className="border border-gray-300 px-2 py-2 text-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedRows.has(owner._id)}
-                            onChange={() => toggleRow(owner._id)}
-                            className="accent-ad-purple"
-                          />
-                        </td>
-                        {visibleColumns.map((c) => renderCell(owner, c.key))}
-                        {viewMode === "active" && (
-                          <td className={`${tdClass} text-center whitespace-nowrap`}>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => toggleSuspend(owner._id, !isSuspended)}
-                                className="rounded px-2 py-0.5 text-xs font-semibold disabled:opacity-60"
-                                style={{ background: isSuspended ? "#dff0d8" : "#fcf8e3", color: isSuspended ? "#3c763d" : "#8a6d3b" }}
-                              >
-                                {busy ? "…" : isSuspended ? "Enable" : "Suspend"}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => deleteOwner(owner._id)}
-                                className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 disabled:opacity-60"
-                              >
-                                {busy ? "…" : "Delete"}
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                        {viewMode === "deleted" && (
-                          <td className={tdClass}>
+              ) : error ? (
+                <tr>
+                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                    Unable to load auto shop owners.
+                  </td>
+                </tr>
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                    {viewMode === "deleted" ? "No deleted auto shop owners." : "No auto shop owners found."}
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((owner, idx) => {
+                  const isSuspended = !!owner.isDisabled;
+                  const busy = !!actionBusy[owner._id];
+                  return (
+                    <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                      <td className="border border-gray-300 px-2 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.has(owner._id)}
+                          onChange={() => toggleRow(owner._id)}
+                          className="accent-ad-purple"
+                        />
+                      </td>
+                      {visibleColumns.map((c) => renderCell(owner, c.key))}
+                      {viewMode === "active" && (
+                        <td className={`${tdClass} text-center whitespace-nowrap`}>
+                          <div className="flex items-center gap-1">
                             <button
                               type="button"
                               disabled={busy}
-                              onClick={() => reviveOwner(owner._id)}
-                              className="rounded bg-ad-green px-2 py-0.5 text-xs font-semibold text-white disabled:opacity-60"
+                              onClick={() => toggleSuspend(owner._id, !isSuspended)}
+                              className="rounded px-2 py-0.5 text-xs font-semibold disabled:opacity-60"
+                              style={{ background: isSuspended ? "#dff0d8" : "#fcf8e3", color: isSuspended ? "#3c763d" : "#8a6d3b" }}
                             >
-                              {busy ? "…" : "Restore"}
+                              {busy ? "…" : isSuspended ? "Enable" : "Suspend"}
                             </button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => deleteOwner(owner._id)}
+                              className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 disabled:opacity-60"
+                            >
+                              {busy ? "…" : "Delete"}
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                      {viewMode === "deleted" && (
+                        <td className={tdClass}>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => reviveOwner(owner._id)}
+                            className="rounded bg-ad-green px-2 py-0.5 text-xs font-semibold text-white disabled:opacity-60"
+                          >
+                            {busy ? "…" : "Restore"}
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        {!loading && !error && (
-          <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between">
             <div className="flex gap-1">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <button
@@ -1126,7 +1155,6 @@ const AutoShopOwners: React.FC = () => {
               {viewMode === "active" ? "Deleted" : "Active Owners"}
             </button>
           </div>
-        )}
       </AdminPage>
     </>
   );

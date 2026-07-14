@@ -105,16 +105,34 @@ const CAR_OWNER_SEARCH_FIELDS: AdminSearchField[] = [
 const API = () => import.meta.env.VITE_API_URL || "";
 const UPLOADS = () => import.meta.env.VITE_UPLOADS_URL || "";
 function mediaUrl(path?: string): string {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  return `${UPLOADS()}/${path.replace(/^\/+/, "")}`;
+  if (!path || !String(path).trim()) return "";
+  const p = String(path).trim();
+  if (p.startsWith("http://") || p.startsWith("https://") || p.startsWith("blob:") || p.startsWith("data:")) {
+    return p;
+  }
+  const base = (UPLOADS() || API()).replace(/\/+$/, "");
+  return `${base}/${p.replace(/^\/+/, "")}`;
 }
 function ownerProfileImg(o: CarOwnerType): string {
-  return mediaUrl(o.profilePhoto ?? o.profileImage ?? "");
+  const raw = o as Record<string, unknown>;
+  const candidates = [
+    o.profilePhoto,
+    o.profileImage,
+    typeof raw.avatar === "string" ? raw.avatar : "",
+    typeof raw.photo === "string" ? raw.photo : "",
+    typeof raw.image === "string" ? raw.image : "",
+  ];
+  for (const candidate of candidates) {
+    const url = mediaUrl(candidate || "");
+    if (url) return url;
+  }
+  return "";
 }
 function fmtDate(d?: string): string {
   if (!d) return "-";
-  return new Date(d).toISOString().slice(0, 10);
+  const parsed = new Date(d);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return parsed.toISOString().slice(0, 10);
 }
 function getMakeName(v: VehicleType): string {
   if (!v.make) return "-";
@@ -137,6 +155,7 @@ const VEHICLE_DOC_FIELDS: { key: string; label: string }[] = [
   { key: "insuranceCertificate", label: "Insurance certificate" },
   { key: "drivingLicenseFront", label: "Driving license (front)" },
   { key: "drivingLicenseBack", label: "Driving license (back)" },
+  { key: "carImage", label: "Vehicle photo" },
 ];
 
 function pushDoc(docs: OwnerDocumentItem[], label: string, path?: string | null) {
@@ -146,40 +165,50 @@ function pushDoc(docs: OwnerDocumentItem[], label: string, path?: string | null)
   docs.push({ label, url });
 }
 
+function collectDocsFromRecord(docs: OwnerDocumentItem[], item: unknown, index: number, plateSuffix = "") {
+  if (typeof item === "string") {
+    pushDoc(docs, `Document ${index + 1}${plateSuffix}`, item);
+    return;
+  }
+  if (!item || typeof item !== "object") return;
+  const rec = item as Record<string, unknown>;
+  const path =
+    (typeof rec.url === "string" && rec.url) ||
+    (typeof rec.path === "string" && rec.path) ||
+    (typeof rec.document === "string" && rec.document) ||
+    (typeof rec.file === "string" && rec.file) ||
+    "";
+  const label =
+    (typeof rec.label === "string" && rec.label) ||
+    (typeof rec.name === "string" && rec.name) ||
+    (typeof rec.type === "string" && rec.type) ||
+    `Document ${index + 1}`;
+  pushDoc(docs, `${label}${plateSuffix}`, path);
+  for (const field of VEHICLE_DOC_FIELDS) {
+    const value = rec[field.key];
+    if (typeof value === "string") pushDoc(docs, `${field.label}${plateSuffix}`, value);
+  }
+}
+
 function ownerDocuments(owner: CarOwnerType): OwnerDocumentItem[] {
   const docs: OwnerDocumentItem[] = [];
   const raw = owner.documents;
   if (Array.isArray(raw)) {
-    raw.forEach((item, i) => {
-      if (typeof item === "string") {
-        pushDoc(docs, `Document ${i + 1}`, item);
-        return;
-      }
-      if (!item || typeof item !== "object") return;
-      const rec = item as Record<string, unknown>;
-      const path =
-        (typeof rec.url === "string" && rec.url) ||
-        (typeof rec.path === "string" && rec.path) ||
-        (typeof rec.document === "string" && rec.document) ||
-        (typeof rec.file === "string" && rec.file) ||
-        "";
-      const label =
-        (typeof rec.label === "string" && rec.label) ||
-        (typeof rec.name === "string" && rec.name) ||
-        (typeof rec.type === "string" && rec.type) ||
-        `Document ${i + 1}`;
-      pushDoc(docs, label, path);
-      for (const field of VEHICLE_DOC_FIELDS) {
-        const value = rec[field.key];
-        if (typeof value === "string") pushDoc(docs, field.label, value);
-      }
-    });
+    raw.forEach((item, i) => collectDocsFromRecord(docs, item, i));
+  } else if (raw && typeof raw === "object") {
+    collectDocsFromRecord(docs, raw, 0);
   }
   for (const v of owner.myVehicles ?? []) {
     const plate = v.licensePlateNo ? ` (${v.licensePlateNo})` : "";
     for (const field of VEHICLE_DOC_FIELDS) {
       const value = v[field.key];
       if (typeof value === "string") pushDoc(docs, `${field.label}${plate}`, value);
+    }
+    const nested = (v as Record<string, unknown>).documents;
+    if (Array.isArray(nested)) {
+      nested.forEach((item, i) => collectDocsFromRecord(docs, item, i, plate));
+    } else if (nested && typeof nested === "object") {
+      collectDocsFromRecord(docs, nested, 0, plate);
     }
   }
   return docs;
@@ -1245,14 +1274,24 @@ const CarOwners: React.FC = () => {
       case "phone": return <td key={key} className={tdClass}>{owner.phone || "-"}</td>;
       case "email": return <td key={key} className={tdClass}>{owner.email || "-"}</td>;
       case "city": return <td key={key} className={tdClass}>{owner.city || "-"}</td>;
-      case "address": return <td key={key} className={`${tdClass} max-w-[180px] truncate`} title={owner.address}>{owner.address || "-"}</td>;
-      case "date": return <td key={key} className={tdClass}>{fmtDate(owner.createdAt)}</td>;
+      case "address": return <td key={key} className={`${tdClass} whitespace-normal break-words text-left align-top min-w-[240px]`}>{owner.address || "-"}</td>;
+      case "date":
+        return (
+          <td key={key} className={`${tdClass} whitespace-nowrap`}>
+            {fmtDate(owner.createdAt)}
+          </td>
+        );
       case "profilePhoto": {
         const img = ownerProfileImg(owner);
         return (
           <td key={key} className={tdClass}>
             {img ? (
-              <ClipImageHover imageUrl={img} alt={`Profile image for ${owner.name}`} size={20} iconClassName="text-ad-purple" />
+              <ClipImageHover
+                imageUrl={img}
+                alt={`Profile image for ${owner.name}`}
+                size={20}
+                iconClassName="text-ad-purple"
+              />
             ) : (
               "-"
             )}
@@ -1429,7 +1468,7 @@ const CarOwners: React.FC = () => {
                 showSearchCard ? "bg-gray-700" : "bg-gray-500"
               }`}
             >
-              Search
+              Filters
             </button>
           </div>
         </div>
@@ -1448,62 +1487,70 @@ const CarOwners: React.FC = () => {
           <span>entries</span>
         </div>
 
-        {loading && <div className="py-10 text-center text-sm text-gray-500">Loading car owners…</div>}
         {error && <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">Error: {error}</div>}
 
-        {!loading && !error && (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-ad-purple text-white">
-                  <th className="border border-ad-purple-dark px-2 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      checked={allPageSel}
-                      onChange={(e) => {
-                        setSelectedRows((prev) => {
-                          const c = new Set(prev);
-                          paginated.forEach((o) => (e.target.checked ? c.add(o._id) : c.delete(o._id)));
-                          return c;
-                        });
-                      }}
-                      className="accent-white"
-                    />
-                  </th>
-                  {ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => (
-                    <th key={c.key} className={thClass}>{c.label}</th>
-                  ))}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm whitespace-nowrap">
+            <thead>
+              <tr className="bg-ad-purple text-white">
+                <th className="border border-ad-purple-dark px-2 py-2 text-center">
+                  <input
+                    type="checkbox"
+                    checked={allPageSel}
+                    onChange={(e) => {
+                      setSelectedRows((prev) => {
+                        const c = new Set(prev);
+                        paginated.forEach((o) => (e.target.checked ? c.add(o._id) : c.delete(o._id)));
+                        return c;
+                      });
+                    }}
+                    className="accent-white"
+                  />
+                </th>
+                {ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => (
+                  <th key={c.key} className={thClass}>{c.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                    Loading car owners…
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 ? (
-                  <tr>
-                    <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
-                      {showDeleted ? "No deleted car owners found." : "No car owners found."}
+              ) : error ? (
+                <tr>
+                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                    Unable to load car owners.
+                  </td>
+                </tr>
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                    {showDeleted ? "No deleted car owners found." : "No car owners found."}
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((owner, idx) => (
+                  <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                    <td className="border border-gray-300 px-2 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.has(owner._id)}
+                        onChange={() => toggleRow(owner._id)}
+                        className="accent-ad-purple"
+                      />
                     </td>
+                    {ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => renderCell(owner, c.key))}
                   </tr>
-                ) : (
-                  paginated.map((owner, idx) => (
-                    <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                      <td className="border border-gray-300 px-2 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedRows.has(owner._id)}
-                          onChange={() => toggleRow(owner._id)}
-                          className="accent-ad-purple"
-                        />
-                      </td>
-                      {ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => renderCell(owner, c.key))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        {!loading && !error && (
-          <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between">
             <div className="flex gap-1">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <button
@@ -1536,7 +1583,6 @@ const CarOwners: React.FC = () => {
               {showDeleted ? "Active / Inactive Users" : "Deleted"}
             </button>
           </div>
-        )}
       </AdminPage>
     </>
   );
