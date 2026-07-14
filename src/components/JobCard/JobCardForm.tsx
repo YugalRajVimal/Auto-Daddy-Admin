@@ -105,7 +105,14 @@ type ServiceCategory = {
   name?: string;
   desc?: string;
   odoOutRequired?: boolean;
-  subServices: Array<{ name: string; desc?: string; price?: number; odoOutRequired?: boolean }>;
+  subServices: Array<{
+    name: string;
+    desc?: string;
+    price?: number;
+    make?: string;
+    model?: string;
+    odoOutRequired?: boolean;
+  }>;
 };
 
 function defaultInvoiceBankId(banks: AutoshopPageDetailsBank[] = DUMMY_SHOP_BANKS.map((b) => ({
@@ -173,6 +180,44 @@ function vehicleDisplayTitle(vehicle: JobCardFormCustomer["myVehicles"][number] 
   const fromFields = [vehicle.vehicleName, vehicle.model].filter(Boolean).join(" ").trim();
   const brand = typeof vehicle.brand === "string" ? vehicle.brand.trim() : "";
   return fromFields || fromMake || brand;
+}
+
+function vehicleMakeModelKey(vehicle: JobCardFormCustomer["myVehicles"][number] | null): {
+  make: string;
+  model: string;
+} {
+  if (!vehicle) return { make: "", model: "" };
+  const makeObj = vehicle.make && typeof vehicle.make === "object" ? vehicle.make : null;
+  const make = (makeObj?.name ?? vehicle.vehicleName ?? vehicle.brand ?? "").trim().toLowerCase();
+  const model = (makeObj?.model ?? vehicle.model ?? "").trim().toLowerCase();
+  return { make, model };
+}
+
+/** Keep unscoped subs (no make/model) for any vehicle; match scoped ones by make+model. */
+function subServiceMatchesVehicle(
+  sub: { make?: string; model?: string },
+  vehicle: JobCardFormCustomer["myVehicles"][number] | null,
+): boolean {
+  if (!vehicle) return false;
+  const subMake = (sub.make ?? "").trim().toLowerCase();
+  const subModel = (sub.model ?? "").trim().toLowerCase();
+  if (!subMake && !subModel) return true;
+  const { make, model } = vehicleMakeModelKey(vehicle);
+  if (!make || !model) return false;
+  return subMake === make && subModel === model;
+}
+
+function filterCategoriesForVehicle(
+  categories: ServiceCategory[],
+  vehicle: JobCardFormCustomer["myVehicles"][number] | null,
+): ServiceCategory[] {
+  if (!vehicle) return [];
+  return categories
+    .map((cat) => ({
+      ...cat,
+      subServices: (cat.subServices || []).filter((sub) => subServiceMatchesVehicle(sub, vehicle)),
+    }))
+    .filter((cat) => cat.subServices.length > 0);
 }
 
 function calcLinePrice(line: Pick<ServiceLine, "unitPriceStr" | "qtyStr" | "labourCostStr">) {
@@ -520,9 +565,14 @@ export default function JobCardForm({
     [formSelectedVehicle],
   );
 
-  const normalizedCategories = useMemo(
+  const allNormalizedCategories = useMemo(
     () => normalizeServiceCategories(myServices),
     [myServices],
+  );
+
+  const normalizedCategories = useMemo(
+    () => filterCategoriesForVehicle(allNormalizedCategories, formSelectedVehicle),
+    [allNormalizedCategories, formSelectedVehicle],
   );
 
   const categoriesWithSubs = useMemo(
@@ -597,6 +647,7 @@ export default function JobCardForm({
       odometerReading: "",
       dueOdometerReading: "",
     }));
+    setServiceLines([emptyTableLine(mkLineId())]);
     setPhoneLookupOpen(false);
     setPhoneActiveIndex(0);
   }
@@ -739,7 +790,19 @@ export default function JobCardForm({
             const jobPhone = phoneDigits((job.customerId as { phone?: string }).phone);
             if (jobPhone) setCustomerPhone(jobPhone);
           }
-          const cats = normalizeServiceCategories(data.myServices);
+          const loadedVehicleId = String(
+            (typeof job.vehicleId === "object"
+              ? (job.vehicleId as { _id?: string })._id
+              : job.vehicleId) ||
+            (job.vehicle as { _id?: string } | undefined)?._id ||
+            "",
+          );
+          const loadedVehicle =
+            (loadedCustomer?.myVehicles || []).find((v) => v._id === loadedVehicleId) ?? null;
+          const cats = filterCategoriesForVehicle(
+            normalizeServiceCategories(data.myServices),
+            loadedVehicle,
+          );
           const loadedLines = applyJobDueOdometerToLines(
             apiServiceBlocksToLines(services as unknown[], cats),
             cats,
@@ -755,13 +818,7 @@ export default function JobCardForm({
           }
           setForm({
             customerId: loadedCustomerId,
-            vehicleId: String(
-              (typeof job.vehicleId === "object"
-                ? (job.vehicleId as { _id?: string })._id
-                : job.vehicleId) ||
-              (job.vehicle as { _id?: string } | undefined)?._id ||
-              "",
-            ),
+            vehicleId: loadedVehicleId,
             odometerReading: String(job.odoIn ?? job.odometerReading ?? ""),
             dueOdometerReading: String(job.dueOdometerReading ?? ""),
             issueDescription: String(job.issueDescription || ""),
@@ -1136,15 +1193,19 @@ export default function JobCardForm({
                       <select
                         disabled={!form.customerId || formMode === "edit"}
                         value={form.vehicleId}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const vehicleId = e.target.value;
                           setForm((f) => ({
                             ...f,
-                            vehicleId: e.target.value,
+                            vehicleId,
                             ...(formMode === "add"
                               ? { odometerReading: "", dueOdometerReading: "" }
                               : {}),
-                          }))
-                        }
+                          }));
+                          if (formMode === "add") {
+                            setServiceLines([emptyTableLine(mkLineId())]);
+                          }
+                        }}
                         className={META_VALUE_CLASS}
                         aria-label="Vehicle"
                       >
@@ -1196,7 +1257,11 @@ export default function JobCardForm({
             <div className={`mb-3 ${JOB_CARD_TABLE_WRAP_CLASS}`}>
               {categoriesWithSubs.length === 0 ? (
                 <div className="rounded border border-gray-300 p-4 text-center text-sm text-gray-600">
-                  No services configured. Add sub-services under My Services first.
+                  {!form.vehicleId
+                    ? "Select a vehicle to see matching sub-services."
+                    : allNormalizedCategories.some((c) => (c.subServices || []).length > 0)
+                      ? "No sub-services match this vehicle's make and model."
+                      : "No services configured. Add sub-services under My Services first."}
                 </div>
               ) : (
                 <>
@@ -1360,6 +1425,20 @@ export default function JobCardForm({
                     }
                     inputMode="decimal"
                     placeholder="0"
+                    className={`${formCellInputClass} w-16 max-w-[4.5rem] text-right tabular-nums`}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4 py-1">
+                  <span className="font-semibold text-gray-800">Discount</span>
+                  <input
+                    value={form.discount}
+                    disabled={formLoading}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, discount: e.target.value }))
+                    }
+                    inputMode="decimal"
+                    placeholder="0"
+                    aria-label="Discount"
                     className={`${formCellInputClass} w-16 max-w-[4.5rem] text-right tabular-nums`}
                   />
                 </div>

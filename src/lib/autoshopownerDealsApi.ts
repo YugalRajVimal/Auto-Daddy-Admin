@@ -22,6 +22,8 @@ export type AutoshopDealFormFields = {
   vehicleModel?: string;
   vehicleYear?: string;
   dealEnabled?: string;
+  soldToCustomerId?: string;
+  soldToCustomerName?: string;
 };
 
 const BASE = "/api/autoshopowner/autoshop-deals";
@@ -58,6 +60,8 @@ function buildAutoshopDealFormData(fields: AutoshopDealFormFields) {
     fd.append("offerEndsOnDate", formatAutoshopDealOfferEndDate(fields.offersEndOnDate));
   }
   appendText(fd, "dealEnabled", fields.dealEnabled);
+  appendText(fd, "soldToCustomerId", fields.soldToCustomerId);
+  appendText(fd, "soldToCustomerName", fields.soldToCustomerName);
 
   const dealType = fields.dealType ?? "Service";
   if (dealType === "Service") {

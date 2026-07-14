@@ -51,6 +51,9 @@ export type ShopDeal = {
   dealEnabled?: boolean;
   offersEndOnDate?: string;
   createdAt?: string;
+  soldToCustomerId?: string;
+  soldToCustomerName?: string;
+  soldAt?: string;
   serviceId?: string;
   vehicleId?: string;
   service?: { id?: string; name?: string; desc?: string };
@@ -82,7 +85,16 @@ export type ShopServiceCategory = {
   updatedAt?: string;
   isActive?: boolean;
   odoOutRequired?: boolean;
-  subServices: { id?: string; name: string; desc: string; price: number; qty?: number; tax?: number }[];
+  subServices: {
+    id?: string;
+    make?: string;
+    model?: string;
+    name: string;
+    desc: string;
+    price: number;
+    qty?: number;
+    tax?: number;
+  }[];
 };
 
 export type DashboardIncomeBreakdown = {

@@ -10,7 +10,7 @@ type ComboSelectWithEditorProps = {
   placeholder?: string;
   options: string[];
   onChange: (value: string) => void;
-  onEditAddNew: () => void;
+  onEditAddNew?: () => void;
   className?: string;
   inputClassName?: string;
   editButtonClassName?: string;
@@ -112,16 +112,18 @@ export default function ComboSelectWithEditor({
             }}
             className="max-h-52 overflow-hidden rounded border border-gray-400 bg-white shadow-lg"
           >
-            <button
-              type="button"
-              onClick={() => {
-                onEditAddNew();
-                setOpen(false);
-              }}
-              className={editButtonClassName}
-            >
-              + Edit / Add New
-            </button>
+            {onEditAddNew ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onEditAddNew();
+                  setOpen(false);
+                }}
+                className={editButtonClassName}
+              >
+                + Edit / Add New
+              </button>
+            ) : null}
             <div className="max-h-40 overflow-y-auto">
               <button
                 type="button"

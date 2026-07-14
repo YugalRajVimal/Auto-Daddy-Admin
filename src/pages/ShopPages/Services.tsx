@@ -109,6 +109,8 @@ function SubServiceTable({
                   className="h-3.5 w-3.5 accent-ad-purple"
                 />
               </th>
+              <th className={SHOP_TABLE.th}>Make</th>
+              <th className={SHOP_TABLE.th}>Model</th>
               <th className={SHOP_TABLE.th}>Category</th>
               <th className={SHOP_TABLE.th}>Description</th>
               <th className={SHOP_TABLE.th}>Unit Cost</th>
@@ -132,6 +134,8 @@ function SubServiceTable({
                       className="h-3.5 w-3.5 accent-ad-purple"
                     />
                   </td>
+                  <td className={SHOP_TABLE.td}>{sub.make?.trim() || "—"}</td>
+                  <td className={SHOP_TABLE.td}>{sub.model?.trim() || "—"}</td>
                   <td className={SHOP_TABLE.td}>
                     <button
                       type="button"
@@ -350,10 +354,11 @@ export default function ShopServicesPage() {
               </div>
             ) : null}
 
-            <ShopReveal show={formOpen}>
+            <ShopReveal show={formOpen} clipOverflow={false}>
               <ShopServiceSubDialog
                 category={activeCategory}
                 editIndex={editIndex}
+                suggestionCategories={categories}
                 onCancel={closeForm}
                 onSaved={() => handleRefresh()}
               />

@@ -446,7 +446,6 @@ function WalletExpenseForm({
   onChequeAccountChange,
   onAttachReceiptChange,
   onReceiptFileChange,
-  onOpenCategoriesPopup,
   onOpenSubcategoriesPopup,
   onSave,
   onCancel,
@@ -485,7 +484,6 @@ function WalletExpenseForm({
   onChequeAccountChange: (value: string) => void;
   onAttachReceiptChange: (value: boolean) => void;
   onReceiptFileChange: (file: File | null) => void;
-  onOpenCategoriesPopup: () => void;
   onOpenSubcategoriesPopup: () => void;
   onSave: () => void;
   onCancel: () => void;
@@ -559,10 +557,8 @@ function WalletExpenseForm({
           placeholder="Select category"
           options={categoryLabels}
           onChange={onCategoryChange}
-          onEditAddNew={onOpenCategoriesPopup}
           className="min-w-0 flex-1"
           inputClassName={shopCompactInputClass}
-          editButtonClassName={SHOP_COMBO_EDIT_BUTTON_CLASS}
           activeItemClassName={SHOP_COMBO_ACTIVE_ITEM_CLASS}
         />
         <ComboSelectWithEditor
@@ -1170,11 +1166,8 @@ export default function ShopWalletPage() {
   const [expenseChequeAccount, setExpenseChequeAccount] = useState("");
   const [expenseAttachReceipt, setExpenseAttachReceipt] = useState(false);
   const [expenseReceiptFile, setExpenseReceiptFile] = useState<File | null>(null);
-  const [categoriesPopupOpen, setCategoriesPopupOpen] = useState(false);
   const [subcategoriesPopupOpen, setSubcategoriesPopupOpen] = useState(false);
-  const [categoriesDraft, setCategoriesDraft] = useState<string[]>([""]);
   const [subcategoriesDraft, setSubcategoriesDraft] = useState<string[]>([""]);
-  const categoriesSnapshotRef = useRef<CategoryOption[]>([]);
   const subcategoriesSnapshotRef = useRef<{ value: string; label: string }[]>([]);
   const [banks, setBanks] = useState<ShopWalletBankRow[]>(() => [...DUMMY_SHOP_BANKS]);
   const [showBankForm, setShowBankForm] = useState(false);
@@ -1393,51 +1386,6 @@ export default function ShopWalletPage() {
     },
     [expenseSubcategoryOptions],
   );
-
-  const openCategoriesPopup = useCallback(() => {
-    categoriesSnapshotRef.current = cloneCategories(effectiveExpenseCategories);
-    setCategoriesDraft(expenseCategoryLabels.length ? [...expenseCategoryLabels] : [""]);
-    setCategoriesPopupOpen(true);
-  }, [effectiveExpenseCategories, expenseCategoryLabels]);
-
-  const saveCategoriesPopup = useCallback(() => {
-    const labels = dedupeLabels(categoriesDraft);
-    const previousLabels = new Set(expenseCategoryLabels.map((label) => label.toLowerCase()));
-    const newlyAdded = labels.filter((label) => !previousLabels.has(label.toLowerCase()));
-
-    const nextCategories = labels.map((label) => {
-      const existing = effectiveExpenseCategories.find((cat) => cat.label.toLowerCase() === label.toLowerCase());
-      if (existing) return { ...existing, label };
-      let value = slugifyLabel(label);
-      if (effectiveExpenseCategories.some((cat) => cat.value === value)) {
-        value = `${value}-${Date.now()}`;
-      }
-      return { value, label, subcategories: [] };
-    });
-
-    setExpenseCategories(nextCategories);
-
-    if (newlyAdded.length > 0) {
-      const lastAdded = newlyAdded[newlyAdded.length - 1];
-      const match = nextCategories.find((cat) => cat.label.toLowerCase() === lastAdded.toLowerCase());
-      if (match) handleExpenseCategoryChange(match.label);
-    } else if (expenseCategory && !nextCategories.some((cat) => cat.value === expenseCategory)) {
-      handleExpenseCategoryChange(nextCategories[0]?.label ?? "");
-    }
-
-    setCategoriesPopupOpen(false);
-  }, [
-    categoriesDraft,
-    expenseCategory,
-    expenseCategoryLabels,
-    effectiveExpenseCategories,
-    handleExpenseCategoryChange,
-  ]);
-
-  const cancelCategoriesPopup = useCallback(() => {
-    setExpenseCategories(categoriesSnapshotRef.current);
-    setCategoriesPopupOpen(false);
-  }, []);
 
   const openSubcategoriesPopup = useCallback(() => {
     if (!expenseCategory) return;
@@ -2097,22 +2045,10 @@ export default function ShopWalletPage() {
             onChequeAccountChange={setExpenseChequeAccount}
             onAttachReceiptChange={setExpenseAttachReceipt}
             onReceiptFileChange={setExpenseReceiptFile}
-            onOpenCategoriesPopup={openCategoriesPopup}
             onOpenSubcategoriesPopup={openSubcategoriesPopup}
             onSave={handleSaveExpense}
             onCancel={closeExpenseForm}
           />
-          {categoriesPopupOpen ? (
-            <ListEditorPopup
-              title="Edit / Add Categories"
-              items={categoriesDraft}
-              onChange={setCategoriesDraft}
-              onSave={saveCategoriesPopup}
-              onCancel={cancelCategoriesPopup}
-              placeholder="Category name"
-              headerClassName={SHOP_LIST_EDITOR_HEADER_CLASS}
-            />
-          ) : null}
           {subcategoriesPopupOpen ? (
             <ListEditorPopup
               title={`Edit / Add Subcategories${selectedExpenseCategoryLabel ? ` — ${selectedExpenseCategoryLabel}` : ""}`}

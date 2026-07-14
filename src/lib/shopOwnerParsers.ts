@@ -181,6 +181,23 @@ function toDeal(raw: unknown): ShopDeal | null {
     dealEnabled: typeof o.dealEnabled === "boolean" ? o.dealEnabled : undefined,
     offersEndOnDate: s(o.offersEndOnDate) ?? s(o.offerEndsOnDate),
     createdAt: s(o.createdAt) ?? s(o.updatedAt),
+    soldToCustomerId:
+      s(o.soldToCustomerId) ??
+      s(o.soldCustomerId) ??
+      s(o.soldToId) ??
+      (o.soldTo && typeof o.soldTo === "object"
+        ? s((o.soldTo as Record<string, unknown>)._id) ?? s((o.soldTo as Record<string, unknown>).id)
+        : undefined),
+    soldToCustomerName:
+      s(o.soldToCustomerName) ??
+      s(o.soldCustomerName) ??
+      s(o.soldToName) ??
+      (o.soldTo && typeof o.soldTo === "object"
+        ? s((o.soldTo as Record<string, unknown>).name)
+        : typeof o.soldTo === "string"
+          ? s(o.soldTo)
+          : undefined),
+    soldAt: s(o.soldAt) ?? s(o.completedAt),
     serviceId: s(o.servicesId) ?? s(o.serviceId),
     vehicleId: s(o.vehicleId) ?? s(selectedVehicle?.id),
     service:
@@ -266,11 +283,29 @@ export function parseMyServices(payload: unknown): ShopServiceCategory[] {
             : typeof sub.price === "string"
               ? parseFloat(sub.price)
               : 0;
+        const qtyRaw = sub.quantity ?? sub.qty;
+        const qty =
+          typeof qtyRaw === "number"
+            ? qtyRaw
+            : typeof qtyRaw === "string"
+              ? parseFloat(qtyRaw)
+              : undefined;
+        const taxRaw = sub.tax;
+        const tax =
+          typeof taxRaw === "number"
+            ? taxRaw
+            : typeof taxRaw === "string"
+              ? parseFloat(taxRaw)
+              : undefined;
         subServices.push({
           id: s(sub.id) ?? s(sub._id),
+          make: s(sub.make) ?? "",
+          model: s(sub.model) ?? "",
           name,
           desc: s(sub.desc) ?? s(sub.description) ?? "",
           price: Number.isFinite(price) ? price : 0,
+          ...(Number.isFinite(qty) && (qty as number) > 0 ? { qty: qty as number } : {}),
+          ...(Number.isFinite(tax) ? { tax: tax as number } : {}),
         });
       }
     }

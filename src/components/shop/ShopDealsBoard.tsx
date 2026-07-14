@@ -286,7 +286,7 @@ export default function ShopDealsBoard({
   deals: ShopDeal[];
   section: DealSectionId;
   selectedIds: Set<string>;
-  toolbar: ReactNode;
+  toolbar?: ReactNode;
   businessName: string;
   businessPhone: string;
   website?: string;
@@ -301,7 +301,7 @@ export default function ShopDealsBoard({
       transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
       className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
     >
-      {toolbar}
+      {toolbar ?? null}
       <div className="space-y-6 px-3 py-5 sm:px-5 sm:py-6">
         {groups.length === 0 ? (
           <p className="py-10 text-center text-sm text-gray-500">No deals in this category.</p>

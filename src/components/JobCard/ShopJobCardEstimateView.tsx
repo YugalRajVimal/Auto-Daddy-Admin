@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiPrinter } from "react-icons/fi";
+import { FiArrowLeft, FiPrinter } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useAuth from "../../auth/useAuth";
 import { useShopOwnerCallingCode } from "../../hooks/useShopOwnerCallingCode";
@@ -239,11 +239,6 @@ export default function ShopJobCardEstimateView({
   const logoUrl = normalizeMediaUrl(business?.businessLogo);
   const hstNumber = pickBusinessHstNumber(business, job) || "—";
   const alreadyInvoiced = job ? jobCardShowsInvoiceHst(job) : false;
-  const documentTitle = alreadyInvoiced
-    ? "Invoice"
-    : invoicePreview
-      ? "Invoice Preview"
-      : "Job Card";
   const documentNoLabel = alreadyInvoiced || invoicePreview ? "Invoice No. :" : "Job Card No. :";
   const footerNote = invoicePreview && !alreadyInvoiced
     ? "Invoice preview — confirm to convert this job card"
@@ -332,20 +327,12 @@ export default function ShopJobCardEstimateView({
     return (
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            {onBack ? (
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-xs font-semibold text-blue-700 underline hover:text-blue-800"
-              >
-                Back
-              </button>
-            ) : null}
-            <h2 className="truncate text-sm font-bold text-gray-900 sm:text-base">
-              {documentTitle} : {docNo}
-            </h2>
-          </div>
+          {onBack ? (
+            <button type="button" onClick={onBack} className={OUTLINE_BTN_CLASS}>
+              <FiArrowLeft size={13} aria-hidden />
+              Back
+            </button>
+          ) : null}
         </div>
         <ShopListSkeleton variant="profile-table" className="w-full" />
       </div>
@@ -359,21 +346,13 @@ export default function ShopJobCardEstimateView({
   return (
     <div className="space-y-3 print:space-y-0">
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <div className="flex min-w-0 items-center gap-2">
-          {onBack ? (
-            <button
-              type="button"
-              onClick={onBack}
-              className="text-xs font-semibold text-blue-700 underline hover:text-blue-800"
-            >
-              Back
-            </button>
-          ) : null}
-          <h2 className="truncate text-sm font-bold text-gray-900 sm:text-base">
-            {documentTitle} : {docNo}
-          </h2>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+        {onBack ? (
+          <button type="button" onClick={onBack} className={OUTLINE_BTN_CLASS}>
+            <FiArrowLeft size={13} aria-hidden />
+            Back
+          </button>
+        ) : null}
+        <div className={`flex flex-wrap items-center gap-2 ${onBack ? "" : "ml-auto"}`}>
           {showPaymentActions ? (
             invoicePreview && !alreadyInvoiced ? (
               <>
@@ -449,12 +428,15 @@ export default function ShopJobCardEstimateView({
         {isInvoiceDocument ? (
           <div className="mb-4 h-1.5 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6" style={{ backgroundColor: theme.accent }} />
         ) : (
-          <div className="-mx-4 -mt-4 mb-2 sm:-mx-6 sm:-mt-6">
-            <JobCardDocumentHeaderWave />
-          </div>
+          <>
+            <div className="pointer-events-none absolute -inset-x-4 -top-4 sm:-inset-x-6 sm:-top-6">
+              <JobCardDocumentHeaderWave />
+            </div>
+            <div className="-mt-4 mb-2 h-16 shrink-0 sm:h-20" aria-hidden />
+          </>
         )}
 
-        <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="relative z-10 mb-4 flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             {logoUrl ? (
               <img src={logoUrl} alt="" className="h-12 max-w-[8rem] object-contain" />
@@ -480,7 +462,7 @@ export default function ShopJobCardEstimateView({
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="relative z-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="space-y-4 text-sm text-gray-800">
             <div>
               {businessBlock.address ? <p>{businessBlock.address}</p> : null}
@@ -506,7 +488,7 @@ export default function ShopJobCardEstimateView({
           </div>
         </div>
 
-        <div className="mt-5 overflow-x-auto">
+        <div className="relative z-10 mt-5 overflow-x-auto">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
               <tr
@@ -564,7 +546,7 @@ export default function ShopJobCardEstimateView({
           </table>
         </div>
 
-        <div className="mt-4 flex justify-end">
+        <div className="relative z-10 mt-4 flex justify-end">
           <EstimateTotalsBlock
             subtotal={formatEstimateMoney(totals.subtotal, callingCode)}
             hst={formatEstimateMoney(totals.hst, callingCode)}
@@ -580,16 +562,19 @@ export default function ShopJobCardEstimateView({
           />
         </div>
 
-        <p className="mt-6 text-right text-[10px] text-gray-500 print:mt-4">
+        <p className="relative z-10 mt-6 text-right text-[10px] text-gray-500 print:mt-4">
           {footerNote}
         </p>
 
         {isInvoiceDocument ? (
           <div className="mt-4 h-1.5 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6" style={{ backgroundColor: theme.accent }} />
         ) : (
-          <div className="-mx-4 -mb-4 mt-6 sm:-mx-6 sm:-mb-6">
-            <JobCardDocumentWaves />
-          </div>
+          <>
+            <div className="-mb-4 mt-6 h-[7.5rem] shrink-0 sm:h-[9rem]" aria-hidden />
+            <div className="pointer-events-none absolute -inset-x-4 -bottom-4 sm:-inset-x-6 sm:-bottom-6">
+              <JobCardDocumentWaves />
+            </div>
+          </>
         )}
       </div>
     </div>

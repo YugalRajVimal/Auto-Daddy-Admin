@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { FiCheck } from "react-icons/fi";
+import {
+  FiCheck,
+  FiChevronRight,
+  FiGift,
+  FiGlobe,
+  FiLayers,
+} from "react-icons/fi";
 import { toast } from "react-toastify";
 import {
   CompactField,
@@ -51,15 +57,17 @@ import {
 import { redirectToStripeCheckout } from "../../lib/stripe";
 import type { SubscriptionPlanId } from "../../types/websiteSubscription";
 
-type ShopWebsiteSection = "domain" | "templates" | "subscription";
+type ShopWebsiteSection = "overview" | "domain" | "templates" | "subscription";
 
 const WEBSITE_SECTIONS = [
+  { id: "overview", label: "Overview", variant: "primary" as const },
   { id: "domain", label: "Domain Details", variant: "primary" as const },
   { id: "templates", label: "My Website", variant: "primary" as const },
   { id: "subscription", label: "Subscription", variant: "primary" as const },
 ];
 
 const SECTION_TITLES: Record<ShopWebsiteSection, string> = {
+  overview: "Overview",
   domain: "Domain Details",
   templates: "My website",
   subscription: "My website",
@@ -595,6 +603,319 @@ function SubscriptionPlanCard({
   );
 }
 
+function OverviewStatPill({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "neutral" | "success" | "warn" | "muted";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
+      : tone === "warn"
+        ? "bg-amber-50 text-amber-900 ring-amber-200"
+        : tone === "muted"
+          ? "bg-gray-50 text-gray-600 ring-gray-200"
+          : "bg-ad-purple/8 text-ad-purple ring-ad-purple/20";
+  return (
+    <div className={`rounded-lg px-3 py-2 ring-1 ${toneClass}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-bold">{value}</p>
+    </div>
+  );
+}
+
+function OverviewSectionCard({
+  icon,
+  title,
+  subtitle,
+  ready,
+  onOpen,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  subtitle: string;
+  ready: boolean;
+  onOpen: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <article
+      className={`flex w-full flex-col overflow-hidden rounded-xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+        ready
+          ? "border-emerald-200/80 bg-white shadow-sm"
+          : "border-gray-200 bg-white/95 shadow-sm"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`flex w-full items-center gap-3 border-b px-4 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ad-purple/40 ${
+          ready
+            ? "border-emerald-100 bg-gradient-to-r from-emerald-50/80 to-white"
+            : "border-gray-100 bg-gradient-to-r from-[#f8f0fa] to-white"
+        }`}
+      >
+        <span
+          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg ${
+            ready ? "bg-emerald-100 text-emerald-700" : "bg-ad-purple/10 text-ad-purple"
+          }`}
+          aria-hidden
+        >
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-sm font-bold text-gray-900">{title}</h3>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                ready ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {ready ? "Set" : "Pending"}
+            </span>
+          </div>
+          <p className="truncate text-xs text-gray-600">{subtitle}</p>
+        </div>
+        <FiChevronRight
+          className="shrink-0 text-gray-400"
+          aria-hidden
+        />
+      </button>
+      <div className="flex flex-1 flex-col gap-3 p-4">{children}</div>
+    </article>
+  );
+}
+
+function WebsiteOverviewPanel({
+  domain,
+  domainLoading,
+  domainDaysLeft,
+  templateName,
+  templateDesc,
+  templatesLoading,
+  subscriptionStatus,
+  subscriptionLoading,
+  onOpenSection,
+}: {
+  domain: DomainForm;
+  domainLoading?: boolean;
+  domainDaysLeft: number | null;
+  templateName: string;
+  templateDesc: string;
+  templatesLoading?: boolean;
+  subscriptionStatus: SubscriptionStatus | null;
+  subscriptionLoading?: boolean;
+  onOpenSection: (section: Exclude<ShopWebsiteSection, "overview">) => void;
+}) {
+  const hasDomain = Boolean(domain.domainName.trim());
+  const hasTemplate = Boolean(templateName.trim());
+  const hasSubscription = Boolean(subscriptionStatus?.active);
+  const completedCount = [hasDomain, hasTemplate, hasSubscription].filter(Boolean).length;
+  const progressPct = Math.round((completedCount / 3) * 100);
+
+  const subscriptionLabel =
+    subscriptionStatus?.planLabel ||
+    (subscriptionStatus?.active ? "Active subscription" : "No active plan");
+
+  const domainHeadline = hasDomain
+    ? domain.domainName.replace(/^https?:\/\//i, "")
+    : "Add your domain";
+  const templateHeadline = hasTemplate ? templateName : "Choose a template";
+  const subscriptionHeadline = subscriptionLoading
+    ? "Loading…"
+    : hasSubscription
+      ? subscriptionLabel
+      : "Choose a plan";
+
+  return (
+    <div
+      className={`overflow-hidden rounded-xl border border-gray-200 ${shopHeroOpaqueSurfaceClass} bg-white`}
+    >
+      <div className="relative overflow-hidden border-b border-ad-purple/15 bg-gradient-to-br from-[#4b145c] via-ad-purple to-[#7a2f8f] px-5 py-6 text-white sm:px-7 sm:py-7">
+        <div
+          className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-16 left-1/3 h-36 w-36 rounded-full bg-[#f5cce8]/25 blur-2xl"
+          aria-hidden
+        />
+        <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+              My Website
+            </p>
+            <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
+              Your website at a glance
+            </h2>
+            <p className="mt-1.5 max-w-md text-sm leading-relaxed text-white/80">
+              Domain, template, and subscription — everything you need to go live, summarized in one
+              place.
+            </p>
+          </div>
+          <div className="w-full shrink-0 sm:w-44">
+            <div className="flex items-baseline justify-between gap-2 text-xs font-semibold text-white/85">
+              <span>Setup progress</span>
+              <span>
+                {completedCount}/3 · {progressPct}%
+              </span>
+            </div>
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/20">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#FFE566] to-[#f5cce8] transition-[width] duration-500 ease-out"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-3">
+        <OverviewSectionCard
+          icon={<FiGlobe />}
+          title="Domain Details"
+          subtitle={domainLoading ? "Loading domain…" : domainHeadline}
+          ready={hasDomain}
+          onOpen={() => onOpenSection("domain")}
+        >
+          {domainLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full rounded-lg" />
+              <Skeleton className="h-12 w-full rounded-lg" />
+            </div>
+          ) : hasDomain ? (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <OverviewStatPill label="Provider" value={domain.provider.trim() || "—"} />
+                <OverviewStatPill label="Status" value={domain.status.trim() || "—"} />
+                <OverviewStatPill
+                  label="Expiry"
+                  value={domain.expiryDate || "—"}
+                  tone={
+                    domainDaysLeft != null && domainDaysLeft < 30
+                      ? "warn"
+                      : domainDaysLeft != null
+                        ? "success"
+                        : "neutral"
+                  }
+                />
+                <OverviewStatPill
+                  label="Days left"
+                  value={domainDaysLeft != null ? `${domainDaysLeft}` : "—"}
+                  tone={
+                    domainDaysLeft != null && domainDaysLeft < 30
+                      ? "warn"
+                      : domainDaysLeft != null
+                        ? "success"
+                        : "muted"
+                  }
+                />
+              </div>
+              {domain.expiryDate ? (
+                <div className="pt-1">
+                  <DomainExpiryProgress expiryDate={domain.expiryDate} />
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-sm leading-relaxed text-gray-600">
+              Save your domain name, provider, and expiry so customers can find your shop online.
+            </p>
+          )}
+        </OverviewSectionCard>
+
+        <OverviewSectionCard
+          icon={<FiLayers />}
+          title="My Website"
+          subtitle={templatesLoading ? "Loading templates…" : templateHeadline}
+          ready={hasTemplate}
+          onOpen={() => onOpenSection("templates")}
+        >
+          {templatesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="aspect-[16/10] w-full rounded-lg" />
+              <Skeleton className="h-4 w-2/3 rounded" />
+            </div>
+          ) : hasTemplate ? (
+            <>
+              <div className="flex aspect-[16/10] items-center justify-center rounded-lg border border-ad-purple/15 bg-gradient-to-br from-[#f8f0fa] via-white to-[#fde8f4]">
+                <div className="text-center">
+                  <FiCheck className="mx-auto text-3xl text-ad-purple" strokeWidth={3} aria-hidden />
+                  <p className="mt-2 text-xs font-bold text-ad-purple">{templateName}</p>
+                </div>
+              </div>
+              <p className="text-xs leading-snug text-gray-600">
+                {templateDesc.trim() || "Your selected website template is ready."}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm leading-relaxed text-gray-600">
+              Pick a website template that speaks for your business — preview and save when you are
+              ready.
+            </p>
+          )}
+        </OverviewSectionCard>
+
+        <OverviewSectionCard
+          icon={<FiGift />}
+          title="Subscription"
+          subtitle={subscriptionHeadline}
+          ready={hasSubscription}
+          onOpen={() => onOpenSection("subscription")}
+        >
+          {subscriptionLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-14 w-full rounded-lg" />
+              <Skeleton className="h-12 w-full rounded-lg" />
+            </div>
+          ) : hasSubscription ? (
+            <>
+              <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-3">
+                <GoldCoinIcon />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800/80">
+                    Current plan
+                  </p>
+                  <p className="truncate text-sm font-bold text-[#006600]">{subscriptionLabel}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <OverviewStatPill
+                  label="Status"
+                  value="Active"
+                  tone="success"
+                />
+                <OverviewStatPill
+                  label="Days left"
+                  value={
+                    subscriptionStatus?.daysLeft != null
+                      ? `${subscriptionStatus.daysLeft}`
+                      : "—"
+                  }
+                  tone={
+                    subscriptionStatus?.daysLeft != null && subscriptionStatus.daysLeft < 30
+                      ? "warn"
+                      : "success"
+                  }
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-sm leading-relaxed text-gray-600">
+              Activate a yearly or bi-weekly plan to keep your website and AutoDaddy tools running.
+            </p>
+          )}
+        </OverviewSectionCard>
+      </div>
+    </div>
+  );
+}
+
 function SubscriptionPanel({
   plans,
   status,
@@ -782,7 +1103,7 @@ function WebsiteInvoiceModal({
 export default function ShopMyWebsitePage() {
   const { token, profile, session } = useAuth();
   const { faqsHeading, faqsDescription, business, user, refresh } = useShopOwnerPortal();
-  const [activeSection, setActiveSection] = useState<ShopWebsiteSection>("domain");
+  const [activeSection, setActiveSection] = useState<ShopWebsiteSection>("overview");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [domainForm, setDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
   const [savedDomainForm, setSavedDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
@@ -928,7 +1249,7 @@ export default function ShopMyWebsitePage() {
   }, [token]);
 
   useEffect(() => {
-    if (token && activeSection === "subscription") {
+    if (token && (activeSection === "subscription" || activeSection === "overview")) {
       void loadSubscription();
     }
   }, [token, activeSection, loadSubscription]);
@@ -936,6 +1257,19 @@ export default function ShopMyWebsitePage() {
   const selectedTemplate = useMemo(
     () => displayTemplates.find((t) => t.id === selectedTemplateId) ?? null,
     [displayTemplates, selectedTemplateId],
+  );
+
+  const overviewTemplate = useMemo(() => {
+    const saved =
+      savedTemplateId
+        ? displayTemplates.find((t) => t.id === savedTemplateId)
+        : undefined;
+    return saved ?? selectedTemplate;
+  }, [displayTemplates, savedTemplateId, selectedTemplate]);
+
+  const domainDaysLeft = useMemo(
+    () => daysUntilExpiry(savedDomainForm.expiryDate || domainForm.expiryDate),
+    [domainForm.expiryDate, savedDomainForm.expiryDate],
   );
 
   const billTo = useMemo(() => {
@@ -1208,6 +1542,20 @@ export default function ShopMyWebsitePage() {
 
   const renderContent = () => {
     switch (activeSection) {
+      case "overview":
+        return (
+          <WebsiteOverviewPanel
+            domain={hasExistingDomain ? savedDomainForm : domainForm}
+            domainLoading={domainLoading}
+            domainDaysLeft={domainDaysLeft}
+            templateName={overviewTemplate?.name ?? ""}
+            templateDesc={overviewTemplate?.desc ?? ""}
+            templatesLoading={templatesLoading && !templatesLoaded}
+            subscriptionStatus={subscriptionStatus}
+            subscriptionLoading={subscriptionLoading}
+            onOpenSection={setActiveSection}
+          />
+        );
       case "domain":
         return (
           <DomainPanel

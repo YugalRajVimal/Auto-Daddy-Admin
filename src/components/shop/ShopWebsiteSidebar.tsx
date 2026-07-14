@@ -1,7 +1,7 @@
 import { ShopSidebarButton } from "./ShopSidebar";
 import { shopSidebarButtonStackClass } from "./shopSidebarStyles";
 
-export type ShopWebsiteSection = "domain" | "preview" | "subscription";
+export type ShopWebsiteSection = "overview" | "domain" | "preview" | "subscription";
 
 type ShopWebsiteSidebarProps = {
   activeSection: ShopWebsiteSection;
@@ -9,6 +9,7 @@ type ShopWebsiteSidebarProps = {
 };
 
 const SECTIONS: { id: ShopWebsiteSection; label: string }[] = [
+  { id: "overview", label: "Overview" },
   { id: "domain", label: "Domain" },
   { id: "preview", label: "My Website" },
   { id: "subscription", label: "Subscription" },

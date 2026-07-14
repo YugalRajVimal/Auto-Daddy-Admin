@@ -74,6 +74,8 @@ export type AutoshopPageDetailsSubService = {
   price?: number;
   quantity?: number;
   tax?: number;
+  make?: string;
+  model?: string;
   odoOutRequired?: boolean;
 };
 
@@ -325,7 +327,14 @@ export function pageDetailsSubServicesToCategories(subs: AutoshopPageDetailsSubS
       name?: string;
       desc?: string;
       odoOutRequired?: boolean;
-      subServices: Array<{ name: string; desc?: string; price?: number; odoOutRequired?: boolean }>;
+      subServices: Array<{
+        name: string;
+        desc?: string;
+        price?: number;
+        make?: string;
+        model?: string;
+        odoOutRequired?: boolean;
+      }>;
     }
   >();
 
@@ -343,10 +352,14 @@ export function pageDetailsSubServicesToCategories(subs: AutoshopPageDetailsSubS
       byId.set(id, cat);
     }
     if (sub.odoOutRequired) cat.odoOutRequired = true;
+    const make = typeof sub.make === "string" ? sub.make.trim() : "";
+    const model = typeof sub.model === "string" ? sub.model.trim() : "";
     cat.subServices.push({
       name: sub.subServiceName,
       desc: sub.desc,
       price: sub.price,
+      ...(make ? { make } : {}),
+      ...(model ? { model } : {}),
       odoOutRequired: Boolean(sub.odoOutRequired),
     });
   }

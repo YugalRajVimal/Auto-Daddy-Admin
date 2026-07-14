@@ -261,8 +261,12 @@ function parseCatalogSubServices(raw: unknown): ShopServiceCategory["subServices
     const price = typeof priceRaw === "number" ? priceRaw : Number(priceRaw);
     const qty = typeof qtyRaw === "number" ? qtyRaw : Number(qtyRaw);
     const tax = typeof taxRaw === "number" ? taxRaw : Number(taxRaw);
+    const make = String(o.make ?? "").trim();
+    const model = String(o.model ?? "").trim();
     out.push({
       id: typeof o._id === "string" ? o._id : typeof o.id === "string" ? o.id : undefined,
+      ...(make ? { make } : {}),
+      ...(model ? { model } : {}),
       name,
       desc: String(o.desc ?? o.description ?? "").trim(),
       price: Number.isFinite(price) ? price : 0,

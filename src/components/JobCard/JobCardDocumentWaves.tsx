@@ -3,7 +3,7 @@ export function JobCardDocumentWaves({ className = "" }: { className?: string })
   return (
     <div className={`pointer-events-none relative w-full overflow-hidden ${className}`} aria-hidden>
       <svg
-        className="block h-[7.5rem] w-full sm:h-[9rem]"
+        className="block h-[18rem] w-full sm:h-[20rem]"
         viewBox="0 0 900 160"
         preserveAspectRatio="none"
       >
@@ -59,7 +59,7 @@ export function JobCardDocumentWaves({ className = "" }: { className?: string })
 export function JobCardDocumentHeaderWave({ className = "" }: { className?: string }) {
   return (
     <svg
-      className={`pointer-events-none block h-16 w-full sm:h-20 ${className}`}
+      className={`pointer-events-none block h-44 w-full sm:h-52 ${className}`}
       viewBox="0 0 900 120"
       preserveAspectRatio="none"
       aria-hidden

@@ -1447,6 +1447,9 @@ export default function ShopPeoplePage() {
   const [sectionError, setSectionError] = useState<string | null>(null);
   const [addedCustomerIds, setAddedCustomerIds] = useState<Set<string>>(() => new Set());
 
+  // Directory search only applies to My Customer List; Approval filters client-side.
+  const myListSearch = section === "my-list" ? search : "";
+
   const loadSectionCustomers = useCallback(async () => {
     if (!token) {
       setSectionCustomers([]);
@@ -1461,7 +1464,7 @@ export default function ShopPeoplePage() {
     try {
       // My Customer List: search merges directory results with already-added customers.
       if (section === "my-list") {
-        const q = search.trim();
+        const q = myListSearch.trim();
 
         if (!q) {
           const approvedRes = await fetchAddedCustomers(token, "approved");
@@ -1556,7 +1559,7 @@ export default function ShopPeoplePage() {
     } finally {
       setSectionLoading(false);
     }
-  }, [token, section, search]);
+  }, [token, section, myListSearch]);
 
   useEffect(() => {
     if (section === "my-list") {
@@ -1570,7 +1573,10 @@ export default function ShopPeoplePage() {
     void loadSectionCustomers();
   }, [loadSectionCustomers, section]);
 
-  const listCustomers = sectionCustomers;
+  const listCustomers = useMemo(() => {
+    if (section !== "approval") return sectionCustomers;
+    return sectionCustomers.filter((customer) => matchesMyCustomerSearch(customer, search));
+  }, [section, sectionCustomers, search]);
 
   const showListLoading = sectionLoading;
   const showListError = sectionError;
@@ -1650,7 +1656,9 @@ export default function ShopPeoplePage() {
 
   const emptyMessage =
     section === "approval"
-      ? "No customers awaiting approval."
+      ? search.trim()
+        ? "No customers found."
+        : "No customers awaiting approval."
       : search.trim()
         ? "No customers found."
         : "No approved customers in your list yet.";
@@ -1750,7 +1758,7 @@ export default function ShopPeoplePage() {
               value={search}
               onChange={setSearch}
               inputId={PEOPLE_SEARCH_INPUT_ID}
-              showSearch={section === "my-list"}
+              showSearch
               leading={
                 showMyListSearchActions ? (
                   <p className="text-sm font-serif italic text-gray-800">

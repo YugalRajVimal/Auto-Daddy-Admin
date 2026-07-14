@@ -195,6 +195,8 @@ export function addMyService(token: string, body: { serviceId: string; status: s
 }
 
 export type SubServiceInput = {
+  make?: string;
+  model?: string;
   name: string;
   desc?: string;
   price?: number;
@@ -208,7 +210,11 @@ export function addSubServices(token: string, body: { serviceId: string; subServ
 
 export function editSubService(
   token: string,
-  body: { serviceId: string; subServiceIndex: number; update: Partial<Pick<SubServiceInput, "price" | "quantity" | "tax" | "name" | "desc">> },
+  body: {
+    serviceId: string;
+    subServiceIndex: number;
+    update: Partial<Pick<SubServiceInput, "make" | "model" | "price" | "quantity" | "tax" | "name" | "desc">>;
+  },
 ) {
   return putJsonAutoshopowner<ApiEnvelope>("/api/autoshopowner/services/subservices/edit", body, token);
 }
