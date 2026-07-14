@@ -7,6 +7,7 @@ import ShopSidebar from "../shop/ShopSidebar";
 import { ownerPageSidebarFooterClass } from "./OwnerFaqsButton";
 import { ownerSidebarButtonStackClass } from "../shop/shopSidebarStyles";
 import {
+  ownerPageIntroClass,
   ownerPageOuterClass,
   ownerPageShellGridClass,
   ownerPageSidebarClass,
@@ -16,6 +17,7 @@ import {
 export {
   ownerPageAddFormSubtitleClass,
   ownerPageHeaderClass,
+  ownerPageIntroClass,
   ownerPageLayoutClass,
   ownerPageMainClass,
   ownerPageSectionTitleClass,
@@ -129,6 +131,8 @@ export default function OwnerPageShell({
     )
   ) : null;
 
+  const titleHeaderClass = title ? ownerPageIntroClass : undefined;
+
   if (showSidebar && sidebar) {
     return (
       <AdminPage
@@ -137,6 +141,7 @@ export default function OwnerPageShell({
         between={chrome.pageHeader}
         noPanel
         className={ownerPageOuterClass}
+        headerClassName={titleHeaderClass}
       >
         <div className={ownerPageShellGridClass}>
           <div className="min-w-0">{sidebar}</div>
@@ -157,6 +162,7 @@ export default function OwnerPageShell({
       between={chrome.pageHeader}
       noPanel={noPanel}
       className={ownerPageOuterClass}
+      headerClassName={titleHeaderClass}
     >
       {children}
     </AdminPage>

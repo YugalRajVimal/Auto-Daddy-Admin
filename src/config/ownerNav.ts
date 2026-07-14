@@ -1,5 +1,11 @@
 import type { NavItem, NavSubItem } from "./adminNav";
 
+/** Sub-header tabs for Help (utility link, not primary nav). */
+export const ownerHelpNav: NavSubItem[] = [
+  { name: "Ticket Raised", path: "/owner/help" },
+  { name: "Resolved", path: "/owner/help/resolved" },
+];
+
 export const ownerPrimaryNav: NavItem[] = [
   {
     name: "Home",

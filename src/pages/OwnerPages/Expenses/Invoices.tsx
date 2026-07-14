@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { FiChevronLeft, FiCreditCard, FiFileText, FiTrash2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
-import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "../../../hooks/useCarOwnerInvoices";
@@ -149,7 +149,7 @@ export default function OwnerInvoicesPage() {
       noPanel
     >
       <div className="flex flex-col gap-4">
-        <header className="flex flex-wrap items-end justify-between gap-3">
+        <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
           <div className="space-y-1">
             <p className="text-sm text-slate-500">Track shop invoices and record payments</p>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">

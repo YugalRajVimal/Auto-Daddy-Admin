@@ -13,7 +13,7 @@ import {
   OwnerJobCardsTable,
   OwnerVehicleDocumentsTable,
 } from "../../../components/owner/OwnerPanelTables";
-import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import OwnerUpdateOdometerPanel from "../../../components/owner/OwnerUpdateOdometerPanel";
 import type { VehiclePanelSection } from "../../../components/owner/OwnerVehicleSectionsSidebar";
 import { useAuth } from "../../../auth";
@@ -730,7 +730,7 @@ export default function OwnerVehiclesPage() {
       noPanel
     >
       <div className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-slate-500">Garage</p>

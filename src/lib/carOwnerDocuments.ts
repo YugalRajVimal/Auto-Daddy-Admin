@@ -154,15 +154,6 @@ export function vehicleImageUri(vehicle: VehicleDocumentsVehicle | null | undefi
   return path ? normalizeMediaUrl(path) : null;
 }
 
-export function sectionThumbUri(
-  vehicle: VehicleDocumentsVehicle | null | undefined,
-  fields: VehicleDocumentFieldRow[]
-): string | null {
-  const fromVehicle = vehicleImageUri(vehicle);
-  if (fromVehicle) return fromVehicle;
-  return fields.find((f) => f.uri)?.uri ?? null;
-}
-
 export function vehicleDocumentSectionFromRecord(record: VehicleDocumentsRecord, index: number): VehicleDocumentsSection {
   const fields = documentFieldsFromRecord(record);
   return {
@@ -170,7 +161,7 @@ export function vehicleDocumentSectionFromRecord(record: VehicleDocumentsRecord,
     vehicleId: record.vehicleId,
     title: vehicleDocumentsTitle(record.vehicle, `Vehicle -${index + 1}`),
     subtitle: vehicleDocumentsSubtitle(record.vehicle),
-    thumbUri: sectionThumbUri(record.vehicle, fields),
+    thumbUri: vehicleImageUri(record.vehicle),
     fields,
   };
 }

@@ -23,6 +23,8 @@ type AdminPageProps = {
   narrowPanel?: boolean;
   /** Extra classes on the page root (e.g. denser owner padding). */
   className?: string;
+  /** Extra classes on the title row (e.g. frosted owner page intro). */
+  headerClassName?: string;
 };
 
 export default function AdminPage({
@@ -37,6 +39,7 @@ export default function AdminPage({
   noPanel = false,
   narrowPanel = false,
   className = "",
+  headerClassName = "",
 }: AdminPageProps) {
   const useInlineFlow = headerAction !== undefined || between !== undefined;
   const neutralPanel = title.trim().toLowerCase().startsWith("deleted");
@@ -55,7 +58,7 @@ export default function AdminPage({
     <div className={twMerge("bg-ad-app-bg py-4 md:py-5", className)}>
       <div className={narrowPanel ? "mx-auto w-full sm:w-[55%] sm:min-w-[320px]" : undefined}>
         {showPageTitle && (
-          <div className={adminPageHeaderClass}>
+          <div className={twMerge(adminPageHeaderClass, headerClassName)}>
             {onTitleClick ? (
               <button
                 type="button"

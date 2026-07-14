@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { FiChevronDown, FiHelpCircle, FiLock, FiStar } from "react-icons/fi";
-import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import { useCarOwnerDashboard, type CarOwnerContentBlock } from "../../../hooks/useOwnerPortal";
 import { Skeleton } from "../../../components/common/Skeleton";
 import {
@@ -107,7 +107,7 @@ function PageIntro({
   demo?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className={`${ownerPageIntroClass} flex flex-wrap items-start justify-between gap-3`}>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium text-slate-500">{eyebrow}</p>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FiBarChart2, FiSearch } from "react-icons/fi";
 import { useLocation } from "react-router";
-import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import {
   OwnerFlatReportTable,
   OwnerGroupedReportTable,
@@ -339,7 +339,7 @@ export default function OwnerReportsPage() {
       noPanel
     >
       <div className="flex flex-col gap-4">
-        <header className="space-y-1">
+        <header className={`${ownerPageIntroClass} space-y-1`}>
           <p className="text-sm text-slate-500">{REPORT_PAGE_SUBTITLES[activeReport]}</p>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
             {REPORT_PAGE_HEADINGS[activeReport]}

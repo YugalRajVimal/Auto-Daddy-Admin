@@ -1,18 +1,29 @@
 import { Link, useLocation } from "react-router";
-import { useCallback, useDeferredValue, useMemo, useState, type ReactNode } from "react";
-import { FiHeart, FiMapPin, FiTool } from "react-icons/fi";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
+import { FiFilter, FiHeart, FiMapPin, FiTool } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
-import OwnerPageShell, { OwnerPageSidebar } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import OwnerShopFilters, {
   EMPTY_SHOP_LIST_FILTERS,
   mergeServiceCatalogWithShopOfferings,
   parseShopServiceValue,
   type OwnerShopListFilters,
 } from "../../../components/owner/OwnerShopFilters";
-import OwnerVehiclePlateSidebar from "../../../components/owner/OwnerVehiclePlateSidebar";
 import OwnerShopExpandedPanel from "../../../components/owner/OwnerShopExpandedPanel";
 import { OwnerCustomerRequestsTable } from "../../../components/owner/OwnerPanelTables";
+import {
+  ownerVehicleLabelClass,
+  ownerVehicleSelectClass,
+} from "../../../components/owner/ownerVehicleFormUtils";
 import { useCarOwnerAutoShops } from "../../../hooks/useCarOwnerAutoShops";
 import { useCarOwnerCustomerRequests } from "../../../hooks/useCarOwnerCustomerRequests";
 import { useCarOwnerFavoriteShops } from "../../../hooks/useCarOwnerFavoriteShops";
@@ -20,11 +31,33 @@ import { useCarOwnerServiceSidebar } from "../../../hooks/useOwnerPortal";
 import { useCarOwnerVehicles } from "../../../hooks/useCarOwnerVehicles";
 import { useOwnerNavReset, useOwnerSidebarDefault } from "../../../hooks/useOwnerNavReset";
 import { isCarOwnerShopOpenToday } from "../../../lib/carOwnerAutoShops";
+import {
+  vehicleSidebarLabel,
+  type CarOwnerVehicle,
+} from "../../../lib/carOwnerVehicles";
 import { getShopTypeLabel, getShopTypeLabels } from "../../../lib/shopTypes";
 import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
 import type { CarOwnerAutoShopListItem } from "../../../types/carOwnerAutoShops";
 
-const SELECT_VEHICLE_PROMPT = "Select a vehicle from the sidebar to find matching auto shops.";
+const SELECT_VEHICLE_PROMPT = "Select a vehicle to find matching auto shops.";
+
+function vehicleOptionLabel(vehicle: CarOwnerVehicle, index: number): string {
+  const plate = vehicle.licensePlateNo?.trim().toUpperCase();
+  if (plate) return plate;
+  const make = vehicleSidebarLabel(vehicle);
+  return make || `Vehicle ${index + 1}`;
+}
+
+function shopFiltersAreActive(filters: OwnerShopListFilters): boolean {
+  return Boolean(
+    filters.search.trim() ||
+      filters.shopType ||
+      filters.serviceValue ||
+      filters.city ||
+      filters.availability !== "all" ||
+      filters.favorites !== "all",
+  );
+}
 
 type AutoShopsSection = "auto-shops" | "approvals";
 
@@ -107,8 +140,10 @@ export default function OwnerAutoShopsPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [expandedShopId, setExpandedShopId] = useState<string | null>(null);
   const [favoriteBusyId, setFavoriteBusyId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [listFilters, setListFilters] = useState<OwnerShopListFilters>(EMPTY_SHOP_LIST_FILTERS);
   const deferredSearch = useDeferredValue(listFilters.search.trim());
+  const filtersActive = shopFiltersAreActive(listFilters);
 
   const { all: sidebarCatalog, loading: servicesLoading } = useCarOwnerServiceSidebar();
 
@@ -242,14 +277,15 @@ export default function OwnerAutoShopsPage() {
     setExpandedShopId(null);
   }, []);
 
-  const resetSidebar = useCallback(() => {
+  const resetPage = useCallback(() => {
     setSelectedVehicleId(vehicles[0]?.id ?? null);
     setExpandedShopId(null);
+    setFiltersOpen(false);
     setListFilters(EMPTY_SHOP_LIST_FILTERS);
   }, [vehicles]);
 
-  useOwnerSidebarDefault(!vehiclesLoading && vehicles.length > 0, resetSidebar);
-  useOwnerNavReset(resetSidebar);
+  useOwnerSidebarDefault(!vehiclesLoading && vehicles.length > 0, resetPage);
+  useOwnerNavReset(resetPage);
 
   const pageTitle =
     section === "approvals"
@@ -295,38 +331,40 @@ export default function OwnerAutoShopsPage() {
     toast.success(result.isFavorite ? "Added to favorites." : "Removed from favorites.");
   };
 
+  const closeShopDialog = useCallback(() => {
+    setExpandedShopId(null);
+  }, []);
+
+  useEffect(() => {
+    if (!expandedShop) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeShopDialog();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [expandedShop, closeShopDialog]);
+
   return (
     <OwnerPageShell
       pageHeading=""
       metaTitle="Auto Shops | AutoDaddy"
       metaDescription="Find auto shops near you"
       noPanel
-      customSidebar={
-        section === "auto-shops" ? (
-          <OwnerPageSidebar>
-            <OwnerVehiclePlateSidebar
-              vehicles={vehicles}
-              loading={vehiclesLoading}
-              selectedVehicleId={selectedVehicleId}
-              onSelect={handleVehicleSelect}
-            />
-          </OwnerPageSidebar>
-        ) : undefined
-      }
     >
       <div className="flex flex-col gap-4">
-        <header className="flex flex-wrap items-end justify-between gap-3">
+        <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
           <div className="space-y-1">
             <p className="text-sm text-slate-500">{pageSubtitle}</p>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
               {pageTitle}
             </h1>
           </div>
-          {section === "auto-shops" &&
-          !loading &&
-          showShopList &&
-          filteredShops.length > 0 &&
-          !expandedShop ? (
+          {section === "auto-shops" && !loading && showShopList && filteredShops.length > 0 ? (
             <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
               {filteredShops.length} shop{filteredShops.length === 1 ? "" : "s"}
             </p>
@@ -364,14 +402,65 @@ export default function OwnerAutoShopsPage() {
           </div>
         ) : (
           <div className="flex min-h-[320px] flex-col gap-4">
-            {showShopList ? (
-              <OwnerShopFilters
-                filters={listFilters}
-                onChange={handleFiltersChange}
-                catalog={catalog}
-                cityOptions={cityOptions}
-                servicesLoading={servicesLoading}
-              />
+            {!vehiclesLoading && vehicles.length > 0 ? (
+              <div className="flex flex-wrap items-end justify-end gap-3">
+                <div className="min-w-[11rem] w-full sm:w-auto sm:min-w-[14rem] sm:max-w-[16rem]">
+                  <label className={ownerVehicleLabelClass} htmlFor="auto-shops-vehicle">
+                    Vehicle
+                  </label>
+                  <select
+                    id="auto-shops-vehicle"
+                    value={selectedVehicleId ?? ""}
+                    onChange={(e) => handleVehicleSelect(e.target.value)}
+                    aria-label="Select vehicle"
+                    className={ownerVehicleSelectClass}
+                  >
+                    {!selectedVehicleId ? (
+                      <option value="" disabled>
+                        Select a vehicle
+                      </option>
+                    ) : null}
+                    {vehicles.map((vehicle, index) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicleOptionLabel(vehicle, index)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {showShopList ? (
+                  <button
+                    type="button"
+                    onClick={() => setFiltersOpen((open) => !open)}
+                    aria-expanded={filtersOpen}
+                    aria-controls="auto-shops-filters"
+                    className={`inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold transition ${
+                      filtersOpen || filtersActive
+                        ? "bg-gradient-to-br from-ad-purple to-ad-purple-dark text-white shadow-[0_6px_14px_rgba(155,48,141,0.22)]"
+                        : "bg-white text-slate-700 ring-1 ring-slate-200/80 hover:bg-slate-50"
+                    }`}
+                  >
+                    <FiFilter size={14} aria-hidden />
+                    Filters
+                    {filtersActive ? (
+                      <span className="ml-0.5 size-1.5 rounded-full bg-white" aria-hidden />
+                    ) : null}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            {showShopList && filtersOpen ? (
+              <div id="auto-shops-filters">
+                <OwnerShopFilters
+                  filters={listFilters}
+                  onChange={handleFiltersChange}
+                  catalog={catalog}
+                  cityOptions={cityOptions}
+                  servicesLoading={servicesLoading}
+                  onClose={() => setFiltersOpen(false)}
+                />
+              </div>
             ) : null}
 
             {vehiclesLoading ? (
@@ -425,22 +514,6 @@ export default function OwnerAutoShopsPage() {
                   Clear filters
                 </button>
               </EmptyState>
-            ) : expandedShop ? (
-              <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5 sm:p-5">
-                <OwnerShopExpandedPanel
-                  shop={expandedShop}
-                  connectingServiceKey={null}
-                  sentServiceKeys={{}}
-                  statusMessage={null}
-                  isFavorite={expandedShop.isFavorite}
-                  favoriteBusy={favoriteBusyId === expandedShop.id}
-                  onToggleFavorite={() => void handleToggleFavorite(expandedShop.id)}
-                  onCollapse={() => setExpandedShopId(null)}
-                  onConnect={() => {
-                    // Auto Shops page is browse-first; connect flow lives in dashboard.
-                  }}
-                />
-              </div>
             ) : (
               <div className="flex flex-col gap-2.5">
                 {filteredShops.map((shop) => {
@@ -522,6 +595,42 @@ export default function OwnerAutoShopsPage() {
                 })}
               </div>
             )}
+
+            {expandedShop
+              ? createPortal(
+                  <div
+                    className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-6"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={expandedShop.name}
+                  >
+                    <button
+                      type="button"
+                      className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
+                      aria-label="Close shop details"
+                      onClick={closeShopDialog}
+                    />
+                    <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_24px_48px_rgba(15,23,42,0.22)] ring-1 ring-black/5">
+                      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+                        <OwnerShopExpandedPanel
+                          shop={expandedShop}
+                          connectingServiceKey={null}
+                          sentServiceKeys={{}}
+                          statusMessage={null}
+                          isFavorite={expandedShop.isFavorite}
+                          favoriteBusy={favoriteBusyId === expandedShop.id}
+                          onToggleFavorite={() => void handleToggleFavorite(expandedShop.id)}
+                          onCollapse={closeShopDialog}
+                          onConnect={() => {
+                            // Auto Shops page is browse-first; connect flow lives in dashboard.
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>,
+                  document.body,
+                )
+              : null}
           </div>
         )}
       </div>

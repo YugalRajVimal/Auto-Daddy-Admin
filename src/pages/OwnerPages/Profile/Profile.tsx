@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiCamera, FiMail, FiMapPin, FiPhone, FiUser } from "react-icons/fi";
 import { getJson } from "../../../api/mobileAuth";
-import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import { Skeleton } from "../../../components/common/Skeleton";
 import { useAuth } from "../../../auth";
 import { useCarOwnerProfile } from "../../../hooks/useCarOwnerProfile";
@@ -115,7 +115,7 @@ export default function OwnerProfilePage() {
       noPanel
     >
       <div className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-slate-500">Account</p>

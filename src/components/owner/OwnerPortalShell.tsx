@@ -45,6 +45,8 @@ export type OwnerPortalShellProps = {
   loginAs?: string;
   headerAvatarSrc?: string | null;
   helpPath?: string;
+  /** Sub-header tabs when Help (utility link) is active. */
+  helpNav?: NavSubItem[];
 };
 
 export default function OwnerPortalShell({
@@ -56,6 +58,7 @@ export default function OwnerPortalShell({
   loginAs,
   headerAvatarSrc,
   helpPath,
+  helpNav = [],
 }: OwnerPortalShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -67,8 +70,12 @@ export default function OwnerPortalShell({
 
   const activePrimary = getActivePrimaryItem(location.pathname, primaryNav, homePath);
   const onHelpNav = helpPath != null && isPathActive(location.pathname, helpPath, homePath);
-  const displaySubItems: NavSubItem[] = activePrimary?.subItems ?? [];
-  const hasSubNav = displaySubItems.length > 0 && activePrimary != null;
+  const helpSubItems = onHelpNav ? helpNav : [];
+  const primarySubItems: NavSubItem[] = activePrimary?.subItems ?? [];
+  const displaySubItems: NavSubItem[] =
+    helpSubItems.length > 0 ? helpSubItems : primarySubItems;
+  const hasSubNav =
+    displaySubItems.length > 0 && (activePrimary != null || (onHelpNav && helpSubItems.length > 0));
   const activeSubItemPath = getActiveSubItemPath(location.pathname, displaySubItems, homePath);
 
   const handleNavLinkClick = (path: string, e: React.MouseEvent<HTMLAnchorElement>) => {

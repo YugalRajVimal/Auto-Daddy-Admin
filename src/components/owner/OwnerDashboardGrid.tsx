@@ -16,6 +16,7 @@ import {
 import { toast } from "react-toastify";
 import { putJson } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
+import { ownerPageIntroClass } from "./ownerLayoutStyles";
 import { useCarOwnerDashboard, useCarOwnerServiceSidebar } from "../../hooks/useOwnerPortal";
 import { useCarOwnerAutoShops } from "../../hooks/useCarOwnerAutoShops";
 import { useCarOwnerDeals } from "../../hooks/useCarOwnerDeals";
@@ -461,7 +462,7 @@ export default function OwnerDashboardGrid() {
 
   return (
     <div className="space-y-3 2xl:space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-2 2xl:gap-3">
+      <div className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-2 2xl:gap-3`}>
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-medium text-slate-500">

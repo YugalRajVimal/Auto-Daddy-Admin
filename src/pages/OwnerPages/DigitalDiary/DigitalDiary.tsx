@@ -7,7 +7,7 @@ import {
   FiPlus,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
-import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import {
   ownerVehicleFieldClass,
   ownerVehicleLabelClass,
@@ -374,7 +374,7 @@ export default function OwnerDigitalDiaryPage() {
       }
     >
       <div className="flex flex-col gap-4">
-        <header className="space-y-1">
+        <header className={`${ownerPageIntroClass} space-y-1`}>
           <p className="text-sm text-slate-500">Reminders, service dates, and personal notes</p>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
             Digital Diary

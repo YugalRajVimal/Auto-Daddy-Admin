@@ -10,7 +10,7 @@ import {
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
-import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerJobCardApprovals } from "../../../hooks/useCarOwnerJobCardApprovals";
@@ -196,7 +196,7 @@ export default function OwnerExpensesJobCardsPage() {
       noPanel
     >
       <div className="flex flex-col gap-4">
-        <header className="flex flex-wrap items-end justify-between gap-3">
+        <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
           <div className="space-y-1">
             <p className="text-sm text-slate-500">Approve work, pay shops, and convert to invoices</p>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">

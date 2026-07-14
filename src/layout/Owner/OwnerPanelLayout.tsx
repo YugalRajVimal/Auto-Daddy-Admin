@@ -1,7 +1,7 @@
 import OwnerPortalShell from "../../components/owner/OwnerPortalShell";
 import { RequirePortal } from "../../auth/guards/RequirePortal";
 import useAuth from "../../auth/useAuth";
-import { buildOwnerPrimaryNav } from "../../config/ownerNav";
+import { buildOwnerPrimaryNav, ownerHelpNav } from "../../config/ownerNav";
 import { OwnerPageChromeProvider } from "../../context/OwnerPageChromeContext";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
@@ -42,6 +42,7 @@ function OwnerLayoutContent() {
       loginAs={loginAs}
       headerAvatarSrc={headerAvatarSrc}
       helpPath="/owner/help"
+      helpNav={ownerHelpNav}
     />
   );
 }

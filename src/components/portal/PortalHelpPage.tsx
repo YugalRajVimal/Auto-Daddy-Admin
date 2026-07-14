@@ -1,21 +1,21 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { FiHelpCircle, FiPlus } from "react-icons/fi";
+import { useLocation, useNavigate } from "react-router";
 import { toast } from "react-toastify";
-import OwnerPageShell from "../owner/OwnerPageShell";
+import OwnerPageShell, { ownerPageIntroClass } from "../owner/OwnerPageShell";
 import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import ShopSupportPanel from "../shop/ShopSupportPanel";
 import ShopTicketRow, { type ShopTicket } from "../shop/ShopTicketRow";
 import { useWebVoiceRecorder } from "../../hooks/useWebVoiceRecorder";
 
-const HELP_SECTIONS = [
-  { id: "ticket-raised", label: "Ticket Raised", variant: "primary" as const },
-  { id: "resolved", label: "Resolved", variant: "primary" as const },
-];
+type HelpSection = "ticket-raised" | "resolved";
 
-const SECTION_META: Record<
-  HelpSection,
-  { title: string; subtitle: string }
-> = {
+const SECTION_BY_PATH: Record<string, HelpSection> = {
+  "/owner/help": "ticket-raised",
+  "/owner/help/resolved": "resolved",
+};
+
+const SECTION_META: Record<HelpSection, { title: string; subtitle: string }> = {
   "ticket-raised": {
     title: "Ticket Raised",
     subtitle: "Open support requests waiting for a response",
@@ -48,7 +48,9 @@ function nextTicketNo() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-type HelpSection = "ticket-raised" | "resolved";
+function helpSectionFromPath(pathname: string): HelpSection {
+  return SECTION_BY_PATH[pathname] ?? "ticket-raised";
+}
 
 function EmptyState({ children }: { children: ReactNode }) {
   return (
@@ -68,23 +70,24 @@ export default function PortalHelpPage({
   onSubmit,
   headerAction,
 }: PortalHelpPageProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { recording, audioBlob, error: recorderError, hasRecording, toggle, reset } =
     useWebVoiceRecorder();
 
-  const [activeSection, setActiveSection] = useState<HelpSection>("ticket-raised");
+  const activeSection = helpSectionFromPath(location.pathname);
   const [showForm, setShowForm] = useState(false);
   const [tickets, setTickets] = useState<ShopTicket[]>([]);
   const [draftTicketNo, setDraftTicketNo] = useState(nextTicketNo);
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const resetSidebar = useCallback(() => {
-    setActiveSection("ticket-raised");
+  const resetView = useCallback(() => {
     setShowForm(false);
     reset();
   }, [reset]);
 
-  useOwnerNavReset(resetSidebar);
+  useOwnerNavReset(resetView);
 
   const resolvedServiceId = selectedServiceId || services[0]?.id || "";
   const meta = SECTION_META[activeSection];
@@ -108,12 +111,6 @@ export default function PortalHelpPage({
     setShowForm(false);
     reset();
   }, [reset]);
-
-  const handleSectionChange = (section: HelpSection) => {
-    setActiveSection(section);
-    setShowForm(false);
-    reset();
-  };
 
   const handleSave = async () => {
     const service = services.find((s) => s.id === resolvedServiceId);
@@ -141,7 +138,9 @@ export default function PortalHelpPage({
       setTickets((prev) => [newTicket, ...prev]);
       toast.success("Support ticket raised.");
       closeForm();
-      setActiveSection("ticket-raised");
+      if (location.pathname !== "/owner/help") {
+        navigate("/owner/help", { replace: true });
+      }
     } catch {
       toast.error("Network error. Please try again.");
     } finally {
@@ -168,13 +167,10 @@ export default function PortalHelpPage({
       metaDescription={metaDescription}
       noPanel
       headerAction={headerAction ?? raiseTicketButton}
-      sidebarItems={HELP_SECTIONS}
-      activeSidebarId={activeSection}
-      onSidebarSelect={(id) => handleSectionChange(id as HelpSection)}
     >
       <div className="flex flex-col gap-4">
         {!showForm ? (
-          <header className="flex flex-wrap items-end justify-between gap-3">
+          <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
             <div className="space-y-1">
               <p className="text-sm text-slate-500">{meta.subtitle}</p>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">

@@ -73,6 +73,7 @@ export const ownerRoutes = (
       <Route path="/owner/deals/salvage" element={<OwnerDealsPage />} />
       <Route path="/owner/deals/completed" element={<OwnerDealsPage />} />
       <Route path="/owner/help" element={<OwnerHelpPage />} />
+      <Route path="/owner/help/resolved" element={<OwnerHelpPage />} />
     </Route>
   </Route>
 );

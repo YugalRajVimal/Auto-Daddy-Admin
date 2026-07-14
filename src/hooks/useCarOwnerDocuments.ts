@@ -66,7 +66,7 @@ export function useCarOwnerDocuments() {
         year: null,
         odometerReading: null,
         disabled: v.disabled ?? null,
-        carImage: v.carImage ?? null,
+        carImage: v.carImage ?? v.carImages?.[0] ?? null,
       }));
 
     const merged = mergeVehicleDocumentRecords(enabledVehicles, documentRecords);

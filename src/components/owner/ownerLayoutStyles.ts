@@ -22,6 +22,10 @@ export const ownerNavPageHeadingClass =
 
 export const ownerPageHeaderClass = "mb-2 flex items-center justify-between gap-3 2xl:mb-3";
 
+/** Frosted glass banner behind page intro / heading blocks. */
+export const ownerPageIntroClass =
+  "rounded-2xl border border-ad-glass bg-ad-glass px-4 py-3 sm:px-5 sm:py-3.5";
+
 export const ownerPageAddFormSubtitleClass =
   "text-center font-serif text-lg font-bold text-ad-grey-dark md:text-xl 2xl:text-2xl";
 

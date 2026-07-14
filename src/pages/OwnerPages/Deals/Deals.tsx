@@ -4,7 +4,7 @@ import { useLocation } from "react-router";
 import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerDealFilters from "../../../components/owner/OwnerDealFilters";
 import OwnerDealRow from "../../../components/owner/OwnerDealRow";
-import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerDeals } from "../../../hooks/useCarOwnerDeals";
@@ -167,7 +167,7 @@ export default function OwnerDealsPage() {
       noPanel
     >
       <div className="flex flex-col gap-4">
-        <header className="flex flex-wrap items-end justify-between gap-3">
+        <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
           <div className="space-y-1">
             <p className="text-sm text-slate-500">{CATEGORY_SUBTITLES[category]}</p>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
