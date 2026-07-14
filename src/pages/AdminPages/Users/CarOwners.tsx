@@ -1178,7 +1178,6 @@ const CarOwners: React.FC = () => {
     setLoading(true); setError("");
     try {
       const res = await axios.get(`${API()}/api/admin/carowners`, { headers: getToken() });
-      console.log(res.data.data);
       if (res.data?.success && Array.isArray(res.data.data)) setAllOwners(res.data.data);
       else {
         const msg = "Failed to fetch car owners";
@@ -1283,11 +1282,12 @@ const CarOwners: React.FC = () => {
         );
       case "profilePhoto": {
         const img = ownerProfileImg(owner);
+        console.log("profilePhoto image URL:", img);
         return (
           <td key={key} className={tdClass}>
             {img ? (
               <ClipImageHover
-                imageUrl={img}
+                imageUrl={`${API()}/${img}`}
                 alt={`Profile image for ${owner.name}`}
                 size={20}
                 iconClassName="text-ad-purple"
@@ -1298,6 +1298,8 @@ const CarOwners: React.FC = () => {
           </td>
         );
       }
+  
+      
       case "documents": {
         const docs = ownerDocuments(owner);
         return (

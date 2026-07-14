@@ -4,12 +4,30 @@ import PageMeta from "../../../components/common/PageMeta";
 import DashboardPanelCard from "../../../components/COMP";
 
 interface AdminDashboardAPI {
-  carOwnersCount: number;
-  autoShopOwnersCount: number;
-  jobCardsCount: number;
-  dealsCount: number;
-  servicesCount: number;
-  subServicesCount: number;
+  carOwners: {
+    total: number;
+    active: number;
+    nonActive: number;
+    closed: number;
+  };
+  shops: {
+    carShops: number;
+    carWash: number;
+    tireMaster: number;
+    towTruck: number;
+  };
+  subscriptions: {
+    received: number;
+    pending: number;
+    inProcess: number;
+    unAnswered: number;
+  };
+  help: {
+    resolved: number;
+    received: number;
+    inProcess: number;
+    unAnswered: number;
+  };
 }
 
 type StatCard = {
@@ -66,43 +84,44 @@ export default function AdminDashboardHome() {
         adminNotify.error(msg);
       })
       .finally(() => setLoading(false));
-  }, []);
+      console.log(data);
+        }, []);
 
   const rows: StatRow[] = [
     {
       title: "Car Owners",
       cards: [
-        { label: "Total", value: data?.carOwnersCount ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
-        { label: "Active", value: data?.carOwnersCount ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
-        { label: "Non-Active", value: 0, bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
-        { label: "Closed", value: 0, bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
+        { label: "Total", value: data?.carOwners?.total ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
+        { label: "Active", value: data?.carOwners?.active ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
+        { label: "Non-Active", value: data?.carOwners?.nonActive ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
+        { label: "Closed", value: data?.carOwners?.closed ?? "—", bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
       ],
     },
     {
       title: "Vendors",
       cards: [
-        { label: "Car Shops", value: data?.autoShopOwnersCount ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
-        { label: "Car Wash", value: 0, bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
-        { label: "Tire Master", value: 0, bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
-        { label: "Tow Truck", value: 0, bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
+        { label: "Car Shops", value: data?.shops?.carShops ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
+        { label: "Car Wash", value: data?.shops?.carWash ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
+        { label: "Tire Master", value: data?.shops?.tireMaster ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
+        { label: "Tow Truck", value: data?.shops?.towTruck ?? "—", bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
       ],
     },
     {
       title: "Subscription",
       cards: [
-        { label: "Received", value: data?.dealsCount ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
-        { label: "Pending", value: 0, bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
-        { label: "In Process", value: 0, bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
-        { label: "Un-Answered", value: 0, bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
+        { label: "Received", value: data?.subscriptions?.received ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
+        { label: "Pending", value: data?.subscriptions?.pending ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
+        { label: "In Process", value: data?.subscriptions?.inProcess ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
+        { label: "Un-Answered", value: data?.subscriptions?.unAnswered ?? "—", bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
       ],
     },
     {
       title: "Help",
       cards: [
-        { label: "Resolved", value: data?.jobCardsCount ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
-        { label: "Received", value: data?.servicesCount ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
-        { label: "In Process", value: data?.subServicesCount ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
-        { label: "Un-Answered", value: 0, bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
+        { label: "Resolved", value: data?.help?.resolved ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
+        { label: "Received", value: data?.help?.received ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
+        { label: "In Process", value: data?.help?.inProcess ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
+        { label: "Un-Answered", value: data?.help?.unAnswered ?? "—", bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
       ],
     },
   ];

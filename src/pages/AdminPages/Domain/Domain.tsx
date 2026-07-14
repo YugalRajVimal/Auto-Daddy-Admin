@@ -196,12 +196,6 @@ function ownerDisplayName(owner: AutoShopOwner | CarOwner | null | undefined) {
   return "—";
 }
 
-// function getNameFromUserId(userId: any): string | undefined {
-//   // If userId is an object and has "name", use it
-//   if (userId && typeof userId === "object" && "name" in userId) return userId.name;
-//   return undefined;
-// }
-
 function getIdFromUserId(userId: any): string | undefined {
   if (typeof userId === "string") return userId;
   if (userId && typeof userId === "object" && "_id" in userId) return userId._id;
@@ -235,37 +229,25 @@ function entryToDomainRow(
   const expiryRaw = entry.expiry || "";
   const dns = entry.dns || "";
   const domainType = entry.domainType === "new" ? "new" : "existing";
-  // const userType = mapApiUserTypeToLocal(entry.userType ?? "");
   
-  // Compute userName from entry
   let userName: string = "—"; // fallback
 
-  // 1. Prefer entry.userName if set and not empty/empty-like
   if (entry.userName && entry.userName !== "—") {
     userName = entry.userName;
-  }
-  // 2. If entry.userId is an object and has name, use name
-  else if (entry.userId && typeof entry.userId === "object" && "name" in entry.userId && entry.userId.name) {
+  } else if (entry.userId && typeof entry.userId === "object" && "name" in entry.userId && entry.userId.name) {
     userName = entry.userId.name;
-  }
-  // 3. If userId is a string: try lookup from owners as fallback
-  else if (
+  } else if (
     entry.userType &&
     ((entry.userType === "autoshopowner" && Array.isArray(owner)) ||
       entry.userType === "carowner")
   ) {
-    // If owner prop supplied, fallback to ownerDisplayName(owner)
     if (owner) {
       userName = ownerDisplayName(owner);
     }
-  }
-  // 4. If no owner prop, just use ownerDisplayName as final fallback
-  else if (owner) {
+  } else if (owner) {
     userName = ownerDisplayName(owner);
   }
 
-  // Pick correct userId string for per-row matching, even if entry.userId is an object
-  // Get userId as string (for all table logic)
   let domainRowUserId: string | undefined = getIdFromUserId(entry.userId);
 
   return {
@@ -301,9 +283,12 @@ export default function Domain() {
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [search, setSearch] = useState("");
+  // --- REWRITE START: SEARCH/FILTER STATE FOR BACKEND ---
+  const [search, setSearch] = useState(""); // For "live search here" input
   const [showSearchCard, setShowSearchCard] = useState(false);
   const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(DOMAIN_SEARCH_FIELDS));
+
+  // Store real query params for backend fetch
   const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(DOMAIN_SEARCH_FIELDS));
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
@@ -328,16 +313,14 @@ export default function Domain() {
       storageKey: "admin_deleted_view:domain",
     });
 
+  // --- 1. Fetch all owners ---
   useEffect(() => {
     fetchOwners();
     fetchCarOwners();
-    fetchAllDomains();
-    // eslint-disable-next-line
+  // eslint-disable-next-line
   }, []);
 
-  // --- 1. Fetch all owners ---
   const fetchOwners = async () => {
-    // This is legacy from old code: just for selecting user in form/view, not using /domains API
     try {
       const res = await axios.get(`${API_URL}/api/admin/autoshopowners`);
       setOwners(res.data.data || []);
@@ -346,7 +329,6 @@ export default function Domain() {
     }
   };
 
-  // --- 2. Fetch car owners for dropdown ---
   const fetchCarOwners = async () => {
     try {
       const res = await axios.get(`${API_URL}/api/admin/carowners`);
@@ -356,12 +338,52 @@ export default function Domain() {
     }
   };
 
-  // --- 3. Fetch all domains ----------
+  // --- 3. Fetch all domains with filter/search params from backend ---
+  // Triggers every time filters/search/page/entriesPerPage change (not for deleted view)
+  useEffect(() => {
+    if (!isDeletedView) fetchAllDomains();
+    // eslint-disable-next-line
+  }, [searchFilters, search, page, entriesPerPage, owners.length, carOwners.length, isDeletedView]);
+
   async function fetchAllDomains() {
     setDomainsLoading(true);
     setDomainsError(null);
     try {
-      const res = await axios.get(`${API_URL}/api/admin/domains`);
+      // Build query params for filters/search for BE
+      const params: Record<string, any> = {};
+
+      // Map filters ("User Type", etc.)
+      if (searchFilters.userType) {
+        // The UI puts "Car Owner"/"Shop Owner", we map to API enum
+        const label = searchFilters.userType.trim();
+        if (label === "Car Owner" || label === "carOwner") params.userType = "carowner";
+        else if (label === "Shop Owner" || label === "shopOwner") params.userType = "autoshopowner";
+      }
+      if (searchFilters.userName) params.userName = searchFilters.userName;
+      if (searchFilters.domain) params.domain = searchFilters.domain;
+      if (searchFilters.domainType) {
+        // UI filter is "New"/"Existing", API uses "new"/"existing"
+        if (searchFilters.domainType === "New") params.domainType = "new";
+        else if (searchFilters.domainType === "Existing") params.domainType = "existing";
+      }
+      if (searchFilters.expiry) params.expiry = searchFilters.expiry;
+      if (searchFilters.provider) {
+        // UI filter is label, convert to value/enums
+        const providerLabel = searchFilters.provider;
+        // Try to map label to value from PROVIDER_OPTIONS
+        const found = PROVIDER_OPTIONS.find(opt => opt.label === providerLabel);
+        params.provider = found ? found.value : providerLabel;
+      }
+      if (searchFilters.dns) params.dns = searchFilters.dns;
+
+      // Map live search ("search") to API param 'search' (lowercase)
+      if (search) params.search = search;
+
+      // Paging
+      params.page = page;
+      params.limit = entriesPerPage;
+
+      const res = await axios.get(`${API_URL}/api/admin/domains`, { params });
       const entries: DomainEntry[] = res.data?.data || [];
 
       setDomains(
@@ -391,9 +413,9 @@ export default function Domain() {
     } finally {
       setDomainsLoading(false);
     }
-  }
+  };
 
-  // --- 4. Refresh for table actions
+  // --- 4. Refresh for table actions (refetch with same filters) ---
   const refreshDomains = async () => {
     await fetchAllDomains();
   };
@@ -587,15 +609,12 @@ export default function Domain() {
 
   // --- 9. Add/edit domain ---
   const handleSave = async () => {
-    // Map to API POST body for /domains
-    // Need: userType ("autoshopowner'/'carowner'), userId, domain, domainType, expiry, provider, dns
     let userTypeApi = mapLocalUserTypeToApi(form.userType);
     let userId: string | null = null;
 
     if (userTypeApi === "autoshopowner") {
       const owner =
         activeOwner ?? owners.find((o) => ownerDisplayName(o) === form.userName) ?? null;
-      // Try by businessProfile, fallback to _id
       if (owner?.businessProfile?._id) userId = owner.businessProfile._id;
       else if (owner?._id) userId = owner._id;
       else userId = null;
@@ -693,36 +712,43 @@ export default function Domain() {
       )
     : sourceDomains;
 
-  const filteredDomainRows = visibleDomains.filter((row) => {
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !q ||
-      userTypeLabel(row.userType).toLowerCase().includes(q) ||
-      row.userName.toLowerCase().includes(q) ||
-      row.domain.toLowerCase().includes(q) ||
-      domainTypeLabel(row.domainType).toLowerCase().includes(q) ||
-      row.expiry.toLowerCase().includes(q) ||
-      row.providerLabel.toLowerCase().includes(q) ||
-      row.dns.toLowerCase().includes(q);
+  // Instead of backend paginating deleted view, we filter locally  
+  const filteredDomainRows = isDeletedView
+    ? visibleDomains.filter((row) => {
+        const q = search.toLowerCase();
+        const matchesSearch =
+          !q ||
+          userTypeLabel(row.userType).toLowerCase().includes(q) ||
+          row.userName.toLowerCase().includes(q) ||
+          row.domain.toLowerCase().includes(q) ||
+          domainTypeLabel(row.domainType).toLowerCase().includes(q) ||
+          row.expiry.toLowerCase().includes(q) ||
+          row.providerLabel.toLowerCase().includes(q) ||
+          row.dns.toLowerCase().includes(q);
 
-    if (!matchesSearch) return false;
+        if (!matchesSearch) return false;
 
-    return (
-      searchEquals(userTypeLabel(row.userType), searchFilters.userType) &&
-      searchIncludes(row.userName, searchFilters.userName) &&
-      searchIncludes(row.domain, searchFilters.domain) &&
-      searchEquals(domainTypeLabel(row.domainType), searchFilters.domainType) &&
-      searchIncludes(toDateInputValue(row.expiryRaw) || row.expiry, searchFilters.expiry) &&
-      searchEquals(row.providerLabel, searchFilters.provider) &&
-      searchIncludes(row.dns, searchFilters.dns)
-    );
-  });
+        return (
+          searchEquals(userTypeLabel(row.userType), searchFilters.userType) &&
+          searchIncludes(row.userName, searchFilters.userName) &&
+          searchIncludes(row.domain, searchFilters.domain) &&
+          searchEquals(domainTypeLabel(row.domainType), searchFilters.domainType) &&
+          searchIncludes(toDateInputValue(row.expiryRaw) || row.expiry, searchFilters.expiry) &&
+          searchEquals(row.providerLabel, searchFilters.provider) &&
+          searchIncludes(row.dns, searchFilters.dns)
+        );
+      })
+    : visibleDomains;
 
-  const totalPages = Math.max(1, Math.ceil(filteredDomainRows.length / entriesPerPage));
-  const pagedDomainRows = filteredDomainRows.slice(
-    (page - 1) * entriesPerPage,
-    page * entriesPerPage
+  // For deleted view, perform local pagination. For live backend, assume BE paging.
+  const totalPages = Math.max(
+    1,
+    isDeletedView ? Math.ceil(filteredDomainRows.length / entriesPerPage) : 1
   );
+
+  const pagedDomainRows = isDeletedView
+    ? filteredDomainRows.slice((page - 1) * entriesPerPage, page * entriesPerPage)
+    : filteredDomainRows;
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -796,6 +822,7 @@ export default function Domain() {
     setShowSearchCard((open) => !open);
   };
 
+  // ---  Backend search/filters: Submit filters to API. Local-update only when in deleted view.
   const handleSearchCardSearch = () => {
     setSearchFilters({ ...searchDraft });
     setPage(1);

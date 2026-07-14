@@ -51,16 +51,29 @@ export function PermissionMatrix({
   permissions,
   onChange,
   readOnly,
+  permissionAll = false,
 }: {
   permissions: Permissions;
   onChange: (perms: Permissions) => void;
   readOnly?: boolean;
+  permissionAll?: boolean;
 }) {
+  // If permissionAll is true, display all permissions as "✓" and table is always readOnly
+  const isSuperAdmin = !!permissionAll;
+
+  const getModulePerms = (modKey: string): ModulePermissions =>
+    isSuperAdmin
+      ? { view: true, add: true, edit: true, delete: true }
+      : permissions[modKey] || { view: false, add: false, edit: false, delete: false };
+
+  // We don't allow toggling for super admin
   const toggle = (mod: string, action: Action) => {
+    if (isSuperAdmin) return;
     onChange({ ...permissions, [mod]: { ...permissions[mod], [action]: !permissions[mod][action] } });
   };
 
   const toggleModule = (mod: string) => {
+    if (isSuperAdmin) return;
     const allOn = ACTIONS.every((a) => permissions[mod][a]);
     onChange({
       ...permissions,
@@ -69,6 +82,7 @@ export function PermissionMatrix({
   };
 
   const toggleAll = () => {
+    if (isSuperAdmin) return;
     const totalOn = MODULES.every((m) => ACTIONS.every((a) => permissions[m.key]?.[a]));
     onChange(
       Object.fromEntries(
@@ -77,12 +91,15 @@ export function PermissionMatrix({
     );
   };
 
-  const allOn = MODULES.every((m) => ACTIONS.every((a) => permissions[m.key]?.[a]));
+  // For super admin, all permissions are on
+  const allOn = isSuperAdmin
+    ? true
+    : MODULES.every((m) => ACTIONS.every((a) => permissions[m.key]?.[a]));
 
   return (
     <div className="overflow-x-auto">
       <div className="mb-2 flex justify-end">
-        {!readOnly && (
+        {!readOnly && !isSuperAdmin && (
           <button
             type="button"
             onClick={toggleAll}
@@ -90,6 +107,11 @@ export function PermissionMatrix({
           >
             {allOn ? "Deselect All" : "Select All"}
           </button>
+        )}
+        {isSuperAdmin && (
+          <span className="text-green-700 text-xs font-bold mr-2">
+            Super Admin: All permissions enabled
+          </span>
         )}
       </div>
       <table className="w-full border-collapse text-sm">
@@ -101,33 +123,33 @@ export function PermissionMatrix({
                 {a}
               </th>
             ))}
-            {!readOnly && <th style={{ ...thStyle, textAlign: "center" }}>All</th>}
+            {!readOnly && !isSuperAdmin && <th style={{ ...thStyle, textAlign: "center" }}>All</th>}
           </tr>
         </thead>
         <tbody>
           {MODULES.map((mod, idx) => {
-            const p = permissions[mod.key] || { view: false, add: false, edit: false, delete: false };
+            const p = getModulePerms(mod.key);
             const modAllOn = ACTIONS.every((a) => p[a]);
             return (
               <tr key={mod.key} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                 <td style={{ ...tdStyle, fontWeight: 600 }}>{mod.label}</td>
                 {ACTIONS.map((a) => (
                   <td key={a} style={{ ...tdStyle, textAlign: "center" }}>
-                    {readOnly ? (
-                      <span className={p[a] ? "font-bold text-ad-green" : "font-bold text-red-600"}>
-                        {p[a] ? "✓" : "✗"}
-                      </span>
-                    ) : (
+                    <span className={p[a] ? "font-bold text-ad-green" : "font-bold text-red-600"}>
+                      {p[a] ? "✓" : "✗"}
+                    </span>
+                    {!readOnly && !isSuperAdmin ? (
                       <input
                         type="checkbox"
                         checked={!!p[a]}
                         onChange={() => toggle(mod.key, a)}
-                        className="h-4 w-4 cursor-pointer accent-ad-purple"
+                        className="h-4 w-4 cursor-pointer accent-ad-purple ml-2"
+                        style={{ display: "inline-block" }}
                       />
-                    )}
+                    ) : null}
                   </td>
                 ))}
-                {!readOnly && (
+                {!readOnly && !isSuperAdmin && (
                   <td style={{ ...tdStyle, textAlign: "center" }}>
                     <button
                       type="button"

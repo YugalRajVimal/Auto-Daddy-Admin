@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "react-router";
-import { FiPaperclip } from "react-icons/fi";
+import { FiPaperclip, FiVolume2, FiLoader } from "react-icons/fi";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
@@ -10,7 +10,7 @@ import AdminSearchCard, {
   searchIncludes,
   type AdminSearchField,
 } from "../../../components/admin/AdminSearchCard";
-import ClipImageHover from "../../../components/admin/ClipImageHover";
+// import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
   CompactAutoGrowTextarea,
   CompactField,
@@ -19,12 +19,16 @@ import {
   CompactFormRow,
   compactFixedFieldWidth,
   compactInputClass,
-  compactReadOnlyMultilineClass,
+  // compactReadOnlyMultilineClass,
   compactReadOnlyValueClass,
 } from "../../../components/admin/ContentPanel";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+
+const API_ROOT = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api/admin`
+  : "/api/admin";
 
 const USER_TYPE_SEARCH_OPTIONS = [
   { value: "carOwner", label: "Car Owner" },
@@ -41,11 +45,13 @@ const SENT_SEARCH_FIELDS: AdminSearchField[] = [
 
 const RECEIVED_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "date", label: "Date", type: "date" },
-  { key: "title", label: "Title" },
-  { key: "note", label: "Message" },
   { key: "userType", label: "User Type", type: "select", options: USER_TYPE_SEARCH_OPTIONS },
   { key: "user", label: "User" },
   { key: "ticketNo", label: "Ticket No." },
+  { key: "status", label: "Status", type: "select", options: [
+    { value: "resolved", label: "Resolved" },
+    { value: "unresolved", label: "Unresolved" }
+  ]},
 ];
 
 interface InviteHelp {
@@ -57,7 +63,7 @@ interface InviteHelp {
   imageUrl?: string | null;
   userType?: UserType;
   status?: "resolved" | "unresolved";
-  audioBlob?: { data: number[]; type: string };
+  audioBlob?: { type: string; data: number[] } | { type: "Buffer"; data: number[] };
   audioUrl?: string;
   createdAt?: string;
   userId?: {
@@ -124,157 +130,6 @@ const SHOP_OWNER_USERS = [
   "Eastside Detailing",
 ];
 
-const notifImageUrl = (id: number) => `https://picsum.photos/seed/notif-${id}/480/320`;
-
-const DUMMY_SENT_NOTIFICATIONS: SentNotification[] = [
-  { _id: "sent-1", date: "2026-06-18", title: "Summer Service Reminder", note: "Book your seasonal oil change and tire rotation before July.", imageUrl: notifImageUrl(1), userType: "carOwner", userScope: "all" },
-  { _id: "sent-2", date: "2026-06-17", title: "New Dealer Partner Alert", note: "A new dealer partner is now available in your area.", imageUrl: notifImageUrl(2), userType: "carOwner", userScope: "particular", particularUsers: ["John Smith"] },
-  { _id: "sent-3", date: "2026-06-16", title: "Platform Maintenance", note: "Scheduled maintenance tonight from 11 PM to 1 AM EST.", imageUrl: null, userType: "shopOwner", userScope: "all" },
-  { _id: "sent-4", date: "2026-06-15", title: "Invoice Upload Reminder", note: "Please upload pending invoices for May billing cycle.", imageUrl: notifImageUrl(4), userType: "shopOwner", userScope: "particular", particularUsers: ["Northside Auto"] },
-  { _id: "sent-5", date: "2026-06-14", title: "Winter Tire Promo", note: "Early-bird discount on winter tire packages — limited slots.", imageUrl: notifImageUrl(5), userType: "carOwner", userScope: "all" },
-  { _id: "sent-6", date: "2026-06-13", title: "Profile Completion", note: "Complete your shop profile to appear in local search results.", imageUrl: notifImageUrl(6), userType: "shopOwner", userScope: "particular", particularUsers: ["Premium Auto Care"] },
-  { _id: "sent-7", date: "2026-06-12", title: "Referral Bonus Live", note: "Earn credits when you refer a friend to AutoDaddy.", imageUrl: notifImageUrl(7), userType: "carOwner", userScope: "particular", particularUsers: ["Maria Garcia"] },
-  { _id: "sent-8", date: "2026-06-11", title: "Lead Assignment Update", note: "New leads are now routed based on your service categories.", imageUrl: null, userType: "shopOwner", userScope: "all" },
-  { _id: "sent-9", date: "2026-06-10", title: "Payment Received", note: "Your wallet payment for job card #4821 has been processed.", imageUrl: notifImageUrl(9), userType: "carOwner", userScope: "particular", particularUsers: ["David Chen"] },
-  { _id: "sent-10", date: "2026-06-09", title: "Ad Campaign Tips", note: "Boost visibility with these best practices for dealer ads.", imageUrl: notifImageUrl(10), userType: "shopOwner", userScope: "particular", particularUsers: ["Kim Auto Shop"] },
-  { _id: "sent-11", date: "2026-06-08", title: "App Update Available", note: "Version 2.4 includes faster booking and push notification fixes.", imageUrl: notifImageUrl(11), userType: "carOwner", userScope: "all" },
-  { _id: "sent-12", date: "2026-06-07", title: "Holiday Hours", note: "Support hours will be reduced on the upcoming public holiday.", imageUrl: null, userType: "shopOwner", userScope: "particular", particularUsers: ["City Tire & Brake"] },
-];
-
-const DUMMY_AUDIO_URL = "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3";
-
-const DUMMY_RECEIVED_NOTIFICATIONS: InviteHelp[] = [
-  {
-    _id: "recv-1",
-    date: "2026-06-18",
-    ticketNo: "TK-240618",
-    title: "Brake Noise Complaint",
-    message: "Hearing a grinding sound when braking at low speeds. Can someone advise?",
-    imageUrl: notifImageUrl(101),
-    userType: "carOwner",
-    status: "unresolved",
-    audioUrl: DUMMY_AUDIO_URL,
-    userId: { name: "John Smith", email: "john.smith@email.com" },
-  },
-  {
-    _id: "recv-2",
-    date: "2026-06-17",
-    ticketNo: "TK-240617",
-    title: "Invoice Dispute",
-    message: "The last job card total does not match the invoice uploaded to wallet.",
-    imageUrl: notifImageUrl(102),
-    userType: "shopOwner",
-    userId: { businessProfile: { businessName: "Northside Auto", businessEmail: "billing@northsideauto.com" } },
-  },
-  {
-    _id: "recv-3",
-    date: "2026-06-16",
-    ticketNo: "TK-240616",
-    title: "App Login Issue",
-    message: "Unable to sign in after password reset — getting session expired error.",
-    imageUrl: null,
-    userType: "carOwner",
-    status: "unresolved",
-    audioUrl: DUMMY_AUDIO_URL,
-    userId: { name: "Maria Garcia", email: "maria.g@email.com" },
-  },
-  {
-    _id: "recv-4",
-    date: "2026-06-15",
-    ticketNo: "TK-240615",
-    title: "Lead Not Received",
-    message: "We did not receive the oil change lead assigned yesterday afternoon.",
-    imageUrl: null,
-    userType: "shopOwner",
-    userId: { businessProfile: { businessName: "Premium Auto Care" } },
-  },
-  {
-    _id: "recv-5",
-    date: "2026-06-14",
-    ticketNo: "TK-240614",
-    title: "Referral Credit Missing",
-    message: "Referred a friend last week but referral bonus has not appeared in wallet.",
-    imageUrl: notifImageUrl(105),
-    userType: "carOwner",
-    userId: { name: "David Chen", email: "david.chen@email.com" },
-  },
-  {
-    _id: "recv-6",
-    date: "2026-06-13",
-    ticketNo: "TK-240613",
-    title: "Shop Profile Photo",
-    message: "Uploaded new shop photos but they are still not showing on our listing.",
-    imageUrl: notifImageUrl(106),
-    userType: "shopOwner",
-    audioUrl: DUMMY_AUDIO_URL,
-    userId: { businessProfile: { businessName: "Kim Auto Shop" } },
-  },
-  {
-    _id: "recv-7",
-    date: "2026-06-12",
-    ticketNo: "TK-240612",
-    title: "Booking Cancellation",
-    message: "Need to cancel tomorrow's appointment and rebook for next Monday.",
-    imageUrl: null,
-    userType: "carOwner",
-    userId: { name: "Sarah Johnson", email: "sarah.j@email.com" },
-  },
-  {
-    _id: "recv-8",
-    date: "2026-06-11",
-    ticketNo: "TK-240611",
-    title: "Ad Performance Query",
-    message: "Dealer ad impressions dropped sharply this week — please review campaign settings.",
-    imageUrl: notifImageUrl(108),
-    userType: "shopOwner",
-    userId: { businessProfile: { businessName: "City Tire & Brake" } },
-  },
-  {
-    _id: "recv-9",
-    date: "2026-06-10",
-    ticketNo: "TK-240610",
-    title: "Payment Not Reflected",
-    message: "Customer payment for job #4821 was processed but wallet balance unchanged.",
-    imageUrl: notifImageUrl(109),
-    userType: "carOwner",
-    status: "unresolved",
-    audioUrl: DUMMY_AUDIO_URL,
-    userId: { name: "Michael Brown", email: "m.brown@email.com" },
-  },
-  {
-    _id: "recv-10",
-    date: "2026-06-09",
-    ticketNo: "TK-240609",
-    title: "Service Category Update",
-    message: "Please add EV battery diagnostics to our shop service categories.",
-    imageUrl: null,
-    userType: "shopOwner",
-    userId: { businessProfile: { businessName: "Lakeview Auto Repair" } },
-  },
-  {
-    _id: "recv-11",
-    date: "2026-06-08",
-    ticketNo: "TK-240608",
-    title: "Voice Message Follow-up",
-    message: "Following up on my earlier voice note about the transmission slipping issue.",
-    imageUrl: notifImageUrl(111),
-    userType: "carOwner",
-    status: "unresolved",
-    audioUrl: DUMMY_AUDIO_URL,
-    userId: { name: "Emily Wilson", email: "emily.w@email.com" },
-  },
-  {
-    _id: "recv-12",
-    date: "2026-06-07",
-    ticketNo: "TK-240607",
-    title: "Detailing Package Inquiry",
-    message: "Looking for pricing on full interior and exterior detailing for fleet vehicles.",
-    imageUrl: notifImageUrl(112),
-    userType: "shopOwner",
-    userId: { businessProfile: { businessName: "Eastside Detailing" } },
-  },
-];
-
 function userTypeLabel(userType: UserType) {
   return USER_TYPE_OPTIONS.find((o) => o.value === userType)?.label ?? userType;
 }
@@ -325,20 +180,81 @@ function receivedImageUrl(inv: InviteHelp) {
   return inv.imageUrl ?? null;
 }
 
-function receivedAudioUrl(inv: InviteHelp) {
-  if (inv.audioUrl) return inv.audioUrl;
-  if (
-    inv.audioBlob?.data &&
-    Array.isArray(inv.audioBlob.data) &&
-    inv.audioBlob.type === "Buffer"
-  ) {
-    return arrayBufferToBlobUrl(inv.audioBlob.data);
+// --- Audio blob fetching by id ---
+// FIX: Handle Node.js Buffer object shape from backend ("{ type: 'Buffer', data: [...] }")
+async function fetchInviteHelpAudioBlob(
+  id: string
+): Promise<{ data: number[]; type: string } | null> {
+  const res = await fetch(`${API_ROOT}/invite-help/audio/${id}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    return null;
   }
+  const data = await res.json();
+
+  // Supporting possible Buffer object: data.audioBlob may be {type: 'Buffer', data: [...]}
+  let audioBlob: { type?: string; data?: any } | undefined = data?.audioBlob;
+
+  if (audioBlob && typeof audioBlob === "object") {
+    if (
+      audioBlob.type === "Buffer" &&
+      Array.isArray(audioBlob.data)
+    ) {
+      // Return in standard format, fixing type as "audio/webm" for playback if needed
+      return {
+        data: audioBlob.data,
+        type: "audio/webm",
+      };
+    }
+    // If already standard (type + data), return as is
+    if (
+      typeof audioBlob.type === "string" &&
+      Array.isArray(audioBlob.data)
+    ) {
+      return {
+        data: audioBlob.data,
+        type: audioBlob.type || "audio/webm",
+      };
+    }
+  }
+
+  // If returned as { data: ... }:
+  if (data?.data && Array.isArray(data.data)) {
+    return {
+      data: data.data,
+      type: "audio/webm",
+    };
+  }
+
+  // Unknown/invalid format
   return null;
 }
 
 function isSentNotification(item: InviteHelp | SentNotification): item is SentNotification {
   return "userScope" in item && "note" in item;
+}
+
+async function fetchInviteHelps(): Promise<InviteHelp[]> {
+  const res = await fetch(`${API_ROOT}/invite-help`, {
+    credentials: "include",
+  });
+
+  if (!res.ok) throw new Error(`Failed to fetch: ${await res.text()}`);
+
+  const data = await res.json();
+  return data.data ?? [];
+}
+
+async function updateInviteHelpStatus(id: string, status: "resolved" | "unresolved"): Promise<InviteHelp> {
+  const res = await fetch(`${API_ROOT}/invite-help/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error(`Failed to update: ${await res.text()}`);
+  return await res.json();
 }
 
 export default function Invitehelp({
@@ -348,12 +264,16 @@ export default function Invitehelp({
 }: InvitehelpProps) {
   const location = useLocation();
   const navResetToken = (location.state as NavResetLocationState | null)?.navReset;
-  const [inviteHelps, setInviteHelps] = useState<InviteHelp[]>(DUMMY_RECEIVED_NOTIFICATIONS);
-  const [sentNotifications, setSentNotifications] = useState<SentNotification[]>(DUMMY_SENT_NOTIFICATIONS);
-  const [loading] = useState(false);
+  const [inviteHelps, setInviteHelps] = useState<InviteHelp[]>([]);
+  const [sentNotifications, setSentNotifications] = useState<SentNotification[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [imagePreview, setImagePreview] = useState<{ url: string; title: string } | null>(null);
+
+  const [audioUrls, setAudioUrls] = useState<Record<string, string | null>>({});
+  const [audioLoading, setAudioLoading] = useState<Record<string, boolean>>({});
+  const [audioError, setAudioError] = useState<Record<string, string | null>>({});
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
@@ -364,7 +284,7 @@ export default function Invitehelp({
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
 
-  const [notifDate, setNotifDate] = useState("2026-06-18");
+  const [notifDate, setNotifDate] = useState("");
   const [notifTitle, setNotifTitle] = useState("");
   const [notifNote, setNotifNote] = useState("");
   const [attachImage, setAttachImage] = useState(false);
@@ -373,6 +293,26 @@ export default function Invitehelp({
   const [selectedUser, setSelectedUser] = useState("");
 
   const [viewingReceived, setViewingReceived] = useState<InviteHelp | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    if (section !== "received") return;
+    setLoading(true);
+    fetchInviteHelps()
+      .then((lst) => {
+        if (ignore) return;
+        setInviteHelps(lst);
+        setLoading(false);
+      })
+      .catch((e) => {
+        setError(e.message);
+        setLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
+    // eslint-disable-next-line
+  }, [location.pathname, navResetToken, section]);
 
   const resetTableControls = () => {
     setPage(1);
@@ -392,6 +332,7 @@ export default function Invitehelp({
 
   const closeReceivedView = () => {
     setViewingReceived(null);
+    setError("");
   };
 
   useEffect(() => {
@@ -424,6 +365,41 @@ export default function Invitehelp({
     setSearch("");
   }, [section]);
 
+  // Audio - Fetch on demand when needed
+  const handleFetchAudio = useCallback(async (id: string) => {
+    setAudioLoading((curr) => ({ ...curr, [id]: true }));
+    setAudioError((curr) => ({ ...curr, [id]: null }));
+    setAudioUrls((urls) => ({ ...urls, [id]: null }));
+    try {
+      const dataBlob = await fetchInviteHelpAudioBlob(id);
+      if (
+        dataBlob &&
+        Array.isArray(dataBlob.data) &&
+        typeof dataBlob.type === "string"
+      ) {
+        const url = arrayBufferToBlobUrl(dataBlob.data, dataBlob.type);
+        setAudioUrls((curr) => ({ ...curr, [id]: url }));
+      } else {
+        setAudioError((curr) => ({
+          ...curr,
+          [id]: "No audio available",
+        }));
+      }
+    } catch (e: any) {
+      setAudioError((curr) => ({
+        ...curr,
+        [id]: "Audio fetch failed",
+      }));
+    } finally {
+      setAudioLoading((curr) => ({ ...curr, [id]: false }));
+    }
+  }, []);
+
+  function hasAudio(inv: InviteHelp): boolean {
+    // Handle node Buffer blob (type: "Buffer"), or standard object with data array
+    return Boolean(inv.audioUrl || (inv.audioBlob && Array.isArray((inv.audioBlob as any).data) && (inv.audioBlob as any).data.length > 0));
+  }
+
   const filteredReceived = (isDeletedView
     ? deletedStash.filter((item): item is InviteHelp => !isSentNotification(item))
     : inviteHelps
@@ -434,17 +410,17 @@ export default function Invitehelp({
       receivedDate(inv).toLowerCase().includes(q) ||
       receivedTicketNo(inv).toLowerCase().includes(q) ||
       userTypeLabel(receivedUserType(inv)).toLowerCase().includes(q) ||
-      receivedUserName(inv).toLowerCase().includes(q) ||
-      (inv.title || "").toLowerCase().includes(q) ||
-      (inv.message || "").toLowerCase().includes(q);
+      receivedUserName(inv).toLowerCase().includes(q);
     if (!live) return false;
     return (
       searchIncludes(receivedDate(inv), searchFilters.date) &&
-      searchIncludes(inv.title || "", searchFilters.title) &&
-      searchIncludes(inv.message || "", searchFilters.note) &&
       searchEquals(receivedUserType(inv), searchFilters.userType) &&
       searchIncludes(receivedUserName(inv), searchFilters.user) &&
-      searchIncludes(receivedTicketNo(inv), searchFilters.ticketNo ?? "")
+      searchIncludes(receivedTicketNo(inv), searchFilters.ticketNo ?? "") &&
+      (
+        !searchFilters.status ||
+        (searchFilters.status === inv.status)
+      )
     );
   });
 
@@ -471,7 +447,6 @@ export default function Invitehelp({
   });
 
   const filtered = section === "sent" ? filteredSent : filteredReceived;
-
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
 
@@ -508,15 +483,14 @@ export default function Invitehelp({
 
     printAdminTable({
       title: isDeletedView ? "Deleted Messages Received" : "Messages Received",
-      headers: ["Date", "Ticket No.", "User Type", "User Name", "Title", "Audio", "Message", "Attachment"],
+      headers: ["Date", "Ticket No.", "User Type", "User Name", "Audio", "Status", "Attachment"],
       rows: filteredReceived.map((invite) => [
           receivedDate(invite),
           receivedTicketNo(invite),
           userTypeLabel(receivedUserType(invite)),
           receivedUserName(invite),
-          invite.title || "—",
-          receivedAudioUrl(invite) ? "Yes" : "No",
-          invite.message || "—",
+          hasAudio(invite) ? "Yes" : "No",
+          invite.status ? invite.status.charAt(0).toUpperCase() + invite.status.slice(1) : "—",
           receivedImageUrl(invite) ? "Yes" : "—",
         ]),
     });
@@ -565,7 +539,7 @@ export default function Invitehelp({
   };
 
   const resetForm = () => {
-    setNotifDate("2026-06-18");
+    setNotifDate("");
     setNotifTitle("");
     setNotifNote("");
     setAttachImage(false);
@@ -627,6 +601,24 @@ export default function Invitehelp({
     setShowForm(false);
   };
 
+  const handleStatusChange = async (id: string, status: "resolved" | "unresolved") => {
+    setLoading(true);
+    setError("");
+    try {
+      const updated = await updateInviteHelpStatus(id, status);
+      setInviteHelps((prev) =>
+        prev.map((item) => (item._id === id ? { ...item, ...updated } : item))
+      );
+      if (viewingReceived && viewingReceived._id === id) setViewingReceived({ ...viewingReceived, ...updated });
+      adminNotify.success("Status updated.");
+    } catch (e: any) {
+      setError(e?.message || "Failed to update status.");
+      adminNotify.error(e?.message || "Failed to update status.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const addFormPanel = showForm && section === "sent" ? (
     <CompactFormPanel
       footer={
@@ -640,155 +632,224 @@ export default function Invitehelp({
     >
       <>
         <CompactFormRow className="w-full items-start">
-            <CompactField label="Date" required className={compactFixedFieldWidth}>
-              <input
-                type="date"
-                value={notifDate}
-                onChange={(e) => setNotifDate(e.target.value)}
-                className={compactInputClass}
-              />
-            </CompactField>
-            <CompactField label="User Type" required className={compactFixedFieldWidth}>
-              <select
-                value={userType}
-                onChange={(e) => {
-                  const next = e.target.value as UserType;
-                  setUserType(next);
-                  setSelectedUser("");
-                }}
-                className={compactInputClass}
-              >
-                {USER_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </CompactField>
-            <CompactField label="User" className={compactFixedFieldWidth}>
-              <select
-                value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className={compactInputClass}
-              >
-                <option value="">All</option>
-                {particularUsersForType(userType).map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </CompactField>
-            <CompactField label="Title" required className={compactFixedFieldWidth}>
-              <input
-                type="text"
-                value={notifTitle}
-                onChange={(e) => setNotifTitle(e.target.value)}
-                className={compactInputClass}
-              />
-            </CompactField>
-            <CompactField label="Note" required className="min-w-0 flex-1">
-              <CompactAutoGrowTextarea
-                value={notifNote}
-                onChange={(e) => setNotifNote(e.target.value)}
-              />
-            </CompactField>
-          </CompactFormRow>
-          <CompactFormRow className="items-start justify-start">
-            <AttachImageCheckbox
-              checked={attachImage}
-              onCheckedChange={setAttachImage}
-              file={notifImage}
-              onFileChange={setNotifImage}
+          <CompactField label="Date" required className={compactFixedFieldWidth}>
+            <input
+              type="date"
+              value={notifDate}
+              onChange={(e) => setNotifDate(e.target.value)}
+              className={compactInputClass}
             />
-          </CompactFormRow>
-        </>
+          </CompactField>
+          <CompactField label="User Type" required className={compactFixedFieldWidth}>
+            <select
+              value={userType}
+              onChange={(e) => {
+                const next = e.target.value as UserType;
+                setUserType(next);
+                setSelectedUser("");
+              }}
+              className={compactInputClass}
+            >
+              {USER_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </CompactField>
+          <CompactField label="User" className={compactFixedFieldWidth}>
+            <select
+              value={selectedUser}
+              onChange={(e) => setSelectedUser(e.target.value)}
+              className={compactInputClass}
+            >
+              <option value="">All</option>
+              {particularUsersForType(userType).map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </CompactField>
+          <CompactField label="Title" required className={compactFixedFieldWidth}>
+            <input
+              type="text"
+              value={notifTitle}
+              onChange={(e) => setNotifTitle(e.target.value)}
+              className={compactInputClass}
+            />
+          </CompactField>
+          <CompactField label="Note" required className="min-w-0 flex-1">
+            <CompactAutoGrowTextarea
+              value={notifNote}
+              onChange={(e) => setNotifNote(e.target.value)}
+            />
+          </CompactField>
+        </CompactFormRow>
+        <CompactFormRow className="items-start justify-start">
+          <AttachImageCheckbox
+            checked={attachImage}
+            onCheckedChange={setAttachImage}
+            file={notifImage}
+            onFileChange={setNotifImage}
+          />
+        </CompactFormRow>
+      </>
     </CompactFormPanel>
   ) : undefined;
 
   const receivedViewPanel =
     section === "received" && viewingReceived ? (
-    <CompactFormPanel
-      footer={
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
-          <div />
-          <span className="text-center text-xs font-serif italic text-gray-800">
-            You are viewing a &apos;Received Notification&apos;
-          </span>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={closeReceivedView}
-              className="rounded border border-gray-400 bg-white px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              Close
-            </button>
+      <CompactFormPanel
+        footer={
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+            <div />
+            <span className="text-center text-xs font-serif italic text-gray-800">
+              You are viewing a &apos;Received Notification&apos;
+            </span>
+            <div className="flex justify-end gap-2">
+              {viewingReceived?.status && (
+                <button
+                  type="button"
+                  className={`rounded px-4 py-1 text-sm font-medium ${
+                    viewingReceived.status === "resolved"
+                      ? "border border-green-700 bg-green-50 text-green-700 hover:bg-green-100"
+                      : "border border-gray-600 bg-gray-50 text-gray-700 hover:bg-gray-100"
+                  }`}
+                  disabled={loading}
+                  onClick={() =>
+                    handleStatusChange(
+                      viewingReceived._id,
+                      viewingReceived.status === "resolved" ? "unresolved" : "resolved"
+                    )
+                  }
+                >
+                  Mark as {viewingReceived.status === "resolved" ? "Unresolved" : "Resolved"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={closeReceivedView}
+                className="rounded border border-gray-400 bg-white px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
           </div>
-        </div>
-      }
-    >
-      <CompactFormRow className="w-full items-start">
-        <CompactField label="Date">
-          <div className={compactReadOnlyValueClass}>{receivedDate(viewingReceived)}</div>
-        </CompactField>
-        <CompactField label="Ticket No.">
-          <div className={compactReadOnlyValueClass}>{receivedTicketNo(viewingReceived)}</div>
-        </CompactField>
-        <CompactField label="User Type">
-          <div className={compactReadOnlyValueClass}>{userTypeLabel(receivedUserType(viewingReceived))}</div>
-        </CompactField>
-        <CompactField label="User Name">
-          <div className={compactReadOnlyValueClass}>{receivedUserName(viewingReceived)}</div>
-        </CompactField>
-        <CompactField label="Title">
-          <div className={compactReadOnlyValueClass}>{viewingReceived.title || "—"}</div>
-        </CompactField>
-        <CompactField label="Audio">
-          {receivedAudioUrl(viewingReceived) ? (
-            <audio controls src={receivedAudioUrl(viewingReceived)!} className="h-[30px] w-full accent-blue-600" />
-          ) : (
-            <div className={`${compactReadOnlyValueClass} text-gray-500`}>No audio</div>
-          )}
-        </CompactField>
-      </CompactFormRow>
-      <CompactFormRow className="w-full items-start">
-        <CompactField label="Message" className="min-w-0 basis-full">
-          <div className={`${compactReadOnlyMultilineClass} whitespace-pre-wrap`}>
-            {viewingReceived.message || "—"}
-          </div>
-        </CompactField>
-      </CompactFormRow>
-      <CompactFormRow className="w-full items-start">
-        <div className="flex min-w-0 basis-full flex-col items-start gap-1.5">
-          <label className="inline-flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-            <input
-              type="checkbox"
-              checked={Boolean(receivedImageUrl(viewingReceived))}
-              readOnly
-              disabled
-              className="h-3.5 w-3.5 accent-ad-green"
-            />
-            Attached Image
-          </label>
-          {receivedImageUrl(viewingReceived) ? (
-            <button
-              type="button"
-              onClick={() =>
-                setImagePreview({
-                  url: receivedImageUrl(viewingReceived)!,
-                  title: `${viewingReceived.title || receivedTicketNo(viewingReceived)} — attached image`,
-                })
+        }
+      >
+        <CompactFormRow className="w-full items-start">
+          <CompactField label="Date">
+            <div className={compactReadOnlyValueClass}>{receivedDate(viewingReceived)}</div>
+          </CompactField>
+          <CompactField label="Ticket No.">
+            <div className={compactReadOnlyValueClass}>{receivedTicketNo(viewingReceived)}</div>
+          </CompactField>
+          <CompactField label="User Type">
+            <div className={compactReadOnlyValueClass}>{userTypeLabel(receivedUserType(viewingReceived))}</div>
+          </CompactField>
+          <CompactField label="User Name">
+            <div className={compactReadOnlyValueClass}>{receivedUserName(viewingReceived)}</div>
+          </CompactField>
+          <CompactField label="Status">
+            <div className={compactReadOnlyValueClass}>
+              {viewingReceived.status ? viewingReceived.status.charAt(0).toUpperCase() + viewingReceived.status.slice(1) : "—"}
+            </div>
+          </CompactField>
+          <CompactField label="Audio">
+            {/* Display: icon -> spinner -> error/text -> playback */}
+            {(() => {
+              const id = viewingReceived._id;
+              if (viewingReceived.audioUrl) {
+                return (
+                  <audio controls src={viewingReceived.audioUrl} className="h-[30px] w-full accent-blue-600" />
+                );
               }
-              className="inline-flex items-center gap-1.5 rounded border border-gray-400 bg-white px-3 py-0.5 text-xs font-medium text-ad-purple hover:bg-ad-purple/10"
-            >
-              <FiPaperclip size={16} aria-hidden />
-              View Image
-            </button>
-          ) : null}
-        </div>
-      </CompactFormRow>
-    </CompactFormPanel>
-  ) : undefined;
+              // Handle Buffer type in audioBlob (Node <Buffer> or { type:..., data:... })
+              if (
+                viewingReceived.audioBlob &&
+                Array.isArray((viewingReceived.audioBlob as any).data) &&
+                (viewingReceived.audioBlob as any).data.length > 0
+              ) {
+                const buffer = (viewingReceived.audioBlob as any).data;
+                // try to use type from object, else default to audio/webm
+                const bType =
+                  typeof (viewingReceived.audioBlob as any).type === "string"
+                    ? (viewingReceived.audioBlob as any).type
+                    : "audio/webm";
+                const url = arrayBufferToBlobUrl(buffer, bType);
+                return (
+                  <audio controls src={url} className="h-[30px] w-full accent-blue-600" />
+                );
+              }
+              const isLoading = !!audioLoading[id];
+              const url = audioUrls[id];
+              const err = audioError[id];
+              if (isLoading) {
+                return (
+                  <span className={compactReadOnlyValueClass + " flex gap-1 items-center text-gray-400"}>
+                    <FiLoader className="animate-spin" /> Loading...
+                  </span>
+                );
+              }
+              if (url) {
+                return (
+                  <audio controls src={url} className="h-[30px] w-full accent-blue-600" />
+                );
+              }
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleFetchAudio(id)}
+                    disabled={isLoading}
+                    className={"inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border " +
+                      (isLoading
+                        ? "bg-gray-200 border-gray-300 text-gray-400 cursor-wait"
+                        : err
+                          ? "border-red-400 text-red-700 bg-red-100"
+                          : "bg-white border-blue-400 text-blue-700 hover:bg-blue-50")}
+                    aria-label="Fetch and play audio"
+                  >
+                    <FiVolume2 /> {err ? "Retry Audio" : "Play Audio"}
+                  </button>
+                  {err && <span className="ml-2 text-xs text-red-600">{err}</span>}
+                </>
+              );
+            })()}
+          </CompactField>
+        </CompactFormRow>
+        <CompactFormRow className="w-full items-start">
+          <div className="flex min-w-0 basis-full flex-col items-start gap-1.5">
+            <label className="inline-flex items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+              <input
+                type="checkbox"
+                checked={Boolean(receivedImageUrl(viewingReceived))}
+                readOnly
+                disabled
+                className="h-3.5 w-3.5 accent-ad-green"
+              />
+              Attached Image
+            </label>
+            {receivedImageUrl(viewingReceived) ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setImagePreview({
+                    url: receivedImageUrl(viewingReceived)!,
+                    title: `${viewingReceived.title || receivedTicketNo(viewingReceived)} — attached image`,
+                  })
+                }
+                className="inline-flex items-center gap-1.5 rounded border border-gray-400 bg-white px-3 py-0.5 text-xs font-medium text-ad-purple hover:bg-ad-purple/10"
+              >
+                <FiPaperclip size={16} aria-hidden />
+                View Image
+              </button>
+            ) : null}
+          </div>
+        </CompactFormRow>
+      </CompactFormPanel>
+    ) : undefined;
 
   return (
     <AdminPage
@@ -923,7 +984,6 @@ export default function Invitehelp({
                   <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Note</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User Type</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" aria-label="Attachment"></th>
                 </>
               ) : (
                 <>
@@ -931,10 +991,8 @@ export default function Invitehelp({
                   <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Ticket No.</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User Type</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User Name</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Title</th>
                   <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Audio</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Message</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" aria-label="Attachment"></th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
                 </>
               )}
             </tr>
@@ -942,13 +1000,13 @@ export default function Invitehelp({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={section === "sent" ? 7 : 9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={section === "sent" ? 7 : 7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={section === "sent" ? 7 : 9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={section === "sent" ? 7 : 7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   {isDeletedView
                     ? section === "sent"
                       ? "No deleted sent notifications found."
@@ -978,25 +1036,30 @@ export default function Invitehelp({
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-center">{userTypeLabel(notification.userType)}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center">{userScopeLabel(notification)}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
-                      {notification.imageUrl ? (
-                        <ClipImageHover
-                          imageUrl={notification.imageUrl}
-                          alt={`Attached image for ${notification.title}`}
-                          iconClassName="text-blue-600"
-                        />
-                      ) : (
-                        <span className="text-gray-500">--</span>
-                      )}
-                    </td>
                   </tr>
                 );
               })
             ) : (
               paged.map((row, idx) => {
                 const invite = row as InviteHelp;
-                const imageUrl = receivedImageUrl(invite);
-                const audioUrl = receivedAudioUrl(invite);
+                // const imageUrl = receivedImageUrl(invite);
+                const id = invite._id;
+                // Buffer/Node: also handle backward compatible shape for audioBlob
+                const isLoading = !!audioLoading[id];
+                const url =
+                  invite.audioUrl ||
+                  (invite.audioBlob &&
+                  Array.isArray((invite.audioBlob as any).data) &&
+                  (invite.audioBlob as any).data.length > 0
+                    ? arrayBufferToBlobUrl(
+                        (invite.audioBlob as any).data,
+                        typeof (invite.audioBlob as any).type === "string"
+                          ? (invite.audioBlob as any).type
+                          : "audio/webm",
+                      )
+                    : audioUrls[id] || null
+                  );
+                const err = audioError[id];
 
                 return (
                   <tr key={invite._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
@@ -1024,26 +1087,42 @@ export default function Invitehelp({
                     <td className="border border-gray-300 px-3 py-2 text-center">
                       <span className="text-blue-700">{receivedUserName(invite)}</span>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{invite.title || "—"}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center">
-                      {audioUrl ? (
-                        <audio controls src={audioUrl} className="h-8 w-44 accent-blue-600" />
+                      {url ? (
+                        <audio controls src={url} className="h-8 w-44 accent-blue-600" />
+                      ) : isLoading ? (
+                        <span className="text-gray-400 flex items-center gap-1 justify-center"><FiLoader className="animate-spin" /> Loading...</span>
                       ) : (
-                        <span className="text-xs italic text-gray-400">No audio</span>
+                        <span className="inline-flex flex-col items-center">
+                          <button
+                            type="button"
+                            onClick={() => handleFetchAudio(id)}
+                            className={"inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border " +
+                              (isLoading
+                                ? "bg-gray-200 border-gray-300 text-gray-400 cursor-wait"
+                                : err
+                                  ? "border-red-400 text-red-700 bg-red-100"
+                                  : "bg-white border-blue-400 text-blue-700 hover:bg-blue-50")}
+                            aria-label="Fetch and play audio"
+                          >
+                            <FiVolume2 /> {err ? "Retry" : "Play"}
+                          </button>
+                          {err && <span className="text-xs text-red-600">{err}</span>}
+                        </span>
                       )}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
-                      {invite.message || "—"}
-                    </td>
                     <td className="border border-gray-300 px-3 py-2 text-center">
-                      {imageUrl ? (
-                        <ClipImageHover
-                          imageUrl={imageUrl}
-                          alt={`Attached image for ${invite.title || receivedTicketNo(invite)}`}
-                          iconClassName="text-blue-600"
-                        />
+                      {invite.status ? (
+                        <span
+                          className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${invite.status === "resolved"
+                            ? "bg-green-100 text-green-800 border border-green-300"
+                            : "bg-yellow-100 text-yellow-800 border border-yellow-300"
+                          }`}
+                        >
+                          {invite.status.charAt(0).toUpperCase() + invite.status.slice(1)}
+                        </span>
                       ) : (
-                        <span className="text-gray-500">--</span>
+                        <span className="text-gray-400">—</span>
                       )}
                     </td>
                   </tr>

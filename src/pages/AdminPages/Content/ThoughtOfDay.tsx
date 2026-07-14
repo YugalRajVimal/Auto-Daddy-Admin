@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
@@ -104,9 +104,31 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
 
   const displayNotes = isDeletedView ? deletedStash : notes;
 
-  // ---------- Data Fetching ----------
-  useEffect(() => {
-    fetch(`${API_BASE}/thought-of-the-day`)
+  // --------- API Filter Query Construction ---------
+  const getApiQuery = useCallback(() => {
+    const params: Record<string, string> = {};
+    // Main filters for API support: date (if exact), country, subject, notes
+    if (searchFilters.date) params.date = searchFilters.date;
+    if (searchFilters.country) params.country = searchFilters.country;
+    if (searchFilters.subject) params.subject = searchFilters.subject;
+    if (searchFilters.notes) params.notes = searchFilters.notes;
+    // Support for top-bar "live" search (free text)
+    if (search.trim()) {
+      // Apply to subject, notes, country, likes as 'search' for future expansion
+      // Our backend on /thought-of-the-day will not use a "search" param by default,
+      // but the frontend UX expects to show results matching this term
+      // So we use client filtering for deleted view, API filters for active
+      params.search = search.trim();
+    }
+    return new URLSearchParams(params).toString();
+  }, [searchFilters, search]);
+
+  // ------------ Data Fetching w/ API Filters -------------
+  const fetchNotes = useCallback(() => {
+    if (isDeletedView) return; // Don't fetch in deleted view
+    const query = getApiQuery();
+    const url = `${API_BASE}/thought-of-the-day${query ? `?${query}` : ""}`;
+    fetch(url)
       .then(async (r) => {
         if (!r.ok) throw new Error(`Failed to fetch: ${r.statusText}`);
         const data = await r.json();
@@ -125,33 +147,41 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
           }))
         );
       })
-      .catch(() => {
-        setNotes([]);
-      });
-  }, []);
+      .catch(() => setNotes([]));
+    // eslint-disable-next-line
+  }, [getApiQuery, isDeletedView]);
+
+  // Fetch when filters/search change or mode toggled
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
 
   // Utility to get key string for any row (string id: _id or id)
-  const getRowKey = (row: NoteRow) => (row._id ? String(row._id) : String(row.id ?? ''));
+  const getRowKey = (row: NoteRow) => (row._id ? String(row._id) : String(row.id ?? ""));
 
   const findNoteByKey = (key: string) => notes.find((n) => getRowKey(n) === key);
 
-  const filtered = displayNotes.filter((n) => {
-    const live =
-      !search.trim() ||
-      n.date.includes(search) ||
-      n.subject.toLowerCase().includes(search.toLowerCase()) ||
-      (n.notes ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      n.country.toLowerCase().includes(search.toLowerCase()) ||
-      String(n.likes ?? 0).includes(search);
-    if (!live) return false;
-    const dateStr = n.date ? String(n.date).slice(0, 10) : "";
-    return (
-      searchIncludes(dateStr, searchFilters.date) &&
-      searchEquals(n.country, searchFilters.country) &&
-      searchIncludes(n.subject, searchFilters.subject) &&
-      searchIncludes(n.notes, searchFilters.notes)
-    );
-  });
+  // --- Filtering logic: only for deleted view, active mode handled by API ---
+  const filtered = isDeletedView
+    ? displayNotes.filter((n) => {
+        // In-memory searching for trash (UI matches backend, but here only for stash)
+        const live =
+          !search.trim() ||
+          n.date.includes(search) ||
+          n.subject.toLowerCase().includes(search.toLowerCase()) ||
+          (n.notes ?? "").toLowerCase().includes(search.toLowerCase()) ||
+          n.country.toLowerCase().includes(search.toLowerCase()) ||
+          String(n.likes ?? 0).includes(search);
+        if (!live) return false;
+        const dateStr = n.date ? String(n.date).slice(0, 10) : "";
+        return (
+          searchIncludes(dateStr, searchFilters.date) &&
+          searchEquals(n.country, searchFilters.country) &&
+          searchIncludes(n.subject, searchFilters.subject) &&
+          searchIncludes(n.notes, searchFilters.notes)
+        );
+      })
+    : displayNotes;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -208,10 +238,12 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setShowSearchCard((open) => !open);
   };
 
+  // --- Search Card and top-bar "search" actions ---
   const handleSearchCardSearch = () => {
     setSearchFilters({ ...searchDraft });
     setPage(1);
     setSelected(new Set());
+    // fetchNotes() will run via useEffect
   };
 
   const handleSearchCardReset = () => {
@@ -220,6 +252,15 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setSearchFilters(empty);
     setPage(1);
     setSelected(new Set());
+    // fetchNotes() will run via useEffect
+  };
+
+  // Top-bar search (live search)
+  const handleQuickSearch = (val: string) => {
+    setSearch(val);
+    setPage(1);
+    setSelected(new Set());
+    // fetchNotes() will run via useEffect
   };
 
   const handleCancel = () => {
@@ -227,7 +268,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setShowForm(false);
   };
 
-  // ----- ADD & EDIT -----
+  // ----- ADD & EDIT (no filtering here) -----
   const handleSave = async () => {
     const formData = new FormData();
     formData.append("date", date);
@@ -261,44 +302,29 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
         });
       } else {
         // Edit (PUT)
-        // This matches:
-        // curl -X PUT "{{BASE}}/thought-of-the-day/PASTE_ID_HERE" \
-        //   -F "subject=Updated subject" \
-        //   -F "likes=5" \
-        //   -F "thoughtImage=@/path/to/new/image.jpg"   # omit this line to keep existing
         resp = await fetch(`${API_BASE}/thought-of-the-day/${editingKey}`, {
           method: "PUT",
           body: formData,
         });
       }
       if (!resp.ok) throw new Error("Failed to save");
-      const data = await resp.json();
+      // const data = await resp.json();
 
-      const normalizedRow: NoteRow = {
-        id: data.id ?? undefined,
-        _id: data._id ?? undefined,
-        date: data.date,
-        subject: data.subject,
-        notes: data.notes,
-        country: data.country,
-        likes: data.likes ?? 0,
-        image: data.image ?? undefined,
-        imageUrl: data.imageUrl || data.image || null,
-      };
+      // const normalizedRow: NoteRow = {
+      //   id: data.id ?? undefined,
+      //   _id: data._id ?? undefined,
+      //   date: data.date,
+      //   subject: data.subject,
+      //   notes: data.notes,
+      //   country: data.country,
+      //   likes: data.likes ?? 0,
+      //   image: data.image ?? undefined,
+      //   imageUrl: data.imageUrl || data.image || null,
+      // };
 
-      if (editingKey == null) {
-        setNotes((prev) => sortNotes([...prev, normalizedRow]));
-        adminNotify.success("Saved successfully.");
-      } else {
-        setNotes((prev) =>
-          sortNotes(
-            prev.map((row) =>
-              getRowKey(row) === getRowKey(normalizedRow) ? normalizedRow : row
-            )
-          )
-        );
-        adminNotify.success("Updated successfully.");
-      }
+      // When adding or updating: refetch list from API for up-to-date filters
+      adminNotify.success(editingKey == null ? "Saved successfully." : "Updated successfully.");
+      fetchNotes();
     } catch (e: any) {
       adminNotify.error("Save failed");
     }
@@ -323,6 +349,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
         return next;
       });
       adminNotify.success("Thought deleted successfully.");
+      fetchNotes();
     } catch {
       adminNotify.error("Delete failed");
     }
@@ -543,10 +570,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
           <input
             type="text"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => handleQuickSearch(e.target.value)}
             placeholder="Live Search here"
             className="border border-gray-400 bg-white px-2 py-1 text-xs"
           />
@@ -652,7 +676,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                             return "";
                           })()
                         }
-                
                         alt={`Image for ${row.subject}`}
                         size={20}
                       />
