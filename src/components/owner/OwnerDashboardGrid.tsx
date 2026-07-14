@@ -362,7 +362,7 @@ export default function OwnerDashboardGrid() {
   const serviceDeals = grouped.Service.city.length + grouped.Service.others.length;
   const partsDeals = grouped.Parts.city.length + grouped.Parts.others.length;
 
-  const thoughtTitle = thoughtOfTheDay.title?.trim() || "Thought of the day";
+  const thoughtLabel = thoughtOfTheDay.title?.trim() || "Thought of the day";
   const thoughtDescription =
     thoughtOfTheDay.description?.trim() &&
     thoughtOfTheDay.description.trim() !== "Start each day with a positive thought."
@@ -656,12 +656,7 @@ export default function OwnerDashboardGrid() {
         <div className="flex flex-col gap-3">
           <div className="rounded-2xl border border-white/80 bg-gradient-to-br from-amber-50 via-white to-rose-50 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-amber-100 2xl:p-4">
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700/80">
-                  Thought of the day
-                </p>
-                <h3 className="mt-1 text-sm font-bold text-slate-900">{thoughtTitle}</h3>
-              </div>
+              <h3 className="text-sm font-bold text-slate-900">{thoughtLabel}</h3>
               <button
                 type="button"
                 onClick={() => void toggleThoughtLike()}

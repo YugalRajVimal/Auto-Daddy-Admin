@@ -76,6 +76,11 @@ export function fetchAutoshopMyDeals(token: string) {
   return getJsonAutoshopowner<unknown>(`${BASE}/my-deals`, token);
 }
 
+/** GET /api/autoshopowner/autoshop-deals/dealers — dealer ads for shop home sidebar. */
+export function fetchAutoshopDealers(token: string) {
+  return getJsonAutoshopowner<unknown>(`${BASE}/dealers`, token);
+}
+
 export function createAutoshopDeal(token: string, fields: AutoshopDealFormFields) {
   return postFormAutoshopowner<ApiEnvelope>(`${BASE}/create`, buildAutoshopDealFormData(fields), token);
 }

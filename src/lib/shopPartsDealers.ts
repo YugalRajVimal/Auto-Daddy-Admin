@@ -1,3 +1,4 @@
+import { normalizeMediaUrl } from "./normalizeMediaUrl";
 import { withPartsDealerDummyImages } from "./shopAdDummyImages";
 
 export type PartsDealerCard = {
@@ -30,45 +31,81 @@ export const FALLBACK_PARTS_DEALERS: PartsDealerCard[] = withPartsDealerDummyIma
   },
 ]);
 
-function parseDealersFromPayload(payload: unknown): PartsDealerCard[] {
-  if (!payload || typeof payload !== "object") return [];
-  const root = payload as Record<string, unknown>;
-  const raw =
-    root.dealers ??
-    root.partsDealers ??
-    root.autoPartsDealers ??
-    (root.data && typeof root.data === "object"
-      ? (root.data as Record<string, unknown>).dealers ??
-        (root.data as Record<string, unknown>).partsDealers
-      : null);
-  if (!Array.isArray(raw)) return [];
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asString(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
+function specialtyFromCategories(categories: unknown): string {
+  if (Array.isArray(categories)) {
+    return categories.map(asString).filter(Boolean).join(", ");
+  }
+  return asString(categories);
+}
+
+function unwrapDealerList(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  const root = asRecord(payload);
+  if (!root) return [];
+  if (Array.isArray(root.dealers)) return root.dealers;
+  if (Array.isArray(root.partsDealers)) return root.partsDealers;
+  if (Array.isArray(root.autoPartsDealers)) return root.autoPartsDealers;
+  if (Array.isArray(root.data)) return root.data;
+  const nested = asRecord(root.data);
+  if (nested) {
+    if (Array.isArray(nested.dealers)) return nested.dealers;
+    if (Array.isArray(nested.partsDealers)) return nested.partsDealers;
+    if (Array.isArray(nested.data)) return nested.data;
+  }
+  return [];
+}
+
+function parseDealerItem(item: unknown): PartsDealerCard | null {
+  const o = asRecord(item);
+  if (!o) return null;
+
+  const name = asString(o.dealership ?? o.name ?? o.businessName ?? o.dealerName);
+  if (!name) return null;
+
+  const phone = asString(o.phone ?? o.contactNo ?? o.businessPhone);
+  const rawImage = asString(o.dealerImage ?? o.imageUrl ?? o.photo ?? o.image ?? o.logoUrl);
+  const imageUrl = normalizeMediaUrl(rawImage) ?? "";
+  const city = asString(o.city ?? o.location);
+  const website = asString(o.websiteUrl ?? o.website ?? o.businessWebsite ?? o.webUrl);
+  const specialty = asString(
+    o.specialty ?? o.shopType ?? o.category ?? specialtyFromCategories(o.categories),
+  );
+
+  return {
+    name,
+    phone,
+    ...(imageUrl ? { imageUrl } : {}),
+    ...(city ? { city } : {}),
+    ...(website ? { website } : {}),
+    ...(specialty ? { specialty } : {}),
+  };
+}
+
+/** Parse dealer ads from `/autoshop-deals/dealers` or a dashboard-style payload. */
+export function parsePartsDealersFromPayload(payload: unknown): PartsDealerCard[] {
   const out: PartsDealerCard[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") continue;
-    const o = item as Record<string, unknown>;
-    const name = String(o.name ?? o.businessName ?? o.dealerName ?? "").trim();
-    const phone = String(o.phone ?? o.contactNo ?? o.businessPhone ?? "").trim();
-    const imageUrl = String(o.imageUrl ?? o.photo ?? o.image ?? o.logoUrl ?? "").trim();
-    const city = String(o.city ?? o.location ?? "").trim();
-    const website = String(o.website ?? o.businessWebsite ?? o.webUrl ?? "").trim();
-    const specialty = String(o.specialty ?? o.shopType ?? o.category ?? "").trim();
-    if (name) {
-      out.push({
-        name,
-        phone,
-        ...(imageUrl ? { imageUrl } : {}),
-        ...(city ? { city } : {}),
-        ...(website ? { website } : {}),
-        ...(specialty ? { specialty } : {}),
-      });
-    }
+  for (const item of unwrapDealerList(payload)) {
+    const dealer = parseDealerItem(item);
+    if (dealer) out.push(dealer);
   }
   return out;
 }
 
-/** Resolve sidebar ad dealers from a dashboard API payload (no network). */
+/** Resolve sidebar ad dealers from a dealers / dashboard API payload. */
 export function resolvePartsDealersFromPayload(payload: unknown): PartsDealerCard[] {
-  const parsed = parseDealersFromPayload(payload);
+  const parsed = parsePartsDealersFromPayload(payload);
   const dealers = parsed.length > 0 ? parsed : FALLBACK_PARTS_DEALERS;
   return withPartsDealerDummyImages(dealers);
 }

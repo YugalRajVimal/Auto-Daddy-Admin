@@ -1,7 +1,12 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { FiChevronDown, FiHelpCircle, FiLock, FiStar } from "react-icons/fi";
 import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
-import { useCarOwnerDashboard, type CarOwnerContentBlock } from "../../../hooks/useOwnerPortal";
+import {
+  useCarOwnerFaqs,
+  useCarOwnerPrivacy,
+  useCarOwnerProductFeatures,
+  type CarOwnerContentBlock,
+} from "../../../hooks/useOwnerPortal";
 import { Skeleton } from "../../../components/common/Skeleton";
 import {
   DUMMY_OWNER_FAQS,
@@ -20,68 +25,6 @@ const FEATURE_ACCENTS = [
 ] as const;
 
 type FaqItem = DummyFaqItem;
-
-function parseFaqItems(description: string): FaqItem[] {
-  const text = description.trim();
-  if (!text) return [];
-
-  const qaPairs: FaqItem[] = [];
-  const qaRegex =
-    /(?:^|\n)\s*(?:Q(?:uestion)?\s*[:.)-]\s*)(.+?)(?:\n)\s*(?:A(?:nswer)?\s*[:.)-]\s*)([\s\S]*?)(?=(?:\n\s*Q(?:uestion)?\s*[:.)-])|$)/gi;
-  let match: RegExpExecArray | null;
-  while ((match = qaRegex.exec(text)) !== null) {
-    const question = match[1]?.trim();
-    const answer = match[2]?.trim();
-    if (question && answer) qaPairs.push({ question, answer });
-  }
-  if (qaPairs.length > 0) return qaPairs;
-
-  const blocks = text
-    .split(/\n{2,}/)
-    .map((b) => b.trim())
-    .filter(Boolean);
-
-  if (blocks.length > 1) {
-    return blocks.map((block, index) => {
-      const lines = block.split(/\n+/).map((l) => l.trim()).filter(Boolean);
-      if (lines.length >= 2) {
-        return { question: lines[0], answer: lines.slice(1).join(" ") };
-      }
-      return { question: `Question ${index + 1}`, answer: block };
-    });
-  }
-
-  const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
-  if (lines.length >= 2 && lines.some((l) => l.endsWith("?"))) {
-    const items: FaqItem[] = [];
-    let currentQ: string | null = null;
-    let currentA: string[] = [];
-    const flush = () => {
-      if (currentQ) {
-        items.push({
-          question: currentQ,
-          answer: currentA.join(" ").trim() || "—",
-        });
-      }
-      currentQ = null;
-      currentA = [];
-    };
-    for (const line of lines) {
-      if (line.endsWith("?")) {
-        flush();
-        currentQ = line;
-      } else if (currentQ) {
-        currentA.push(line);
-      } else {
-        currentQ = line;
-      }
-    }
-    flush();
-    if (items.length > 0) return items;
-  }
-
-  return [{ question: "Frequently asked questions", answer: text }];
-}
 
 function DemoBadge() {
   return (
@@ -251,8 +194,7 @@ function LoadingBlock() {
 }
 
 export function OwnerFaqsPage() {
-  const { loading, faqsHeading, faqsDescription } = useCarOwnerDashboard();
-  const liveItems = useMemo(() => parseFaqItems(faqsDescription), [faqsDescription]);
+  const { loading, faqsHeading, items: liveItems } = useCarOwnerFaqs("carowner");
   const usingDummy = !loading && liveItems.length === 0;
   const items = usingDummy ? DUMMY_OWNER_FAQS : liveItems;
 
@@ -274,7 +216,10 @@ export function OwnerFaqsPage() {
 }
 
 export function OwnerPrivacyPage() {
-  const { loading, privacyHeading, privacyDescription } = useCarOwnerDashboard();
+  const { loading, privacyHeading, privacyDescription } = useCarOwnerPrivacy({
+    country: "canada",
+    type: "privacy",
+  });
   const privacy = withDummyPrivacy(privacyHeading, privacyDescription);
 
   return (
@@ -304,7 +249,10 @@ export function OwnerPrivacyPage() {
 }
 
 export function OwnerFeaturesPage() {
-  const { loading, sections } = useCarOwnerDashboard();
+  const { loading, sections } = useCarOwnerProductFeatures({
+    country: "canada",
+    role: "carowner",
+  });
   const features = withDummyFeatures(sections);
 
   return (

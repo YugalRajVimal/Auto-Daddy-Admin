@@ -97,6 +97,88 @@ export function updateTemplateSlugs(token: string, fields: TemplateSlugsFields) 
   );
 }
 
+// ---- Invoice prefix ----
+export type InvoicePrefixEntry = {
+  prefix: string;
+  year: number | null;
+};
+
+/** GET /api/autoshopowner/invoice-prefix — current year, or `?year=` for a specific year. */
+export function fetchInvoicePrefix(token: string, year?: number) {
+  return getJsonAutoshopowner<unknown>(
+    withQuery("/api/autoshopowner/invoice-prefix", {
+      year: year != null ? String(year) : undefined,
+    }),
+    token,
+  );
+}
+
+/** GET /api/autoshopowner/invoice-prefix/all — full prefix history. */
+export function fetchInvoicePrefixHistory(token: string) {
+  return getJsonAutoshopowner<unknown>("/api/autoshopowner/invoice-prefix/all", token);
+}
+
+/**
+ * PUT /api/autoshopowner/invoice-prefix — set/update prefix.
+ * Omit `year` to apply to the current year.
+ */
+export function updateInvoicePrefix(token: string, prefix: string, year?: number) {
+  const body: Record<string, unknown> = { prefix };
+  if (year != null) body.year = year;
+  return putJsonAutoshopowner<ApiEnvelope>("/api/autoshopowner/invoice-prefix", body, token);
+}
+
+function readPrefixYear(obj: Record<string, unknown>): number | null {
+  const raw = obj.year ?? obj.Year;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim()) {
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function readPrefixString(obj: Record<string, unknown>): string {
+  const raw =
+    obj.prefix ??
+    obj.invoicePrefix ??
+    obj.invoice_prefix;
+  return typeof raw === "string" ? raw.trim() : raw != null ? String(raw).trim() : "";
+}
+
+export function parseInvoicePrefix(payload: unknown): InvoicePrefixEntry {
+  if (!payload || typeof payload !== "object") return { prefix: "", year: null };
+  const root = payload as Record<string, unknown>;
+  const data =
+    root.data && typeof root.data === "object" && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : root;
+  return {
+    prefix: readPrefixString(data) || readPrefixString(root),
+    year: readPrefixYear(data) ?? readPrefixYear(root),
+  };
+}
+
+export function parseInvoicePrefixHistory(payload: unknown): InvoicePrefixEntry[] {
+  if (!payload || typeof payload !== "object") return [];
+  const root = payload as Record<string, unknown>;
+  const raw = root.data ?? root.prefixes ?? root.history ?? root;
+  const arr = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>).prefixes)
+      ? ((raw as Record<string, unknown>).prefixes as unknown[])
+      : [];
+  return arr
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const obj = item as Record<string, unknown>;
+      const prefix = readPrefixString(obj);
+      if (!prefix) return null;
+      return { prefix, year: readPrefixYear(obj) };
+    })
+    .filter((entry): entry is InvoicePrefixEntry => entry != null);
+}
+
 // ---- Services ----
 export function fetchAdminServices(token: string, query: { shopType?: string; services?: string }) {
   return getJsonAutoshopowner<unknown>(

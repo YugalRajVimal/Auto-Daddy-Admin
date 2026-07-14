@@ -20,7 +20,7 @@ import {
   type MyCustomersPeriod,
 } from "../lib/shopOwnerApi";
 import { fetchAutoshopJobCards } from "../lib/autoshopownerJobCardsApi";
-import { fetchAutoshopMyDeals } from "../lib/autoshopownerDealsApi";
+import { fetchAutoshopDealers, fetchAutoshopMyDeals } from "../lib/autoshopownerDealsApi";
 import {
   getPrefetchSectionForShopPath,
   getSectionsForShopPath,
@@ -39,7 +39,11 @@ import {
   parseMyServices,
   parsePayments,
 } from "../lib/shopOwnerParsers";
-import { FALLBACK_PARTS_DEALERS, resolvePartsDealersFromPayload, type PartsDealerCard } from "../lib/shopPartsDealers";
+import {
+  FALLBACK_PARTS_DEALERS,
+  resolvePartsDealersFromPayload,
+  type PartsDealerCard,
+} from "../lib/shopPartsDealers";
 import {
   fetchWebsiteTemplates,
   parseWebsiteTemplatesResponse,
@@ -245,8 +249,13 @@ async function fetchSectionData(
           error: null,
         };
       }
-      case "partsDealers":
-        return { data: null, error: null };
+      case "partsDealers": {
+        const res = await fetchAutoshopDealers(token);
+        if (!res.ok) {
+          return { data: FALLBACK_PARTS_DEALERS, error: "Could not load dealer ads." };
+        }
+        return { data: resolvePartsDealersFromPayload(res.data), error: null };
+      }
       case "customers": {
         const res = await fetchMyCustomers(token, buildMyCustomersQuery(DEFAULT_PERIOD));
         if (!res.ok) return { data: [], error: "Could not load customers." };
@@ -348,27 +357,6 @@ export function ShopOwnerDataProvider({ children }: { children: ReactNode }) {
     async (section: ShopDataSection, options?: { silent?: boolean; force?: boolean }) => {
       if (!token) return;
 
-      if (section === "partsDealers") {
-        setSections((prev) => {
-          if (!options?.force && prev.partsDealers.loaded) return prev;
-          const fromPortal = prev.portal.data?.dashboard;
-          const dealers =
-            fromPortal != null
-              ? resolvePartsDealersFromPayload(fromPortal)
-              : (prev.partsDealers.data ?? FALLBACK_PARTS_DEALERS);
-          return {
-            ...prev,
-            partsDealers: {
-              data: dealers,
-              loading: false,
-              error: null,
-              loaded: true,
-            },
-          };
-        });
-        return;
-      }
-
       const existing = sectionsRef.current[section];
       if (!options?.force && existing.loaded) return;
 
@@ -389,27 +377,15 @@ export function ShopOwnerDataProvider({ children }: { children: ReactNode }) {
       const promise = (async () => {
         try {
           const result = await fetchSectionData(section, token);
-          setSections((prev) => {
-            const next = {
-              ...prev,
-              [section]: {
-                data: result.data ?? prev[section].data,
-                loading: false,
-                error: result.error,
-                loaded: true,
-              },
-            };
-            if (section === "portal" && result.data) {
-              const portalData = result.data as ShopPortalCache;
-              next.partsDealers = {
-                data: resolvePartsDealersFromPayload(portalData.dashboard),
-                loading: false,
-                error: null,
-                loaded: true,
-              };
-            }
-            return next;
-          });
+          setSections((prev) => ({
+            ...prev,
+            [section]: {
+              data: result.data ?? prev[section].data,
+              loading: false,
+              error: result.error,
+              loaded: true,
+            },
+          }));
         } catch {
           setSections((prev) => ({
             ...prev,

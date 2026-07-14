@@ -43,6 +43,9 @@ import { parseMyServices } from "../../lib/shopOwnerParsers";
 import {
   addMyService,
   fetchAdminServices,
+  fetchInvoicePrefix,
+  parseInvoicePrefix,
+  updateInvoicePrefix,
   updateTemplateSlugs,
 } from "../../lib/autoshopownerApi";
 import { getCarBrandId, getCarBrandName } from "../../lib/dummyCarBrands";
@@ -230,6 +233,7 @@ export default function ShopProfilePage() {
   );
   const [numbering, setNumbering] = useState(readStoredNumbering);
   const [manageInvoicesOpen, setManageInvoicesOpen] = useState(false);
+  const [invoicePrefixLoading, setInvoicePrefixLoading] = useState(false);
 
   useEffect(() => {
     const invoiceSlug = resolveTemplateSlug(
@@ -239,6 +243,39 @@ export default function ShopProfilePage() {
     setInvoiceTemplateId(invoiceSlug);
     setSavedInvoiceTemplateId(invoiceSlug);
   }, [business?.invoiceTemplateSlug]);
+
+  useEffect(() => {
+    if (!manageInvoicesOpen || !token) return;
+    let cancelled = false;
+    setInvoicePrefixLoading(true);
+    void fetchInvoicePrefix(token)
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          toast.error(apiMessage(res.data) || "Could not load invoice prefix.");
+          return;
+        }
+        const { prefix } = parseInvoicePrefix(res.data);
+        setNumbering((prev) => {
+          const next = { ...prev, invoice: { ...prev.invoice, code: prefix } };
+          try {
+            localStorage.setItem(NUMBERING_STORAGE_KEY, JSON.stringify(next));
+          } catch {
+            // ignore quota / private mode
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Could not load invoice prefix.");
+      })
+      .finally(() => {
+        if (!cancelled) setInvoicePrefixLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [manageInvoicesOpen, token]);
 
   const shopTypes = useMemo(
     () =>
@@ -437,9 +474,25 @@ export default function ShopProfilePage() {
     [],
   );
 
-  const saveNumbering = (kind: NumberingKind, values: NumberingValues) => {
+  const saveInvoiceNumbering = async (values: NumberingValues): Promise<boolean> => {
+    if (!token) {
+      toast.error("Sign in to update invoice prefix.");
+      return false;
+    }
+    const prefix = values.code.trim();
+    const res = await updateInvoicePrefix(token, prefix);
+    if (!res.ok) {
+      toast.error(apiMessage(res.data) || "Could not update invoice prefix.");
+      return false;
+    }
     setNumbering((prev) => {
-      const next = { ...prev, [kind]: values };
+      const next = {
+        ...prev,
+        invoice: {
+          code: prefix,
+          number: values.number.trim() || prev.invoice.number,
+        },
+      };
       try {
         localStorage.setItem(NUMBERING_STORAGE_KEY, JSON.stringify(next));
       } catch {
@@ -447,6 +500,7 @@ export default function ShopProfilePage() {
       }
       return next;
     });
+    return true;
   };
 
   const removeBrand = async (company: ShopCarCompany) => {
@@ -754,8 +808,9 @@ export default function ShopProfilePage() {
         open={manageInvoicesOpen}
         kind="invoice"
         initial={numbering.invoice}
+        loading={invoicePrefixLoading}
         onClose={() => setManageInvoicesOpen(false)}
-        onSave={(values) => saveNumbering("invoice", values)}
+        onSave={saveInvoiceNumbering}
       />
     </>
   );

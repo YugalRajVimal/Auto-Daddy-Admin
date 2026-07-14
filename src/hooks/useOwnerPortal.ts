@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { getJson, postJson } from "../api/mobileAuth";
 import { useAuth } from "../auth";
+import {
+  fetchCarOwnerFaqs,
+  fetchCarOwnerHome,
+  fetchCarOwnerPrivacy,
+  fetchCarOwnerProductFeatures,
+  parseCarOwnerFaqItems,
+  parseCarOwnerPrivacy,
+  parseCarOwnerProductFeatures,
+} from "../lib/carOwnerHomeApi";
+import type { DummyFaqItem } from "../lib/dummyOwnerHomeProfile";
 import { extractThoughtOfTheDay, type ThoughtOfTheDayView } from "../lib/extractThought";
 import {
   parseServiceCatalogResponse,
@@ -100,6 +110,14 @@ export type CarOwnerDashboardData = {
   dashboard?: CarOwnerDashboardPayload;
   userProfile?: CarOwnerDashboardUserProfile;
   nextService?: CarOwnerNextService | null;
+  /** Nested home payload from GET /api/carowner/home */
+  data?: {
+    thoughtOfTheDay?: CarOwnerThoughtOfTheDayApi;
+    thoughtOfTheDayLike?: number;
+    carOwnerName?: string;
+    name?: string | null;
+    city?: string | null;
+  };
 };
 
 const DEFAULT_THOUGHT: ThoughtOfTheDayView = {
@@ -134,6 +152,70 @@ function normalizeLikeCount(raw: unknown): number {
   return 0;
 }
 
+function coalesceHomePayload(raw: CarOwnerDashboardData | null): CarOwnerDashboardData | null {
+  if (!raw || typeof raw !== "object") return null;
+  const root = raw as CarOwnerDashboardData & { data?: Record<string, unknown> };
+  const nested = root.data && typeof root.data === "object" ? root.data : null;
+
+  const nestedThought = nested?.thoughtOfTheDay;
+  const likesFromThought =
+    nestedThought &&
+    typeof nestedThought === "object" &&
+    typeof (nestedThought as { likes?: unknown }).likes === "number"
+      ? (nestedThought as { likes: number }).likes
+      : null;
+  const nestedLike =
+    typeof nested?.thoughtOfTheDayLike === "number"
+      ? nested.thoughtOfTheDayLike
+      : likesFromThought;
+
+  const pickName = (...vals: unknown[]) => {
+    for (const v of vals) {
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+  };
+  const pickCity = (...vals: unknown[]) => {
+    for (const v of vals) {
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+  };
+
+  const carOwnerName = pickName(nested?.name, nested?.carOwnerName, root.userProfile?.name);
+  const carOwnerCity = pickCity(nested?.city, root.userProfile?.city);
+
+  const dashboardFromNested =
+    nestedThought != null || nestedLike != null
+      ? {
+          ...(typeof root.dashboard === "object" && root.dashboard ? root.dashboard : {}),
+          thoughtOfTheDay:
+            (nestedThought as CarOwnerThoughtOfTheDayApi | undefined) ??
+            root.dashboard?.thoughtOfTheDay,
+          thoughtOfTheDayLike:
+            typeof nestedLike === "number"
+              ? nestedLike
+              : root.dashboard?.thoughtOfTheDayLike,
+        }
+      : root.dashboard;
+
+  const profile = root.userProfile
+    ? {
+        ...root.userProfile,
+        name: pickName(root.userProfile.name, carOwnerName) || root.userProfile.name,
+        city: pickCity(root.userProfile.city, carOwnerCity) || root.userProfile.city,
+      }
+    : carOwnerName || carOwnerCity
+      ? { name: carOwnerName || undefined, city: carOwnerCity || undefined }
+      : root.userProfile;
+
+  return {
+    ...root,
+    dashboard: dashboardFromNested,
+    userProfile: profile,
+  };
+}
+
 export function useCarOwnerDashboard() {
   const { token } = useAuth();
   const [data, setData] = useState<CarOwnerDashboardData | null>(null);
@@ -150,12 +232,15 @@ export function useCarOwnerDashboard() {
     }
     setLoading(true);
     try {
-      const res = await getJson<CarOwnerDashboardData>("/api/user/dashboard", token);
+      const res = await fetchCarOwnerHome(token);
       if (res.ok && res.data) {
-        setData(res.data);
+        const next = coalesceHomePayload(res.data);
+        setData(next);
         const nextLiked =
           res.data.thoughtOfTheDayLiked === true ||
-          res.data.userProfile?.thoughtOfTheDayLiked === true;
+          res.data.userProfile?.thoughtOfTheDayLiked === true ||
+          next?.thoughtOfTheDayLiked === true ||
+          next?.userProfile?.thoughtOfTheDayLiked === true;
         setLiked(nextLiked);
       }
     } finally {
@@ -199,8 +284,6 @@ export function useCarOwnerDashboard() {
   const thought =
     extractThoughtOfTheDay(data?.dashboard?.thoughtOfTheDay) ?? DEFAULT_THOUGHT;
 
-  const faqs = data?.dashboard?.FAQs;
-  const privacy = data?.dashboard?.privacyPolicy;
   const sections = normalizeSections(data?.dashboard?.sections);
   const thoughtLikeCount = normalizeLikeCount(data?.dashboard?.thoughtOfTheDayLike);
   const profile = data?.userProfile;
@@ -221,11 +304,110 @@ export function useCarOwnerDashboard() {
     toggleThoughtLike,
     sections,
     nextService,
-    faqsHeading: typeof faqs?.heading === "string" ? faqs.heading.trim() : "FAQs",
-    faqsDescription: typeof faqs?.desc === "string" ? faqs.desc.trim() : "",
-    privacyHeading: typeof privacy?.heading === "string" ? privacy.heading.trim() : "Privacy Policy",
-    privacyDescription: typeof privacy?.desc === "string" ? privacy.desc.trim() : "",
   };
+}
+
+export function useCarOwnerFaqs(role = "carowner") {
+  const { token } = useAuth();
+  const [items, setItems] = useState<DummyFaqItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetchCarOwnerFaqs(token, role);
+        if (cancelled) return;
+        setItems(res.ok ? parseCarOwnerFaqItems(res.data) : []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [role, token]);
+
+  return { items, loading, faqsHeading: "FAQs" };
+}
+
+export function useCarOwnerPrivacy(query?: { country?: string; type?: string }) {
+  const { token } = useAuth();
+  const country = query?.country ?? "canada";
+  const type = query?.type ?? "privacy";
+  const [heading, setHeading] = useState("Privacy Policy");
+  const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token) {
+      setHeading("Privacy Policy");
+      setDescription("");
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetchCarOwnerPrivacy(token, { country, type });
+        if (cancelled) return;
+        if (res.ok) {
+          const parsed = parseCarOwnerPrivacy(res.data);
+          setHeading(parsed.heading);
+          setDescription(parsed.description);
+        } else {
+          setHeading("Privacy Policy");
+          setDescription("");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [country, token, type]);
+
+  return { loading, privacyHeading: heading, privacyDescription: description };
+}
+
+export function useCarOwnerProductFeatures(query?: { country?: string; role?: string }) {
+  const { token } = useAuth();
+  const country = query?.country ?? "canada";
+  const role = query?.role ?? "carowner";
+  const [sections, setSections] = useState<CarOwnerContentBlock[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token) {
+      setSections([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetchCarOwnerProductFeatures(token, { country, role });
+        if (cancelled) return;
+        setSections(res.ok ? parseCarOwnerProductFeatures(res.data) : []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [country, role, token]);
+
+  return { loading, sections };
 }
 
 export function useCarOwnerServiceSidebar() {
