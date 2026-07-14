@@ -105,7 +105,7 @@ export type InvoicePrefixEntry = {
 
 /** GET /api/autoshopowner/invoice-prefix — current year, or `?year=` for a specific year. */
 export function fetchInvoicePrefix(token: string, year?: number) {
-  return getJsonAutoshopowner<unknown>(
+  return getJsonAutoshopowner<ApiEnvelope>(
     withQuery("/api/autoshopowner/invoice-prefix", {
       year: year != null ? String(year) : undefined,
     }),
