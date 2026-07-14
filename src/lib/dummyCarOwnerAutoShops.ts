@@ -38,6 +38,12 @@ function makeShop(
     closedWeekdays: ["Sunday"],
     isFavorite: false,
     shopType,
+    shopTypes: [shopType],
+    serviceOfferings: serviceItems.map((s) => ({
+      id: s.id,
+      name: s.name,
+      subServices: [],
+    })),
   };
 }
 
@@ -59,7 +65,9 @@ export function getDummyCarOwnerAutoShops(filters: { shopType?: string | null; s
   // Keep it simple: if shopType filter exists, match it (supports "autoShops" too).
   const type = (filters.shopType ?? "").toString().trim();
   if (!type) return shops;
-  if (type === "autoShops") return shops.map((s) => ({ ...s, shopType: "autoShop" }));
-  return shops.map((s) => ({ ...s, shopType: type }));
+  if (type === "autoShops") {
+    return shops.map((s) => ({ ...s, shopType: "autoShop", shopTypes: ["autoShop"] }));
+  }
+  return shops.map((s) => ({ ...s, shopType: type, shopTypes: [type] }));
 }
 

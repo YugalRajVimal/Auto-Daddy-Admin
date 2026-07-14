@@ -157,6 +157,11 @@ export const DUMMY_REPORT_SHOPS: CarOwnerAutoShopListItem[] = [
     closedWeekdays: [],
     isFavorite: true,
     shopType: "autoShop",
+    shopTypes: ["autoShop"],
+    serviceOfferings: [
+      { id: "svc-1", name: "Oil Change", subServices: [] },
+      { id: "svc-2", name: "Brake Service", subServices: [] },
+    ],
   },
   {
     id: "dummy-shop-2",
@@ -184,6 +189,11 @@ export const DUMMY_REPORT_SHOPS: CarOwnerAutoShopListItem[] = [
     closedWeekdays: [],
     isFavorite: false,
     shopType: "tyreShop",
+    shopTypes: ["tyreShop"],
+    serviceOfferings: [
+      { id: "svc-3", name: "Tire Service", subServices: [] },
+      { id: "svc-2", name: "Brake Service", subServices: [] },
+    ],
   },
   {
     id: "dummy-shop-3",
@@ -211,6 +221,11 @@ export const DUMMY_REPORT_SHOPS: CarOwnerAutoShopListItem[] = [
     closedWeekdays: [],
     isFavorite: false,
     shopType: "autoShop",
+    shopTypes: ["autoShop"],
+    serviceOfferings: [
+      { id: "svc-4", name: "General Repair", subServices: [] },
+      { id: "svc-5", name: "Inspection", subServices: [] },
+    ],
   },
 ];
 

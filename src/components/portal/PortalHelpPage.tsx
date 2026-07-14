@@ -1,16 +1,30 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { FiHelpCircle, FiPlus } from "react-icons/fi";
 import { toast } from "react-toastify";
 import OwnerPageShell from "../owner/OwnerPageShell";
 import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import ShopSupportPanel from "../shop/ShopSupportPanel";
 import ShopTicketRow, { type ShopTicket } from "../shop/ShopTicketRow";
-import { ShopEmptyPanel, ShopListPanel } from "../shop/ShopPanels";
 import { useWebVoiceRecorder } from "../../hooks/useWebVoiceRecorder";
 
 const HELP_SECTIONS = [
   { id: "ticket-raised", label: "Ticket Raised", variant: "primary" as const },
   { id: "resolved", label: "Resolved", variant: "primary" as const },
 ];
+
+const SECTION_META: Record<
+  HelpSection,
+  { title: string; subtitle: string }
+> = {
+  "ticket-raised": {
+    title: "Ticket Raised",
+    subtitle: "Open support requests waiting for a response",
+  },
+  resolved: {
+    title: "Resolved",
+    subtitle: "Tickets that have already been closed",
+  },
+};
 
 export type HelpServiceOption = { id: string; name: string };
 
@@ -35,6 +49,17 @@ function nextTicketNo() {
 }
 
 type HelpSection = "ticket-raised" | "resolved";
+
+function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ad-purple/20 bg-white/60 px-6 py-14 text-center shadow-sm backdrop-blur-sm">
+      <span className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-ad-bg-purple text-ad-purple">
+        <FiHelpCircle size={22} aria-hidden />
+      </span>
+      <div className="max-w-sm text-sm text-slate-600">{children}</div>
+    </div>
+  );
+}
 
 export default function PortalHelpPage({
   metaDescription,
@@ -62,6 +87,7 @@ export default function PortalHelpPage({
   useOwnerNavReset(resetSidebar);
 
   const resolvedServiceId = selectedServiceId || services[0]?.id || "";
+  const meta = SECTION_META[activeSection];
 
   const filteredTickets = useMemo(
     () =>
@@ -128,56 +154,83 @@ export default function PortalHelpPage({
       <button
         type="button"
         onClick={openNewTicketForm}
-        className="shrink-0 rounded-full border border-[#006600] bg-[#006600] px-5 py-2 text-sm font-bold text-white hover:brightness-95"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-ad-purple to-ad-purple-dark px-4 py-2 text-sm font-semibold text-white shadow-[0_6px_14px_rgba(155,48,141,0.28)] transition hover:brightness-105"
       >
+        <FiPlus size={15} aria-hidden />
         Raise Ticket
       </button>
     ) : undefined;
 
   return (
     <OwnerPageShell
-      pageHeading={activeSection === "resolved" ? "Resolved" : "Ticket Raised"}
+      pageHeading=""
       metaTitle="Help | AutoDaddy"
       metaDescription={metaDescription}
+      noPanel
       headerAction={headerAction ?? raiseTicketButton}
       sidebarItems={HELP_SECTIONS}
       activeSidebarId={activeSection}
       onSidebarSelect={(id) => handleSectionChange(id as HelpSection)}
     >
-      {showForm ? (
-        <ShopSupportPanel
-          ticketNo={draftTicketNo}
-          services={services}
-          servicesLoading={servicesLoading}
-          selectedServiceId={resolvedServiceId}
-          onServiceChange={setSelectedServiceId}
-          recording={recording}
-          hasRecording={hasRecording}
-          recorderError={recorderError}
-          onToggleRecording={() => void toggle()}
-          saving={saving}
-          onSave={() => void handleSave()}
-          onCancel={closeForm}
-        />
-      ) : (
-        <div className="flex flex-col gap-3">
-          {filteredTickets.length === 0 ? (
-            <ShopEmptyPanel
-              message={
-                activeSection === "resolved"
-                  ? "No resolved tickets yet."
-                  : "No active tickets. Raise a ticket to get help."
-              }
-            />
-          ) : (
-            <ShopListPanel>
-              {filteredTickets.map((ticket) => (
-                <ShopTicketRow key={ticket.id} ticket={ticket} />
-              ))}
-            </ShopListPanel>
-          )}
-        </div>
-      )}
+      <div className="flex flex-col gap-4">
+        {!showForm ? (
+          <header className="flex flex-wrap items-end justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-sm text-slate-500">{meta.subtitle}</p>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+                {meta.title}
+              </h1>
+            </div>
+            {filteredTickets.length > 0 ? (
+              <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
+                {filteredTickets.length} ticket{filteredTickets.length === 1 ? "" : "s"}
+              </p>
+            ) : null}
+          </header>
+        ) : null}
+
+        {showForm ? (
+          <ShopSupportPanel
+            ownerStyle
+            ticketNo={draftTicketNo}
+            services={services}
+            servicesLoading={servicesLoading}
+            selectedServiceId={resolvedServiceId}
+            onServiceChange={setSelectedServiceId}
+            recording={recording}
+            hasRecording={hasRecording}
+            recorderError={recorderError}
+            onToggleRecording={() => void toggle()}
+            saving={saving}
+            onSave={() => void handleSave()}
+            onCancel={closeForm}
+          />
+        ) : filteredTickets.length === 0 ? (
+          <EmptyState>
+            {activeSection === "resolved" ? (
+              "No resolved tickets yet."
+            ) : (
+              <>
+                <p className="mb-3">No active tickets. Raise a ticket to get help.</p>
+                <button
+                  type="button"
+                  onClick={openNewTicketForm}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-ad-purple to-ad-purple-dark px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-105"
+                >
+                  <FiPlus size={14} aria-hidden />
+                  Raise Ticket
+                </button>
+              </>
+            )}
+          </EmptyState>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {filteredTickets.map((ticket) => (
+              <ShopTicketRow key={ticket.id} ticket={ticket} ownerStyle />
+            ))}
+          </div>
+        )}
+      </div>
     </OwnerPageShell>
   );
 }

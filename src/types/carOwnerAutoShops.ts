@@ -1,3 +1,10 @@
+/** One service a shop offers, with optional shop-specific sub-services (from `myServices`). */
+export type CarOwnerShopServiceOffering = {
+  id: string;
+  name: string;
+  subServices: { id?: string; name: string }[];
+};
+
 /** Normalized row for car-owner shop listings (GET /api/user/auto-shops). */
 export type CarOwnerAutoShopListItem = {
   id: string;
@@ -12,6 +19,8 @@ export type CarOwnerAutoShopListItem = {
   mainServices: string[];
   mainServiceItems: { id: string; name: string }[];
   subServices: string[];
+  /** Hierarchical services from `myServices` (preferred for filters). */
+  serviceOfferings: CarOwnerShopServiceOffering[];
   /** Car company / brand names the shop specializes in. */
   carCompanies: string[];
   address: string;
@@ -22,5 +31,8 @@ export type CarOwnerAutoShopListItem = {
   openWeekdays: string[];
   closedWeekdays: string[];
   isFavorite: boolean;
+  /** Primary / first shop type (backward compatible). */
   shopType: string;
+  /** All shop types from API — can be a string or array like `["autoShop","carWash"]`. */
+  shopTypes: string[];
 };

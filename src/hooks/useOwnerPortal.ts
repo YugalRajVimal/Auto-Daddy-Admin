@@ -232,12 +232,14 @@ export function useCarOwnerServiceSidebar() {
   const { token } = useAuth();
   const [indoor, setIndoor] = useState<ServiceCategory[]>([]);
   const [outdoor, setOutdoor] = useState<ServiceCategory[]>([]);
+  const [all, setAll] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!token) {
       setIndoor([]);
       setOutdoor([]);
+      setAll([]);
       setLoading(false);
       return;
     }
@@ -249,6 +251,7 @@ export function useCarOwnerServiceSidebar() {
         if (cancelled) return;
         const categories = parseServiceCatalogResponse(res.data);
         const partitioned = partitionOwnerHomeSidebarServices(categories);
+        setAll(categories);
         setIndoor(partitioned.indoor);
         setOutdoor(partitioned.outdoor);
       } finally {
@@ -260,5 +263,5 @@ export function useCarOwnerServiceSidebar() {
     };
   }, [token]);
 
-  return { indoor, outdoor, loading };
+  return { indoor, outdoor, all, loading };
 }

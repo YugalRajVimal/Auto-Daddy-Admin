@@ -6,6 +6,7 @@ import {
   formatPerDayScheduleDisplay,
   resolvePerDaySchedule,
 } from "./perDayOpenHours";
+import { normalizeShopTypes } from "./shopTypes";
 import type { CarOwnerAutoShopListItem } from "../types/carOwnerAutoShops";
 
 function formatPincodeDisplay(input: string): string {
@@ -42,6 +43,11 @@ function extractServices(raw: Record<string, unknown>): {
   mainServices: string[];
   mainServiceItems: { id: string; name: string }[];
   subServices: string[];
+  serviceOfferings: {
+    id: string;
+    name: string;
+    subServices: { id?: string; name: string }[];
+  }[];
 } {
   const serviceRoots =
     (Array.isArray(raw.myServices) && raw.myServices.length > 0 ? raw.myServices : null) ??
@@ -50,10 +56,15 @@ function extractServices(raw: Record<string, unknown>): {
   const mainServices: string[] = [];
   const mainServiceItems: { id: string; name: string }[] = [];
   const subServices: string[] = [];
+  const serviceOfferings: {
+    id: string;
+    name: string;
+    subServices: { id?: string; name: string }[];
+  }[] = [];
   const seenItems = new Set<string>();
 
   if (!serviceRoots) {
-    return { mainServices, mainServiceItems, subServices };
+    return { mainServices, mainServiceItems, subServices, serviceOfferings };
   }
 
   for (const s of serviceRoots) {
@@ -81,19 +92,36 @@ function extractServices(raw: Record<string, unknown>): {
       ? ((serviceObj as { services: unknown[] }).services ?? [])
       : [];
     const selectedSubIds = new Set<string>();
+    const offeringSubs: { id?: string; name: string }[] = [];
+    const seenOfferingSub = new Set<string>();
     const selectedSubsRaw = (s.subServices ?? s.selectedSubServices) as unknown;
     if (Array.isArray(selectedSubsRaw)) {
       for (const sub of selectedSubsRaw) {
         if (typeof sub === "string") {
           const t = sub.trim();
-          if (t) selectedSubIds.add(t);
+          if (t) {
+            selectedSubIds.add(t);
+            const key = t.toLowerCase();
+            if (!seenOfferingSub.has(key)) {
+              seenOfferingSub.add(key);
+              offeringSubs.push({ name: t });
+            }
+            subServices.push(t);
+          }
           continue;
         }
         if (!isShopRecord(sub)) continue;
         const subId = pickString(sub.subService, sub._id, sub.id);
         if (subId) selectedSubIds.add(subId);
         const subName = pickString(sub.name, sub.title);
-        if (subName) subServices.push(subName);
+        if (subName) {
+          subServices.push(subName);
+          const key = (subId || subName).toLowerCase();
+          if (!seenOfferingSub.has(key)) {
+            seenOfferingSub.add(key);
+            offeringSubs.push({ id: subId || undefined, name: subName });
+          }
+        }
       }
     }
 
@@ -122,12 +150,21 @@ function extractServices(raw: Record<string, unknown>): {
         mainServices.push(mainName);
       }
     }
+
+    if (mainName) {
+      serviceOfferings.push({
+        id: mainId,
+        name: mainName,
+        subServices: offeringSubs,
+      });
+    }
   }
 
   return {
     mainServices: [...new Set(mainServices)],
     mainServiceItems,
     subServices: [...new Set(subServices)],
+    serviceOfferings,
   };
 }
 
@@ -437,7 +474,17 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
   const services = extractServices(raw);
   const carCompanies = extractCarCompanies(raw);
   const coords = parseWgs84MapLocation(raw);
-  const shopType = pickString(raw.shopType, raw.shop_type, raw.type);
+  // API may send `shopType` as a string ("autoShop") or array (["autoShop","carWash",…]).
+  const shopTypes = normalizeShopTypes(
+    (raw.shopTypes ?? raw.shopType ?? raw.shop_type ?? raw.type) as
+      | string
+      | string[]
+      | null
+      | undefined,
+  );
+  const shopType = shopTypes[0] ?? "autoShop";
+
+  const favouriteRaw = raw.isFavourite ?? raw.isFavorite ?? raw.favourite ?? raw.favorite;
 
   return {
     id,
@@ -452,6 +499,7 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
     mainServices: services.mainServices,
     mainServiceItems: services.mainServiceItems,
     subServices: services.subServices,
+    serviceOfferings: services.serviceOfferings,
     carCompanies,
     address,
     phone,
@@ -460,8 +508,9 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
     mapLng: coords?.lng ?? null,
     openWeekdays,
     closedWeekdays,
-    isFavorite: false,
+    isFavorite: favouriteRaw === true || favouriteRaw === "true" || favouriteRaw === 1,
     shopType,
+    shopTypes,
   };
 }
 

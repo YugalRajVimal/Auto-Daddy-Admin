@@ -1,15 +1,15 @@
 import { Link, useLocation } from "react-router";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
-import {
-  FiChevronLeft,
-  FiChevronRight,
-  FiHeart,
-  FiMapPin,
-  FiTool,
-} from "react-icons/fi";
+import { useCallback, useDeferredValue, useMemo, useState, type ReactNode } from "react";
+import { FiHeart, FiMapPin, FiTool } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerPageShell, { OwnerPageSidebar } from "../../../components/owner/OwnerPageShell";
+import OwnerShopFilters, {
+  EMPTY_SHOP_LIST_FILTERS,
+  mergeServiceCatalogWithShopOfferings,
+  parseShopServiceValue,
+  type OwnerShopListFilters,
+} from "../../../components/owner/OwnerShopFilters";
 import OwnerVehiclePlateSidebar from "../../../components/owner/OwnerVehiclePlateSidebar";
 import OwnerShopExpandedPanel from "../../../components/owner/OwnerShopExpandedPanel";
 import { OwnerCustomerRequestsTable } from "../../../components/owner/OwnerPanelTables";
@@ -20,7 +20,9 @@ import { useCarOwnerServiceSidebar } from "../../../hooks/useOwnerPortal";
 import { useCarOwnerVehicles } from "../../../hooks/useCarOwnerVehicles";
 import { useOwnerNavReset, useOwnerSidebarDefault } from "../../../hooks/useOwnerNavReset";
 import { isCarOwnerShopOpenToday } from "../../../lib/carOwnerAutoShops";
+import { getShopTypeLabel, getShopTypeLabels } from "../../../lib/shopTypes";
 import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
+import type { CarOwnerAutoShopListItem } from "../../../types/carOwnerAutoShops";
 
 const SELECT_VEHICLE_PROMPT = "Select a vehicle from the sidebar to find matching auto shops.";
 
@@ -43,31 +45,94 @@ function EmptyState({
   );
 }
 
+function uniqueSortedCities(shops: CarOwnerAutoShopListItem[]): string[] {
+  const set = new Set<string>();
+  for (const shop of shops) {
+    const city = shop.city?.trim();
+    if (city) set.add(city);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+function matchesShopSearch(shop: CarOwnerAutoShopListItem, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [
+    shop.name,
+    shop.city,
+    shop.phone,
+    shop.address,
+    shop.shopType,
+    ...(shop.shopTypes ?? []),
+    getShopTypeLabels(shop.shopTypes?.length ? shop.shopTypes : shop.shopType),
+    ...shop.mainServices,
+    ...shop.subServices,
+    ...shop.carCompanies,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
+function shopOffersService(
+  shop: CarOwnerAutoShopListItem,
+  serviceId: string,
+): boolean {
+  const id = serviceId.trim();
+  if (!id) return true;
+  if (shop.serviceOfferings?.some((o) => o.id === id)) return true;
+  return shop.mainServiceItems.some((item) => item.id === id);
+}
+
+function shopOffersSubService(
+  shop: CarOwnerAutoShopListItem,
+  serviceId: string,
+  subName: string,
+): boolean {
+  const needle = subName.trim().toLowerCase();
+  if (!needle) return true;
+  const offering = shop.serviceOfferings?.find((o) => o.id === serviceId);
+  if (offering) {
+    if (offering.subServices.length === 0) return false;
+    return offering.subServices.some((s) => s.name.trim().toLowerCase() === needle);
+  }
+  return shop.subServices.some((name) => name.trim().toLowerCase() === needle);
+}
+
 export default function OwnerAutoShopsPage() {
   const location = useLocation();
   const section: AutoShopsSection =
     location.pathname.includes("/approvals") ? "approvals" : "auto-shops";
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
-  const [selectedServiceIndex, setSelectedServiceIndex] = useState(0);
   const [expandedShopId, setExpandedShopId] = useState<string | null>(null);
   const [favoriteBusyId, setFavoriteBusyId] = useState<string | null>(null);
+  const [listFilters, setListFilters] = useState<OwnerShopListFilters>(EMPTY_SHOP_LIST_FILTERS);
+  const deferredSearch = useDeferredValue(listFilters.search.trim());
 
-  const { indoor, outdoor, loading: servicesLoading } = useCarOwnerServiceSidebar();
-  const allServices = useMemo(() => [...indoor, ...outdoor], [indoor, outdoor]);
-  const safeServiceIndex =
-    allServices.length === 0 ? 0 : Math.min(selectedServiceIndex, allServices.length - 1);
-  const selectedService = allServices[safeServiceIndex] ?? null;
+  const { all: sidebarCatalog, loading: servicesLoading } = useCarOwnerServiceSidebar();
+
+  const serviceSelectionPreview = useMemo(
+    () => parseShopServiceValue(listFilters.serviceValue, sidebarCatalog),
+    [listFilters.serviceValue, sidebarCatalog],
+  );
+
+  const selectedServiceId =
+    serviceSelectionPreview.kind === "all" ? "" : serviceSelectionPreview.serviceId;
 
   const { vehicles, loading: vehiclesLoading, error: vehiclesError } = useCarOwnerVehicles();
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId) ?? null;
 
   const shopFilters = useMemo(
     () => ({
-      serviceIds: selectedService?.id ? [selectedService.id] : ([] as string[]),
-      shopType: selectedService?.shopType ?? ("autoShop" as const),
+      // Only send main service id to API; sub-service narrowing is client-side.
+      serviceIds: selectedServiceId ? [selectedServiceId] : ([] as string[]),
+      shopType: listFilters.shopType || null,
       carCompanyIds: [] as string[],
+      search: deferredSearch || null,
+      enabled: Boolean(selectedVehicleId),
     }),
-    [selectedService?.id, selectedService?.shopType]
+    [selectedServiceId, listFilters.shopType, deferredSearch, selectedVehicleId],
   );
 
   const { shops, loading, error, refresh } = useCarOwnerAutoShops(shopFilters);
@@ -83,11 +148,79 @@ export default function OwnerAutoShopsPage() {
   } = useCarOwnerCustomerRequests();
 
   const shopsWithFavorites = useMemo(
-    () => shops.map((shop) => ({ ...shop, isFavorite: isFavorite(shop.id) })),
-    [shops, isFavorite]
+    () =>
+      shops.map((shop) => ({
+        ...shop,
+        isFavorite: isFavorite(shop.id) || shop.isFavorite,
+      })),
+    [shops, isFavorite],
   );
 
-  const expandedShop = shopsWithFavorites.find((s) => s.id === expandedShopId) ?? null;
+  const catalog = useMemo(
+    () => mergeServiceCatalogWithShopOfferings(sidebarCatalog, shopsWithFavorites),
+    [sidebarCatalog, shopsWithFavorites],
+  );
+
+  const serviceSelection = useMemo(
+    () => parseShopServiceValue(listFilters.serviceValue, catalog),
+    [listFilters.serviceValue, catalog],
+  );
+
+  const cityOptions = useMemo(
+    () => uniqueSortedCities(shopsWithFavorites),
+    [shopsWithFavorites],
+  );
+
+  const filteredShops = useMemo(() => {
+    return shopsWithFavorites.filter((shop) => {
+      if (!matchesShopSearch(shop, listFilters.search)) return false;
+
+      if (listFilters.shopType) {
+        const types =
+          shop.shopTypes?.length > 0
+            ? shop.shopTypes
+            : [shop.shopType || "autoShop"];
+        if (!types.includes(listFilters.shopType)) return false;
+      }
+
+      if (serviceSelection.kind === "service") {
+        if (!shopOffersService(shop, serviceSelection.serviceId)) return false;
+      }
+
+      if (serviceSelection.kind === "subservice") {
+        if (
+          !shopOffersSubService(
+            shop,
+            serviceSelection.serviceId,
+            serviceSelection.subServiceName,
+          )
+        ) {
+          return false;
+        }
+      }
+
+      if (listFilters.city) {
+        if (shop.city.trim().toLowerCase() !== listFilters.city.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
+      if (listFilters.availability !== "all") {
+        const open = isCarOwnerShopOpenToday(shop);
+        if (listFilters.availability === "open" && !open) return false;
+        if (listFilters.availability === "closed" && open) return false;
+      }
+
+      if (listFilters.favorites === "favorites" && !shop.isFavorite) return false;
+
+      return true;
+    });
+  }, [shopsWithFavorites, listFilters, serviceSelection]);
+
+  const expandedShop =
+    filteredShops.find((s) => s.id === expandedShopId) ??
+    shopsWithFavorites.find((s) => s.id === expandedShopId) ??
+    null;
 
   const vehicleMakeLabel = useMemo(() => {
     const make = selectedVehicle?.make?.name?.trim();
@@ -104,9 +237,15 @@ export default function OwnerAutoShopsPage() {
     setExpandedShopId(null);
   }, []);
 
+  const handleFiltersChange = useCallback((next: OwnerShopListFilters) => {
+    setListFilters(next);
+    setExpandedShopId(null);
+  }, []);
+
   const resetSidebar = useCallback(() => {
     setSelectedVehicleId(vehicles[0]?.id ?? null);
     setExpandedShopId(null);
+    setListFilters(EMPTY_SHOP_LIST_FILTERS);
   }, [vehicles]);
 
   useOwnerSidebarDefault(!vehiclesLoading && vehicles.length > 0, resetSidebar);
@@ -119,12 +258,19 @@ export default function OwnerAutoShopsPage() {
         ? `Shops for ${vehicleMakeLabel}`
         : "Auto Repair Shops";
 
-  const pageSubtitle =
-    section === "approvals"
-      ? "Review shops waiting to connect with you"
-      : selectedService?.name
-        ? `Nearby mechanics for ${selectedService.name}`
-        : "Find mechanics near you by vehicle and service";
+  const pageSubtitle = (() => {
+    if (section === "approvals") return "Review shops waiting to connect with you";
+    if (serviceSelection.kind === "subservice") {
+      return `Nearby shops for ${serviceSelection.subServiceName}`;
+    }
+    if (serviceSelection.kind === "service") {
+      return `Nearby shops for ${serviceSelection.serviceName}`;
+    }
+    if (listFilters.shopType) {
+      return `Nearby ${getShopTypeLabel(listFilters.shopType).toLowerCase()} shops`;
+    }
+    return "Find mechanics near you by shop type, service, and filters";
+  })();
 
   const handleApprove = async (businessId: string) => {
     const result = await approve(businessId);
@@ -179,10 +325,10 @@ export default function OwnerAutoShopsPage() {
           {section === "auto-shops" &&
           !loading &&
           showShopList &&
-          shopsWithFavorites.length > 0 &&
+          filteredShops.length > 0 &&
           !expandedShop ? (
             <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
-              {shopsWithFavorites.length} shop{shopsWithFavorites.length === 1 ? "" : "s"}
+              {filteredShops.length} shop{filteredShops.length === 1 ? "" : "s"}
             </p>
           ) : null}
         </header>
@@ -218,40 +364,15 @@ export default function OwnerAutoShopsPage() {
           </div>
         ) : (
           <div className="flex min-h-[320px] flex-col gap-4">
-            <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/95 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5">
-              <div className="bg-gradient-to-r from-ad-purple/95 to-ad-purple-dark px-4 py-3 text-center">
-                <p className="text-sm font-bold tracking-wide text-white">Auto Mechanics Nearby</p>
-              </div>
-              <div className="flex items-center justify-center gap-3 bg-gradient-to-b from-slate-50/80 to-white px-4 py-3">
-                <button
-                  type="button"
-                  className="flex size-8 items-center justify-center rounded-full bg-slate-600 text-white shadow-sm transition hover:bg-slate-700 disabled:opacity-40"
-                  onClick={() => setSelectedServiceIndex((i) => Math.max(0, i - 1))}
-                  disabled={servicesLoading || allServices.length === 0 || safeServiceIndex === 0}
-                  aria-label="Previous service"
-                >
-                  <FiChevronLeft />
-                </button>
-                <div className="min-w-[220px] rounded-full bg-white px-5 py-2 text-center text-sm font-semibold text-slate-800 ring-1 ring-slate-200/80">
-                  {selectedService?.name ?? "Select a service"}
-                </div>
-                <button
-                  type="button"
-                  className="flex size-8 items-center justify-center rounded-full bg-slate-600 text-white shadow-sm transition hover:bg-slate-700 disabled:opacity-40"
-                  onClick={() =>
-                    setSelectedServiceIndex((i) => Math.min(allServices.length - 1, i + 1))
-                  }
-                  disabled={
-                    servicesLoading ||
-                    allServices.length === 0 ||
-                    safeServiceIndex >= Math.max(0, allServices.length - 1)
-                  }
-                  aria-label="Next service"
-                >
-                  <FiChevronRight />
-                </button>
-              </div>
-            </div>
+            {showShopList ? (
+              <OwnerShopFilters
+                filters={listFilters}
+                onChange={handleFiltersChange}
+                catalog={catalog}
+                cityOptions={cityOptions}
+                servicesLoading={servicesLoading}
+              />
+            ) : null}
 
             {vehiclesLoading ? (
               <div className="space-y-3">
@@ -293,6 +414,17 @@ export default function OwnerAutoShopsPage() {
               </EmptyState>
             ) : shopsWithFavorites.length === 0 ? (
               <EmptyState>No auto repair shops found in your area yet.</EmptyState>
+            ) : filteredShops.length === 0 ? (
+              <EmptyState>
+                <p className="mb-3">No shops match the selected filters.</p>
+                <button
+                  type="button"
+                  onClick={() => handleFiltersChange(EMPTY_SHOP_LIST_FILTERS)}
+                  className="rounded-xl bg-ad-purple px-4 py-2 text-sm font-semibold text-white shadow-sm"
+                >
+                  Clear filters
+                </button>
+              </EmptyState>
             ) : expandedShop ? (
               <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5 sm:p-5">
                 <OwnerShopExpandedPanel
@@ -311,7 +443,7 @@ export default function OwnerAutoShopsPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-2.5">
-                {shopsWithFavorites.map((shop) => {
+                {filteredShops.map((shop) => {
                   const open = isCarOwnerShopOpenToday(shop);
                   const phone = shop.phone.trim();
                   const logo = normalizeMediaUrl(shop.logoUrl);
@@ -332,13 +464,22 @@ export default function OwnerAutoShopsPage() {
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-bold tracking-tight text-slate-900">{shop.name}</p>
+                        <p className="truncate font-bold tracking-tight text-slate-900">
+                          {shop.name}
+                        </p>
                         <p className="mt-0.5 truncate text-xs font-semibold text-sky-700 sm:text-sm">
                           {phone || "—"}
                         </p>
-                        {shop.city ? (
-                          <p className="mt-0.5 truncate text-xs text-slate-500">{shop.city}</p>
-                        ) : null}
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          {[
+                            shop.city,
+                            getShopTypeLabels(
+                              shop.shopTypes?.length ? shop.shopTypes : shop.shopType,
+                            ),
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
                       </div>
 
                       <span
