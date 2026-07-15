@@ -24,7 +24,7 @@ type IndividualService = { name: string; desc?: string; price?: number; _id: str
 type Service = { _id: string; name?: string; desc?: string; services?: IndividualService[];[k: string]: any };
 type MyService = { service: Service; subServices?: { subService: string }[]; serviceName?: string; serviceId?: string;[k: string]: any };
 type BusinessProfileType = {
-  _id: string; businessName?: string; businessAddress?: string; pincode?: string; city?: string;
+  _id: string; Name?: string; businessAddress?: string; pincode?: string; city?: string;
   businessPhone?: string; businessEmail?: string; businessHSTNumber?: string; openHours?: string;
   openDays?: string[]; perDayOpenHours?: any[]; businessLogo?: string; myServices?: MyService[];
   myDeals?: any[]; teamMembers?: TeamMemberType[]; businessMapLocation?: any; isOpen?: boolean;
@@ -46,10 +46,12 @@ type JobCardType = {
   createdAt?: string; updatedAt?: string; status?: string;[k: string]: any;
 };
 type ShopType = "autoShop" | "tyreShop" | "carWash" | "towTruck";
+// Change shopType to support multiple shop types (array)
 type AutoShopOwnerType = {
   _id: string;
   name: string;
   email?: string;
+  city?: string;
   countryCode?: string;
   phone?: string;
   pincode?: string;
@@ -63,26 +65,26 @@ type AutoShopOwnerType = {
   deals?: DealType[];
   jobCards?: JobCardType[];
   status?: string;
-  shopType?: ShopType; // ADDED shopType
+  shopType?: ShopType[]; // CHANGED: shopType is now ShopType[]
 };
 
 // ─── Column Config ────────────────────────────────────────────────────────────
 const ALL_COLUMNS = [
   { key: "date", label: "Date" },
   { key: "phone", label: "Phone" },
-  { key: "businessName", label: "Business Name" },
+  { key: "Name", label: "Owner Name" },
   { key: "shopType", label: "Shop Type" },
   { key: "city", label: "City" },
   { key: "customers", label: "No. of Customers" },
   { key: "dealsPosted", label: "Deals Posted" },
   { key: "email", label: "Email" },
 ];
-const DEFAULT_VISIBLE = ["date", "phone", "businessName", "shopType", "city", "customers", "dealsPosted", "email"];
+const DEFAULT_VISIBLE = ["date", "phone", "Name", "shopType", "city", "customers", "dealsPosted", "email"];
 
 const AUTO_SHOP_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "date", label: "Date", type: "date" },
   { key: "phone", label: "Phone" },
-  { key: "businessName", label: "Business Name" },
+  { key: "Name", label: "Owner Name" },
   {
     key: "shopType",
     label: "Shop Type",
@@ -137,7 +139,7 @@ function GCRow({ label, value }: { label: string; value?: any }) {
 const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
   { value: "autoShop", label: "Mechanic Shop" },
   { value: "carWash", label: "Car Washing" },
-  { value: "tyreShop", label: "Tire Master" },
+  { value: "tyreShop", label: "Tire Service" },
   { value: "towTruck", label: "Tow Truck" },
 ];
 
@@ -148,8 +150,16 @@ const DEFAULT_SHOP_TYPE_FILTERS: Record<ShopType, boolean> = {
   towTruck: false,
 };
 
-function ownerShopType(owner: AutoShopOwnerType): ShopType {
-  return (owner.shopType as ShopType) || "autoShop";
+// Return array of ShopType. If owner.shopType is not array, normalize to array.
+// Default to ['autoShop'] if undefined or empty.
+function ownerShopTypes(owner: AutoShopOwnerType): ShopType[] {
+  if (Array.isArray(owner.shopType)) {
+    return owner.shopType.length > 0 ? owner.shopType : ["autoShop"];
+  }
+  if (typeof owner.shopType === "string" && owner.shopType) {
+    return [owner.shopType as ShopType];
+  }
+  return ["autoShop"];
 }
 
 function ownerDealsList(owner: AutoShopOwnerType): DealType[] {
@@ -372,8 +382,8 @@ function ownerCustomersCount(owner: AutoShopOwnerType): number {
 function autoShopOwnerPrintColMap(): Record<string, (o: AutoShopOwnerType) => string> {
   return {
     phone: o => `${o.countryCode ?? ""} ${o.phone ?? ""}`.trim() || "-",
-    businessName: o => o.businessProfile?.businessName || "-",
-    shopType: o => SHOP_TYPE_OPTIONS.find(x => x.value === ownerShopType(o))?.label || "-",
+    Name: o => o.businessProfile?.Name || "-",
+    shopType: o => ownerShopTypes(o).map(st => SHOP_TYPE_OPTIONS.find(x => x.value === st)?.label || "-").join(", "),
     city: o => o.businessProfile?.city || "-",
     date: o => fmtDate(o.createdAt),
     customers: o => String(ownerCustomersCount(o)),
@@ -400,20 +410,27 @@ const tdClass = "border border-gray-300 px-3 py-2 text-center text-sm text-gray-
 const thClass = "border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap";
 const linkClass = "text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-medium";
 
+const COUNTRY_CODES = [
+  { label: "+1 (US/CA)", value: "+1" },
+  { label: "+91 (IN)", value: "+91" },
+  // Add more codes as needed
+];
+
 const AutoShopAddEditForm: React.FC<{
   owner?: AutoShopOwnerType | null;
   onCancel: () => void;
   onSaved: () => void;
 }> = ({ owner, onCancel, onSaved }) => {
   const isEdit = !!owner;
-  const [businessName, setBusinessName] = useState("");
+  const [Name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [countryCode, setCountryCode] = useState("+1");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
-  const [shopType, setShopType] = useState<ShopType>("autoShop");
+  const [shopType, setShopType] = useState<ShopType[]>(["autoShop"]);
   const [attempted, setAttempted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -450,31 +467,34 @@ const AutoShopAddEditForm: React.FC<{
     setAttempted(false);
     setApiError(null);
     if (isEdit && owner) {
-      setBusinessName(owner.businessProfile?.businessName || owner.name || "");
+      setName(owner.businessProfile?.Name || owner.name || "");
       setEmail(owner.email || "");
+      setCountryCode(owner.countryCode || "+1");
       setPhone(owner.phone || "");
-      setCity(owner.businessProfile?.city || "");
+      setCity(owner?.city || "");
       setAddress(owner.address || owner.businessProfile?.businessAddress || "");
       setZipCode(owner.pincode || owner.businessProfile?.pincode || "");
       setJoiningDate(fmtDate(owner.createdAt) !== "-" ? fmtDate(owner.createdAt) : "");
-      setShopType(ownerShopType(owner));
+      setShopType(ownerShopTypes(owner));
     } else {
-      setBusinessName("");
+      setName("");
       setEmail("");
+      setCountryCode("+1");
       setPhone("");
       setCity("");
       setAddress("");
       setZipCode("");
       setJoiningDate(new Date().toISOString().slice(0, 10));
-      setShopType("autoShop");
+      setShopType(["autoShop"]);
     }
   }, [isEdit, owner]);
 
   function validate(): string | null {
-    if (!businessName.trim()) return "Business name is required.";
+    if (!Name.trim()) return "Owner name is required.";
     if (email.trim() && !isEmail(email)) return "Enter a valid email.";
     if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
-    if (!shopType) return "Shop type required.";
+    if (!countryCode || !COUNTRY_CODES.find(c => c.value === countryCode)) return "Country code required.";
+    if (!shopType || shopType.length === 0) return "Shop type required.";
     return null;
   }
 
@@ -487,20 +507,22 @@ const AutoShopAddEditForm: React.FC<{
       return;
     }
     setApiError(null);
-    const payload: Record<string, string> = {
-      name: businessName.trim(),
-      businessName: businessName.trim(),
+    const payload: Record<string, any> = {
+      name: Name.trim(),
+      Name: Name.trim(),
       email: email.trim(),
+      countryCode: countryCode,
       phone: phone.replace(/\D/g, ""),
       city: city.trim(),
       address: address.trim(),
       pincode: zipCode.trim(),
       role: "autoshopowner",
-      shopType,
+      shopType: shopType, // always send as array
     };
     if (joiningDate.trim()) payload.createdAt = joiningDate.trim();
     setSubmitting(true);
     try {
+      console.log(shopType);
       if (isEdit && owner) {
         await axios.put(`${API()}/api/admin/autoshopowners/${owner._id}`, payload, { headers: getToken() });
       } else {
@@ -548,41 +570,69 @@ const AutoShopAddEditForm: React.FC<{
             className={compactInputClass}
           />
         </CompactField>
-        <CompactField label="Phone" required>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-            className={compactInputClass}
-          />
-          {attempted && phone.replace(/\D/g, "").length !== 10 && (
-            <p className={fieldErrorClass}>Must be 10 digits</p>
-          )}
-        </CompactField>
-        <CompactField label="Business Name" required>
-          <input
-            type="text"
-            value={businessName}
-            onChange={(e) => setBusinessName(e.target.value.slice(0, 60))}
-            className={compactInputClass}
-          />
-          {attempted && !businessName.trim() && <p className={fieldErrorClass}>Required</p>}
-        </CompactField>
-        <CompactField label="Shop Type" required>
+        <CompactField label="Country Code" required className="w-fit">
           <select
-            value={shopType}
-            onChange={(e) => setShopType(e.target.value as ShopType)}
+            value={countryCode}
+            onChange={e => setCountryCode(e.target.value)}
             className={compactInputClass}
           >
-            {SHOP_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+            {COUNTRY_CODES.map(c => (
+              <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
         </CompactField>
+        <CompactField label="Phone" required>
+          <input
+            type="tel"
+            value={phone
+              .replace(/\D/g, "")
+              .slice(0, 10)
+              .replace(/(\d{3})(\d{3})(\d{0,4})/, (_m, p1, p2, p3) => {
+                if (!p2) return p1;
+                if (!p3) return `${p1} ${p2}`;
+                return `${p1} ${p2} ${p3}`;
+              })
+            }
+            onChange={e => {
+              // Remove non-digits, format, but keep only 10 digits max
+              const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
+              setPhone(raw);
+            }}
+            className={compactInputClass}
+            placeholder="xxx xxx xxxx"
+          />
+          {attempted && phone.replace(/\D/g, "").length !== 10 && (
+            <p className={fieldErrorClass}>Must be 10 digits (format: xxx xxx xxxx)</p>
+          )}
+        </CompactField>
+        <CompactField label="Owner Name" required>
+          <input
+            type="text"
+            value={Name}
+            onChange={(e) => setName(e.target.value.slice(0, 60))}
+            className={compactInputClass}
+          />
+          {attempted && !Name.trim() && <p className={fieldErrorClass}>Required</p>}
+        </CompactField>
+        <CompactField label="Shop Type" required>
+          <select
+            multiple
+            value={shopType}
+            onChange={e => {
+              const selectedOptions = Array.from(e.target.selectedOptions).map(opt => opt.value as ShopType);
+              setShopType(selectedOptions);
+            }}
+            className={compactInputClass}
+            style={{ minHeight: "60px" }}
+          >
+            <option value="autoShop">Mechanic Shop</option>
+            <option value="tyreShop">Tire Master</option>
+            <option value="carWash">Car Washing</option>
+            <option value="towTruck">Tow Truck</option>
+          </select>
+          <p className="text-xs mt-1 text-gray-500">Hold Ctrl (Cmd on Mac) to select multiple</p>
+        </CompactField>
       </CompactFormRow>
-
       <CompactFormRow columns={4} className="items-start">
         <CompactField label="City">
           <select
@@ -598,7 +648,7 @@ const AutoShopAddEditForm: React.FC<{
             ))}
           </select>
         </CompactField>
-        <CompactField label="Address">
+        <CompactField label="Personal Address">
           <input
             type="text"
             value={address}
@@ -611,10 +661,37 @@ const AutoShopAddEditForm: React.FC<{
           <input
             type="text"
             value={zipCode}
-            onChange={(e) => setZipCode(e.target.value.replace(/[^\d]/g, "").slice(0, 10))}
+            onChange={(e) => setZipCode(e.target.value.replace(/[^a-zA-Z0-9]/g, "").slice(0, 10))}
             className={compactInputClass}
+            placeholder="e.g. 110001 / 12345 / K1A0B1"
           />
+          {attempted && !zipCode.trim() && <p className={fieldErrorClass}>Required</p>}
+
+          {attempted && zipCode.trim() && (
+            (() => {
+              // US: 5 or 5+4 zip (12345 or 12345-6789)
+              const usPattern = /^\d{5}(-\d{4})?$/;
+              // Canada: ANA NAN (A-Z 1-9 A-Z 1-9 A-Z 1-9), spaces optional, no lower
+              const caPattern = /^[A-Z]\d[A-Z][ ]?\d[A-Z]\d$/i;
+              // India: 6 digit pincode
+              const inPattern = /^\d{6}$/;
+
+              if (
+                !usPattern.test(zipCode) &&
+                !caPattern.test(zipCode) &&
+                !inPattern.test(zipCode)
+              ) {
+                return (
+                  <p className={fieldErrorClass}>
+                    Enter a valid Zip/Postal Code: e.g. 110001 (IN), 12345 or 12345-6789 (US), K1A0B1 (CA)
+                  </p>
+                );
+              }
+              return null;
+            })()
+          )}
         </CompactField>
+  
         <CompactField label="Email">
           <input
             type="email"
@@ -739,12 +816,14 @@ const AutoShopOwners: React.FC = () => {
   };
 
   const filtered = displayOwners.filter(o => {
-    const st = ownerShopType(o);
-    if (!(shopTypeFilters[st] ?? true)) return false;
+    const stArr = ownerShopTypes(o);
+    // At least one shopType must be checked in filters
+    if (!stArr.some(st => shopTypeFilters[st] ?? true)) return false;
     const q = search.toLowerCase();
-    const shopTypeLabel = SHOP_TYPE_OPTIONS.find(x => x.value === st)?.label ?? "";
+    // For search, use the labels of all shopTypes, joined
+    const shopTypeLabels = stArr.map(st => SHOP_TYPE_OPTIONS.find(x => x.value === st)?.label ?? "").join(", ");
     const phone = `${o.countryCode ? `${o.countryCode} ` : ""}${o.phone || ""}`;
-    const businessName = o.businessProfile?.businessName || o.name || "";
+    const Name = o.businessProfile?.Name || o.name || "";
     const city = o.businessProfile?.city || "";
     const customers = String(ownerCustomersCount(o));
     const dealsPosted = String(ownerDealsList(o).length);
@@ -752,24 +831,28 @@ const AutoShopOwners: React.FC = () => {
       !q ||
       (o.email || "").toLowerCase().includes(q) ||
       (o.phone || "").toLowerCase().includes(q) ||
-      businessName.toLowerCase().includes(q) ||
+      Name.toLowerCase().includes(q) ||
       city.toLowerCase().includes(q) ||
       (o.address || o.businessProfile?.businessAddress || "").toLowerCase().includes(q) ||
       (o.pincode || o.businessProfile?.pincode || "").toLowerCase().includes(q) ||
-      st.toLowerCase().includes(q) ||
-      shopTypeLabel.toLowerCase().includes(q);
+      stArr.some(st => st.toLowerCase().includes(q)) ||
+      shopTypeLabels.toLowerCase().includes(q);
     if (!live) return false;
     return (
       searchIncludes(fmtDate(o.createdAt), searchFilters.date) &&
       searchIncludes(phone, searchFilters.phone) &&
-      searchIncludes(businessName, searchFilters.businessName) &&
-      searchEquals(shopTypeLabel, searchFilters.shopType) &&
+      searchIncludes(Name, searchFilters.Name) &&
+      // searchEquals: filter may provide only one label, but owner may have multiple shop type labels. Need to match any.
+      (searchFilters.shopType
+        ? shopTypeLabels.split(", ").some(label => searchEquals(label, searchFilters.shopType))
+        : true) &&
       searchIncludes(city, searchFilters.city) &&
       searchIncludes(customers, searchFilters.customers) &&
       searchIncludes(dealsPosted, searchFilters.dealsPosted) &&
       searchIncludes(o.email || "", searchFilters.email)
     );
   });
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const selected = Array.from(selectedRows);
@@ -836,9 +919,23 @@ const AutoShopOwners: React.FC = () => {
       case "date":
         return <td key={key} className={tdClass}>{fmtDate(owner.createdAt)}</td>;
       case "phone":
-        return <td key={key} className={tdClass}>{owner.countryCode ? `${owner.countryCode} ` : ""}{owner.phone || "-"}</td>;
-      case "businessName": {
-        const label = owner.businessProfile?.businessName || owner.name || "-";
+        function formatPhone(phone?: string) {
+          if (!phone) return "-";
+          // Remove all non-digits
+          const digits = phone.replace(/\D/g, "");
+          // Format as xxx xxx xxxx (assumes 10 digits)
+          if (digits.length === 10) {
+            return `${digits.slice(0,3)} ${digits.slice(3,6)} ${digits.slice(6,10)}`;
+          }
+          // fallback for other lengths
+          return phone;
+        }
+        return <td key={key} className={tdClass}>
+          {owner.countryCode ? `${owner.countryCode} ` : ""}
+          {formatPhone(owner.phone)}
+        </td>;
+      case "Name": {
+        const label = owner.businessProfile?.Name || owner.name || "-";
         return (
           <td key={key} className={`${tdClass} text-center font-medium`}>
             {viewMode === "active" && label !== "-" ? (
@@ -855,14 +952,18 @@ const AutoShopOwners: React.FC = () => {
           </td>
         );
       }
-      case "shopType":
+      case "shopType": {
+        const labels = ownerShopTypes(owner).map(st => SHOP_TYPE_OPTIONS.find(x => x.value === st)?.label || "-").join(", ");
         return (
           <td key={key} className={tdClass}>
-            {SHOP_TYPE_OPTIONS.find(x => x.value === ownerShopType(owner))?.label || "-"}
+            {labels}
           </td>
         );
-      case "city":
-        return <td key={key} className={tdClass}>{owner.businessProfile?.city || "-"}</td>;
+      }
+      case "city": {
+        // Prefer city from businessProfile, fallback to top-level
+        return <td key={key} className={tdClass}>{owner.businessProfile?.city || owner?.city || "-"}</td>;
+      }
       case "customers": {
         const count = ownerCustomersCount(owner);
         return (
@@ -1091,14 +1192,14 @@ const AutoShopOwners: React.FC = () => {
                             >
                               {busy ? "…" : isSuspended ? "Enable" : "Suspend"}
                             </button>
-                            <button
+                            {/* <button
                               type="button"
                               disabled={busy}
                               onClick={() => deleteOwner(owner._id)}
                               className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 disabled:opacity-60"
                             >
                               {busy ? "…" : "Delete"}
-                            </button>
+                            </button> */}
                           </div>
                         </td>
                       )}

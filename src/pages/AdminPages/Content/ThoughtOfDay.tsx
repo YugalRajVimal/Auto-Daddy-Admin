@@ -21,6 +21,8 @@ import AdminSearchCard, {
 } from "../../../components/admin/AdminSearchCard";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 // Utility to get backend API endpoint
 const API_BASE = (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/admin/common` : "/api");
@@ -66,6 +68,14 @@ function sortNotes(notes: NoteRow[]) {
   });
 }
 
+function isTodayOrFuture(date: Date) {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const comp = new Date(date);
+  comp.setHours(0, 0, 0, 0);
+  return comp >= now;
+}
+
 export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfDayPageProps) {
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -77,7 +87,11 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [date, setDate] = useState("");
+
+  // Use Date objects for react-datepicker
+  const [date, setDate] = useState<Date | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
+
   const [country, setCountry] = useState("India");
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
@@ -202,8 +216,9 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   };
 
   const resetForm = () => {
-    setDate(new Date().toISOString().slice(0, 10));
-    setCountry("India");
+    setDate(new Date());
+    setDateError(null);
+    setCountry("Canada");
     setTitle("");
     setNote("");
     setAttachImage(false);
@@ -219,7 +234,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   };
 
   const openEdit = (row: NoteRow) => {
-    setDate(row.date);
+    setDate(row.date ? new Date(row.date) : null);
+    setDateError(null);
     setCountry(row.country);
     setTitle(row.subject);
     setNote(row.notes);
@@ -270,8 +286,20 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
 
   // ----- ADD & EDIT (no filtering here) -----
   const handleSave = async () => {
+    setDateError(null);
+    // Validation: Date must be set, and must be today or in the future
+    if (!date) {
+      setDateError("Please select a date.");
+      return;
+    }
+    if (!isTodayOrFuture(date)) {
+      setDateError("Date must be today or in the future.");
+      return;
+    }
+
     const formData = new FormData();
-    formData.append("date", date);
+    // Store as yyyy-mm-dd string
+    formData.append("date", date.toISOString().slice(0, 10));
     formData.append("country", country);
     formData.append("subject", title);
     if (note) formData.append("notes", note);
@@ -308,21 +336,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
         });
       }
       if (!resp.ok) throw new Error("Failed to save");
-      // const data = await resp.json();
 
-      // const normalizedRow: NoteRow = {
-      //   id: data.id ?? undefined,
-      //   _id: data._id ?? undefined,
-      //   date: data.date,
-      //   subject: data.subject,
-      //   notes: data.notes,
-      //   country: data.country,
-      //   likes: data.likes ?? 0,
-      //   image: data.image ?? undefined,
-      //   imageUrl: data.imageUrl || data.image || null,
-      // };
-
-      // When adding or updating: refetch list from API for up-to-date filters
       adminNotify.success(editingKey == null ? "Saved successfully." : "Updated successfully.");
       fetchNotes();
     } catch (e: any) {
@@ -425,12 +439,22 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
           >
             <CompactFormRow className="items-start">
               <CompactField label="Date" required className={compactFixedFieldWidth}>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                <DatePicker
+                  selected={date}
+                  onChange={(val: Date | null) => {
+                    setDate(val);
+                    setDateError(null);
+                  }}
+                  minDate={new Date()}
+                  dateFormat="yyyy-MM-dd"
                   className={compactInputClass}
+                  placeholderText="Select date"
+                  showPopperArrow={false}
+                  isClearable
                 />
+                {dateError && (
+                  <span className="text-xs text-red-600 block mt-1">{dateError}</span>
+                )}
               </CompactField>
               <CompactField label="Country" required className={compactFixedFieldWidth}>
                 <select
@@ -438,10 +462,11 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   onChange={(e) => setCountry(e.target.value)}
                   className={compactInputClass}
                 >
-                  <option value="India">India</option>
                   <option value="Canada">Canada</option>
+                  <option value="India">India</option>
                   <option value="USA">USA</option>
                 </select>
+           
               </CompactField>
               <CompactField label="Subject" required className={compactFixedFieldWidth}>
                 <input

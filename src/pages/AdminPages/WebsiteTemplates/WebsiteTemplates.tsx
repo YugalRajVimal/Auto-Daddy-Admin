@@ -19,10 +19,10 @@ import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
-const USER_TYPE_OPTIONS = [
+const SHOP_TYPE_OPTIONS = [
   { value: "mechanic-shop", label: "Mechanic Shop", apiValue: "mechanic-shop" },
   { value: "car-washing", label: "Car Washing", apiValue: "car-washing" },
-  { value: "tire-master", label: "Tire Master", apiValue: "tire-master" },
+  { value: "tire-master", label: "Tire Service", apiValue: "tire-master" },
   { value: "tow-truck", label: "Tow Truck", apiValue: "tow-truck" },
 ];
 
@@ -41,16 +41,16 @@ const WEBSITE_SEARCH_FIELDS: AdminSearchField[] = [
     ],
   },
   {
-    key: "userType",
-    label: "User Type",
+    key: "shopType",
+    label: "Shop Type",
     type: "select",
-    options: USER_TYPE_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
+    options: SHOP_TYPE_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
   },
   { key: "usedBy", label: "Used by", type: "number" },
 ];
 
-const websiteUserTypeLabel = (shopType: string) =>
-  USER_TYPE_OPTIONS.find((o) => o.value === shopType)?.label ?? shopType;
+const websiteShopTypeLabel = (shopType: string) =>
+  SHOP_TYPE_OPTIONS.find((o) => o.value === shopType)?.label ?? shopType;
 
 // NOTE: The API returns an "_id" string. We should map to `id` for internal row usage.
 type TemplateRow = {
@@ -67,7 +67,10 @@ type WebsiteTemplatesProps = {
   initialShowForm?: boolean;
 };
 
-const API_BASE = (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/admin/common` : "/api");
+const API_BASE =
+  import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api/admin/common`
+    : "/api";
 
 // Map API data (with "_id") to local TemplateRow ("id"), and format date as YYYY-MM-DD string.
 function mapApiTemplate(t: any): TemplateRow {
@@ -130,17 +133,21 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [showSearchCard, setShowSearchCard] = useState(false);
-  const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(WEBSITE_SEARCH_FIELDS));
-  const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(WEBSITE_SEARCH_FIELDS));
+  const [searchDraft, setSearchDraft] = useState(() =>
+    emptyAdminSearchValues(WEBSITE_SEARCH_FIELDS)
+  );
+  const [searchFilters, setSearchFilters] = useState(() =>
+    emptyAdminSearchValues(WEBSITE_SEARCH_FIELDS)
+  );
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [date, setDate] = useState("2026-06-16");
   const [country, setCountry] = useState("Canada");
-  const [userType, setUserType] = useState("mechanic-shop");
+  const [shopType, setShopType] = useState("mechanic-shop");
   const [url, setUrl] = useState("");
   const [templateName, setTemplateName] = useState("");
-  const [userTypeFilters, setUserTypeFilters] = useState<Record<string, boolean>>({
+  const [shopTypeFilters, setShopTypeFilters] = useState<Record<string, boolean>>({
     "mechanic-shop": true,
     "car-washing": false,
     "tire-master": false,
@@ -158,29 +165,35 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     setShowSearchCard(false);
   };
 
-  const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
-    useAdminDeletedView<TemplateRow>({
-      onToggle: resetTableControls,
-      storageKey: "admin_deleted_view:website-templates",
-    });
+  const {
+    viewMode,
+    isDeletedView,
+    toggleViewMode,
+    deletedStash,
+    stashDeleted,
+    restoreStashed,
+  } = useAdminDeletedView<TemplateRow>({
+    onToggle: resetTableControls,
+    storageKey: "admin_deleted_view:website-templates",
+  });
 
   // Helper: Convert checked filters to API shopType params
   const getActiveShopTypeFilter = () => {
-    return Object.entries(userTypeFilters).find(([_, val]) => val)?.[0];
+    return Object.entries(shopTypeFilters).find(([_, val]) => val)?.[0];
   };
 
   // Fetch templates
   const fetchAndSetTemplates = useCallback(async () => {
     setLoading(true);
     try {
-      const shopType = getActiveShopTypeFilter();
-      const arr = await fetchTemplates({ country, shopType });
+      const activeShopType = getActiveShopTypeFilter();
+      const arr = await fetchTemplates({ country, shopType: activeShopType });
       setSites(arr || []);
     } catch (e) {
       adminNotify.error("Failed to fetch website templates");
     }
     setLoading(false);
-  }, [country, userTypeFilters]);
+  }, [country, shopTypeFilters]);
 
   useEffect(() => {
     fetchAndSetTemplates();
@@ -190,11 +203,11 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const displaySites = isDeletedView ? deletedStash : sites;
 
   const filtered = displaySites.filter((s) => {
-    const userTypeLabel = websiteUserTypeLabel(s.shopType);
+    const shopTypeLabel = websiteShopTypeLabel(s.shopType);
     const live =
       !search.trim() ||
       s.date.includes(search) ||
-      userTypeLabel.toLowerCase().includes(search.toLowerCase()) ||
+      shopTypeLabel.toLowerCase().includes(search.toLowerCase()) ||
       s.templateName.toLowerCase().includes(search.toLowerCase()) ||
       s.url.toLowerCase().includes(search.toLowerCase()) ||
       s.country.toLowerCase().includes(search.toLowerCase()) ||
@@ -206,7 +219,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
       searchIncludes(s.url, searchFilters.url) &&
       searchIncludes(dateStr, searchFilters.date) &&
       searchEquals(s.country, searchFilters.country) &&
-      searchEquals(userTypeLabel, searchFilters.userType) &&
+      searchEquals(shopTypeLabel, searchFilters.shopType) &&
       searchIncludes(s.usedBy, searchFilters.usedBy)
     );
   });
@@ -229,8 +242,8 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     else setSelected(new Set(paged.map((s) => s.id)));
   };
 
-  const toggleUserType = (type: string) => {
-    setUserTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }));
+  const toggleShopType = (type: string) => {
+    setShopTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }));
     setPage(1);
     setTimeout(fetchAndSetTemplates, 0);
   };
@@ -238,7 +251,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const resetForm = () => {
     setDate("2026-06-16");
     setCountry("Canada");
-    setUserType("mechanic-shop");
+    setShopType("mechanic-shop");
     setUrl("");
     setTemplateName("");
   };
@@ -275,7 +288,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
         url,
         date,
         country,
-        shopType: userType,
+        shopType: shopType,
       });
       adminNotify.success("Saved successfully.");
       fetchAndSetTemplates();
@@ -330,7 +343,14 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const handleToolbarPrint = () => {
     printAdminTable({
       title: isDeletedView ? "Deleted Website Templates" : "Website Templates",
-      headers: ["Template Name", "URL", "Date", "Country", "User Type", "Used by"],
+      headers: [
+        "Template Name",
+        "URL",
+        "Date",
+        "Country",
+        "Shop Type",
+        "Used by",
+      ],
       rows: filtered.map((template, idx) => {
         const templateName = template.templateName || `Template ${idx + 1}`;
         return [
@@ -338,7 +358,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
           template.url,
           template.date,
           template.country,
-          USER_TYPE_OPTIONS.find((option) => option.value === template.shopType)?.label ??
+          SHOP_TYPE_OPTIONS.find((option) => option.value === template.shopType)?.label ??
             template.shopType,
           String(template.usedBy),
         ];
@@ -399,13 +419,13 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   <option value="India">India</option>
                 </select>
               </CompactField>
-              <CompactField label="User Type" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
+              <CompactField label="Shop Type" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
                 <select
-                  value={userType}
-                  onChange={(e) => setUserType(e.target.value)}
+                  value={shopType}
+                  onChange={(e) => setShopType(e.target.value)}
                   className={compactInputClass}
                 >
-                  {USER_TYPE_OPTIONS.map((option) => (
+                  {SHOP_TYPE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -430,12 +450,12 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
         <AdminDeletedBanner count={deletedStash.length} entityLabel="website templates" />
       )}
       <div className="mb-2 flex flex-wrap items-center gap-4 border-b border-gray-300 bg-gray-100 px-3 py-2">
-        {USER_TYPE_OPTIONS.map((option) => (
+        {SHOP_TYPE_OPTIONS.map((option) => (
           <label key={option.value} className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
             <input
               type="checkbox"
-              checked={userTypeFilters[option.value]}
-              onChange={() => toggleUserType(option.value)}
+              checked={shopTypeFilters[option.value]}
+              onChange={() => toggleShopType(option.value)}
               className="h-3.5 w-3.5 accent-ad-green"
             />
             {option.label}
@@ -530,7 +550,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">URL</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User Type</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Shop Type</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Used by</th>
             </tr>
           </thead>
@@ -574,7 +594,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.date}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">
-                    {USER_TYPE_OPTIONS.find((o) => o.value === row.shopType)?.label ?? row.shopType}
+                    {SHOP_TYPE_OPTIONS.find((o) => o.value === row.shopType)?.label ?? row.shopType}
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.usedBy}</td>
                 </tr>
@@ -591,10 +611,11 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${page === p
-                ? "border-ad-green bg-ad-green text-white"
-                : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-                }`}
+              className={`h-7 w-7 border text-xs font-medium ${
+                page === p
+                  ? "border-ad-green bg-ad-green text-white"
+                  : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+              }`}
             >
               {p}
             </button>

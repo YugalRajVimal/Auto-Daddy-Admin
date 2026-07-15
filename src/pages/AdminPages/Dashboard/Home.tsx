@@ -102,7 +102,7 @@ export default function AdminDashboardHome() {
       cards: [
         { label: "Car Shops", value: data?.shops?.carShops ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
         { label: "Car Wash", value: data?.shops?.carWash ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
-        { label: "Tire Master", value: data?.shops?.tireMaster ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
+        { label: "Tire Service", value: data?.shops?.tireMaster ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
         { label: "Tow Truck", value: data?.shops?.towTruck ?? "—", bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
       ],
     },

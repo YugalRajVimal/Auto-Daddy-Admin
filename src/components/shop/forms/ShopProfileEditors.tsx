@@ -372,11 +372,10 @@ export function ShopPersonalProfileEditor({
 
   const isDirty = useMemo(() => {
     return (
-      name !== (user?.name ?? "") ||
-      selectedCity !== (city ?? "") ||
+      email !== (user?.email ?? "") ||
       profilePhoto !== null
     );
-  }, [name, selectedCity, profilePhoto, user?.name, city]);
+  }, [email, profilePhoto, user?.email]);
 
   const syncFromUser = () => {
     setName(user?.name ?? "");
@@ -422,12 +421,11 @@ export function ShopPersonalProfileEditor({
     if (!token) return;
     setSaving(true);
     try {
-      // PUT /api/autoshopowner/profile/personal — name, city, profilePhoto only (phone & email locked).
+      // Only email and profilePhoto are editable/updatable here.
       const res = await updatePersonalProfile(token, {
-        name: name.trim(),
-        city: selectedCity.trim(),
         profilePhoto,
       });
+ 
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save.");
         return;
@@ -468,8 +466,8 @@ export function ShopPersonalProfileEditor({
             <input
               className={shopCompactInputClass}
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={saving}
+              disabled
+              readOnly
             />
           </CompactField>
           <CompactField label="Phone">
@@ -484,8 +482,7 @@ export function ShopPersonalProfileEditor({
             <select
               className={shopCompactInputClass}
               value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              disabled={saving}
+              disabled
             >
               <option value="">Select city</option>
               {citySelectOptions.map((cityName) => (
@@ -500,8 +497,8 @@ export function ShopPersonalProfileEditor({
               type="email"
               className={shopCompactInputClass}
               value={email}
-              disabled
-              readOnly
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={saving}
             />
           </CompactField>
         </CompactFormRow>
@@ -564,6 +561,15 @@ export function ShopBusinessProfileEditor({
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedOnce, setSavedOnce] = useState(false);
+
+  // Validation error states
+  const [errors, setErrors] = useState<{
+    businessPhone?: string;
+    zip?: string;
+    email?: string;
+    hst?: string;
+    tax?: string;
+  }>({});
 
   const savedLogoUrl = useMemo(
     () => normalizeMediaUrl(business?.businessLogo ?? null),
@@ -648,6 +654,7 @@ export function ShopBusinessProfileEditor({
     setShopTypesOpen(false);
     setShowUploadImage(false);
     setLogo(null);
+    setErrors({});
   };
 
   const reset = () => {
@@ -723,12 +730,119 @@ export function ShopBusinessProfileEditor({
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [cityOptions, city]);
 
+  // --- VALIDATION HELPERS ---
+  function isValidUSZip(zip: string) {
+    // 12345 or 12345-6789
+    return /^\d{5}(-\d{4})?$/.test(zip);
+  }
+  function isValidCanadaPostalCode(zip: string) {
+    // K1A 0B1 or K1A-0B1 or K1A0B1, case insensitive
+    return /^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ -]?\d[ABCEGHJ-NPRSTV-Z]\d$/i.test(zip);
+  }
+  function isValidIndiaPincode(pin: string) {
+    return /^\d{6}$/.test(pin);
+  }
+  // function detectZipCountry(zip: string): "IN" | "US" | "CA" | "unknown" {
+  //   if (isValidIndiaPincode(zip)) return "IN";
+  //   if (isValidUSZip(zip)) return "US";
+  //   if (isValidCanadaPostalCode(zip)) return "CA";
+  //   return "unknown";
+  // }
+
+  function isValidEmail(email: string) {
+    // RFC 5322 Official Standard (relaxed)
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+  function isValidPhone(phone: string) {
+    // US/Canada/India mobile and landline (basic: 10-15 digits)
+    return /^[0-9]{10,15}$/.test(phone);
+  }
+  function isValidTaxPercentage(tax: string) {
+    const value = Number(tax);
+    return !isNaN(value) && value >= 0 && value <= 50;
+  }
+
+  // HST formats:
+  // Canada: 9 digits, optional "RT0001" (eg. 123456789RT0001)
+  function isValidCanadaHst(hst: string) {
+    // 9 digits or 9digits+RT+4digits
+    return /^(\d{9}|(\d{9}RT\d{4}))$/i.test(hst.replace(/\s/g, ""));
+  }
+  // India GSTIN: 15 char format: 11AAAAA1111Z1A1 (but sometimes called "HST")
+  function isValidIndiaHst(hst: string) {
+    // GSTIN: 15 chars, format: 2 digits, 10 alphanum, 1 letter, 1 digit, 1 letter/number
+    return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i.test(hst.replace(/\s/g, ""));
+  }
+  // US Federal Tax ID/EIN: 2 digits - 7 digits (optional for HST?)
+  function isValidUSHst(hst: string) {
+    // 12-3456789 or 123456789
+    return /^(\d{2}-?\d{7})$/.test(hst.replace(/\s/g, ""));
+  }
+
+  function validateAllFields() {
+    let fieldErrors: typeof errors = {};
+
+    // Business Phone
+    if (!businessPhone || !isValidPhone(businessPhone)) {
+      fieldErrors.businessPhone =
+        "Enter a valid phone number (10-15 digits, digits only).";
+    }
+
+    // Email
+    if (!email.trim() || !isValidEmail(email.trim())) {
+      fieldErrors.email = "Enter a valid email address.";
+    }
+
+    // Zip/Postal/Pin Code
+    if (!zip.trim()) {
+      fieldErrors.zip = "Enter a zip/postal/pincode.";
+    } else {
+      if (
+        !(
+          isValidUSZip(zip.trim()) ||
+          isValidCanadaPostalCode(zip.trim()) ||
+          isValidIndiaPincode(zip.trim())
+        )
+      ) {
+        fieldErrors.zip = "Enter a valid US zip, Canada postal code, or India PIN code.";
+      }
+    }
+
+    // HST Number
+    if (hst.trim()) {
+      const formatValid =
+        isValidCanadaHst(hst.trim()) ||
+        isValidUSHst(hst.trim()) ||
+        isValidIndiaHst(hst.trim());
+      if (!formatValid) {
+        fieldErrors.hst =
+          "Enter a valid HST/GST number (Canada, India, or US format).";
+      }
+    }
+
+    // Tax %
+    if (tax.trim()) {
+      if (!isValidTaxPercentage(tax.trim())) {
+        fieldErrors.tax = "Enter a valid tax percentage (0 - 50).";
+      }
+    }
+
+    setErrors(fieldErrors);
+    return Object.keys(fieldErrors).length === 0;
+  }
+
   const handleUpdate = async () => {
     if (!token) return;
     if (shopTypes.length === 0) {
       toast.error("Select at least one business type.");
       return;
     }
+
+    if (!validateAllFields()) {
+      toast.error("Please fix validation errors.");
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await updateBusinessProfile(token, {
@@ -786,13 +900,16 @@ export function ShopBusinessProfileEditor({
               disabled={saving}
             />
           </CompactField>
-          <CompactField label="Business Phone">
+          <CompactField label="Business Phone" >
             <input
-              className={shopCompactInputClass}
+              className={shopCompactInputClass + (errors.businessPhone ? " border-red-500" : "")}
               value={formatPhoneDisplay(businessPhone)}
               onChange={(e) => setBusinessPhone(phoneDigits(e.target.value))}
               disabled={saving}
             />
+            {errors.businessPhone && (
+              <div className="text-xs text-red-600">{errors.businessPhone}</div>
+            )}
           </CompactField>
           <CompactField label="City">
             <select
@@ -821,36 +938,48 @@ export function ShopBusinessProfileEditor({
         <CompactFormRow className={BUSINESS_PROFILE_FIELD_GRID}>
           <CompactField label="Zip Code">
             <input
-              className={shopCompactInputClass}
+              className={shopCompactInputClass + (errors.zip ? " border-red-500" : "")}
               value={zip}
               onChange={(e) => setZip(e.target.value)}
               disabled={saving}
             />
+            {errors.zip && (
+              <div className="text-xs text-red-600">{errors.zip}</div>
+            )}
           </CompactField>
           <CompactField label="HST No.">
             <input
-              className={shopCompactInputClass}
+              className={shopCompactInputClass + (errors.hst ? " border-red-500" : "")}
               value={hst}
               onChange={(e) => setHst(e.target.value)}
               disabled={saving}
             />
+            {errors.hst && (
+              <div className="text-xs text-red-600">{errors.hst}</div>
+            )}
           </CompactField>
           <CompactField label="Tax %">
             <input
-              className={shopCompactInputClass}
+              className={shopCompactInputClass + (errors.tax ? " border-red-500" : "")}
               value={tax}
               onChange={(e) => setTax(e.target.value)}
               disabled={saving}
             />
+            {errors.tax && (
+              <div className="text-xs text-red-600">{errors.tax}</div>
+            )}
           </CompactField>
           <CompactField label="E mail">
             <input
               type="email"
-              className={shopCompactInputClass}
+              className={shopCompactInputClass + (errors.email ? " border-red-500" : "")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={saving}
             />
+            {errors.email && (
+              <div className="text-xs text-red-600">{errors.email}</div>
+            )}
           </CompactField>
         </CompactFormRow>
         <CompactFormRow className={`${BUSINESS_PROFILE_FIELD_GRID} items-start`}>

@@ -45,7 +45,7 @@ const PROVINCE_SEARCH_FIELDS: AdminSearchField[] = [
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 type ProvinceStatus = "Active" | "Inactive";
-type Country = "Canada" | "USA";
+type Country = "Canada" | "India" | "USA";
 
 interface Province {
   _id: string;
@@ -60,6 +60,9 @@ interface Province {
 type ProvincesPageProps = {
   initialShowForm?: boolean;
 };
+
+type SortDirection = "asc" | "desc";
+type SortField = "name" | "country" | null;
 
 export default function Provinces({ initialShowForm = false }: ProvincesPageProps) {
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -81,6 +84,10 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
   const [nickName, setNickName] = useState("");
   const [country, setCountry] = useState<Country>("Canada");
   const [status, setStatus] = useState<ProvinceStatus>("Active");
+
+  // For sorting
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const resetTableControls = () => {
     setPage(1);
@@ -141,8 +148,30 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     );
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
-  const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
+  // Sorting logic, by "name" (province) or "country"
+  const sorted = [...filtered];
+
+  if (sortField) {
+    sorted.sort((a, b) => {
+      let aField, bField;
+      if (sortField === "name") {
+        aField = (a.name ?? "").toLowerCase();
+        bField = (b.name ?? "").toLowerCase();
+      } else if (sortField === "country") {
+        aField = (a.country ?? "Canada").toLowerCase();
+        bField = (b.country ?? "Canada").toLowerCase();
+      } else {
+        aField = "";
+        bField = "";
+      }
+      if (aField < bField) return sortDirection === "asc" ? -1 : 1;
+      if (aField > bField) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / entriesPerPage));
+  const paged = sorted.slice((page - 1) * entriesPerPage, page * entriesPerPage);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -320,19 +349,45 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     printAdminTable({
       title: isDeletedView ? "Deleted Provinces" : "Provinces",
       headers: ["Province Name", "Country", "Nickname", "Cities", "Status"],
-      rows: filtered.map((province) => [
-          province.name,
-          province.country || "Canada",
-          province.nickName || "—",
-          String(province.cities?.length ?? 0),
-          province.status || "Active",
-        ]),
+      rows: sorted.map((province) => [
+        province.name,
+        province.country || "Canada",
+        province.nickName || "—",
+        String(province.cities?.length ?? 0),
+        province.status || "Active",
+      ]),
     });
   };
 
   const formMessage = editingId
     ? "You are updating a 'Province'"
     : "You are creating a 'Province'";
+
+  // Sorting handlers for columns
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  // Returns an up/down arrow unicode, bolded if active sort
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return (
+        <span className="ml-1 cursor-pointer select-none text-xs text-gray-200 hover:text-white" title="Sort">
+          &#8597;
+        </span>
+      );
+    }
+    return sortDirection === "asc" ? (
+      <span className="ml-1 cursor-pointer select-none text-xs font-bold text-yellow-300" title="Sorted Asc">&#8593;</span>
+    ) : (
+      <span className="ml-1 cursor-pointer select-none text-xs font-bold text-yellow-300" title="Sorted Desc">&#8595;</span>
+    );
+  };
 
   return (
     <AdminPage
@@ -377,8 +432,10 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                   className={compactInputClass}
                 >
                   <option value="Canada">Canada</option>
+                  <option value="India">India</option>
                   <option value="USA">USA</option>
                 </select>
+           
               </CompactField>
               <CompactField label="Province Name" required>
                 <input
@@ -508,8 +565,22 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Province Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
+              <th
+                className="border border-ad-purple-dark px-3 py-2 text-center font-medium cursor-pointer select-none group"
+                onClick={() => handleSort("name")}
+                style={{ userSelect: "none" }}
+              >
+                Province Name
+                {renderSortIcon("name")}
+              </th>
+              <th
+                className="border border-ad-purple-dark px-3 py-2 text-center font-medium cursor-pointer select-none group"
+                onClick={() => handleSort("country")}
+                style={{ userSelect: "none" }}
+              >
+                Country
+                {renderSortIcon("country")}
+              </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Nickname</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Cities</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>

@@ -50,7 +50,7 @@ export function ContentPanel({
 export const COMPACT_FIELD_HEIGHT_PX = 30;
 
 export const compactInputClass =
-  "w-full h-[30px] min-h-[30px] box-border border border-gray-400 bg-white px-2 text-sm leading-[18px] focus:border-blue-500 focus:outline-none";
+  "w-full h-[30px] z-50 min-h-[30px] z-50 box-border border border-gray-400 bg-white px-2 text-sm leading-[18px] focus:border-blue-500 focus:outline-none";
 
 export const compactTextareaClass =
   "w-full min-h-[30px] box-border border border-gray-400 bg-white px-2 py-1 text-sm leading-snug focus:border-blue-500 focus:outline-none resize-none overflow-hidden";
@@ -101,7 +101,7 @@ export function PanelBottomBorder({
 }) {
   return (
     <div
-      className="pointer-events-none absolute left-0 z-20 mx-auto w-full overflow-hidden"
+      className="z-0 pointer-events-none absolute left-0 z-0 mx-auto w-full overflow-hidden"
       style={{ bottom: -height, height }}
       aria-hidden
     >
