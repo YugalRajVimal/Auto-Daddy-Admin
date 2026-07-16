@@ -1641,6 +1641,12 @@ function formatLeadDate(value?: string | null): string {
   return parsed.toISOString().slice(0, 10);
 }
 
+function getBackendImageUrl(path: string) {
+  if (/^https?:\/\//.test(path)) return path;
+  const base = import.meta.env.VITE_API_URL || "";
+  return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
+}
+
 // The backend has no image upload endpoint for leads. Any image attached
 // here stays client-side only (object URL) and is never sent to the API.
 function mapLeadFromApi(row: LeadApiRow): LeadRow {
@@ -1659,7 +1665,7 @@ function mapLeadFromApi(row: LeadApiRow): LeadRow {
     personContacted: status === "completed" ? row.sentTo ?? null : undefined,
     notes: row.notes ?? "",
     status,
-    imageUrl: null,
+    imageUrl: row.image ? getBackendImageUrl(row.image) : null, // was: null
   };
 }
 
@@ -1726,6 +1732,7 @@ export default function LeadsPage({
   const [editingObjectUrl, setEditingObjectUrl] = useState<string | null>(null);
   const [bulkStatus, setBulkStatus] = useState<LeadStatus>("visited");
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [removeExistingImage, setRemoveExistingImage] = useState(false);
 
   const resetTableControls = () => {
     setPage(1);
@@ -1852,6 +1859,7 @@ export default function LeadsPage({
     setImageUrl(null);
     if (editingObjectUrl) URL.revokeObjectURL(editingObjectUrl);
     setEditingObjectUrl(null);
+    setRemoveExistingImage(false);
   };
 
   const openAdd = () => {
@@ -1943,7 +1951,7 @@ export default function LeadsPage({
       adminNotify.error("Please fill Date, Name, Phone, and City.");
       return;
     }
-
+  
     const basePayload = {
       date: date.trim(),
       name: name.trim(),
@@ -1954,14 +1962,22 @@ export default function LeadsPage({
       notes: notes.trim() || undefined,
       sentTo: sentTo || null,
     };
-
+  
     setSaving(true);
     try {
       if (editingId != null) {
-        await updateLead(editingId, { ...basePayload, status: uiStatusToApi(status) });
+        await updateLead(editingId, {
+          ...basePayload,
+          status: uiStatusToApi(status),
+          image: imageFile ?? undefined,
+          removeImage: removeExistingImage,
+        });
         adminNotify.success("Lead updated.");
       } else {
-        await createLead(basePayload);
+        await createLead({
+          ...basePayload,
+          image: imageFile ?? undefined,
+        });
         adminNotify.success("Lead created.");
       }
       resetForm();
@@ -2285,7 +2301,7 @@ export default function LeadsPage({
                 </select>
               </CompactField>
             </CompactFormRow>
-            {editingId != null && (
+      
               <CompactFormRow className="w-full items-start" columns={4}>
                 <div className="w-full min-w-0 lg:col-span-3">
                   <AttachImageCheckbox
@@ -2297,11 +2313,15 @@ export default function LeadsPage({
                         setEditingObjectUrl(null);
                         setImageFile(null);
                         setImageUrl(null);
+                        setRemoveExistingImage(true); // was previously silently dropped
+                      } else {
+                        setRemoveExistingImage(false);
                       }
                     }}
                     file={imageFile}
                     onFileChange={(file) => {
                       setImageFile(file);
+                      setRemoveExistingImage(false);
                       if (!file) return;
                       if (editingObjectUrl) URL.revokeObjectURL(editingObjectUrl);
                       const url = URL.createObjectURL(file);
@@ -2336,7 +2356,7 @@ export default function LeadsPage({
                   </select>
                 </CompactField>
               </CompactFormRow>
-            )}
+
           </CompactFormPanel>
         ) : undefined)
         )
@@ -2508,7 +2528,7 @@ export default function LeadsPage({
                   <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.notes}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.sentTo || "-"}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center capitalize">{row.status || "-"}</td>
-                  {section === "completed" && (
+                  {/* {section === "completed" && (
                     <td className="border border-gray-300 px-3 py-2 text-center">
                     {row.imageUrl ? (
                       <ClipImageHover
@@ -2521,7 +2541,34 @@ export default function LeadsPage({
                       <span className="text-gray-500">--</span>
                     )}
                   </td>
-                  )}
+                  )} */}
+     {section === "completed" && (
+  <td className="border border-gray-300 px-3 py-2 text-center">
+    {row.imageUrl ? (
+      <div className="flex flex-col items-center gap-1">
+        <ClipImageHover
+          imageUrl={row.imageUrl}
+          alt={`Image for ${row.name}`}
+          size={20}
+          iconClassName="text-ad-purple"
+        />
+        <button
+          type="button"
+          onClick={() =>
+            setImagePreview({ url: row.imageUrl!, title: `${row.name} — lead image` })
+          }
+          className="text-xs text-blue-700 underline hover:text-blue-900 p-0 rounded-none"
+          style={{ margin: 0, padding: 0, border: "none", background: "none" }}
+        >
+          Preview
+        </button>
+      </div>
+    ) : (
+      <span className="text-gray-500">--</span>
+    )}
+  </td>
+)}
+                  
                 </tr>
               ))
             )}

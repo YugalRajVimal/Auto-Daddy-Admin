@@ -701,9 +701,10 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
     let cancelled = false;
     (async () => {
       try {
-        const res = await axios.get(`${API()}/api/auto-shop-owner/car-details`, { headers: getToken() });
+        const res = await axios.get(`${API()}/api/admin/car-company`, { headers: getToken() });
         if (cancelled) return;
         if (res.data?.success && Array.isArray(res.data.data)) {
+
           setCarCatalog(res.data.data);
         } else {
           setCarCatalog([]);
@@ -796,8 +797,8 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
     });
     setSubmitting(true);
     try {
-      if (isEdit) await axios.put(`${API()}/api/admin/my-customers`, fd, { headers: getToken() });
-      else await axios.post(`${API()}/api/admin/onboard-carowner`, fd, { headers: getToken() });
+      if (isEdit) await axios.put(`${API()}/api/admin/carowners/edit`, fd, { headers: getToken() });
+      else await axios.post(`${API()}/api/admin/carowners/onboard`, fd, { headers: getToken() });
       adminNotify.success(isEdit ? "Car owner updated." : "Car owner added.");
       onSaved();
     } catch (err: any) {

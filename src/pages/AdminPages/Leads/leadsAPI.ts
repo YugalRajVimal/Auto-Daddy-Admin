@@ -8,6 +8,7 @@ export type LeadApiStatus = "Pending" | "Visited" | "Completed";
 export const LEAD_STATUS_OPTIONS: LeadApiStatus[] = ["Pending", "Visited", "Completed"];
 export const LEAD_STATUS_DEFAULT: LeadApiStatus = "Pending";
 
+
 export type LeadApiRow = {
   _id: string;
   date: string;
@@ -18,7 +19,8 @@ export type LeadApiRow = {
   website?: string;
   notes?: string;
   sentTo?: string | null;
-  status: LeadApiStatus; // Always present, required, enforced for editing
+  status: LeadApiStatus;
+  image?: string | null; // added
   createdAt?: string;
   updatedAt?: string;
 };
@@ -39,12 +41,34 @@ export type LeadCreatePayload = {
   website?: string;
   notes?: string;
   sentTo?: string | null;
-  status?: LeadApiStatus; // Allow creating with status (optional, defaults to "Pending" on backend if not provided)
+  status?: LeadApiStatus;
+  image?: File | null; // added
 };
 
-export type LeadUpdatePayload = Partial<Omit<LeadCreatePayload, "status">> & {
-  status?: LeadApiStatus; // Allow editing status with enum restriction
+
+export type LeadUpdatePayload = Partial<Omit<LeadCreatePayload, "status" | "image">> & {
+  status?: LeadApiStatus;
+  image?: File | null;   // set to attach/replace an image
+  removeImage?: boolean; // set true to clear an existing image
 };
+
+function buildLeadFormData(payload: Record<string, any>): FormData {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined) continue;
+    if (key === "image") {
+      if (value instanceof File) fd.append("leadImage", value);
+      continue;
+    }
+    if (key === "removeImage") {
+      fd.append("removeImage", value ? "true" : "false");
+      continue;
+    }
+    if (value === null) continue; // don't send null fields as text "null"
+    fd.append(key, String(value));
+  }
+  return fd;
+}
 
 // ---------- Helpers ----------
 
@@ -94,12 +118,11 @@ export async function fetchLeadById(id: string): Promise<LeadApiRow> {
 
 // POST /leads
 export async function createLead(payload: LeadCreatePayload): Promise<LeadApiRow> {
-  // Allow payload.status, but if not set, backend should handle default "Pending"
+  const fd = buildLeadFormData(payload);
   const res = await fetch(`${BASE_ADMIN}/leads`, {
     method: "POST",
     credentials: "include",
-    headers: jsonHeaders,
-    body: JSON.stringify(payload),
+    body: fd, // no Content-Type header — browser sets multipart boundary
   });
   const body = await handleResponse<{ data?: LeadApiRow } | LeadApiRow>(res);
   return (body as any).data ?? (body as LeadApiRow);
@@ -107,17 +130,16 @@ export async function createLead(payload: LeadCreatePayload): Promise<LeadApiRow
 
 // PATCH /leads/:id
 export async function updateLead(id: string, payload: LeadUpdatePayload): Promise<LeadApiRow> {
-  // Allow updating status in payload, frontend should only allow valid enum values
   if (payload.status && !LEAD_STATUS_OPTIONS.includes(payload.status)) {
     throw new Error(
       `Invalid status "${payload.status}". Must be one of: ${LEAD_STATUS_OPTIONS.join(", ")}`
     );
   }
+  const fd = buildLeadFormData(payload);
   const res = await fetch(`${BASE_ADMIN}/leads/${id}`, {
     method: "PATCH",
     credentials: "include",
-    headers: jsonHeaders,
-    body: JSON.stringify(payload),
+    body: fd,
   });
   const body = await handleResponse<{ data?: LeadApiRow } | LeadApiRow>(res);
   return (body as any).data ?? (body as LeadApiRow);

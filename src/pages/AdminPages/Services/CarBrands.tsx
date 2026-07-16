@@ -1073,10 +1073,70 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
 
   const findRowById = (id: string) => tableRows.find((r) => r.rowId === id);
 
-  const handleToolbarDelete = () => {
-    if (selected.size !== 1) return;
-    const row = findRowById([...selected][0]);
-    if (row) handleDeleteCompany(row.companyId, row.make);
+  // const handleToolbarDelete = () => {
+  //   if (selected.size !== 1) return;
+  //   const row = findRowById([...selected][0]);
+  //   if (row) handleDeleteCompany(row.companyId, row.make);
+  // };
+
+  const handleToolbarDelete = async () => {
+    if (selected.size === 0) return;
+  
+    const rows = [...selected]
+      .map(findRowById)
+      .filter((r): r is TableRow => !!r && r.model !== "—"); // skip "no models" placeholder rows
+  
+    if (rows.length === 0) return;
+  
+    const label =
+      rows.length === 1 ? `${rows[0].make} - ${rows[0].model}` : `${rows.length} models`;
+    if (!window.confirm(`Remove ${label}?`)) return;
+  
+    // Group selected rows by companyId so each make gets a single PATCH call
+    // removing all of its selected models at once.
+    const byCompany = new Map<string, TableRow[]>();
+    for (const r of rows) {
+      const arr = byCompany.get(r.companyId) ?? [];
+      arr.push(r);
+      byCompany.set(r.companyId, arr);
+    }
+  
+    setActionLoading(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      for (const [companyId, rowsForCompany] of byCompany) {
+        const company = companies.find((c) => c._id === companyId);
+        if (!company) continue;
+  
+        const removeNames = new Set(rowsForCompany.map((r) => r.model.toLowerCase()));
+        const remainingModels = (company.models || [])
+          .filter((m) => !removeNames.has(m.modelName.toLowerCase()))
+          .map((m) => ({ modelName: m.modelName.trim() }))
+          .filter((m) => m.modelName);
+  
+        const formData = new FormData();
+        formData.append("companyName", company.companyName);
+        formData.append("models", JSON.stringify(remainingModels));
+        formData.append("country", "Canada");
+  
+        await axios.patch(`${API_BASE}/admin/car-company/${companyId}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+  
+      adminNotify.success("Model(s) removed.");
+      setSuccessMsg("Model(s) removed.");
+      setSelected(new Set());
+      fetchCompanies(search);
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to remove model(s)";
+      setError(msg);
+      adminNotify.error(msg);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleRestore = async () => {
