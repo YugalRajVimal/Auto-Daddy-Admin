@@ -86,8 +86,6 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return body as T;
 }
 
-const jsonHeaders = { "Content-Type": "application/json" };
-
 // ---------- API calls ----------
 
 // GET /leads  (supports ?status= &city= &sentTo= &search=)

@@ -615,7 +615,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     isDeletedView,
     toggleViewMode,
     deletedStash,
-    stashDeleted,
     restoreStashed,
   } = useAdminDeletedView<CarCompany>({
     onToggle: resetTableControls,
@@ -1042,42 +1041,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     }
   };
 
-  const handleDeleteCompany = async (companyId: string, label: string) => {
-    if (!window.confirm(`Delete car brand "${label}" and all its models?`)) return;
-    setActionLoading(true);
-    setError("");
-    setSuccessMsg("");
-    try {
-      const company = companies.find((c) => c._id === companyId);
-      await axios.delete(`${API_BASE}/admin/car-company/${companyId}`);
-      if (company) stashDeleted(company);
-      adminNotify.success("Car brand deleted.");
-      setSuccessMsg("Car brand deleted.");
-      setSelected((prev) => {
-        const next = new Set(prev);
-        for (const id of prev) {
-          if (id.startsWith(`${companyId}::`)) next.delete(id);
-        }
-        return next;
-      });
-      fetchCompanies(search);
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to delete car brand";
-      setError(msg);
-      adminNotify.error(msg);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const findRowById = (id: string) => tableRows.find((r) => r.rowId === id);
-
-  // const handleToolbarDelete = () => {
-  //   if (selected.size !== 1) return;
-  //   const row = findRowById([...selected][0]);
-  //   if (row) handleDeleteCompany(row.companyId, row.make);
-  // };
 
   const handleToolbarDelete = async () => {
     if (selected.size === 0) return;
