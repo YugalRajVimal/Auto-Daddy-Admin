@@ -162,15 +162,10 @@ const USE_SAMPLE_DATA = true;
 
 // Simulate fetching from API if not using sample data
 async function apiFetchTemplates(
-  userTypeFilters: Record<string, boolean>,
   // signal?: AbortSignal
 ): Promise<TemplateRow[]> {
   if (USE_SAMPLE_DATA) {
-    // Filter sample data by userType (simulate server-side filtering)
-    const checkedUserTypes = Object.entries(userTypeFilters)
-      .filter(([, checked]) => checked)
-      .map(([type]) => type);
-    return SAMPLE_TEMPLATES.filter((tpl) => checkedUserTypes.includes(tpl.userType));
+    return SAMPLE_TEMPLATES;
   }
   // fallback: unreachable in demo, but code kept for future
   return [];
@@ -248,12 +243,6 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   const [userType, setUserType] = useState("mechanic-shop");
   const [label, setLabel] = useState("");
   const [templateSlug, setTemplateSlug] = useState(DUMMY_INVOICE_TEMPLATES[0]?.id ?? "");
-  const [userTypeFilters, setUserTypeFilters] = useState<Record<string, boolean>>({
-    "mechanic-shop": true,
-    "car-washing": false,
-    "tire-master": false,
-    "tow-truck": false,
-  });
   const [attachImage, setAttachImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
@@ -287,25 +276,24 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   useEffect(() => {
     let ignore = false;
     // simulate async with a timeout
-    apiFetchTemplates(userTypeFilters).then((data) => {
+    apiFetchTemplates().then((data) => {
       if (!ignore) setTemplates(data);
     });
     return () => {
       ignore = true;
     };
-  }, [userTypeFilters]);
+  }, []);
 
   const displayTemplates = isDeletedView ? deletedStash : templates;
 
   const filtered = displayTemplates.filter((t) => {
     const userTypeLabel = getUserTypeLabel(t.userType);
     const live =
-      (userTypeFilters[t.userType] ?? true) &&
-      (!search.trim() ||
-        t.date.includes(search) ||
-        userTypeLabel.toLowerCase().includes(search.toLowerCase()) ||
-        t.notes.toLowerCase().includes(search.toLowerCase()) ||
-        String(t.usedBy).includes(search));
+      !search.trim() ||
+      t.date.includes(search) ||
+      userTypeLabel.toLowerCase().includes(search.toLowerCase()) ||
+      t.notes.toLowerCase().includes(search.toLowerCase()) ||
+      String(t.usedBy).includes(search);
     if (!live) return false;
     const dateStr = t.date ? String(t.date).slice(0, 10) : "";
     return (
@@ -331,11 +319,6 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   const toggleSelectAll = () => {
     if (selected.size === paged.length) setSelected(new Set());
     else setSelected(new Set(paged.map((t) => t.id)));
-  };
-
-  const toggleUserType = (type: string) => {
-    setUserTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }));
-    setPage(1);
   };
 
   const resetForm = () => {
@@ -574,19 +557,6 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
       {isDeletedView && (
         <AdminDeletedBanner count={deletedStash.length} entityLabel="invoice templates" />
       )}
-      <div className="mb-2 flex flex-wrap items-center gap-4 border-b border-gray-300 bg-gray-100 px-3 py-2">
-        {USER_TYPE_OPTIONS.map((option) => (
-          <label key={option.value} className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
-            <input
-              type="checkbox"
-              checked={userTypeFilters[option.value]}
-              onChange={() => toggleUserType(option.value)}
-              className="h-3.5 w-3.5 accent-ad-green"
-            />
-            {option.label}
-          </label>
-        ))}
-      </div>
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
