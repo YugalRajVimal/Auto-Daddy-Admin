@@ -143,7 +143,6 @@ export default function CustomersPage() {
   const [editorSaveAttempted, setEditorSaveAttempted] = useState(false);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
-  const [editCountryCode, setEditCountryCode] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editPincode, setEditPincode] = useState("");
   const [editCity, setEditCity] = useState<UserCity | null>(null);
@@ -353,7 +352,6 @@ export default function CustomersPage() {
     setEditorEditable(editable);
     setEditName(customer.name ?? "");
     setEditEmail(customer.email ?? "");
-    setEditCountryCode(customer.countryCode ?? "");
     setEditPhone(customer.phone ?? "");
     setEditPincode(formatPincodeDisplay(customer.pincode ?? ""));
     setEditCity(userCityFromPick(pickCustomerCity(customer as Record<string, unknown>)));
@@ -444,7 +442,7 @@ export default function CustomersPage() {
       carOwnerId,
       name: editName.trim(),
       email: editEmail.trim(),
-      countryCode: editCountryCode.trim(),
+      countryCode: "+1",
       phone: phoneDigits,
       pincode: pinDigits,
       address: editAddress.trim().slice(0, 50),
@@ -787,24 +785,15 @@ export default function CustomersPage() {
               {editorEditable && editEmail.trim() && !isValidEmail(editEmail) ? (
                 <Text style={styles.editorErrorText}>Enter a valid email address.</Text>
               ) : null}
-              <View style={styles.editorPhoneRow}>
-                <TextInput
-                  value={editCountryCode}
-                  onChangeText={setEditCountryCode}
-                  style={[styles.editorInput, styles.editorCountry]}
-                  editable={editorEditable}
-                  placeholder="+91"
-                />
-                <TextInput
-                  value={editPhone}
-                  onChangeText={(t) => setEditPhone(t.replace(/\D/g, "").slice(0, 10))}
-                  style={[styles.editorInput, styles.editorPhone]}
-                  editable={editorEditable}
-                  placeholder="Phone"
-                  keyboardType="number-pad"
-                  maxLength={10}
-                />
-              </View>
+              <TextInput
+                value={editPhone}
+                onChangeText={(t) => setEditPhone(t.replace(/\D/g, "").slice(0, 10))}
+                style={styles.editorInput}
+                editable={editorEditable}
+                placeholder="Phone"
+                keyboardType="number-pad"
+                maxLength={10}
+              />
               {editorEditable && editorSaveAttempted && editPhone.replace(/\D/g, "").length !== 10 ? (
                 <Text style={styles.editorErrorText}>Phone number must be 10 digits.</Text>
               ) : null}
@@ -1018,9 +1007,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.white,
   },
-  editorPhoneRow: { flexDirection: "row", gap: spacing.sm },
-  editorCountry: { width: 80 },
-  editorPhone: { flex: 1 },
   editorAddress: { minHeight: 64, textAlignVertical: "top" },
   editorCityRow: {
     flexDirection: "row",

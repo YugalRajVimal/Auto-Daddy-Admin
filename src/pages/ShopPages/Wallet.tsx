@@ -1137,7 +1137,7 @@ function WalletBankTable({
 }
 
 export default function ShopWalletPage() {
-  const { session, token } = useAuth();
+  const { token } = useAuth();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
   const [view, setView] = useState<WalletView>("paid");
   const [search, setSearch] = useState("");
@@ -1894,7 +1894,7 @@ export default function ShopWalletPage() {
           <WalletExpenseTable
             rows={paginatedExpenses}
             categories={effectiveExpenseCategories}
-            countryCode={session?.meta?.countryCode}
+            countryCode="+1"
             onEditRow={openEditExpenseForm}
             {...selectionProps}
           />
@@ -1916,7 +1916,7 @@ export default function ShopWalletPage() {
         <>
           <WalletBankTable
             rows={paginatedBanks}
-            countryCode={session?.meta?.countryCode}
+            countryCode="+1"
             {...selectionProps}
           />
           <WalletListFooter
@@ -1938,7 +1938,7 @@ export default function ShopWalletPage() {
         <WalletInvoiceTable
           rows={paginatedList}
           isPaid={view === "paid"}
-          countryCode={session?.meta?.countryCode}
+          countryCode="+1"
           onPreviewRow={openInvoicePreview}
           {...selectionProps}
         />

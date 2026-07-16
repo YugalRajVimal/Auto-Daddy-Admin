@@ -907,8 +907,8 @@ function AddNewCustomerForm({
   onCancel: () => void;
   onSaved: (message: string) => void;
 }) {
-  const { token, session } = useAuth();
-  const countryCode = session?.meta?.countryCode ?? "+1";
+  const { token } = useAuth();
+  const countryCode = "+1";
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -1059,8 +1059,8 @@ function EditCustomerForm({
   onCancel: () => void;
   onSaved: (message: string) => void;
 }) {
-  const { token, session } = useAuth();
-  const countryCode = session?.meta?.countryCode ?? "+1";
+  const { token } = useAuth();
+  const countryCode = "+1";
   const id = customerId(customer);
   const [name, setName] = useState(customer.name ?? "");
   const [phone, setPhone] = useState(phoneDigits(customer.phone ?? ""));

@@ -1,5 +1,4 @@
 import { normalizeMediaUrl } from "./normalizeMediaUrl";
-import { withPartsDealerDummyImages } from "./shopAdDummyImages";
 
 export type PartsDealerCard = {
   name: string;
@@ -9,27 +8,6 @@ export type PartsDealerCard = {
   website?: string;
   specialty?: string;
 };
-
-export const FALLBACK_PARTS_DEALERS: PartsDealerCard[] = withPartsDealerDummyImages([
-  {
-    name: "Hindustan Agencies",
-    phone: "289 763 5476",
-    city: "Mississauga",
-    specialty: "Aftermarket Spares Specialist",
-  },
-  {
-    name: "Ram Singh & Sons",
-    phone: "289 763 5476",
-    city: "Brampton",
-    specialty: "Auto Parts Dealer",
-  },
-  {
-    name: "Metro Auto Supply",
-    phone: "416 555 0192",
-    city: "Toronto",
-    specialty: "OEM & Aftermarket Parts",
-  },
-]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -105,9 +83,7 @@ export function parsePartsDealersFromPayload(payload: unknown): PartsDealerCard[
 
 /** Resolve sidebar ad dealers from a dealers / dashboard API payload. */
 export function resolvePartsDealersFromPayload(payload: unknown): PartsDealerCard[] {
-  const parsed = parsePartsDealersFromPayload(payload);
-  const dealers = parsed.length > 0 ? parsed : FALLBACK_PARTS_DEALERS;
-  return withPartsDealerDummyImages(dealers);
+  return parsePartsDealersFromPayload(payload);
 }
 
 export function resolvePartsDealerLink(dealer: PartsDealerCard): string | null {

@@ -65,7 +65,6 @@ export const adminRoutes = (
     <Route path="/admin/leads/completed" element={<P module="dashboard"><LeadsPage title="Completed" section="completed" showAddNew={false} /></P>} />
     <Route path="/admin/accounts" element={<Navigate to="/admin/accounts/expenses" replace />} />
     <Route path="/admin/accounts/expenses" element={<P module="dashboard"><AccountsPage title="Expenses" variant="expenses" /></P>} />
-    <Route path="/admin/accounts/income" element={<P module="dashboard"><AccountsPage title="Income" variant="income" /></P>} />
     <Route path="/admin/accounts/bank" element={<P module="dashboard"><AccountsPage title="Manage Banks" /></P>} />
     <Route path="/admin/invoices" element={<P module="dashboard"><InvoicesPage /></P>} />
     <Route path="/admin/messages" element={<Navigate to="/admin/messages/sent" replace />} />

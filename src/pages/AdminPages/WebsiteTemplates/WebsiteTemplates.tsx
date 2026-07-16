@@ -31,16 +31,6 @@ const WEBSITE_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "url", label: "URL" },
   { key: "date", label: "Date", type: "date" },
   {
-    key: "country",
-    label: "Country",
-    type: "select",
-    options: [
-      { value: "Canada", label: "Canada" },
-      { value: "USA", label: "USA" },
-      { value: "India", label: "India" },
-    ],
-  },
-  {
     key: "shopType",
     label: "Shop Type",
     type: "select",
@@ -58,7 +48,6 @@ type TemplateRow = {
   templateName: string;
   url: string;
   date: string;
-  country: string;
   shopType: string;
   usedBy: number;
 };
@@ -80,21 +69,18 @@ function mapApiTemplate(t: any): TemplateRow {
     url: t.url,
     // If date is ISO string, format to YYYY-MM-DD for display
     date: t.date ? t.date.slice(0, 10) : "",
-    country: t.country,
     shopType: t.shopType,
     usedBy: Number(t.usedBy ?? t.usedCount ?? t.usageCount ?? 0) || 0,
   };
 }
 
 const fetchTemplates = async ({
-  country,
   shopType,
 }: {
-  country?: string;
   shopType?: string;
 }) => {
   const params = new URLSearchParams();
-  if (country) params.append("country", country);
+  params.append("country", "Canada");
   if (shopType) params.append("shopType", shopType);
   const res = await fetch(`${API_BASE}/website-templates?${params}`);
   // DO NOT await res.json() twice
@@ -109,13 +95,12 @@ const createTemplate = async (body: {
   templateName: string;
   url: string;
   date: string;
-  country: string;
   shopType: string;
 }) => {
   const res = await fetch(`${API_BASE}/website-templates`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, country: "Canada" }),
   });
   if (!res.ok) throw new Error("Could not create website template");
   return await res.json();
@@ -143,7 +128,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [date, setDate] = useState("2026-06-16");
-  const [country, setCountry] = useState("Canada");
   const [shopType, setShopType] = useState("mechanic-shop");
   const [url, setUrl] = useState("");
   const [templateName, setTemplateName] = useState("");
@@ -187,13 +171,13 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     setLoading(true);
     try {
       const activeShopType = getActiveShopTypeFilter();
-      const arr = await fetchTemplates({ country, shopType: activeShopType });
+      const arr = await fetchTemplates({ shopType: activeShopType });
       setSites(arr || []);
     } catch (e) {
       adminNotify.error("Failed to fetch website templates");
     }
     setLoading(false);
-  }, [country, shopTypeFilters]);
+  }, [shopTypeFilters]);
 
   useEffect(() => {
     fetchAndSetTemplates();
@@ -210,7 +194,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
       shopTypeLabel.toLowerCase().includes(search.toLowerCase()) ||
       s.templateName.toLowerCase().includes(search.toLowerCase()) ||
       s.url.toLowerCase().includes(search.toLowerCase()) ||
-      s.country.toLowerCase().includes(search.toLowerCase()) ||
       String(s.usedBy).includes(search);
     if (!live) return false;
     const dateStr = s.date ? String(s.date).slice(0, 10) : "";
@@ -218,7 +201,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
       searchIncludes(s.templateName, searchFilters.templateName) &&
       searchIncludes(s.url, searchFilters.url) &&
       searchIncludes(dateStr, searchFilters.date) &&
-      searchEquals(s.country, searchFilters.country) &&
       searchEquals(shopTypeLabel, searchFilters.shopType) &&
       searchIncludes(s.usedBy, searchFilters.usedBy)
     );
@@ -250,7 +232,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
 
   const resetForm = () => {
     setDate("2026-06-16");
-    setCountry("Canada");
     setShopType("mechanic-shop");
     setUrl("");
     setTemplateName("");
@@ -287,7 +268,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
         templateName,
         url,
         date,
-        country,
         shopType: shopType,
       });
       adminNotify.success("Saved successfully.");
@@ -327,7 +307,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
           templateName: row.templateName,
           url: row.url,
           date: row.date,
-          country: row.country,
           shopType: row.shopType,
         });
       }
@@ -347,7 +326,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
         "Template Name",
         "URL",
         "Date",
-        "Country",
         "Shop Type",
         "Used by",
       ],
@@ -357,7 +335,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
           templateName,
           template.url,
           template.date,
-          template.country,
           SHOP_TYPE_OPTIONS.find((option) => option.value === template.shopType)?.label ??
             template.shopType,
           String(template.usedBy),
@@ -407,17 +384,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   onChange={(e) => setDate(e.target.value)}
                   className={compactInputClass}
                 />
-              </CompactField>
-              <CompactField label="Country" required className={compactFixedFieldWidth}>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className={compactInputClass}
-                >
-                  <option value="Canada">Canada</option>
-                  <option value="USA">USA</option>
-                  <option value="India">India</option>
-                </select>
               </CompactField>
               <CompactField label="Shop Type" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
                 <select
@@ -549,7 +515,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">URL</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Shop Type</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Used by</th>
             </tr>
@@ -557,13 +522,13 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-gray-500">
+                <td colSpan={6} className="py-6 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-gray-500">
+                <td colSpan={6} className="py-6 text-center text-gray-500">
                   {isDeletedView ? "No deleted templates found." : "No templates found."}
                 </td>
               </tr>
@@ -592,7 +557,6 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                     </a>
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.date}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">
                     {SHOP_TYPE_OPTIONS.find((o) => o.value === row.shopType)?.label ?? row.shopType}
                   </td>

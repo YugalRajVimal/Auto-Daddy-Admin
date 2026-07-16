@@ -23,15 +23,6 @@ const PROVINCE_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "province", label: "Province" },
   { key: "nickName", label: "Nickname" },
   {
-    key: "country",
-    label: "Country",
-    type: "select",
-    options: [
-      { value: "Canada", label: "Canada" },
-      { value: "USA", label: "USA" },
-    ],
-  },
-  {
     key: "status",
     label: "Status",
     type: "select",
@@ -45,13 +36,11 @@ const PROVINCE_SEARCH_FIELDS: AdminSearchField[] = [
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 type ProvinceStatus = "Active" | "Inactive";
-type Country = "Canada" | "India" | "USA";
 
 interface Province {
   _id: string;
   name: string;
   nickName?: string;
-  country?: Country;
   status?: ProvinceStatus;
   cities: { name: string; status?: string }[];
   createdAt?: string;
@@ -62,7 +51,7 @@ type ProvincesPageProps = {
 };
 
 type SortDirection = "asc" | "desc";
-type SortField = "name" | "country" | null;
+type SortField = "name" | null;
 
 export default function Provinces({ initialShowForm = false }: ProvincesPageProps) {
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -82,7 +71,6 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [nickName, setNickName] = useState("");
-  const [country, setCountry] = useState<Country>("Canada");
   const [status, setStatus] = useState<ProvinceStatus>("Active");
 
   // For sorting
@@ -137,18 +125,16 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     const live =
       !search.trim() ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.nickName || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.country || "Canada").toLowerCase().includes(search.toLowerCase());
+      (p.nickName || "").toLowerCase().includes(search.toLowerCase());
     if (!live) return false;
     return (
       searchIncludes(p.name, searchFilters.province) &&
       searchIncludes(p.nickName, searchFilters.nickName) &&
-      searchEquals(p.country || "Canada", searchFilters.country) &&
       searchEquals(p.status || "Active", searchFilters.status)
     );
   });
 
-  // Sorting logic, by "name" (province) or "country"
+  // Sorting logic, by "name" (province)
   const sorted = [...filtered];
 
   if (sortField) {
@@ -157,9 +143,6 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
       if (sortField === "name") {
         aField = (a.name ?? "").toLowerCase();
         bField = (b.name ?? "").toLowerCase();
-      } else if (sortField === "country") {
-        aField = (a.country ?? "Canada").toLowerCase();
-        bField = (b.country ?? "Canada").toLowerCase();
       } else {
         aField = "";
         bField = "";
@@ -190,7 +173,6 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
   const resetForm = () => {
     setName("");
     setNickName("");
-    setCountry("Canada");
     setStatus("Active");
     setEditingId(null);
     setError("");
@@ -205,7 +187,6 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
   const openEdit = (province: Province) => {
     setName(province.name);
     setNickName(province.nickName || "");
-    setCountry(province.country || "Canada");
     setStatus(province.status || "Active");
     setEditingId(province._id);
     setError("");
@@ -254,7 +235,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
         await axios.patch(`${API_BASE}/admin/provinces/${editingId}`, {
           name: name.trim(),
           nickName: nickName.trim(),
-          country,
+          country: "Canada",
           status,
         });
         adminNotify.success("Province updated successfully.");
@@ -263,7 +244,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
         await axios.post(`${API_BASE}/admin/provinces`, {
           name: name.trim(),
           nickName: nickName.trim(),
-          country,
+          country: "Canada",
           status,
         });
         adminNotify.success("Province added successfully.");
@@ -327,7 +308,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
       await axios.post(`${API_BASE}/admin/provinces`, {
         name: province.name,
         nickName: province.nickName || "",
-        country: province.country || "Canada",
+        country: "Canada",
         status: province.status || "Active",
       });
       restoreStashed((item) => item._id === province._id);
@@ -348,10 +329,9 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
   const handleToolbarPrint = () => {
     printAdminTable({
       title: isDeletedView ? "Deleted Provinces" : "Provinces",
-      headers: ["Province Name", "Country", "Nickname", "Cities", "Status"],
+      headers: ["Province Name", "Nickname", "Cities", "Status"],
       rows: sorted.map((province) => [
         province.name,
-        province.country || "Canada",
         province.nickName || "—",
         String(province.cities?.length ?? 0),
         province.status || "Active",
@@ -425,18 +405,6 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
               </div>
             )}
             <CompactFormRow className="items-start">
-              <CompactField label="Country" required>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value as Country)}
-                  className={compactInputClass}
-                >
-                  <option value="Canada">Canada</option>
-                  <option value="India">India</option>
-                  <option value="USA">USA</option>
-                </select>
-           
-              </CompactField>
               <CompactField label="Province Name" required>
                 <input
                   type="text"
@@ -573,14 +541,6 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                 Province Name
                 {renderSortIcon("name")}
               </th>
-              <th
-                className="border border-ad-purple-dark px-3 py-2 text-center font-medium cursor-pointer select-none group"
-                onClick={() => handleSort("country")}
-                style={{ userSelect: "none" }}
-              >
-                Country
-                {renderSortIcon("country")}
-              </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Nickname</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Cities</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
@@ -589,13 +549,13 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   {isDeletedView ? "No deleted provinces found." : "No provinces found."}
                 </td>
               </tr>
@@ -619,7 +579,6 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                       {row.name}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.country || "Canada"}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center italic text-xs">
                     {row.nickName || "—"}
                   </td>

@@ -1,6 +1,4 @@
 import { ProfileFieldRow, ExpandableCard } from "@/components/reusables";
-import { DialCountrySelector } from "@/components/reusables/forms/dial-country-selector";
-import type { DialCountryId } from "@/lib/dial-countries";
 import { nationalPhoneDisplayFromKeystrokes, NATIONAL_PHONE_DISPLAY_MAX_LENGTH } from "@/lib/national-phone-format";
 import {
   clampText,
@@ -38,8 +36,6 @@ type PersonalInformationCardProps = {
   setEditPincode: (value: string) => void;
   editAddress: string;
   setEditAddress: (value: string) => void;
-  editDialCountryId: DialCountryId;
-  setEditDialCountryId: (id: DialCountryId) => void;
 };
 
 export function PersonalInformationCard({
@@ -61,8 +57,6 @@ export function PersonalInformationCard({
   setEditPincode,
   editAddress,
   setEditAddress,
-  editDialCountryId,
-  setEditDialCountryId,
 }: PersonalInformationCardProps) {
   return (
     <ExpandableCard
@@ -120,35 +114,26 @@ export function PersonalInformationCard({
                 maxLength={
                   isName ? 20 : isEmail ? 80 : isMobile ? NATIONAL_PHONE_DISPLAY_MAX_LENGTH : isPincode ? PINCODE_DISPLAY_MAX_LENGTH : 50
                 }
-                    errorText={
-                      isName
-                        ? editName.trim().length === 0
-                          ? "Name is required."
+                errorText={
+                  isName
+                    ? editName.trim().length === 0
+                      ? "Name is required."
+                      : null
+                    : isEmail
+                      ? editEmail.trim().length > 0 && !isValidEmail(editEmail)
+                        ? "Enter a valid email."
+                        : null
+                      : isPincode
+                        ? hasCanadianPostalCodeValidationError(editPincode)
+                          ? POSTAL_CODE_ERROR_MESSAGE
                           : null
-                        : isEmail
-                          ? editEmail.trim().length > 0 && !isValidEmail(editEmail)
-                            ? "Enter a valid email."
+                        : isMobile
+                          ? digitsOnly(editPhone).length > 0 && digitsOnly(editPhone).length !== 10
+                            ? "Phone must be 10 digits."
                             : null
-                          : isPincode
-                            ? hasCanadianPostalCodeValidationError(editPincode)
-                              ? POSTAL_CODE_ERROR_MESSAGE
-                              : null
-                            : isMobile
-                              ? digitsOnly(editPhone).length > 0 && digitsOnly(editPhone).length !== 10
-                                ? "Phone must be 10 digits."
-                                : null
-                              : editAddress.trim().length > 50
-                                ? "Address must be at most 50 characters."
-                                : null
-                    }
-                leftAddon={
-                  isMobile ? (
-                    <DialCountrySelector
-                      valueId={editDialCountryId}
-                      onChange={setEditDialCountryId}
-                      compact
-                    />
-                  ) : undefined
+                          : editAddress.trim().length > 50
+                            ? "Address must be at most 50 characters."
+                            : null
                 }
               />
             );

@@ -149,10 +149,10 @@ function vehicleDetailsBracket(vehicle: CarOwnerVehicle): string {
 }
 
 export default function OwnerVehiclesPage() {
-  const { token, session } = useAuth();
+  const { token } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const countryCode = session?.meta?.countryCode;
+  const countryCode = "+1";
   const { vehicles: apiVehicles, loading, error, refresh } = useCarOwnerVehicles();
   const vehicleSource = withDummyVehicles(apiVehicles);
   const vehicles = vehicleSource.vehicles;

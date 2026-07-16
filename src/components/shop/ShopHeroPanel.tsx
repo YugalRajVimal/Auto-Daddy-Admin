@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { PartsDealerCard } from "../../hooks/usePartsDealers";
 import type { ThoughtOfTheDayView } from "../../lib/extractThought";
 import type { SalvageDeal } from "../../lib/dummySalvageDeals";
+import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import { PORTAL_HOME_HERO_IMAGE } from "../../lib/portalHeroImage";
 import { Skeleton } from "../common/Skeleton";
 import { ThoughtOfTheDayCard } from "../portal/ThoughtOfTheDayCard";
@@ -40,6 +41,11 @@ export default function ShopHeroPanel({
       ? thoughtOfTheDay.trim()
       : thoughtOfTheDay?.description?.trim() || "";
   const hasThought = Boolean(thoughtTitle || thoughtDescription);
+  const thoughtImage =
+    typeof thoughtOfTheDay === "string"
+      ? null
+      : normalizeMediaUrl(thoughtOfTheDay?.image ?? null);
+  const heroSrc = thoughtImage || PORTAL_HOME_HERO_IMAGE;
 
   useEffect(() => {
     if (!showingOverlay || !handleOverlayClose) return;
@@ -64,7 +70,7 @@ export default function ShopHeroPanel({
       ) : (
         <>
           <img
-            src={PORTAL_HOME_HERO_IMAGE}
+            src={heroSrc}
             alt="AutoDaddy hero"
             className="absolute inset-0 h-full w-full object-cover"
           />

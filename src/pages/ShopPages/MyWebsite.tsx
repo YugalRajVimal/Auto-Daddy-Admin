@@ -1101,7 +1101,7 @@ function WebsiteInvoiceModal({
 }
 
 export default function ShopMyWebsitePage() {
-  const { token, profile, session } = useAuth();
+  const { token, profile } = useAuth();
   const { faqsHeading, faqsDescription, business, user, refresh } = useShopOwnerPortal();
   const [activeSection, setActiveSection] = useState<ShopWebsiteSection>("overview");
   const [faqsOpen, setFaqsOpen] = useState(false);
@@ -1628,7 +1628,7 @@ export default function ShopMyWebsitePage() {
         billToAddress={billTo.addressLine}
         billToHst={billTo.hst}
         billToPhone={billTo.phone}
-        countryCode={session?.meta?.countryCode}
+        countryCode="+1"
         processing={paymentProcessing}
       />
     </>

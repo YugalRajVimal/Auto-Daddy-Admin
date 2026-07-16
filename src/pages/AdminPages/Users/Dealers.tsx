@@ -1084,14 +1084,12 @@ import AdminSearchCard, {
 } from "../../../components/admin/AdminSearchCard";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
-  CompactAutoGrowTextarea,
   CompactField,
   CompactFormFooter,
   CompactFormPanel,
-  CompactFormRow,
-  compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminCityOptions, withSelectedCity } from "../../../hooks/useAdminCityOptions";
 import { adminNotify } from "../../../utils/adminNotify";
 import {
   createDealer,
@@ -1366,6 +1364,8 @@ const DummyUserAddEditForm: React.FC<{
   const [imageFile, setImageFile] = useState<File | null>(null);
   // const [ setImagePreviewUrl] = useState("");
   const [attempted, setAttempted] = useState(false);
+  const cityOptions = useAdminCityOptions();
+  const citySelectOptions = withSelectedCity(cityOptions, city);
 
   useEffect(() => {
     setAttempted(false);
@@ -1458,14 +1458,14 @@ const DummyUserAddEditForm: React.FC<{
         />
       }
     >
-      <CompactFormRow className="items-start">
-        <CompactField label="Full Name" required className={compactFixedFieldWidth}>
+      <div className="grid grid-cols-1 gap-x-4 gap-y-4 items-start sm:grid-cols-5">
+        <CompactField label="Full Name" required className="min-w-0">
           <input type="text" value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} className={compactInputClass} />
         </CompactField>
-        <CompactField label="Email" required className={compactFixedFieldWidth}>
+        <CompactField label="Email" required className="min-w-0">
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={compactInputClass} />
         </CompactField>
-        <CompactField label="Phone" required className={compactFixedFieldWidth}>
+        <CompactField label="Phone" required className="min-w-0">
           <input
             type="tel"
             value={phone}
@@ -1473,9 +1473,47 @@ const DummyUserAddEditForm: React.FC<{
             className={compactInputClass}
           />
         </CompactField>
-        <CompactField label="City" className={compactFixedFieldWidth}>
-          <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className={compactInputClass} />
+        <CompactField label={config.primaryFieldLabel} required className="min-w-0">
+          <input type="text" value={primaryLabel} onChange={(e) => setPrimaryLabel(e.target.value)} className={compactInputClass} />
         </CompactField>
+        <CompactField label="City" className="min-w-0">
+          <select value={city} onChange={(e) => setCity(e.target.value)} className={compactInputClass}>
+            <option value="">Select city</option>
+            {citySelectOptions.map((cityName) => (
+              <option key={cityName} value={cityName}>
+                {cityName}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-4 items-start sm:grid-cols-5">
+        {showAddress && (
+          <CompactField label="Address" required={!isWebMode} className="min-w-0">
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value.slice(0, 200))}
+              placeholder="Street / Area"
+              className={compactInputClass}
+            />
+          </CompactField>
+        )}
+        {isWebMode ? (
+          <CompactField label={config.regionFieldLabel} required className="min-w-0">
+            <input
+              type="url"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value.slice(0, 120))}
+              placeholder="https://example.com"
+              className={compactInputClass}
+            />
+          </CompactField>
+        ) : (
+          <CompactField label={config.regionFieldLabel} required className="min-w-0">
+            <input type="text" value={region} onChange={(e) => setRegion(e.target.value)} className={compactInputClass} />
+          </CompactField>
+        )}
         {isWebMode && (
           <AttachImageCheckbox
             label={config.imageFieldLabel ?? "Attach Image"}
@@ -1488,37 +1526,10 @@ const DummyUserAddEditForm: React.FC<{
             }}
             file={imageFile}
             onFileChange={handleImageFileChange}
-            className={compactFixedFieldWidth}
+            className="min-w-0 sm:col-start-5"
           />
         )}
-        {showAddress && (
-          <CompactField label="Address" required={!isWebMode} className="min-w-0 flex-1">
-            <CompactAutoGrowTextarea
-              value={address}
-              onChange={(e) => setAddress(e.target.value.slice(0, 200))}
-              placeholder="Street / Area"
-            />
-          </CompactField>
-        )}
-        <CompactField label={config.primaryFieldLabel} required className={compactFixedFieldWidth}>
-          <input type="text" value={primaryLabel} onChange={(e) => setPrimaryLabel(e.target.value)} className={compactInputClass} />
-        </CompactField>
-        {isWebMode ? (
-          <CompactField label={config.regionFieldLabel} required className={compactFixedFieldWidth}>
-            <input
-              type="url"
-              value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value.slice(0, 120))}
-              placeholder="https://example.com"
-              className={compactInputClass}
-            />
-          </CompactField>
-        ) : (
-          <CompactField label={config.regionFieldLabel} required className={compactFixedFieldWidth}>
-            <input type="text" value={region} onChange={(e) => setRegion(e.target.value)} className={compactInputClass} />
-          </CompactField>
-        )}
-      </CompactFormRow>
+      </div>
       {attempted && !isValid && <p className="text-xs font-semibold text-red-700">Please fill all required fields correctly.</p>}
     </CompactFormPanel>
   );

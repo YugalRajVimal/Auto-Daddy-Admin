@@ -18,6 +18,7 @@ export type ShopThoughtOfTheDayApi =
       text?: string;
       quote?: string;
       thought?: string;
+      image?: string;
     };
 
 export type ShopDashboardData = {

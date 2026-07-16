@@ -47,7 +47,7 @@ type JobCardType = {
 type OwnerDocumentItem = { label: string; url: string };
 
 type CarOwnerType = {
-  _id: string; name: string; email?: string; countryCode?: string; phone?: string;
+  _id: string; name: string; email?: string; phone?: string;
   address?: string; pincode?: string; city?: string; status?: string;
   isProfileComplete?: boolean; isDisabled?: boolean; myVehicles?: VehicleType[];
   onboardedBy?: { _id: string; name?: string; email?: string } | null;

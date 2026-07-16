@@ -3,7 +3,6 @@ import OwnerPageShell, {
   OwnerPageSearchInput,
 } from "../../components/owner/OwnerPageShell";
 import { OwnerJobCardsTable } from "../../components/owner/OwnerPanelTables";
-import { useAuth } from "../../auth";
 import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
 import {
   businessName,
@@ -15,8 +14,7 @@ import {
 const PAGE_SIZE = 10;
 
 export default function OwnerJobCardsPage() {
-  const { session } = useAuth();
-  const countryCode = session?.meta?.countryCode;
+  const countryCode = "+1";
   const { items, loading, error, refresh } = useCarOwnerJobCards(null);
 
   const [search, setSearch] = useState("");

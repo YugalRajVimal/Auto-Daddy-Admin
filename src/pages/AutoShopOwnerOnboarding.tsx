@@ -9,21 +9,10 @@ import axios from "axios";
  *
  * Server source: Auth Controller (signUpLogInAndCompleteProfileAutoShopOwner, verifyAccount)
  *
- * Allowed country codes:
- *   Canada — +1
- *   United States — +1
- *   Australia — +61
- *   United Kingdom — +44
- *   India — +91
+ * Country code is fixed to Canada (+1).
  */
 
-const ALLOWED_COUNTRY_CODES = [
-  { label: "Canada (+1)", value: "+1" },
-  { label: "United States (+1)", value: "+1" },
-  { label: "Australia (+61)", value: "+61" },
-  { label: "United Kingdom (+44)", value: "+44" },
-  { label: "India (+91)", value: "+91" },
-];
+const DEFAULT_COUNTRY_CODE = "+1";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -101,7 +90,6 @@ const Stepper = ({ step }: { step: number }) => (
 const AutoShopOwnerOnboarding: React.FC = () => {
   const [step, setStep] = useState<"form" | "otp" | "verified" | "error">("form");
   const [form, setForm] = useState({
-    countryCode: "+1",
     phone: "",
     email: "",
     name: "",
@@ -115,7 +103,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
   const [otpSent, setOtpSent] = useState(false);
 
   // Handle input change for form fields
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
@@ -125,17 +113,10 @@ const AutoShopOwnerOnboarding: React.FC = () => {
     setError("");
     setLoading(true);
 
-    if (!ALLOWED_COUNTRY_CODES.some(cc => cc.value === form.countryCode)) {
-      setError(`Selected country code is not allowed.`);
-      setStep("error");
-      setLoading(false);
-      return;
-    }
-
     try {
       const res = await axios.post(
         `${API_BASE}/api/auth/autoshopowner/sign-up-log-in-complete-profile`,
-        { ...form }
+        { ...form, countryCode: DEFAULT_COUNTRY_CODE }
       );
       setLoading(false);
       if (res.data && res.data.userId) {
@@ -162,7 +143,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
     setLoading(true);
     try {
       const res = await axios.post(`${API_BASE}/api/auth/verify-otp`, {
-        countryCode: form.countryCode,
+        countryCode: DEFAULT_COUNTRY_CODE,
         phone: form.phone,
         otp,
       });
@@ -197,7 +178,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
     try {
       await axios.post(
         `${API_BASE}/api/auth/autoshopowner/sign-up-log-in-complete-profile`,
-        { ...form }
+        { ...form, countryCode: DEFAULT_COUNTRY_CODE }
       );
       setOtpSent(true);
       setResendLoading(false);
@@ -234,41 +215,17 @@ const AutoShopOwnerOnboarding: React.FC = () => {
               autoComplete="off"
               className="space-y-6"
             >
-              {/* Country code + Phone in one group */}
-              <div className="flex gap-4">
-                <div className="w-1/3">
-                  <label className={`text-sm font-semibold ${darkText} mb-1 block`}>
-                    Country
-                  </label>
-                  <select
-                    name="countryCode"
-                    value={form.countryCode}
-                    onChange={handleChange}
-                    required
-                    className={`w-full px-4 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-700 transition bg-white ${darkText}`}
-                    autoComplete="tel-country-code"
-                  >
-                    {ALLOWED_COUNTRY_CODES.map((cc) => (
-                      <option key={cc.value + cc.label} value={cc.value}>
-                        {cc.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-grow">
-                  <InputField
-                    label="Phone"
-                    name="phone"
-                    value={form.phone}
-                    onChange={handleChange}
-                    type="tel"
-                    required
-                    pattern="\d{5,15}"
-                    placeholder="Phone number"
-                    autoComplete="tel-local"
-                  />
-                </div>
-              </div>
+              <InputField
+                label="Phone"
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                type="tel"
+                required
+                pattern="\d{5,15}"
+                placeholder="Phone number"
+                autoComplete="tel-local"
+              />
               <InputField
                 label="Full Name"
                 name="name"
@@ -334,12 +291,6 @@ const AutoShopOwnerOnboarding: React.FC = () => {
                   "Submit"
                 )}
               </button>
-              <div className="mt-2 text-xs text-center text-gray-800">
-                Allowed country codes:{" "}
-                <span className="inline-block text-gray-900 font-mono">
-                  {ALLOWED_COUNTRY_CODES.map((cc) => cc.label).join(", ")}
-                </span>
-              </div>
             </form>
           )}
 
@@ -364,7 +315,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
                 </svg>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">Verify Your Account</h2>
                 <p className="text-gray-900 text-sm mb-2">
-                  We sent a 6-digit OTP to <span className="font-semibold">{form.countryCode} {form.phone}</span>
+                  We sent a 6-digit OTP to <span className="font-semibold">{DEFAULT_COUNTRY_CODE} {form.phone}</span>
                 </p>
                 {otpSent && (
                   <span className="text-xs text-green-900 mb-1">OTP sent!</span>

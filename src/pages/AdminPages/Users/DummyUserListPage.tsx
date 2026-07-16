@@ -18,6 +18,7 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useAdminCityOptions, withSelectedCity } from "../../../hooks/useAdminCityOptions";
 import { adminNotify } from "../../../utils/adminNotify";
 
 export type DummyUserRow = {
@@ -258,6 +259,8 @@ const DummyUserAddEditForm: React.FC<{
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [attempted, setAttempted] = useState(false);
+  const cityOptions = useAdminCityOptions();
+  const citySelectOptions = withSelectedCity(cityOptions, city);
 
   useEffect(() => {
     setAttempted(false);
@@ -384,12 +387,14 @@ const DummyUserAddEditForm: React.FC<{
           />
         </CompactField>
         <CompactField label="City" className={compactFixedFieldWidth}>
-          <input
-            type="text"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            className={compactInputClass}
-          />
+          <select value={city} onChange={(e) => setCity(e.target.value)} className={compactInputClass}>
+            <option value="">Select city</option>
+            {citySelectOptions.map((cityName) => (
+              <option key={cityName} value={cityName}>
+                {cityName}
+              </option>
+            ))}
+          </select>
         </CompactField>
         {isWebMode ? (
           <AttachImageCheckbox

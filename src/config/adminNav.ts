@@ -80,10 +80,9 @@ export const primaryNav: NavItem[] = [
     permissionModule: "dashboard",
     subItems: [
       { name: "Expenses", path: "/admin/accounts/expenses", permissionModule: "dashboard" },
-      { name: "Income", path: "/admin/accounts/income", permissionModule: "dashboard" },
       { name: "Bank", path: "/admin/accounts/bank", permissionModule: "dashboard" },
     ],
-    matchPaths: ["/admin/accounts/expenses", "/admin/accounts/income", "/admin/accounts/bank"],
+    matchPaths: ["/admin/accounts/expenses", "/admin/accounts/bank"],
   },
   {
     name: "Invoices",

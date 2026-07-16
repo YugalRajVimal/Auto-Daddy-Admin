@@ -39,15 +39,6 @@ const USER_OPTIONS = [
 const FEATURE_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "date", label: "Date", type: "date" },
   {
-    key: "country",
-    label: "Country",
-    type: "select",
-    options: [
-      { value: "Canada", label: "Canada" },
-      { value: "USA", label: "USA" },
-    ],
-  },
-  {
     key: "user",
     label: "User",
     type: "select",
@@ -65,7 +56,6 @@ type FeatureRow = {
   date: string;
   user: string;
   feature: string;
-  country: string;
   hasClip: boolean;
   imageUrl?: string | null;
 };
@@ -99,12 +89,12 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingId, setEditingId] = useState<number | string | null>(null);
   const [date, setDate] = useState("2026-06-16");
-  const [country, setCountry] = useState("Canada");
   const [user, setUser] = useState("car-owner");
   const [feature, setFeature] = useState(DEFAULT_FEATURE);
   const [attachImage, setAttachImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refresh, setRefresh] = useState(0);
 
   const resetTableControls = () => {
     setPage(1);
@@ -133,8 +123,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
     const fetchFeatures = async () => {
       setLoading(true);
       try {
-        const qCountry = country ? `country=${encodeURIComponent(country)}` : "";
-        const url = `${BASE}/product-features${qCountry ? `?${qCountry}` : ""}`;
+        const url = `${BASE}/product-features?country=Canada`;
         const res = await fetch(url, { method: "GET" });
         if (!res.ok) throw new Error("Failed to fetch features");
         const data = await res.json();
@@ -146,7 +135,6 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
               date: item.date,
               user: item.role || item.user,
               feature: item.feature,
-              country: item.country,
               // Prefer 'image' for new format, fallback for old
               imageUrl: getAbsImageUrl(
                 item.image ||
@@ -165,9 +153,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       setLoading(false);
     };
     fetchFeatures();
-    // Only on mount or when country changes for demo parity (can tweak if needed)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [country]);
+  }, [refresh]);
 
   const displayFeatures = isDeletedView ? deletedStash : features;
 
@@ -178,13 +164,11 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       f.date?.toString().includes(search) ||
       f.user?.toLowerCase().includes(search.toLowerCase()) ||
       userLabel.toLowerCase().includes(search.toLowerCase()) ||
-      f.feature?.toLowerCase().includes(search.toLowerCase()) ||
-      f.country?.toLowerCase().includes(search.toLowerCase());
+      f.feature?.toLowerCase().includes(search.toLowerCase());
     if (!live) return false;
     const dateStr = f.date ? String(f.date).slice(0, 10) : "";
     return (
       searchIncludes(dateStr, searchFilters.date) &&
-      searchEquals(f.country, searchFilters.country) &&
       searchEquals(userLabel, searchFilters.user) &&
       searchIncludes(f.feature, searchFilters.feature)
     );
@@ -209,7 +193,6 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
 
   const resetForm = () => {
     setDate("2026-06-16");
-    setCountry("Canada");
     setUser("car-owner");
     setFeature(DEFAULT_FEATURE);
     setAttachImage(false);
@@ -225,7 +208,6 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
 
   const openEdit = (row: FeatureRow) => {
     setDate(row.date);
-    setCountry(row.country);
     setUser(row.user);
     setFeature(row.feature);
     setAttachImage(!!row.imageUrl);
@@ -267,7 +249,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       setLoading(true);
       const formData = new FormData();
       formData.append("date", date);
-      formData.append("country", country);
+      formData.append("country", "Canada");
       formData.append("role", user); // called "role" in API
       formData.append("feature", feature);
 
@@ -301,9 +283,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       );
       resetForm();
       setShowForm(false);
-
-      // Refetch features after save (refreshing country triggers useEffect above)
-      setCountry((prev) => prev);
+      setRefresh((c) => c + 1);
     } catch (e: any) {
       adminNotify.error(e?.message || "Could not save product feature.");
     } finally {
@@ -327,8 +307,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       if (toStash.length > 0) stashDeleted(toStash);
       adminNotify.success("Deleted successfully.");
       setSelected(new Set());
-      // Refetch
-      setCountry((prev) => prev);
+      setRefresh((c) => c + 1);
     } catch (err: any) {
       adminNotify.error(err?.message || "Failed to delete.");
     } finally {
@@ -346,7 +325,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       for (const row of toRestore) {
         const formData = new FormData();
         formData.append("date", row.date);
-        formData.append("country", row.country);
+        formData.append("country", "Canada");
         formData.append("role", row.user);
         formData.append("feature", row.feature);
         const res = await fetch(`${BASE}/product-features`, {
@@ -358,7 +337,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       }
       adminNotify.success("Restored successfully.");
       setSelected(new Set());
-      setCountry((prev) => prev);
+      setRefresh((c) => c + 1);
     } catch (err: any) {
       adminNotify.error(err?.message || "Failed to restore.");
     } finally {
@@ -369,10 +348,9 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   const handleToolbarPrint = () => {
     printAdminTable({
       title: isDeletedView ? "Deleted Product Features" : "Product Features",
-      headers: ["Date", "Country", "User", "Feature", "Clip"],
+      headers: ["Date", "User", "Feature", "Clip"],
       rows: filtered.map((featureRow) => [
         featureRow.date,
-        featureRow.country,
         featureRow.user,
         featureRow.feature,
         featureRow.imageUrl ? "Yes" : "—",
@@ -420,17 +398,6 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                   className={compactInputClass}
                   disabled={loading}
                 />
-              </CompactField>
-              <CompactField label="Country" required className={compactFixedFieldWidth}>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className={compactInputClass}
-                  disabled={loading}
-                >
-                  <option value="Canada">Canada</option>
-                  <option value="USA">USA</option>
-                </select>
               </CompactField>
               <CompactField label="User" required className={compactFixedFieldWidth}>
                 <select
@@ -555,7 +522,6 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                   />
                 </th>
                 <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
                 <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User</th>
                 <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Feature</th>
                 <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Clip</th>
@@ -564,7 +530,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
             <tbody>
               {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                  <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                     {isDeletedView ? "No deleted features found." : "No features found."}
                   </td>
                 </tr>
@@ -588,7 +554,6 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                         {row.date?.slice(0, 10)}
                       </button>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center">
                       {USER_OPTIONS.find((o) => o.value === row.user)?.label ?? row.user}
                     </td>

@@ -81,16 +81,6 @@ const PRIVACY_SEARCH_FIELDS: AdminSearchField[] = [
     inputType: "date",
   },
   {
-    key: "country",
-    label: "Country",
-    type: "select",
-    options: [
-      { value: "Canada", label: "Canada" },
-      { value: "USA", label: "USA" },
-      { value: "India", label: "India" },
-    ],
-  },
-  {
     key: "type",
     label: "Type",
     type: "select",
@@ -150,7 +140,6 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [date, setDate] = useState("");
-  const [country, setCountry] = useState("Canada");
   const [type, setType] = useState(TYPE_OPTIONS[0]);
   const [description, setDescription] = useState("");
   const [refresh, setRefresh] = useState(0);
@@ -190,12 +179,10 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
       !search.trim() ||
       e.date.includes(search) ||
       (e.type ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (e.description ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (e.country ?? "").toLowerCase().includes(search.toLowerCase());
+      (e.description ?? "").toLowerCase().includes(search.toLowerCase());
     if (!live) return false;
     return (
       dateInRange(e.date, searchFilters.dateFrom, searchFilters.dateTo) &&
-      searchEquals(e.country, searchFilters.country) &&
       searchEquals(e.type, searchFilters.type) &&
       searchIncludes(e.description, searchFilters.description)
     );
@@ -220,7 +207,6 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
 
   const resetForm = () => {
     setDate("");
-    setCountry("Canada");
     setType(TYPE_OPTIONS[0]);
     setDescription("");
     setEditingId(null);
@@ -234,7 +220,6 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
 
   const openEdit = (row: PrivacyRow) => {
     setDate(row.date);
-    setCountry(row.country);
     setType(row.type);
     setDescription(row.description);
     setEditingId(row.id);
@@ -279,7 +264,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
         const backendType = type.split(" - ")[0].toLowerCase();
         await createEntry({
           date: date || new Date().toISOString().slice(0, 10),
-          country,
+          country: "Canada",
           type: backendType,
           description,
         });
@@ -335,10 +320,9 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   const handleToolbarPrint = () => {
     printAdminTable({
       title: isDeletedView ? "Deleted Privacy" : "Privacy",
-      headers: ["Date", "Country", "Type", "Description"],
+      headers: ["Date", "Type", "Description"],
       rows: filtered.map((entry) => [
         entry.date,
-        entry.country,
         entry.type,
         entry.description,
       ]),
@@ -383,17 +367,6 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                   onChange={(e) => setDate(e.target.value)}
                   className={compactInputClass}
                 />
-              </CompactField>
-              <CompactField label="Country" required className={compactFixedFieldWidth}>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className={compactInputClass}
-                >
-                  <option value="Canada">Canada</option>
-                  <option value="USA">USA</option>
-                  <option value="India">India</option>
-                </select>
               </CompactField>
               <CompactField label="Type" required className="w-[180px] shrink-0 flex-none sm:w-[220px]">
                 <select
@@ -505,7 +478,6 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                 />
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Type</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Description</th>
             </tr>
@@ -513,13 +485,13 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="text-center py-6">
+                <td colSpan={4} className="text-center py-6">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-6">
+                <td colSpan={4} className="text-center py-6">
                   {isDeletedView ? "No deleted entries found." : "No entries found."}
                 </td>
               </tr>
@@ -544,7 +516,6 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                  
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.type}</td>
                   <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[280px]">{row.description}</td>
                 </tr>

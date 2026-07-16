@@ -1,5 +1,4 @@
 import { CarOwnerCityPickerModal } from "@/components/car-owner/car-owner-city-picker-modal";
-import { DialCountrySelector } from "@/components/reusables/forms/dial-country-selector";
 import { CarOwnerProfileField } from "@/components/car-owner/car-owner-profile-field";
 import { CarOwnerProfileHeader } from "@/components/car-owner/car-owner-profile-header";
 import { CarOwnerProfileSelectField } from "@/components/car-owner/car-owner-profile-select-field";
@@ -28,11 +27,7 @@ import type { UserCity } from "@/types/user-cities";
 import * as ImagePicker from "expo-image-picker";
 import {
   defaultDialCallingCode,
-  defaultDialCountryId,
-  type DialCountryId,
   formatStoredNationalPhone,
-  getDialCountryOption,
-  resolveDialCountryIdFromStoredCallingCode,
 } from "@/lib/dial-countries";
 import {
   digitsFromNationalPhoneDisplay,
@@ -115,7 +110,6 @@ export default function CarOwnerProfile() {
   const [editCityId, setEditCityId] = useState("");
   const [editCityName, setEditCityName] = useState("");
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
-  const [editDialCountryId, setEditDialCountryId] = useState<DialCountryId>(defaultDialCountryId());
   const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({});
 
   const clearFieldError = useCallback((key: ProfileFieldKey) => {
@@ -132,7 +126,6 @@ export default function CarOwnerProfile() {
     setEditName(display.name);
     setEditEmail(display.email);
     setEditPhone(formatNationalPhoneDisplay(digitsFromNationalPhoneDisplay(display.phone)));
-    setEditDialCountryId(resolveDialCountryIdFromStoredCallingCode(display.countryCode));
     setEditAddress(display.address);
     setEditPincode(formatPincodeDisplay(display.pincode));
     setEditCityId(display.cityId);
@@ -141,7 +134,6 @@ export default function CarOwnerProfile() {
     display.address,
     display.city,
     display.cityId,
-    display.countryCode,
     display.email,
     display.name,
     display.phone,
@@ -155,7 +147,6 @@ export default function CarOwnerProfile() {
     setEditName(display.name);
     setEditEmail(display.email);
     setEditPhone(formatNationalPhoneDisplay(digitsFromNationalPhoneDisplay(display.phone)));
-    setEditDialCountryId(resolveDialCountryIdFromStoredCallingCode(display.countryCode));
     setEditAddress(display.address);
     setEditPincode(formatPincodeDisplay(display.pincode));
     setEditCityId(display.cityId);
@@ -191,7 +182,7 @@ export default function CarOwnerProfile() {
     const body: Record<string, string> = {
       name: nextName,
       ...(nextEmail ? { email: nextEmail } : {}),
-      ...(nextPhone ? { phone: nextPhone, countryCode: getDialCountryOption(editDialCountryId).callingCode } : {}),
+      ...(nextPhone ? { phone: nextPhone, countryCode: defaultDialCallingCode() } : {}),
       ...(nextAddress ? { address: nextAddress } : {}),
       ...(nextPincode ? { pincode: nextPincode } : {}),
       ...(editCityId.trim() ? { cityId: editCityId.trim() } : {}),
@@ -205,7 +196,7 @@ export default function CarOwnerProfile() {
       name: nextName,
       email: nextEmail,
       phone: nextPhone,
-      countryCode: getDialCountryOption(editDialCountryId).callingCode,
+      countryCode: defaultDialCallingCode(),
       address: nextAddress,
       pincode: nextPincode,
       city: editCityName.trim() || undefined,
@@ -268,10 +259,7 @@ export default function CarOwnerProfile() {
       const phoneDigits = digitsOnly(phoneSrc);
       if (phoneDigits.length === 10) {
         body.append("phone", phoneDigits);
-        body.append(
-          "countryCode",
-          isEditing ? getDialCountryOption(editDialCountryId).callingCode : display.countryCode || defaultDialCallingCode()
-        );
+        body.append("countryCode", defaultDialCallingCode());
       }
       const addr = addrSrc?.trim();
       if (addr) body.append("address", addr.slice(0, PROFILE_ADDRESS_MAX_LENGTH));
@@ -317,7 +305,6 @@ export default function CarOwnerProfile() {
     token,
     display.address,
     display.city,
-    display.countryCode,
     display.email,
     display.name,
     display.phone,
@@ -328,7 +315,6 @@ export default function CarOwnerProfile() {
     editCityName,
     editEmail,
     editName,
-    editDialCountryId,
     editPhone,
     editPincode,
     isEditing,
@@ -413,15 +399,6 @@ export default function CarOwnerProfile() {
               keyboardType="phone-pad"
               errorText={isEditing ? fieldErrors.phone : null}
               maxLength={NATIONAL_PHONE_DISPLAY_MAX_LENGTH}
-              leadingSlot={
-                isEditing ? (
-                  <DialCountrySelector
-                    valueId={editDialCountryId}
-                    onChange={setEditDialCountryId}
-                    compact
-                  />
-                ) : undefined
-              }
             />
             <CarOwnerProfileSelectField
               label="City"

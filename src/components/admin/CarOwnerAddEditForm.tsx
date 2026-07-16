@@ -457,7 +457,7 @@ export default function CarOwnerAddEditForm({
   vehiclesByPhone = false,
   onLookupCustomer,
 }: CarOwnerAddEditFormProps) {
-  const { token, session } = useAuth();
+  const { token } = useAuth();
   const isShop = apiVariant === "shop";
   const isEdit = !!owner;
   const viewOnly = readOnly && isEdit;
@@ -726,7 +726,7 @@ export default function CarOwnerAddEditForm({
       setApiError("Not signed in.");
       return;
     }
-    const countryCode = session?.meta?.countryCode ?? "+1";
+    const countryCode = "+1";
     const vehiclePayloads = buildVehiclePayloads(filled);
     const uploads = {
       profilePhoto: profileFile,

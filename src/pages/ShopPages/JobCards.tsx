@@ -357,7 +357,7 @@ function JobCardListTable({
 }
 
 export default function ShopJobCardsPage() {
-  const { session, token } = useAuth();
+  const { token } = useAuth();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
   const [section, setSection] = useState<JobCardSection>("my-list");
   const [search, setSearch] = useState("");
@@ -856,7 +856,7 @@ export default function ShopJobCardsPage() {
               <>
                 <JobCardListTable
                   rows={paginatedList}
-                  countryCode={session?.meta?.countryCode}
+                  countryCode="+1"
                   onEdit={openJobCard}
                   onView={openJobCardDetail}
                   selectedIds={selectedJobCardIds}

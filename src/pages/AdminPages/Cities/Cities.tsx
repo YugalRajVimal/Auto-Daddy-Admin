@@ -23,15 +23,6 @@ const CITY_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "city", label: "City" },
   { key: "province", label: "Province" },
   {
-    key: "country",
-    label: "Country",
-    type: "select",
-    options: [
-      { value: "Canada", label: "Canada" },
-      { value: "USA", label: "USA" },
-    ],
-  },
-  {
     key: "status",
     label: "Status",
     type: "select",
@@ -46,7 +37,6 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 type CityStatus = "Active" | "Inactive";
 type ProvinceStatus = "Active" | "Inactive";
-type Country = "Canada" | "USA";
 
 interface City {
   name: string;
@@ -59,12 +49,11 @@ interface Province {
   _id: string;
   name: string;
   nickName?: string;
-  country?: Country;
   status?: ProvinceStatus;
   cities: City[];
 }
 
-type CityRow = City & { provinceName: string; provinceId: string; country: Country };
+type CityRow = City & { provinceName: string; provinceId: string };
 
 const getCityRowId = (city: CityRow) => `${city.provinceId}-${city.name}`;
 
@@ -75,7 +64,6 @@ type CitiesPageProps = {
 export default function Cities({ initialShowForm = false }: CitiesPageProps) {
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [selectedProvinceId, setSelectedProvinceId] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState<"" | Country>("");
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
@@ -92,7 +80,6 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
   const [editingCity, setEditingCity] = useState<City | null>(null);
   const [formName, setFormName] = useState("");
   const [formStatus, setFormStatus] = useState<CityStatus>("Active");
-  const [formCountry, setFormCountry] = useState<Country>("Canada");
   const [formProvinceId, setFormProvinceId] = useState("");
 
   const resetTableControls = () => {
@@ -131,17 +118,13 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     }
   };
 
-  const provincesForCountry = (country: Country) =>
-    provinces.filter((p) => (p.country || "Canada") === country);
-
-  const allCities: CityRow[] = (selectedProvinceId
+  const allCities: CityRow[] = selectedProvinceId
     ? (provinces.find((p) => p._id === selectedProvinceId)?.cities || []).map((c) => {
         const province = provinces.find((p) => p._id === selectedProvinceId);
         return {
           ...c,
           provinceName: province?.name || "",
           provinceId: selectedProvinceId,
-          country: province?.country || "Canada",
         };
       })
     : provinces.flatMap((p) =>
@@ -149,10 +132,8 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
           ...c,
           provinceName: p.name,
           provinceId: p._id,
-          country: p.country || "Canada",
         }))
-      )
-  ).filter((c) => !selectedCountry || c.country === selectedCountry);
+      );
 
   const displayCities = isDeletedView ? deletedStash : allCities;
 
@@ -160,13 +141,11 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     const live =
       !search.trim() ||
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.provinceName.toLowerCase().includes(search.toLowerCase()) ||
-      c.country.toLowerCase().includes(search.toLowerCase());
+      c.provinceName.toLowerCase().includes(search.toLowerCase());
     if (!live) return false;
     return (
       searchIncludes(c.name, searchFilters.city) &&
       searchIncludes(c.provinceName, searchFilters.province) &&
-      searchEquals(c.country, searchFilters.country) &&
       searchEquals(c.status || "Active", searchFilters.status)
     );
   });
@@ -195,7 +174,6 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
   const resetForm = () => {
     setFormName("");
     setFormStatus("Active");
-    setFormCountry(selectedCountry || "Canada");
     setFormProvinceId(selectedProvinceId);
     setEditingCity(null);
     setError("");
@@ -211,7 +189,6 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     setEditingCity(city);
     setFormName(city.name);
     setFormStatus(city.status || "Active");
-    setFormCountry(city.country);
     setFormProvinceId(city.provinceId);
     setError("");
     setShowSearchCard(false);
@@ -237,12 +214,6 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     setSearchFilters(empty);
     setPage(1);
     setSelected(new Set());
-  };
-
-  const handleCountryChange = (value: Country) => {
-    setFormCountry(value);
-    const validProvince = provincesForCountry(value).some((p) => p._id === formProvinceId);
-    if (!validProvince) setFormProvinceId("");
   };
 
   const handleCancel = () => {
@@ -361,8 +332,8 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
   const handleToolbarPrint = () => {
     printAdminTable({
       title: isDeletedView ? "Deleted Cities" : "Cities",
-      headers: ["City", "Province", "Country", "Status"],
-      rows: filtered.map((city) => [city.name, city.provinceName, city.country, city.status || "Active"]),
+      headers: ["City", "Province", "Status"],
+      rows: filtered.map((city) => [city.name, city.provinceName, city.status || "Active"]),
     });
   };
 
@@ -404,16 +375,6 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
               </div>
             )}
             <CompactFormRow className="items-start">
-              <CompactField label="Country" required>
-                <select
-                  value={formCountry}
-                  onChange={(e) => handleCountryChange(e.target.value as Country)}
-                  className={compactInputClass}
-                >
-                  <option value="Canada">Canada</option>
-                  <option value="USA">USA</option>
-                </select>
-              </CompactField>
               <CompactField label="Province" required>
                 <select
                   value={formProvinceId}
@@ -421,7 +382,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
                   className={compactInputClass}
                 >
                   <option value="">Select Province</option>
-                  {provincesForCountry(formCountry).map((p) => (
+                  {provinces.map((p) => (
                     <option key={p._id} value={p._id}>
                       {p.name}
                       {p.nickName ? ` (${p.nickName})` : ""}
@@ -496,23 +457,6 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1 text-xs text-gray-700">
-            <span>Country:</span>
-            <select
-              value={selectedCountry}
-              onChange={(e) => {
-                setSelectedCountry(e.target.value as "" | Country);
-                setSelectedProvinceId("");
-                setPage(1);
-                setSelected(new Set());
-              }}
-              className="border border-gray-400 bg-white px-2 py-1 text-xs"
-            >
-              <option value="">All Countries</option>
-              <option value="Canada">Canada</option>
-              <option value="USA">USA</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-gray-700">
             <span>Province:</span>
             <select
               value={selectedProvinceId}
@@ -524,7 +468,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
               className="border border-gray-400 bg-white px-2 py-1 text-xs"
             >
               <option value="">All Provinces</option>
-              {(selectedCountry ? provincesForCountry(selectedCountry) : provinces).map((p) => (
+              {provinces.map((p) => (
                 <option key={p._id} value={p._id}>
                   {p.name}
                   {p.nickName ? ` (${p.nickName})` : ""}
@@ -586,20 +530,19 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">City</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Province</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={4} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={4} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   {isDeletedView
                     ? "No deleted cities found."
                     : (selectedProvinceId
@@ -630,7 +573,6 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
                   <td className="border border-gray-300 px-3 py-2 text-center text-xs font-medium uppercase tracking-wide">
                     {row.provinceName}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.status || "Active"}</td>
                 </tr>
               ))

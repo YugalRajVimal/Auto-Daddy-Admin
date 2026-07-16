@@ -69,8 +69,8 @@ export default function ShopCustomerForm({
   backTo = "/shop/people",
 }: ShopCustomerFormProps) {
   const navigate = useNavigate();
-  const { token, session } = useAuth();
-  const countryCode = session?.meta?.countryCode ?? "+1";
+  const { token } = useAuth();
+  const countryCode = "+1";
 
   const [name, setName] = useState(customer?.name ?? "");
   const [email, setEmail] = useState(customer?.email ?? "");

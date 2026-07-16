@@ -3,7 +3,6 @@ import { CustomerVehicleFields } from "@/components/customers/customer-vehicle-f
 import { AddVehicleImageButton } from "@/components/car-owner/my-vehicles/add-vehicle-form-fields";
 import type { PickedImage } from "@/components/car-owner/my-vehicles/add-vehicle-helpers";
 import { StackScreenFrame, useToast } from "@/components/reusables";
-import { DialCountrySelector } from "@/components/reusables/forms/dial-country-selector";
 import { ShopOwnerCityPickerModal } from "@/components/shop-owner/shop-owner-city-picker-modal";
 import { colors, fontSizes, radii, shadows, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
@@ -18,13 +17,7 @@ import {
   updateMyCustomer,
   type CustomerImageUploads,
 } from "@/lib/auto-shop-owner-api";
-import {
-  defaultDialCallingCode,
-  defaultDialCountryId,
-  type DialCountryId,
-  getDialCountryOption,
-  resolveDialCountryIdFromStoredCallingCode,
-} from "@/lib/dial-countries";
+import { defaultDialCallingCode } from "@/lib/dial-countries";
 import { NATIONAL_PHONE_DISPLAY_MAX_LENGTH, nationalPhoneDisplayFromKeystrokes } from "@/lib/national-phone-format";
 import {
   loadCustomerCityForForm,
@@ -254,7 +247,6 @@ export default function AddCustomerPage() {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [dialCountryId, setDialCountryId] = useState<DialCountryId>(defaultDialCountryId());
   const [phone, setPhone] = useState("");
   const [pincode, setPincode] = useState("");
   const [address, setAddress] = useState("");
@@ -277,7 +269,6 @@ export default function AddCustomerPage() {
     setIsAppendingVehicle(false);
     setName("");
     setEmail("");
-    setDialCountryId(defaultDialCountryId());
     setPhone("");
     setPincode("");
     setAddress("");
@@ -317,7 +308,6 @@ export default function AddCustomerPage() {
       );
       setName(parsed.name ?? "");
       setEmail(parsed.email ?? "");
-      setDialCountryId(resolveDialCountryIdFromStoredCallingCode(parsed.countryCode ?? defaultDialCallingCode()));
       setPhone(nationalPhoneDisplayFromKeystrokes(parsed.phone ?? ""));
       setPincode(formatPincodeDisplay(parsed.pincode ?? ""));
       setAddress(parsed.address ?? "");
@@ -455,7 +445,7 @@ export default function AddCustomerPage() {
       carOwnerId: editCarOwnerId ?? "",
       name: name.trim(),
       email: email.trim(),
-      countryCode: getDialCountryOption(dialCountryId).callingCode,
+      countryCode: defaultDialCallingCode(),
       phone: phoneDigits,
       pincode: pinDigits,
       address: address.trim().slice(0, 50),
@@ -508,7 +498,7 @@ export default function AddCustomerPage() {
         : await onboardCarOwner(token, {
           name: name.trim(),
           email: email.trim(),
-          countryCode: getDialCountryOption(dialCountryId).callingCode,
+          countryCode: defaultDialCallingCode(),
           phone: phoneDigits,
           pincode: pinDigits,
           role: "carowner",
@@ -583,7 +573,7 @@ export default function AddCustomerPage() {
   // }
 
   const isSingleVehicleEdit = Boolean(isEditMode && editVehicleListSlot !== null && vehiclesBaseline);
-  const phoneDisplay = `${getDialCountryOption(dialCountryId).callingCode} ${phone}`.trim();
+  const phoneDisplay = `${defaultDialCallingCode()} ${phone}`.trim();
 
   const switchToEditMode = useCallback(() => {
     router.setParams({ mode: "edit" });
@@ -681,20 +671,17 @@ export default function AddCustomerPage() {
                   />
 
                   <Text style={styles.fieldLabel}>Phone Number *</Text>
-                  <View style={styles.phoneRow}>
-                    <DialCountrySelector valueId={dialCountryId} onChange={setDialCountryId} triggerMinWidth={100} />
-                    <View style={styles.phoneInput}>
-                      <Ionicons name="call-outline" size={18} color="#70A8CF" />
-                      <TextInput
-                        placeholder="781 708 9765"
-                        placeholderTextColor={colors.textLight}
-                        style={styles.input}
-                        value={phone}
-                        onChangeText={(t) => setPhone(nationalPhoneDisplayFromKeystrokes(t))}
-                        keyboardType="phone-pad"
-                        maxLength={NATIONAL_PHONE_DISPLAY_MAX_LENGTH}
-                      />
-                    </View>
+                  <View style={styles.phoneInput}>
+                    <Ionicons name="call-outline" size={18} color="#70A8CF" />
+                    <TextInput
+                      placeholder="781 708 9765"
+                      placeholderTextColor={colors.textLight}
+                      style={styles.input}
+                      value={phone}
+                      onChangeText={(t) => setPhone(nationalPhoneDisplayFromKeystrokes(t))}
+                      keyboardType="phone-pad"
+                      maxLength={NATIONAL_PHONE_DISPLAY_MAX_LENGTH}
+                    />
                   </View>
                   {attemptedSave && phone.replace(/\D/g, "").length !== 10 ? (
                     <Text style={styles.errorText}>Phone number must be 10 digits.</Text>
@@ -897,7 +884,6 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: fontSizes.md, color: colors.text, paddingVertical: 0 },
   roleFixed: { flex: 1, fontSize: fontSizes.md, color: colors.textMuted, fontWeight: "600" },
   inputMultiline: { textAlignVertical: "top", minHeight: 48 },
-  phoneRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
   phoneInput: {
     flex: 1,
     minHeight: 40,

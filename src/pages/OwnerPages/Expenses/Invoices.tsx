@@ -3,7 +3,6 @@ import { FiChevronLeft, FiCreditCard, FiFileText, FiTrash2 } from "react-icons/f
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
-import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "../../../hooks/useCarOwnerInvoices";
 import { formatCurrencyAmount } from "../../../lib/currency";
@@ -94,8 +93,7 @@ function ToolbarButton({
 }
 
 export default function OwnerInvoicesPage() {
-  const { session } = useAuth();
-  const countryCode = session?.meta?.countryCode;
+  const countryCode = "+1";
   const { loading, error, refresh, invoiceRows } = useCarOwnerInvoices();
 
   const [view, setView] = useState<"list" | "payment">("list");

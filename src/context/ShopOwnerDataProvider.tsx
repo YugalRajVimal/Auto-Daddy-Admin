@@ -40,7 +40,6 @@ import {
   parsePayments,
 } from "../lib/shopOwnerParsers";
 import {
-  FALLBACK_PARTS_DEALERS,
   resolvePartsDealersFromPayload,
   type PartsDealerCard,
 } from "../lib/shopPartsDealers";
@@ -252,7 +251,7 @@ async function fetchSectionData(
       case "partsDealers": {
         const res = await fetchAutoshopDealers(token);
         if (!res.ok) {
-          return { data: FALLBACK_PARTS_DEALERS, error: "Could not load dealer ads." };
+          return { data: [], error: "Could not load dealer ads." };
         }
         return { data: resolvePartsDealersFromPayload(res.data), error: null };
       }
@@ -482,7 +481,6 @@ export {
   customerKey,
   dealId,
   parseJobCardsFromPagePayload,
-  FALLBACK_PARTS_DEALERS,
 };
 export type { PartsDealerCard } from "../lib/shopPartsDealers";
 export type { JobCardListRow } from "../lib/shopOwnerJobCards";

@@ -1,9 +1,4 @@
 import {
-  defaultDialCountryId,
-  type DialCountryId,
-  resolveDialCountryIdFromStoredCallingCode,
-} from "@/lib/dial-countries";
-import {
   digitsFromNationalPhoneDisplay,
   formatNationalPhoneDisplay,
 } from "@/lib/national-phone-format";
@@ -26,7 +21,6 @@ export function usePersonalProfileEditor(displayProfile: DisplayProfile) {
   const [editPhone, setEditPhone] = useState("");
   const [editPincode, setEditPincode] = useState("");
   const [editAddress, setEditAddress] = useState("");
-  const [editDialCountryId, setEditDialCountryId] = useState<DialCountryId>(defaultDialCountryId());
 
   useEffect(() => {
     if (isPersonalEditing) {
@@ -37,10 +31,8 @@ export function usePersonalProfileEditor(displayProfile: DisplayProfile) {
     setEditPhone(formatNationalPhoneDisplay(digitsFromNationalPhoneDisplay(displayProfile.phone || "")));
     setEditPincode(formatPincodeDisplay(displayProfile.pincode || ""));
     setEditAddress(displayProfile.address || "");
-    setEditDialCountryId(resolveDialCountryIdFromStoredCallingCode(displayProfile.countryCode));
   }, [
     displayProfile.address,
-    displayProfile.countryCode,
     displayProfile.email,
     displayProfile.name,
     displayProfile.phone,
@@ -54,7 +46,6 @@ export function usePersonalProfileEditor(displayProfile: DisplayProfile) {
     setEditPhone(formatNationalPhoneDisplay(digitsFromNationalPhoneDisplay(displayProfile.phone || "")));
     setEditPincode(formatPincodeDisplay(displayProfile.pincode || ""));
     setEditAddress(displayProfile.address || "");
-    setEditDialCountryId(resolveDialCountryIdFromStoredCallingCode(displayProfile.countryCode));
   }
 
   function cancelPersonalEdit() {
@@ -71,8 +62,6 @@ export function usePersonalProfileEditor(displayProfile: DisplayProfile) {
     setEditEmail,
     editPhone,
     setEditPhone,
-    editDialCountryId,
-    setEditDialCountryId,
     editPincode,
     setEditPincode,
     editAddress,

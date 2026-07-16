@@ -1,9 +1,5 @@
 import { useCallback, useEffect } from "react";
-import {
-  FALLBACK_PARTS_DEALERS,
-  useShopOwnerData,
-  type PartsDealerCard,
-} from "../context/ShopOwnerDataProvider";
+import { useShopOwnerData, type PartsDealerCard } from "../context/ShopOwnerDataProvider";
 
 export type { PartsDealerCard };
 
@@ -21,7 +17,7 @@ export function usePartsDealers() {
   }, [refreshSection]);
 
   return {
-    dealers: state.data ?? FALLBACK_PARTS_DEALERS,
+    dealers: state.data ?? [],
     loading: state.loading && !state.loaded,
     refresh,
   };

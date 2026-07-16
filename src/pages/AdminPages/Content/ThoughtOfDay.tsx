@@ -15,7 +15,6 @@ import {
 } from "../../../components/admin/ContentPanel";
 import AdminSearchCard, {
   emptyAdminSearchValues,
-  searchEquals,
   searchIncludes,
   type AdminSearchField,
 } from "../../../components/admin/AdminSearchCard";
@@ -29,16 +28,6 @@ const API_BASE = (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL
 
 const THOUGHT_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "date", label: "Date", type: "date" },
-  {
-    key: "country",
-    label: "Country",
-    type: "select",
-    options: [
-      { value: "India", label: "India" },
-      { value: "Canada", label: "Canada" },
-      { value: "USA", label: "USA" },
-    ],
-  },
   { key: "subject", label: "Subject" },
   { key: "notes", label: "Notes" },
 ];
@@ -50,7 +39,6 @@ type NoteRow = {
   date: string;
   subject: string;
   notes: string;
-  country: string;
   image?: string | null;
   imageUrl?: string | null;
   likes: number;
@@ -92,7 +80,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const [date, setDate] = useState<Date | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
 
-  const [country, setCountry] = useState("India");
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
   const [attachImage, setAttachImage] = useState(false);
@@ -121,9 +108,9 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   // --------- API Filter Query Construction ---------
   const getApiQuery = useCallback(() => {
     const params: Record<string, string> = {};
-    // Main filters for API support: date (if exact), country, subject, notes
+    // Main filters for API support: date (if exact), subject, notes
     if (searchFilters.date) params.date = searchFilters.date;
-    if (searchFilters.country) params.country = searchFilters.country;
+    params.country = "Canada";
     if (searchFilters.subject) params.subject = searchFilters.subject;
     if (searchFilters.notes) params.notes = searchFilters.notes;
     // Support for top-bar "live" search (free text)
@@ -154,7 +141,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
             date: item.date,
             subject: item.subject,
             notes: item.notes,
-            country: item.country,
             likes: item.likes ?? 0,
             imageUrl: item.imageUrl || item.image || null,
             image: item.image ?? undefined,
@@ -184,13 +170,11 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
           n.date.includes(search) ||
           n.subject.toLowerCase().includes(search.toLowerCase()) ||
           (n.notes ?? "").toLowerCase().includes(search.toLowerCase()) ||
-          n.country.toLowerCase().includes(search.toLowerCase()) ||
           String(n.likes ?? 0).includes(search);
         if (!live) return false;
         const dateStr = n.date ? String(n.date).slice(0, 10) : "";
         return (
           searchIncludes(dateStr, searchFilters.date) &&
-          searchEquals(n.country, searchFilters.country) &&
           searchIncludes(n.subject, searchFilters.subject) &&
           searchIncludes(n.notes, searchFilters.notes)
         );
@@ -218,7 +202,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const resetForm = () => {
     setDate(new Date());
     setDateError(null);
-    setCountry("Canada");
     setTitle("");
     setNote("");
     setAttachImage(false);
@@ -236,7 +219,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const openEdit = (row: NoteRow) => {
     setDate(row.date ? new Date(row.date) : null);
     setDateError(null);
-    setCountry(row.country);
     setTitle(row.subject);
     setNote(row.notes);
     setAttachImage(Boolean(row.imageUrl));
@@ -300,7 +282,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     const formData = new FormData();
     // Store as yyyy-mm-dd string
     formData.append("date", date.toISOString().slice(0, 10));
-    formData.append("country", country);
+    formData.append("country", "Canada");
     formData.append("subject", title);
     if (note) formData.append("notes", note);
     const existingLikes =
@@ -391,10 +373,9 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const handleToolbarPrint = () => {
     printAdminTable({
       title: isDeletedView ? "Deleted Today's Tips" : "Today's Tip",
-      headers: ["Date", "Country", "Subject", "Notes", "Likes", "Image"],
+      headers: ["Date", "Subject", "Notes", "Likes", "Image"],
       rows: filtered.map((noteRow) => [
         noteRow.date,
-        noteRow.country,
         noteRow.subject,
         noteRow.notes,
         String(noteRow.likes ?? 0),
@@ -455,18 +436,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 {dateError && (
                   <span className="text-xs text-red-600 block mt-1">{dateError}</span>
                 )}
-              </CompactField>
-              <CompactField label="Country" required className={compactFixedFieldWidth}>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className={compactInputClass}
-                >
-                  <option value="Canada">Canada</option>
-                  <option value="India">India</option>
-                  <option value="USA">USA</option>
-                </select>
-           
               </CompactField>
               <CompactField label="Subject" required className={compactFixedFieldWidth}>
                 <input
@@ -642,7 +611,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 />
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Country</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" style={{ width: "26%" }}>Subject</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" style={{ width: "36%" }}>Notes</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Likes</th>
@@ -652,7 +620,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   {isDeletedView ? "No deleted thoughts found." : "No thoughts found."}
                 </td>
               </tr>
@@ -678,7 +646,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                     {new Date(row.date).toISOString().slice(0, 10)}
                   </button>
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-center">{row.country}</td>
                 <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]" style={{ width: "26%" }}>{row.subject}</td>
                 <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]" style={{ width: "36%" }}>{row.notes}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">{row.likes ?? 0}</td>

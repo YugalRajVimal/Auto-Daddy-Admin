@@ -37,7 +37,6 @@ interface AutoShopOwner {
   name?: string;
   email?: string;
   phone?: string;
-  countryCode?: string;
   isDisabled?: boolean;
   isProfileComplete?: boolean;
   businessProfile?: BusinessProfile | null;
@@ -1035,7 +1034,7 @@ export default function Domain() {
           </CompactField>
           <CompactField label="Phone" className={compactFixedFieldWidth}>
             <div className={compactReadOnlyValueClass}>
-              {viewingOwner.countryCode ? `${viewingOwner.countryCode} ` : ""}
+              {viewingOwner.phone ? "+1 " : ""}
               {viewingOwner.phone || "—"}
             </div>
           </CompactField>

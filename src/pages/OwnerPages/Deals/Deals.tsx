@@ -5,7 +5,6 @@ import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerDealFilters from "../../../components/owner/OwnerDealFilters";
 import OwnerDealRow from "../../../components/owner/OwnerDealRow";
 import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
-import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerDeals } from "../../../hooks/useCarOwnerDeals";
 import { useCarOwnerVehicles } from "../../../hooks/useCarOwnerVehicles";
@@ -117,8 +116,7 @@ function DealSection({
 }
 
 export default function OwnerDealsPage() {
-  const { session } = useAuth();
-  const countryCode = session?.meta?.countryCode;
+  const countryCode = "+1";
   const location = useLocation();
   const category = dealCategoryFromPath(location.pathname);
   const [listFilters, setListFilters] = useState<DealListFilters>(EMPTY_DEAL_LIST_FILTERS);

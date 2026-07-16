@@ -11,7 +11,6 @@ import {
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
-import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerJobCardApprovals } from "../../../hooks/useCarOwnerJobCardApprovals";
 import { useCarOwnerJobCards } from "../../../hooks/useCarOwnerJobCards";
@@ -98,8 +97,7 @@ function ToolbarButton({
 }
 
 export default function OwnerExpensesJobCardsPage() {
-  const { session } = useAuth();
-  const countryCode = session?.meta?.countryCode;
+  const countryCode = "+1";
   const { items, loading, error, refresh } = useCarOwnerJobCards();
   const { acting, approveMany, rejectMany } = useCarOwnerJobCardApprovals();
   const navigate = useNavigate();

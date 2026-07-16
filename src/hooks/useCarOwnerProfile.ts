@@ -162,7 +162,7 @@ export function useCarOwnerProfile() {
     const body: Record<string, string> = {
       name: nextName,
       ...(nextEmail ? { email: nextEmail } : {}),
-      countryCode: display.countryCode || DEFAULT_CALLING_CODE,
+      countryCode: DEFAULT_CALLING_CODE,
       ...(nextAddress ? { address: nextAddress } : {}),
       ...(nextPincode ? { pincode: nextPincode } : {}),
       ...(editCityName.trim() ? { city: editCityName.trim() } : {}),
@@ -174,7 +174,7 @@ export function useCarOwnerProfile() {
       name: nextName,
       email: nextEmail,
       phone: nextPhone,
-      countryCode: display.countryCode || DEFAULT_CALLING_CODE,
+      countryCode: DEFAULT_CALLING_CODE,
       address: nextAddress,
       pincode: nextPincode,
       city: editCityName.trim() || undefined,
@@ -250,7 +250,7 @@ export function useCarOwnerProfile() {
         const phoneDigits = digitsOnly(phoneSrc);
         if (phoneDigits.length === 10) {
           body.append("phone", phoneDigits);
-          body.append("countryCode", display.countryCode || DEFAULT_CALLING_CODE);
+          body.append("countryCode", DEFAULT_CALLING_CODE);
         }
         const addr = addrSrc?.trim();
         if (addr) body.append("address", addr.slice(0, PROFILE_ADDRESS_MAX_LENGTH));

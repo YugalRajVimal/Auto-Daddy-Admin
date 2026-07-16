@@ -39,7 +39,6 @@ import { getAutoShopOwnerProfile } from "@/lib/auth";
 import {
   defaultDialCallingCode,
   formatStoredNationalPhone,
-  getDialCountryOption,
 } from "@/lib/dial-countries";
 import { getQuickDeviceCoordinates } from "@/lib/get-quick-device-coordinates";
 import { templatesForKind } from "@/lib/document-templates";
@@ -293,8 +292,6 @@ export default function ProfilePage() {
     setEditEmail,
     editPhone,
     setEditPhone,
-    editDialCountryId,
-    setEditDialCountryId,
     editPincode,
     setEditPincode,
     editAddress,
@@ -761,7 +758,7 @@ export default function ProfilePage() {
     if (nextEmail.length > 0) personalUpdateBody.email = nextEmail;
     if (nextPhone.length > 0) {
       personalUpdateBody.phone = nextPhone;
-      personalUpdateBody.countryCode = getDialCountryOption(editDialCountryId).callingCode;
+      personalUpdateBody.countryCode = defaultDialCallingCode();
     }
     if (nextPincode.length > 0) personalUpdateBody.pincode = nextPincode;
     if (nextAddress.length > 0) personalUpdateBody.address = nextAddress.slice(0, 50);
@@ -1172,8 +1169,6 @@ export default function ProfilePage() {
                 setEditPincode={setEditPincode}
                 editAddress={editAddress}
                 setEditAddress={setEditAddress}
-                editDialCountryId={editDialCountryId}
-                setEditDialCountryId={setEditDialCountryId}
               />
 
               {isAutoShopOwner ? (

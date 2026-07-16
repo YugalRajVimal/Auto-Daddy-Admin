@@ -1570,6 +1570,7 @@ import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
+import { useAdminCityOptions, withSelectedCity } from "../../../hooks/useAdminCityOptions";
 import {
   createLead,
   deleteLead,
@@ -1594,7 +1595,7 @@ const ASSOCIATE_OPTIONS = [
 type LeadStatus = "pending" | "visited" | "completed";
 
 const STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
-  { value: "pending", label: "pending" },
+  // { value: "pending", label: "pending" },
   { value: "visited", label: "visited" },
   { value: "completed", label: "completed" },
 ];
@@ -1709,6 +1710,8 @@ export default function LeadsPage({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
+  const cityOptions = useAdminCityOptions();
+  const citySelectOptions = withSelectedCity(cityOptions, city);
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
   const [notes, setNotes] = useState(DEFAULT_NOTES);
@@ -2236,12 +2239,14 @@ export default function LeadsPage({
                   />
                 </CompactField>
                 <CompactField label="City" required className="w-full min-w-0">
-                  <input
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className={compactInputClass}
-                  />
+                  <select value={city} onChange={(e) => setCity(e.target.value)} className={compactInputClass}>
+                    <option value="">Select city</option>
+                    {citySelectOptions.map((cityName) => (
+                      <option key={cityName} value={cityName}>
+                        {cityName}
+                      </option>
+                    ))}
+                  </select>
                 </CompactField>
               </CompactFormRow>
             <CompactFormRow className="w-full items-start" columns={4}>
@@ -2459,7 +2464,7 @@ export default function LeadsPage({
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Notes</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">{sentToLabel}</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">View Image</th>
+              {section === "completed" && <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">View Image</th>}
             </tr>
           </thead>
           <tbody>
@@ -2503,7 +2508,8 @@ export default function LeadsPage({
                   <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.notes}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.sentTo || "-"}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center capitalize">{row.status || "-"}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  {section === "completed" && (
+                    <td className="border border-gray-300 px-3 py-2 text-center">
                     {row.imageUrl ? (
                       <ClipImageHover
                         imageUrl={row.imageUrl}
@@ -2515,6 +2521,7 @@ export default function LeadsPage({
                       <span className="text-gray-500">--</span>
                     )}
                   </td>
+                  )}
                 </tr>
               ))
             )}

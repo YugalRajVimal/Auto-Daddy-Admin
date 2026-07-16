@@ -1,6 +1,8 @@
 export type ThoughtOfTheDayView = {
   title: string;
   description: string;
+  /** Relative API path or absolute URL for the thought hero image. */
+  image?: string;
 };
 
 function pickString(obj: Record<string, unknown>, keys: string[]): string {
@@ -37,8 +39,9 @@ export function extractThoughtOfTheDay(raw: unknown): ThoughtOfTheDayView | null
       "message",
       "content",
     ]);
-    if (!title && !description) return null;
-    return { title, description };
+    const image = pickString(o, ["image", "imageUrl", "photo", "banner"]);
+    if (!title && !description && !image) return null;
+    return image ? { title, description, image } : { title, description };
   }
   return null;
 }
