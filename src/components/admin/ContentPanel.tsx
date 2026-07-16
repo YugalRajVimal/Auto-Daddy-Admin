@@ -210,7 +210,7 @@ export function CompactField({
   className = "",
   labelClassName = "",
 }: {
-  label: string;
+  label: ReactNode;
   required?: boolean;
   children: ReactNode;
   className?: string;
