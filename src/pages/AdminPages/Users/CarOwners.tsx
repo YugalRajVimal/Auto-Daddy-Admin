@@ -7,6 +7,7 @@ import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { authHeaders } from "../../../api/client";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import AdminSearchCard, {
   emptyAdminSearchValues,
   searchEquals,
@@ -1270,7 +1271,7 @@ const CarOwners: React.FC = () => {
   function renderCell(owner: CarOwnerType, key: string) {
     const shops = owner.autoshopsReceivedServiceFrom ?? [];
     switch (key) {
-      case "name": return <td key={key} className={`${tdClass} text-center font-medium`}><button type="button" onClick={() => openEdit(owner)} className="text-ad-purple hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">{owner.name || "-"}</button></td>;
+      case "name": return <td key={key} className={`${tdClass} text-center font-medium`}><button type="button" onClick={() => openEdit(owner)} className="text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">{owner.name || "-"}</button></td>;
       case "phone": return <td key={key} className={tdClass}>{owner.phone || "-"}</td>;
       case "email": return <td key={key} className={tdClass}>{owner.email || "-"}</td>;
       case "city": return <td key={key} className={tdClass}>{owner.city || "-"}</td>;
@@ -1554,6 +1555,7 @@ const CarOwners: React.FC = () => {
         </div>
 
         <div className="mt-4 flex items-center justify-between">
+            <TableEntriesSummary total={filtered.length} page={currentPage} pageSize={pageSize} />
             <div className="flex gap-1">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <button

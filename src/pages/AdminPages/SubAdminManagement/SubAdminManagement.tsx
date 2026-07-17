@@ -8,6 +8,7 @@ import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admi
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import AdminSearchCard, {
   emptyAdminSearchValues,
   searchEquals,
@@ -1213,6 +1214,7 @@ const SubAdminManagement: React.FC = () => {
         </div>
 
         <div className="mt-4 flex items-center justify-between">
+          <TableEntriesSummary total={filtered.length} page={currentPage} pageSize={pageSize} />
           <div className="flex gap-1">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
               <button

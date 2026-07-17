@@ -4,6 +4,7 @@ import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { authHeaders } from "../../../api/client";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import AdminSearchCard, {
   emptyAdminSearchValues,
   searchEquals,
@@ -89,9 +90,9 @@ const AUTO_SHOP_SEARCH_FIELDS: AdminSearchField[] = [
     label: "Shop Type",
     type: "select",
     options: [
-      { value: "Mechanic Shop", label: "Mechanic Shop" },
-      { value: "Car Washing", label: "Car Washing" },
-      { value: "Tire Master", label: "Tire Master" },
+      { value: "Auto Shop", label: "Auto Shop" },
+      { value: "Tyre Shop", label: "Tyre Shop" },
+      { value: "Car Wash", label: "Car Wash" },
       { value: "Tow Truck", label: "Tow Truck" },
     ],
   },
@@ -136,18 +137,13 @@ function GCRow({ label, value }: { label: string; value?: any }) {
 
 // Shop Type Options (labels match Web-Temp screen)
 const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
-  { value: "autoShop", label: "Mechanic Shop" },
-  { value: "carWash", label: "Car Washing" },
-  { value: "tyreShop", label: "Tire Service" },
+  { value: "autoShop", label: "Auto Shop" },
+  { value: "tyreShop", label: "Tyre Shop" },
+  { value: "carWash", label: "Car Wash" },
   { value: "towTruck", label: "Tow Truck" },
 ];
 
-const DEFAULT_SHOP_TYPE_FILTERS: Record<ShopType, boolean> = {
-  autoShop: true,
-  carWash: false,
-  tyreShop: false,
-  towTruck: false,
-};
+const DEFAULT_SHOP_TYPE_FILTER: ShopType = "autoShop";
 
 // Return array of ShopType. If owner.shopType is not array, normalize to array.
 // Default to ['autoShop'] if undefined or empty.
@@ -751,7 +747,7 @@ const AutoShopOwners: React.FC = () => {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [visibleCols, setVisibleCols] = useState<string[]>(DEFAULT_VISIBLE);
   const [actionBusy, setActionBusy] = useState<Record<string, boolean>>({});
-  const [shopTypeFilters, setShopTypeFilters] = useState<Record<ShopType, boolean>>(DEFAULT_SHOP_TYPE_FILTERS);
+  const [shopTypeFilter, setShopTypeFilter] = useState<ShopType>(DEFAULT_SHOP_TYPE_FILTER);
 
   // ── View toggle: "active" shows active/suspended, "deleted" shows deleted ──
   const [viewMode, setViewMode] = useState<"active" | "deleted">("active");
@@ -794,8 +790,8 @@ const AutoShopOwners: React.FC = () => {
   const deletedOwners = allOwners.filter((o) => isOwnerDeleted(o));
   const displayOwners = viewMode === "deleted" ? deletedOwners : activeOwners;
 
-  function toggleShopType(type: ShopType) {
-    setShopTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }));
+  function selectShopType(type: ShopType) {
+    setShopTypeFilter(type);
     setCurrentPage(1);
   }
 
@@ -845,8 +841,7 @@ const AutoShopOwners: React.FC = () => {
 
   const filtered = displayOwners.filter(o => {
     const stArr = ownerShopTypes(o);
-    // At least one shopType must be checked in filters
-    if (!stArr.some(st => shopTypeFilters[st] ?? true)) return false;
+    if (!stArr.includes(shopTypeFilter)) return false;
     const q = search.toLowerCase();
     // For search, use the labels of all shopTypes, joined
     const shopTypeLabels = stArr.map(st => SHOP_TYPE_OPTIONS.find(x => x.value === st)?.label ?? "").join(", ");
@@ -970,7 +965,7 @@ const AutoShopOwners: React.FC = () => {
               <button
                 type="button"
                 onClick={() => openEdit(owner)}
-                className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-ad-purple hover:underline"
+                className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-blue-700 hover:underline"
               >
                 {label}
               </button>
@@ -1074,9 +1069,10 @@ const AutoShopOwners: React.FC = () => {
           {SHOP_TYPE_OPTIONS.map((option) => (
             <label key={option.value} className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
               <input
-                type="checkbox"
-                checked={shopTypeFilters[option.value]}
-                onChange={() => toggleShopType(option.value)}
+                type="radio"
+                name="shopTypeFilter"
+                checked={shopTypeFilter === option.value}
+                onChange={() => selectShopType(option.value)}
                 className="h-3.5 w-3.5 accent-ad-green"
               />
               {option.label}
@@ -1252,6 +1248,7 @@ const AutoShopOwners: React.FC = () => {
         </div>
 
         <div className="mt-4 flex items-center justify-between">
+            <TableEntriesSummary total={filtered.length} page={currentPage} pageSize={pageSize} />
             <div className="flex gap-1">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <button

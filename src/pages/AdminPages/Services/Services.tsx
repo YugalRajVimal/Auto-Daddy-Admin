@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios, { AxiosError } from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import {
@@ -599,6 +600,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
       </div>
 
       <div className="mt-4 flex items-center justify-between">
+        <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <button

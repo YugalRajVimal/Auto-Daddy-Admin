@@ -643,6 +643,40 @@ export function AdminDataTable<T>({
   );
 }
 
+/**
+ * "Showing X to Y of Z entries" footer line for tables that don't use AdminDataTable.
+ * Pass `page`/`pageSize` for paginated tables; omit them to show just the total.
+ */
+export function TableEntriesSummary({
+  total,
+  page,
+  pageSize,
+  filteredFrom,
+  className = "",
+}: {
+  total: number;
+  page?: number;
+  pageSize?: number;
+  /** Total before search/filter, shown as "(filtered from N total)" when it differs */
+  filteredFrom?: number;
+  className?: string;
+}) {
+  let text: string;
+  if (total === 0) {
+    text = "No entries";
+  } else if (page !== undefined && pageSize !== undefined) {
+    const start = (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, total);
+    text = `Showing ${start} to ${end} of ${total} entries`;
+  } else {
+    text = `${total} ${total === 1 ? "entry" : "entries"}`;
+  }
+  if (filteredFrom !== undefined && filteredFrom !== total) {
+    text += ` (filtered from ${filteredFrom} total)`;
+  }
+  return <p className={`m-0 text-xs text-gray-700 ${className}`}>{text}</p>;
+}
+
 /** Helper for simple text cells. Pass `{ wrap: true }` for description/notes/etc. */
 export function tableCell(
   content: React.ReactNode,

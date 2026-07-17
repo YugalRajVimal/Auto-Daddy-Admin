@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactAutoGrowTextarea,
@@ -526,6 +527,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
       </div>
 
       <div className="mt-4 flex items-center justify-between">
+        <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <button

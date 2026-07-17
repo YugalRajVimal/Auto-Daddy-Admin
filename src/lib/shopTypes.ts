@@ -4,9 +4,9 @@ export type ShopType = OwnerShopType;
 
 /** Labels match Admin → Auto Shop Owners form. */
 export const SHOP_TYPE_OPTIONS: { value: ShopType; label: string }[] = [
-  { value: "autoShop", label: "Mechanic Shop" },
-  { value: "carWash", label: "Car Washing" },
-  { value: "tyreShop", label: "Tire Services" },
+  { value: "autoShop", label: "Auto Shop" },
+  { value: "tyreShop", label: "Tyre Shop" },
+  { value: "carWash", label: "Car Wash" },
   { value: "towTruck", label: "Tow Truck" },
 ];
 
@@ -47,7 +47,7 @@ export function normalizeShopTypes(value?: string | string[] | null): ShopType[]
 
 export function getShopTypeLabel(value?: string | null): string {
   const shopType = normalizeShopType(value);
-  return SHOP_TYPE_OPTIONS.find((option) => option.value === shopType)?.label ?? "Mechanic Shop";
+  return SHOP_TYPE_OPTIONS.find((option) => option.value === shopType)?.label ?? "Auto Shop";
 }
 
 export function getShopTypeLabels(value?: string | string[] | null): string {

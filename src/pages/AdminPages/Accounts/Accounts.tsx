@@ -1263,6 +1263,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import AdminSearchCard, {
   emptyAdminSearchValues,
@@ -1882,7 +1883,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
                           adminNotify.error(err instanceof Error ? err.message : "Failed to delete bank.");
                         }
                       }}
-                      className="text-red-600 hover:underline"
+                      className="text-blue-700 hover:underline"
                     >
                       Delete
                     </button>
@@ -2962,7 +2963,7 @@ function LedgerPage({
                         <button
                           type="button"
                           onClick={() => handleRestore([row._id])}
-                          className="text-ad-green hover:underline"
+                          className="text-blue-700 hover:underline"
                         >
                           Restore
                         </button>
@@ -2970,7 +2971,7 @@ function LedgerPage({
                         <button
                           type="button"
                           onClick={() => handleDeleteRow(row._id)}
-                          className="text-red-600 hover:underline"
+                          className="text-blue-700 hover:underline"
                         >
                           Delete
                         </button>
@@ -2985,6 +2986,7 @@ function LedgerPage({
       </div>
 
       <div className="mt-4 flex items-center justify-between">
+        <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <button

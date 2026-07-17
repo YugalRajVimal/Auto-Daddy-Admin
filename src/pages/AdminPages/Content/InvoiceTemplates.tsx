@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 // import ClipImageHover from "../../../components/admin/ClipImageHover";
 import {
@@ -25,9 +26,9 @@ import { InvoiceTemplatePreview } from "../../../components/shop/invoice-templat
 import { DEFAULT_INVOICE_PREVIEW } from "../../../components/shop/invoice-templates/sampleInvoiceData";
 
 const USER_TYPE_OPTIONS = [
-  { value: "mechanic-shop", label: "Mechanic Shop" },
-  { value: "car-washing", label: "Car Washing" },
-  { value: "tire-master", label: "Tire Service" },
+  { value: "mechanic-shop", label: "Auto Shop" },
+  { value: "tire-master", label: "Tyre Shop" },
+  { value: "car-washing", label: "Car Wash" },
   { value: "tow-truck", label: "Tow Truck" },
 ];
 
@@ -743,6 +744,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
       </div>
 
       <div className="mt-4 flex items-center justify-between">
+        <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <button

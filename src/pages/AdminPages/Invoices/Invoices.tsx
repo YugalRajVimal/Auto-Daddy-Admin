@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import AdminPage, { adminPageTitleClass } from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import {
   CompactAutoGrowTextarea,
   CompactField,
@@ -797,6 +798,7 @@ export default function InvoicesPage() {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <TableEntriesSummary total={filtered.length} page={1} pageSize={entriesPerPage} />
             <span className="text-sm font-bold text-gray-800">
               Invoice Totals : {fmtMoney(invoiceGrandTotal)}
             </span>

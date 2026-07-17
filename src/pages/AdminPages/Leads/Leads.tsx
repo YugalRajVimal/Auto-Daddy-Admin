@@ -1549,6 +1549,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FiPaperclip } from "react-icons/fi";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import AdminSearchCard, {
   emptyAdminSearchValues,
   searchEquals,
@@ -2577,6 +2578,7 @@ export default function LeadsPage({
       </div>
 
       <div className="mt-4 flex items-center justify-between">
+        <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <button

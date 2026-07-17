@@ -73,3 +73,7 @@ export function adminPanelTableClasses(compact = false): AdminPanelTableClasses 
 export function adminPanelRowClass(index: number): string {
   return index % 2 === 0 ? "bg-white" : "bg-gray-100";
 }
+
+/** Default link styling for pressable text inside admin tables. */
+export const ADMIN_TABLE_LINK_CLASS =
+  "cursor-pointer border-0 bg-transparent p-0 text-blue-700 hover:underline";

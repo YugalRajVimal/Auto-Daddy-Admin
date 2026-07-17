@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { FiPrinter } from "react-icons/fi";
 import AdminPage from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import {
   CompactField,
   CompactFormFooter,
@@ -793,7 +794,9 @@ export default function Reports() {
               </div>
 
               {filteredBanks.length > 0 && (
-                <div className="mt-4 flex gap-1">
+                <div className="mt-4 flex items-center justify-between">
+                  <TableEntriesSummary total={filteredBanks.length} page={page} pageSize={entriesPerPage} />
+                  <div className="flex gap-1">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                     <button
                       key={p}
@@ -808,6 +811,7 @@ export default function Reports() {
                       {p}
                     </button>
                   ))}
+                  </div>
                 </div>
               )}
             </>

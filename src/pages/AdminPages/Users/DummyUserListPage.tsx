@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import AdminSearchCard, {
   emptyAdminSearchValues,
   searchEquals,
@@ -667,7 +668,7 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
       case "name":
         return (
           <td key={key} className={`${tdClass} text-center font-medium`}>
-            <button type="button" onClick={() => openEdit(row)} className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-ad-purple hover:underline">
+            <button type="button" onClick={() => openEdit(row)} className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-blue-700 hover:underline">
               {row.name}
             </button>
           </td>
@@ -997,6 +998,7 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
         </div>
 
         <div className="mt-4 flex items-center justify-between">
+          <TableEntriesSummary total={filtered.length} page={currentPage} pageSize={pageSize} />
           <div className="flex gap-1">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
               <button

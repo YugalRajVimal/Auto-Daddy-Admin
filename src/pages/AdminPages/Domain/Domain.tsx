@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import axios from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import AdminSearchCard, {
   emptyAdminSearchValues,
@@ -936,7 +937,7 @@ export default function Domain() {
               <button
                 type="button"
                 onClick={() => handleDelete(row)}
-                className="text-red-700 hover:underline"
+                className="text-blue-700 hover:underline"
               >
                 Delete
               </button>
@@ -1425,6 +1426,11 @@ export default function Domain() {
 
   const paginationFooter = (
     <div className="mt-4 flex items-center justify-between">
+      <TableEntriesSummary
+        total={filteredDomainRows.length}
+        page={isDeletedView ? page : undefined}
+        pageSize={isDeletedView ? entriesPerPage : undefined}
+      />
       <div className="flex gap-1">
         {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
           <button

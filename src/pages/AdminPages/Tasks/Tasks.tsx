@@ -480,7 +480,7 @@ const Tasks: React.FC = () => {
           isDeletedView ? (
             <button
               type="button"
-              className="text-ad-green hover:underline"
+              className="text-blue-700 hover:underline"
               disabled={deleting}
               onClick={() => handleRestore([task._id])}
             >
@@ -489,7 +489,7 @@ const Tasks: React.FC = () => {
           ) : (
             <button
               type="button"
-              className="text-rose-700 hover:underline"
+              className="text-blue-700 hover:underline"
               disabled={deleting}
               onClick={() => handleDelete(task._id)}
             >

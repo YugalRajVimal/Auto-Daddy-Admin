@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import AdminPage from "../../../components/admin/AdminPage";
+import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactField,
@@ -20,9 +21,9 @@ import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
 const SHOP_TYPE_OPTIONS = [
-  { value: "mechanic-shop", label: "Mechanic Shop", apiValue: "mechanic-shop" },
-  { value: "car-washing", label: "Car Washing", apiValue: "car-washing" },
-  { value: "tire-master", label: "Tire Service", apiValue: "tire-master" },
+  { value: "mechanic-shop", label: "Auto Shop", apiValue: "mechanic-shop" },
+  { value: "tire-master", label: "Tyre Shop", apiValue: "tire-master" },
+  { value: "car-washing", label: "Car Wash", apiValue: "car-washing" },
   { value: "tow-truck", label: "Tow Truck", apiValue: "tow-truck" },
 ];
 
@@ -569,6 +570,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
       </div>
 
       <div className="mt-4 flex items-center justify-between">
+        <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <button
