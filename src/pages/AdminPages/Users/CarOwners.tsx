@@ -24,7 +24,6 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 import { getPostLoginRedirect, useAuth } from "../../../auth";
-import { useNavigate } from "react-router";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type BusinessProfileType = {
@@ -1253,7 +1252,6 @@ const CarOwners: React.FC = () => {
   const [loginAsBusy, setLoginAsBusy] = useState(false);
 
 
-  const navigate = useNavigate();
   const { login} = useAuth();
 
   async function loginAsOwner(userId: string) {

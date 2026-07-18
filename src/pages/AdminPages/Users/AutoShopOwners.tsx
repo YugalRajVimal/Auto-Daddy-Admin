@@ -18,7 +18,6 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
-import { useNavigate } from "react-router";
 import { getPostLoginRedirect, useAuth } from "../../../auth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -897,7 +896,6 @@ const AutoShopOwners: React.FC = () => {
     setSelectedRows(prev => { const c = new Set(prev); c.has(id) ? c.delete(id) : c.add(id); return c; });
   }
 
-  const navigate = useNavigate();
   const { login} = useAuth();
 
 
