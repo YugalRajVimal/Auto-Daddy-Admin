@@ -116,10 +116,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     if (searchFilters.notes) params.notes = searchFilters.notes;
     // Support for top-bar "live" search (free text)
     if (search.trim()) {
-      // Apply to subject, notes, country, likes as 'search' for future expansion
-      // Our backend on /thought-of-the-day will not use a "search" param by default,
-      // but the frontend UX expects to show results matching this term
-      // So we use client filtering for deleted view, API filters for active
       params.search = search.trim();
     }
     return new URLSearchParams(params).toString();
@@ -127,7 +123,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
 
   // ------------ Data Fetching w/ API Filters -------------
   const fetchNotes = useCallback(() => {
-    if (isDeletedView) return; // Don't fetch in deleted view
+    if (isDeletedView) return;
     const query = getApiQuery();
     const url = `${API_BASE}/thought-of-the-day${query ? `?${query}` : ""}`;
     fetch(url)
@@ -152,7 +148,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     // eslint-disable-next-line
   }, [getApiQuery, isDeletedView]);
 
-  // Fetch when filters/search change or mode toggled
   useEffect(() => {
     fetchNotes();
   }, [fetchNotes]);
@@ -165,7 +160,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   // --- Filtering logic: only for deleted view, active mode handled by API ---
   const filtered = isDeletedView
     ? displayNotes.filter((n) => {
-        // In-memory searching for trash (UI matches backend, but here only for stash)
         const live =
           !search.trim() ||
           n.date.includes(search) ||
@@ -242,7 +236,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setSearchFilters({ ...searchDraft });
     setPage(1);
     setSelected(new Set());
-    // fetchNotes() will run via useEffect
   };
 
   const handleSearchCardReset = () => {
@@ -251,7 +244,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setSearchFilters(empty);
     setPage(1);
     setSelected(new Set());
-    // fetchNotes() will run via useEffect
   };
 
   // Top-bar search (live search)
@@ -259,7 +251,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setSearch(val);
     setPage(1);
     setSelected(new Set());
-    // fetchNotes() will run via useEffect
   };
 
   const handleCancel = () => {
@@ -270,7 +261,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   // ----- ADD & EDIT (no filtering here) -----
   const handleSave = async () => {
     setDateError(null);
-    // Validation: Date must be set, and must be today or in the future
     if (!date) {
       setDateError("Please select a date.");
       return;
@@ -281,7 +271,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     }
 
     const formData = new FormData();
-    // Store as yyyy-mm-dd string
     formData.append("date", date.toISOString().slice(0, 10));
     formData.append("country", "Canada");
     formData.append("subject", title);
@@ -289,30 +278,24 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     const existingLikes =
       editingKey != null ? findNoteByKey(editingKey)?.likes ?? 0 : 0;
     formData.append("likes", String(existingLikes));
-    // For ADD, always add image if attachImage && imageFile
-    // For EDIT, only send 'thoughtImage' if user provided a new image
     if (editingKey == null) {
       if (attachImage && imageFile) {
         formData.append("thoughtImage", imageFile);
       }
     } else {
       if (attachImage && imageFile) {
-        // User wants to update (replace) the image
         formData.append("thoughtImage", imageFile);
       }
-      // If no imageFile and editing, omit thoughtImage to keep current server image
     }
 
     try {
       let resp: Response;
       if (editingKey == null) {
-        // Add new (POST)
         resp = await fetch(`${API_BASE}/thought-of-the-day`, {
           method: "POST",
           body: formData,
         });
       } else {
-        // Edit (PUT)
         resp = await fetch(`${API_BASE}/thought-of-the-day/${editingKey}`, {
           method: "PUT",
           body: formData,
@@ -329,9 +312,9 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setShowForm(false);
   };
 
-  // ----- DELETE -----
-  const handleDelete = async (row: NoteRow) => {
-    if (!window.confirm(`Delete thought for "${row.date}"?`)) return;
+  // ----- DELETE (single and multi, but confirm all at once for multi) -----
+  const handleDelete = async (row: NoteRow, skipConfirm = false) => {
+    if (!skipConfirm && !window.confirm(`Delete thought for "${row.subject}"?`)) return;
     try {
       const key = getRowKey(row);
       const resp = await fetch(`${API_BASE}/thought-of-the-day/${key}`, {
@@ -352,13 +335,37 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     }
   };
 
-  const handleToolbarDelete = () => {
-    if (selected.size !== 1) return;
-    const key = [...selected][0];
-    const row = findNoteByKey(key);
-    if (row) handleDelete(row);
+  // Modified: one confirmation for all selected
+  const handleToolbarDelete = async () => {
+    if (selected.size === 0) return;
+    const keys = [...selected];
+    // Build a string describing what will be deleted, e.g. dates
+    const toDelete = keys
+      .map(k => {
+        const row = findNoteByKey(k);
+        return row ? `"${row.subject}"` : "";
+      })
+      .filter(Boolean)
+      .join(", ");
+
+    const message =
+      selected.size === 1
+        ? `Delete thought for ${toDelete}?`
+        : `Delete ${selected.size} thoughts (${toDelete})?`;
+
+    if (!window.confirm(message)) return;
+
+    for (const key of keys) {
+      const row = findNoteByKey(key);
+      if (row) {
+        // eslint-disable-next-line no-await-in-loop
+        await handleDelete(row, true);
+      }
+    }
+    fetchNotes();
   };
 
+  // For restore: unchanged, as bulk restore is not mentioned in prompt.
   const handleRestore = () => {
     if (selected.size !== 1) return;
     const key = [...selected][0];
@@ -665,7 +672,6 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                             } else if (row.image) {
                               return row.image;
                             }
-                            // fallback string (avoid undefined)
                             return "";
                           })()
                         }

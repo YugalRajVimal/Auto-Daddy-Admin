@@ -577,7 +577,7 @@ function VehicleRowForm({ v, i, attempted, carCatalog, onChange, onRemove, canRe
             )}
           </select>
         </CompactField>
-        <CompactField label="License Plate" required className={vehicleFieldClass}>
+        {/* <CompactField label="License Plate" required className={vehicleFieldClass}>
           <input
             type="text"
             value={v.licensePlateNo}
@@ -587,6 +587,25 @@ function VehicleRowForm({ v, i, attempted, carCatalog, onChange, onRemove, canRe
           />
           {attempted && !v.licensePlateNo.trim() && <p className={fieldErrorClass}>Required</p>}
         </CompactField>
+         */}
+
+{/* Inside VehicleRowForm, replace the "License Plate" CompactField with this: */}
+
+<CompactField label="License Plate" required className={vehicleFieldClass}>
+  <input
+    type="text"
+    value={v.licensePlateNo}
+    onChange={(e) => onChange({ licensePlateNo: e.target.value.slice(0, 14) })}
+    placeholder="ABC 1234"
+    disabled={!!v._id}
+    className={`${compactInputClass} ${v._id ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""}`}
+  />
+  {attempted && !v.licensePlateNo.trim() && <p className={fieldErrorClass}>Required</p>}
+  {!!v._id && (
+    <p className="mt-0.5 text-[11px] text-gray-500">License plate can't be changed after creation</p>
+  )}
+</CompactField>
+
         <CompactField label="VIN" className={vehicleFieldClass}>
           <input
             type="text"

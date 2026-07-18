@@ -23,6 +23,10 @@ import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
+// --- Import React DatePicker related code
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+
 // Base API URL from env
 const BASE =
   import.meta.env.VITE_API_URL
@@ -78,6 +82,24 @@ function getAbsImageUrl(imagePath: string | null | undefined): string | null {
   return window.location.origin + "/" + imagePath.replace(/^\/?/, "");
 }
 
+// --- Helper to parse/format ISO dates for react-datepicker
+function parseDateString(date: string | null | undefined): Date | null {
+  if (!date) return null;
+  // Handle only date portion if full ISO string
+  // Defensive: some API might return undefined/null or slightly different format
+  const dateOnlyStr = String(date).slice(0, 10);
+  const parsed = new Date(dateOnlyStr);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+function formatDateString(date: Date | null): string {
+  if (!date) return "";
+  // Return YYYY-MM-DD
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function FeaturesPage({ initialShowForm = false }: FeaturesPageProps) {
   const [features, setFeatures] = useState<FeatureRow[]>([]);
   const [selected, setSelected] = useState<Set<number | string>>(new Set());
@@ -89,7 +111,10 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingId, setEditingId] = useState<number | string | null>(null);
-  const [date, setDate] = useState("2026-06-16");
+
+  // --- For react-datepicker, store value as Date object
+  const [date, setDate] = useState<Date | null>(parseDateString("2026-06-16"));
+
   const [user, setUser] = useState("car-owner");
   const [feature, setFeature] = useState(DEFAULT_FEATURE);
   const [attachImage, setAttachImage] = useState(false);
@@ -193,7 +218,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   };
 
   const resetForm = () => {
-    setDate("2026-06-16");
+    setDate(parseDateString("2026-06-16"));
     setUser("car-owner");
     setFeature(DEFAULT_FEATURE);
     setAttachImage(false);
@@ -208,7 +233,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   };
 
   const openEdit = (row: FeatureRow) => {
-    setDate(row.date);
+    setDate(parseDateString(row.date));
     setUser(row.user);
     setFeature(row.feature);
     setAttachImage(!!row.imageUrl);
@@ -249,7 +274,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
     try {
       setLoading(true);
       const formData = new FormData();
-      formData.append("date", date);
+      formData.append("date", formatDateString(date));
       formData.append("country", "Canada");
       formData.append("role", user); // called "role" in API
       formData.append("feature", feature);
@@ -387,17 +412,21 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                 onSave={loading ? undefined : handleSave}
                 onCancel={loading ? undefined : handleCancel}
               />
-        
+
             }
           >
             <CompactFormRow className="items-start">
               <CompactField label="Date" required className={compactFixedFieldWidth}>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                {/* --- React DatePicker replacement --- */}
+                <DatePicker
+                  selected={date}
+                  onChange={(d: Date | null) => setDate(d)}
+                  dateFormat="yyyy-MM-dd"
                   className={compactInputClass}
                   disabled={loading}
+                  placeholderText="Select date"
+                  // you can restrict min/max dates if needed
+                  // minDate, maxDate props here
                 />
               </CompactField>
               <CompactField label="User" required className={compactFixedFieldWidth}>
@@ -429,7 +458,6 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                 file={imageFile}
                 onFileChange={setImageFile}
               />
-        
             </CompactFormRow>
           </CompactFormPanel>
         ) : undefined
@@ -552,6 +580,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                         onClick={() => !isDeletedView && openEdit(row)}
                         className="text-blue-700 hover:underline"
                       >
+                        {/* Format date string for display */}
                         {row.date?.slice(0, 10)}
                       </button>
                     </td>

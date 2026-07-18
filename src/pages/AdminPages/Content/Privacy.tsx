@@ -21,6 +21,10 @@ import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
+// ---- React Date Picker import and CSS ----
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+
 // Utility to get backend API endpoint (like in ThoughtOfDay.tsx)
 const API_BASE = (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/admin/common` : "/api");
 
@@ -128,6 +132,23 @@ function mapApiRowToRow(apiRow: PrivacyApiRow): PrivacyRow {
   };
 }
 
+function toDateString(d: Date | null) {
+  if (!d) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+function parseDateSafe(val: string): Date | null {
+  // Accepts YYYY-MM-DD
+  if (!val) return null;
+  // DatePicker can't take invalid dates
+  const parts = val.split("-");
+  if (parts.length !== 3) return null;
+  const [y, m, d] = parts;
+  return new Date(Number(y), Number(m) - 1, Number(d));
+}
+
 export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProps) {
   const [entries, setEntries] = useState<PrivacyRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -140,7 +161,8 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [date, setDate] = useState("");
+  // Change: use Date object for date state for the form, default to today
+  const [date, setDate] = useState<Date>(() => new Date());
   const [type, setType] = useState(TYPE_OPTIONS[0]);
   const [description, setDescription] = useState("");
   const [refresh, setRefresh] = useState(0);
@@ -206,13 +228,15 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
     else setSelected(new Set(paged.map((e) => e.id)));
   };
 
+  // --- Changed: resetForm uses today's date by default
   const resetForm = () => {
-    setDate("");
+    setDate(new Date());
     setType(TYPE_OPTIONS[0]);
     setDescription("");
     setEditingId(null);
   };
 
+  // --- Changed: openEdit uses existing date from entry (converted to Date object)
   const openAdd = () => {
     resetForm();
     setShowSearchCard(false);
@@ -220,7 +244,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   };
 
   const openEdit = (row: PrivacyRow) => {
-    setDate(row.date);
+    setDate(row.date ? parseDateSafe(row.date) || new Date() : new Date());
     setType(row.type);
     setDescription(row.description);
     setEditingId(row.id);
@@ -254,6 +278,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
     setShowForm(false);
   };
 
+  // --- Changed: handleSave uses new date state (as Date object)
   const handleSave = async () => {
     try {
       if (editingId) {
@@ -264,7 +289,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
         // Parse type to backend value: e.g. "Privacy - Web" -> "privacy"
         const backendType = type.split(" - ")[0].toLowerCase();
         await createEntry({
-          date: date || new Date().toISOString().slice(0, 10),
+          date: toDateString(date) || new Date().toISOString().slice(0, 10),
           country: "Canada",
           type: backendType,
           description,
@@ -362,11 +387,17 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
           >
             <CompactFormRow className="items-start">
               <CompactField label="Date" required className={compactFixedFieldWidth}>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                {/* Use react-datepicker instead of input type="date" */}
+                <DatePicker
+                  selected={date}
+                  onChange={(d: Date | null) => setDate(d ?? new Date())}
+                  dateFormat="yyyy-MM-dd"
                   className={compactInputClass}
+                  maxDate={new Date(2100, 11, 31)}
+                  minDate={new Date(1900, 0, 1)}
+                  placeholderText="Select date"
+                  todayButton="Today"
+                  isClearable={false}
                 />
               </CompactField>
               <CompactField label="Type" required className="w-[180px] shrink-0 flex-none sm:w-[220px]">
