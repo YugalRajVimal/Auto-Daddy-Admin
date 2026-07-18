@@ -413,7 +413,7 @@ export default function InvoicesPage() {
           <h1 className={`${adminPageTitleClass} mb-4`}>{editingId ? "Edit Invoice" : "New Invoice"}</h1>
           <CompactFormPanel
             footer={
-              <div className="flex flex-wrap items-start gap-8 border-t border-ad-form-border bg-ad-form-bg px-4 py-4">
+              <div className="flex flex-wrap items-start justify-center gap-8 border-t border-ad-form-border bg-ad-form-bg px-4 py-4">
                 <div>
                   <button
                     type="button"
@@ -498,7 +498,7 @@ export default function InvoicesPage() {
                   {form.status === "Paid" ? "Paid" : "Unpaid"}
                 </button>
               </div>
-              <div className="w-full space-y-4 sm:ml-auto sm:w-1/2">
+              <div className="w-full space-y-4 sm:ml-auto sm:mr-8 sm:w-1/2">
                 <CompactField label="Invoice Number">
                   <input
                     type="text"
@@ -530,11 +530,11 @@ export default function InvoicesPage() {
               <table className="w-[calc(100%-2rem)] min-w-[720px] table-fixed border-collapse text-sm">
                 <colgroup>
                   <col className="w-[22%]" />
-                  <col className="w-[38%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[7%]" />
+                  <col className="w-[46%]" />
                   <col className="w-[8%]" />
-                  <col className="w-[15%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
                 </colgroup>
                 <thead>
                   <tr className="bg-ad-purple text-white">
@@ -656,7 +656,7 @@ export default function InvoicesPage() {
             </div>
 
             <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-              <div>
+              <div className="w-full max-w-sm">
                 <CompactField label="Bank (Payment Transfer Information)">
                   <select
                     value={form.bank}
@@ -680,6 +680,7 @@ export default function InvoicesPage() {
                 </button>
               </div>
               <CompactField
+                className="w-full max-w-sm sm:mr-8 sm:justify-self-end"
                 label={
                   <>
                     Terms (
