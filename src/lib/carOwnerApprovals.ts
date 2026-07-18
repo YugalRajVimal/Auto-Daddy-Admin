@@ -24,6 +24,25 @@ function asString(value: unknown): string {
   return "";
 }
 
+/** Decode JWT payload (unsigned) — auth token carries `{ id, role }`. */
+export function userIdFromAuthToken(token: string): string {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return "";
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded)) as Record<string, unknown>;
+    return asString(payload.id ?? payload._id ?? payload.userId);
+  } catch {
+    return "";
+  }
+}
+
+function customerRequestActionPath(businessId: string, action: "approve" | "reject", customerId: string) {
+  const qs = `?customerId=${encodeURIComponent(customerId)}`;
+  return `${CUSTOMER_REQUESTS_BASE}/${encodeURIComponent(businessId)}/${action}${qs}`;
+}
+
 function pickPendingEdit(raw: unknown): CarOwnerCustomerRequestPendingEdit | null {
   const obj = asRecord(raw);
   if (!obj) return null;
@@ -82,17 +101,17 @@ export function fetchCarOwnerCustomerRequests(token: string) {
   return getJson<CarOwnerCustomerRequestsResponse>(CUSTOMER_REQUESTS_BASE, token);
 }
 
-export function approveCarOwnerCustomerRequest(token: string, businessId: string) {
+export function approveCarOwnerCustomerRequest(token: string, businessId: string, customerId: string) {
   return postJson<CarOwnerCustomerRequestsResponse>(
-    `${CUSTOMER_REQUESTS_BASE}/${encodeURIComponent(businessId)}/approve`,
+    customerRequestActionPath(businessId, "approve", customerId),
     {},
     token,
   );
 }
 
-export function rejectCarOwnerCustomerRequest(token: string, businessId: string) {
+export function rejectCarOwnerCustomerRequest(token: string, businessId: string, customerId: string) {
   return postJson<CarOwnerCustomerRequestsResponse>(
-    `${CUSTOMER_REQUESTS_BASE}/${encodeURIComponent(businessId)}/reject`,
+    customerRequestActionPath(businessId, "reject", customerId),
     {},
     token,
   );

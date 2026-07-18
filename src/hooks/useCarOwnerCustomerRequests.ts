@@ -5,15 +5,22 @@ import {
   fetchCarOwnerCustomerRequests,
   normalizeCarOwnerCustomerRequestsPayload,
   rejectCarOwnerCustomerRequest,
+  userIdFromAuthToken,
 } from "../lib/carOwnerApprovals";
 import type { CarOwnerCustomerRequest } from "../types/carOwnerApprovals";
 
 export function useCarOwnerCustomerRequests() {
-  const { token } = useAuth();
+  const { token, profile } = useAuth();
   const [items, setItems] = useState<CarOwnerCustomerRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
+
+  const resolveCustomerId = useCallback(() => {
+    const fromProfile = profile?.id?.trim() ?? "";
+    if (fromProfile) return fromProfile;
+    return token ? userIdFromAuthToken(token) : "";
+  }, [profile?.id, token]);
 
   const load = useCallback(async () => {
     if (!token) {
@@ -55,8 +62,12 @@ export function useCarOwnerCustomerRequests() {
   const approve = useCallback(
     async (businessId: string) => {
       if (!token || !businessId.trim()) return { ok: false as const, message: "Not signed in." };
+      const customerId = resolveCustomerId();
+      if (!customerId) {
+        return { ok: false as const, message: "Could not resolve your customer id. Please sign in again." };
+      }
       setActingId(businessId);
-      const res = await approveCarOwnerCustomerRequest(token, businessId);
+      const res = await approveCarOwnerCustomerRequest(token, businessId, customerId);
       setActingId(null);
       if (!res.ok || (res.data && typeof res.data === "object" && "success" in res.data && res.data.success === false)) {
         return {
@@ -70,14 +81,18 @@ export function useCarOwnerCustomerRequests() {
       setItems((prev) => prev.filter((item) => item.businessId !== businessId));
       return { ok: true as const, message: "Customer add request approved." };
     },
-    [token],
+    [resolveCustomerId, token],
   );
 
   const reject = useCallback(
     async (businessId: string) => {
       if (!token || !businessId.trim()) return { ok: false as const, message: "Not signed in." };
+      const customerId = resolveCustomerId();
+      if (!customerId) {
+        return { ok: false as const, message: "Could not resolve your customer id. Please sign in again." };
+      }
       setActingId(businessId);
-      const res = await rejectCarOwnerCustomerRequest(token, businessId);
+      const res = await rejectCarOwnerCustomerRequest(token, businessId, customerId);
       setActingId(null);
       if (!res.ok || (res.data && typeof res.data === "object" && "success" in res.data && res.data.success === false)) {
         return {
@@ -91,7 +106,7 @@ export function useCarOwnerCustomerRequests() {
       setItems((prev) => prev.filter((item) => item.businessId !== businessId));
       return { ok: true as const, message: "Customer add request rejected." };
     },
-    [token],
+    [resolveCustomerId, token],
   );
 
   return { items, loading, error, actingId, refresh: load, approve, reject };
