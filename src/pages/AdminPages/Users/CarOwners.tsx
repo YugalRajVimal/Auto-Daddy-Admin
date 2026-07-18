@@ -23,6 +23,8 @@ import {
   compactFixedFieldWidth,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { getPostLoginRedirect, useAuth } from "../../../auth";
+import { useNavigate } from "react-router";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type BusinessProfileType = {
@@ -1247,6 +1249,54 @@ const CarOwners: React.FC = () => {
 
   function toggleRow(id: string) { setSelectedRows(prev => { const c = new Set(prev); c.has(id) ? c.delete(id) : c.add(id); return c; }); }
 
+
+  const [loginAsBusy, setLoginAsBusy] = useState(false);
+
+
+  const navigate = useNavigate();
+  const { login} = useAuth();
+
+  async function loginAsOwner(userId: string) {
+    setLoginAsBusy(true);
+    try {
+      const res = await axios.post(
+        `${API()}/api/auth/admin/loginas`,
+        { userId },
+        { headers: getToken() }
+      );
+      console.log("loginAsOwner response:", res);
+      const { token } = res.data || {};
+      if (!token) {
+        console.log("No token returned from server. Response data:", res.data);
+        adminNotify.error("No token returned from server.");
+        return;
+      }
+
+      const backToSuperAdminToken = localStorage.getItem("admin-token");
+      if (backToSuperAdminToken !== null) {
+        localStorage.setItem("back-to-admin-token", backToSuperAdminToken);
+      } else {
+        localStorage.removeItem("back-to-admin-token");
+      }
+ 
+
+      login({ token:token, role: 'car_owner' });
+
+         setTimeout(() => {
+      window.location.href = getPostLoginRedirect('car_owner');
+ 
+      }, 800);
+
+      adminNotify.success("Opened owner session in a new tab.");
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Could not login as this car owner.";
+      console.log("Error in loginAsOwner:", e, "Message:", msg);
+      adminNotify.error(msg);
+    } finally {
+      setLoginAsBusy(false);
+    }
+  }
+
   async function toggleStatus(userId: string, status: "active" | "suspended" | "deleted") {
     try {
       await axios.put(
@@ -1410,6 +1460,22 @@ const CarOwners: React.FC = () => {
                 Delete
               </button>
             )}
+            {!showDeleted && (
+  <button
+    type="button"
+    disabled={selCount !== 1 || loginAsBusy}
+    onClick={() => {
+      const owner = allOwners.find(o => o._id === selected[0]);
+      if (!owner) return;
+      if (window.confirm(`Login as ${owner.name}? This opens their account in a new tab.`)) {
+        loginAsOwner(selected[0]);
+      }
+    }}
+    className={toolbarBtnClass(selCount !== 1 || loginAsBusy)}
+  >
+    {loginAsBusy ? "Opening…" : "Login As"}
+  </button>
+)}
             {!showDeleted && (() => {
               const owner = selCount > 0 ? allOwners.find(o => o._id === selected[0]) : null;
               const isSuspended = owner?.status === "suspended";

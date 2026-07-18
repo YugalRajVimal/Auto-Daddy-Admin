@@ -18,6 +18,8 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
+import { useNavigate } from "react-router";
+import { getPostLoginRedirect, useAuth } from "../../../auth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TeamMemberType = { _id: string; name: string; email?: string; phone?: string; designation?: string; photo?: string };
@@ -895,6 +897,53 @@ const AutoShopOwners: React.FC = () => {
     setSelectedRows(prev => { const c = new Set(prev); c.has(id) ? c.delete(id) : c.add(id); return c; });
   }
 
+  const navigate = useNavigate();
+  const { login} = useAuth();
+
+
+  const [loginAsBusy, setLoginAsBusy] = useState(false);
+
+async function loginAsOwner(userId: string) {
+  setLoginAsBusy(true);
+  try {
+    const res = await axios.post(
+      `${API()}/api/auth/admin/loginas`,
+      { userId },
+      { headers: getToken() }
+    );
+    const { token } = res.data || {};
+    if (!token) {
+      adminNotify.error("No token returned from server.");
+      return;
+    }
+    const backToSuperAdminToken = localStorage.getItem("admin-token");
+    if (backToSuperAdminToken !== null) {
+      localStorage.setItem("back-to-admin-token", backToSuperAdminToken);
+    } else {
+      localStorage.removeItem("back-to-admin-token");
+    }
+
+
+    login({ token:token, role: 'auto_shop_owner' });
+
+       setTimeout(() => {
+    window.location.href = getPostLoginRedirect('auto_shop_owner');
+  }, 800);
+
+
+    // const shopUrl = `${window.location.origin}/shop?loginAsToken=${encodeURIComponent(token)}`;
+    // window.open(shopUrl, "_blank", "noopener,noreferrer");
+    adminNotify.success("Opened shop session in a new tab.");
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || "Could not login as this auto shop owner.";
+    adminNotify.error(msg);
+  } finally {
+    setLoginAsBusy(false);
+  }
+}
+
+
+
   async function toggleSuspend(ownerId: string, disable: boolean) {
     setActionBusy(prev => ({ ...prev, [ownerId]: true }));
     try {
@@ -1096,6 +1145,21 @@ const AutoShopOwners: React.FC = () => {
                 <button type="button" disabled={selCount === 0} onClick={() => deleteOwner(selected[0])} className={toolbarBtnClass(selCount === 0)}>
                   Delete
                 </button>
+                <button
+  type="button"
+  disabled={selCount !== 1 || loginAsBusy}
+  onClick={() => {
+    const owner = allOwners.find(o => o._id === selected[0]);
+    if (!owner) return;
+    const label = owner.businessProfile?.Name || owner.name;
+    if (window.confirm(`Login as ${label}? This opens their account in a new tab.`)) {
+      loginAsOwner(selected[0]);
+    }
+  }}
+  className={toolbarBtnClass(selCount !== 1 || loginAsBusy)}
+>
+  {loginAsBusy ? "Opening…" : "Login As"}
+</button>
               </>
             )}
             {viewMode === "deleted" && (
