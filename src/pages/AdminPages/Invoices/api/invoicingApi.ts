@@ -1,0 +1,116 @@
+// Adjust BASE_URL to match how the rest of your admin panel calls the API
+// (e.g. import from your existing axios instance if you have one).
+const BASE_URL = `${import.meta.env.VITE_API_URL}/api/admin/invoices`;
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    credentials: "include", // cookie-based auth
+    headers: options.body instanceof FormData ? undefined : { "Content-Type": "application/json" },
+    ...options,
+  });
+  const data = await res.json();
+  if (!res.ok || data.success === false) {
+    throw new Error(data.message || "Request failed");
+  }
+  return data;
+}
+
+/* ---------------------------- Items ---------------------------- */
+
+export type ItemView = "active" | "archived" | "deleted";
+
+export function fetchItems(params: { view: ItemView; search?: string; page?: number; limit?: number }) {
+  const qs = new URLSearchParams({
+    view: params.view,
+    search: params.search || "",
+    page: String(params.page || 1),
+    limit: String(params.limit || 10),
+  });
+  return request<{ items: any[]; total: number; page: number; limit: number }>(`/items?${qs}`);
+}
+
+export function createItem(formValues: Record<string, string>, imageFile?: File | null) {
+  const fd = new FormData();
+  Object.entries(formValues).forEach(([k, v]) => fd.append(k, v));
+  if (imageFile) fd.append("itemImage", imageFile);
+  return request<{ item: any }>(`/items`, { method: "POST", body: fd });
+}
+
+export function updateItem(id: string, formValues: Record<string, string>, imageFile?: File | null) {
+  const fd = new FormData();
+  Object.entries(formValues).forEach(([k, v]) => fd.append(k, v));
+  if (imageFile) fd.append("itemImage", imageFile);
+  return request<{ item: any }>(`/items/${id}`, { method: "PUT", body: fd });
+}
+
+export function bulkUpdateItems(ids: string[], action: "archive" | "delete" | "restore") {
+  return request<{ message: string }>(`/items/bulk`, {
+    method: "PATCH",
+    body: JSON.stringify({ ids, action }),
+  });
+}
+
+/* -------------------------- Invoices ---------------------------- */
+
+export type InvoiceView = "active" | "archived" | "deleted";
+
+export function fetchInvoices(params: { view: InvoiceView; search?: string; page?: number; limit?: number }) {
+  const qs = new URLSearchParams({
+    view: params.view,
+    search: params.search || "",
+    page: String(params.page || 1),
+    limit: String(params.limit || 10),
+  });
+  return request<{ invoices: any[]; total: number; grandTotal: number }>(`?${qs}`);
+}
+
+export function createInvoice(payload: Record<string, any>) {
+  return request<{ invoice: any }>(``, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateInvoice(id: string, payload: Record<string, any>) {
+  return request<{ invoice: any }>(`/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+}
+
+export function bulkUpdateInvoices(
+  ids: string[],
+  action: "archive" | "delete" | "restore" | "send" | "markPaid" | "markDraft"
+) {
+  return request<{ message: string }>(`/bulk`, {
+    method: "PATCH",
+    body: JSON.stringify({ ids, action }),
+  });
+}
+
+export function copyInvoices(ids: string[], nextInvoiceNumbers: string[]) {
+  return request<{ invoices: any[] }>(`/copy`, {
+    method: "POST",
+    body: JSON.stringify({ ids, nextInvoiceNumbers }),
+  });
+}
+
+export function fetchBanks() {
+  return request<{ banks: any[] }>(`/banks/list`);
+}
+
+/* ---------------------- Auto Shop Owners (Clients) ---------------------- */
+
+// This endpoint lives outside /api/admin/invoices, so it hits the API root directly.
+import axios from "axios";
+
+// Utility to get the API base URL
+const API = () => (import.meta.env.VITE_API_URL as string) || "";
+
+export async function fetchAutoShopOwners() {
+  const token = localStorage.getItem('admin-token');
+  const res = await axios.get(`${API()}/api/admin/autoshopowners`, {
+    headers: token
+      ? { "Authorization": `${token}` }
+      : {},
+  });
+  const data = res.data;
+  if (!data || data.success === false) {
+    throw new Error(data?.message || "Failed to fetch auto shop owners");
+  }
+  return data as { success: boolean; data: any[] };
+}
