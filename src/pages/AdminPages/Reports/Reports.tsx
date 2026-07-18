@@ -50,11 +50,11 @@ const REPORT_OPTIONS: { value: AccountReportTitle; label: string; description: s
     label: "Expense Report",
     description: "View expenses grouped by category, vendor, or date.",
   },
-  {
-    value: "income",
-    label: "Income Report",
-    description: "View income grouped by category, vendor, or date.",
-  },
+  // {
+  //   value: "income",
+  //   label: "Income Report",
+  //   description: "View income grouped by category, vendor, or date.",
+  // },
   {
     value: "bank",
     label: "Bank Report",
@@ -446,7 +446,7 @@ function GstReportView({
 
 function ReportTypePicker({ onSelect }: { onSelect: (report: AccountReportTitle) => void }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-1 xl:grid-cols-3">
       {REPORT_OPTIONS.map((option) => (
         <button
           key={option.value}
