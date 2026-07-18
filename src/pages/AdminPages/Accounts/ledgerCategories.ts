@@ -200,6 +200,27 @@ export function slugifyLabel(label: string) {
     .replace(/^-|-$/g, "");
 }
 
+/**
+ * Converts expense category rows from the backend
+ * (GET /admin/accounts/expenses-category) into the local CategoryOption
+ * shape the ledger UI already works with. Uses the Mongo _id as the
+ * option `value` so category CRUD calls can reference it directly;
+ * subcategories don't carry a stable id from the API, so their name is
+ * used as both value and label.
+ */
+export function expenseApiRowsToOptions(
+  rows: { _id: string; name: string; subcategories?: { name: string }[] }[]
+): CategoryOption[] {
+  return rows.map((row) => ({
+    value: row._id,
+    label: row.name,
+    subcategories: (row.subcategories ?? []).map((sub) => ({
+      value: sub.name,
+      label: sub.name,
+    })),
+  }));
+}
+
 export function dedupeLabels(values: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
