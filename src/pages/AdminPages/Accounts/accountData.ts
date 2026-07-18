@@ -123,8 +123,9 @@ export const DUMMY_INCOME: LedgerRow[] = [
 ];
 
 export function formatDisplayDate(iso: string) {
-  const [year, month, day] = iso.split("-");
-  if (!year || !month || !day) return iso;
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return iso;
+  const [, year, month, day] = match;
   return `${day}/${month}/${year}`;
 }
 

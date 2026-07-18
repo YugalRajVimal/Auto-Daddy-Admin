@@ -1547,7 +1547,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { FiPaperclip } from "react-icons/fi";
-import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import AdminSearchCard, {
@@ -1724,9 +1723,7 @@ export default function LeadsPage({
   const [notes, setNotes] = useState(DEFAULT_NOTES);
   const [sentTo, setSentTo] = useState("");
   const [status, setStatus] = useState<LeadStatus>("pending");
-  const [attachImage, setAttachImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [viewingLead, setViewingLead] = useState<LeadRow | null>(null);
   const [viewStatusDraft, setViewStatusDraft] = useState<LeadStatus | null>(null);
   const [imagePreview, setImagePreview] = useState<{ url: string; title: string } | null>(null);
@@ -1855,9 +1852,7 @@ export default function LeadsPage({
     setNotes(DEFAULT_NOTES);
     setSentTo("");
     setStatus("pending");
-    setAttachImage(false);
     setImageFile(null);
-    setImageUrl(null);
     if (editingObjectUrl) URL.revokeObjectURL(editingObjectUrl);
     setEditingObjectUrl(null);
     setRemoveExistingImage(false);
@@ -1894,9 +1889,7 @@ export default function LeadsPage({
     setNotes(row.notes);
     setSentTo(row.sentTo || "");
     setStatus(row.status);
-    setAttachImage(Boolean(row.imageUrl));
     setImageFile(null);
-    setImageUrl(row.imageUrl ?? null);
     setShowSearchCard(false);
     setShowForm(true);
   };
@@ -2302,62 +2295,6 @@ export default function LeadsPage({
                 </select>
               </CompactField>
             </CompactFormRow>
-      
-              <CompactFormRow className="w-full items-start" columns={4}>
-                <div className="w-full min-w-0 lg:col-span-3">
-                  <AttachImageCheckbox
-                    checked={attachImage}
-                    onCheckedChange={(checked) => {
-                      setAttachImage(checked);
-                      if (!checked) {
-                        if (editingObjectUrl) URL.revokeObjectURL(editingObjectUrl);
-                        setEditingObjectUrl(null);
-                        setImageFile(null);
-                        setImageUrl(null);
-                        setRemoveExistingImage(true); // was previously silently dropped
-                      } else {
-                        setRemoveExistingImage(false);
-                      }
-                    }}
-                    file={imageFile}
-                    onFileChange={(file) => {
-                      setImageFile(file);
-                      setRemoveExistingImage(false);
-                      if (!file) return;
-                      if (editingObjectUrl) URL.revokeObjectURL(editingObjectUrl);
-                      const url = URL.createObjectURL(file);
-                      setEditingObjectUrl(url);
-                      setImageUrl(url);
-                    }}
-                  />
-                  {imageUrl && attachImage ? (
-                    <div className="mt-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setImagePreview({ url: imageUrl, title: `${name || "Lead"} — lead image` })}
-                        className="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
-                      >
-                        <FiPaperclip className="size-4" aria-hidden />
-                        Preview
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-                <CompactField label="Status" className="w-full min-w-0 lg:col-span-1">
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as LeadStatus)}
-                    className={compactInputClass}
-                  >
-                    {STATUS_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </CompactField>
-              </CompactFormRow>
-
           </CompactFormPanel>
         ) : undefined)
         )

@@ -2913,7 +2913,7 @@ function LedgerPage({
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center">
-                      {row.amount % 1 === 0 ? row.amount : row.amount.toFixed(2)} CAD
+                      {row.amount % 1 === 0 ? row.amount : row.amount.toFixed(2)}
                     </td>
                     {isIncome ? (
                       <td className="border border-gray-300 px-3 py-2 text-center">{incomeRow.paymentMode || ""}</td>

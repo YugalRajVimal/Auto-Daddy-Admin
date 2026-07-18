@@ -124,7 +124,7 @@ function invoiceTotal(row: Pick<InvoiceRow, "lineItems" | "roundOffEnabled" | "r
 }
 
 function fmtMoney(value: number) {
-  return `${value % 1 === 0 ? value : value.toFixed(2)} CAD`;
+  return value % 1 === 0 ? String(value) : value.toFixed(2);
 }
 
 function formatInvoiceNo(code: string, seq: number) {
@@ -276,6 +276,8 @@ export default function InvoicesPage() {
       return;
     }
     const lineItems = draftLineItems();
+    // Stamp "Paid" on the form takes priority over Draft/Sent footer actions
+    const finalStatus: InvoiceStatus = form.status === "Paid" ? "Paid" : status;
 
     if (editingId) {
       setInvoices((prev) =>
@@ -293,12 +295,18 @@ export default function InvoicesPage() {
                 terms: form.terms,
                 roundOffEnabled: form.roundOffEnabled,
                 roundOffAmount: Number(form.roundOffAmount) || 0,
-                status,
+                status: finalStatus,
               }
             : row
         )
       );
-      adminNotify.success(status === "Sent" ? "Invoice updated and sent." : "Invoice updated.");
+      adminNotify.success(
+        finalStatus === "Paid"
+          ? "Invoice updated and marked paid."
+          : finalStatus === "Sent"
+            ? "Invoice updated and sent."
+            : "Invoice updated."
+      );
     } else {
       const newRow: InvoiceRow = {
         id: `inv-${Date.now()}`,
@@ -312,12 +320,18 @@ export default function InvoicesPage() {
         terms: form.terms,
         roundOffEnabled: form.roundOffEnabled,
         roundOffAmount: Number(form.roundOffAmount) || 0,
-        status,
+        status: finalStatus,
         view: "active",
       };
       setInvoices((prev) => [newRow, ...prev]);
       setNextInvoiceSeq((n) => n + 1);
-      adminNotify.success(status === "Sent" ? "Invoice created and sent." : "Invoice saved as draft.");
+      adminNotify.success(
+        finalStatus === "Paid"
+          ? "Invoice created and marked paid."
+          : finalStatus === "Sent"
+            ? "Invoice created and sent."
+            : "Invoice saved as draft."
+      );
     }
     resetForm();
     setShowForm(false);
@@ -432,8 +446,8 @@ export default function InvoicesPage() {
               </div>
             }
           >
-            <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-              <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-[1fr_auto_1fr]">
+              <div className="w-full space-y-4 sm:w-1/2">
                 <CompactField label="Client" required>
                   <div className="relative">
                     <select
@@ -464,7 +478,27 @@ export default function InvoicesPage() {
                   />
                 </CompactField>
               </div>
-              <div className="space-y-4">
+              <div className="flex items-center justify-center sm:px-4">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      status: f.status === "Paid" ? "Draft" : "Paid",
+                    }))
+                  }
+                  title={form.status === "Paid" ? "Mark as unpaid" : "Mark as paid"}
+                  aria-label={form.status === "Paid" ? "Mark as unpaid" : "Mark as paid"}
+                  className={`-rotate-12 select-none rounded border-4 px-4 py-1 text-xl font-extrabold uppercase tracking-widest transition-opacity hover:opacity-80 ${
+                    form.status === "Paid"
+                      ? "border-ad-green text-ad-green"
+                      : "border-red-500 text-red-500"
+                  }`}
+                >
+                  {form.status === "Paid" ? "Paid" : "Unpaid"}
+                </button>
+              </div>
+              <div className="w-full space-y-4 sm:ml-auto sm:w-1/2">
                 <CompactField label="Invoice Number">
                   <input
                     type="text"
@@ -493,7 +527,15 @@ export default function InvoicesPage() {
             </div>
 
             <div className="mt-6 overflow-x-auto rounded border border-gray-300">
-              <table className="w-full min-w-[720px] border-collapse text-sm">
+              <table className="w-[calc(100%-2rem)] min-w-[720px] table-fixed border-collapse text-sm">
+                <colgroup>
+                  <col className="w-[22%]" />
+                  <col className="w-[38%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[15%]" />
+                </colgroup>
                 <thead>
                   <tr className="bg-ad-purple text-white">
                     <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Item</th>
@@ -502,7 +544,6 @@ export default function InvoicesPage() {
                     <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Days</th>
                     <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">GST (%)</th>
                     <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Amount</th>
-                    <th className="border border-ad-purple-dark px-2 py-2" />
                   </tr>
                 </thead>
                 <tbody>
@@ -554,15 +595,13 @@ export default function InvoicesPage() {
                           className={`${compactInputClass} text-right`}
                         />
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-right">
+                      <td className="relative border border-gray-300 px-4 py-2 text-right tabular-nums">
                         {fmtMoney(lineAmount({ unitPrice: Number(line.unitPrice) || 0, days: Number(line.days) || 0 }))}
-                      </td>
-                      <td className="border border-gray-300 px-2 py-2 text-center">
                         <button
                           type="button"
                           onClick={() => removeLine(line.id)}
                           disabled={form.lineItems.length <= 1}
-                          className="font-bold text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="absolute -right-6 top-1/2 -translate-y-1/2 font-bold text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label="Remove line"
                         >
                           ✕
@@ -581,15 +620,15 @@ export default function InvoicesPage() {
               + Add Line
             </button>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 mr-8 flex justify-end">
               <div className="w-full max-w-sm rounded border border-gray-300">
                 <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2 text-sm">
                   <span>Subtotal</span>
-                  <span>{fmtMoney(draftSubtotal)}</span>
+                  <span className="w-24 text-right tabular-nums">{fmtMoney(draftSubtotal)}</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2 text-sm">
                   <span>GST</span>
-                  <span>{fmtMoney(draftGst)}</span>
+                  <span className="w-24 text-right tabular-nums">{fmtMoney(draftGst)}</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2 text-sm">
                   <label className="flex items-center gap-2 font-medium text-blue-700">
@@ -606,12 +645,12 @@ export default function InvoicesPage() {
                     value={form.roundOffAmount}
                     disabled={!form.roundOffEnabled}
                     onChange={(e) => setForm((f) => ({ ...f, roundOffAmount: e.target.value }))}
-                    className="w-20 border border-gray-300 px-1.5 py-0.5 text-right text-sm disabled:bg-gray-100"
+                    className="w-24 border border-gray-300 px-1.5 py-0.5 text-right text-sm tabular-nums disabled:bg-gray-100"
                   />
                 </div>
                 <div className="flex items-center justify-between bg-gray-100 px-4 py-2.5 text-sm font-bold">
                   <span>Invoice Total</span>
-                  <span>{fmtMoney(draftTotal)}</span>
+                  <span className="w-24 text-right tabular-nums">{fmtMoney(draftTotal)}</span>
                 </div>
               </div>
             </div>
