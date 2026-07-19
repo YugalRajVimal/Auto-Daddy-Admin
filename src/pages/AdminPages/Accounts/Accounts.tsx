@@ -3115,11 +3115,29 @@ const BASE_ADMIN =
     ? (import.meta as any).env?.VITE_API_URL + "/api/admin"
     : "/api/admin");
  
+// async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
+//   const res = await fetch(`${BASE_ADMIN}${path}`, {
+//     ...init,
+//     headers: {
+//       ...(init?.body ? { "Content-Type": "application/json" } : {}),
+//       ...(init?.headers || {}),
+//     },
+//   });
+//   if (!res.ok) {
+//     const message = await res.text().catch(() => res.statusText);
+//     throw new Error(message || `Request failed (${res.status})`);
+//   }
+//   if (res.status === 204) return undefined as T;
+//   return (await res.json()) as T;
+// }
+ 
+
 async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_ADMIN}${path}`, {
     ...init,
     headers: {
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      Authorization: localStorage.getItem("admin-token") || "",
       ...(init?.headers || {}),
     },
   });
@@ -3130,9 +3148,25 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
- 
+
+
+// async function apiForm<T>(path: string, method: "POST" | "PATCH", formData: FormData): Promise<T> {
+//   const res = await fetch(`${BASE_ADMIN}${path}`, { method, body: formData });
+//   if (!res.ok) {
+//     const message = await res.text().catch(() => res.statusText);
+//     throw new Error(message || `Request failed (${res.status})`);
+//   }
+//   return (await res.json()) as T;
+// }
+
 async function apiForm<T>(path: string, method: "POST" | "PATCH", formData: FormData): Promise<T> {
-  const res = await fetch(`${BASE_ADMIN}${path}`, { method, body: formData });
+  const res = await fetch(`${BASE_ADMIN}${path}`, {
+    method,
+    body: formData,
+    headers: {
+      Authorization: localStorage.getItem("admin-token") || "",
+    },
+  });
   if (!res.ok) {
     const message = await res.text().catch(() => res.statusText);
     throw new Error(message || `Request failed (${res.status})`);

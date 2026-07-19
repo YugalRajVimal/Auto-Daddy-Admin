@@ -149,6 +149,13 @@ const DOMAIN_SEARCH_FIELDS: AdminSearchField[] = [
 
 const API_URL = import.meta.env.VITE_API_URL 
 
+function getAdminToken() {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("admin-token") || "";
+  }
+  return "";
+}
+
 type WebsiteTemplate = {
   id: string;
   name: string;
@@ -317,12 +324,15 @@ export default function Domain() {
   useEffect(() => {
     fetchOwners();
     fetchCarOwners();
-  // eslint-disable-next-line
+    // eslint-disable-next-line
   }, []);
 
   const fetchOwners = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/admin/autoshopowners`);
+      const res = await axios.get(
+        `${API_URL}/api/admin/autoshopowners`,
+        { headers: { Authorization: getAdminToken() } }
+      );
       setOwners(res.data.data || []);
     } catch {
       setOwners([]);
@@ -331,7 +341,10 @@ export default function Domain() {
 
   const fetchCarOwners = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/admin/carowners`);
+      const res = await axios.get(
+        `${API_URL}/api/admin/carowners`,
+        { headers: { Authorization: getAdminToken() } }
+      );
       setCarOwners(res.data.data || []);
     } catch {
       setCarOwners([]);
@@ -383,7 +396,13 @@ export default function Domain() {
       params.page = page;
       params.limit = entriesPerPage;
 
-      const res = await axios.get(`${API_URL}/api/admin/domains`, { params });
+      const res = await axios.get(
+        `${API_URL}/api/admin/domains`,
+        { 
+          params,
+          headers: { Authorization: getAdminToken() }
+        }
+      );
       const entries: DomainEntry[] = res.data?.data || [];
 
       setDomains(
@@ -518,7 +537,9 @@ export default function Domain() {
     setDomainsLoading(true);
     setDomainsError(null);
     try {
-      await axios.delete(`${API_URL}/api/admin/domains/${row.id}`);
+      await axios.delete(`${API_URL}/api/admin/domains/${row.id}`, {
+        headers: { Authorization: getAdminToken() }
+      });
       stashDeleted(row);
       adminNotify.success("Domain entry deleted.");
       await refreshDomains();
@@ -547,7 +568,11 @@ export default function Domain() {
     setDomainsError(null);
     try {
       await Promise.all(
-        toDelete.map((row) => axios.delete(`${API_URL}/api/admin/domains/${row.id}`))
+        toDelete.map((row) =>
+          axios.delete(`${API_URL}/api/admin/domains/${row.id}`, {
+            headers: { Authorization: getAdminToken() }
+          })
+        )
       );
       stashDeleted(toDelete);
       adminNotify.success("Selected domain(s) deleted.");
@@ -588,7 +613,12 @@ export default function Domain() {
             provider: row.providerLabel !== "—" ? row.providerLabel : row.provider,
             dns: row.dns === "—" ? "" : row.dns,
           },
-          { headers: { "Content-Type": "application/json" } }
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: getAdminToken(),
+            }
+          }
         );
       }
       restoreStashed((item) => selected.has(item.id));
@@ -667,7 +697,10 @@ export default function Domain() {
             dns: form.dns,
           },
           {
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: getAdminToken(),
+            },
           }
         );
         adminNotify.success("Domain entry created.");
@@ -680,7 +713,10 @@ export default function Domain() {
             dns: form.dns,
           },
           {
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: getAdminToken(),
+            },
           }
         );
         adminNotify.success("Domain entry updated.");

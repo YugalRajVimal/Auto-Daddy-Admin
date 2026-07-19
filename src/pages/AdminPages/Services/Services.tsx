@@ -22,6 +22,16 @@ import { printAdminTable } from "../../../utils/adminPrintTable";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
+// Helper: Get admin-token for Authorization header (NO Bearer)
+function getAdminAuthConfig() {
+  const adminToken = localStorage.getItem("admin-token");
+  return {
+    headers: {
+      Authorization: adminToken || undefined,
+    },
+  };
+}
+
 export type ShopType = "autoShop" | "tyreShop" | "carWash" | "towTruck";
 type ServiceStatus = "Active" | "Inactive";
 
@@ -124,6 +134,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
 
   useEffect(() => {
     fetchServices();
+    // eslint-disable-next-line
   }, [filterShopType]);
 
   const fetchServices = async () => {
@@ -132,7 +143,10 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     try {
       let url = `${API_BASE}/admin/services`;
       if (filterShopType !== "all") url += `?shopType=${filterShopType}`;
-      const res = await axios.get<{ success: boolean; data: Service[] }>(url);
+      const res = await axios.get<{ success: boolean; data: Service[] }>(
+        url,
+        getAdminAuthConfig()
+      );
       if (res.data.success) setServices(res.data.data || []);
       else {
         const msg = "Failed to fetch services.";
@@ -249,13 +263,21 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     try {
       const payload = { name: name.trim(), shopType, status, odoOutRequired };
       if (editingId) {
-        await axios.put(`${API_BASE}/admin/services/${editingId}`, payload);
+        await axios.put(
+          `${API_BASE}/admin/services/${editingId}`,
+          payload,
+          getAdminAuthConfig()
+        );
         adminNotify.success("Service updated successfully.");
-      setSuccessMsg("Service updated successfully.");
+        setSuccessMsg("Service updated successfully.");
       } else {
-        await axios.post(`${API_BASE}/admin/services`, payload);
+        await axios.post(
+          `${API_BASE}/admin/services`,
+          payload,
+          getAdminAuthConfig()
+        );
         adminNotify.success("Service added successfully.");
-      setSuccessMsg("Service added successfully.");
+        setSuccessMsg("Service added successfully.");
       }
       resetForm();
       setShowForm(false);
@@ -276,7 +298,10 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     setError("");
     setSuccessMsg("");
     try {
-      await axios.delete(`${API_BASE}/admin/services/${service._id}`);
+      await axios.delete(
+        `${API_BASE}/admin/services/${service._id}`,
+        getAdminAuthConfig()
+      );
       stashDeleted(service);
       adminNotify.success("Service deleted successfully.");
       setSuccessMsg("Service deleted successfully.");
@@ -311,12 +336,16 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     setError("");
     setSuccessMsg("");
     try {
-      await axios.post(`${API_BASE}/admin/services`, {
-        name: service.name,
-        shopType: service.shopType,
-        status: service.status || "Active",
-        odoOutRequired: Boolean(service.odoOutRequired),
-      });
+      await axios.post(
+        `${API_BASE}/admin/services`,
+        {
+          name: service.name,
+          shopType: service.shopType,
+          status: service.status || "Active",
+          odoOutRequired: Boolean(service.odoOutRequired),
+        },
+        getAdminAuthConfig()
+      );
       restoreStashed((item) => item._id === service._id);
       adminNotify.success("Service restored.");
       setSuccessMsg("Service restored.");
@@ -337,12 +366,12 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
       title: "Services",
       headers: ["Name", "Shop Type", "Sub Services", "Status", "Odo Out Required"],
       rows: filtered.map((service) => [
-          service.name,
-          shopTypeLabel(service.shopType),
-          String(service.subServices?.length ?? 0),
-          service.status || "Active",
-          service.odoOutRequired ? "Yes" : "No",
-        ]),
+        service.name,
+        shopTypeLabel(service.shopType),
+        String(service.subServices?.length ?? 0),
+        service.status || "Active",
+        service.odoOutRequired ? "Yes" : "No",
+      ]),
     });
   };
 

@@ -21,6 +21,23 @@ import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 
+// Helper to get token and provide correct header for admin token (no Bearer)
+const getAdminAuthHeaders = () => {
+  // Try localStorage, then sessionStorage, then cookies.
+  let token =
+    window.localStorage.getItem("admin-token") ||
+    window.sessionStorage.getItem("admin-token") ||
+    (document.cookie.split("; ").find((row) => row.startsWith("admin-token=")) || "")
+      .split("=")[1];
+
+  // If not found, set as empty string
+  if (!token) token = "";
+
+  return {
+    Authorization: token,
+  };
+};
+
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 type CarModel = {
@@ -628,7 +645,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     try {
       let url = `${import.meta.env.VITE_API_URL}/api/admin/car-company`;
       if (q) url += `?companyName=${encodeURIComponent(q)}`;
-      const res = await axios.get(url);
+      const res = await axios.get(url, { headers: getAdminAuthHeaders() });
       setCompanies(res.data?.data ?? []);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
@@ -877,7 +894,10 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
         );
         formData.append("country", "Canada");
         await axios.patch(`${API_BASE}/admin/car-company/${existingCompany._id}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: {
+            "Content-Type": "multipart/form-data",
+            ...getAdminAuthHeaders(),
+          },
         });
         setCompanies((prev) =>
           prev.map((c) => (c._id === existingCompany._id ? { ...c, companyName: trimmedNew } : c))
@@ -1014,15 +1034,29 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
       if (attachBrandLogo && brandLogoFile) formData.append("brandLogo", brandLogoFile);
 
       if (editingCompany) {
-        await axios.patch(`${API_BASE}/admin/car-company/${editingCompany._id}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await axios.patch(
+          `${API_BASE}/admin/car-company/${editingCompany._id}`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              ...getAdminAuthHeaders(),
+            },
+          }
+        );
         adminNotify.success("Car brand updated.");
         setSuccessMsg("Car brand updated.");
       } else {
-        await axios.post(`${API_BASE}/admin/car-company`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await axios.post(
+          `${API_BASE}/admin/car-company`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              ...getAdminAuthHeaders(),
+            },
+          }
+        );
         adminNotify.success("Car brand added.");
         setSuccessMsg("Car brand added.");
       }
@@ -1085,9 +1119,16 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
         formData.append("models", JSON.stringify(remainingModels));
         formData.append("country", "Canada");
   
-        await axios.patch(`${API_BASE}/admin/car-company/${companyId}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await axios.patch(
+          `${API_BASE}/admin/car-company/${companyId}`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              ...getAdminAuthHeaders(),
+            },
+          }
+        );
       }
   
       adminNotify.success("Model(s) removed.");
@@ -1126,9 +1167,16 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
         )
       );
       formData.append("country", "Canada");
-      await axios.post(`${API_BASE}/admin/car-company`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await axios.post(
+        `${API_BASE}/admin/car-company`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            ...getAdminAuthHeaders(),
+          },
+        }
+      );
       restoreStashed((item) => item._id === company._id);
       adminNotify.success("Car brand restored.");
       setSuccessMsg("Car brand restored.");

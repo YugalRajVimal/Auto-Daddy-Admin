@@ -177,8 +177,11 @@ export default function AdminSignInPage() {
           body: JSON.stringify({ ...getAdminAuthPayload(), otp }),
         });
         const data = await res.json();
+        console.log(data);
         if (res.ok && data.token) {
           login({ token: data.token, role: ADMIN_ROLE });
+          localStorage.setItem('permission', JSON.stringify(data.permissions));
+     
           setStatus("Login successful!");
           setTimeout(() => {
             navigate(getPostLoginRedirect(ADMIN_ROLE), { replace: true });

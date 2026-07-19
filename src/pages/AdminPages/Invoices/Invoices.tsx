@@ -981,19 +981,19 @@ type LineItemDraft = {
   id: string;
   itemRefId: string;
   itemLabel: string;
-  unitCost: number; // reference unit cost pulled from the selected item, editable
+  unitCost: number;
   description: string;
   unitPrice: string;
-  units: string; // was "days" on the old mock UI, renamed to Units
+  units: string;
   gstPercent: string;
 };
 
-const STATUS_LEGEND: { status: InvoiceStatus; description: string }[] = [
-  { status: "Draft", description: "Invoice created, but you have not notified your client. Your client will not see this invoice." },
-  { status: "Sent", description: "Your client has been notified about this invoice and can view it." },
-  { status: "Paid", description: "Payment has been recorded against this invoice in full." },
-  { status: "Overdue", description: "The invoice due date has passed and payment has not been recorded." },
-];
+// const STATUS_LEGEND: { status: InvoiceStatus; description: string }[] = [
+//   { status: "Draft", description: "Invoice created, but you have not notified your client. Your client will not see this invoice." },
+//   { status: "Sent", description: "Your client has been notified about this invoice and can view it." },
+//   { status: "Paid", description: "Payment has been recorded against this invoice in full." },
+//   { status: "Overdue", description: "The invoice due date has passed and payment has not been recorded." },
+// ];
 
 const DEFAULT_TERMS =
   "Payment is due within 30 days of the invoice date. Late payments may be subject to a 2% monthly interest charge.";
@@ -1129,10 +1129,21 @@ export default function InvoicesPage() {
     else setSelected(new Set(paged.map((row) => row._id)));
   };
 
+  // This function now keeps track of deleted screen state for heading
+  const [currentHeading, setCurrentHeading] = useState<string>("Invoices");
   const switchView = (mode: InvoiceView) => {
     setViewMode(mode);
     setSelected(new Set());
     setShowForm(false);
+
+    // Update heading based on the view mode
+    if (mode === "deleted") {
+      setCurrentHeading("Deleted Invoices");
+    } else if (mode === "archived") {
+      setCurrentHeading("Archived Invoices");
+    } else {
+      setCurrentHeading("Invoices");
+    }
   };
 
   const resetForm = () => {
@@ -1676,7 +1687,8 @@ export default function InvoicesPage() {
       ) : (
         <>
           <div className="mb-3 grid grid-cols-3 items-center gap-3">
-            <h1 className={`${adminPageTitleClass} justify-self-start`}>Invoices</h1>
+            {/* Use currentHeading state for heading */}
+            <h1 className={`${adminPageTitleClass} justify-self-start`}>{currentHeading}</h1>
             <div className="relative justify-self-center">
               <button
                 type="button"
@@ -1843,7 +1855,7 @@ export default function InvoicesPage() {
             </div>
           </div>
 
-          <div className="mt-6 rounded border border-gray-200 bg-white px-5 py-4 shadow-sm">
+          {/* <div className="mt-6 rounded border border-gray-200 bg-white px-5 py-4 shadow-sm">
             <h2 className="mb-3 text-base font-bold text-gray-900">Invoice Status Legend</h2>
             <dl className="space-y-2">
               {STATUS_LEGEND.map(({ status, description }) => (
@@ -1853,7 +1865,7 @@ export default function InvoicesPage() {
                 </div>
               ))}
             </dl>
-          </div>
+          </div> */}
         </>
       )}
 

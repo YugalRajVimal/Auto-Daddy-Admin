@@ -162,8 +162,20 @@ const BASE_ADMIN = (import.meta.env.VITE_API_URL ?? "/admin") + "/api/admin";
 
 type ApiEnvelope<T> = { success: boolean; data: T; message?: string };
 
+// Utility to get the admin token from localStorage or cookie/etc.
+function getAdminToken(): string | null {
+  // You might want to enhance this if your token is stored elsewhere
+  // (e.g. a secure cookie, session storage, etc). Here we check localStorage:
+  return localStorage.getItem("admin-token");
+}
+
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_ADMIN}${path}`);
+  const adminToken = getAdminToken();
+  const headers: HeadersInit = {};
+  if (adminToken) {
+    headers["Authorization"] = adminToken;
+  }
+  const res = await fetch(`${BASE_ADMIN}${path}`, { headers });
   let json: ApiEnvelope<T>;
   try {
     json = await res.json();

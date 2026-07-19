@@ -23,6 +23,16 @@ import type { ShopType, Service } from "./Services";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
+// ---- ADD HELPER TO GET HEADER ----
+function getAdminAuthHeader() {
+  let adminToken = "";
+  try {
+    adminToken = localStorage.getItem("admin-token") || "";
+  } catch {}
+  return adminToken ? { Authorization: adminToken } : {};
+}
+// ----------------------------------
+
 type SubServiceStatus = "active" | "inactive";
 
 interface SubService {
@@ -123,7 +133,9 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     try {
       let url = `${API_BASE}/admin/services`;
       if (filterShopType !== "all") url += `?shopType=${filterShopType}`;
-      const res = await axios.get<{ success: boolean; data: Service[] }>(url);
+      const res = await axios.get<{ success: boolean; data: Service[] }>(url, {
+        headers: getAdminAuthHeader(),
+      });
       if (res.data.success) setServices(res.data.data || []);
       else {
         const msg = "Failed to fetch sub services.";
@@ -258,8 +270,8 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       const parent = services.find((s) => s._id === formServiceId);
       if (!parent) {
         const __adminMsg = "Selected service not found.";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
+        setError(__adminMsg);
+        adminNotify.error(__adminMsg);
         return;
       }
       const existing: SubService[] = (parent.subServices || []).map((s) => ({
@@ -276,7 +288,11 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       } else {
         updated = [...existing, { name: formName.trim(), status: formStatus }];
       }
-      await axios.put(`${API_BASE}/admin/services/${formServiceId}`, { subServices: updated });
+      await axios.put(
+        `${API_BASE}/admin/services/${formServiceId}`,
+        { subServices: updated },
+        { headers: getAdminAuthHeader() }
+      );
       adminNotify.success(editingRow ? "Sub service updated." : "Sub service added.");
       setSuccessMsg(editingRow ? "Sub service updated." : "Sub service added.");
       resetForm();
@@ -301,7 +317,11 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       const parent = services.find((s) => s._id === row.categoryId);
       if (!parent) return;
       const updated = (parent.subServices || []).filter((s) => s.name !== row.name);
-      await axios.put(`${API_BASE}/admin/services/${row.categoryId}`, { subServices: updated });
+      await axios.put(
+        `${API_BASE}/admin/services/${row.categoryId}`,
+        { subServices: updated },
+        { headers: getAdminAuthHeader() }
+      );
       stashDeleted(row);
       adminNotify.success("Sub service deleted successfully.");
       setSuccessMsg("Sub service deleted successfully.");
@@ -351,7 +371,11 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
         status: (s.status as SubServiceStatus) || "active",
       }));
       const updated = [...existing, { name: row.name, status: row.status || "active" }];
-      await axios.put(`${API_BASE}/admin/services/${row.categoryId}`, { subServices: updated });
+      await axios.put(
+        `${API_BASE}/admin/services/${row.categoryId}`,
+        { subServices: updated },
+        { headers: getAdminAuthHeader() }
+      );
       restoreStashed((item) => getRowId(item) === getRowId(row));
       adminNotify.success("Sub service restored.");
       setSuccessMsg("Sub service restored.");

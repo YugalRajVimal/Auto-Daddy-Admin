@@ -2,10 +2,33 @@
 // (e.g. import from your existing axios instance if you have one).
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api/admin/invoices`;
 
+// Helper to get admin-token from localStorage and return Authorization header (no Bearer)
+function getAuthHeader(): Record<string, string> {
+  const token = localStorage.getItem('admin-token');
+  // Only include Authorization if token is present and non-empty as a string
+  return token ? { Authorization: token } : {};
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // Always include the Authorization header if available.
+  // If FormData, don't set Content-Type to let the browser handle the boundary
+  const userHeaders: Record<string, string> =
+    options.headers && typeof options.headers === "object"
+      ? Object.fromEntries(Object.entries(options.headers as Record<string, string>).filter(([k]) => k.toLowerCase() !== "authorization"))
+      : {};
+
+  let mergedHeaders: Record<string, string>;
+  const authHeader = getAuthHeader();
+
+  if (options.body instanceof FormData) {
+    mergedHeaders = { ...authHeader, ...userHeaders };
+  } else {
+    mergedHeaders = { "Content-Type": "application/json", ...authHeader, ...userHeaders };
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
     credentials: "include", // cookie-based auth
-    headers: options.body instanceof FormData ? undefined : { "Content-Type": "application/json" },
+    headers: mergedHeaders,
     ...options,
   });
   const data = await res.json();
@@ -105,7 +128,7 @@ export async function fetchAutoShopOwners() {
   const token = localStorage.getItem('admin-token');
   const res = await axios.get(`${API()}/api/admin/autoshopowners`, {
     headers: token
-      ? { "Authorization": `${token}` }
+      ? { Authorization: token }
       : {},
   });
   const data = res.data;

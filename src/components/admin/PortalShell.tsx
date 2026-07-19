@@ -148,6 +148,12 @@ export default function PortalShell({
     setHelpOpen(true);
   };
 
+
+  useEffect(() => {
+    const perms = window.localStorage.getItem("permission");
+    console.log("LocalStorage permissions:", perms);
+  }, []);
+
   const closeHelp = () => setHelpOpen(false);
 
   const submitHelp = () => {

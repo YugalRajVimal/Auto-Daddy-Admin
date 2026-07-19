@@ -1,7 +1,18 @@
 import { DummyUserRow } from "./DummyUserListPage";
 
-
 const BASE_ADMIN = `${import.meta.env.VITE_API_URL}/api/admin`;
+
+// --- Helper to fetch admin token and auth headers (no Bearer) ---
+function getAdminToken(): string | null {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("admin-token");
+  }
+  return null;
+}
+function getAuthHeaders(): HeadersInit {
+  const token = getAdminToken();
+  return token ? { Authorization: token } : {};
+}
 
 // ---------- Types ----------
 
@@ -115,6 +126,9 @@ export async function fetchDealers(filters?: DealerListFilters): Promise<DealerA
   const res = await fetch(`${BASE_ADMIN}/dealer${qs ? `?${qs}` : ""}`, {
     method: "GET",
     credentials: "include",
+    headers: {
+      ...getAuthHeaders(),
+    },
   });
   const body = await handleResponse<{ data?: DealerApiRow[] } | DealerApiRow[]>(res);
   return Array.isArray(body) ? body : body.data ?? [];
@@ -125,6 +139,9 @@ export async function fetchDealerById(id: string): Promise<DealerApiRow> {
   const res = await fetch(`${BASE_ADMIN}/dealer/${id}`, {
     method: "GET",
     credentials: "include",
+    headers: {
+      ...getAuthHeaders(),
+    },
   });
   const body = await handleResponse<{ data?: DealerApiRow } | DealerApiRow>(res);
   return (body as any).data ?? (body as DealerApiRow);
@@ -135,6 +152,10 @@ export async function createDealer(payload: DealerPayload): Promise<DealerApiRow
   const res = await fetch(`${BASE_ADMIN}/dealer`, {
     method: "POST",
     credentials: "include",
+    headers: {
+      ...getAuthHeaders(),
+      // Don't set Content-Type header for FormData
+    },
     body: buildFormData(payload),
   });
   const body = await handleResponse<{ data?: DealerApiRow } | DealerApiRow>(res);
@@ -146,6 +167,10 @@ export async function updateDealer(id: string, payload: DealerPayload): Promise<
   const res = await fetch(`${BASE_ADMIN}/dealer/${id}`, {
     method: "PATCH",
     credentials: "include",
+    headers: {
+      ...getAuthHeaders(),
+      // Don't set Content-Type header for FormData
+    },
     body: buildFormData(payload),
   });
   const body = await handleResponse<{ data?: DealerApiRow } | DealerApiRow>(res);
@@ -157,6 +182,9 @@ export async function deleteDealer(id: string): Promise<void> {
   const res = await fetch(`${BASE_ADMIN}/dealer/${id}`, {
     method: "DELETE",
     credentials: "include",
+    headers: {
+      ...getAuthHeaders(),
+    },
   });
   await handleResponse<unknown>(res);
 }

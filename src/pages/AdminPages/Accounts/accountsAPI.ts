@@ -38,6 +38,13 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return body as T;
 }
 
+// Helper to get admin-token and create Authorization header
+function getAdminAuthHeader(): { Authorization: string } {
+  const token = localStorage.getItem('admin-token');
+  // Always return an Authorization property, even if empty string
+  return { Authorization: token ?? "" };
+}
+
 // ---------- Expense Category API calls ----------
 // Base path: /api/admin/accounts/expenses-category
 
@@ -46,6 +53,9 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategoryApiRow[]>
   const res = await fetch(`${BASE_ADMIN}/accounts/expenses-category`, {
     method: "GET",
     credentials: "include",
+    headers: {
+      ...getAdminAuthHeader(),
+    },
   });
   const body = await handleResponse<{ data?: ExpenseCategoryApiRow[] } | ExpenseCategoryApiRow[]>(res);
   return Array.isArray(body) ? body : body.data ?? [];
@@ -58,7 +68,10 @@ export async function addExpenseCategory(
   const res = await fetch(`${BASE_ADMIN}/accounts/expenses-category`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getAdminAuthHeader(),
+    },
     body: JSON.stringify({
       name: payload.name,
       subcategories: payload.subcategories ?? [],
@@ -80,7 +93,10 @@ export async function editExpenseCategory(
   const res = await fetch(`${BASE_ADMIN}/accounts/expenses-category/${id}`, {
     method: "PUT",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getAdminAuthHeader(),
+    },
     body: JSON.stringify(body),
   });
   const resBody = await handleResponse<{ data?: ExpenseCategoryApiRow } | ExpenseCategoryApiRow>(res);
@@ -92,6 +108,9 @@ export async function removeExpenseCategory(id: string): Promise<void> {
   const res = await fetch(`${BASE_ADMIN}/accounts/expenses-category/${id}`, {
     method: "DELETE",
     credentials: "include",
+    headers: {
+      ...getAdminAuthHeader(),
+    },
   });
   await handleResponse<unknown>(res);
 }

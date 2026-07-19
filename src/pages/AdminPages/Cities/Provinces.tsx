@@ -36,6 +36,16 @@ const PROVINCE_SEARCH_FIELDS: AdminSearchField[] = [
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
+// Helper to get config with admin-token for axios requests, without Bearer
+const getAdminAuthConfig = () => {
+  const token = localStorage.getItem("admin-token") || "";
+  return {
+    headers: {
+      Authorization: token,
+    },
+  };
+};
+
 type ProvinceStatus = "Active" | "Inactive";
 
 interface Province {
@@ -108,7 +118,10 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     setLoading(true);
     setError("");
     try {
-      const res = await axios.get<{ data: Province[] }>(`${API_BASE}/admin/provinces`);
+      const res = await axios.get<{ data: Province[] }>(
+        `${API_BASE}/admin/provinces`,
+        getAdminAuthConfig()
+      );
       setProvinces(res.data.data || []);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
@@ -233,21 +246,29 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     setSuccessMsg("");
     try {
       if (editingId) {
-        await axios.patch(`${API_BASE}/admin/provinces/${editingId}`, {
-          name: name.trim(),
-          nickName: nickName.trim(),
-          country: "Canada",
-          status,
-        });
+        await axios.patch(
+          `${API_BASE}/admin/provinces/${editingId}`,
+          {
+            name: name.trim(),
+            nickName: nickName.trim(),
+            country: "Canada",
+            status,
+          },
+          getAdminAuthConfig()
+        );
         adminNotify.success("Province updated successfully.");
         setSuccessMsg("Province updated successfully.");
       } else {
-        await axios.post(`${API_BASE}/admin/provinces`, {
-          name: name.trim(),
-          nickName: nickName.trim(),
-          country: "Canada",
-          status,
-        });
+        await axios.post(
+          `${API_BASE}/admin/provinces`,
+          {
+            name: name.trim(),
+            nickName: nickName.trim(),
+            country: "Canada",
+            status,
+          },
+          getAdminAuthConfig()
+        );
         adminNotify.success("Province added successfully.");
         setSuccessMsg("Province added successfully.");
       }
@@ -270,7 +291,10 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     setError("");
     setSuccessMsg("");
     try {
-      await axios.delete(`${API_BASE}/admin/provinces/${province._id}`);
+      await axios.delete(
+        `${API_BASE}/admin/provinces/${province._id}`,
+        getAdminAuthConfig()
+      );
       stashDeleted(province);
       adminNotify.success("Province deleted successfully.");
       setSuccessMsg("Province deleted successfully.");
@@ -306,12 +330,16 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     setError("");
     setSuccessMsg("");
     try {
-      await axios.post(`${API_BASE}/admin/provinces`, {
-        name: province.name,
-        nickName: province.nickName || "",
-        country: "Canada",
-        status: province.status || "Active",
-      });
+      await axios.post(
+        `${API_BASE}/admin/provinces`,
+        {
+          name: province.name,
+          nickName: province.nickName || "",
+          country: "Canada",
+          status: province.status || "Active",
+        },
+        getAdminAuthConfig()
+      );
       restoreStashed((item) => item._id === province._id);
       adminNotify.success("Province restored.");
       setSuccessMsg("Province restored.");

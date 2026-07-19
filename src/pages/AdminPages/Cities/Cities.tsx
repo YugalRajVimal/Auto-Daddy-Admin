@@ -36,6 +36,16 @@ const CITY_SEARCH_FIELDS: AdminSearchField[] = [
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
+const getAdminAuthHeader = () => {
+  const token = localStorage.getItem("admin-token");
+  if (!token) return {};
+  return {
+    headers: {
+      Authorization: token,
+    },
+  };
+};
+
 type CityStatus = "Active" | "Inactive";
 type ProvinceStatus = "Active" | "Inactive";
 
@@ -107,7 +117,10 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.get<{ data: Province[] }>(`${API_BASE}/admin/provinces`);
+      const res = await axios.get<{ data: Province[] }>(
+        `${API_BASE}/admin/provinces`,
+        getAdminAuthHeader()
+      );
       setProvinces(res.data.data || []);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
@@ -242,17 +255,22 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
       if (editingCity) {
         await axios.patch(
           `${API_BASE}/admin/provinces/${formProvinceId}/cities/${encodeURIComponent(editingCity.name)}`,
-          { name: formName.trim(), status: formStatus }
+          { name: formName.trim(), status: formStatus },
+          getAdminAuthHeader()
         );
         adminNotify.success("City updated successfully.");
-      setSuccessMsg("City updated successfully.");
+        setSuccessMsg("City updated successfully.");
       } else {
-        await axios.post(`${API_BASE}/admin/provinces/${formProvinceId}/cities`, {
-          name: formName.trim(),
-          status: formStatus,
-        });
+        await axios.post(
+          `${API_BASE}/admin/provinces/${formProvinceId}/cities`,
+          {
+            name: formName.trim(),
+            status: formStatus,
+          },
+          getAdminAuthHeader()
+        );
         adminNotify.success("City added successfully.");
-      setSuccessMsg("City added successfully.");
+        setSuccessMsg("City added successfully.");
       }
       resetForm();
       setShowForm(false);
@@ -274,7 +292,8 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     setSuccessMsg("");
     try {
       await axios.delete(
-        `${API_BASE}/admin/provinces/${city.provinceId}/cities/${encodeURIComponent(city.name)}`
+        `${API_BASE}/admin/provinces/${city.provinceId}/cities/${encodeURIComponent(city.name)}`,
+        getAdminAuthHeader()
       );
       stashDeleted(city);
       adminNotify.success("City deleted successfully.");
@@ -311,10 +330,14 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     setError("");
     setSuccessMsg("");
     try {
-      await axios.post(`${API_BASE}/admin/provinces/${city.provinceId}/cities`, {
-        name: city.name,
-        status: city.status || "Active",
-      });
+      await axios.post(
+        `${API_BASE}/admin/provinces/${city.provinceId}/cities`,
+        {
+          name: city.name,
+          status: city.status || "Active",
+        },
+        getAdminAuthHeader()
+      );
       restoreStashed((item) => getCityRowId(item) === id);
       adminNotify.success("City restored.");
       setSuccessMsg("City restored.");

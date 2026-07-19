@@ -28,6 +28,16 @@ import "react-datepicker/dist/react-datepicker.css";
 // Utility to get backend API endpoint (like in ThoughtOfDay.tsx)
 const API_BASE = (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/admin/common` : "/api");
 
+// --- Helper to get Authorization Header for fetch API ---
+function getAuthHeader(): HeadersInit | undefined {
+  const adminToken = localStorage.getItem("admin-token");
+  if (adminToken) {
+    // fetch expects an object, NOT undefined/k-v object for headers
+    return { Authorization: adminToken };
+  }
+  return undefined;
+}
+
 // API helpers
 async function fetchEntries(params: { country?: string; type?: string } = {}) {
   const searchParams = new URLSearchParams();
@@ -35,7 +45,10 @@ async function fetchEntries(params: { country?: string; type?: string } = {}) {
   if (params.type) searchParams.append("type", params.type);
   const res = await fetch(
     `${API_BASE}/privacy-and-disclaimers${searchParams.toString() ? `?${searchParams}` : ""}`,
-    { method: "GET" }
+    {
+      method: "GET",
+      headers: getAuthHeader()
+    }
   );
   if (!res.ok) throw new Error("Failed to fetch privacy/disclaimer entries");
   return res.json();
@@ -46,18 +59,24 @@ async function createEntry(data: {
   type: string;
   description: string;
 }) {
+  const baseHeaders: Record<string, string> = { "Content-Type": "application/json" };
+  const authHeader = getAuthHeader();
+  const headers = authHeader ? { ...baseHeaders, ...authHeader } : baseHeaders;
   const res = await fetch(`${API_BASE}/privacy-and-disclaimers`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create entry");
   return res.json();
 }
 async function updateEntry(id: string, data: Partial<{ description: string }>) {
+  const baseHeaders: Record<string, string> = { "Content-Type": "application/json" };
+  const authHeader = getAuthHeader();
+  const headers = authHeader ? { ...baseHeaders, ...authHeader } : baseHeaders;
   const res = await fetch(`${API_BASE}/privacy-and-disclaimers/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update entry");
@@ -66,6 +85,7 @@ async function updateEntry(id: string, data: Partial<{ description: string }>) {
 async function deleteEntry(id: string) {
   const res = await fetch(`${API_BASE}/privacy-and-disclaimers/${id}`, {
     method: "DELETE",
+    headers: getAuthHeader(),
   });
   if (!res.ok) throw new Error("Failed to delete entry");
 }

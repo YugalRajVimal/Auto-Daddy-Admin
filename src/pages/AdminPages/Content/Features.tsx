@@ -100,6 +100,15 @@ function formatDateString(date: Date | null): string {
   return `${year}-${month}-${day}`;
 }
 
+// ---- Helper to get admin-token and build headers ----
+function getAuthHeaders(extra?: Record<string, any>) {
+  const token = localStorage.getItem("admin-token") || "";
+  return {
+    ...(extra || {}),
+    Authorization: token,
+  };
+}
+
 export default function FeaturesPage({ initialShowForm = false }: FeaturesPageProps) {
   const [features, setFeatures] = useState<FeatureRow[]>([]);
   const [selected, setSelected] = useState<Set<number | string>>(new Set());
@@ -150,7 +159,10 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       setLoading(true);
       try {
         const url = `${BASE}/product-features?country=Canada`;
-        const res = await fetch(url, { method: "GET" });
+        const res = await fetch(url, {
+          method: "GET",
+          headers: getAuthHeaders(),
+        });
         if (!res.ok) throw new Error("Failed to fetch features");
         const data = await res.json();
         // The API may return array of features with "_id" and "image"
@@ -295,6 +307,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       const res = await fetch(url, {
         method,
         body: formData,
+        headers: getAuthHeaders(), // this will include Authorization: admin-token
       });
 
       if (!res.ok) {
@@ -326,7 +339,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       await Promise.all(
         Array.from(selected).map(async (id) => {
           const url = `${BASE}/product-features/${id}`;
-          const res = await fetch(url, { method: "DELETE" });
+          const res = await fetch(url, { method: "DELETE", headers: getAuthHeaders() });
           if (!res.ok) throw new Error("Delete failed");
         })
       );
@@ -357,6 +370,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
         const res = await fetch(`${BASE}/product-features`, {
           method: "POST",
           body: formData,
+          headers: getAuthHeaders(),
         });
         if (!res.ok) throw new Error("Restore failed");
         restoreStashed((item) => item.id === row.id);

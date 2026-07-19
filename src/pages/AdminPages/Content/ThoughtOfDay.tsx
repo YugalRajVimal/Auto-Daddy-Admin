@@ -27,6 +27,13 @@ import "react-datepicker/dist/react-datepicker.css";
 // Utility to get backend API endpoint
 const API_BASE = (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/admin/common` : "/api");
 
+// Helper to get Authorization option for fetch
+function getAuthHeader(): HeadersInit | undefined {
+  const token = localStorage.getItem("admin-token");
+  // Return undefined if not set, or a POJO if set
+  return token ? { Authorization: token } : undefined;
+}
+
 const THOUGHT_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "date", label: "Date", type: "date" },
   { key: "subject", label: "Subject" },
@@ -126,7 +133,9 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     if (isDeletedView) return;
     const query = getApiQuery();
     const url = `${API_BASE}/thought-of-the-day${query ? `?${query}` : ""}`;
-    fetch(url)
+    fetch(url, {
+      headers: getAuthHeader(),
+    })
       .then(async (r) => {
         if (!r.ok) throw new Error(`Failed to fetch: ${r.statusText}`);
         const data = await r.json();
@@ -294,11 +303,13 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
         resp = await fetch(`${API_BASE}/thought-of-the-day`, {
           method: "POST",
           body: formData,
+          headers: getAuthHeader(),
         });
       } else {
         resp = await fetch(`${API_BASE}/thought-of-the-day/${editingKey}`, {
           method: "PUT",
           body: formData,
+          headers: getAuthHeader(),
         });
       }
       if (!resp.ok) throw new Error("Failed to save");
@@ -319,6 +330,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
       const key = getRowKey(row);
       const resp = await fetch(`${API_BASE}/thought-of-the-day/${key}`, {
         method: "DELETE",
+        headers: getAuthHeader(),
       });
       if (!resp.ok) throw new Error();
       setNotes((prev) => prev.filter((n) => getRowKey(n) !== key));

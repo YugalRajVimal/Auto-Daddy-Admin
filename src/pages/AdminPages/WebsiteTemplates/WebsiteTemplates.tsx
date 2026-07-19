@@ -62,6 +62,19 @@ const API_BASE =
     ? `${import.meta.env.VITE_API_URL}/api/admin/common`
     : "/api";
 
+// Returns a Headers object with or without the Authorization header depending on token existence
+function getAdminTokenHeaders(withContentType = false): Headers {
+  const headers = new Headers();
+  const token = localStorage.getItem("admin-token");
+  if (token) {
+    headers.append("Authorization", token);
+  }
+  if (withContentType) {
+    headers.append("Content-Type", "application/json");
+  }
+  return headers;
+}
+
 // Map API data (with "_id") to local TemplateRow ("id"), and format date as YYYY-MM-DD string.
 function mapApiTemplate(t: any): TemplateRow {
   return {
@@ -83,8 +96,9 @@ const fetchTemplates = async ({
   const params = new URLSearchParams();
   params.append("country", "Canada");
   if (shopType) params.append("shopType", shopType);
-  const res = await fetch(`${API_BASE}/website-templates?${params}`);
-  // DO NOT await res.json() twice
+  const res = await fetch(`${API_BASE}/website-templates?${params}`, {
+    headers: getAdminTokenHeaders(),
+  });
   const data = await res.json();
   if (!res.ok) throw new Error("Could not fetch templates");
   // Accepts both { data: [...] } or [...]; best effort:
@@ -100,7 +114,7 @@ const createTemplate = async (body: {
 }) => {
   const res = await fetch(`${API_BASE}/website-templates`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAdminTokenHeaders(true),
     body: JSON.stringify({ ...body, country: "Canada" }),
   });
   if (!res.ok) throw new Error("Could not create website template");
@@ -110,6 +124,7 @@ const createTemplate = async (body: {
 const deleteTemplate = async (id: string) => {
   const res = await fetch(`${API_BASE}/website-templates/${id}`, {
     method: "DELETE",
+    headers: getAdminTokenHeaders(),
   });
   if (!res.ok) throw new Error("Could not delete template");
 };

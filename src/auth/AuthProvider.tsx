@@ -37,20 +37,61 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 
 const API_BASE = import.meta.env.VITE_API_URL as string;
 
+const LOCALSTORAGE_PERMISSIONS_KEY = "permission";
+
+function savePermissionsToLocalStorage(permission: Permissions | null) {
+  if (permission) {
+    localStorage.setItem(
+      LOCALSTORAGE_PERMISSIONS_KEY,
+      JSON.stringify(permission)
+    );
+  } else {
+    window.localStorage.removeItem(LOCALSTORAGE_PERMISSIONS_KEY);
+  }
+}
+
+function loadPermissionsFromLocalStorage(): Permissions | null {
+  try {
+    const item = window.localStorage.getItem(LOCALSTORAGE_PERMISSIONS_KEY);
+    return item ? JSON.parse(item) : null;
+  } catch {
+    return null;
+  }
+}
+
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [session, setSession] = useState<Session | null>(() => readSession());
+  const [session, setSession] = useState<Session | null>(() => {
+    const s = readSession();
+    // Merge local permissions on init if present
+    if (s && (!s.permissions || Object.keys(s.permissions).length === 0)) {
+      const lsPerms = loadPermissionsFromLocalStorage();
+      if (lsPerms) {
+        s.permissions = lsPerms;
+      }
+    }
+    return s;
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshSession = useCallback(() => {
-    setSession(readSession());
+    const s = readSession();
+    // Merge local permissions if missing from session
+    if (s && (!s.permissions || Object.keys(s.permissions).length === 0)) {
+      const lsPerms = loadPermissionsFromLocalStorage();
+      if (lsPerms) {
+        s.permissions = lsPerms;
+      }
+    }
+    setSession(s);
   }, []);
 
   const login = useCallback((next: Session) => {
     writeSession(next);
+    savePermissionsToLocalStorage(next.permissions ?? null);
     setSession(next);
   }, []);
 
@@ -60,6 +101,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         ? getSignInPathForRole(session.role)
         : "/";
       clearSession();
+      savePermissionsToLocalStorage(null);
       setSession(null);
       if (redirect) {
         window.location.href = signInPath;
@@ -73,9 +115,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (!prev) return prev;
       const next = { ...prev, profile };
       writeSession(next);
+      // Permissions in profile should not usually change here, so do not touch LS
       return next;
     });
   }, []);
+
+  // const setPermissions = useCallback((permissions: Permissions | null) => {
+  //   setSession((prev) => {
+  //     if (!prev) return prev;
+  //     const next = { ...prev, permissions: permissions || {} };
+  //     writeSession(next);
+  //     savePermissionsToLocalStorage(permissions);
+  //     return next;
+  //   });
+  // }, []);
 
   const can = useCallback(
     (module: string, action: Action = "view"): boolean => {
@@ -97,11 +150,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     async function validate() {
       const current = readSession();
+      // Merge any "offline" permissions
+      const savedPermissions = loadPermissionsFromLocalStorage();
+      if (current && savedPermissions && (!current.permissions || Object.keys(current.permissions).length === 0)) {
+        current.permissions = savedPermissions;
+      }
+
       if (!current?.token) {
         if (!cancelled) {
           setSession(null);
           setIsLoading(false);
         }
+        savePermissionsToLocalStorage(null);
         return;
       }
 
@@ -123,17 +183,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
           if (!cancelled) {
             if (res.ok) {
               const data = await res.json();
+              const updatedPermissions = data?.permissions ? data.permissions : current.permissions;
               const next: Session = {
                 ...current,
                 profile:
                   current.isLogInViaSuperAdmin && data?.name
                     ? { name: data.name, email: data.email }
                     : current.profile,
+                permissions: updatedPermissions
               };
               writeSession(next);
+              savePermissionsToLocalStorage(updatedPermissions ?? null);
               setSession(next);
             } else {
               clearSession();
+              savePermissionsToLocalStorage(null);
               setSession(null);
             }
             setIsLoading(false);
@@ -165,6 +229,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setSession(current);
           } else {
             clearSession();
+            savePermissionsToLocalStorage(null);
             setSession(null);
           }
           setIsLoading(false);
@@ -200,6 +265,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       canView,
       refreshSession,
       setProfile,
+      // Not in interface, but add for local permission saving externally if needed:
+      // setPermissions,
     }),
     [session, isLoading, login, logout, can, canView, refreshSession, setProfile]
   );

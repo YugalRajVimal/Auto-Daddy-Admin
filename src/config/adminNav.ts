@@ -228,3 +228,4 @@ export function getActivePrimaryItem(
   }
   return null;
 }
+

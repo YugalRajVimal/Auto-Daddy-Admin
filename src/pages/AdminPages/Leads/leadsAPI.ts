@@ -1,5 +1,18 @@
 const BASE_ADMIN = `${import.meta.env.VITE_API_URL}/api/admin`;
 
+// --- Helpers to get admin-token for headers ---
+function getAdminToken(): string {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("admin-token") || "";
+  }
+  return "";
+}
+function getAuthHeaders(): HeadersInit | undefined {
+  const token = getAdminToken();
+  // Only return headers object if token exists, otherwise undefined
+  return token ? { Authorization: token } : undefined;
+}
+
 // ---------- Types ----------
 
 // Status as stored/returned by the backend.
@@ -96,9 +109,11 @@ export async function fetchLeads(filters?: LeadListFilters): Promise<LeadApiRow[
   if (filters?.sentTo) params.set("sentTo", filters.sentTo);
   if (filters?.search) params.set("search", filters.search);
   const qs = params.toString();
+  const headers = getAuthHeaders();
   const res = await fetch(`${BASE_ADMIN}/leads${qs ? `?${qs}` : ""}`, {
     method: "GET",
     credentials: "include",
+    ...(headers ? { headers } : {}),
   });
   const body = await handleResponse<{ data?: LeadApiRow[] } | LeadApiRow[]>(res);
   return Array.isArray(body) ? body : body.data ?? [];
@@ -106,9 +121,11 @@ export async function fetchLeads(filters?: LeadListFilters): Promise<LeadApiRow[
 
 // GET /leads/:id
 export async function fetchLeadById(id: string): Promise<LeadApiRow> {
+  const headers = getAuthHeaders();
   const res = await fetch(`${BASE_ADMIN}/leads/${id}`, {
     method: "GET",
     credentials: "include",
+    ...(headers ? { headers } : {}),
   });
   const body = await handleResponse<{ data?: LeadApiRow } | LeadApiRow>(res);
   return (body as any).data ?? (body as LeadApiRow);
@@ -117,9 +134,11 @@ export async function fetchLeadById(id: string): Promise<LeadApiRow> {
 // POST /leads
 export async function createLead(payload: LeadCreatePayload): Promise<LeadApiRow> {
   const fd = buildLeadFormData(payload);
+  const headers = getAuthHeaders();
   const res = await fetch(`${BASE_ADMIN}/leads`, {
     method: "POST",
     credentials: "include",
+    ...(headers ? { headers } : {}),
     body: fd, // no Content-Type header — browser sets multipart boundary
   });
   const body = await handleResponse<{ data?: LeadApiRow } | LeadApiRow>(res);
@@ -134,9 +153,11 @@ export async function updateLead(id: string, payload: LeadUpdatePayload): Promis
     );
   }
   const fd = buildLeadFormData(payload);
+  const headers = getAuthHeaders();
   const res = await fetch(`${BASE_ADMIN}/leads/${id}`, {
     method: "PATCH",
     credentials: "include",
+    ...(headers ? { headers } : {}),
     body: fd,
   });
   const body = await handleResponse<{ data?: LeadApiRow } | LeadApiRow>(res);
@@ -145,9 +166,11 @@ export async function updateLead(id: string, payload: LeadUpdatePayload): Promis
 
 // DELETE /leads/:id
 export async function deleteLead(id: string): Promise<void> {
+  const headers = getAuthHeaders();
   const res = await fetch(`${BASE_ADMIN}/leads/${id}`, {
     method: "DELETE",
     credentials: "include",
+    ...(headers ? { headers } : {}),
   });
   await handleResponse<unknown>(res);
 }
