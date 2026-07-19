@@ -36,6 +36,48 @@ const USER_OPTIONS = [
   { value: "dealer", label: "Dealer", apiValue: "dealer" },
 ];
 
+// Enum-like slug options for pageSlug by user type, mapped for dropdown rendering
+const PAGE_SLUG_OPTIONS = [
+  // AutoShopOwner & Mechanic
+  { value: "Home - AutoShopOwner", label: "Home - AutoShopOwner", user: "shop-owner"},
+  { value: "Profile - AutoShopOwner", label: "Profile - AutoShopOwner", user: "shop-owner"},
+  { value: "People - AutoShopOwner", label: "People - AutoShopOwner", user: "shop-owner"},
+  { value: "Services - AutoShopOwner", label: "Services - AutoShopOwner", user: "shop-owner"},
+  { value: "JobCards - AutoShopOwner", label: "JobCards - AutoShopOwner", user: "shop-owner"},
+  { value: "Wallet - AutoShopOwner", label: "Wallet - AutoShopOwner", user: "shop-owner"},
+  { value: "MyWebsite - AutoShopOwner", label: "MyWebsite - AutoShopOwner", user: "shop-owner"},
+  { value: "Reports - AutoShopOwner", label: "Reports - AutoShopOwner", user: "shop-owner"},
+  { value: "Deals - AutoShopOwner", label: "Deals - AutoShopOwner", user: "shop-owner"},
+  { value: "Help - AutoShopOwner", label: "Help - AutoShopOwner", user: "shop-owner"},
+  { value: "Notifications - AutoShopOwner", label: "Notifications - AutoShopOwner", user: "shop-owner"},
+
+  // Mechanic
+  { value: "Home - Mechanic", label: "Home - Mechanic", user: "mechanic"},
+  { value: "Profile - Mechanic", label: "Profile - Mechanic", user: "mechanic"},
+  { value: "People - Mechanic", label: "People - Mechanic", user: "mechanic"},
+  { value: "Services - Mechanic", label: "Services - Mechanic", user: "mechanic"},
+  { value: "JobCards - Mechanic", label: "JobCards - Mechanic", user: "mechanic"},
+  { value: "Wallet - Mechanic", label: "Wallet - Mechanic", user: "mechanic"},
+  { value: "MyWebsite - Mechanic", label: "MyWebsite - Mechanic", user: "mechanic"},
+  { value: "Reports - Mechanic", label: "Reports - Mechanic", user: "mechanic"},
+  { value: "Deals - Mechanic", label: "Deals - Mechanic", user: "mechanic"},
+  { value: "Help - Mechanic", label: "Help - Mechanic", user: "mechanic"},
+  { value: "Notifications - Mechanic", label: "Notifications - Mechanic", user: "mechanic"},
+
+  // CarOwner
+  { value: "Home - CarOwner", label: "Home - CarOwner", user: "car-owner" },
+  { value: "Profile - CarOwner", label: "Profile - CarOwner", user: "car-owner" },
+  { value: "MyVehicles - CarOwner", label: "MyVehicles - CarOwner", user: "car-owner" },
+  { value: "Documents - CarOwner", label: "Documents - CarOwner", user: "car-owner" },
+  { value: "AutoShops - CarOwner", label: "AutoShops - CarOwner", user: "car-owner" },
+  { value: "Deals - CarOwner", label: "Deals - CarOwner", user: "car-owner" },
+  { value: "Expenses - CarOwner", label: "Expenses - CarOwner", user: "car-owner" },
+  { value: "Digital Diary - CarOwner", label: "Digital Diary - CarOwner", user: "car-owner" },
+  { value: "Reports - CarOwner", label: "Reports - CarOwner", user: "car-owner" },
+  { value: "Notifications - CarOwner", label: "Notifications - CarOwner", user: "car-owner" },
+  { value: "Help - CarOwner", label: "Help - CarOwner", user: "car-owner" },
+];
+
 const FAQ_SEARCH_FIELDS: AdminSearchField[] = [
   {
     key: "user",
@@ -43,6 +85,13 @@ const FAQ_SEARCH_FIELDS: AdminSearchField[] = [
     type: "select",
     options: USER_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
   },
+  // Optional: add pageSlug as filter. Comment in if needed.
+  // {
+  //   key: "pageSlug",
+  //   label: "Page Slug",
+  //   type: "select",
+  //   options: PAGE_SLUG_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+  // },
   { key: "date", label: "Date", type: "date" },
   { key: "question", label: "Question" },
   { key: "answer", label: "Answer" },
@@ -57,13 +106,10 @@ type FaqRow = {
   question: string;
   answer: string;
   role: string;
+  pageSlug: string;
 };
 
-// Raw shape coming back from the API before normalization. Mongo-backed
-// endpoints commonly return `_id` instead of `id` -- if that goes
-// unnormalized every row ends up with `id === undefined`, which makes a
-// `Set<number>` of selected ids collapse to a single "undefined" entry and
-// checking ANY row's checkbox makes every row appear checked.
+// Raw shape coming back from the API before normalization.
 type RawFaqRow = Partial<FaqRow> & { _id?: number | string };
 
 const normalizeFaqRow = (row: RawFaqRow): FaqRow => ({
@@ -72,9 +118,12 @@ const normalizeFaqRow = (row: RawFaqRow): FaqRow => ({
   question: row.question ?? "",
   answer: row.answer ?? "",
   role: row.role ?? "",
+  pageSlug: row.pageSlug ?? "",
 });
 
 const DEFAULT_ANSWER = "Answer";
+
+const DEFAULT_PAGE_SLUG = ""; // Set as "" so user must pick, or override to a value for default
 
 // Parse a "YYYY-MM-DD" (or ISO) string into a local Date for the picker,
 // falling back to today if it's missing/invalid.
@@ -102,7 +151,7 @@ async function myFetch(input: RequestInfo, options: RequestInit = {}) {
     ...(options.headers as Record<string, string>),
   };
   if (token) {
-    newHeaders["Authorization"] = token; // no 'Bearer'
+    newHeaders["Authorization"] = token;
   }
   return fetch(input, { ...options, headers: newHeaders });
 }
@@ -126,6 +175,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   const [user, setUser] = useState("car-owner");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(DEFAULT_ANSWER);
+  const [pageSlug, setPageSlug] = useState(DEFAULT_PAGE_SLUG);
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -190,6 +240,8 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
       searchIncludes(dateStr, searchFilters.date) &&
       searchIncludes(f.question, searchFilters.question) &&
       searchIncludes(f.answer, searchFilters.answer)
+      // Optionally also filter by pageSlug if searchFilters is extended
+      // searchIncludes(f.pageSlug, searchFilters.pageSlug)
     );
   });
 
@@ -215,6 +267,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     setUser("car-owner");
     setQuestion("");
     setAnswer(DEFAULT_ANSWER);
+    setPageSlug(DEFAULT_PAGE_SLUG);
     setEditingId(null);
   };
 
@@ -229,6 +282,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     setUser(USER_OPTIONS.find((o) => o.apiValue === row.role)?.value ?? row.role);
     setQuestion(row.question);
     setAnswer(row.answer);
+    setPageSlug(row.pageSlug ?? DEFAULT_PAGE_SLUG);
     setEditingId(row.id);
     setShowSearchCard(false);
     setShowForm(true);
@@ -260,14 +314,20 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     setShowForm(false);
   };
 
+  // Get the user for which this pageSlug belongs (helper for dropdown limiting)
+  const filteredPageSlugOptions = PAGE_SLUG_OPTIONS.filter(
+    (opt) => opt.user === user
+  );
+
   const handleSave = async () => {
-    // The backend expects role, date, question, answer
+    // The backend expects role, date, question, answer, pageSlug
     const roleForApi = USER_OPTIONS.find((o) => o.value === user)?.apiValue || "car_owner";
-    const payload = {
+    const payload: any = {
       role: roleForApi,
       date,
       question,
       answer,
+      pageSlug: pageSlug,
     };
 
     try {
@@ -285,13 +345,13 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
         adminNotify.success("Saved successfully.");
       } else {
         // Update (API only supports updating answer according to cURL given)
+        // If you want to support updating more, expand this
         res = await myFetch(`${API_BASE}/faqs/${editingId}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
-          // The API only wants answer for PUT
-          body: JSON.stringify({ answer }),
+          body: JSON.stringify({ answer, pageSlug }), // NOTE: update pageSlug as well if your backend supports it
         });
         if (!res.ok) throw new Error("Failed to update.");
         adminNotify.success("Updated successfully.");
@@ -304,10 +364,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     }
   };
 
-  // Deletes selected rows one request at a time, in order, against the same
-  // DELETE /faqs/:id endpoint -- intentionally sequential (not
-  // Promise.all/allSettled) so we don't hammer the API with a burst of
-  // concurrent requests and so we can track partial failures per id.
+  // Deletes selected rows, sequentially (unchanged)
   const handleDelete = async () => {
     if (selected.size === 0 || isDeleting) return;
     const ids = Array.from(selected);
@@ -353,7 +410,6 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     if (toRestore.length === 0) return;
     if (!window.confirm(`Restore ${toRestore.length} FAQ(s)?`)) return;
     let allSucceeded = true;
-    // Same pattern: restore sequentially, one POST per row.
     for (const row of toRestore) {
       try {
         const roleForApi =
@@ -368,6 +424,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
             date: row.date,
             question: row.question,
             answer: row.answer,
+            pageSlug: row.pageSlug,
           }),
         });
         if (!res.ok) throw new Error();
@@ -386,9 +443,10 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   const handleToolbarPrint = () => {
     printAdminTable({
       title: isDeletedView ? "Deleted FAQ Management" : "FAQ Management",
-      headers: ["User", "Date", "Question", "Answer"],
+      headers: ["User", "Page", "Date", "Question", "Answer"],
       rows: filtered.map((faq) => [
           USER_OPTIONS.find((option) => option.apiValue === faq.role || option.value === faq.role)?.label ?? faq.role,
+          PAGE_SLUG_OPTIONS.find(p => p.value === faq.pageSlug)?.label ?? faq.pageSlug ?? "",
           faq.date,
           faq.question,
           faq.answer,
@@ -419,19 +477,37 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                 actionLabel={editingId != null ? "Update" : "Save"}
                 onSave={isLoading ? undefined : handleSave}
                 onCancel={handleCancel}
-                // removed unsupported 'saving' prop
               />
-     
             }
           >
             <CompactFormRow className="items-start">
               <CompactField label="User" required className={compactFixedFieldWidth}>
                 <select
                   value={user}
-                  onChange={(e) => setUser(e.target.value)}
+                  onChange={(e) => {
+                    setUser(e.target.value);
+                    // Also change pageSlug to empty if user changes
+                    setPageSlug("");
+                  }}
                   className={compactInputClass}
                 >
                   {USER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </CompactField>
+              <CompactField label="Page Slug" required className={compactFixedFieldWidth}>
+                <select
+                  value={pageSlug}
+                  onChange={(e) => setPageSlug(e.target.value)}
+                  className={compactInputClass}
+                >
+                  <option value="" disabled>
+                    Select Page...
+                  </option>
+                  {filteredPageSlugOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -552,6 +628,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                 />
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Page</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Question</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Answer</th>
@@ -560,7 +637,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   {isDeletedView ? "No deleted FAQs found." : "No FAQs found."}
                 </td>
               </tr>
@@ -583,6 +660,9 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                     >
                       {USER_OPTIONS.find((o) => o.apiValue === row.role || o.value === row.role)?.label ?? row.role}
                     </button>
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2 text-center">
+                    {PAGE_SLUG_OPTIONS.find(p => p.value === row.pageSlug)?.label ?? row.pageSlug ?? ""}
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-center">
                     {row.date ? new Date(row.date).toISOString().slice(0, 10) : ""}
