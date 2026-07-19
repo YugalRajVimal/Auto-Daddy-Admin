@@ -543,19 +543,15 @@ import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { bulkUpdateItems, createItem, fetchItems, ItemView, updateItem } from "./api/invoicingApi";
 
-type ItemType = "Goods" | "Service";
-
+// Remove ItemType and HSN code from data model, and openingStock as well.
 type ItemRow = {
   _id: string;
   itemName: string;
-  hsnCode: string;
-  itemType: ItemType;
   description: string;
   unitCost: number | null;
   quantity: number;
   unitType: string;
   gstPercent: number | null;
-  openingStock: number | null;
   costWithGst: number | null;
   image: string;
   view: ItemView;
@@ -563,18 +559,14 @@ type ItemRow = {
 
 type ItemFormDraft = {
   itemName: string;
-  hsnCode: string;
-  itemType: ItemType;
   description: string;
   unitCost: string;
   quantity: string;
   unitType: string;
   gstPercent: string;
-  openingStock: string;
 };
 
-const ITEM_TYPE_OPTIONS: ItemType[] = ["Goods", "Service"];
-const QUANTITY_UNIT_OPTIONS = ["Nos", "Box", "Kg", "Litre", "Hrs", "Days"];
+const QUANTITY_UNIT_OPTIONS = ["Unit", "Days"];
 
 // Adjust to wherever your server serves the Uploads folder from
 const IMAGE_BASE_URL = "/Uploads/Items";
@@ -582,14 +574,11 @@ const IMAGE_BASE_URL = "/Uploads/Items";
 function emptyItemForm(): ItemFormDraft {
   return {
     itemName: "",
-    hsnCode: "",
-    itemType: "Goods",
     description: "",
     unitCost: "",
     quantity: "1",
     unitType: "",
     gstPercent: "",
-    openingStock: "",
   };
 }
 
@@ -679,14 +668,11 @@ export default function ItemsPage() {
     setExistingImage(row.image || "");
     setForm({
       itemName: row.itemName,
-      hsnCode: row.hsnCode,
-      itemType: row.itemType,
       description: row.description,
       unitCost: row.unitCost != null ? String(row.unitCost) : "",
       quantity: String(row.quantity),
       unitType: row.unitType,
       gstPercent: row.gstPercent != null ? String(row.gstPercent) : "",
-      openingStock: row.openingStock != null ? String(row.openingStock) : "",
     });
     setShowForm(true);
   };
@@ -752,11 +738,12 @@ export default function ItemsPage() {
   const handlePrint = () => {
     printAdminTable({
       title: viewMode === "active" ? "Items" : viewMode === "archived" ? "Archived Items" : "Deleted Items",
-      headers: ["Item Name", "Description", "Total Stock", "Unit Cost", "GST(%)", "Cost with GST"],
+      headers: ["Item Name", "Description", "Quantity", "Unit Type", "Unit Cost", "GST(%)", "Cost with GST"],
       rows: items.map((row) => [
         row.itemName,
         row.description,
-        row.openingStock != null ? String(row.openingStock) : "",
+        row.quantity != null ? String(row.quantity) : "",
+        row.unitType,
         fmtOptionalMoney(row.unitCost),
         row.gstPercent != null ? `${row.gstPercent}%` : "",
         fmtOptionalMoney(row.costWithGst),
@@ -796,27 +783,6 @@ export default function ItemsPage() {
                     <p className="mt-1 text-xs text-red-600">Item name is required.</p>
                   )}
                 </CompactField>
-                <CompactField label="HSN Code">
-                  <input
-                    type="text"
-                    value={form.hsnCode}
-                    onChange={(e) => setForm((f) => ({ ...f, hsnCode: e.target.value }))}
-                    className={compactInputClass}
-                  />
-                </CompactField>
-                <CompactField label="Item Type">
-                  <select
-                    value={form.itemType}
-                    onChange={(e) => setForm((f) => ({ ...f, itemType: e.target.value as ItemType }))}
-                    className={compactInputClass}
-                  >
-                    {ITEM_TYPE_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                </CompactField>
                 <CompactField label={'Description "shown on invoice / estimate"'}>
                   <input
                     type="text"
@@ -850,7 +816,7 @@ export default function ItemsPage() {
                       onChange={(e) => setForm((f) => ({ ...f, unitType: e.target.value }))}
                       className={compactInputClass}
                     >
-                      <option value="">Unit</option>
+                      <option value="">Select</option>
                       {QUANTITY_UNIT_OPTIONS.map((opt) => (
                         <option key={opt} value={opt}>
                           {opt}
@@ -870,20 +836,6 @@ export default function ItemsPage() {
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                <CompactField label="Opening Stock">
-                  <input
-                    type="number"
-                    value={form.openingStock}
-                    onChange={(e) => setForm((f) => ({ ...f, openingStock: e.target.value }))}
-                    className={compactInputClass}
-                  />
-                  {editingId && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Editing this adjusts the live stock count directly. Stock also auto-adjusts when this
-                      item is used on invoices.
-                    </p>
-                  )}
-                </CompactField>
                 <CompactField label="Image">
                   {existingImage && !imageFile && (
                     <img
@@ -976,7 +928,8 @@ export default function ItemsPage() {
               </th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Item Name</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Description</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Total Stock</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Quantity</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Unit Type</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Unit Cost</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">GST(%)</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Cost with GST</th>
@@ -986,13 +939,13 @@ export default function ItemsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
                   No items found.
                 </td>
               </tr>
@@ -1013,7 +966,8 @@ export default function ItemsPage() {
                     </button>
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-left">{row.description}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.openingStock != null ? row.openingStock : ""}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-center">{row.quantity != null ? row.quantity : ""}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-center">{row.unitType || ""}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{fmtOptionalMoney(row.unitCost)}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{row.gstPercent != null ? `${row.gstPercent}%` : ""}</td>
                   <td className="border border-gray-300 px-3 py-2 text-center">{fmtOptionalMoney(row.costWithGst)}</td>

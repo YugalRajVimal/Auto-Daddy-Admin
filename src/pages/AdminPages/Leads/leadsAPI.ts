@@ -1,3 +1,180 @@
+// const BASE_ADMIN = `${import.meta.env.VITE_API_URL}/api/admin`;
+
+// // --- Helpers to get admin-token for headers ---
+// function getAdminToken(): string {
+//   if (typeof window !== "undefined") {
+//     return localStorage.getItem("admin-token") || "";
+//   }
+//   return "";
+// }
+// function getAuthHeaders(): HeadersInit | undefined {
+//   const token = getAdminToken();
+//   // Only return headers object if token exists, otherwise undefined
+//   return token ? { Authorization: token } : undefined;
+// }
+
+// // ---------- Types ----------
+
+// // Status as stored/returned by the backend.
+// export type LeadApiStatus = "Pending" | "Visited" | "Completed";
+
+// export const LEAD_STATUS_OPTIONS: LeadApiStatus[] = ["Pending", "Visited", "Completed"];
+// export const LEAD_STATUS_DEFAULT: LeadApiStatus = "Pending";
+
+
+// export type LeadApiRow = {
+//   _id: string;
+//   date: string;
+//   name: string;
+//   phone: string;
+//   city: string;
+//   email?: string;
+//   website?: string;
+//   notes?: string;
+//   sentTo?: string | null;
+//   status: LeadApiStatus;
+//   image?: string | null; // added
+//   createdAt?: string;
+//   updatedAt?: string;
+// };
+
+// export type LeadListFilters = {
+//   status?: LeadApiStatus;
+//   city?: string;
+//   sentTo?: string;
+//   search?: string;
+// };
+
+// export type LeadCreatePayload = {
+//   date: string;
+//   name: string;
+//   phone: string;
+//   city: string;
+//   email?: string;
+//   website?: string;
+//   notes?: string;
+//   sentTo?: string | null;
+//   status?: LeadApiStatus;
+//   image?: File | null; // added
+// };
+
+
+// export type LeadUpdatePayload = Partial<Omit<LeadCreatePayload, "status" | "image">> & {
+//   status?: LeadApiStatus;
+//   image?: File | null;   // set to attach/replace an image
+//   removeImage?: boolean; // set true to clear an existing image
+// };
+
+// function buildLeadFormData(payload: Record<string, any>): FormData {
+//   const fd = new FormData();
+//   for (const [key, value] of Object.entries(payload)) {
+//     if (value === undefined) continue;
+//     if (key === "image") {
+//       if (value instanceof File) fd.append("leadImage", value);
+//       continue;
+//     }
+//     if (key === "removeImage") {
+//       fd.append("removeImage", value ? "true" : "false");
+//       continue;
+//     }
+//     if (value === null) continue; // don't send null fields as text "null"
+//     fd.append(key, String(value));
+//   }
+//   return fd;
+// }
+
+// // ---------- Helpers ----------
+
+// async function handleResponse<T>(res: Response): Promise<T> {
+//   let body: any = null;
+//   try {
+//     body = await res.json();
+//   } catch {
+//     // no JSON body
+//   }
+//   if (!res.ok) {
+//     const message = body?.message || body?.error || `Request failed with status ${res.status}`;
+//     throw new Error(message);
+//   }
+//   return body as T;
+// }
+
+// // ---------- API calls ----------
+
+// // GET /leads  (supports ?status= &city= &sentTo= &search=)
+// export async function fetchLeads(filters?: LeadListFilters): Promise<LeadApiRow[]> {
+//   const params = new URLSearchParams();
+//   if (filters?.status) params.set("status", filters.status);
+//   if (filters?.city) params.set("city", filters.city);
+//   if (filters?.sentTo) params.set("sentTo", filters.sentTo);
+//   if (filters?.search) params.set("search", filters.search);
+//   const qs = params.toString();
+//   const headers = getAuthHeaders();
+//   const res = await fetch(`${BASE_ADMIN}/leads${qs ? `?${qs}` : ""}`, {
+//     method: "GET",
+//     credentials: "include",
+//     ...(headers ? { headers } : {}),
+//   });
+//   const body = await handleResponse<{ data?: LeadApiRow[] } | LeadApiRow[]>(res);
+//   return Array.isArray(body) ? body : body.data ?? [];
+// }
+
+// // GET /leads/:id
+// export async function fetchLeadById(id: string): Promise<LeadApiRow> {
+//   const headers = getAuthHeaders();
+//   const res = await fetch(`${BASE_ADMIN}/leads/${id}`, {
+//     method: "GET",
+//     credentials: "include",
+//     ...(headers ? { headers } : {}),
+//   });
+//   const body = await handleResponse<{ data?: LeadApiRow } | LeadApiRow>(res);
+//   return (body as any).data ?? (body as LeadApiRow);
+// }
+
+// // POST /leads
+// export async function createLead(payload: LeadCreatePayload): Promise<LeadApiRow> {
+//   const fd = buildLeadFormData(payload);
+//   const headers = getAuthHeaders();
+//   const res = await fetch(`${BASE_ADMIN}/leads`, {
+//     method: "POST",
+//     credentials: "include",
+//     ...(headers ? { headers } : {}),
+//     body: fd, // no Content-Type header — browser sets multipart boundary
+//   });
+//   const body = await handleResponse<{ data?: LeadApiRow } | LeadApiRow>(res);
+//   return (body as any).data ?? (body as LeadApiRow);
+// }
+
+// // PATCH /leads/:id
+// export async function updateLead(id: string, payload: LeadUpdatePayload): Promise<LeadApiRow> {
+//   if (payload.status && !LEAD_STATUS_OPTIONS.includes(payload.status)) {
+//     throw new Error(
+//       `Invalid status "${payload.status}". Must be one of: ${LEAD_STATUS_OPTIONS.join(", ")}`
+//     );
+//   }
+//   const fd = buildLeadFormData(payload);
+//   const headers = getAuthHeaders();
+//   const res = await fetch(`${BASE_ADMIN}/leads/${id}`, {
+//     method: "PATCH",
+//     credentials: "include",
+//     ...(headers ? { headers } : {}),
+//     body: fd,
+//   });
+//   const body = await handleResponse<{ data?: LeadApiRow } | LeadApiRow>(res);
+//   return (body as any).data ?? (body as LeadApiRow);
+// }
+
+// // DELETE /leads/:id
+// export async function deleteLead(id: string): Promise<void> {
+//   const headers = getAuthHeaders();
+//   const res = await fetch(`${BASE_ADMIN}/leads/${id}`, {
+//     method: "DELETE",
+//     credentials: "include",
+//     ...(headers ? { headers } : {}),
+//   });
+//   await handleResponse<unknown>(res);
+// }
+
 const BASE_ADMIN = `${import.meta.env.VITE_API_URL}/api/admin`;
 
 // --- Helpers to get admin-token for headers ---
@@ -9,18 +186,21 @@ function getAdminToken(): string {
 }
 function getAuthHeaders(): HeadersInit | undefined {
   const token = getAdminToken();
-  // Only return headers object if token exists, otherwise undefined
   return token ? { Authorization: token } : undefined;
 }
 
 // ---------- Types ----------
 
-// Status as stored/returned by the backend.
 export type LeadApiStatus = "Pending" | "Visited" | "Completed";
 
 export const LEAD_STATUS_OPTIONS: LeadApiStatus[] = ["Pending", "Visited", "Completed"];
 export const LEAD_STATUS_DEFAULT: LeadApiStatus = "Pending";
 
+/** Populated associate reference, as returned by the backend on every lead read. */
+export type LeadApiSentTo = {
+  _id: string;
+  name: string;
+};
 
 export type LeadApiRow = {
   _id: string;
@@ -31,9 +211,10 @@ export type LeadApiRow = {
   email?: string;
   website?: string;
   notes?: string;
-  sentTo?: string | null;
+  // Populated object when present, null/undefined when not set — never a raw id string on read.
+  sentTo?: LeadApiSentTo | null;
   status: LeadApiStatus;
-  image?: string | null; // added
+  image?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -53,16 +234,24 @@ export type LeadCreatePayload = {
   email?: string;
   website?: string;
   notes?: string;
+  // Raw ObjectId string (or null to clear) when writing.
   sentTo?: string | null;
   status?: LeadApiStatus;
-  image?: File | null; // added
+  image?: File | null;
 };
-
 
 export type LeadUpdatePayload = Partial<Omit<LeadCreatePayload, "status" | "image">> & {
   status?: LeadApiStatus;
-  image?: File | null;   // set to attach/replace an image
-  removeImage?: boolean; // set true to clear an existing image
+  image?: File | null;
+  removeImage?: boolean;
+};
+
+/** Associate staff user for the "Sent To" dropdown. */
+export type AssociateApiRow = {
+  _id: string;
+  name: string;
+  email?: string;
+  phone?: string;
 };
 
 function buildLeadFormData(payload: Record<string, any>): FormData {
@@ -100,6 +289,18 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 // ---------- API calls ----------
+
+// GET /leads/associates — active StaffUser records with role "associates"
+export async function fetchAssociates(): Promise<AssociateApiRow[]> {
+  const headers = getAuthHeaders();
+  const res = await fetch(`${BASE_ADMIN}/leads/associates`, {
+    method: "GET",
+    credentials: "include",
+    ...(headers ? { headers } : {}),
+  });
+  const body = await handleResponse<{ data?: AssociateApiRow[] } | AssociateApiRow[]>(res);
+  return Array.isArray(body) ? body : body.data ?? [];
+}
 
 // GET /leads  (supports ?status= &city= &sentTo= &search=)
 export async function fetchLeads(filters?: LeadListFilters): Promise<LeadApiRow[]> {
@@ -139,7 +340,7 @@ export async function createLead(payload: LeadCreatePayload): Promise<LeadApiRow
     method: "POST",
     credentials: "include",
     ...(headers ? { headers } : {}),
-    body: fd, // no Content-Type header — browser sets multipart boundary
+    body: fd,
   });
   const body = await handleResponse<{ data?: LeadApiRow } | LeadApiRow>(res);
   return (body as any).data ?? (body as LeadApiRow);

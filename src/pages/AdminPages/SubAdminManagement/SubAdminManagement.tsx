@@ -269,7 +269,7 @@ const fetchRoles = useCallback(async () => {
 
 useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
-const rolesForType = (t: StaffRole | "") => roles.filter((r) => r.type === t);
+// const rolesForType = (t: StaffRole | "") => roles.filter((r) => r.type === t);
 
 
   const resetTableControls = () => {
@@ -793,33 +793,31 @@ const rolesForType = (t: StaffRole | "") => roles.filter((r) => r.type === t);
                       </label>
                     </div>
                   </CompactField>
-                  <CompactField label="Role" required className={compactFixedFieldWidth}>
+                  <CompactField label="Assigned Role" required>
   <select
-    value={role}
-    onChange={(e) => { setRole(e.target.value as StaffRole); setRoleId(""); }}
+    value={roleId}
+    onChange={(e) => {
+      setRoleId(e.target.value);
+      setRole(
+        roles.find((r) => r._id === e.target.value)?.type || ""
+      );
+    }}
     className={compactInputClass}
     disabled={!!editingStaff}
   >
-    <option value="">Select role type</option>
-    {ONBOARDABLE_ROLES.map((r) => (
-      <option key={r.value} value={r.value}>{r.label}</option>
+    <option value="">Select role</option>
+    {roles.map((r) => (
+      <option key={r._id} value={r._id}>
+        {r.name} 
+      </option>
     ))}
   </select>
+  {roles.length === 0 && (
+    <p className="mt-1 text-[11px] text-red-600">
+      No roles exist yet — create one in Role Management first.
+    </p>
+  )}
 </CompactField>
-
-{role && (
-  <CompactField label="Assigned Role" required>
-    <select value={roleId} onChange={(e) => setRoleId(e.target.value)} className={compactInputClass}>
-      <option value="">Select role</option>
-      {rolesForType(role).map((r) => (
-        <option key={r._id} value={r._id}>{r.name}</option>
-      ))}
-    </select>
-    {rolesForType(role).length === 0 && (
-      <p className="mt-1 text-[11px] text-red-600">No roles exist for this type yet — create one in Role Management first.</p>
-    )}
-  </CompactField>
-)}
                 </div>
 
                 <div>

@@ -40,7 +40,24 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 /* ---------------------------- Items ---------------------------- */
 
+// Only two allowed values for unitType: "Unit" or "Days"
+// Removed HSN Code, itemType, and opening Stock related logic as per requirements
+
 export type ItemView = "active" | "archived" | "deleted";
+
+// We omit HSN Code, itemType, openingStock from parameters and payloads now
+export interface InvoiceItem {
+  _id?: string;
+  itemName: string;
+  description?: string;
+  unitCost: number;
+  quantity: number;
+  unitType: "Unit" | "Days"; // Only "Unit" or "Days" allowed
+  gstPercent?: number;
+  image?: string;
+  view?: ItemView;
+  // No HSN Code, itemType, or openingStock!
+}
 
 export function fetchItems(params: { view: ItemView; search?: string; page?: number; limit?: number }) {
   const qs = new URLSearchParams({
@@ -49,21 +66,26 @@ export function fetchItems(params: { view: ItemView; search?: string; page?: num
     page: String(params.page || 1),
     limit: String(params.limit || 10),
   });
-  return request<{ items: any[]; total: number; page: number; limit: number }>(`/items?${qs}`);
+  return request<{ items: InvoiceItem[]; total: number; page: number; limit: number }>(`/items?${qs}`);
 }
 
-export function createItem(formValues: Record<string, string>, imageFile?: File | null) {
+// FormValues for create/update should NOT include HSN Code, itemType, or openingStock
+export function createItem(formValues: Record<string, string | number>, imageFile?: File | null) {
   const fd = new FormData();
-  Object.entries(formValues).forEach(([k, v]) => fd.append(k, v));
+  Object.entries(formValues).forEach(([k, v]) => fd.append(k, String(v)));
   if (imageFile) fd.append("itemImage", imageFile);
-  return request<{ item: any }>(`/items`, { method: "POST", body: fd });
+  return request<{ item: InvoiceItem }>(`/items`, { method: "POST", body: fd });
 }
 
-export function updateItem(id: string, formValues: Record<string, string>, imageFile?: File | null) {
+export function updateItem(
+  id: string,
+  formValues: Record<string, string | number>,
+  imageFile?: File | null
+) {
   const fd = new FormData();
-  Object.entries(formValues).forEach(([k, v]) => fd.append(k, v));
+  Object.entries(formValues).forEach(([k, v]) => fd.append(k, String(v)));
   if (imageFile) fd.append("itemImage", imageFile);
-  return request<{ item: any }>(`/items/${id}`, { method: "PUT", body: fd });
+  return request<{ item: InvoiceItem }>(`/items/${id}`, { method: "PUT", body: fd });
 }
 
 export function bulkUpdateItems(ids: string[], action: "archive" | "delete" | "restore") {
@@ -76,6 +98,8 @@ export function bulkUpdateItems(ids: string[], action: "archive" | "delete" | "r
 /* -------------------------- Invoices ---------------------------- */
 
 export type InvoiceView = "active" | "archived" | "deleted";
+
+// No changes required in invoice fetch payload, as InvoiceItem embedded type is covered above
 
 export function fetchInvoices(params: { view: InvoiceView; search?: string; page?: number; limit?: number }) {
   const qs = new URLSearchParams({

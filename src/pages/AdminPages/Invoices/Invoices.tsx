@@ -947,6 +947,7 @@ import {
 
 type InvoiceStatus = "Draft" | "Sent" | "Paid" | "Overdue";
 
+// Removed HSN Code, itemType, and opening Stock, and only allow unitType to be "Unit" or "Days"
 type InvoiceLineItemApi = {
   ItemRefId: string;
   Item: string;
@@ -955,6 +956,7 @@ type InvoiceLineItemApi = {
   Units: number;
   GSTPercent: number;
   Amount: number;
+  UnitType: "Unit" | "Days";
 };
 
 type InvoiceRow = {
@@ -986,14 +988,8 @@ type LineItemDraft = {
   unitPrice: string;
   units: string;
   gstPercent: string;
+  unitType: "Unit" | "Days";
 };
-
-// const STATUS_LEGEND: { status: InvoiceStatus; description: string }[] = [
-//   { status: "Draft", description: "Invoice created, but you have not notified your client. Your client will not see this invoice." },
-//   { status: "Sent", description: "Your client has been notified about this invoice and can view it." },
-//   { status: "Paid", description: "Payment has been recorded against this invoice in full." },
-//   { status: "Overdue", description: "The invoice due date has passed and payment has not been recorded." },
-// ];
 
 const DEFAULT_TERMS =
   "Payment is due within 30 days of the invoice date. Late payments may be subject to a 2% monthly interest charge.";
@@ -1008,6 +1004,7 @@ function emptyLineItem(): LineItemDraft {
     unitPrice: "",
     units: "1",
     gstPercent: "5",
+    unitType: "Unit",
   };
 }
 
@@ -1179,6 +1176,7 @@ export default function InvoicesPage() {
             unitPrice: String(l.UnitPrice),
             units: String(l.Units),
             gstPercent: String(l.GSTPercent),
+            unitType: l.UnitType === "Days" ? "Days" : "Unit",
           }))
         : [emptyLineItem(), emptyLineItem()],
       bankRefId: row.bankRefId || "",
@@ -1214,13 +1212,14 @@ export default function InvoicesPage() {
     }));
   };
 
-  // When an item is picked from the dropdown, prefill description/unitPrice/gst from the item record
+  // When an item is picked from the dropdown, prefill description/unitPrice/gst/unitType from the item record
   const handleItemPick = (lineId: string, itemId: string) => {
     const picked = availableItems.find((it) => it._id === itemId);
     if (!picked) {
       updateLine(lineId, { itemRefId: "", itemLabel: "" });
       return;
     }
+    // Default unitType to "Unit" unless picked.unitType is "Days"
     updateLine(lineId, {
       itemRefId: picked._id,
       itemLabel: picked.itemName,
@@ -1228,6 +1227,7 @@ export default function InvoicesPage() {
       description: picked.description || "",
       unitPrice: picked.unitCost != null ? String(picked.unitCost) : "",
       gstPercent: picked.gstPercent != null ? String(picked.gstPercent) : "0",
+      unitType: picked.unitType === "Days" ? "Days" : "Unit",
     });
   };
 
@@ -1242,6 +1242,7 @@ export default function InvoicesPage() {
         Units: Number(l.units) || 0,
         GSTPercent: Number(l.gstPercent) || 0,
         Amount: lineAmount(Number(l.unitPrice) || 0, Number(l.units) || 0),
+        UnitType: l.unitType === "Days" ? "Days" : "Unit",
       }));
 
   const draftItems = draftApiLineItems();
@@ -1275,6 +1276,7 @@ export default function InvoicesPage() {
         unitPrice: l.UnitPrice,
         units: l.Units,
         gstPercent: l.GSTPercent,
+        unitType: l.UnitType,
       })),
       bankRefId: form.bankRefId || undefined,
       bankName: form.bankName,
@@ -1468,13 +1470,58 @@ export default function InvoicesPage() {
                   }
                   title={form.status === "Paid" ? "Mark as unpaid" : "Mark as paid"}
                   aria-label={form.status === "Paid" ? "Mark as unpaid" : "Mark as paid"}
-                  className={`-rotate-12 select-none rounded border-4 px-4 py-1 text-xl font-extrabold uppercase tracking-widest transition-opacity hover:opacity-80 ${
-                    form.status === "Paid" ? "border-ad-green text-ad-green" : "border-red-500 text-red-500"
-                  }`}
+                  className={`
+                    relative
+                    select-none
+                    h-24 w-24
+                    flex items-center justify-center
+                    rounded-full
+                    border-4
+                    font-extrabold
+                    uppercase
+                    tracking-wider
+                    shadow-md
+                    transition
+                    duration-200
+                    hover:opacity-80
+                    whitespace-nowrap
+                    p-0
+                    text-white
+                    ${form.status === "Paid" ? "border-ad-green bg-ad-green" : "border-red-500 bg-red-500"}
+                  `}
+                  style={{
+                    boxShadow: '0 4px 24px -6px rgba(0,0,0,0.09)',
+                    letterSpacing: '0.18em',
+                    transform: "rotate(-8deg)"
+                  }}
                 >
-                  {form.status === "Paid" ? "Paid" : "Unpaid"}
+                  <span
+                    className="block w-full text-center text-xl"
+                    style={{
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {form.status === "Paid" ? "PAID" : "UNPAID"}
+                  </span>
+                  {/* Optional subtle "stamp" shadow ring */}
+                  <span
+                    className={`
+                      absolute inset-0 rounded-full
+                      border-2
+                      pointer-events-none
+                      ${form.status === "Paid" ? "border-ad-green" : "border-red-200"}
+                      opacity-25
+                    `}
+                    style={{
+                      top: 6,
+                      left: 6,
+                      right: 6,
+                      bottom: 6,
+                    }}
+                  />
                 </button>
               </div>
+        
               <div className="w-full space-y-4 sm:ml-auto sm:mr-8 sm:w-1/2">
                 <CompactField label="Invoice Number">
                   <input
@@ -1508,8 +1555,7 @@ export default function InvoicesPage() {
                 <colgroup>
                   <col className="w-[22%]" />
                   <col className="w-[36%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[8%]" />
+                  <col className="w-[14%]" />
                   <col className="w-[8%]" />
                   <col className="w-[8%]" />
                   <col className="w-[8%]" />
@@ -1518,7 +1564,7 @@ export default function InvoicesPage() {
                   <tr className="bg-ad-purple text-white">
                     <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Item</th>
                     <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Description</th>
-                    <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Stock</th>
+                    <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Unit Type</th>
                     <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Unit Price</th>
                     <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Units</th>
                     <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">GST (%)</th>
@@ -1527,7 +1573,6 @@ export default function InvoicesPage() {
                 </thead>
                 <tbody>
                   {form.lineItems.map((line) => {
-                    const pickedItem = availableItems.find((it) => it._id === line.itemRefId);
                     return (
                       <tr key={line.id} className="bg-white">
                         <td className="border border-gray-300 p-1">
@@ -1552,8 +1597,16 @@ export default function InvoicesPage() {
                             className={compactInputClass}
                           />
                         </td>
-                        <td className="border border-gray-300 px-2 py-2 text-center text-xs text-gray-600">
-                          {pickedItem ? pickedItem.openingStock ?? "—" : ""}
+                        {/* Unit Type selector: restrict to Unit or Days */}
+                        <td className="border border-gray-300 p-1 text-center">
+                          <select
+                            value={line.unitType}
+                            onChange={e => updateLine(line.id, { unitType: e.target.value as "Unit" | "Days" })}
+                            className={compactInputClass}
+                          >
+                            <option value="Unit">Unit</option>
+                            <option value="Days">Days</option>
+                          </select>
                         </td>
                         <td className="border border-gray-300 p-1">
                           <input
@@ -1854,18 +1907,6 @@ export default function InvoicesPage() {
               </button>
             </div>
           </div>
-
-          {/* <div className="mt-6 rounded border border-gray-200 bg-white px-5 py-4 shadow-sm">
-            <h2 className="mb-3 text-base font-bold text-gray-900">Invoice Status Legend</h2>
-            <dl className="space-y-2">
-              {STATUS_LEGEND.map(({ status, description }) => (
-                <div key={status} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-                  <dt className="w-20 shrink-0 font-bold text-gray-900">{status}</dt>
-                  <dd className="text-sm text-gray-600">{description}</dd>
-                </div>
-              ))}
-            </dl>
-          </div> */}
         </>
       )}
 
