@@ -176,12 +176,14 @@ export default function AdminSignInPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...getAdminAuthPayload(), otp }),
         });
+        
         const data = await res.json();
         console.log(data);
         if (res.ok && data.token) {
-          login({ token: data.token, role: ADMIN_ROLE });
-          localStorage.setItem('permission', JSON.stringify(data.permissions));
+          login({ token: data.token, role: data.role, permissions: data.permissions });
      
+          localStorage.setItem('permission', JSON.stringify(data.permissions));
+
           setStatus("Login successful!");
           setTimeout(() => {
             navigate(getPostLoginRedirect(ADMIN_ROLE), { replace: true });
@@ -189,6 +191,7 @@ export default function AdminSignInPage() {
         } else {
           setStatus(data?.message || "OTP verification failed");
         }
+
         return;
       }
 

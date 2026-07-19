@@ -1,656 +1,160 @@
-// import { useEffect, useRef, useState } from "react";
-// import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
-// import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
-// import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
-// import {
-//   CompactField,
-//   CompactFormFooter,
-//   CompactFormPanel,
-//   CompactFormRow,
-//   compactInputClass,
-// } from "../../../components/admin/ContentPanel";
-// import AdminSearchCard, {
-//   emptyAdminSearchValues,
-//   searchEquals,
-//   searchIncludes,
-//   type AdminSearchField,
-// } from "../../../components/admin/AdminSearchCard";
-// import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
-// import { adminNotify } from "../../../utils/adminNotify";
-// import { printAdminTable } from "../../../utils/adminPrintTable";
-// import { MODULES } from "../../../components/admin/PermissionMatrix";
 
-// type RoleRow = {
-//   id: number;
-//   role: string;
-//   city: string;
-//   permissionKeys: string[];
-//   createdDate: string;
-// };
-
-// const CITY_OPTIONS = [
-//   "Toronto",
-//   "Vancouver",
-//   "Montreal",
-//   "Calgary",
-//   "Ottawa",
-//   "Edmonton",
-//   "Winnipeg",
-//   "Halifax",
-// ];
-
-// const ROLE_SEARCH_FIELDS: AdminSearchField[] = [
-//   { key: "role", label: "Role" },
-//   {
-//     key: "city",
-//     label: "City",
-//     type: "select",
-//     options: CITY_OPTIONS.map((c) => ({ value: c, label: c })),
-//   },
-//   { key: "permissions", label: "Permissions" },
-//   {
-//     key: "createdDate",
-//     label: "Created Date",
-//     type: "range",
-//     fromKey: "createdFrom",
-//     toKey: "createdTo",
-//     inputType: "date",
-//   },
-// ];
-
-// const dateInRange = (dateValue: string, from: string, to: string) => {
-//   const dateStr = dateValue ? String(dateValue).slice(0, 10) : "";
-//   if (from && (!dateStr || dateStr < from)) return false;
-//   if (to && (!dateStr || dateStr > to)) return false;
-//   return true;
-// };
-
-// const DUMMY_ROLES: RoleRow[] = [
-//   {
-//     id: 1,
-//     role: "Super Admin",
-//     city: "Toronto",
-//     permissionKeys: MODULES.map((m) => m.key),
-//     createdDate: "2026-01-15",
-//   },
-//   {
-//     id: 2,
-//     role: "Admin",
-//     city: "Vancouver",
-//     permissionKeys: [
-//       "dashboard",
-//       "users",
-//       "services",
-//       "categories",
-//       "provinces",
-//       "cities",
-//       "domain",
-//       "runningDeals",
-//       "wallet",
-//       "inviteHelp",
-//       "tasks",
-//     ],
-//     createdDate: "2026-02-20",
-//   },
-//   {
-//     id: 3,
-//     role: "Sub Admin",
-//     city: "Montreal",
-//     permissionKeys: ["dashboard", "users", "services", "categories", "inviteHelp", "tasks"],
-//     createdDate: "2026-03-08",
-//   },
-//   {
-//     id: 4,
-//     role: "Business Associate",
-//     city: "Calgary",
-//     permissionKeys: ["dashboard", "users", "runningDeals", "inviteHelp"],
-//     createdDate: "2026-04-02",
-//   },
-// ];
-
-// function permissionLabels(keys: string[]) {
-//   return keys
-//     .map((key) => MODULES.find((m) => m.key === key)?.label ?? key)
-//     .join(", ");
-// }
-
-// function PermissionsDropdown({
-//   selected,
-//   onChange,
-// }: {
-//   selected: string[];
-//   onChange: (keys: string[]) => void;
-// }) {
-//   const [open, setOpen] = useState(false);
-//   const ref = useRef<HTMLDivElement>(null);
-
-//   useEffect(() => {
-//     function handleClick(e: MouseEvent) {
-//       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-//     }
-//     document.addEventListener("mousedown", handleClick);
-//     return () => document.removeEventListener("mousedown", handleClick);
-//   }, []);
-
-//   const toggle = (key: string) => {
-//     onChange(
-//       selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]
-//     );
-//   };
-
-//   const summary =
-//     selected.length === 0
-//       ? "Select permissions"
-//       : selected.length === MODULES.length
-//         ? "All permissions"
-//         : `${selected.length} selected`;
-
-//   return (
-//     <div ref={ref} className="relative w-full min-w-0">
-//       <button
-//         type="button"
-//         onClick={() => setOpen((value) => !value)}
-//         className={`${compactInputClass} flex w-full items-center justify-between gap-2 text-left`}
-//       >
-//         <span className={`truncate ${selected.length === 0 ? "text-gray-500" : ""}`}>{summary}</span>
-//         <span className="shrink-0 text-[10px] text-gray-600">▼</span>
-//       </button>
-//       {open ? (
-//         <div className="absolute left-0 top-full z-50 mt-0.5 max-h-52 w-full min-w-[240px] overflow-y-auto border border-gray-400 bg-white shadow-md">
-//           {MODULES.map((mod) => (
-//             <label
-//               key={mod.key}
-//               className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-gray-800 hover:bg-gray-100"
-//             >
-//               <input
-//                 type="checkbox"
-//                 checked={selected.includes(mod.key)}
-//                 onChange={() => toggle(mod.key)}
-//                 className="h-3.5 w-3.5 accent-ad-purple"
-//               />
-//               {mod.label}
-//             </label>
-//           ))}
-//         </div>
-//       ) : null}
-//     </div>
-//   );
-// }
-
-// export default function RoleManager() {
-//   const [roles, setRoles] = useState(DUMMY_ROLES);
-//   const [selected, setSelected] = useState<Set<number>>(new Set());
-//   const [search, setSearch] = useState("");
-//   const [showSearchCard, setShowSearchCard] = useState(false);
-//   const [searchDraft, setSearchDraft] = useState(() => emptyAdminSearchValues(ROLE_SEARCH_FIELDS));
-//   const [searchFilters, setSearchFilters] = useState(() => emptyAdminSearchValues(ROLE_SEARCH_FIELDS));
-//   const [page, setPage] = useState(1);
-//   const [entriesPerPage, setEntriesPerPage] = useState(10);
-//   const [showForm, setShowForm] = useState(false);
-//   const [editingId, setEditingId] = useState<number | null>(null);
-//   const [role, setRole] = useState("");
-//   const [city, setCity] = useState("");
-//   const [permissionKeys, setPermissionKeys] = useState<string[]>([]);
-
-//   const resetTableControls = () => {
-//     setPage(1);
-//     setSelected(new Set());
-//     setSearch("");
-//     const empty = emptyAdminSearchValues(ROLE_SEARCH_FIELDS);
-//     setSearchDraft(empty);
-//     setSearchFilters(empty);
-//     setShowSearchCard(false);
-//   };
-
-//   const { viewMode, isDeletedView, toggleViewMode, deletedStash, stashDeleted, restoreStashed } =
-//     useAdminDeletedView<RoleRow>({
-//       onToggle: resetTableControls,
-//       storageKey: "admin_deleted_view:role-manager",
-//     });
-
-//   const displayRoles = isDeletedView ? deletedStash : roles;
-
-//   const filtered = displayRoles.filter((row) => {
-//     const perms = permissionLabels(row.permissionKeys);
-//     const q = search.toLowerCase();
-//     const live =
-//       !search.trim() ||
-//       row.role.toLowerCase().includes(q) ||
-//       row.city.toLowerCase().includes(q) ||
-//       perms.toLowerCase().includes(q) ||
-//       row.createdDate.includes(search);
-//     if (!live) return false;
-//     return (
-//       searchIncludes(row.role, searchFilters.role) &&
-//       searchEquals(row.city, searchFilters.city) &&
-//       searchIncludes(perms, searchFilters.permissions) &&
-//       dateInRange(row.createdDate, searchFilters.createdFrom, searchFilters.createdTo)
-//     );
-//   });
-
-//   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
-//   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
-
-//   const toggleSelect = (id: number) => {
-//     setSelected((prev) => {
-//       const next = new Set(prev);
-//       if (next.has(id)) next.delete(id);
-//       else next.add(id);
-//       return next;
-//     });
-//   };
-
-//   const toggleSelectAll = () => {
-//     if (selected.size === paged.length) setSelected(new Set());
-//     else setSelected(new Set(paged.map((r) => r.id)));
-//   };
-
-//   const resetForm = () => {
-//     setRole("");
-//     setCity("");
-//     setPermissionKeys([]);
-//     setEditingId(null);
-//   };
-
-//   const openAdd = () => {
-//     resetForm();
-//     setShowSearchCard(false);
-//     setShowForm(true);
-//   };
-
-//   const openEdit = (row: RoleRow) => {
-//     setEditingId(row.id);
-//     setRole(row.role);
-//     setCity(row.city);
-//     setPermissionKeys([...row.permissionKeys]);
-//     setShowSearchCard(false);
-//     setShowForm(true);
-//   };
-
-//   const openSearchCard = () => {
-//     setShowForm(false);
-//     setEditingId(null);
-//     setSearchDraft({ ...searchFilters });
-//     setShowSearchCard((open) => !open);
-//   };
-
-//   const handleSearchCardSearch = () => {
-//     setSearchFilters({ ...searchDraft });
-//     setPage(1);
-//     setSelected(new Set());
-//   };
-
-//   const handleSearchCardReset = () => {
-//     const empty = emptyAdminSearchValues(ROLE_SEARCH_FIELDS);
-//     setSearchDraft(empty);
-//     setSearchFilters(empty);
-//     setPage(1);
-//     setSelected(new Set());
-//   };
-
-//   const handleCancel = () => {
-//     resetForm();
-//     setShowForm(false);
-//   };
-
-//   const handleSave = () => {
-//     if (!role.trim()) {
-//       adminNotify.error("Role is required.");
-//       return;
-//     }
-//     if (!city) {
-//       adminNotify.error("City is required.");
-//       return;
-//     }
-//     if (permissionKeys.length === 0) {
-//       adminNotify.error("Select at least one permission.");
-//       return;
-//     }
-
-//     const payload = {
-//       role: role.trim(),
-//       city,
-//       permissionKeys: [...permissionKeys],
-//       createdDate: new Date().toISOString().slice(0, 10),
-//     };
-
-//     if (editingId != null) {
-//       setRoles((prev) =>
-//         prev.map((r) => (r.id === editingId ? { ...r, ...payload } : r))
-//       );
-//     } else {
-//       setRoles((prev) => [
-//         ...prev,
-//         { id: Math.max(0, ...prev.map((r) => r.id)) + 1, ...payload },
-//       ]);
-//     }
-
-//     adminNotify.success(editingId != null ? "Role updated." : "Role created.");
-//     resetForm();
-//     setShowForm(false);
-//   };
-
-//   const handleDeleteSelected = () => {
-//     if (selected.size === 0) return;
-//     if (!window.confirm(`Delete ${selected.size} selected role(s)?`)) return;
-//     const toDelete = roles.filter((r) => selected.has(r.id));
-//     stashDeleted(toDelete);
-//     setRoles((prev) => prev.filter((r) => !selected.has(r.id)));
-//     setSelected(new Set());
-//     adminNotify.success("Selected role(s) deleted.");
-//   };
-
-//   const handleRestore = () => {
-//     if (selected.size === 0) return;
-//     const toRestore = deletedStash.filter((r) => selected.has(r.id));
-//     if (toRestore.length === 0) return;
-//     if (!window.confirm(`Restore ${toRestore.length} role(s)?`)) return;
-//     restoreStashed((item) => selected.has(item.id));
-//     setRoles((prev) => [...toRestore, ...prev.filter((r) => !selected.has(r.id))]);
-//     setSelected(new Set());
-//     adminNotify.success("Role(s) restored.");
-//   };
-
-//   const handleToolbarPrint = () => {
-//     printAdminTable({
-//       title: isDeletedView ? "Deleted Role Manager" : "Role Manager",
-//       headers: ["Role", "City", "Permissions", "Created Date"],
-//       rows: filtered.map((role) => [
-//           role.role,
-//           role.city,
-//           permissionLabels(role.permissionKeys),
-//           role.createdDate,
-//         ]),
-//     });
-//   };
-
-//   return (
-//     <AdminPage
-//       title={isDeletedView ? "Deleted Role Manager" : "Role Manager"}
-//       headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
-//       between={
-//         showSearchCard ? (
-//           <AdminSearchCard
-//             fields={ROLE_SEARCH_FIELDS}
-//             values={searchDraft}
-//             onChange={setSearchDraft}
-//             onSearch={handleSearchCardSearch}
-//             onReset={handleSearchCardReset}
-//             onClose={() => setShowSearchCard(false)}
-//           />
-//         ) : showForm ? (
-//           <CompactFormPanel
-//             footer={
-//               <CompactFormFooter
-//                 message={
-//                   editingId != null ? "You are editing a 'Role'" : "You are creating a 'Role'"
-//                 }
-//                 messageCenter
-//                 actionLabel={editingId != null ? "Update" : "Save"}
-//                 onSave={handleSave}
-//                 onCancel={handleCancel}
-//               />
-//             }
-//           >
-//             <CompactFormRow className="grid w-full grid-cols-3 items-start gap-4">
-//               <CompactField label="Role" required className="min-w-0">
-//                 <input
-//                   type="text"
-//                   value={role}
-//                   onChange={(e) => setRole(e.target.value)}
-//                   className={compactInputClass}
-//                 />
-//               </CompactField>
-//               <CompactField label="City" required className="min-w-0">
-//                 <select
-//                   value={city}
-//                   onChange={(e) => setCity(e.target.value)}
-//                   className={compactInputClass}
-//                 >
-//                   <option value="">Select city</option>
-//                   {CITY_OPTIONS.map((option) => (
-//                     <option key={option} value={option}>
-//                       {option}
-//                     </option>
-//                   ))}
-//                 </select>
-//               </CompactField>
-//               <CompactField label="Permissions" required className="min-w-0">
-//                 <PermissionsDropdown selected={permissionKeys} onChange={setPermissionKeys} />
-//               </CompactField>
-//             </CompactFormRow>
-//           </CompactFormPanel>
-//         ) : undefined
-//       }
-//     >
-//       {isDeletedView && (
-//         <AdminDeletedBanner count={deletedStash.length} entityLabel="roles" />
-//       )}
-//       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
-//         <div className="flex flex-wrap gap-1">
-//           {!isDeletedView ? (
-//             <button
-//               type="button"
-//               onClick={handleDeleteSelected}
-//               disabled={selected.size === 0}
-//               className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-//             >
-//               Delete
-//             </button>
-//           ) : (
-//             <button
-//               type="button"
-//               onClick={handleRestore}
-//               disabled={selected.size === 0}
-//               className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
-//             >
-//               Restore
-//             </button>
-//           )}
-//           <button
-//             type="button"
-//             onClick={handleToolbarPrint}
-//             className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark"
-//           >
-//             Print
-//           </button>
-//         </div>
-//         <div className="flex items-center gap-1">
-//           <input
-//             type="text"
-//             value={search}
-//             onChange={(e) => {
-//               setSearch(e.target.value);
-//               setPage(1);
-//             }}
-//             placeholder="Live Search here"
-//             className="border border-gray-400 bg-white px-2 py-1 text-xs"
-//           />
-//           <button
-//             type="button"
-//             onClick={openSearchCard}
-//             className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${
-//               showSearchCard ? "bg-gray-700" : "bg-gray-500"
-//             }`}
-//           >
-//             Filters
-//           </button>
-//         </div>
-//       </div>
-
-//       <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
-//         <span>Show</span>
-//         <select
-//           value={entriesPerPage}
-//           onChange={(e) => {
-//             setEntriesPerPage(Number(e.target.value));
-//             setPage(1);
-//           }}
-//           className="border border-gray-400 px-1 py-0.5"
-//         >
-//           <option value={10}>10</option>
-//           <option value={25}>25</option>
-//           <option value={50}>50</option>
-//         </select>
-//         <span>entries</span>
-//       </div>
-
-//       <div className="overflow-x-auto">
-//         <table className="w-full border-collapse text-sm whitespace-nowrap">
-//           <thead>
-//             <tr className="bg-ad-purple text-white">
-//               <th className="border border-ad-purple-dark px-2 py-2 text-center">
-//                 <input
-//                   type="checkbox"
-//                   checked={paged.length > 0 && selected.size === paged.length}
-//                   onChange={toggleSelectAll}
-//                   className="accent-white"
-//                 />
-//               </th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Role</th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">City</th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Permissions</th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Created Date</th>
-//             </tr>
-//           </thead>
-//           <tbody>
-//             {paged.length === 0 ? (
-//               <tr>
-//                 <td colSpan={5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
-//                   {isDeletedView ? "No deleted roles found." : "No roles found."}
-//                 </td>
-//               </tr>
-//             ) : (
-//               paged.map((row, idx) => (
-//                 <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-//                   <td className="border border-gray-300 px-2 py-2 text-center">
-//                     <input
-//                       type="checkbox"
-//                       checked={selected.has(row.id)}
-//                       onChange={() => toggleSelect(row.id)}
-//                       className="accent-ad-purple"
-//                     />
-//                   </td>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">
-//                     {!isDeletedView ? (
-//                       <button
-//                         type="button"
-//                         onClick={() => openEdit(row)}
-//                         className="text-blue-700 hover:underline"
-//                       >
-//                         {row.role}
-//                       </button>
-//                     ) : (
-//                       row.role
-//                     )}
-//                   </td>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">{row.city}</td>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">
-//                     {permissionLabels(row.permissionKeys)}
-//                   </td>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">{row.createdDate}</td>
-//                 </tr>
-//               ))
-//             )}
-//           </tbody>
-//         </table>
-//       </div>
-
-//       <div className="mt-4 flex items-center justify-between">
-//         <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
-//         <div className="flex gap-1">
-//           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-//             <button
-//               key={p}
-//               type="button"
-//               onClick={() => setPage(p)}
-//               className={`h-7 w-7 border text-xs font-medium ${
-//                 page === p
-//                   ? "border-ad-green bg-ad-green text-white"
-//                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-//               }`}
-//             >
-//               {p}
-//             </button>
-//           ))}
-//         </div>
-//         <AdminDeletedToggle
-//           viewMode={viewMode}
-//           onToggle={toggleViewMode}
-//           activeLabel="Active Roles"
-//         />
-//       </div>
-//     </AdminPage>
-//   );
-// }
-
-
-// pages/AdminPages/Roles/RoleManager.tsx
-//
-// Roles are FIXED (hardcoded on the backend as an enum: admin, role_admin,
-// sub_admin, associates) — there is no "create/edit/delete a role" flow.
-// This page is a read-only reference showing each role's default/starting
-// permission set (config/permissionModules.ts -> DEFAULT_ROLE_PERMISSIONS).
-//
-// To actually grant/revoke permissions for a real person, go to
-// Staff Users -> select a user -> Permissions. Editing here has no effect
-// and is intentionally disabled (readOnly PermissionMatrix).
-
-import { useState } from "react";
-import AdminPage from "../../../components/admin/AdminPage";
+import React, { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import AdminPage, { AddNewButton }  from "../../../components/admin/AdminPage";
 import { PermissionMatrix } from "../../../components/admin/PermissionMatrix";
-import { FIXED_ROLES, DEFAULT_ROLE_PERMISSIONS, type StaffRole } from "../../../config/permissionModules";
+import { adminNotify } from "../../../utils/adminNotify";
+import { CompactField, CompactFormFooter, CompactFormPanel, compactInputClass } from "../../../components/admin/ContentPanel";
+import { ONBOARDABLE_ROLES,roleLabel, type Permissions, type StaffRole } from "../../../config/permissionModules";
 
-export default function RoleManager() {
-  const [activeRole, setActiveRole] = useState<StaffRole>("role_admin");
-  const activeDef = FIXED_ROLES.find((r) => r.value === activeRole)!;
+interface RoleDoc {
+  _id: string;
+  name: string;
+  type: StaffRole;
+  permissions: Permissions;
+  createdAt: string;
+}
+
+const API = import.meta.env.VITE_API_URL;
+const getTokenHeaders = () => ({ Authorization: localStorage.getItem("admin-token") || "" });
+
+const RoleManagement: React.FC = () => {
+  const [roles, setRoles] = useState<RoleDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingRole, setEditingRole] = useState<RoleDoc | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState("");
+  const [type, setType] = useState<StaffRole | "">("");
+  const [permissions, setPermissions] = useState<Permissions>({} as Permissions);
+  const [saving, setSaving] = useState(false);
+
+  const fetchRoles = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API}/api/admin/roles`, { headers: getTokenHeaders() });
+      setRoles(res.data.data || []);
+    } catch (e: any) {
+      adminNotify.error(e?.response?.data?.message || "Failed to load roles");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchRoles(); }, [fetchRoles]);
+
+  const openCreate = () => {
+    setEditingRole(null);
+    setName("");
+    setType("");
+    setPermissions({} as Permissions);
+    setShowForm(true);
+  };
+
+  const openEdit = (r: RoleDoc) => {
+    setEditingRole(r);
+    setName(r.name);
+    setType(r.type);
+    setPermissions(r.permissions);
+    setShowForm(true);
+  };
+
+  const save = async () => {
+    if (!name.trim()) return adminNotify.error("Name is required.");
+    if (!editingRole && !type) return adminNotify.error("Type is required.");
+    setSaving(true);
+    try {
+      if (editingRole) {
+        await axios.put(`${API}/api/admin/roles/${editingRole._id}`, { name: name.trim() }, { headers: getTokenHeaders() });
+        await axios.patch(`${API}/api/admin/roles/${editingRole._id}/permissions`, { permissions }, { headers: getTokenHeaders() });
+        adminNotify.success("Role updated. Every staff user with this role is updated immediately.");
+      } else {
+        await axios.post(`${API}/api/admin/roles`, { name: name.trim(), type, permissions }, { headers: getTokenHeaders() });
+        adminNotify.success("Role created.");
+      }
+      setShowForm(false);
+      fetchRoles();
+    } catch (e: any) {
+      adminNotify.error(e?.response?.data?.message || "Failed to save role");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (r: RoleDoc) => {
+    if (!window.confirm(`Delete role "${r.name}"? Staff still assigned to it must be reassigned first.`)) return;
+    try {
+      await axios.delete(`${API}/api/admin/roles/${r._id}`, { headers: getTokenHeaders() });
+      adminNotify.success("Role deleted.");
+      fetchRoles();
+    } catch (e: any) {
+      adminNotify.error(e?.response?.data?.message || "Failed to delete role");
+    }
+  };
 
   return (
-    <AdminPage title="Role Manager">
-      <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-        Roles are fixed and cannot be created, renamed, or deleted. This screen shows the{" "}
-        <strong>default</strong> permission set for each role for reference only. To grant or
-        revoke permissions for a specific person, go to{" "}
-        <strong>Staff Users \u2192 Permissions</strong>.
-      </div>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        {FIXED_ROLES.map((r) => (
-          <button
-            key={r.value}
-            type="button"
-            onClick={() => setActiveRole(r.value)}
-            className={`border px-3 py-1.5 text-xs font-medium ${
-              activeRole === r.value
-                ? "border-ad-purple bg-ad-purple text-white"
-                : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-            }`}
+    <AdminPage
+      title="Roles"
+      headerAction={!showForm ? <AddNewButton onClick={openCreate} /> : undefined}
+      between={
+        showForm ? (
+          <CompactFormPanel
+            footer={
+              <CompactFormFooter
+                message={editingRole ? `Editing '${editingRole.name}'` : "Creating a new Role"}
+                messageCenter
+                actionLabel={saving ? "Saving..." : editingRole ? "Update" : "Save"}
+                onSave={save}
+                onCancel={() => setShowForm(false)}
+              />
+            }
           >
-            {r.label}
-            {!r.onboardable && (
-              <span className="ml-1 rounded bg-white/20 px-1 text-[10px] font-normal">system</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-3 text-sm text-gray-700">
-        <span className="font-semibold">{activeDef.label}</span>
-        {activeRole === "admin" ? (
-          <span className="ml-2 text-xs text-gray-500">
-            (SuperAdmin bypasses all permission checks server-side \u2014 shown as full access below
-            for reference only)
-          </span>
-        ) : !activeDef.onboardable ? (
-          <span className="ml-2 text-xs text-gray-500">(cannot be onboarded via Staff Users)</span>
-        ) : null}
-      </div>
-
-      <PermissionMatrix
-        permissions={DEFAULT_ROLE_PERMISSIONS[activeRole]}
-        onChange={() => {}}
-        readOnly
-      />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-4">
+              <CompactField label="Role Name" required>
+                <input value={name} onChange={(e) => setName(e.target.value)} className={compactInputClass} placeholder="e.g. Regional Sub Admin" />
+              </CompactField>
+              <CompactField label="Type" required>
+                <select value={type} onChange={(e) => setType(e.target.value as StaffRole)} className={compactInputClass} disabled={!!editingRole}>
+                  <option value="">Select type</option>
+                  {ONBOARDABLE_ROLES.map((r: { value: string; label: string }) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+             
+                </select>
+                {editingRole && <p className="mt-1 text-[11px] text-gray-500">Type cannot change after creation — staff are assigned by type.</p>}
+              </CompactField>
+            </div>
+            <PermissionMatrix permissions={permissions} onChange={setPermissions} />
+          </CompactFormPanel>
+        ) : undefined
+      }
+    >
+      {loading ? (
+        <p className="py-6 text-center text-sm text-gray-500">Loading roles…</p>
+      ) : (
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-ad-purple text-white">
+              <th className="border px-3 py-2">Name</th>
+              <th className="border px-3 py-2">Type</th>
+              <th className="border px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {roles.map((r) => (
+              <tr key={r._id}>
+                <td className="border px-3 py-2 text-center">{r.name}</td>
+                <td className="border px-3 py-2 text-center">{roleLabel(r.type)}</td>
+                <td className="border px-3 py-2 text-center">
+                  <button onClick={() => openEdit(r)} className="text-blue-700 hover:underline mr-3">Edit</button>
+                  <button onClick={() => remove(r)} className="text-red-700 hover:underline">Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </AdminPage>
   );
-}
+};
+
+export default RoleManagement;

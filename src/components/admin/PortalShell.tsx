@@ -6,6 +6,7 @@ import { getRoleConfig } from "../../auth/roleRegistry";
 import { getActivePrimaryItem, type NavItem, type NavSubItem } from "../../config/adminNav";
 import { adminNotify } from "../../utils/adminNotify";
 import SupportHelpModal from "./SupportHelpModal";
+import { hasView, type StoredPermissions } from "../../utils/navPermissions";
 
 const LOGO = "/logo.png";
 const ADMIN_MESSAGES_PATH = "/admin/messages/received";
@@ -56,6 +57,7 @@ export type PortalShellProps = {
   helpPath?: string;
 };
 
+
 export default function PortalShell({
   children,
   homePath,
@@ -73,7 +75,54 @@ export default function PortalShell({
 }: PortalShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { role, logout, session } = useAuth();
+
+
+  const { role, logout, session, permissions } = useAuth();
+
+const isSuperAdmin = role === "admin";
+
+const storedPerms = (permissions as StoredPermissions | null) ?? null;
+
+const canShowPrimary = (item: NavItem) =>
+  isSuperAdmin || hasView(storedPerms, item.permissionModule);
+
+const canShowSub = (sub: NavSubItem) =>
+  isSuperAdmin || hasView(storedPerms, sub.permissionModule);
+
+// export default function PortalShell({
+//   children,
+//   homePath,
+//   profilePath,
+//   primaryNav,
+//   utilityNav = [],
+//   utilityNavLabel = "Admin",
+//   contextualNav = [],
+//   loginAs,
+//   brandLogo,
+//   headerCenter,
+//   headerAvatarSrc,
+//   subscriptionDaysLeft,
+//   helpPath,
+// }: PortalShellProps) {
+  // const location = useLocation();
+  // const navigate = useNavigate();
+  // const { role, logout, session } = useAuth();
+
+
+  console.log("role:", role, "isSuperAdmin:", isSuperAdmin);
+console.log("storedPerms:", storedPerms);
+
+  // NOTE: assumes role === "admin" means SuperAdmin, matching AdminAuthContext.
+  // Adjust if your role string differs.
+  // const isSuperAdmin = role === "admin";
+  // const storedPerms = useMemo(() => readStoredPermissions(), []);
+
+  // const canShowPrimary = (item: NavItem) =>
+  //   isSuperAdmin || hasView(storedPerms, item.permissionModule);
+
+  // const canShowSub = (sub: NavSubItem) =>
+  //   isSuperAdmin || hasView(storedPerms, sub.permissionModule);
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpSubject, setHelpSubject] = useState("");
@@ -83,12 +132,27 @@ export default function PortalShell({
   const contentKey = `${location.pathname}-${navReset}`;
 
   const activePrimary = getActivePrimaryItem(location.pathname, primaryNav, homePath);
-  const onUtilityNav = utilityNav.some((s) => isPathActive(location.pathname, s.path, homePath));
-  const onContextualNav = contextualNav.some((s) => isPathActive(location.pathname, s.path, homePath));
+
+  const visiblePrimaryNav = useMemo(
+    () => primaryNav.filter(canShowPrimary),
+    [primaryNav, storedPerms, isSuperAdmin]
+  );
+  const visibleUtilityNav = useMemo(
+    () => utilityNav.filter(canShowSub),
+    [utilityNav, storedPerms, isSuperAdmin]
+  );
+  const visibleContextualNav = useMemo(
+    () => contextualNav.filter(canShowSub),
+    [contextualNav, storedPerms, isSuperAdmin]
+  );
+
+  const onUtilityNav = visibleUtilityNav.some((s) => isPathActive(location.pathname, s.path, homePath));
+  const onContextualNav = visibleContextualNav.some((s) => isPathActive(location.pathname, s.path, homePath));
   const onHelpNav = helpPath != null && isPathActive(location.pathname, helpPath, homePath);
-  const utilitySubItems = onUtilityNav ? utilityNav : [];
-  const contextualSubItems = onContextualNav ? contextualNav : [];
-  const primarySubItems: NavSubItem[] = activePrimary?.subItems ?? [];
+  const utilitySubItems = onUtilityNav ? visibleUtilityNav : [];
+  const contextualSubItems = onContextualNav ? visibleContextualNav : [];
+  const primarySubItems: NavSubItem[] = (activePrimary?.subItems ?? []).filter(canShowSub);
+
   const displaySubItems =
     utilitySubItems.length > 0
       ? utilitySubItems
@@ -96,7 +160,7 @@ export default function PortalShell({
         ? contextualSubItems
         : primarySubItems;
   const activeSubItemPath = getActiveSubItemPath(location.pathname, displaySubItems, homePath);
-  const utilityNavPath = utilityNav[0]?.path ?? "#";
+  const utilityNavPath = visibleUtilityNav[0]?.path ?? "#";
 
   const handleNavLinkClick = (path: string, e: React.MouseEvent<HTMLAnchorElement>) => {
     setMobileOpen(false);
@@ -147,7 +211,6 @@ export default function PortalShell({
     setHelpDetails("");
     setHelpOpen(true);
   };
-
 
   useEffect(() => {
     const perms = window.localStorage.getItem("permission");
@@ -223,7 +286,7 @@ export default function PortalShell({
         ) : (
           <span className={utilityLinkClass}>Login as : {loginAsDisplay}</span>
         ))}
-      {utilityNav.length > 0 && (
+      {visibleUtilityNav.length > 0 && (
         <Link
           to={utilityNavPath}
           className={onUtilityNav ? utilityLinkActiveClass : utilityLinkClass}
@@ -327,7 +390,7 @@ export default function PortalShell({
           className={`relative z-20 overflow-visible px-3 pb-0 sm:px-4 ${mobileOpen ? "block" : "hidden lg:block"}`}
         >
           <ul className="flex flex-col gap-px lg:flex-row lg:w-full lg:gap-px">
-            {primaryNav.map((item) => {
+            {visiblePrimaryNav.map((item) => {
               const isActive = activePrimary?.name === item.name;
               const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
               const itemClass = `w-full px-3 py-1.5 text-center text-sm font-semibold transition-colors lg:rounded-b-lg lg:px-4 lg:py-2 lg:text-sm ${isActive
@@ -403,6 +466,7 @@ export default function PortalShell({
             </ul>
           </div>
         )}
+  
 
         <main key={contentKey} className="flex min-h-0 flex-1 flex-col">
           {children}

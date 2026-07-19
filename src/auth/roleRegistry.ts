@@ -16,6 +16,27 @@ export const ROLE_REGISTRY: Record<UserRole, RoleConfig> = {
     signInPath: "/",
     label: "Admin",
   },
+  role_admin: {
+    role: "role_admin",
+    portal: "admin",
+    homePath: "/admin",
+    signInPath: "/a",
+    label: "Role Admin",
+  },
+  sub_admin: {
+    role: "sub_admin",
+    portal: "admin",
+    homePath: "/admin",
+    signInPath: "/",
+    label: "Sub Admin",
+  },
+  associates: {
+    role: "associates",
+    portal: "admin",
+    homePath: "/admin",
+    signInPath: "/",
+    label: "Associate",
+  },
   subadmin: {
     role: "subadmin",
     portal: "admin",

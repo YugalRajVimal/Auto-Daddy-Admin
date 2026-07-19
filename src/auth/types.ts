@@ -2,12 +2,15 @@ export type Action = "view" | "add" | "edit" | "delete";
 
 export type UserRole =
   | "admin"
+  | "role_admin"
+  | "sub_admin"
+  | "associates"
   | "subadmin"
   | "car_owner"
   | "auto_shop_owner"
   | "supervisor";
 
-export type Portal = "admin" | "owner" | "shop";
+export type Portal = "admin" | "role_admin" | "sub_admin" | "associates" | "owner" | "shop";
 
 export interface Permissions {
   [module: string]: Partial<Record<Action, boolean>>;

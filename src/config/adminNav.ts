@@ -1,5 +1,5 @@
 export type NavSubItem = {
-  name: string;
+    name: string;
   path: string;
   permissionModule?: string;
 };
@@ -18,15 +18,15 @@ export const primaryNav: NavItem[] = [
   {
     name: "Home",
     path: "/admin",
-    permissionModule: "dashboard",
+    permissionModule: "home",
     subItems: [
-      { name: "Dashboard", path: "/admin", permissionModule: "dashboard" },
-      { name: "Thought of Day", path: "/admin/thought-of-day", permissionModule: "dashboardData" },
-      { name: "Features", path: "/admin/features", permissionModule: "dashboardData" },
-      { name: "FAQs", path: "/admin/faqs", permissionModule: "dashboardData" },
-      { name: "Privacy", path: "/admin/privacy", permissionModule: "dashboardData" },
-      { name: "Web - Temp", path: "/admin/website-templates", permissionModule: "websiteTemplates" },
-      { name: "Inv - Temp", path: "/admin/invoice-templates", permissionModule: "websiteTemplates" },
+      { name: "Dashboard", path: "/admin", permissionModule: "home.subNav.dashboard" },
+      { name: "Thought of Day", path: "/admin/thought-of-day", permissionModule: "home.subNav.thoughtOfDay" },
+      { name: "Features", path: "/admin/features", permissionModule: "home.subNav.features" },
+      { name: "FAQs", path: "/admin/faqs", permissionModule: "home.subNav.faqs" },
+      { name: "Privacy", path: "/admin/privacy", permissionModule: "home.subNav.privacy" },
+      { name: "Web - Temp", path: "/admin/website-templates", permissionModule: "home.subNav.websiteTemplate" },
+      { name: "Inv - Temp", path: "/admin/invoice-templates", permissionModule: "home.subNav.invoiceTemplate" },
     ],
     matchPaths: [
       "/admin",
@@ -40,18 +40,20 @@ export const primaryNav: NavItem[] = [
   },
   {
     name: "Locations",
+    permissionModule: "location",
     subItems: [
-      { name: "Provinces", path: "/admin/provinces", permissionModule: "provinces" },
-      { name: "Cities", path: "/admin/cities", permissionModule: "cities" },
+      { name: "Provinces", path: "/admin/provinces", permissionModule: "location.subNav.provinces" },
+      { name: "Cities", path: "/admin/cities", permissionModule: "location.subNav.cities" },
     ],
     matchPaths: ["/admin/provinces", "/admin/cities"],
   },
   {
     name: "Services",
+    permissionModule: "services",
     subItems: [
-      { name: "Services", path: "/admin/categories", permissionModule: "services" },
-      { name: "Sub Services", path: "/admin/services", permissionModule: "categories" },
-      { name: "Car Brands", path: "/admin/car-brands", permissionModule: "carCompanies" },
+      { name: "Services", path: "/admin/categories", permissionModule: "services.subNav.services" },
+      { name: "Sub Services", path: "/admin/services", permissionModule: "services.subNav.subServices" },
+      { name: "Car Brands", path: "/admin/car-brands", permissionModule: "carCompanies.subNav.carCompanies" },
     ],
     matchPaths: ["/admin/categories", "/admin/services", "/admin/car-brands"],
   },
@@ -59,51 +61,53 @@ export const primaryNav: NavItem[] = [
     name: "Users",
     permissionModule: "users",
     subItems: [
-      { name: "Car Owners", path: "/admin/car-owners", permissionModule: "users" },
-      { name: "Auto Shop Owners", path: "/admin/auto-shop-owners", permissionModule: "users" },
-      { name: "Dealers", path: "/admin/dealers", permissionModule: "users" },
+      { name: "Car Owners", path: "/admin/car-owners", permissionModule: "users.subNav.carOwners" },
+      { name: "Auto Shop Owners", path: "/admin/auto-shop-owners", permissionModule: "users.subNav.autoShopOwners" },
+      { name: "Dealers", path: "/admin/dealers", permissionModule: "users.subNav.dealers" },
     ],
     matchPaths: ["/admin/car-owners", "/admin/auto-shop-owners", "/admin/dealers"],
   },
   {
     name: "Leads",
-    permissionModule: "dashboard",
+    permissionModule: "leads",
     subItems: [
-      { name: "All Leads", path: "/admin/leads", permissionModule: "dashboard" },
-      { name: "Visited", path: "/admin/leads/visited", permissionModule: "dashboard" },
-      { name: "Completed", path: "/admin/leads/completed", permissionModule: "dashboard" },
+      { name: "All Leads", path: "/admin/leads", permissionModule: "leads.subNav.allLeads" },
+      { name: "Visited", path: "/admin/leads/visited", permissionModule: "leads.subNav.visitedLeads" },
+      { name: "Completed", path: "/admin/leads/completed", permissionModule: "leads.subNav.completedLeads" },
     ],
     matchPaths: ["/admin/leads", "/admin/leads/visited", "/admin/leads/completed"],
   },
   {
     name: "Accounts",
-    permissionModule: "dashboard",
+    permissionModule: "accounts",
     subItems: [
-      { name: "Expenses", path: "/admin/accounts/expenses", permissionModule: "dashboard" },
-      { name: "Bank", path: "/admin/accounts/bank", permissionModule: "dashboard" },
+      { name: "Expenses", path: "/admin/accounts/expenses", permissionModule: "accounts.subNav.expenses" },
+      { name: "Bank", path: "/admin/accounts/bank", permissionModule: "accounts.subNav.bank" },
     ],
     matchPaths: ["/admin/accounts/expenses", "/admin/accounts/bank"],
   },
   {
     name: "Invoices",
-    permissionModule: "dashboard",
+    permissionModule: "invoices",
     subItems: [
-      { name: "Invoices", path: "/admin/invoices", permissionModule: "dashboard" },
-      { name: "Items", path: "/admin/invoices/items", permissionModule: "dashboard" },
+      { name: "Invoices", path: "/admin/invoices", permissionModule: "invoices.subNav.invoices" },
+      { name: "Items", path: "/admin/invoices/items", permissionModule: "invoices.subNav.items" },
     ],
     matchPaths: ["/admin/invoices", "/admin/invoices/items"],
   },
   {
     name: "Reports",
     path: "/admin/reports",
-    permissionModule: "dashboard",
+    // Leaf item with no subItems — check its own subNav leaf directly since
+    // the top-level "reports.view" in your sample is always false.
+    permissionModule: "reports.subNav.reports",
     matchPaths: ["/admin/reports"],
   },
   {
     name: "Domain",
     permissionModule: "domain",
     subItems: [
-      { name: "Domain Manager", path: "/admin/domain/manager", permissionModule: "domain" },
+      { name: "Domain Manager", path: "/admin/domain/manager", permissionModule: "domain.subNav.domainManager" },
     ],
     matchPaths: ["/admin/domain/manager"],
   },
@@ -111,104 +115,17 @@ export const primaryNav: NavItem[] = [
 
 /** Routes accessed via the top Admin utility button (not primary nav). */
 export const adminUtilityNav: NavSubItem[] = [
-  { name: "Role Manager", path: "/admin/roles", permissionModule: "subAdminManagement" },
-  { name: "Manage Admin", path: "/admin/subadmins", permissionModule: "subAdminManagement" },
+  { name: "Role Manager", path: "/admin/roles", permissionModule: "roleManagement.subNav.staffUsers" },
+  { name: "Manage Admin", path: "/admin/subadmins", permissionModule: "roleManagement.subNav.staffUsers" },
 ];
 
 /** Sub-header tabs for the notification bell (/admin/messages/*). */
 export const adminMessagesNav: NavSubItem[] = [
-  { name: "Notifications Sent", path: "/admin/messages/sent", permissionModule: "inviteHelp" },
-  { name: "Messages Received", path: "/admin/messages/received", permissionModule: "inviteHelp" },
+  { name: "Notifications Sent", path: "/admin/messages/sent", permissionModule: "messages.subNav.sent" },
+  { name: "Messages Received", path: "/admin/messages/received", permissionModule: "messages.subNav.received" },
 ];
 
-/* ── Legacy nav items (commented out — routes still reachable by URL) ──
-export const legacyPrimaryNav: NavItem[] = [
-  {
-    name: "Dashboard",
-    path: "/admin",
-    permissionModule: "dashboard",
-    subItems: [
-      { name: "Dashboard", path: "/admin", permissionModule: "dashboard" },
-      { name: "Dashboard Data", path: "/admin/dashboard-data", permissionModule: "dashboardData" },
-      { name: "FAQs", path: "/admin/faqs", permissionModule: "dashboardData" },
-      { name: "Privacy", path: "/admin/privacy", permissionModule: "dashboardData" },
-      { name: "Web - Temp", path: "/admin/website-templates", permissionModule: "websiteTemplates" },
-      { name: "Inv - Temp", path: "/admin/invoice-templates", permissionModule: "websiteTemplates" },
-    ],
-    matchPaths: [
-      "/admin",
-      "/admin/dashboard-data",
-      "/admin/faqs",
-      "/admin/privacy",
-      "/admin/website-templates",
-      "/admin/invoice-templates",
-    ],
-  },
-  {
-    name: "All Users",
-    permissionModule: "users",
-    subItems: [
-      { name: "Car Owners", path: "/admin/car-owners", permissionModule: "users" },
-      { name: "Auto Shop Owners", path: "/admin/auto-shop-owners", permissionModule: "users" },
-      { name: "Associates", path: "/admin/associates", permissionModule: "users" },
-      { name: "Dealers", path: "/admin/dealers", permissionModule: "users" },
-    ],
-    matchPaths: ["/admin/car-owners", "/admin/auto-shop-owners", "/admin/associates", "/admin/dealers"],
-  },
-  {
-    name: "Categories / Services",
-    subItems: [
-      { name: "Categories", path: "/admin/categories", permissionModule: "services" },
-      { name: "Services", path: "/admin/services", permissionModule: "categories" },
-    ],
-    matchPaths: ["/admin/categories", "/admin/services"],
-  },
-  {
-    name: "Car Companies",
-    path: "/admin/car-companies",
-    permissionModule: "carCompanies",
-  },
-  {
-    name: "Location",
-    subItems: [
-      { name: "Provinces", path: "/admin/provinces", permissionModule: "provinces" },
-      { name: "Cities", path: "/admin/cities", permissionModule: "cities" },
-    ],
-    matchPaths: ["/admin/provinces", "/admin/cities"],
-  },
-  {
-    name: "Running Deals",
-    path: "/admin/running-deals",
-    permissionModule: "runningDeals",
-  },
-  {
-    name: "Wallet",
-    path: "/admin/wallet",
-    permissionModule: "wallet",
-  },
-  {
-    name: "Invite Help",
-    path: "/admin/invite-help",
-    permissionModule: "inviteHelp",
-  },
-  {
-    name: "Manage Task",
-    path: "/admin/manage-task",
-    permissionModule: "tasks",
-  },
-];
-*/
-
-export const adminOnlyNav: NavItem[] = [
-  /* ── Legacy admin-only nav (commented out — route still reachable by URL) ──
-  {
-    name: "Administration",
-    adminOnly: true,
-    subItems: [{ name: "Sub Admin Management", path: "/admin/subadmins" }],
-    matchPaths: ["/admin/subadmins"],
-  },
-  */
-];
+export const adminOnlyNav: NavItem[] = [];
 
 export function getActivePrimaryItem(
   pathname: string,
@@ -228,4 +145,3 @@ export function getActivePrimaryItem(
   }
   return null;
 }
-

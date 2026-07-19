@@ -1,230 +1,25 @@
-// import React from "react";
-
-// export const MODULES = [
-//   { key: "dashboard", label: "Dashboard" },
-//   { key: "users", label: "Users" },
-//   { key: "services", label: "Services" },
-//   { key: "categories", label: "Sub Services" },
-//   { key: "websiteTemplates", label: "Web - Temp" },
-//   { key: "dashboardData", label: "Dashboard Data" },
-//   { key: "carCompanies", label: "Car Companies" },
-//   { key: "provinces", label: "Provinces" },
-//   { key: "cities", label: "Cities" },
-//   { key: "domain", label: "Domain" },
-//   { key: "runningDeals", label: "Running Deals" },
-//   { key: "wallet", label: "Wallet" },
-//   { key: "inviteHelp", label: "Invite Help" },
-//   { key: "tasks", label: "Tasks" },
-// ];
-
-// export const ACTIONS = ["view", "add", "edit", "delete"] as const;
-// export type Action = (typeof ACTIONS)[number];
-
-// export type ModulePermissions = Record<Action, boolean>;
-// export type Permissions = Record<string, ModulePermissions>;
-
-// export const DEFAULT_PERMS = (): Permissions =>
-//   Object.fromEntries(
-//     MODULES.map((m) => [m.key, { view: false, add: false, edit: false, delete: false }])
-//   );
-
-// const thStyle: React.CSSProperties = {
-//   border: "1px solid #d2d6de",
-//   background: "#f9fafc",
-//   padding: "10px 12px",
-//   textAlign: "left",
-//   fontWeight: 700,
-//   fontSize: 13,
-//   color: "#333",
-//   whiteSpace: "nowrap",
-// };
-
-// const tdStyle: React.CSSProperties = {
-//   border: "1px solid #d2d6de",
-//   padding: "10px 12px",
-//   fontSize: 13,
-//   color: "#555",
-//   verticalAlign: "middle",
-// };
-
-// export function PermissionMatrix({
-//   permissions,
-//   onChange,
-//   readOnly,
-//   permissionAll = false,
-// }: {
-//   permissions: Permissions;
-//   onChange: (perms: Permissions) => void;
-//   readOnly?: boolean;
-//   permissionAll?: boolean;
-// }) {
-//   // If permissionAll is true, display all permissions as "✓" and table is always readOnly
-//   const isSuperAdmin = !!permissionAll;
-
-//   const getModulePerms = (modKey: string): ModulePermissions =>
-//     isSuperAdmin
-//       ? { view: true, add: true, edit: true, delete: true }
-//       : permissions[modKey] || { view: false, add: false, edit: false, delete: false };
-
-//   // We don't allow toggling for super admin
-//   const toggle = (mod: string, action: Action) => {
-//     if (isSuperAdmin) return;
-//     onChange({ ...permissions, [mod]: { ...permissions[mod], [action]: !permissions[mod][action] } });
-//   };
-
-//   const toggleModule = (mod: string) => {
-//     if (isSuperAdmin) return;
-//     const allOn = ACTIONS.every((a) => permissions[mod][a]);
-//     onChange({
-//       ...permissions,
-//       [mod]: Object.fromEntries(ACTIONS.map((a) => [a, !allOn])) as ModulePermissions,
-//     });
-//   };
-
-//   const toggleAll = () => {
-//     if (isSuperAdmin) return;
-//     const totalOn = MODULES.every((m) => ACTIONS.every((a) => permissions[m.key]?.[a]));
-//     onChange(
-//       Object.fromEntries(
-//         MODULES.map((m) => [m.key, Object.fromEntries(ACTIONS.map((a) => [a, !totalOn]))])
-//       ) as Permissions
-//     );
-//   };
-
-//   // For super admin, all permissions are on
-//   const allOn = isSuperAdmin
-//     ? true
-//     : MODULES.every((m) => ACTIONS.every((a) => permissions[m.key]?.[a]));
-
-//   return (
-//     <div className="overflow-x-auto">
-//       <div className="mb-2 flex justify-end">
-//         {!readOnly && !isSuperAdmin && (
-//           <button
-//             type="button"
-//             onClick={toggleAll}
-//             className="cursor-pointer border-none bg-transparent p-0 text-xs text-blue-700 underline"
-//           >
-//             {allOn ? "Deselect All" : "Select All"}
-//           </button>
-//         )}
-//         {isSuperAdmin && (
-//           <span className="text-green-700 text-xs font-bold mr-2">
-//             Super Admin: All permissions enabled
-//           </span>
-//         )}
-//       </div>
-//       <table className="w-full border-collapse text-sm">
-//         <thead>
-//           <tr className="bg-gray-100">
-//             <th style={{ ...thStyle, width: 160 }}>Module</th>
-//             {ACTIONS.map((a) => (
-//               <th key={a} style={{ ...thStyle, textAlign: "center", textTransform: "capitalize" }}>
-//                 {a}
-//               </th>
-//             ))}
-//             {!readOnly && !isSuperAdmin && <th style={{ ...thStyle, textAlign: "center" }}>All</th>}
-//           </tr>
-//         </thead>
-//         <tbody>
-//           {MODULES.map((mod, idx) => {
-//             const p = getModulePerms(mod.key);
-//             const modAllOn = ACTIONS.every((a) => p[a]);
-//             return (
-//               <tr key={mod.key} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-//                 <td style={{ ...tdStyle, fontWeight: 600 }}>{mod.label}</td>
-//                 {ACTIONS.map((a) => (
-//                   <td key={a} style={{ ...tdStyle, textAlign: "center" }}>
-//                     <span className={p[a] ? "font-bold text-ad-green" : "font-bold text-red-600"}>
-//                       {p[a] ? "✓" : "✗"}
-//                     </span>
-//                     {!readOnly && !isSuperAdmin ? (
-//                       <input
-//                         type="checkbox"
-//                         checked={!!p[a]}
-//                         onChange={() => toggle(mod.key, a)}
-//                         className="h-4 w-4 cursor-pointer accent-ad-purple ml-2"
-//                         style={{ display: "inline-block" }}
-//                       />
-//                     ) : null}
-//                   </td>
-//                 ))}
-//                 {!readOnly && !isSuperAdmin && (
-//                   <td style={{ ...tdStyle, textAlign: "center" }}>
-//                     <button
-//                       type="button"
-//                       onClick={() => toggleModule(mod.key)}
-//                       className={`cursor-pointer rounded border px-2 py-0.5 text-[11px] ${
-//                         modAllOn
-//                           ? "border-ad-purple bg-ad-purple text-white"
-//                           : "border-ad-purple bg-white text-ad-purple"
-//                       }`}
-//                     >
-//                       {modAllOn ? "Clear" : "All"}
-//                     </button>
-//                   </td>
-//                 )}
-//               </tr>
-//             );
-//           })}
-//         </tbody>
-//       </table>
-//     </div>
-//   );
-// }
-
-
 import React from "react";
+import {
+  PERMISSION_TREE,
+  BASE_ACTIONS,
+  subNavAnyTrue,
+  buildDefaultPermissions,
+  type Permissions,
+  type BaseAction,
+  type SubNavPermission,
+} from "../../config/permissionModules";
 
-export const MODULES = [
-  { key: "dashboard", label: "Dashboard" },
-  { key: "users", label: "Users" },
-  { key: "services", label: "Services" },
-  { key: "categories", label: "Sub Services" },
-  { key: "websiteTemplates", label: "Web - Temp" },
-  { key: "dashboardData", label: "Dashboard Data" },
-  { key: "carCompanies", label: "Car Companies" },
-  { key: "provinces", label: "Provinces" },
-  { key: "cities", label: "Cities" },
-  { key: "domain", label: "Domain" },
-  { key: "runningDeals", label: "Running Deals" },
-  { key: "wallet", label: "Wallet" },
-  { key: "inviteHelp", label: "Invite Help" },
-  { key: "tasks", label: "Tasks" },
-];
-
-export const ACTIONS = ["view", "add", "edit", "delete"] as const;
-export type Action = (typeof ACTIONS)[number];
-
-// Made partial so it's structurally compatible with NavPermission (which may
-// only define `view` + extras like `subNav`) from config/permissionModules.ts.
-export type ModulePermissions = Partial<Record<Action, boolean>> & {
-  [key: string]: any;
-};
-export type Permissions = Record<string, ModulePermissions>;
-
-export const DEFAULT_PERMS = (): Permissions =>
-  Object.fromEntries(
-    MODULES.map((m) => [m.key, { view: false, add: false, edit: false, delete: false }])
-  );
+// Re-exported so existing imports (e.g. AdminProfile.tsx) keep working
+// against the real tree-shaped permissions object.
+export const DEFAULT_PERMS = buildDefaultPermissions;
+export type { Permissions };
 
 const thStyle: React.CSSProperties = {
-  border: "1px solid #d2d6de",
-  background: "#f9fafc",
-  padding: "10px 12px",
-  textAlign: "left",
-  fontWeight: 700,
-  fontSize: 13,
-  color: "#333",
-  whiteSpace: "nowrap",
+  border: "1px solid #d2d6de", background: "#f9fafc", padding: "8px 10px",
+  textAlign: "center", fontWeight: 700, fontSize: 12, color: "#333", whiteSpace: "nowrap",
 };
-
 const tdStyle: React.CSSProperties = {
-  border: "1px solid #d2d6de",
-  padding: "10px 12px",
-  fontSize: 13,
-  color: "#555",
-  verticalAlign: "middle",
+  border: "1px solid #d2d6de", padding: "8px 10px", fontSize: 12, color: "#555", verticalAlign: "middle",
 };
 
 export function PermissionMatrix({
@@ -238,124 +33,132 @@ export function PermissionMatrix({
   readOnly?: boolean;
   permissionAll?: boolean;
 }) {
-  // If permissionAll is true, display all permissions as "✓" and table is always readOnly
   const isSuperAdmin = !!permissionAll;
+  const locked = readOnly || isSuperAdmin;
 
-  const getModulePerms = (modKey: string): ModulePermissions =>
+  const getSub = (navKey: string, subKey: string): SubNavPermission =>
     isSuperAdmin
-      ? { view: true, add: true, edit: true, delete: true }
-      : permissions[modKey] || { view: false, add: false, edit: false, delete: false };
+      ? { view: true, create: true, update: true, delete: true }
+      : permissions[navKey]?.subNav?.[subKey] ?? { view: false, create: false, update: false, delete: false };
 
-  // We don't allow toggling for super admin
-  const toggle = (mod: string, action: Action) => {
-    if (isSuperAdmin) return;
+  const toggleAction = (navKey: string, subKey: string, action: BaseAction) => {
+    if (locked) return;
+    const nav = permissions[navKey] ?? { view: false, subNav: {} };
+    const sub = nav.subNav[subKey] ?? { view: false, create: false, update: false, delete: false };
+    const nextSub = { ...sub, [action]: !sub[action] };
     onChange({
       ...permissions,
-      [mod]: { ...permissions[mod], [action]: !permissions[mod]?.[action] },
+      [navKey]: {
+        ...nav,
+        subNav: { ...nav.subNav, [subKey]: nextSub },
+        view: nav.view || subNavAnyTrue(nextSub),
+      },
     });
   };
 
-  const toggleModule = (mod: string) => {
-    if (isSuperAdmin) return;
-    const current = permissions[mod] || {};
-    const allOn = ACTIONS.every((a) => !!current[a]);
+  const toggleSubRow = (navKey: string, subKey: string) => {
+    if (locked) return;
+    const sub = getSub(navKey, subKey);
+    const allOn = BASE_ACTIONS.every((a) => !!sub[a]);
+    const nextSub: SubNavPermission = { view: !allOn, create: !allOn, update: !allOn, delete: !allOn };
+    const nav = permissions[navKey] ?? { view: false, subNav: {} };
     onChange({
       ...permissions,
-      [mod]: { ...current, ...Object.fromEntries(ACTIONS.map((a) => [a, !allOn])) },
+      [navKey]: {
+        ...nav,
+        subNav: { ...nav.subNav, [subKey]: nextSub },
+        view: nav.view || subNavAnyTrue(nextSub),
+      },
     });
   };
 
   const toggleAll = () => {
-    if (isSuperAdmin) return;
-    const totalOn = MODULES.every((m) => ACTIONS.every((a) => !!permissions[m.key]?.[a]));
-    onChange(
-      Object.fromEntries(
-        MODULES.map((m) => [
-          m.key,
-          { ...permissions[m.key], ...Object.fromEntries(ACTIONS.map((a) => [a, !totalOn])) },
-        ])
-      ) as Permissions
+    if (locked) return;
+    const allOn = Object.entries(PERMISSION_TREE).every(([navKey, navDef]) =>
+      Object.keys(navDef.subNav).every((subKey) => BASE_ACTIONS.every((a) => !!getSub(navKey, subKey)[a]))
     );
+    const next: Permissions = {};
+    for (const [navKey, navDef] of Object.entries(PERMISSION_TREE)) {
+      next[navKey] = { view: !allOn, subNav: {} };
+      for (const subKey of Object.keys(navDef.subNav)) {
+        next[navKey].subNav[subKey] = { view: !allOn, create: !allOn, update: !allOn, delete: !allOn };
+      }
+    }
+    onChange(next);
   };
 
-  // For super admin, all permissions are on
   const allOn = isSuperAdmin
     ? true
-    : MODULES.every((m) => ACTIONS.every((a) => !!permissions[m.key]?.[a]));
+    : Object.entries(PERMISSION_TREE).every(([navKey, navDef]) =>
+        Object.keys(navDef.subNav).every((subKey) => BASE_ACTIONS.every((a) => !!getSub(navKey, subKey)[a]))
+      );
 
   return (
     <div className="overflow-x-auto">
       <div className="mb-2 flex justify-end">
-        {!readOnly && !isSuperAdmin && (
-          <button
-            type="button"
-            onClick={toggleAll}
-            className="cursor-pointer border-none bg-transparent p-0 text-xs text-blue-700 underline"
-          >
+        {!locked && (
+          <button type="button" onClick={toggleAll}
+            className="cursor-pointer border-none bg-transparent p-0 text-xs text-blue-700 underline">
             {allOn ? "Deselect All" : "Select All"}
           </button>
         )}
         {isSuperAdmin && (
-          <span className="text-green-700 text-xs font-bold mr-2">
-            Super Admin: All permissions enabled
-          </span>
+          <span className="mr-2 text-xs font-bold text-green-700">Super Admin: All permissions enabled</span>
         )}
       </div>
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="bg-gray-100">
-            <th style={{ ...thStyle, width: 160 }}>Module</th>
-            {ACTIONS.map((a) => (
-              <th key={a} style={{ ...thStyle, textAlign: "center", textTransform: "capitalize" }}>
-                {a}
-              </th>
-            ))}
-            {!readOnly && !isSuperAdmin && <th style={{ ...thStyle, textAlign: "center" }}>All</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {MODULES.map((mod, idx) => {
-            const p = getModulePerms(mod.key);
-            const modAllOn = ACTIONS.every((a) => !!p[a]);
-            return (
-              <tr key={mod.key} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                <td style={{ ...tdStyle, fontWeight: 600 }}>{mod.label}</td>
-                {ACTIONS.map((a) => (
-                  <td key={a} style={{ ...tdStyle, textAlign: "center" }}>
-                    <span className={p[a] ? "font-bold text-ad-green" : "font-bold text-red-600"}>
-                      {p[a] ? "✓" : "✗"}
-                    </span>
-                    {!readOnly && !isSuperAdmin ? (
-                      <input
-                        type="checkbox"
-                        checked={!!p[a]}
-                        onChange={() => toggle(mod.key, a)}
-                        className="h-4 w-4 cursor-pointer accent-ad-purple ml-2"
-                        style={{ display: "inline-block" }}
-                      />
-                    ) : null}
-                  </td>
+
+      {Object.entries(PERMISSION_TREE).map(([navKey, navDef]) => (
+        <div key={navKey} className="mb-4">
+          <div className="mb-1 text-xs font-bold text-ad-purple">{navDef.label}</div>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-gray-100">
+                <th style={{ ...thStyle, textAlign: "left", width: 180 }}>Module</th>
+                {BASE_ACTIONS.map((a) => (
+                  <th key={a} style={{ ...thStyle, textTransform: "capitalize" }}>{a}</th>
                 ))}
-                {!readOnly && !isSuperAdmin && (
-                  <td style={{ ...tdStyle, textAlign: "center" }}>
-                    <button
-                      type="button"
-                      onClick={() => toggleModule(mod.key)}
-                      className={`cursor-pointer rounded border px-2 py-0.5 text-[11px] ${
-                        modAllOn
-                          ? "border-ad-purple bg-ad-purple text-white"
-                          : "border-ad-purple bg-white text-ad-purple"
-                      }`}
-                    >
-                      {modAllOn ? "Clear" : "All"}
-                    </button>
-                  </td>
-                )}
+                {!locked && <th style={thStyle}>All</th>}
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {Object.entries(navDef.subNav).map(([subKey, subDef], idx) => {
+                const sub = getSub(navKey, subKey);
+                const rowAllOn = BASE_ACTIONS.every((a) => !!sub[a]);
+                return (
+                  <tr key={subKey} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    <td style={{ ...tdStyle, fontWeight: 600 }}>{subDef.label}</td>
+                    {BASE_ACTIONS.map((a) => (
+                      <td key={a} style={{ ...tdStyle, textAlign: "center" }}>
+                        <span className={sub[a] ? "font-bold text-ad-green" : "font-bold text-red-600"}>
+                          {sub[a] ? "✓" : "✗"}
+                        </span>
+                        {!locked && (
+                          <input
+                            type="checkbox"
+                            checked={!!sub[a]}
+                            onChange={() => toggleAction(navKey, subKey, a)}
+                            className="ml-2 h-4 w-4 cursor-pointer accent-ad-purple"
+                          />
+                        )}
+                      </td>
+                    ))}
+                    {!locked && (
+                      <td style={{ ...tdStyle, textAlign: "center" }}>
+                        <button type="button" onClick={() => toggleSubRow(navKey, subKey)}
+                          className={`cursor-pointer rounded border px-2 py-0.5 text-[11px] ${
+                            rowAllOn ? "border-ad-purple bg-ad-purple text-white" : "border-ad-purple bg-white text-ad-purple"
+                          }`}>
+                          {rowAllOn ? "Clear" : "All"}
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   );
 }
