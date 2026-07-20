@@ -30,10 +30,10 @@ const API_BASE = (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL
 
 const USER_OPTIONS = [
   { value: "car-owner", label: "Car Owner", apiValue: "car_owner" },
-  { value: "mechanic", label: "Mechanic", apiValue: "mechanic" },
+  // { value: "mechanic", label: "Mechanic", apiValue: "mechanic" },
   { value: "shop-owner", label: "Shop Owner", apiValue: "shop_owner" },
-  { value: "associate", label: "Associate", apiValue: "associate" },
-  { value: "dealer", label: "Dealer", apiValue: "dealer" },
+  // { value: "associate", label: "Associate", apiValue: "associate" },
+  // { value: "dealer", label: "Dealer", apiValue: "dealer" },
 ];
 
 // Enum-like slug options for pageSlug by user type, mapped for dropdown rendering
@@ -52,17 +52,17 @@ const PAGE_SLUG_OPTIONS = [
   { value: "Notifications - AutoShopOwner", label: "Notifications - AutoShopOwner", user: "shop-owner"},
 
   // Mechanic
-  { value: "Home - Mechanic", label: "Home - Mechanic", user: "mechanic"},
-  { value: "Profile - Mechanic", label: "Profile - Mechanic", user: "mechanic"},
-  { value: "People - Mechanic", label: "People - Mechanic", user: "mechanic"},
-  { value: "Services - Mechanic", label: "Services - Mechanic", user: "mechanic"},
-  { value: "JobCards - Mechanic", label: "JobCards - Mechanic", user: "mechanic"},
-  { value: "Wallet - Mechanic", label: "Wallet - Mechanic", user: "mechanic"},
-  { value: "MyWebsite - Mechanic", label: "MyWebsite - Mechanic", user: "mechanic"},
-  { value: "Reports - Mechanic", label: "Reports - Mechanic", user: "mechanic"},
-  { value: "Deals - Mechanic", label: "Deals - Mechanic", user: "mechanic"},
-  { value: "Help - Mechanic", label: "Help - Mechanic", user: "mechanic"},
-  { value: "Notifications - Mechanic", label: "Notifications - Mechanic", user: "mechanic"},
+  // { value: "Home - Mechanic", label: "Home - Mechanic", user: "mechanic"},
+  // { value: "Profile - Mechanic", label: "Profile - Mechanic", user: "mechanic"},
+  // { value: "People - Mechanic", label: "People - Mechanic", user: "mechanic"},
+  // { value: "Services - Mechanic", label: "Services - Mechanic", user: "mechanic"},
+  // { value: "JobCards - Mechanic", label: "JobCards - Mechanic", user: "mechanic"},
+  // { value: "Wallet - Mechanic", label: "Wallet - Mechanic", user: "mechanic"},
+  // { value: "MyWebsite - Mechanic", label: "MyWebsite - Mechanic", user: "mechanic"},
+  // { value: "Reports - Mechanic", label: "Reports - Mechanic", user: "mechanic"},
+  // { value: "Deals - Mechanic", label: "Deals - Mechanic", user: "mechanic"},
+  // { value: "Help - Mechanic", label: "Help - Mechanic", user: "mechanic"},
+  // { value: "Notifications - Mechanic", label: "Notifications - Mechanic", user: "mechanic"},
 
   // CarOwner
   { value: "Home - CarOwner", label: "Home - CarOwner", user: "car-owner" },

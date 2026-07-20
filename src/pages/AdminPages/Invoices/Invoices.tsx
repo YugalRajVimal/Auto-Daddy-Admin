@@ -24,6 +24,9 @@ import {
 } from "./api/invoicingApi";
 
 import InvoiceViewModal from "./InvoiceViewModal";
+import { PaidStampToggle } from "./PaidStampToggle";
+
+import { fetchInvoiceSettings, updateInvoiceSettings } from "./api/invoicingApi";
 
 type InvoiceStatus = "Draft" | "Sent" | "Paid" | "Overdue";
 
@@ -120,9 +123,9 @@ function fmtMoney(value: number) {
   return value % 1 === 0 ? String(value) : value.toFixed(2);
 }
 
-function formatInvoiceNo(code: string, seq: number) {
-  return `${code}${String(seq).padStart(5, "0")}`;
-}
+// function formatInvoiceNo(code: string, seq: number) {
+//   return `${code}${String(seq).padStart(5, "0")}`;
+// }
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
@@ -145,11 +148,24 @@ export default function InvoicesPage() {
   const [autoShopOwners, setAutoShopOwners] = useState<any[]>([]);
 
   const [manageOpen, setManageOpen] = useState(false);
-  const [invoiceCode, setInvoiceCode] = useState("");
-  const [nextInvoiceSeq, setNextInvoiceSeq] = useState(1);
-  const [manageForm, setManageForm] = useState({ invoiceCode: "", invoiceNumber: "1" });
+  const [invoicePreview, setInvoicePreview] = useState(""); // formatted next number, e.g. "INV00001"
+  const [manageForm, setManageForm] = useState({ invoicePrefix: "", nextNumber: "1", padLength: "5" });
+  
 
   const [viewingInvoice, setViewingInvoice] = useState<InvoiceRow | null>(null);
+
+  useEffect(() => {
+    fetchInvoiceSettings()
+      .then((res) => {
+        setInvoicePreview(res.settings.nextInvoiceNumberPreview);
+        setManageForm({
+          invoicePrefix: res.settings.invoicePrefix,
+          nextNumber: String(res.settings.nextNumber),
+          padLength: String(res.settings.padLength),
+        });
+      })
+      .catch((err) => adminNotify.error(err.message || "Failed to load invoice settings."));
+  }, []);
 
   const loadInvoices = async () => {
     setLoading(true);
@@ -234,9 +250,11 @@ export default function InvoicesPage() {
   const openAdd = async () => {
     resetForm();
     await loadReferenceData();
-    setForm((f) => ({ ...f, invoiceNo: formatInvoiceNo(invoiceCode, nextInvoiceSeq) }));
+    setForm((f) => ({ ...f, invoiceNo: invoicePreview }));
     setShowForm(true);
   };
+
+
 
   const openEdit = async (row: InvoiceRow) => {
     await loadReferenceData();
@@ -377,7 +395,18 @@ export default function InvoicesPage() {
         );
       } else {
         await createInvoice(payload);
-        setNextInvoiceSeq((n) => n + 1);
+        // Invoice numbering now lives server-side (AdminInvoiceSettings),
+        // so re-fetch the freshly-incremented preview instead of bumping
+        // local state — this keeps the UI correct even if another admin
+        // created an invoice in between, or the manage-invoice settings
+        // changed since this form was opened.
+        try {
+          const settingsRes = await fetchInvoiceSettings();
+          setInvoicePreview(settingsRes.settings.nextInvoiceNumberPreview);
+        } catch {
+          // Non-fatal — the invoice itself saved fine, we just won't have
+          // an up-to-date "next number" preview until the page reloads.
+        }
         adminNotify.success(
           finalStatus === "Paid" ? "Invoice created and marked paid." : finalStatus === "Sent" ? "Invoice created and sent." : "Invoice saved as draft."
         );
@@ -418,14 +447,29 @@ export default function InvoicesPage() {
     if (selected.size === 0) return;
     try {
       const ids = [...selected];
-      let seq = nextInvoiceSeq;
+
+      // Numbering now lives server-side (AdminInvoiceSettings) instead of
+      // local invoiceCode/nextInvoiceSeq state, so pull the current prefix
+      // and starting sequence fresh before generating the batch of numbers
+      // — this avoids handing out numbers that drift from what "Manage
+      // Invoice" last saved.
+      const settingsRes = await fetchInvoiceSettings();
+      const { invoicePrefix, nextNumber, padLength } = settingsRes.settings;
+
+      let seq = nextNumber;
       const nextInvoiceNumbers = ids.map(() => {
-        const no = formatInvoiceNo(invoiceCode, seq);
+        const no = `${invoicePrefix}${String(seq).padStart(padLength, "0")}`;
         seq += 1;
         return no;
       });
+
       await copyInvoices(ids, nextInvoiceNumbers);
-      setNextInvoiceSeq(seq);
+
+      // Reserve the numbers we just handed out by advancing nextNumber past
+      // them, so the next invoice created (copy or new) doesn't collide.
+      const updatedSettingsRes = await updateInvoiceSettings({ nextNumber: seq });
+      setInvoicePreview(updatedSettingsRes.settings.nextInvoiceNumberPreview);
+
       adminNotify.success("Invoice(s) copied.");
       setSelected(new Set());
       loadInvoices();
@@ -449,22 +493,27 @@ export default function InvoicesPage() {
       ]),
     });
   };
+  const openManage = () => setManageOpen(true); 
 
-  const openManage = () => {
-    setManageForm({ invoiceCode, invoiceNumber: String(nextInvoiceSeq) });
-    setManageOpen(true);
-  };
-
-  const handleManageSave = () => {
-    const parsed = Number(manageForm.invoiceNumber);
-    if (!manageForm.invoiceNumber.trim() || Number.isNaN(parsed)) {
+  const handleManageSave = async () => {
+    const parsedNext = Number(manageForm.nextNumber);
+    const parsedPad = Number(manageForm.padLength);
+    if (!manageForm.nextNumber.trim() || Number.isNaN(parsedNext) || parsedNext < 1) {
       adminNotify.error("Invoice number is required.");
       return;
     }
-    setInvoiceCode(manageForm.invoiceCode.trim());
-    setNextInvoiceSeq(parsed);
-    setManageOpen(false);
-    adminNotify.success("Invoice settings updated.");
+    try {
+      const res = await updateInvoiceSettings({
+        invoicePrefix: manageForm.invoicePrefix.trim(),
+        nextNumber: parsedNext,
+        padLength: parsedPad || 5,
+      });
+      setInvoicePreview(res.settings.nextInvoiceNumberPreview);
+      setManageOpen(false);
+      adminNotify.success("Invoice settings updated.");
+    } catch (err: any) {
+      adminNotify.error(err.message || "Failed to update invoice settings.");
+    }
   };
 
   return (
@@ -542,66 +591,13 @@ export default function InvoicesPage() {
                 </CompactField>
               </div>
               <div className="flex items-center justify-center sm:px-4">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setForm((f) => ({
-                      ...f,
-                      status: f.status === "Paid" ? "Draft" : "Paid",
-                    }))
-                  }
-                  title={form.status === "Paid" ? "Mark as unpaid" : "Mark as paid"}
-                  aria-label={form.status === "Paid" ? "Mark as unpaid" : "Mark as paid"}
-                  className={`
-                    relative
-                    select-none
-                    h-24 w-24
-                    flex items-center justify-center
-                    rounded-full
-                    border-4
-                    font-extrabold
-                    uppercase
-                    tracking-wider
-                    shadow-md
-                    transition
-                    duration-200
-                    hover:opacity-80
-                    whitespace-nowrap
-                    p-0
-                    text-white
-                    ${form.status === "Paid" ? "border-ad-green bg-ad-green" : "border-red-500 bg-red-500"}
-                  `}
-                  style={{
-                    boxShadow: '0 4px 24px -6px rgba(0,0,0,0.09)',
-                    letterSpacing: '0.18em',
-                    transform: "rotate(-8deg)"
-                  }}
-                >
-                  <span
-                    className="block w-full text-center text-xl"
-                    style={{
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {form.status === "Paid" ? "PAID" : "UNPAID"}
-                  </span>
-                  {/* Optional subtle "stamp" shadow ring */}
-                  <span
-                    className={`
-                      absolute inset-0 rounded-full
-                      border-2
-                      pointer-events-none
-                      ${form.status === "Paid" ? "border-ad-green" : "border-red-200"}
-                      opacity-25
-                    `}
-                    style={{
-                      top: 6,
-                      left: 6,
-                      right: 6,
-                      bottom: 6,
-                    }}
-                  />
-                </button>
+          
+
+              <PaidStampToggle
+                paid={form.status === "Paid"}
+                onToggle={() => setForm((f) => ({ ...f, status: f.status === "Paid" ? "Draft" : "Paid" }))}
+              />
+
               </div>
         
               <div className="w-full space-y-4 sm:ml-auto sm:mr-8 sm:w-1/2">
@@ -633,35 +629,44 @@ export default function InvoicesPage() {
             </div>
 
             <div className="mt-6 overflow-x-auto rounded border border-gray-300">
-              <table className="w-[calc(100%-2rem)] min-w-[760px] table-fixed border-collapse text-sm">
-                <colgroup>
-                  <col className="w-[22%]" />
-                  <col className="w-[36%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[8%]" />
-                </colgroup>
-                <thead>
-                  <tr className="bg-ad-purple text-white">
-                    <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Item</th>
-                    <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Description</th>
-                    <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Unit Type</th>
-                    <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Unit Price</th>
-                    <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Units</th>
-                    <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">GST (%)</th>
-                    <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.lineItems.map((line) => {
-                    return (
-                      <tr key={line.id} className="bg-white">
-                        <td className="border border-gray-300 p-1">
+              <div className="overflow-x-auto rounded-lg border border-gray-300 bg-white shadow">
+                <table className="min-w-[900px] w-full border-collapse text-sm">
+                  <colgroup>
+                    <col className="w-[22%]" />
+                    <col className="w-[32%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[10%]" />
+                    <col style={{ width: "36px" }} /> {/* X icon column */}
+                  </colgroup>
+                  <thead>
+                    <tr className="bg-ad-purple text-white">
+                      <th className="border-b border-ad-purple-dark px-3 py-3 text-left font-semibold">Item</th>
+                      <th className="border-b border-ad-purple-dark px-3 py-3 text-left font-semibold">Description</th>
+                      <th className="border-b border-ad-purple-dark px-3 py-3 text-center font-semibold">Unit Type</th>
+                      <th className="border-b border-ad-purple-dark px-3 py-3 text-center font-semibold">Unit Price</th>
+                      <th className="border-b border-ad-purple-dark px-3 py-3 text-center font-semibold">Units</th>
+                      <th className="border-b border-ad-purple-dark px-3 py-3 text-center font-semibold">GST (%)</th>
+                      <th className="border-b border-ad-purple-dark px-3 py-3 text-center font-semibold">Amount</th>
+                      <th className="border-b border-ad-purple-dark px-3 py-3 text-center font-semibold"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {form.lineItems.map((line, idx) => (
+                      <tr
+                        key={line.id}
+                        className={`
+                          ${idx % 2 === 0 ? "bg-gray-50" : "bg-white"}
+                          transition-colors hover:bg-indigo-50
+                        `}
+                      >
+                        <td className="border-t border-gray-200 px-2 py-2 align-middle">
                           <select
                             value={line.itemRefId}
                             onChange={(e) => handleItemPick(line.id, e.target.value)}
-                            className={compactInputClass}
+                            className={`${compactInputClass} w-full min-w-[130px]`}
                           >
                             <option value="">Select item</option>
                             {availableItems.map((it) => (
@@ -671,66 +676,79 @@ export default function InvoicesPage() {
                             ))}
                           </select>
                         </td>
-                        <td className="border border-gray-300 p-1">
+                        <td className="border-t border-gray-200 px-2 py-2 align-middle">
                           <input
                             type="text"
                             value={line.description}
                             onChange={(e) => updateLine(line.id, { description: e.target.value })}
-                            className={compactInputClass}
+                            className={`${compactInputClass} w-full`}
+                            placeholder="Item description"
                           />
                         </td>
-                        {/* Unit Type selector: restrict to Unit or Days */}
-                        <td className="border border-gray-300 p-1 text-center">
+                        <td className="border-t border-gray-200 px-2 py-2 text-center align-middle">
                           <select
                             value={line.unitType}
-                            onChange={e => updateLine(line.id, { unitType: e.target.value as "Unit" | "Days" })}
-                            className={compactInputClass}
+                            onChange={(e) => updateLine(line.id, { unitType: e.target.value as "Unit" | "Days" })}
+                            className={`${compactInputClass} w-full`}
                           >
                             <option value="Unit">Unit</option>
                             <option value="Days">Days</option>
                           </select>
                         </td>
-                        <td className="border border-gray-300 p-1">
+                        <td className="border-t border-gray-200 px-2 py-2 text-right align-middle">
                           <input
                             type="number"
                             value={line.unitPrice}
                             onChange={(e) => updateLine(line.id, { unitPrice: e.target.value })}
-                            className={`${compactInputClass} text-right`}
+                            className={`${compactInputClass} w-full text-right`}
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
                           />
                         </td>
-                        <td className="border border-gray-300 p-1">
+                        <td className="border-t border-gray-200 px-2 py-2 text-right align-middle">
                           <input
                             type="number"
                             value={line.units}
                             onChange={(e) => updateLine(line.id, { units: e.target.value })}
-                            className={`${compactInputClass} text-right`}
+                            className={`${compactInputClass} w-full text-right`}
+                            min="0"
+                            step="1"
+                            placeholder="0"
                           />
                         </td>
-                        <td className="border border-gray-300 p-1">
+                        <td className="border-t border-gray-200 px-2 py-2 text-right align-middle">
                           <input
                             type="number"
                             value={line.gstPercent}
                             onChange={(e) => updateLine(line.id, { gstPercent: e.target.value })}
-                            className={`${compactInputClass} text-right`}
+                            className={`${compactInputClass} w-full text-right`}
+                            min="0"
+                            step="0.1"
+                            placeholder="0"
                           />
                         </td>
-                        <td className="relative border border-gray-300 px-4 py-2 text-right tabular-nums">
+                        <td className="border-t border-gray-200 px-4 py-2 text-right align-middle tabular-nums bg-gray-50 font-semibold">
                           {fmtMoney(lineAmount(Number(line.unitPrice) || 0, Number(line.units) || 0))}
+                        </td>
+                        <td className="border-t border-gray-200 px-1 py-2 text-center align-middle">
                           <button
                             type="button"
                             onClick={() => removeLine(line.id)}
                             disabled={form.lineItems.length <= 1}
-                            className="absolute -right-6 top-1/2 -translate-y-1/2 font-bold text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="inline-flex items-center justify-center rounded-full p-1 font-bold text-base text-red-600 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30"
                             aria-label="Remove line"
+                            tabIndex={0}
                           >
-                            ✕
+                            <span aria-hidden>✕</span>
                           </button>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+     
             </div>
             <button
               type="button"
@@ -936,16 +954,21 @@ export default function InvoicesPage() {
                         />
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-center">
-                        {/* <button type="button" onClick={() => openEdit(row)} className="text-blue-700 hover:underline">
-                          {row.invoiceNumber}
-                        </button> */}
                         <button
-  type="button"
-  onClick={() => setViewingInvoice(row)}
-  className="text-blue-700 hover:underline"
->
-  {row.invoiceNumber}
-</button>
+                          type="button"
+                          onClick={() => setViewingInvoice(row)}
+                          // Show red color if deleted view is open
+                          className={
+                            viewMode === "deleted"
+                              ? "text-red-600 font-bold hover:text-red-800 underline"
+                              : "text-blue-700 hover:underline"
+                          }
+                        >
+                          {row.invoiceNumber}
+                        </button>
+                        {/* {viewMode === "deleted" && (
+                          <div className="text-xs text-red-500 mt-0.5">{row._id}</div>
+                        )} */}
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-center">
                         {new Date(row.dateOfIssue).toLocaleDateString("en-CA", { day: "2-digit", month: "2-digit", year: "numeric" })}
@@ -956,7 +979,12 @@ export default function InvoicesPage() {
                       <td className="border border-gray-300 px-3 py-2 text-center">{fmtMoney(row.invoiceTotal)}</td>
                       <td className="border border-gray-300 px-3 py-2 text-center">{row.status}</td>
                       <td className="border border-gray-300 px-3 py-2 text-center">
-                        <button type="button" onClick={() => openEdit(row)} className="text-blue-700 hover:text-blue-900" aria-label={`Edit invoice ${row.invoiceNumber}`}>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(row)}
+                          className="text-blue-700 hover:text-blue-900"
+                          aria-label={`Edit invoice ${row.invoiceNumber}`}
+                        >
                           ✎
                         </button>
                       </td>
@@ -1012,19 +1040,19 @@ export default function InvoicesPage() {
                 <span aria-hidden>⚙</span> Manage Invoice
               </div>
               <div className="space-y-4">
-                <CompactField label="Invoice Code">
+              <CompactField label="Invoice Prefix">
                   <input
                     type="text"
-                    value={manageForm.invoiceCode}
-                    onChange={(e) => setManageForm((f) => ({ ...f, invoiceCode: e.target.value }))}
+                    value={manageForm.invoicePrefix}
+                    onChange={(e) => setManageForm((f) => ({ ...f, invoicePrefix: e.target.value }))}
                     className={compactInputClass}
                   />
                 </CompactField>
-                <CompactField label="Invoice Number" required>
+                <CompactField label="Next Invoice Number" required>
                   <input
                     type="text"
-                    value={manageForm.invoiceNumber}
-                    onChange={(e) => setManageForm((f) => ({ ...f, invoiceNumber: e.target.value.replace(/\D/g, "") }))}
+                    value={manageForm.nextNumber}
+                    onChange={(e) => setManageForm((f) => ({ ...f, nextNumber: e.target.value.replace(/\D/g, "") }))}
                     className={compactInputClass}
                   />
                 </CompactField>

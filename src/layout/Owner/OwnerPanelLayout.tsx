@@ -76,12 +76,29 @@ function OwnerLayoutContent() {
   return (
     <>
       {backToAdminToken && (
-        <div className="w-full bg-yellow-100 border-b border-yellow-300 text-yellow-900 flex items-center justify-between px-4 py-2 text-sm z-50" style={{ position: "sticky", top: 0 }}>
+        <div
+          className="flex items-center justify-between px-4 py-2 text-sm z-50 border border-yellow-300 text-yellow-900 bg-yellow-100 whitespace-nowrap"
+          style={{
+            position: "sticky",
+            top: 0,
+            left: 0,
+            right: 0,
+            width: "fit-content",
+            maxWidth: "360px",
+            minWidth: "225px",
+            margin: "12px auto 0 auto",
+            borderBottomLeftRadius: "22px",
+            borderBottomRightRadius: "22px",
+            borderTopLeftRadius: "8px",
+            borderTopRightRadius: "8px",
+            boxShadow: "0 6px 16px #0001",
+          }}
+        >
           <span>
-            <b>Logged in as Super Admin</b> (impersonating car owner)
+            <b>Logged in as Super Admin</b>
           </span>
           <button
-            className="ml-4 px-3 py-1 rounded bg-yellow-400 hover:bg-yellow-500 font-semibold text-yellow-900 border border-yellow-600"
+            className="ml-4 px-3 py-1 rounded bg-yellow-400 hover:bg-yellow-500 font-semibold text-yellow-900 border border-yellow-600 whitespace-nowrap"
             type="button"
             onClick={handleBackToAdmin}
           >
@@ -89,6 +106,8 @@ function OwnerLayoutContent() {
           </button>
         </div>
       )}
+ 
+ 
       <OwnerPortalShell
         homePath="/owner"
         profilePath="/owner/profile"

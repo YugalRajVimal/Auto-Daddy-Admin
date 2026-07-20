@@ -59,6 +59,28 @@ export interface InvoiceItem {
   // No HSN Code, itemType, or openingStock!
 }
 
+export interface InvoiceSettings {
+  invoicePrefix: string;
+  nextNumber: number;
+  padLength: number;
+  nextInvoiceNumberPreview: string;
+}
+
+export function fetchInvoiceSettings() {
+  return request<{ settings: InvoiceSettings }>(`/settings`);
+}
+
+export function updateInvoiceSettings(payload: {
+  invoicePrefix?: string;
+  nextNumber?: number;
+  padLength?: number;
+}) {
+  return request<{ settings: InvoiceSettings }>(`/settings`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchItems(params: { view: ItemView; search?: string; page?: number; limit?: number }) {
   const qs = new URLSearchParams({
     view: params.view,

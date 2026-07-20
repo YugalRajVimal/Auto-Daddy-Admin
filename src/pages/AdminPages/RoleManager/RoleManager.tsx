@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import AdminPage, { AddNewButton }  from "../../../components/admin/AdminPage";
+import AdminPage  from "../../../components/admin/AdminPage";
 import { PermissionMatrix } from "../../../components/admin/PermissionMatrix";
 import { adminNotify } from "../../../utils/adminNotify";
 import { CompactField, CompactFormFooter, CompactFormPanel, compactInputClass } from "../../../components/admin/ContentPanel";
@@ -42,13 +42,13 @@ const RoleManagement: React.FC = () => {
 
   useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
-  const openCreate = () => {
-    setEditingRole(null);
-    setName("");
-    setType("");
-    setPermissions({} as Permissions);
-    setShowForm(true);
-  };
+  // const openCreate = () => {
+  //   setEditingRole(null);
+  //   setName("");
+  //   setType("");
+  //   setPermissions({} as Permissions);
+  //   setShowForm(true);
+  // };
 
   const openEdit = (r: RoleDoc) => {
     setEditingRole(r);
@@ -94,7 +94,7 @@ const RoleManagement: React.FC = () => {
   return (
     <AdminPage
       title="Roles"
-      headerAction={!showForm ? <AddNewButton onClick={openCreate} /> : undefined}
+      // headerAction={!showForm ? <AddNewButton onClick={openCreate} /> : undefined}
       between={
         showForm ? (
           <CompactFormPanel

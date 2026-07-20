@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React,{ useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { FiBell, FiImage, FiUser } from "react-icons/fi";
 import useAuth from "../../auth/useAuth";
@@ -10,6 +10,27 @@ import { hasView, type StoredPermissions } from "../../utils/navPermissions";
 
 const LOGO = "/logo.png";
 const ADMIN_MESSAGES_PATH = "/admin/messages/received";
+
+
+
+// Adopt OwnerPanelLayout (22-35): Track impersonation state using localStorage, sync across tabs
+const useBackToSuperAdminToken = () => {
+  const [backToSuperAdminToken, setBackToSuperAdminToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("back-to-admin-token");
+    setBackToSuperAdminToken(token);
+    // Listen for changes to storage (other tabs etc)
+    const storageListener = () => {
+      const t = localStorage.getItem("back-to-admin-token");
+      setBackToSuperAdminToken(t);
+    };
+    window.addEventListener('storage', storageListener);
+    return () => window.removeEventListener('storage', storageListener);
+  }, []);
+
+  return backToSuperAdminToken;
+};
 
 function isPathActive(pathname: string, path: string, homePath: string) {
   if (path === homePath) return pathname === homePath;
@@ -161,6 +182,25 @@ console.log("storedPerms:", storedPerms);
         : primarySubItems;
   const activeSubItemPath = getActiveSubItemPath(location.pathname, displaySubItems, homePath);
   const utilityNavPath = visibleUtilityNav[0]?.path ?? "#";
+
+  const { profile, isLogInViaSuperAdmin, login } = useAuth();
+  const backToSuperAdminToken = useBackToSuperAdminToken();
+
+  // Handler for reverting back to Super Admin session
+  const handleBackToSuperAdmin = () => {
+    const backToken = localStorage.getItem("back-to-admin-token");
+
+    if (backToken) {
+      localStorage.setItem("admin-token", backToken);
+      localStorage.removeItem("back-to-admin-token");
+      login({ token: backToken, role: "admin" });
+      setTimeout(() => {
+        // Use post-login redirect (use correct path for your app)
+        window.location.href = "/admin";
+      }, 800);
+    }
+  };
+
 
   const handleNavLinkClick = (path: string, e: React.MouseEvent<HTMLAnchorElement>) => {
     setMobileOpen(false);
@@ -325,6 +365,62 @@ console.log("storedPerms:", storedPerms);
         subjects={helpSubjects}
         onSubmit={submitHelp}
       />
+
+{backToSuperAdminToken && (
+        <div
+          className="flex items-center justify-between px-4 py-2 text-sm z-50 border border-yellow-300 text-yellow-900 bg-yellow-100 whitespace-nowrap"
+          style={{
+            position: "sticky",
+            top: 0,
+            left: 0,
+            right: 0,
+            width: "fit-content",
+
+            minWidth: "225px",
+            margin: "12px auto 0 auto",
+            borderBottomLeftRadius: "22px",
+            borderBottomRightRadius: "22px",
+            borderTopLeftRadius: "8px",
+            borderTopRightRadius: "8px",
+            boxShadow: "0 6px 16px #0001",
+          }}
+        >
+          <span>
+            <b>Impersonating from Super Admin</b>
+            {profile?.name && (
+              <span>
+                {" "}
+                (<span className="font-medium">{profile.name}</span>
+                {profile.email && (
+                  <span className="ml-1 text-gray-600">| {profile.email}</span>
+                )}
+                )
+              </span>
+            )}
+          </span>
+          <button
+            className="ml-4 px-3 py-1 rounded bg-yellow-400 hover:bg-yellow-500 font-semibold text-yellow-900 border border-yellow-600 whitespace-nowrap"
+            type="button"
+            onClick={handleBackToSuperAdmin}
+          >
+            Back to Super Admin
+          </button>
+        </div>
+      )}
+      {!backToSuperAdminToken && isLogInViaSuperAdmin && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-yellow-200 bg-yellow-100 px-4 py-2 text-xs text-yellow-900">
+          <span className="font-semibold">You are logged in as Admin</span>
+          {profile?.name && (
+            <span>
+              (<span className="font-medium">{profile.name}</span>
+              {profile.email && (
+                <span className="ml-1 text-gray-600">| {profile.email}</span>
+              )}
+              )
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="flex min-h-0 w-full flex-1 flex-col">
         <header className="px-3 pt-0 pb-2 sm:px-4">

@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
@@ -32,7 +34,11 @@ import {
 } from "../../../config/permissionModules";
 import { PermissionMatrix } from "../../../components/admin/PermissionMatrix";
 import { useNavigate } from "react-router";
+import { useAuth } from "../../../auth";
 
+
+// Filters cover every field the table shows: Date, Role (type), Assigned
+// Role (the actual Role doc), Name, Phone, Email, Status.
 const STAFF_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "date", label: "Date", type: "date" },
   {
@@ -41,10 +47,10 @@ const STAFF_SEARCH_FIELDS: AdminSearchField[] = [
     type: "select",
     options: ONBOARDABLE_ROLES.map((r) => ({ value: r.value, label: r.label })),
   },
+  { key: "assignedRole", label: "Assigned Role" },
   { key: "name", label: "Name" },
   { key: "phone", label: "Phone" },
   { key: "email", label: "Email" },
-  { key: "permissions", label: "Permissions" },
   {
     key: "status",
     label: "Status",
@@ -220,6 +226,17 @@ const getTokenHeaders = () => ({
   Authorization: localStorage.getItem("admin-token") || "",
 });
 
+
+
+function getPostLoginRedirect(role: string) {
+  // Replace with your app's role-to-redirect mapping logic
+  if (role === "admin") return "/admin";
+  if (role === "role_admin") return "/admin";
+  if (role === "sub_admin") return "/admin";
+  if (role === "associates") return "/admin";
+  return "/";
+}
+
 const StaffUserManagement: React.FC = () => {
   const navigate = useNavigate();
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
@@ -235,19 +252,29 @@ const StaffUserManagement: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  const { login} = useAuth();
+
+  // LoginAs
+  const [loginAsBusy, setLoginAsBusy] = useState(false);
+
   const [showForm, setShowForm] = useState(false);
-  // const [showPermModal, setShowPermModal] = useState<StaffUser | null>(null);
   const [showActivityModal, setShowActivityModal] = useState<StaffUser | null>(null);
   const [showViewModal, setShowViewModal] = useState<StaffUser | null>(null);
   const [showResetModal, setShowResetModal] = useState<StaffUser | null>(null);
   const [editingStaff, setEditingStaff] = useState<StaffUser | null>(null);
 
-  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
-  // const [role, setRole] = useState<StaffRole | "">("");
-  const [role, setRole] = useState<StaffRole | "">("");
-const [roleId, setRoleId] = useState("");
-// delete: const [permissions, setPermissions] = useState<Permissions>(buildDefaultPermissions());
-  // const [permissions, setPermissions] = useState<Permissions>(buildDefaultPermissions());
+  // Password intentionally NOT part of the create/edit form — staff users
+  // are created with a server-generated password and the SuperAdmin sets
+  // the real one via the "Reset Password" row action.
+  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+
+  // `role` (role_admin/sub_admin/associates) is derived automatically from
+  // whichever Role doc (`roleId`) is picked — there is only ONE dropdown
+  // in the UI ("Role"), not two. `role` is kept in state purely so we can
+  // show helper text / gate whether it's editable.
+
+  const [roleId, setRoleId] = useState("");
+
   const [isActive, setIsActive] = useState(true);
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
@@ -255,22 +282,17 @@ const [roleId, setRoleId] = useState("");
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
 
-
-
   const [newPassword, setNewPassword] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
 
   const [roles, setRoles] = useState<{ _id: string; name: string; type: StaffRole }[]>([]);
 
-const fetchRoles = useCallback(async () => {
-  const res = await axios.get(`${API}/api/admin/roles`, { headers: getTokenHeaders() });
-  setRoles(res.data.data || []);
-}, []);
+  const fetchRoles = useCallback(async () => {
+    const res = await axios.get(`${API}/api/admin/roles`, { headers: getTokenHeaders() });
+    setRoles(res.data.data || []);
+  }, []);
 
-useEffect(() => { fetchRoles(); }, [fetchRoles]);
-
-// const rolesForType = (t: StaffRole | "") => roles.filter((r) => r.type === t);
-
+  useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
   const resetTableControls = () => {
     setCurrentPage(1);
@@ -287,10 +309,6 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
       onToggle: resetTableControls,
       storageKey: "admin_deleted_view:staff-users",
     });
-
-  // Remove old token/headers usage; always dynamically produce headers for axios
-  // const token = localStorage.getItem("admin-token");
-  // const headers = { Authorization: token || "" };
 
   const fetchStaffUsers = useCallback(async () => {
     setLoading(true);
@@ -319,16 +337,16 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
   };
 
   const resetFormFields = () => {
-    setForm({ name: "", email: "", phone: "", password: "" });
-    setRole("");
-    // setPermissions(buildDefaultPermissions());
+    setForm({ name: "", email: "", phone: "" });
+
+    setRoleId("");
     setIsActive(true);
   };
 
   const displayStaffUsers = isDeletedView ? deletedStash : staffUsers;
 
   const filtered = displayStaffUsers.filter((s) => {
-    const permsLabel = permissionsSummary((s as any).permissions);
+    const assignedRoleName = (s as any).roleRef?.name || "";
     const q = search.toLowerCase();
     const live =
       !q ||
@@ -336,16 +354,16 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
       s.email.toLowerCase().includes(q) ||
       (s.phone || "").includes(q) ||
       roleLabel(s.role).toLowerCase().includes(q) ||
-      formatAdminDate(s.createdAt).includes(search) ||
-      permsLabel.toLowerCase().includes(q);
+      assignedRoleName.toLowerCase().includes(q) ||
+      formatAdminDate(s.createdAt).includes(search);
     if (!live) return false;
     return (
       searchIncludes(formatAdminDate(s.createdAt), searchFilters.date) &&
       searchEquals(s.role, searchFilters.role) &&
+      searchIncludes(assignedRoleName, searchFilters.assignedRole) &&
       searchIncludes(s.name, searchFilters.name) &&
       searchIncludes(s.phone || "", searchFilters.phone) &&
       searchIncludes(s.email, searchFilters.email) &&
-      searchIncludes(permsLabel, searchFilters.permissions) &&
       searchEquals(s.isActive ? "Active" : "Inactive", searchFilters.status)
     );
   });
@@ -377,8 +395,7 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
   const openEdit = (s: StaffUser) => {
     setEditingStaff(s);
-    setForm({ name: s.name, email: s.email, phone: s.phone || "", password: "" });
-    setRole(s.role);
+    setForm({ name: s.name, email: s.email, phone: s.phone || "" });
     setRoleId((s as any).roleRef?._id || "");
     setIsActive(s.isActive);
     setFormError("");
@@ -413,23 +430,18 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
     setShowForm(false);
   };
 
-  // Pre-fill the matrix with that role's default preset the first time a
-  // role is picked while creating (does not override an in-progress edit).
-  const handleRoleChange = (value: StaffRole) => {
-    setRole(value);
-    // if (!editingStaff) {
-    //   setPermissions({ ...DEFAULT_ROLE_PERMISSIONS[value] });
-    // }
+  // Single source of truth: picking a Role doc sets both roleId and the
+  // derived role "type" (role_admin/sub_admin/associates) together.
+  const handleAssignedRoleChange = (id: string) => {
+    setRoleId(id);
+
   };
 
   const saveForm = async () => {
     setFormError("");
     if (!form.name.trim()) return fail("Name is required.");
     if (!form.email.trim()) return fail("Email is required.");
-    if (!editingStaff && !form.password.trim()) return fail("Password is required.");
-    if (!editingStaff && form.password.trim().length < 6)
-      return fail("Password must be at least 6 characters.");
-    if (!role) return fail("Role is required.");
+    if (!roleId) return fail("Please select a role.");
 
     function fail(msg: string) {
       setFormError(msg);
@@ -450,13 +462,14 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
         }
         showMsg("Staff user updated successfully.");
       } else {
-        if (!roleId) return fail("Please select a role.");
+        // No password sent — the backend generates one; use "Reset Password"
+        // from the row menu afterwards to set the real one.
         await axios.post(
           `${API}/api/admin/staff-users`,
-          { name: form.name.trim(), email: form.email.trim(), phone: form.phone, password: form.password, roleId },
+          { name: form.name.trim(), email: form.email.trim(), phone: form.phone, roleId },
           { headers: getTokenHeaders() }
         );
-        showMsg("Staff user created successfully.");
+        showMsg("Staff user created successfully. Use 'Reset Password' to set their password.");
       }
       setShowForm(false);
       resetFormFields();
@@ -511,6 +524,73 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
       adminNotify.error(msg);
     }
   };
+
+  // LOGIN AS STAFF FOR SINGLE SELECTION
+
+  async function handleLoginAsStaffUser() {
+    if (selectedIds.size !== 1) return;
+    setLoginAsBusy(true);
+    try {
+      // Only get the selected staff user
+      const id = Array.from(selectedIds)[0];
+      // Find the staff user object
+      const userRow = staffUsers.find((u) => u._id === id);
+      if (!userRow) {
+        adminNotify.error("Staff user not found.");
+        setLoginAsBusy(false);
+        return;
+      }
+      // Permissions (if any)
+      const staffPermissions = (userRow as any).roleRef?.permissions || undefined;
+      // Role code, as required by backend (role_admin/sub_admin/associates etc)
+      const sentRole = userRow.role;
+      // Make the request (POST)
+      const res = await axios.post(
+        `${API}/api/auth/admin/loginas-staff`,
+        {
+          staffUserId: userRow._id,
+          permissions: staffPermissions,
+          role: sentRole,
+        },
+        { headers: getTokenHeaders() }
+      );
+      const data = res.data;
+      const { token, role, permissions } = data || {};
+      if (!token || !role) {
+        adminNotify.error(data?.message || "Server did not return token.");
+        setLoginAsBusy(false);
+        return;
+      }
+
+      // Save the SuperAdmin's token for revert
+      const backToSuperAdminToken = localStorage.getItem("admin-token");
+      if (backToSuperAdminToken !== null) {
+        localStorage.setItem("back-to-admin-token", backToSuperAdminToken);
+      } else {
+        localStorage.removeItem("back-to-admin-token");
+      }
+
+      // Store the permission in localStorage (like verify otp)
+      if (permissions !== undefined) {
+        localStorage.setItem("permission", JSON.stringify(permissions));
+      }
+
+      login({ token, role, permissions });
+
+      setTimeout(() => {
+        // Hardcoded ADMIN dashboard for all roles for now
+        window.location.href = getPostLoginRedirect(role);
+      }, 800);
+
+      adminNotify.success("Logged in as selected staff user.");
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Could not login as this staff user.";
+      adminNotify.error(msg);
+    } finally {
+      setLoginAsBusy(false);
+    }
+  }
+
   // Note: deleted staff users are soft-deleted server-side (isActive=false,
   // email mangled) — there is no "recreate" restore path like the old
   // SubAdmin flow, since re-POSTing would create a duplicate with a
@@ -520,45 +600,18 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
   const handleToolbarPrint = () => {
     printAdminTable({
       title: isDeletedView ? "Deleted Staff Users" : "Staff Users",
-      headers: ["Date", "Role", "Name", "Phone", "Email", "Permissions", "Status"],
+      headers: ["Date", "Role", "Assigned Role", "Name", "Phone", "Email", "Status"],
       rows: filtered.map((s) => [
         formatAdminDate(s.createdAt),
         roleLabel(s.role),
+        (s as any).roleRef?.name || "—",
         s.name,
         s.phone || "—",
         s.email,
-        roleLabel(s.role),
-   
         s.isActive ? "Active" : "Inactive",
       ]),
     });
   };
-
-  // const openPermModal = (s: StaffUser) => {
-  //   setEditPerms({ ...buildDefaultPermissions(), ...s.permissions });
-  //   setShowPermModal(s);
-  // };
-
-  // const handleSavePerms = async () => {
-  //   if (!showPermModal) return;
-  //   setPermLoading(true);
-  //   try {
-  //     await axios.patch(
-  //       `${API}/api/admin/staff-users/${showPermModal._id}/permissions`,
-  //       { permissions: editPerms },
-  //       { headers: getTokenHeaders() }
-  //     );
-  //     showMsg("Permissions updated.");
-  //     setShowPermModal(null);
-  //     fetchStaffUsers();
-  //   } catch (e: any) {
-  //     const msg = e?.response?.data?.message || "Failed to update permissions.";
-  //     setError(msg);
-  //     adminNotify.error(msg);
-  //   } finally {
-  //     setPermLoading(false);
-  //   }
-  // };
 
   const openActivityModal = async (s: StaffUser) => {
     setShowActivityModal(s);
@@ -603,8 +656,6 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
   return (
     <>
-    
-
       <Modal isOpen={!!showActivityModal} onClose={() => setShowActivityModal(null)} title={`Activity Log — ${showActivityModal?.name}`} wide>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, whiteSpace: "nowrap" }}>
@@ -648,6 +699,7 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
               {[
                 ["Date", formatAdminDate(showViewModal.createdAt)],
                 ["Role", roleLabel(showViewModal.role)],
+                ["Assigned Role", (showViewModal as any).roleRef?.name || "—"],
                 ["Name", showViewModal.name],
                 ["Phone", showViewModal.phone || "—"],
                 ["Email", showViewModal.email],
@@ -662,12 +714,11 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
             <PermissionMatrix
               permissions={{
                 ...buildDefaultPermissions(),
-                ...(showViewModal && (showViewModal as any).permissions ? (showViewModal as any).permissions : {}),
+                ...(showViewModal && (showViewModal as any).roleRef?.permissions ? (showViewModal as any).roleRef.permissions : {}),
               }}
               onChange={() => {}}
               readOnly
             />
-      
           </>
         )}
       </Modal>
@@ -726,20 +777,27 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
                 <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <CompactField label="Role" required className={compactFixedFieldWidth}>
                     <select
-                      value={role}
-                      onChange={(e) => handleRoleChange(e.target.value as StaffRole)}
+                      value={roleId}
+                      onChange={(e) => handleAssignedRoleChange(e.target.value)}
                       className={compactInputClass}
                       disabled={!!editingStaff}
                     >
                       <option value="">Select role</option>
-                      {ONBOARDABLE_ROLES.map((r) => (
-                        <option key={r.value} value={r.value}>{r.label}</option>
+                      {roles.map((r) => (
+                        <option key={r._id} value={r._id}>
+                          {r.name} 
+                        </option>
                       ))}
                     </select>
-                    {editingStaff && (
+                    {editingStaff ? (
                       <p className="mt-1 text-[11px] text-gray-500">Role cannot be changed after creation.</p>
-                    )}
+                    ) : roles.length === 0 ? (
+                      <p className="mt-1 text-[11px] text-red-600">
+                        No roles exist yet — create one in Role Management first.
+                      </p>
+                    ) : null}
                   </CompactField>
+
                   <CompactField label="Name" required>
                     <input
                       type="text"
@@ -754,11 +812,24 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
                     <input
                       type="tel"
                       value={form.phone}
-                      onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-                      placeholder="+1 800 000 0000"
+                      onChange={(e) => {
+                        // Only allow digits, spaces, and +
+                        const raw = e.target.value.replace(/[^\d\s\+]/g, "");
+                        setForm((p) => ({ ...p, phone: raw }));
+                      }}
+                      placeholder="+1 234 567 8901"
                       className={compactInputClass}
+                      maxLength={17}
+                      pattern="^(\+1\s?\d{3}[\s\-]?\d{3}[\s\-]?\d{4}|(\+91\s?|0)?[6-9]\d{9}|(\+1|1)?\s?\d{3}[\s\-]?\d{3}[\s\-]?\d{4})$"
+                      title="Enter a valid phone number. Canada/USA: +1 234 567 8901, India: +91 98765 43210"
                     />
+                    {form.phone && !/^(\+1\s?\d{3}[\s\-]?\d{3}[\s\-]?\d{4}|(\+91\s?|0)?[6-9]\d{9}|(\+1|1)?\s?\d{3}[\s\-]?\d{3}[\s\-]?\d{4})$/.test(form.phone) && (
+                      <p className="mt-1 text-xs text-red-600">
+                        Please enter a valid phone number. Canada/USA: +1 234 567 8901, India: +91 98765 43210
+                      </p>
+                    )}
                   </CompactField>
+
                   <CompactField label="Email" required>
                     <input
                       type="email"
@@ -769,18 +840,7 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
                       className={compactInputClass}
                     />
                   </CompactField>
-                  {!editingStaff && (
-                    <CompactField label="Password" required>
-                      <input
-                        type="password"
-                        required
-                        value={form.password}
-                        onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                        placeholder="At least 6 characters"
-                        className={compactInputClass}
-                      />
-                    </CompactField>
-                  )}
+
                   <CompactField label="Status" className={compactFixedFieldWidth}>
                     <div className="flex h-[30px] items-center gap-4">
                       <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-gray-800">
@@ -793,45 +853,20 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
                       </label>
                     </div>
                   </CompactField>
-                  <CompactField label="Assigned Role" required>
-  <select
-    value={roleId}
-    onChange={(e) => {
-      setRoleId(e.target.value);
-      setRole(
-        roles.find((r) => r._id === e.target.value)?.type || ""
-      );
-    }}
-    className={compactInputClass}
-    disabled={!!editingStaff}
-  >
-    <option value="">Select role</option>
-    {roles.map((r) => (
-      <option key={r._id} value={r._id}>
-        {r.name} 
-      </option>
-    ))}
-  </select>
-  {roles.length === 0 && (
-    <p className="mt-1 text-[11px] text-red-600">
-      No roles exist yet — create one in Role Management first.
-    </p>
-  )}
-</CompactField>
+{/* 
+                  {!editingStaff && (
+                    <div className="col-span-full text-[11px] text-gray-500">
+                      No password field here — a temporary password is generated automatically.
+                      Use <span className="font-medium">Reset Password</span> from the row menu after saving to set it.
+                    </div>
+                  )} */}
                 </div>
 
-                <div>
+                {/* <div>
                   <div className="mb-1.5 text-xs font-semibold text-gray-700">
-                    Permissions {role ? `(pre-filled with ${roleLabel(role)} defaults — adjust as needed)` : ""}
+                    Permissions {role ? `(inherited from ${roleLabel(role)} → ${roles.find((r) => r._id === roleId)?.name ?? ""})` : ""}
                   </div>
-                  {/* <PermissionMatrix
-                    permissions={permissions}
-                    onChange={(perms) => setPermissions(perms as any)}
-                  /> */}
-
-                  
-            
-                </div>
+                </div> */}
               </form>
             </CompactFormPanel>
           ) : undefined
@@ -852,6 +887,17 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
             <button type="button" onClick={handleToolbarPrint} className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark">
               Print
             </button>
+            {/** LOGIN AS STAFF BUTTON */}
+            {!isDeletedView && selectedIds.size === 1 && (
+              <button
+                type="button"
+                onClick={handleLoginAsStaffUser}
+                disabled={loginAsBusy}
+                className="bg-purple-600 px-3 py-1 text-xs font-medium text-white hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {loginAsBusy ? "Logging in..." : "Login As"}
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <input
@@ -912,7 +958,12 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
                         <input type="checkbox" checked={selectedIds.has(s._id)} onChange={() => toggleSelect(s._id)} className="accent-ad-purple" />
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-center">{formatAdminDate(s.createdAt)}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{roleLabel(s.role)}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center">
+                        {roleLabel(s.role)}
+                        {(s as any).roleRef?.name ? (
+                          <div className="text-[11px] text-gray-500">{(s as any).roleRef.name}</div>
+                        ) : null}
+                      </td>
                       <td className="border border-gray-300 px-3 py-2 text-center">
                         {!isDeletedView ? (
                           <button type="button" onClick={() => openEdit(s)} className="font-medium text-blue-700 hover:underline">
@@ -923,11 +974,10 @@ useEffect(() => { fetchRoles(); }, [fetchRoles]);
                       <td className="border border-gray-300 px-3 py-2 text-center">{s.phone || "—"}</td>
                       <td className="border border-gray-300 px-3 py-2 text-center">{s.email}</td>
                       <td className="border border-gray-300 px-3 py-2 text-center max-w-[280px] truncate" title={s.roleRef?.permissions ? permissionsSummary(s.roleRef.permissions) : "—"}>
-                        {s.roleRef?.permissions 
+                        {s.roleRef?.permissions
                           ? permissionsSummary(s.roleRef.permissions)
                           : "—"}
                       </td>
-                 
                       <td className="border border-gray-300 px-3 py-2 text-center">{s.isActive ? "Active" : "Inactive"}</td>
                       <td className="border border-gray-300 px-3 py-2 text-center">
                         {!isDeletedView ? (

@@ -26,7 +26,7 @@ type IndividualService = { name: string; desc?: string; price?: number; _id: str
 type Service = { _id: string; name?: string; desc?: string; services?: IndividualService[];[k: string]: any };
 type MyService = { service: Service; subServices?: { subService: string }[]; serviceName?: string; serviceId?: string;[k: string]: any };
 type BusinessProfileType = {
-  _id: string; Name?: string; businessAddress?: string; pincode?: string; city?: string;
+  _id: string; Name?: string; businessName?:string; businessAddress?: string; pincode?: string; city?: string;
   businessPhone?: string; businessEmail?: string; businessHSTNumber?: string; openHours?: string;
   openDays?: string[]; perDayOpenHours?: any[]; businessLogo?: string; myServices?: MyService[];
   myDeals?: any[]; teamMembers?: TeamMemberType[]; businessMapLocation?: any; isOpen?: boolean;
@@ -766,6 +766,7 @@ const AutoShopOwners: React.FC = () => {
     setLoading(true); setError("");
     try {
       const res = await axios.get(`${API()}/api/admin/autoshopowners`, { headers: getToken() });
+      console.log(res.data.data);
       if (res.data?.success && Array.isArray(res.data.data)) setAllOwners(res.data.data);
       else {
         const msg = "Failed to fetch auto shop owners";
@@ -1005,7 +1006,7 @@ async function loginAsOwner(userId: string) {
           {formatPhone(owner.phone)}
         </td>;
       case "Name": {
-        const label = owner.businessProfile?.Name || owner.name || "-";
+        const label = owner.businessProfile?.businessName ;
         return (
           <td key={key} className={`${tdClass} text-center font-medium`}>
             {viewMode === "active" && label !== "-" ? (
