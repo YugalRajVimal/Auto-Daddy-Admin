@@ -41,11 +41,6 @@ const SECTION_HEADINGS: Record<HelpSection, string> = {
   resolved: "Resolved",
 };
 
-const EMPTY_MESSAGES: Record<HelpSection, string> = {
-  "ticket-raised": "No active tickets. Raise a ticket to get help.",
-  resolved: "No resolved tickets yet.",
-};
-
 const SHOP_TABLE_BASE = adminPanelTableClasses(true);
 const SHOP_TABLE: AdminPanelTableClasses = {
   ...SHOP_TABLE_BASE,
@@ -404,8 +399,6 @@ export default function ShopHelpPage() {
 
             {listLoading ? (
               <p className="text-center text-sm text-gray-600">Loading tickets…</p>
-            ) : filteredTickets.length === 0 ? (
-              <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES[activeId]}</p>
             ) : (
               <>
                 <HelpTicketTable

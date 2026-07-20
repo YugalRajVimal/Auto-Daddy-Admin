@@ -86,7 +86,7 @@ const checkboxBoxClass =
 const shopHoursBulkButtonClass =
   "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
 
-/** Business profile — phone/city/HST/tax equal; address/email equal (wider); full row width. */
+/** Business profile — phone/city/TAX ID/tax equal; address/email equal (wider); full row width. */
 const BUSINESS_PROFILE_FIELD_GRID =
   "grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(0,2.2fr)]";
 
@@ -549,7 +549,7 @@ export function ShopBusinessProfileEditor({
   const [zip, setZip] = useState(zipCode ?? "");
   const [address, setAddress] = useState(business?.address ?? "");
   const [email, setEmail] = useState(business?.email ?? "");
-  const [hst, setHst] = useState(business?.hstNumber ?? "");
+  const [hst, setHst] = useState((business?.hstNumber ?? "").toUpperCase());
   const [tax, setTax] = useState(business?.gstPercent != null ? String(business.gstPercent) : "");
   const [shopTypes, setShopTypes] = useState<ShopType[]>(() =>
     normalizeShopTypes(initialShopTypes ?? business?.shopTypes ?? initialShopType ?? business?.shopType)
@@ -648,7 +648,7 @@ export function ShopBusinessProfileEditor({
     setZip(zipCode ?? "");
     setAddress(business?.address ?? "");
     setEmail(business?.email ?? "");
-    setHst(business?.hstNumber ?? "");
+    setHst((business?.hstNumber ?? "").toUpperCase());
     setTax(business?.gstPercent != null ? String(business.gstPercent) : "");
     setShopTypes(savedShopTypes);
     setShopTypesOpen(false);
@@ -762,21 +762,8 @@ export function ShopBusinessProfileEditor({
     return !isNaN(value) && value >= 0 && value <= 50;
   }
 
-  // HST formats:
-  // Canada: 9 digits, optional "RT0001" (eg. 123456789RT0001)
-  function isValidCanadaHst(hst: string) {
-    // 9 digits or 9digits+RT+4digits
-    return /^(\d{9}|(\d{9}RT\d{4}))$/i.test(hst.replace(/\s/g, ""));
-  }
-  // India GSTIN: 15 char format: 11AAAAA1111Z1A1 (but sometimes called "HST")
-  function isValidIndiaHst(hst: string) {
-    // GSTIN: 15 chars, format: 2 digits, 10 alphanum, 1 letter, 1 digit, 1 letter/number
-    return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i.test(hst.replace(/\s/g, ""));
-  }
-  // US Federal Tax ID/EIN: 2 digits - 7 digits (optional for HST?)
-  function isValidUSHst(hst: string) {
-    // 12-3456789 or 123456789
-    return /^(\d{2}-?\d{7})$/.test(hst.replace(/\s/g, ""));
+  function isValidTaxId(taxId: string) {
+    return /^[A-Z0-9]{17}$/.test(taxId.replace(/\s/g, ""));
   }
 
   function validateAllFields() {
@@ -808,15 +795,10 @@ export function ShopBusinessProfileEditor({
       }
     }
 
-    // HST Number
+    // TAX ID No
     if (hst.trim()) {
-      const formatValid =
-        isValidCanadaHst(hst.trim()) ||
-        isValidUSHst(hst.trim()) ||
-        isValidIndiaHst(hst.trim());
-      if (!formatValid) {
-        fieldErrors.hst =
-          "Enter a valid HST/GST number (Canada, India, or US format).";
+      if (!isValidTaxId(hst.trim())) {
+        fieldErrors.hst = "Enter a valid TAX ID No (17 uppercase alphanumeric characters).";
       }
     }
 
@@ -852,7 +834,7 @@ export function ShopBusinessProfileEditor({
         businessAddress: address.trim(),
         pincode: zip.trim(),
         businessEmail: email.trim(),
-        businessHSTNumber: hst.trim(),
+        businessHSTNumber: hst.trim().toUpperCase(),
         gst: tax.trim() || "0",
         shopTypes,
         businessLogo: logo,
@@ -947,11 +929,14 @@ export function ShopBusinessProfileEditor({
               <div className="text-xs text-red-600">{errors.zip}</div>
             )}
           </CompactField>
-          <CompactField label="HST No.">
+          <CompactField label="TAX ID No">
             <input
               className={shopCompactInputClass + (errors.hst ? " border-red-500" : "")}
               value={hst}
-              onChange={(e) => setHst(e.target.value)}
+              onChange={(e) =>
+                setHst(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 17))
+              }
+              maxLength={17}
               disabled={saving}
             />
             {errors.hst && (
@@ -1697,6 +1682,109 @@ export function ShopCarBrandList({
   );
 }
 
+export function ShopCarBrandCheckboxList({
+  brands,
+  selectedIds,
+  savingBrandId,
+  onToggle,
+  emptyMessage = "No car brands available.",
+}: {
+  brands: ShopCarCompany[];
+  selectedIds: Set<string>;
+  savingBrandId?: string | null;
+  onToggle: (id: string, next: boolean) => void;
+  emptyMessage?: string;
+}) {
+  const sortedBrands = useMemo(
+    () =>
+      [...brands].sort((a, b) =>
+        getCarBrandName(a).localeCompare(getCarBrandName(b), undefined, { sensitivity: "base" })
+      ),
+    [brands]
+  );
+
+  return sortedBrands.length === 0 ? (
+    <p className="py-4 text-center text-sm text-gray-500">{emptyMessage}</p>
+  ) : (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+      {sortedBrands.map((company) => {
+        const id = getCarBrandId(company);
+        const name = getCarBrandName(company);
+        const isSaving = savingBrandId === id;
+        const isSelected = selectedIds.has(id);
+        return (
+          <label
+            key={id}
+            className={`relative flex cursor-pointer flex-col items-center gap-2 rounded-lg border bg-white px-2 py-3 shadow-sm transition-all hover:border-ad-purple/40 hover:shadow-md ${
+              isSelected ? "border-ad-purple ring-1 ring-ad-purple/30" : "border-gray-200"
+            } ${isSaving ? "opacity-60" : ""}`}
+          >
+            <input
+              type="checkbox"
+              checked={isSelected}
+              disabled={isSaving}
+              onChange={(e) => onToggle(id, e.target.checked)}
+              aria-label={`Select ${name}`}
+              className="absolute right-2 top-2 h-3.5 w-3.5 accent-ad-purple disabled:opacity-60"
+            />
+            <div className="flex h-14 w-full items-center justify-center pt-2">
+              <CarBrandLogo company={company} className="max-h-12 max-w-full object-contain" />
+            </div>
+            <span className="text-center text-[11px] font-bold uppercase tracking-wide text-gray-800">
+              {name}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ShopCarBrandAddCheckboxPanel({
+  brands,
+  selectedIds,
+  savingBrandId,
+  onToggle,
+  onClose,
+  emptyMessage = "All car brands have been added.",
+}: {
+  brands: ShopCarCompany[];
+  selectedIds: Set<string>;
+  savingBrandId?: string | null;
+  onToggle: (id: string, next: boolean) => void;
+  onClose: () => void;
+  emptyMessage?: string;
+}) {
+  return (
+    <CompactFormPanel
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
+      footer={
+        <ProfileStatusFooter
+          message="You are adding a car brand"
+          actions={
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs font-medium text-blue-600 underline hover:text-blue-700"
+            >
+              Cancel
+            </button>
+          }
+        />
+      }
+    >
+      <ShopCarBrandCheckboxList
+        brands={brands}
+        selectedIds={selectedIds}
+        savingBrandId={savingBrandId}
+        onToggle={onToggle}
+        emptyMessage={emptyMessage}
+      />
+    </CompactFormPanel>
+  );
+}
+
 export function ShopCarBrandAddEditor({
   companies,
   selectedIds,
@@ -2118,6 +2206,20 @@ export function ShopServiceAddEditor({
             onChange={(e) => setServiceDate(e.target.value)}
           />
         </CompactField>
+        <CompactField label="Match Vendor Type">
+          <select
+            className={shopCompactInputClass}
+            value={vendorType}
+            disabled={saving || allowedVendorTypes.length === 0}
+            onChange={(e) => handleVendorTypeChange(normalizeShopType(e.target.value))}
+          >
+            {allowedVendorTypes.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </CompactField>
         <CompactField label="Name of Service">
           <select
             className={shopCompactInputClass}
@@ -2139,20 +2241,6 @@ export function ShopServiceAddEditor({
                 </option>
               );
             })}
-          </select>
-        </CompactField>
-        <CompactField label="Match Vendor Type">
-          <select
-            className={shopCompactInputClass}
-            value={vendorType}
-            disabled={saving || allowedVendorTypes.length === 0}
-            onChange={(e) => handleVendorTypeChange(normalizeShopType(e.target.value))}
-          >
-            {allowedVendorTypes.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
           </select>
         </CompactField>
         <CompactField label="Status">
@@ -2252,7 +2340,7 @@ export function ShopOperationalServicesEditor({
               type="button"
               onClick={() => void handleBulkDelete()}
               disabled={!hasBulkSelection || saving}
-              className={shopHoursBulkButtonClass}
+              className={`${shopHoursBulkButtonClass}${hasBulkSelection ? "" : " invisible"}`}
             >
               Delete
             </button>
@@ -2278,10 +2366,6 @@ export function ShopOperationalServicesEditor({
       </ShopReveal>
       {loading ? (
         <ShopLoadingPanel variant="profile-table" className="mt-4" />
-      ) : services.length === 0 ? (
-        <p className="text-center text-sm text-gray-600">
-          No services added yet. Click &ldquo;+ Add New&rdquo; to add one.
-        </p>
       ) : (
         <ShopServiceList
           services={services}

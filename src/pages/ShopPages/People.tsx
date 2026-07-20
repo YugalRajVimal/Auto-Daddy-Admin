@@ -360,6 +360,21 @@ function StatusBanner({ message }: { message: string }) {
   );
 }
 
+function SearchInviteNotice() {
+  return (
+    <div className="mt-3 flex flex-col items-center gap-2 py-2 text-center">
+      <img
+        src="/images/shop/attention-stamp.png"
+        alt="Attention"
+        className="h-20 w-20 object-contain"
+      />
+      <p className="max-w-md text-sm font-serif italic text-gray-800">
+        this customer is not on your list, Invite to add in your permanent customer list
+      </p>
+    </div>
+  );
+}
+
 function VehicleInfoField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 flex-1">
@@ -821,7 +836,7 @@ function CustomerListTable({
                           onClick={() => onAddCustomer?.(customer)}
                           className="rounded border border-ad-purple bg-white px-3 py-0.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8]"
                         >
-                          Add
+                          Invite
                         </button>
                       )}
                     </td>
@@ -1654,15 +1669,6 @@ export default function ShopPeoplePage() {
     await loadSectionCustomers();
   };
 
-  const emptyMessage =
-    section === "approval"
-      ? search.trim()
-        ? "No customers found."
-        : "No customers awaiting approval."
-      : search.trim()
-        ? "No customers found."
-        : "No approved customers in your list yet.";
-
   const showList = !detailView;
   const showAddNewAction =
     section === "my-list" &&
@@ -1759,13 +1765,6 @@ export default function ShopPeoplePage() {
               onChange={setSearch}
               inputId={PEOPLE_SEARCH_INPUT_ID}
               showSearch
-              leading={
-                showMyListSearchActions ? (
-                  <p className="text-sm font-serif italic text-gray-800">
-                    Press on &apos;add&apos; button, to add as customer
-                  </p>
-                ) : null
-              }
               trailing={
                 showAddNewAction ? (
                   <AddNewButton onClick={() => setShowAddForm(true)} />
@@ -1816,9 +1815,7 @@ export default function ShopPeoplePage() {
                   void loadSectionCustomers();
                 }}
               />
-            ) : listCustomers.length === 0 && !showAddForm ? (
-              <p className="text-center text-sm text-gray-600">{emptyMessage}</p>
-            ) : listCustomers.length > 0 ? (
+            ) : (
               <>
                 {section === "approval" ? (
                   <ApprovalCustomerListTable
@@ -1826,16 +1823,19 @@ export default function ShopPeoplePage() {
                     onEdit={handleEditCustomer}
                   />
                 ) : (
-                  <CustomerListTable
-                    customers={paginatedCustomers}
-                    onEdit={handleEditCustomer}
-                    onShowVehicles={handleShowVehicles}
-                    showCity
-                    showStatus={!showMyListSearchActions}
-                    showAction={showMyListSearchActions}
-                    isCustomerAdded={isCustomerAlreadyAdded}
-                    onAddCustomer={handleAddCustomerFromSearch}
-                  />
+                  <>
+                    <CustomerListTable
+                      customers={paginatedCustomers}
+                      onEdit={handleEditCustomer}
+                      onShowVehicles={handleShowVehicles}
+                      showCity
+                      showStatus={!showMyListSearchActions}
+                      showAction={showMyListSearchActions}
+                      isCustomerAdded={isCustomerAlreadyAdded}
+                      onAddCustomer={handleAddCustomerFromSearch}
+                    />
+                    {showMyListSearchActions ? <SearchInviteNotice /> : null}
+                  </>
                 )}
 
                 <ShopListFooter>
@@ -1864,7 +1864,7 @@ export default function ShopPeoplePage() {
                   ) : null}
                 </ShopListFooter>
               </>
-            ) : null}
+            )}
           </>
         ) : null}
       </div>

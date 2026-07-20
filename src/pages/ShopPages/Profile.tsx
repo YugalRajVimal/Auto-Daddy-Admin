@@ -11,7 +11,7 @@ import ShopManageNumberingDialog, {
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopBusinessProfileEditor,
-  ShopCarBrandAddEditor,
+  ShopCarBrandAddCheckboxPanel,
   ShopCarBrandList,
   ShopOpenHoursEditor,
   ShopOperationalServicesEditor,
@@ -423,6 +423,10 @@ export default function ShopProfilePage() {
     () => carCompanies.filter((company) => selectedBrands.has(getCarBrandId(company))),
     [carCompanies, selectedBrands]
   );
+  const availableBrandList = useMemo(
+    () => carCompanies.filter((company) => !selectedBrands.has(getCarBrandId(company))),
+    [carCompanies, selectedBrands]
+  );
   const selectedServiceList = useMemo(
     () => resolveProfileSelectedServices(fullServiceCatalog, myServices, selectedServiceIds),
     [fullServiceCatalog, myServices, selectedServiceIds]
@@ -616,30 +620,30 @@ export default function ShopProfilePage() {
               </div>
             ) : null}
             <ShopReveal show={showAddBrand && !brandsLoading}>
-              <ShopCarBrandAddEditor
-                companies={carCompanies}
-                selectedIds={selectedBrands}
-                onSaved={(id) => {
-                  setSelectedBrands((prev) => new Set([...prev, id]));
-                  void refresh();
-                  setShowAddBrand(false);
+              <ShopCarBrandAddCheckboxPanel
+                brands={availableBrandList}
+                selectedIds={new Set()}
+                savingBrandId={savingBrand}
+                emptyMessage="All car brands have been added."
+                onToggle={(id, next) => {
+                  if (next) void toggleBrand(id, true);
                 }}
                 onClose={() => setShowAddBrand(false)}
               />
             </ShopReveal>
             {brandsLoading ? (
               <ShopLoadingPanel variant="brand-grid" />
-            ) : selectedBrandList.length === 0 ? (
+            ) : selectedBrandList.length === 0 && !showAddBrand ? (
               <p className="text-center text-sm text-gray-600">
                 No car brands added yet. Click &ldquo;+ Add New&rdquo; to add one.
               </p>
-            ) : (
+            ) : selectedBrandList.length > 0 ? (
               <ShopCarBrandList
                 brands={selectedBrandList}
                 savingBrandId={savingBrand}
                 onRemove={(company) => void removeBrand(company)}
               />
-            )}
+            ) : null}
           </div>
         );
       case "services":

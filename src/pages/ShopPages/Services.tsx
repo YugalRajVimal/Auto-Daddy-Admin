@@ -345,7 +345,7 @@ export default function ShopServicesPage() {
                     type="button"
                     onClick={() => void handleBulkDelete()}
                     disabled={!hasBulkSelection || bulkDeleting}
-                    className={shopHoursBulkButtonClass}
+                    className={`${shopHoursBulkButtonClass}${hasBulkSelection ? "" : " invisible"}`}
                   >
                     Delete
                   </button>
@@ -364,9 +364,7 @@ export default function ShopServicesPage() {
               />
             </ShopReveal>
 
-            {allSubs.length === 0 && !formOpen ? (
-              <p className="text-center text-sm text-gray-600">No sub-services yet.</p>
-            ) : allSubs.length > 0 ? (
+            {!formOpen ? (
               <>
                 <SubServiceTable
                   rows={paginatedRows}

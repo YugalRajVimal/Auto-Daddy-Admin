@@ -81,13 +81,6 @@ const SECTION_HEADINGS: Record<WalletView, string> = {
   banks: "Manage Banks",
 };
 
-const EMPTY_MESSAGES: Record<WalletView, string> = {
-  paid: "No paid invoices in this category.",
-  unpaid: "No unpaid invoices in this category.",
-  expenses: "No expenses match your search.",
-  banks: "No bank accounts match your search.",
-};
-
 const SHOP_COMBO_EDIT_BUTTON_CLASS =
   "block w-full border-b-2 border-ad-purple-dark bg-ad-purple px-2 py-2 text-left text-sm font-bold tracking-wide text-white shadow-inner hover:bg-ad-purple-dark";
 const SHOP_COMBO_ACTIVE_ITEM_CLASS = "bg-[#f5cce8] font-semibold text-ad-purple";
@@ -1886,9 +1879,6 @@ export default function ShopWalletPage() {
     }
 
     if (view === "expenses") {
-      if (filteredExpenses.length === 0) {
-        return <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES.expenses}</p>;
-      }
       return (
         <>
           <WalletExpenseTable
@@ -1909,9 +1899,6 @@ export default function ShopWalletPage() {
     }
 
     if (view === "banks") {
-      if (filteredBanks.length === 0) {
-        return <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES.banks}</p>;
-      }
       return (
         <>
           <WalletBankTable
@@ -1927,10 +1914,6 @@ export default function ShopWalletPage() {
           />
         </>
       );
-    }
-
-    if (filteredList.length === 0) {
-      return <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES[view]}</p>;
     }
 
     return (

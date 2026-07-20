@@ -97,13 +97,6 @@ const SECTION_HEADINGS: Record<JobCardSection, string> = {
   paid: "Paid Jobs",
 };
 
-const EMPTY_MESSAGES: Record<JobCardSection, string> = {
-  "my-list": "No job cards yet.",
-  approvals: "No job cards awaiting approval yet.",
-  "convert-invoice": "No converted to invoice job cards yet.",
-  paid: "No paid cash job cards yet.",
-};
-
 const SHOP_TABLE_BASE = adminPanelTableClasses(true);
 const SHOP_TABLE: AdminPanelTableClasses = {
   ...SHOP_TABLE_BASE,
@@ -807,7 +800,7 @@ export default function ShopJobCardsPage() {
                     type="button"
                     onClick={() => void handleBulkDelete()}
                     disabled={!canBulkDelete || bulkBusy}
-                    className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
+                    className={`${SHOP_JOB_CARD_BULK_BUTTON_CLASS}${hasBulkSelection ? "" : " invisible"}`}
                   >
                     Delete
                   </button>
@@ -850,8 +843,6 @@ export default function ShopJobCardsPage() {
               <ShopListSkeleton variant="profile-table" className="w-full" />
             ) : error ? (
               <ShopErrorPanel message={error} onRetry={() => void refreshLists()} />
-            ) : filteredListCards.length === 0 ? (
-              <p className="text-center text-sm text-gray-600">{EMPTY_MESSAGES[section]}</p>
             ) : (
               <>
                 <JobCardListTable

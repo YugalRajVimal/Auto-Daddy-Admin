@@ -135,8 +135,6 @@ export default function ShopMessagesPage() {
           <ShopLoadingPanel variant="profile-table" count={6} />
         ) : error ? (
           <ShopErrorPanel message={error} onRetry={() => void refresh()} />
-        ) : items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-600">No notifications yet.</p>
         ) : (
           <>
             <MessagesTable rows={items} />

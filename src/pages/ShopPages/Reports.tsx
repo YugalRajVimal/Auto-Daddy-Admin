@@ -204,119 +204,117 @@ function ShopGroupedLedgerReport({
       fromDate={fromDate}
       toDate={toDate}
     >
-      {rows.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-gray-600">
-          No records found for the selected filters.
-        </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className={ADMIN_PANEL_TABLE_CLASS}>
-            <thead>
-              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-                {tableHeaders.map((header) => (
-                  <th
-                    key={header}
-                    className={`${ADMIN_PANEL_TH_CLASS} ${header === "Amount" ? "text-right" : "text-left"}`}
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {groupBy === "category" &&
-                categoryGroups.map((group) => (
-                  <Fragment key={`cat-${group.key}`}>
-                    <tr className="bg-gray-300">
-                      <td colSpan={4} className={`${ADMIN_PANEL_TD_CLASS} font-bold uppercase`}>
-                        {group.label}
-                      </td>
-                    </tr>
-                    {group.subcategories.map((sub) => (
-                      <Fragment key={`sub-${group.key}-${sub.key}`}>
-                        <tr>
-                          <td colSpan={4} className={`${ADMIN_PANEL_TD_CLASS} font-bold uppercase`}>
-                            {sub.label}
-                          </td>
-                        </tr>
-                        {sub.rows.map((row, idx) => (
-                          <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
-                            <td className={ADMIN_PANEL_TD_CLASS}>{formatDisplayDate(row.date)}</td>
-                            <td className={`${ADMIN_PANEL_TD_CLASS} uppercase`}>{row.vendor}</td>
-                            <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
-                            <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
-                              {formatReportAmount(row.amount)}
+      <div className="overflow-x-auto">
+        <table className={ADMIN_PANEL_TABLE_CLASS}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              {tableHeaders.map((header) => (
+                <th
+                  key={header}
+                  className={`${ADMIN_PANEL_TH_CLASS} ${header === "Amount" ? "text-right" : "text-left"}`}
+                >
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? null : (
+              <>
+                {groupBy === "category" &&
+                  categoryGroups.map((group) => (
+                    <Fragment key={`cat-${group.key}`}>
+                      <tr className="bg-gray-300">
+                        <td colSpan={4} className={`${ADMIN_PANEL_TD_CLASS} font-bold uppercase`}>
+                          {group.label}
+                        </td>
+                      </tr>
+                      {group.subcategories.map((sub) => (
+                        <Fragment key={`sub-${group.key}-${sub.key}`}>
+                          <tr>
+                            <td colSpan={4} className={`${ADMIN_PANEL_TD_CLASS} font-bold uppercase`}>
+                              {sub.label}
                             </td>
                           </tr>
-                        ))}
-                        <GroupTotalRow colSpan={4} total={sub.total} />
-                      </Fragment>
-                    ))}
-                  </Fragment>
-                ))}
+                          {sub.rows.map((row, idx) => (
+                            <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
+                              <td className={ADMIN_PANEL_TD_CLASS}>{formatDisplayDate(row.date)}</td>
+                              <td className={`${ADMIN_PANEL_TD_CLASS} uppercase`}>{row.vendor}</td>
+                              <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
+                              <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
+                                {formatReportAmount(row.amount)}
+                              </td>
+                            </tr>
+                          ))}
+                          <GroupTotalRow colSpan={4} total={sub.total} />
+                        </Fragment>
+                      ))}
+                    </Fragment>
+                  ))}
 
-              {groupBy === "vendor" &&
-                vendorGroups.map((group) => (
-                  <Fragment key={`vendor-${group.key}`}>
-                    <tr className="bg-gray-300">
-                      <td colSpan={4} className={`${ADMIN_PANEL_TD_CLASS} font-bold uppercase`}>
-                        {group.label}
-                      </td>
-                    </tr>
-                    {group.rows.map((row, idx) => (
-                      <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
-                        <td className={ADMIN_PANEL_TD_CLASS}>{formatDisplayDate(row.date)}</td>
-                        <CategoryCell
-                          categories={categories}
-                          row={row as unknown as ShopReportLedgerRow}
-                        />
-                        <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
-                        <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
-                          {formatReportAmount(row.amount)}
+                {groupBy === "vendor" &&
+                  vendorGroups.map((group) => (
+                    <Fragment key={`vendor-${group.key}`}>
+                      <tr className="bg-gray-300">
+                        <td colSpan={4} className={`${ADMIN_PANEL_TD_CLASS} font-bold uppercase`}>
+                          {group.label}
                         </td>
                       </tr>
-                    ))}
-                    <GroupTotalRow colSpan={4} total={group.total} />
-                  </Fragment>
-                ))}
+                      {group.rows.map((row, idx) => (
+                        <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
+                          <td className={ADMIN_PANEL_TD_CLASS}>{formatDisplayDate(row.date)}</td>
+                          <CategoryCell
+                            categories={categories}
+                            row={row as unknown as ShopReportLedgerRow}
+                          />
+                          <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
+                          <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
+                            {formatReportAmount(row.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                      <GroupTotalRow colSpan={4} total={group.total} />
+                    </Fragment>
+                  ))}
 
-              {groupBy === "project" &&
-                projectGroups.map((group) => (
-                  <Fragment key={`project-${group.key}`}>
-                    <tr className="bg-gray-300">
-                      <td colSpan={4} className={`${ADMIN_PANEL_TD_CLASS} font-bold`}>
-                        {group.label}
-                      </td>
-                    </tr>
-                    {group.rows.map((row, idx) => (
-                      <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
-                        <td className={`${ADMIN_PANEL_TD_CLASS} uppercase`}>{row.vendor}</td>
-                        <CategoryCell
-                          categories={categories}
-                          row={row as unknown as ShopReportLedgerRow}
-                        />
-                        <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
-                        <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
-                          {formatReportAmount(row.amount)}
+                {groupBy === "project" &&
+                  projectGroups.map((group) => (
+                    <Fragment key={`project-${group.key}`}>
+                      <tr className="bg-gray-300">
+                        <td colSpan={4} className={`${ADMIN_PANEL_TD_CLASS} font-bold`}>
+                          {group.label}
                         </td>
                       </tr>
-                    ))}
-                    <GroupTotalRow colSpan={4} total={group.total} />
-                  </Fragment>
-                ))}
+                      {group.rows.map((row, idx) => (
+                        <tr key={String(row.id)} className={adminPanelRowClass(idx)}>
+                          <td className={`${ADMIN_PANEL_TD_CLASS} uppercase`}>{row.vendor}</td>
+                          <CategoryCell
+                            categories={categories}
+                            row={row as unknown as ShopReportLedgerRow}
+                          />
+                          <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
+                          <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
+                            {formatReportAmount(row.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                      <GroupTotalRow colSpan={4} total={group.total} />
+                    </Fragment>
+                  ))}
 
-              <tr className="bg-gray-100">
-                <td colSpan={3} className={`${ADMIN_PANEL_TD_CLASS} text-right font-bold`}>
-                  Grand Total
-                </td>
-                <td className={`${ADMIN_PANEL_TD_CLASS} text-right font-bold`}>
-                  {formatReportAmount(grandTotal)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
+                <tr className="bg-gray-100">
+                  <td colSpan={3} className={`${ADMIN_PANEL_TD_CLASS} text-right font-bold`}>
+                    Grand Total
+                  </td>
+                  <td className={`${ADMIN_PANEL_TD_CLASS} text-right font-bold`}>
+                    {formatReportAmount(grandTotal)}
+                  </td>
+                </tr>
+              </>
+            )}
+          </tbody>
+        </table>
+      </div>
     </ShopReportShell>
   );
 }
@@ -359,53 +357,49 @@ function ShopGstReportView({
         </div>
       </div>
 
-      {rows.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-gray-600">
-          No GST records found for the selected date range.
-        </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className={ADMIN_PANEL_TABLE_CLASS}>
-            <thead>
-              <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-                {["Date", "Type", "Vendor / Source", "Category", "Amount", "GST", "Notes"].map((header) => (
-                  <th
-                    key={header}
-                    className={`${ADMIN_PANEL_TH_CLASS} ${
-                      header === "Amount" || header === "GST" ? "text-right" : "text-left"
-                    }`}
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, idx) => {
-                const categories = row.ledgerType === "expenses" ? expenseCategories : incomeCategories;
-                const labels = categoryLabel(categories, row.category, row.subcategory);
-                const gstAmount = estimateGstAmount(row.amount);
-                return (
-                  <tr key={`${row.ledgerType}-${row.id}`} className={adminPanelRowClass(idx)}>
-                    <td className={ADMIN_PANEL_TD_CLASS}>{formatDisplayDate(row.date)}</td>
-                    <td className={`${ADMIN_PANEL_TD_CLASS} capitalize`}>
-                      {row.ledgerType === "expenses" ? "Expense" : "Income"}
-                    </td>
-                    <td className={`${ADMIN_PANEL_TD_CLASS} uppercase`}>{row.vendor}</td>
-                    <td className={ADMIN_PANEL_TD_CLASS}>
-                      <div className="font-bold leading-tight text-gray-800">{labels.category}</div>
-                      <div className="text-xs text-gray-500">{labels.subcategory}</div>
-                    </td>
-                    <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
-                      {formatReportAmount(row.amount)}
-                    </td>
-                    <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
-                      {formatReportAmount(gstAmount)}
-                    </td>
-                    <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
-                  </tr>
-                );
-              })}
+      <div className="overflow-x-auto">
+        <table className={ADMIN_PANEL_TABLE_CLASS}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              {["Date", "Type", "Vendor / Source", "Category", "Amount", "GST", "Notes"].map((header) => (
+                <th
+                  key={header}
+                  className={`${ADMIN_PANEL_TH_CLASS} ${
+                    header === "Amount" || header === "GST" ? "text-right" : "text-left"
+                  }`}
+                >
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => {
+              const categories = row.ledgerType === "expenses" ? expenseCategories : incomeCategories;
+              const labels = categoryLabel(categories, row.category, row.subcategory);
+              const gstAmount = estimateGstAmount(row.amount);
+              return (
+                <tr key={`${row.ledgerType}-${row.id}`} className={adminPanelRowClass(idx)}>
+                  <td className={ADMIN_PANEL_TD_CLASS}>{formatDisplayDate(row.date)}</td>
+                  <td className={`${ADMIN_PANEL_TD_CLASS} capitalize`}>
+                    {row.ledgerType === "expenses" ? "Expense" : "Income"}
+                  </td>
+                  <td className={`${ADMIN_PANEL_TD_CLASS} uppercase`}>{row.vendor}</td>
+                  <td className={ADMIN_PANEL_TD_CLASS}>
+                    <div className="font-bold leading-tight text-gray-800">{labels.category}</div>
+                    <div className="text-xs text-gray-500">{labels.subcategory}</div>
+                  </td>
+                  <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
+                    {formatReportAmount(row.amount)}
+                  </td>
+                  <td className={`${ADMIN_PANEL_TD_CLASS} text-right`}>
+                    {formatReportAmount(gstAmount)}
+                  </td>
+                  <td className={ADMIN_PANEL_TD_CLASS}>{row.notes || ""}</td>
+                </tr>
+              );
+            })}
+            {rows.length > 0 ? (
               <tr className="bg-gray-100">
                 <td colSpan={5} className={`${ADMIN_PANEL_TD_CLASS} text-right font-bold`}>
                   Net GST
@@ -415,10 +409,10 @@ function ShopGstReportView({
                 </td>
                 <td className={ADMIN_PANEL_TD_CLASS} />
               </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
+            ) : null}
+          </tbody>
+        </table>
+      </div>
     </ShopReportShell>
   );
 }

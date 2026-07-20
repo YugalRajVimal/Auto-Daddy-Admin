@@ -187,6 +187,7 @@ function dealsMatchingSelection(selectedIds: Set<string>, deals: ShopDeal[]): Sh
 }
 
 function DealsToolbar({
+  hasSelection,
   canDelete,
   canDeactivate,
   canPrint,
@@ -197,6 +198,7 @@ function DealsToolbar({
   onPrint,
   onAddNew,
 }: {
+  hasSelection: boolean;
   canDelete: boolean;
   canDeactivate: boolean;
   canPrint: boolean;
@@ -214,7 +216,7 @@ function DealsToolbar({
           type="button"
           onClick={onDelete}
           disabled={!canDelete || bulkBusy}
-          className={DEAL_TOOLBAR_GRAY_BUTTON_CLASS}
+          className={`${DEAL_TOOLBAR_GRAY_BUTTON_CLASS}${hasSelection ? "" : " invisible"}`}
         >
           Delete
         </button>
@@ -758,6 +760,7 @@ export default function ShopDealsPage() {
           <div className="space-y-0">
             <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
               <DealsToolbar
+                hasSelection={hasBulkSelection}
                 canDelete={canBulkDelete}
                 canDeactivate={canBulkDeactivate}
                 canPrint={canPrint}
@@ -776,10 +779,6 @@ export default function ShopDealsPage() {
                 <div className="p-4">
                   <ShopErrorPanel message={error} onRetry={() => void refresh()} />
                 </div>
-              ) : deals.length === 0 ? (
-                <p className="py-10 text-center text-sm text-gray-500">
-                  {activeId === "completed" ? "No completed deals yet." : "No deals in this category."}
-                </p>
               ) : (
                 <DealsListTable
                   deals={deals}
