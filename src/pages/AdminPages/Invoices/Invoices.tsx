@@ -20,6 +20,7 @@ import {
   fetchInvoices,
   fetchItems,
   InvoiceView,
+  sendInvoiceById,
   updateInvoice,
 } from "./api/invoicingApi";
 
@@ -40,6 +41,7 @@ type InvoiceLineItemApi = {
   GSTPercent: number;
   Amount: number;
   UnitType: "Unit" | "Days";
+  Image?: string; // Optional image URL or base64 string
 };
 
 type InvoiceRow = {
@@ -123,9 +125,12 @@ function fmtMoney(value: number) {
   return value % 1 === 0 ? String(value) : value.toFixed(2);
 }
 
-// function formatInvoiceNo(code: string, seq: number) {
-//   return `${code}${String(seq).padStart(5, "0")}`;
-// }
+// Build the "PREFIX00001" style preview client-side so it's always correct,
+// even if the backend's nextInvoiceNumberPreview field is unformatted.
+function formatInvoiceNo(prefix: string, nextNumber: number, padLength: number) {
+  const pad = padLength && padLength > 0 ? padLength : 5;
+  return `${prefix || ""}${String(nextNumber).padStart(pad, "0")}`;
+}
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
@@ -141,6 +146,7 @@ export default function InvoicesPage() {
   const [form, setForm] = useState(emptyInvoiceForm());
   const [attempted, setAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sendingPreviewInvoice, setSendingPreviewInvoice] = useState(false);
 
   // Reference data for pickers
   const [availableItems, setAvailableItems] = useState<any[]>([]);
@@ -157,11 +163,12 @@ export default function InvoicesPage() {
   useEffect(() => {
     fetchInvoiceSettings()
       .then((res) => {
-        setInvoicePreview(res.settings.nextInvoiceNumberPreview);
+        const { invoicePrefix, nextNumber, padLength } = res.settings;
+        setInvoicePreview(formatInvoiceNo(invoicePrefix, nextNumber, padLength));
         setManageForm({
-          invoicePrefix: res.settings.invoicePrefix,
-          nextNumber: String(res.settings.nextNumber),
-          padLength: String(res.settings.padLength),
+          invoicePrefix,
+          nextNumber: String(nextNumber),
+          padLength: String(padLength),
         });
       })
       .catch((err) => adminNotify.error(err.message || "Failed to load invoice settings."));
@@ -172,6 +179,7 @@ export default function InvoicesPage() {
     try {
       const res = await fetchInvoices({ view: viewMode, search, page: 1, limit: entriesPerPage });
       setInvoices(res.invoices as InvoiceRow[]);
+      console.log(res.invoices);
       setTotal(res.total);
       setGrandTotal(res.grandTotal);
     } catch (err: any) {
@@ -388,21 +396,30 @@ export default function InvoicesPage() {
 
     setSaving(true);
     try {
+      let savedId = editingId || "";
       if (editingId) {
-        await updateInvoice(editingId, payload);
+        const res = await updateInvoice(editingId, payload);
+        savedId = res.invoice?._id || editingId;
         adminNotify.success(
           finalStatus === "Paid" ? "Invoice updated and marked paid." : finalStatus === "Sent" ? "Invoice updated and sent." : "Invoice updated."
         );
       } else {
-        await createInvoice(payload);
+        const res = await createInvoice(payload);
+        savedId = res.invoice?._id || "";
         // Invoice numbering now lives server-side (AdminInvoiceSettings),
-        // so re-fetch the freshly-incremented preview instead of bumping
+        // so re-fetch the freshly-incremented settings instead of bumping
         // local state — this keeps the UI correct even if another admin
         // created an invoice in between, or the manage-invoice settings
         // changed since this form was opened.
         try {
           const settingsRes = await fetchInvoiceSettings();
-          setInvoicePreview(settingsRes.settings.nextInvoiceNumberPreview);
+          const { invoicePrefix, nextNumber, padLength } = settingsRes.settings;
+          setInvoicePreview(formatInvoiceNo(invoicePrefix, nextNumber, padLength));
+          setManageForm({
+            invoicePrefix,
+            nextNumber: String(nextNumber),
+            padLength: String(padLength),
+          });
         } catch {
           // Non-fatal — the invoice itself saved fine, we just won't have
           // an up-to-date "next number" preview until the page reloads.
@@ -411,6 +428,32 @@ export default function InvoicesPage() {
           finalStatus === "Paid" ? "Invoice created and marked paid." : finalStatus === "Sent" ? "Invoice created and sent." : "Invoice saved as draft."
         );
       }
+
+      // For Drafts, open the invoice preview straight away with the data
+      // that was just submitted, instead of only returning to the list.
+      if (finalStatus === "Draft") {
+        const clientName = autoShopOwners.find((o) => o._id === form.clientRefId)?.name || "";
+        setViewingInvoice({
+          _id: savedId,
+          invoiceNumber: payload.invoiceNumber,
+          dateOfIssue: payload.dateOfIssue,
+          clientRefId: payload.clientRefId,
+          client: clientName,
+          clientRemark: payload.clientRemark,
+          poNumber: payload.poNumber,
+          items: lineItems,
+          subtotal: draftSubtotal,
+          gst: draftGst,
+          roundOff: draftRoundOff,
+          invoiceTotal: draftTotal,
+          bankRefId: payload.bankRefId,
+          bankName: payload.bankName,
+          terms: payload.terms,
+          status: finalStatus,
+          view: "active",
+        });
+      }
+
       resetForm();
       setShowForm(false);
       loadInvoices();
@@ -458,7 +501,7 @@ export default function InvoicesPage() {
 
       let seq = nextNumber;
       const nextInvoiceNumbers = ids.map(() => {
-        const no = `${invoicePrefix}${String(seq).padStart(padLength, "0")}`;
+        const no = formatInvoiceNo(invoicePrefix, seq, padLength);
         seq += 1;
         return no;
       });
@@ -468,7 +511,13 @@ export default function InvoicesPage() {
       // Reserve the numbers we just handed out by advancing nextNumber past
       // them, so the next invoice created (copy or new) doesn't collide.
       const updatedSettingsRes = await updateInvoiceSettings({ nextNumber: seq });
-      setInvoicePreview(updatedSettingsRes.settings.nextInvoiceNumberPreview);
+      setInvoicePreview(
+        formatInvoiceNo(
+          updatedSettingsRes.settings.invoicePrefix,
+          updatedSettingsRes.settings.nextNumber,
+          updatedSettingsRes.settings.padLength
+        )
+      );
 
       adminNotify.success("Invoice(s) copied.");
       setSelected(new Set());
@@ -508,11 +557,31 @@ export default function InvoicesPage() {
         nextNumber: parsedNext,
         padLength: parsedPad || 5,
       });
-      setInvoicePreview(res.settings.nextInvoiceNumberPreview);
+      setInvoicePreview(
+        formatInvoiceNo(res.settings.invoicePrefix, res.settings.nextNumber, res.settings.padLength)
+      );
       setManageOpen(false);
       adminNotify.success("Invoice settings updated.");
     } catch (err: any) {
       adminNotify.error(err.message || "Failed to update invoice settings.");
+    }
+  };
+
+  const handleSendFromPreview = async () => {
+    if (!viewingInvoice || !viewingInvoice._id) {
+      adminNotify.error("Cannot send: invoice id missing.");
+      return;
+    }
+    setSendingPreviewInvoice(true);
+    try {
+      await sendInvoiceById(viewingInvoice._id);
+      adminNotify.success("Invoice sent.");
+      setViewingInvoice(null);
+      loadInvoices();
+    } catch (err: any) {
+      adminNotify.error(err.message || "Failed to send invoice.");
+    } finally {
+      setSendingPreviewInvoice(false);
     }
   };
 
@@ -1067,6 +1136,13 @@ export default function InvoicesPage() {
     invoice={viewingInvoice}
     templateId="default" // swap in your actual template id source
     onClose={() => setViewingInvoice(null)}
+    onEdit={() => {
+      const rowToEdit = viewingInvoice;
+      setViewingInvoice(null);
+      openEdit(rowToEdit);
+    }}
+    onSend={handleSendFromPreview}
+    sending={sendingPreviewInvoice}
   />
 )}
     </AdminPage>

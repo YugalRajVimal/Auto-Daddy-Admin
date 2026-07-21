@@ -682,39 +682,34 @@ const AutoShopAddEditForm: React.FC<{
             className={compactInputClass}
           />
         </CompactField>
-        <CompactField label="Zip Code">
+        <CompactField label="Postal Code">
           <input
             type="text"
             value={zipCode}
-            onChange={(e) => setZipCode(e.target.value.replace(/[^a-zA-Z0-9]/g, "").slice(0, 10))}
+            onChange={(e) =>
+              setZipCode(
+                e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6)
+              )
+            }
             className={compactInputClass}
-            placeholder="e.g. 110001 / 12345 / K1A0B1"
+            placeholder="e.g. K1A0B1"
           />
-          {attempted && !zipCode.trim() && <p className={fieldErrorClass}>Required</p>}
-
-          {attempted && zipCode.trim() && (
-            (() => {
-              // US: 5 or 5+4 zip (12345 or 12345-6789)
-              const usPattern = /^\d{5}(-\d{4})?$/;
-              // Canada: ANA NAN (A-Z 1-9 A-Z 1-9 A-Z 1-9), spaces optional, no lower
-              const caPattern = /^[A-Z]\d[A-Z][ ]?\d[A-Z]\d$/i;
-              // India: 6 digit pincode
-              const inPattern = /^\d{6}$/;
-
-              if (
-                !usPattern.test(zipCode) &&
-                !caPattern.test(zipCode) &&
-                !inPattern.test(zipCode)
-              ) {
-                return (
-                  <p className={fieldErrorClass}>
-                    Enter a valid Zip/Postal Code: e.g. 110001 (IN), 12345 or 12345-6789 (US), K1A0B1 (CA)
-                  </p>
-                );
-              }
-              return null;
-            })()
+          {attempted && !zipCode.trim() && (
+            <p className={fieldErrorClass}>Required</p>
           )}
+
+          {attempted && zipCode.trim() && (() => {
+            // Canada: ANA NAN (A-Z 1-9 A-Z 1-9 A-Z 1-9), spaces optional, case-insensitive
+            const caPattern = /^[A-Z]\d[A-Z][ ]?\d[A-Z]\d$/i;
+            if (!caPattern.test(zipCode)) {
+              return (
+                <p className={fieldErrorClass}>
+                  Enter a valid Canadian Postal Code (e.g. K1A0B1)
+                </p>
+              );
+            }
+            return null;
+          })()}
         </CompactField>
   
         <CompactField label="Email">
