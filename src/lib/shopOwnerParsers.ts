@@ -290,6 +290,16 @@ export function parseMyServices(payload: unknown): ShopServiceCategory[] {
             : typeof qtyRaw === "string"
               ? parseFloat(qtyRaw)
               : undefined;
+        const qtyTypeRaw = s(sub.qtyType) ?? s(sub.quantityType);
+        const qtyType =
+          qtyTypeRaw === "days" || qtyTypeRaw === "unit" ? qtyTypeRaw : undefined;
+        const labourRaw = sub.labourCost ?? sub.laborCost ?? sub.labourCharge;
+        const labourCost =
+          typeof labourRaw === "number"
+            ? labourRaw
+            : typeof labourRaw === "string"
+              ? parseFloat(labourRaw)
+              : undefined;
         const taxRaw = sub.tax;
         const tax =
           typeof taxRaw === "number"
@@ -305,6 +315,8 @@ export function parseMyServices(payload: unknown): ShopServiceCategory[] {
           desc: s(sub.desc) ?? s(sub.description) ?? "",
           price: Number.isFinite(price) ? price : 0,
           ...(Number.isFinite(qty) && (qty as number) > 0 ? { qty: qty as number } : {}),
+          ...(qtyType ? { qtyType } : {}),
+          ...(Number.isFinite(labourCost) ? { labourCost: labourCost as number } : {}),
           ...(Number.isFinite(tax) ? { tax: tax as number } : {}),
         });
       }

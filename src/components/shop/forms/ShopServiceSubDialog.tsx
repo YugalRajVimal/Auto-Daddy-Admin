@@ -19,6 +19,9 @@ import { apiMessage } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
 
 type CatalogSub = ShopServiceCategory["subServices"][number];
+type QtyType = NonNullable<CatalogSub["qtyType"]>;
+
+const QTY_TYPE_OPTIONS: QtyType[] = ["days", "unit"];
 
 type SuggestionEntry = CatalogSub & {
   serviceId: string;
@@ -123,7 +126,8 @@ export default function ShopServiceSubDialog({
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [qty, setQty] = useState("1");
-  const [tax, setTax] = useState("13");
+  const [qtyType, setQtyType] = useState<QtyType>("unit");
+  const [labourCost, setLabourCost] = useState("0");
   const [desc, setDesc] = useState("");
   const [saving, setSaving] = useState(false);
   const [companies, setCompanies] = useState<CarCompanyCatalogItem[]>([]);
@@ -181,7 +185,8 @@ export default function ShopServiceSubDialog({
       setPrice(String(sub.price));
       setDesc(sub.desc);
       setQty(String(sub.qty != null && sub.qty > 0 ? sub.qty : 1));
-      setTax(sub.tax != null ? String(sub.tax) : "13");
+      setQtyType(sub.qtyType === "days" ? "days" : "unit");
+      setLabourCost(sub.labourCost != null ? String(sub.labourCost) : "0");
     } else {
       setMake("");
       setModel("");
@@ -189,7 +194,8 @@ export default function ShopServiceSubDialog({
       setPrice("");
       setDesc("");
       setQty("1");
-      setTax("13");
+      setQtyType("unit");
+      setLabourCost("0");
     }
     setShowSuggestions(false);
   }, [category, editIndex]);
@@ -320,7 +326,8 @@ export default function ShopServiceSubDialog({
     setDesc(sub.desc ?? "");
     setPrice(String(sub.price ?? ""));
     setQty(String(sub.qty != null && sub.qty > 0 ? sub.qty : 1));
-    setTax(sub.tax != null ? String(sub.tax) : "13");
+    setQtyType(sub.qtyType === "days" ? "days" : "unit");
+    setLabourCost(sub.labourCost != null ? String(sub.labourCost) : "0");
     setShowSuggestions(false);
   };
 
@@ -340,7 +347,11 @@ export default function ShopServiceSubDialog({
       toast.error("Enter a valid quantity.");
       return;
     }
-    const taxNum = parseFloat(tax);
+    const labourCostNum = parseFloat(labourCost);
+    if (!Number.isFinite(labourCostNum) || labourCostNum < 0) {
+      toast.error("Enter a valid labor cost.");
+      return;
+    }
     const nextSubs = [...category.subServices];
     const entry = {
       id: editIndex != null ? nextSubs[editIndex]?.id : undefined,
@@ -350,7 +361,8 @@ export default function ShopServiceSubDialog({
       desc: desc.trim(),
       price: priceNum,
       qty: qtyNum,
-      ...(Number.isFinite(taxNum) ? { tax: taxNum } : {}),
+      qtyType,
+      labourCost: labourCostNum,
     };
     if (editIndex != null) nextSubs[editIndex] = entry;
     else nextSubs.push(entry);
@@ -373,7 +385,8 @@ export default function ShopServiceSubDialog({
         desc: desc.trim(),
         price: priceNum,
         quantity: qtyNum,
-        ...(Number.isFinite(taxNum) ? { tax: taxNum } : {}),
+        qtyType,
+        labourCost: labourCostNum,
       };
       const res =
         editIndex != null
@@ -565,17 +578,28 @@ export default function ShopServiceSubDialog({
             disabled={saving}
           />
         </CompactField>
-        <CompactField label="Tax" className="w-[4.75rem] shrink-0">
-          <div className="flex items-center gap-0.5">
-            <input
-              className={`${shopCompactInputClass} min-w-0 flex-1`}
-              value={tax}
-              onChange={(e) => setTax(e.target.value)}
-              inputMode="decimal"
-              disabled={saving}
-            />
-            <span className="shrink-0 text-xs font-semibold text-gray-700">%</span>
-          </div>
+        <CompactField label="Qty Type" className="w-[5.5rem] shrink-0">
+          <select
+            className={shopCompactInputClass}
+            value={qtyType}
+            onChange={(e) => setQtyType(e.target.value as QtyType)}
+            disabled={saving}
+          >
+            {QTY_TYPE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+        <CompactField label="Labor Cost" className="w-[5rem] shrink-0">
+          <input
+            className={shopCompactInputClass}
+            value={labourCost}
+            onChange={(e) => setLabourCost(e.target.value)}
+            inputMode="decimal"
+            disabled={saving}
+          />
         </CompactField>
       </CompactFormRow>
     </CompactFormPanel>

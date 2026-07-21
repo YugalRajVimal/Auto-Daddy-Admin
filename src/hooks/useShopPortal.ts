@@ -65,7 +65,7 @@ export function useShopOwnerPortal() {
     business?.businessName?.trim() ||
     "";
 
-  const businessNameLoaded = !loading;
+  const businessNameLoaded = portal.loaded;
 
   const city = business?.city?.trim() || "";
   const daysLeft = dashboard?.subscriptionDaysLeftCount;

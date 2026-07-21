@@ -1,7 +1,6 @@
 /**
  * Inline New/Edit Job Card form — shown inside the shop job cards page.
  */
-import { Link } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiPlus, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
@@ -25,11 +24,6 @@ import {
   adminPanelTableClasses,
 } from "../admin/adminPanelTableStyles";
 import { extractSavedJobCardId, pickJobNoFromRecord } from "./shopJobCardEstimate";
-import { DUMMY_SHOP_BANKS } from "../../lib/dummyShopWallet";
-import {
-  defaultBankIdFromPageDetails,
-  type AutoshopPageDetailsBank,
-} from "../../lib/autoshopownerJobCardsApi";
 import {
   fetchJobCardByIdForForm,
   fetchJobCardFormData,
@@ -109,21 +103,12 @@ type ServiceCategory = {
     name: string;
     desc?: string;
     price?: number;
+    qty?: number;
     make?: string;
     model?: string;
     odoOutRequired?: boolean;
   }>;
 };
-
-function defaultInvoiceBankId(banks: AutoshopPageDetailsBank[] = DUMMY_SHOP_BANKS.map((b) => ({
-  _id: b.id,
-  BankName: b.label,
-  assignToInvoice: b.assignToInvoice,
-}))) {
-  const fromApi = defaultBankIdFromPageDetails(banks);
-  if (fromApi) return fromApi;
-  return DUMMY_SHOP_BANKS.find((bank) => bank.assignToInvoice)?.id ?? DUMMY_SHOP_BANKS[0]?.id ?? "";
-}
 
 function shopDefaultTermsText(business: Record<string, unknown> | null | undefined) {
   const raw = business?.termsAndConditions ?? business?.terms;
@@ -321,6 +306,31 @@ function applyJobDueOdometerToLines(
   );
 }
 
+function findCatalogSubIndex(
+  cat: ServiceCategory,
+  ss: Record<string, unknown>,
+): number {
+  const subName = String(ss.name ?? "").trim();
+  const desc = String(ss.desc ?? "").trim();
+  if (subName) {
+    const byName = cat.subServices.findIndex((s) => s.name === subName);
+    if (byName >= 0) return byName;
+  }
+  if (desc) {
+    const byDesc = cat.subServices.findIndex(
+      (s) => (s.desc ?? "").trim() === desc || s.name.trim() === desc,
+    );
+    if (byDesc >= 0) return byDesc;
+  }
+  if (cat.subServices.length === 1) return 0;
+  const unitPrice = parseNumberFromText(ss.unitPrice ?? ss.price);
+  if (unitPrice > 0) {
+    const byPrice = cat.subServices.findIndex((s) => (s.price ?? 0) === unitPrice);
+    if (byPrice >= 0) return byPrice;
+  }
+  return -1;
+}
+
 function apiServiceBlocksToLines(blocks: unknown[], categories: ServiceCategory[]) {
   const lines: ServiceLine[] = [];
   let n = 0;
@@ -331,17 +341,20 @@ function apiServiceBlocksToLines(blocks: unknown[], categories: ServiceCategory[
     const cat = categories.find((c) => c.id === catId);
     if (!cat) continue;
     for (const ss of b.subServices || []) {
-      const subName = String(ss.name || "").trim();
-      if (!subName) continue;
-      const subIdx = cat.subServices.findIndex((s) => s.name === subName);
+      const subIdx = findCatalogSubIndex(cat, ss);
       if (subIdx < 0) continue;
       const catalogSub = cat.subServices[subIdx];
       const qtyStr = String(ss.qty ?? ss.unit ?? ss.labourDuration ?? "1");
       const labourCostStr = String(ss.labourCost ?? ss.labourCharge ?? "0");
       const qty = parseNumberFromText(qtyStr) || 1;
       const labour = parseNumberFromText(labourCostStr);
-      const savedTotal = parseNumberFromText(ss.price);
-      let unitPriceStr = ss.unitPrice != null ? String(ss.unitPrice) : "";
+      const savedTotal = parseNumberFromText(ss.price ?? ss.amount);
+      let unitPriceStr =
+        ss.unitPrice != null
+          ? String(ss.unitPrice)
+          : ss.unitCost != null
+            ? String(ss.unitCost)
+            : "";
       if (!unitPriceStr && savedTotal > 0 && qty > 0) {
         unitPriceStr = String((savedTotal - labour) / qty);
       } else if (!unitPriceStr) {
@@ -349,11 +362,12 @@ function apiServiceBlocksToLines(blocks: unknown[], categories: ServiceCategory[
       }
       n += 1;
       const draft = { unitPriceStr, qtyStr, labourCostStr };
+      const odoRaw = ss.dueOdometerReading ?? ss.odoOutReading ?? ss.odoOut ?? "";
       lines.push({
         id: `line-${n}`,
         subKey: subServiceKey(catId, subIdx),
-        desc: String(ss.desc ?? ""),
-        odoOutStr: String(ss.dueOdometerReading ?? ss.odoOut ?? "").replace(/\D/g, ""),
+        desc: String(ss.desc ?? catalogSub?.desc ?? ""),
+        odoOutStr: String(odoRaw).replace(/\D/g, ""),
         ...draft,
         priceStr: priceStrFromLine(draft),
       });
@@ -415,13 +429,15 @@ function emptyTableLine(id: string): ServiceLine {
 function defaultLineForSub(
   catId: string,
   subIdx: number,
-  sub: { desc?: string; price?: number },
+  sub: { desc?: string; price?: number; qty?: number },
   categories: ServiceCategory[],
   vehicle: JobCardFormCustomer["myVehicles"][number] | null,
 ) {
+  const qty =
+    typeof sub?.qty === "number" && Number.isFinite(sub.qty) && sub.qty > 0 ? sub.qty : 1;
   const draft = {
     unitPriceStr: String(sub?.price ?? 0),
-    qtyStr: "1",
+    qtyStr: String(qty),
     labourCostStr: "0",
   };
   return {
@@ -457,7 +473,13 @@ function pickJobId(job: Record<string, unknown>) {
 
 function pickJobNo(job: Record<string, unknown>) {
   const raw =
-    job.jobCardNumber ?? job.jobNo ?? job.jobNumber ?? job.jobCode ?? job.displayJobNo;
+    job.jobCardNumber ??
+    job.jobNo ??
+    job.jobNumber ??
+    job.jobCode ??
+    job.displayJobNo ??
+    job.jobCardNo;
+  if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
   return typeof raw === "string" && raw.trim() ? raw.trim() : "";
 }
 
@@ -530,8 +552,6 @@ export default function JobCardForm({
   const phoneComboRef = useRef<HTMLDivElement>(null);
   const [vehiclePhotoFiles, setVehiclePhotoFiles] = useState<File[]>([]);
   const [keptVehiclePhotoUrls, setKeptVehiclePhotoUrls] = useState<string[]>([]);
-  const [myBanks, setMyBanks] = useState<AutoshopPageDetailsBank[]>([]);
-  const [selectedBankId, setSelectedBankId] = useState("");
   const [termsNotes, setTermsNotes] = useState("");
   const lineIdRef = useRef(1);
 
@@ -598,6 +618,18 @@ export default function JobCardForm({
     [serviceLines],
   );
 
+  const canAddServiceLine = useMemo(() => {
+    if (categoryOptions.length === 0) return false;
+    const selectedSubKeys = new Set(
+      serviceLines.map((line) => line.subKey).filter(Boolean),
+    );
+    const remainingOptions = categoryOptions.filter(
+      (option) => !selectedSubKeys.has(option.value),
+    ).length;
+    const emptyLines = serviceLines.filter((line) => !line.subKey).length;
+    return remainingOptions > emptyLines;
+  }, [categoryOptions, serviceLines]);
+
   const showOdoColumn = useMemo(
     () => serviceLines.some((line) => lineRequiresOdoOut(line, normalizedCategories)),
     [serviceLines, normalizedCategories],
@@ -633,7 +665,6 @@ export default function JobCardForm({
     setServiceLines([emptyTableLine(mkLineId())]);
     setVehiclePhotoFiles([]);
     setKeptVehiclePhotoUrls([]);
-    setSelectedBankId("");
     setTermsNotes("");
   }
 
@@ -740,8 +771,6 @@ export default function JobCardForm({
         if (cancelled) return;
         setMyCustomers(data.myCustomers);
         setMyServices(data.myServices);
-        setMyBanks(data.myBanks);
-        setSelectedBankId("");
 
         if (modeProp === "add") {
           const displayNo =
@@ -783,12 +812,20 @@ export default function JobCardForm({
                   phoneDigits(customer.phone) ===
                   phoneDigits((job.customerId as { phone?: string }).phone),
               )
+              : null) ??
+            (typeof job.phone === "string"
+              ? data.myCustomers.find(
+                (customer) =>
+                  phoneDigits(customer.phone) === phoneDigits(job.phone as string),
+              )
               : null);
           if (loadedCustomer?.phone) {
             setCustomerPhone(phoneDigits(loadedCustomer.phone));
           } else if (typeof job.customerId === "object") {
             const jobPhone = phoneDigits((job.customerId as { phone?: string }).phone);
             if (jobPhone) setCustomerPhone(jobPhone);
+          } else if (typeof job.phone === "string" && job.phone) {
+            setCustomerPhone(phoneDigits(job.phone));
           }
           const loadedVehicleId = String(
             (typeof job.vehicleId === "object"
@@ -799,15 +836,21 @@ export default function JobCardForm({
           );
           const loadedVehicle =
             (loadedCustomer?.myVehicles || []).find((v) => v._id === loadedVehicleId) ?? null;
-          const cats = filterCategoriesForVehicle(
-            normalizeServiceCategories(data.myServices),
-            loadedVehicle,
+          const allCats = normalizeServiceCategories(data.myServices);
+          const vehicleCats = filterCategoriesForVehicle(allCats, loadedVehicle);
+          const dueOdo = String(job.dueOdometerReading ?? "");
+          let loadedLines = applyJobDueOdometerToLines(
+            apiServiceBlocksToLines(services as unknown[], vehicleCats.length > 0 ? vehicleCats : allCats),
+            vehicleCats.length > 0 ? vehicleCats : allCats,
+            dueOdo,
           );
-          const loadedLines = applyJobDueOdometerToLines(
-            apiServiceBlocksToLines(services as unknown[], cats),
-            cats,
-            String(job.dueOdometerReading ?? ""),
-          );
+          if (loadedLines.length === 0 && vehicleCats.length > 0) {
+            loadedLines = applyJobDueOdometerToLines(
+              apiServiceBlocksToLines(services as unknown[], allCats),
+              allCats,
+              dueOdo,
+            );
+          }
           let labourCharge = String(job.labourCharge ?? "");
           if (!parseNumberFromText(labourCharge)) {
             const fromLines = loadedLines.reduce(
@@ -842,7 +885,6 @@ export default function JobCardForm({
           );
           setServiceLines(loadedLines.length > 0 ? loadedLines : [emptyTableLine(mkLineId())]);
           setTermsNotes(String(job.terms ?? job.additionalNotes ?? ""));
-          if (job.bank) setSelectedBankId(String(job.bank));
           setEditId(jobCardId);
         }
       } catch (e) {
@@ -910,7 +952,6 @@ export default function JobCardForm({
         {
         jobCardId: formMode === "edit" ? editId ?? undefined : undefined,
         jobCardNo: formMode === "edit" ? displayJobNo || undefined : undefined,
-        bankId: selectedBankId || undefined,
         terms: termsNotes.trim() || shopDefaultTerms,
         sendForApproval: formMode !== "edit",
         form: {
@@ -943,6 +984,7 @@ export default function JobCardForm({
   }
 
   function addTableLine() {
+    if (!canAddServiceLine) return;
     setServiceLines((prev) => [...prev, emptyTableLine(mkLineId())]);
   }
 
@@ -1255,158 +1297,170 @@ export default function JobCardForm({
             </div>
 
             <div className={`mb-3 ${JOB_CARD_TABLE_WRAP_CLASS}`}>
-              {categoriesWithSubs.length === 0 ? (
-                <div className="rounded border border-gray-300 p-4 text-center text-sm text-gray-600">
-                  {!form.vehicleId
-                    ? "Select a vehicle to see matching sub-services."
-                    : allNormalizedCategories.some((c) => (c.subServices || []).length > 0)
-                      ? "No sub-services match this vehicle's make and model."
-                      : "No services configured. Add sub-services under My Services first."}
-                </div>
-              ) : (
-                <>
-                  <div className="w-full overflow-visible rounded border border-gray-300 bg-white">
-                    <table className={`${JOB_CARD_TABLE.table} w-full table-fixed`}>
-                      <thead>
-                        <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
-                          <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_CATEGORY_COL_CLASS}`}>
-                            Category
-                          </th>
-                          <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${descriptionColClass}`}>
-                            Description
-                          </th>
-                          {showOdoColumn ? (
-                            <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_ODO_COL_CLASS}`}>
-                              Odo Out
-                            </th>
-                          ) : null}
-                          <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_UNIT_COST_COL_CLASS} text-right`}>
-                            Unit Cost
-                          </th>
-                          <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_QTY_COL_CLASS} text-center`}>
-                            Qty
-                          </th>
-                          <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_AMOUNT_COL_CLASS} pr-2`}>
-                            Amount
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {serviceLines.map((line, index) => {
-                          const showOdoOut = lineRequiresOdoOut(line, normalizedCategories);
-                          const lineAmount =
-                            parseNumberFromText(line.unitPriceStr) * parseNumberFromText(line.qtyStr);
-                          return (
-                            <tr
-                              key={line.id}
-                              className={index % 2 === 1 ? "bg-gray-100" : "bg-white"}
-                            >
-                              <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${JOB_CARD_CATEGORY_COL_CLASS}`}>
-                                <select
-                                  value={line.subKey}
-                                  disabled={formLoading}
-                                  onChange={(e) => setLineCategory(line.id, e.target.value)}
-                                  className={`${formCellInputClass} min-w-0 w-full`}
-                                >
-                                  <option value="">Select category</option>
-                                  {categoryOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
+              <div className="w-full overflow-visible rounded border border-gray-300 bg-white">
+                <table className={`${JOB_CARD_TABLE.table} w-full table-fixed`}>
+                  <thead>
+                    <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+                      <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_CATEGORY_COL_CLASS}`}>
+                        Sub Category
+                      </th>
+                      <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${descriptionColClass}`}>
+                        Description
+                      </th>
+                      {showOdoColumn ? (
+                        <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_ODO_COL_CLASS}`}>
+                          Odo Out
+                        </th>
+                      ) : null}
+                      <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_UNIT_COST_COL_CLASS} text-right`}>
+                        Unit Cost
+                      </th>
+                      <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_QTY_COL_CLASS} text-center`}>
+                        Qty
+                      </th>
+                      <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_AMOUNT_COL_CLASS} pr-2`}>
+                        Amount
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoriesWithSubs.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={showOdoColumn ? 6 : 5}
+                          className={`${JOB_CARD_TABLE_BODY_TD_CLASS} py-4 text-center text-gray-600`}
+                        >
+                          {!form.vehicleId
+                            ? "Select a vehicle to see matching sub-services."
+                            : allNormalizedCategories.some((c) => (c.subServices || []).length > 0)
+                              ? "No sub-services match this vehicle's make and model."
+                              : "No services configured. Add sub-services under My Services first."}
+                        </td>
+                      </tr>
+                    ) : (
+                      serviceLines.map((line, index) => {
+                        const showOdoOut = lineRequiresOdoOut(line, normalizedCategories);
+                        const lineAmount =
+                          parseNumberFromText(line.unitPriceStr) * parseNumberFromText(line.qtyStr);
+                        const usedSubKeys = new Set(
+                          serviceLines
+                            .filter((other) => other.id !== line.id && other.subKey)
+                            .map((other) => other.subKey),
+                        );
+                        const lineCategoryOptions = categoryOptions.filter(
+                          (option) =>
+                            option.value === line.subKey || !usedSubKeys.has(option.value),
+                        );
+                        return (
+                          <tr
+                            key={line.id}
+                            className={index % 2 === 1 ? "bg-gray-100" : "bg-white"}
+                          >
+                            <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${JOB_CARD_CATEGORY_COL_CLASS}`}>
+                              <select
+                                value={line.subKey}
+                                disabled={formLoading}
+                                onChange={(e) => setLineCategory(line.id, e.target.value)}
+                                className={`${formCellInputClass} min-w-0 w-full`}
+                              >
+                                <option value="">Select sub category</option>
+                                {lineCategoryOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${descriptionColClass}`}>
+                              <input
+                                value={line.desc}
+                                disabled={formLoading || !line.subKey}
+                                onChange={(e) =>
+                                  updateServiceLine(line.id, { desc: e.target.value })
+                                }
+                                placeholder="Description"
+                                className={`${formCellInputClass} w-full min-w-0`}
+                              />
+                            </td>
+                            {showOdoColumn ? (
+                              <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${JOB_CARD_ODO_COL_CLASS}`}>
+                                {showOdoOut ? (
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={line.odoOutStr ?? ""}
+                                    disabled={formLoading || !line.subKey}
+                                    onChange={(e) =>
+                                      updateServiceLine(line.id, {
+                                        odoOutStr: e.target.value.replace(/\D/g, ""),
+                                      })
+                                    }
+                                    placeholder={odometerPlaceholders.out}
+                                    aria-label="Odometer out"
+                                    className={`${formCellInputClass} w-full min-w-0`}
+                                  />
+                                ) : null}
                               </td>
-                              <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${descriptionColClass}`}>
-                                <input
-                                  value={line.desc}
-                                  disabled={formLoading || !line.subKey}
-                                  onChange={(e) =>
-                                    updateServiceLine(line.id, { desc: e.target.value })
-                                  }
-                                  placeholder="Description"
-                                  className={`${formCellInputClass} w-full min-w-0`}
-                                />
-                              </td>
-                              {showOdoColumn ? (
-                                <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${JOB_CARD_ODO_COL_CLASS}`}>
-                                  {showOdoOut ? (
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      value={line.odoOutStr ?? ""}
-                                      disabled={formLoading || !line.subKey}
-                                      onChange={(e) =>
-                                        updateServiceLine(line.id, {
-                                          odoOutStr: e.target.value.replace(/\D/g, ""),
-                                        })
-                                      }
-                                      placeholder={odometerPlaceholders.out}
-                                      aria-label="Odometer out"
-                                      className={`${formCellInputClass} w-full min-w-0`}
-                                    />
-                                  ) : null}
-                                </td>
-                              ) : null}
-                              <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${JOB_CARD_UNIT_COST_COL_CLASS} text-right`}>
-                                <input
-                                  value={line.unitPriceStr}
-                                  disabled={formLoading || !line.subKey}
-                                  onChange={(e) =>
-                                    updateServiceLine(line.id, { unitPriceStr: e.target.value })
-                                  }
-                                  inputMode="decimal"
-                                  placeholder="0"
-                                  className={`${JOB_CARD_NUM_INPUT_CLASS} text-right`}
-                                />
-                              </td>
-                              <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${JOB_CARD_QTY_COL_CLASS} text-center`}>
-                                <input
-                                  value={line.qtyStr}
-                                  disabled={formLoading || !line.subKey}
-                                  onChange={(e) =>
-                                    updateServiceLine(line.id, { qtyStr: e.target.value })
-                                  }
-                                  inputMode="decimal"
-                                  placeholder="1"
-                                  className={JOB_CARD_QTY_INPUT_CLASS}
-                                />
-                              </td>
-                              <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} relative ${JOB_CARD_AMOUNT_COL_CLASS} pr-2`}>
-                                <input
-                                  readOnly
-                                  tabIndex={-1}
-                                  value={line.subKey ? formatMoney(lineAmount) : ""}
-                                  aria-label="Line amount"
-                                  className={JOB_CARD_AMOUNT_INPUT_CLASS}
-                                />
-                                <button
-                                  type="button"
-                                  title="Remove line"
-                                  disabled={formLoading}
-                                  onClick={() => removeTableLine(line.id)}
-                                  className={JOB_CARD_REMOVE_BTN_CLASS}
-                                >
-                                  <FiX size={14} aria-hidden />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                            ) : null}
+                            <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${JOB_CARD_UNIT_COST_COL_CLASS} text-right`}>
+                              <input
+                                value={line.unitPriceStr}
+                                disabled={formLoading || !line.subKey}
+                                onChange={(e) =>
+                                  updateServiceLine(line.id, { unitPriceStr: e.target.value })
+                                }
+                                inputMode="decimal"
+                                placeholder="0"
+                                className={`${JOB_CARD_NUM_INPUT_CLASS} text-right`}
+                              />
+                            </td>
+                            <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${JOB_CARD_QTY_COL_CLASS} text-center`}>
+                              <input
+                                value={line.qtyStr}
+                                disabled={formLoading || !line.subKey}
+                                onChange={(e) =>
+                                  updateServiceLine(line.id, { qtyStr: e.target.value })
+                                }
+                                inputMode="decimal"
+                                placeholder="1"
+                                className={JOB_CARD_QTY_INPUT_CLASS}
+                              />
+                            </td>
+                            <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} relative ${JOB_CARD_AMOUNT_COL_CLASS} pr-2`}>
+                              <input
+                                readOnly
+                                tabIndex={-1}
+                                value={line.subKey ? formatMoney(lineAmount) : ""}
+                                aria-label="Line amount"
+                                className={JOB_CARD_AMOUNT_INPUT_CLASS}
+                              />
+                              <button
+                                type="button"
+                                title="Remove line"
+                                disabled={formLoading}
+                                onClick={() => removeTableLine(line.id)}
+                                className={JOB_CARD_REMOVE_BTN_CLASS}
+                              >
+                                <FiX size={14} aria-hidden />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-                  <button
-                    type="button"
-                    disabled={formLoading}
-                    onClick={addTableLine}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded border border-gray-400 bg-gray-200 px-3 py-1 text-xs font-bold text-gray-800 hover:bg-gray-300 disabled:opacity-60"
-                  >
-                    <FiPlus size={13} aria-hidden />
-                    Add Line
-                  </button>
-                </>
-              )}
+              <button
+                type="button"
+                disabled={formLoading || !canAddServiceLine}
+                onClick={addTableLine}
+                className="mt-2 inline-flex items-center gap-1.5 rounded border border-gray-400 bg-gray-200 px-3 py-1 text-xs font-bold text-gray-800 hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <FiPlus size={13} aria-hidden />
+                Add Line
+              </button>
             </div>
 
             <div className="mt-4 flex justify-end border-t border-gray-300 pt-4">
@@ -1451,36 +1505,7 @@ export default function JobCardForm({
               </div>
             </div>
 
-            <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="inline-grid w-max max-w-full grid-cols-1">
-                <label
-                  htmlFor="job-card-bank-select"
-                  className="text-sm font-bold text-gray-900"
-                >
-                  Bank (Payment Transfer Information)
-                </label>
-                <select
-                  id="job-card-bank-select"
-                  value={selectedBankId}
-                  disabled={formLoading || myBanks.length === 0}
-                  onChange={(e) => setSelectedBankId(e.target.value)}
-                  className={`${formCellInputClass} mt-1 w-full`}
-                >
-                  {myBanks.length === 0 ? (
-                    <option value="">No bank accounts</option>
-                  ) : (
-                    myBanks.map((bank) => (
-                      <option key={bank._id} value={bank._id}>
-                        {bank.BankName ?? bank.AccountName ?? "Bank"}
-                      </option>
-                    ))
-                  )}
-                </select>
-                <Link to="/shop/wallet" className={`${JOB_CARD_FOOTER_LINK_CLASS} mt-1 inline-block`}>
-                  Manage Banks
-                </Link>
-              </div>
-
+            <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-end">
               <div className={JOB_CARD_TOTALS_CARD_WIDTH_CLASS}>
                 <div className="flex flex-wrap items-center gap-1">
                   <label htmlFor="job-card-terms" className="text-sm font-bold text-gray-900">

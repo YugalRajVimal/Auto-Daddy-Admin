@@ -423,10 +423,6 @@ export default function ShopProfilePage() {
     () => carCompanies.filter((company) => selectedBrands.has(getCarBrandId(company))),
     [carCompanies, selectedBrands]
   );
-  const availableBrandList = useMemo(
-    () => carCompanies.filter((company) => !selectedBrands.has(getCarBrandId(company))),
-    [carCompanies, selectedBrands]
-  );
   const selectedServiceList = useMemo(
     () => resolveProfileSelectedServices(fullServiceCatalog, myServices, selectedServiceIds),
     [fullServiceCatalog, myServices, selectedServiceIds]
@@ -621,29 +617,25 @@ export default function ShopProfilePage() {
             ) : null}
             <ShopReveal show={showAddBrand && !brandsLoading}>
               <ShopCarBrandAddCheckboxPanel
-                brands={availableBrandList}
-                selectedIds={new Set()}
+                brands={carCompanies}
+                selectedIds={selectedBrands}
                 savingBrandId={savingBrand}
-                emptyMessage="All car brands have been added."
+                emptyMessage="No car brands available."
                 onToggle={(id, next) => {
-                  if (next) void toggleBrand(id, true);
+                  void toggleBrand(id, next);
                 }}
                 onClose={() => setShowAddBrand(false)}
               />
             </ShopReveal>
             {brandsLoading ? (
               <ShopLoadingPanel variant="brand-grid" />
-            ) : selectedBrandList.length === 0 && !showAddBrand ? (
-              <p className="text-center text-sm text-gray-600">
-                No car brands added yet. Click &ldquo;+ Add New&rdquo; to add one.
-              </p>
-            ) : selectedBrandList.length > 0 ? (
+            ) : (
               <ShopCarBrandList
                 brands={selectedBrandList}
                 savingBrandId={savingBrand}
                 onRemove={(company) => void removeBrand(company)}
               />
-            ) : null}
+            )}
           </div>
         );
       case "services":
@@ -661,36 +653,63 @@ export default function ShopProfilePage() {
             editingId={editingServiceId}
             showAddForm={showAddService}
             onAddFormClose={() => setShowAddService(false)}
-            onSaveService={async (id, replacesId, meta) => {
-              const persistMeta = () => applyServiceMeta(id, meta);
+            onSaveService={async (idOrIds, replacesId, meta) => {
+              const ids = (Array.isArray(idOrIds) ? idOrIds : [idOrIds]).filter(Boolean);
+              if (ids.length === 0) return false;
 
               if (!token) return false;
 
-              persistMeta();
+              for (const id of ids) {
+                applyServiceMeta(id, meta);
+              }
 
               const isMetaOnly =
-                (replacesId === undefined && editingServiceId === id) ||
-                (replacesId !== undefined && replacesId === id);
+                ids.length === 1 &&
+                ((replacesId === undefined && editingServiceId === ids[0]) ||
+                  (replacesId !== undefined && replacesId === ids[0]));
 
-              if (isMetaOnly) return true;
+              if (isMetaOnly) {
+                toast.success("Service updated.");
+                return true;
+              }
 
               const createdAt = meta?.createdAt?.trim() || new Date().toISOString().slice(0, 10);
               const dateIso = new Date(createdAt).toISOString();
               const status = meta?.isActive === false ? "Inactive" : "Active";
 
-              const addRes = await addMyService(token, { serviceId: id, status, date: dateIso });
-              if (!addRes.ok) {
-                toast.error(apiMessage(addRes.data) || "Could not add service.");
-                return true; // handled (prevents legacy fallback), but shows error
+              const addedIds: string[] = [];
+              for (const id of ids) {
+                const addRes = await addMyService(token, { serviceId: id, status, date: dateIso });
+                if (!addRes.ok) {
+                  toast.error(apiMessage(addRes.data) || "Could not add service.");
+                  if (addedIds.length > 0) {
+                    setSelectedServiceIds((prev) => {
+                      const next = new Set(prev);
+                      if (replacesId) next.delete(replacesId);
+                      for (const addedId of addedIds) next.add(addedId);
+                      return next;
+                    });
+                  }
+                  return true;
+                }
+                addedIds.push(id);
               }
 
               setSelectedServiceIds((prev) => {
                 const next = new Set(prev);
                 if (replacesId) next.delete(replacesId);
-                next.add(id);
+                for (const id of addedIds) next.add(id);
                 return next;
               });
-              toast.success(apiMessage(addRes.data) || "Service added.");
+
+              const count = addedIds.length;
+              toast.success(
+                replacesId
+                  ? "Service updated."
+                  : count === 1
+                    ? "Service added."
+                    : `${count} services added.`
+              );
               return true;
             }}
             onSaved={() => {

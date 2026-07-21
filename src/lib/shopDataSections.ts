@@ -23,33 +23,21 @@ const PATH_SECTIONS: Record<string, ShopDataSection[]> = {
   "/shop/deals": ["deals"],
 };
 
-/** Next primary-nav section to prefetch while the user is on `path`. */
-const PREFETCH_AFTER: Record<string, ShopDataSection> = {
-  "/shop": "services",
-  "/shop/profile": "customers",
-  "/shop/people": "services",
-  "/shop/services": "jobCards",
-  "/shop/job-cards": "wallet",
-  "/shop/wallet": "websiteTemplates",
-  "/shop/my-website": "payments",
-  "/shop/reports": "deals",
-};
-
+/** Longest match wins so `/shop` does not swallow `/shop/services`, etc. */
 export function normalizeShopPrimaryPath(pathname: string): string | null {
-  const match = shopPrimaryNav.find(
-    (item) => pathname === item.path || pathname.startsWith(`${item.path}/`),
-  );
-  return match?.path ?? null;
+  let best: string | null = null;
+  for (const item of shopPrimaryNav) {
+    if (pathname === item.path || pathname.startsWith(`${item.path}/`)) {
+      if (!best || item.path.length > best.length) {
+        best = item.path;
+      }
+    }
+  }
+  return best;
 }
 
 export function getSectionsForShopPath(pathname: string): ShopDataSection[] {
   const primary = normalizeShopPrimaryPath(pathname);
   if (!primary) return [];
   return PATH_SECTIONS[primary] ?? [];
-}
-
-export function getPrefetchSectionForShopPath(pathname: string): ShopDataSection | null {
-  const primary = normalizeShopPrimaryPath(pathname);
-  if (!primary) return null;
-  return PREFETCH_AFTER[primary] ?? null;
 }

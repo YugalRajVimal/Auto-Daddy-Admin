@@ -2053,7 +2053,7 @@ export function ShopServiceAddEditor({
   onClose?: () => void;
   /** When set, handles save locally. Return true if handled, false to fall through to API. */
   onSaveService?: (
-    id: string,
+    id: string | string[],
     replacesId?: string,
     meta?: ShopServiceFormMeta
   ) => Promise<boolean> | boolean;
@@ -2068,19 +2068,50 @@ export function ShopServiceAddEditor({
     allowedVendorTypes[0]?.value ??
     normalizeShopType(shopType);
   const [vendorType, setVendorType] = useState<ShopType>(defaultVendorType);
-  const shopTypeFiltered = filterServicesByShopType(services, vendorType);
-  const available = shopTypeFiltered.filter((service) => {
-    const id = getServiceId(service);
-    return id && (!selectedIds.has(id) || id === editingId);
-  });
+  const available = useMemo(
+    () =>
+      filterServicesByShopType(services, vendorType)
+        .filter((service) => {
+          const id = getServiceId(service);
+          return id && (!selectedIds.has(id) || id === editingId);
+        })
+        .sort((a, b) =>
+          getServiceName(a).localeCompare(getServiceName(b), undefined, { sensitivity: "base" })
+        ),
+    [editingId, selectedIds, services, vendorType]
+  );
+  const availableIds = useMemo(
+    () => available.map((service) => getServiceId(service)),
+    [available]
+  );
   const [serviceId, setServiceId] = useState(editingId ?? "");
+  const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [serviceDate, setServiceDate] = useState(todayISODate());
   const [serviceActive, setServiceActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [servicePickerOpen, setServicePickerOpen] = useState(false);
   const isEditing = Boolean(editingId);
+  const servicePickerRef = useRef<HTMLDivElement>(null);
+  const pickAllRef = useRef<HTMLInputElement>(null);
+  const allAvailablePicked =
+    availableIds.length > 0 && availableIds.every((id) => pickedIds.has(id));
+  const someAvailablePicked = availableIds.some((id) => pickedIds.has(id)) && !allAvailablePicked;
+
+  const servicePickerLabel = useMemo(() => {
+    if (available.length === 0) return "All services already added";
+    if (pickedIds.size === 0) return "Select service";
+    if (pickedIds.size === 1) {
+      const onlyId = [...pickedIds][0];
+      const match = available.find((service) => getServiceId(service) === onlyId);
+      return match ? getServiceName(match) : "1 service selected";
+    }
+    return `${pickedIds.size} services selected`;
+  }, [available, pickedIds]);
 
   const resetFormFields = (nextServiceId = "", nextDate = todayISODate(), nextActive = true) => {
     setServiceId(nextServiceId);
+    setPickedIds(new Set());
+    setServicePickerOpen(false);
     setServiceDate(nextDate);
     setServiceActive(nextActive);
   };
@@ -2107,12 +2138,62 @@ export function ShopServiceAddEditor({
     resetFormFields();
   }, [allowedVendorTypes, defaultVendorType, editingId, selectedServices, services, shopType]);
 
+  useEffect(() => {
+    if (pickAllRef.current) {
+      pickAllRef.current.indeterminate = someAvailablePicked;
+    }
+  }, [someAvailablePicked]);
+
+  useEffect(() => {
+    if (!servicePickerOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!servicePickerRef.current?.contains(event.target as Node)) {
+        setServicePickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [servicePickerOpen]);
+
   const handleVendorTypeChange = (nextType: ShopType) => {
     setVendorType(nextType);
-    const stillAvailable = filterServicesByShopType(services, nextType).some(
-      (service) => getServiceId(service) === serviceId
+    setServicePickerOpen(false);
+    const nextAvailableIds = new Set(
+      filterServicesByShopType(services, nextType)
+        .filter((service) => {
+          const id = getServiceId(service);
+          return id && (!selectedIds.has(id) || id === editingId);
+        })
+        .map((service) => getServiceId(service))
     );
-    if (!stillAvailable) setServiceId("");
+    if (isEditing) {
+      if (!nextAvailableIds.has(serviceId)) setServiceId("");
+      return;
+    }
+    setPickedIds((prev) => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (nextAvailableIds.has(id)) next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const togglePicked = (id: string) => {
+    setPickedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const togglePickAll = () => {
+    setPickedIds((prev) => {
+      const allChecked =
+        availableIds.length > 0 && availableIds.every((id) => prev.has(id));
+      return allChecked ? new Set() : new Set(availableIds);
+    });
   };
 
   const handleCancel = () => {
@@ -2122,29 +2203,55 @@ export function ShopServiceAddEditor({
   };
 
   const handleSave = async () => {
-    if (!serviceId) {
-      toast.error("Please select a service.");
-      return;
-    }
-
     const meta: ShopServiceFormMeta = {
       createdAt: serviceDate,
       isActive: serviceActive,
     };
 
-    if (isEditing && serviceId === editingId) {
+    if (isEditing) {
+      if (!serviceId) {
+        toast.error("Please select a service.");
+        return;
+      }
+
+      if (serviceId === editingId) {
+        setSaving(true);
+        try {
+          if (onSaveService) {
+            const handled = await onSaveService(serviceId, undefined, meta);
+            if (handled) {
+              onSaved(serviceId);
+              return;
+            }
+          }
+          if (!token) return;
+          toast.success("Service updated.");
+          onSaved(serviceId);
+        } finally {
+          setSaving(false);
+        }
+        return;
+      }
+
+      const nextIds = [...selectedIds].filter((id) => id !== editingId).concat(serviceId);
       setSaving(true);
       try {
         if (onSaveService) {
-          const handled = await onSaveService(serviceId, undefined, meta);
+          const handled = await onSaveService(serviceId, editingId ?? undefined, meta);
           if (handled) {
-            toast.success("Service updated.");
+            resetFormFields();
             onSaved(serviceId);
             return;
           }
         }
         if (!token) return;
+        const res = await updateServiceWeWorkWith(token, nextIds);
+        if (!res.ok) {
+          toast.error(apiMessage(res.data) || "Could not save.");
+          return;
+        }
         toast.success("Service updated.");
+        resetFormFields();
         onSaved(serviceId);
       } finally {
         setSaving(false);
@@ -2152,18 +2259,20 @@ export function ShopServiceAddEditor({
       return;
     }
 
-    const nextIds = isEditing
-      ? [...selectedIds].filter((id) => id !== editingId).concat(serviceId)
-      : [...selectedIds, serviceId];
+    const idsToAdd = availableIds.filter((id) => pickedIds.has(id));
+    if (idsToAdd.length === 0) {
+      toast.error("Please select at least one service.");
+      return;
+    }
 
+    const nextIds = [...selectedIds, ...idsToAdd];
     setSaving(true);
     try {
       if (onSaveService) {
-        const handled = await onSaveService(serviceId, editingId ?? undefined, meta);
+        const handled = await onSaveService(idsToAdd, undefined, meta);
         if (handled) {
-          toast.success(isEditing ? "Service updated." : "Service added.");
           resetFormFields();
-          onSaved(serviceId);
+          onSaved(idsToAdd[0] ?? "");
           return;
         }
       }
@@ -2173,9 +2282,9 @@ export function ShopServiceAddEditor({
         toast.error(apiMessage(res.data) || "Could not save.");
         return;
       }
-      toast.success(isEditing ? "Service updated." : "Service added.");
+      toast.success(idsToAdd.length === 1 ? "Service added." : "Services added.");
       resetFormFields();
-      onSaved(serviceId);
+      onSaved(idsToAdd[0] ?? "");
     } finally {
       setSaving(false);
     }
@@ -2187,7 +2296,13 @@ export function ShopServiceAddEditor({
       showBottomBorder={false}
       footer={
         <ProfileFormFooter
-          message={isEditing ? "You are updating a service" : "You are adding a service"}
+          message={
+            isEditing
+              ? "You are updating a service"
+              : pickedIds.size > 1
+                ? "You are adding services"
+                : "You are adding a service"
+          }
           saving={saving}
           saveLabel={isEditing ? "Update" : "Save"}
           onSave={() => void handleSave()}
@@ -2221,27 +2336,82 @@ export function ShopServiceAddEditor({
           </select>
         </CompactField>
         <CompactField label="Name of Service">
-          <select
-            className={shopCompactInputClass}
-            value={serviceId}
-            onChange={(e) => setServiceId(e.target.value)}
-            disabled={saving || (!isEditing && available.length === 0)}
-          >
-            <option value="">
-              {!isEditing && available.length === 0
-                ? "All services already added"
-                : "Select service"}
-            </option>
-            {available.map((service) => {
-              const id = getServiceId(service);
-              const name = getServiceName(service);
-              return (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              );
-            })}
-          </select>
+          {isEditing ? (
+            <select
+              className={shopCompactInputClass}
+              value={serviceId}
+              onChange={(e) => setServiceId(e.target.value)}
+              disabled={saving || available.length === 0}
+            >
+              <option value="">Select service</option>
+              {available.map((service) => {
+                const id = getServiceId(service);
+                const name = getServiceName(service);
+                return (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <div ref={servicePickerRef} className="relative min-w-0 w-full">
+              <button
+                type="button"
+                disabled={saving || available.length === 0}
+                onClick={() => setServicePickerOpen((open) => !open)}
+                className={`${shopCompactInputClass} flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:bg-gray-100`}
+                aria-expanded={servicePickerOpen}
+                aria-haspopup="listbox"
+              >
+                <span className="truncate">{servicePickerLabel}</span>
+                <span className="ml-2 shrink-0 text-[10px] text-gray-500">
+                  {servicePickerOpen ? "▲" : "▼"}
+                </span>
+              </button>
+              {servicePickerOpen && !saving && available.length > 0 ? (
+                <div
+                  role="listbox"
+                  aria-multiselectable="true"
+                  className="absolute left-0 right-0 z-50 mt-0.5 max-h-56 overflow-y-auto rounded border border-gray-400 bg-white shadow-lg"
+                >
+                  <label className="flex sticky top-0 z-10 cursor-pointer items-center gap-2 border-b border-gray-100 bg-gray-50 px-3 py-2 text-xs font-bold text-ad-green-dark">
+                    <input
+                      ref={pickAllRef}
+                      type="checkbox"
+                      checked={allAvailablePicked}
+                      onChange={togglePickAll}
+                      className="h-3.5 w-3.5 accent-ad-green"
+                      aria-label="Select all services"
+                    />
+                    Select all
+                  </label>
+                  {available.map((service) => {
+                    const id = getServiceId(service);
+                    const name = getServiceName(service);
+                    const checked = pickedIds.has(id);
+                    const inputId = `shop-add-service-${id}`;
+                    return (
+                      <label
+                        key={id}
+                        htmlFor={inputId}
+                        className="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-3 py-2 text-xs font-bold text-ad-green-dark last:border-b-0 hover:bg-gray-50"
+                      >
+                        <input
+                          id={inputId}
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => togglePicked(id)}
+                          className="h-3.5 w-3.5 shrink-0 accent-ad-green"
+                        />
+                        <span className="min-w-0 truncate">{name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          )}
         </CompactField>
         <CompactField label="Status">
           <select
@@ -2287,7 +2457,7 @@ export function ShopOperationalServicesEditor({
   showAddForm?: boolean;
   onAddFormClose?: () => void;
   onSaveService?: (
-    id: string,
+    id: string | string[],
     replacesId?: string,
     meta?: ShopServiceFormMeta
   ) => Promise<boolean> | boolean;
@@ -2348,7 +2518,7 @@ export function ShopOperationalServicesEditor({
           {headerAction ? <div className="flex shrink-0 items-center">{headerAction}</div> : null}
         </div>
       ) : null}
-      <ShopReveal show={showForm}>
+      <ShopReveal show={showForm} clipOverflow={false}>
         <ShopServiceAddEditor
           services={fullServiceCatalog}
           selectedServices={services}

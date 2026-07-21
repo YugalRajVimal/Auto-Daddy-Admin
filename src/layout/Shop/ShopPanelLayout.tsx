@@ -12,8 +12,9 @@ import { useEffect, useState } from "react";
 import { getPostLoginRedirect, useAuth } from "../../auth";
 
 function ShopLayoutContent() {
-  const { displayName, city, daysLeft, business, businessNameLoaded } = useShopOwnerPortal();
-  const businessLogoSrc = normalizeMediaUrl(business?.businessLogo ?? null);
+  const { displayName, city, daysLeft, business, businessNameLoaded, profileIcon } =
+    useShopOwnerPortal();
+  const profilePhotoSrc = normalizeMediaUrl(profileIcon ?? null);
   const location = city || business?.city?.trim();
   const { login } = useAuth();
 
@@ -88,7 +89,7 @@ function ShopLayoutContent() {
         homePath="/shop"
         profilePath="/shop/profile"
         primaryNav={shopPrimaryNav}
-        brandLogo={{ src: businessLogoSrc, placeholderLabel: "Business logo" }}
+        brandLogo={{ src: profilePhotoSrc, placeholderLabel: "Profile photo" }}
         businessName={displayName}
         businessNameLoading={!businessNameLoaded}
         city={location}

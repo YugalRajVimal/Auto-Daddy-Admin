@@ -129,18 +129,16 @@ export default function ShopMessagesPage() {
           <ShopRefreshButton onClick={() => void refresh()} />
         </div>
 
-        {!showNotifications ? (
-          <p className="py-8 text-center text-sm text-gray-600">No sent messages yet.</p>
-        ) : loading ? (
+        {showNotifications && loading ? (
           <ShopLoadingPanel variant="profile-table" count={6} />
-        ) : error ? (
+        ) : showNotifications && error ? (
           <ShopErrorPanel message={error} onRetry={() => void refresh()} />
         ) : (
           <>
-            <MessagesTable rows={items} />
+            <MessagesTable rows={showNotifications ? items : []} />
             <ShopListFooter>
-              <p>{items.length} Entries</p>
-              {hasMore ? (
+              <p>{showNotifications ? items.length : 0} Entries</p>
+              {showNotifications && hasMore ? (
                 <button
                   type="button"
                   onClick={loadMore}

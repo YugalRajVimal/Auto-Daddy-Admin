@@ -331,6 +331,7 @@ export function pageDetailsSubServicesToCategories(subs: AutoshopPageDetailsSubS
         name: string;
         desc?: string;
         price?: number;
+        qty?: number;
         make?: string;
         model?: string;
         odoOutRequired?: boolean;
@@ -354,10 +355,15 @@ export function pageDetailsSubServicesToCategories(subs: AutoshopPageDetailsSubS
     if (sub.odoOutRequired) cat.odoOutRequired = true;
     const make = typeof sub.make === "string" ? sub.make.trim() : "";
     const model = typeof sub.model === "string" ? sub.model.trim() : "";
+    const qty =
+      typeof sub.quantity === "number" && Number.isFinite(sub.quantity) && sub.quantity > 0
+        ? sub.quantity
+        : undefined;
     cat.subServices.push({
       name: sub.subServiceName,
       desc: sub.desc,
       price: sub.price,
+      ...(qty != null ? { qty } : {}),
       ...(make ? { make } : {}),
       ...(model ? { model } : {}),
       odoOutRequired: Boolean(sub.odoOutRequired),

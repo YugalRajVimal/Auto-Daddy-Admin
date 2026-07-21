@@ -6,7 +6,7 @@ export function useShopServices() {
   const state = sections.services;
 
   useEffect(() => {
-    void loadSection("services");
+    void loadSection("services", { force: true });
   }, [loadSection]);
 
   const refresh = useCallback(async () => {
@@ -15,7 +15,7 @@ export function useShopServices() {
 
   return {
     categories: state.data ?? [],
-    loading: state.loading && !state.loaded,
+    loading: state.loading,
     loaded: state.loaded,
     error: state.error,
     refresh,

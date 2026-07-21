@@ -16,7 +16,7 @@ export function useShopWallet() {
   };
 
   useEffect(() => {
-    void loadSection("wallet");
+    void loadSection("wallet", { force: true });
   }, [loadSection]);
 
   const refresh = useCallback(async () => {
@@ -30,7 +30,7 @@ export function useShopWallet() {
     paidOnline: wallet.paidOnline,
     unpaidCash: wallet.unpaidCash,
     unpaidOnline: wallet.unpaidOnline,
-    loading: state.loading && !state.loaded,
+    loading: state.loading,
     error: state.error,
     refresh,
   };

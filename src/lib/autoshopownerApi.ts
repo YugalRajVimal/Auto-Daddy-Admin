@@ -201,6 +201,8 @@ export type SubServiceInput = {
   desc?: string;
   price?: number;
   quantity?: number;
+  qtyType?: "days" | "unit";
+  labourCost?: number;
   tax?: number;
 };
 
@@ -213,7 +215,12 @@ export function editSubService(
   body: {
     serviceId: string;
     subServiceIndex: number;
-    update: Partial<Pick<SubServiceInput, "make" | "model" | "price" | "quantity" | "tax" | "name" | "desc">>;
+    update: Partial<
+      Pick<
+        SubServiceInput,
+        "make" | "model" | "price" | "quantity" | "qtyType" | "labourCost" | "tax" | "name" | "desc"
+      >
+    >;
   },
 ) {
   return putJsonAutoshopowner<ApiEnvelope>("/api/autoshopowner/services/subservices/edit", body, token);

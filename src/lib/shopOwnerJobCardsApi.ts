@@ -280,10 +280,14 @@ export function normalizeJobCardServiceBlocks(job: Record<string, unknown>): unk
   if (!Array.isArray(services)) return [];
 
   const first = services[0];
-  if (first && typeof first === "object" && ("service" in (first as object) || "subServices" in (first as object))) {
+  if (!first || typeof first !== "object") return [];
+
+  // Legacy nested shape: { service, subServices: [...] }
+  if (Array.isArray((first as { subServices?: unknown }).subServices)) {
     return services;
   }
 
+  // Flat API shape: { service, category, desc, unitCost, qty, amount, odoOutReading }
   const byService = new Map<string, Array<Record<string, unknown>>>();
   for (const raw of services) {
     if (!raw || typeof raw !== "object") continue;
@@ -291,13 +295,16 @@ export function normalizeJobCardServiceBlocks(job: Record<string, unknown>): unk
     const serviceId = String(s.service ?? s.serviceId ?? "").trim();
     if (!serviceId) continue;
     const bucket = byService.get(serviceId) ?? [];
+    const subName = String(s.subServiceName ?? s.name ?? "").trim();
     bucket.push({
-      name: String(s.desc ?? s.category ?? "Service"),
+      name: subName,
       desc: String(s.desc ?? ""),
       qty: s.qty ?? 1,
-      unitPrice: s.unitCost ?? s.amount,
+      unitPrice: s.unitCost ?? s.unitPrice ?? s.amount,
       price: s.amount ?? s.unitCost,
-      dueOdometerReading: s.odoOutReading,
+      dueOdometerReading: s.odoOutReading ?? s.dueOdometerReading ?? s.odoOut,
+      odoOut: s.odoOutReading ?? s.odoOut,
+      odoOutReading: s.odoOutReading,
     });
     byService.set(serviceId, bucket);
   }

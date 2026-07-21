@@ -6,7 +6,7 @@ export function useShopPayments() {
   const state = sections.payments;
 
   useEffect(() => {
-    void loadSection("payments");
+    void loadSection("payments", { force: true });
   }, [loadSection]);
 
   const refresh = useCallback(async () => {
@@ -15,7 +15,7 @@ export function useShopPayments() {
 
   return {
     rows: state.data ?? [],
-    loading: state.loading && !state.loaded,
+    loading: state.loading,
     error: state.error,
     refresh,
   };

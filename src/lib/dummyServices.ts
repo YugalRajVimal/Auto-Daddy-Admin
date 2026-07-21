@@ -258,9 +258,13 @@ function parseCatalogSubServices(raw: unknown): ShopServiceCategory["subServices
     const priceRaw = o.price;
     const qtyRaw = o.quantity ?? o.qty;
     const taxRaw = o.tax;
+    const labourRaw = o.labourCost ?? o.laborCost ?? o.labourCharge;
+    const qtyTypeRaw = String(o.qtyType ?? o.quantityType ?? "").trim().toLowerCase();
     const price = typeof priceRaw === "number" ? priceRaw : Number(priceRaw);
     const qty = typeof qtyRaw === "number" ? qtyRaw : Number(qtyRaw);
     const tax = typeof taxRaw === "number" ? taxRaw : Number(taxRaw);
+    const labourCost = typeof labourRaw === "number" ? labourRaw : Number(labourRaw);
+    const qtyType = qtyTypeRaw === "days" || qtyTypeRaw === "unit" ? qtyTypeRaw : undefined;
     const make = String(o.make ?? "").trim();
     const model = String(o.model ?? "").trim();
     out.push({
@@ -271,6 +275,8 @@ function parseCatalogSubServices(raw: unknown): ShopServiceCategory["subServices
       desc: String(o.desc ?? o.description ?? "").trim(),
       price: Number.isFinite(price) ? price : 0,
       ...(Number.isFinite(qty) && qty > 0 ? { qty } : {}),
+      ...(qtyType ? { qtyType } : {}),
+      ...(Number.isFinite(labourCost) ? { labourCost } : {}),
       ...(Number.isFinite(tax) ? { tax } : {}),
     });
   }

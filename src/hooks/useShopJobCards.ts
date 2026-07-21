@@ -19,7 +19,7 @@ export function useShopJobCards(search?: string) {
 
   useEffect(() => {
     if (!q) {
-      void loadSection("jobCards");
+      void loadSection("jobCards", { force: true });
       return;
     }
 
@@ -84,7 +84,7 @@ export function useShopJobCards(search?: string) {
 
   return {
     cards,
-    loading: q ? searchLoading : state.loading && !state.loaded,
+    loading: q ? searchLoading : state.loading,
     error: q ? searchError : state.error,
     refresh,
   };

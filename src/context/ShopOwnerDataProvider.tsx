@@ -22,7 +22,6 @@ import {
 import { fetchAutoshopJobCards } from "../lib/autoshopownerJobCardsApi";
 import { fetchAutoshopDealers, fetchAutoshopMyDeals } from "../lib/autoshopownerDealsApi";
 import {
-  getPrefetchSectionForShopPath,
   getSectionsForShopPath,
   type ShopDataSection,
 } from "../lib/shopDataSections";
@@ -359,7 +358,8 @@ export function ShopOwnerDataProvider({ children }: { children: ReactNode }) {
       const existing = sectionsRef.current[section];
       if (!options?.force && existing.loaded) return;
 
-      const showLoading = !existing.loaded && !options?.silent;
+      // Force navigations show loading even when cached data exists.
+      const showLoading = Boolean(options?.force ? !options.silent : !existing.loaded && !options?.silent);
       if (showLoading) {
         setSections((prev) => ({
           ...prev,
@@ -457,22 +457,20 @@ export function useShopOwnerData() {
   return ctx;
 }
 
-/** Loads the current page's data and prefetches the next primary-nav section. */
+/** Force-refetches the current page's data on every navigation. */
 export function ShopOwnerPrefetcher() {
   const location = useLocation();
-  const { loadSection, prefetchSection } = useShopOwnerData();
+  const { loadSection, refreshSection } = useShopOwnerData();
 
   useEffect(() => {
-    const currentSections = getSectionsForShopPath(location.pathname);
-    const nextSection = getPrefetchSectionForShopPath(location.pathname);
+    // Portal powers the shell on every page — refresh in background (no header flicker).
+    void refreshSection("portal");
 
-    for (const section of currentSections) {
-      void loadSection(section);
+    for (const section of getSectionsForShopPath(location.pathname)) {
+      if (section === "portal") continue;
+      void loadSection(section, { force: true });
     }
-    if (nextSection) {
-      void prefetchSection(nextSection);
-    }
-  }, [location.pathname, loadSection, prefetchSection]);
+  }, [location.pathname, loadSection, refreshSection]);
 
   return null;
 }

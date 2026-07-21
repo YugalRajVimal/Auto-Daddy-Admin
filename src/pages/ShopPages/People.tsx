@@ -73,7 +73,6 @@ function logPeopleApi(method: string, path: string, request: unknown, response: 
 }
 
 type DetailView =
-  | { kind: "add-to-list"; customer: MyCustomer }
   | { kind: "customer-info"; customer: MyCustomer; vehicleIndex: number }
   | { kind: "vehicle-list"; customer: MyCustomer };
 
@@ -751,6 +750,7 @@ function CustomerListTable({
   showStatus = false,
   showAction = false,
   isCustomerAdded,
+  invitingCustomerId,
   onAddCustomer,
 }: {
   customers: MyCustomer[];
@@ -760,6 +760,7 @@ function CustomerListTable({
   showStatus?: boolean;
   showAction?: boolean;
   isCustomerAdded?: (customer: MyCustomer) => boolean;
+  invitingCustomerId?: string | null;
   onAddCustomer?: (customer: MyCustomer) => void;
 }) {
   return (
@@ -834,9 +835,12 @@ function CustomerListTable({
                         <button
                           type="button"
                           onClick={() => onAddCustomer?.(customer)}
-                          className="rounded border border-ad-purple bg-white px-3 py-0.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8]"
+                          disabled={Boolean(invitingCustomerId)}
+                          className="rounded border border-ad-purple bg-white px-3 py-0.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:opacity-60"
                         >
-                          Invite
+                          {invitingCustomerId && invitingCustomerId === customerId(customer)
+                            ? "Inviting…"
+                            : "Invite"}
                         </button>
                       )}
                     </td>
@@ -1264,98 +1268,6 @@ function EditCustomerForm({
   );
 }
 
-function AddToListForm({
-  customer,
-  onCancel,
-  onSaved,
-}: {
-  customer: MyCustomer;
-  onCancel: () => void;
-  onSaved: (message: string) => void;
-}) {
-  const { token, session } = useAuth();
-  void session;
-  const name = customer.name ?? "";
-  const phone = customer.phone ?? "";
-  const city = customer.city ?? "";
-  const [email, setEmail] = useState(customer.email ?? "");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const id = customerId(customer);
-
-  const handleAdd = async () => {
-    if (!token || !id) {
-      setError("Missing customer id.");
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      const addRes = await addCarOwnerToMyCustomers(token, id, {
-        name: name.trim(),
-        email: email.trim(),
-        city: city.trim(),
-      });
-      logPeopleApi("POST", "/api/autoshopowner/customer/add", { customerId: id, edits: { name, email, city } }, addRes);
-      if (!addRes.ok) {
-        setError(apiMessage(addRes.data) || "Could not add customer to your list.");
-        return;
-      }
-
-      onSaved(
-        apiMessage(addRes.data) ||
-        "Notification sent for approval. Pl. wait or contact with Customer",
-      );
-    } catch {
-      setError("Network error.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <CompactFormPanel
-      className={shopProfileFormPanelClass}
-      showBottomBorder={false}
-      footer={
-        <PeopleFormFooter
-          message="You are adding a customer to your list"
-          saving={submitting}
-          saveLabel="+ Add"
-          savingLabel="Adding…"
-          onSave={() => void handleAdd()}
-          onCancel={onCancel}
-        />
-      }
-    >
-      {error ? <PeopleFormError message={error} /> : null}
-      <CompactFormRow className="items-end">
-        <CompactField label="Name" className={compactFixedFieldWidth}>
-          <input className={`${shopCompactInputClass} bg-gray-100`} value={name} readOnly />
-        </CompactField>
-        <CompactField label="Phone" className={compactFixedFieldWidth}>
-          <input
-            className={`${shopCompactInputClass} bg-gray-100`}
-            value={formatPhoneLabel(phone)}
-            readOnly
-          />
-        </CompactField>
-        <CompactField label="City" className={compactFixedFieldWidth}>
-          <input className={`${shopCompactInputClass} bg-gray-100`} value={city} readOnly />
-        </CompactField>
-        <CompactField label="Email" className={compactFixedFieldWidth}>
-          <input
-            className={shopCompactInputClass}
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </CompactField>
-      </CompactFormRow>
-    </CompactFormPanel>
-  );
-}
-
 function CustomerInfoView({
   customer,
   vehicleIndex,
@@ -1461,6 +1373,7 @@ export default function ShopPeoplePage() {
   const [sectionLoading, setSectionLoading] = useState(false);
   const [sectionError, setSectionError] = useState<string | null>(null);
   const [addedCustomerIds, setAddedCustomerIds] = useState<Set<string>>(() => new Set());
+  const [invitingCustomerId, setInvitingCustomerId] = useState<string | null>(null);
 
   // Directory search only applies to My Customer List; Approval filters client-side.
   const myListSearch = section === "my-list" ? search : "";
@@ -1684,11 +1597,47 @@ export default function ShopPeoplePage() {
     setEditingCustomer(customer);
   };
 
-  const handleAddCustomerFromSearch = (customer: MyCustomer) => {
+  const handleAddCustomerFromSearch = async (customer: MyCustomer) => {
+    if (!token || invitingCustomerId) return;
+    const id = customerId(customer);
+    if (!id) {
+      toast.error("Missing customer id.");
+      return;
+    }
+
     setShowAddForm(false);
     setEditingCustomer(null);
+    setDetailView(null);
     setStatusMessage(null);
-    setDetailView({ kind: "add-to-list", customer });
+    setInvitingCustomerId(id);
+
+    const edits = {
+      name: (customer.name ?? "").trim(),
+      email: (customer.email ?? "").trim(),
+      city: (customer.city ?? "").trim(),
+    };
+
+    try {
+      const addRes = await addCarOwnerToMyCustomers(token, id, edits);
+      logPeopleApi(
+        "POST",
+        "/api/autoshopowner/customer/add",
+        { customerId: id, edits },
+        addRes,
+      );
+      if (!addRes.ok) {
+        toast.error(apiMessage(addRes.data) || "Could not add customer to your list.");
+        return;
+      }
+      await handleAddToListSaved(
+        apiMessage(addRes.data) ||
+          "Notification sent for approval. Pl. wait or contact with Customer",
+      );
+    } catch {
+      toast.error("Network error.");
+    } finally {
+      setInvitingCustomerId(null);
+    }
   };
 
   const handleShowVehicles = (customer: MyCustomer) => {
@@ -1735,16 +1684,7 @@ export default function ShopPeoplePage() {
       faqsDescription={faqsDescription}
     >
       <div className="space-y-1">
-        {detailView?.kind === "add-to-list" ? (
-          <>
-            <AddToListForm
-              customer={detailView.customer}
-              onCancel={resetDetail}
-              onSaved={(message) => void handleAddToListSaved(message)}
-            />
-            {statusMessage ? <StatusBanner message={statusMessage} /> : null}
-          </>
-        ) : detailView?.kind === "customer-info" ? (
+        {detailView?.kind === "customer-info" ? (
           <CustomerInfoView
             customer={detailView.customer}
             vehicleIndex={detailView.vehicleIndex}
@@ -1832,7 +1772,8 @@ export default function ShopPeoplePage() {
                       showStatus={!showMyListSearchActions}
                       showAction={showMyListSearchActions}
                       isCustomerAdded={isCustomerAlreadyAdded}
-                      onAddCustomer={handleAddCustomerFromSearch}
+                      invitingCustomerId={invitingCustomerId}
+                      onAddCustomer={(customer) => void handleAddCustomerFromSearch(customer)}
                     />
                     {showMyListSearchActions ? <SearchInviteNotice /> : null}
                   </>

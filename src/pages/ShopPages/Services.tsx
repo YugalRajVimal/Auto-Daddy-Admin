@@ -34,6 +34,9 @@ const SHOP_TABLE: AdminPanelTableClasses = {
 const shopHoursBulkButtonClass =
   "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
 
+const shopFilterSelectClass =
+  "shop-compact-input h-[26px] w-[9rem] shrink-0 box-border border border-gray-400 bg-white px-2 py-0 text-sm leading-tight text-gray-800 focus:border-blue-500 focus:outline-none";
+
 type SubService = ShopServiceCategory["subServices"][number];
 
 function formatUnitCost(price: number): string {
@@ -54,6 +57,10 @@ function formatAmount(amount: number): string {
 
 function getSubRowId(sub: SubService, index: number): string {
   return sub.id ?? `${sub.name}-${index}`;
+}
+
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
 function AddNewButton({ onClick }: { onClick: () => void }) {
@@ -115,6 +122,8 @@ function SubServiceTable({
               <th className={SHOP_TABLE.th}>Description</th>
               <th className={SHOP_TABLE.th}>Unit Cost</th>
               <th className={SHOP_TABLE.th}>Qty</th>
+              <th className={SHOP_TABLE.th}>Qty Type</th>
+              <th className={SHOP_TABLE.th}>Labor Cost</th>
               <th className={SHOP_TABLE.th}>Amount</th>
             </tr>
           </thead>
@@ -152,6 +161,10 @@ function SubServiceTable({
                     {formatUnitCost(sub.price)}
                   </td>
                   <td className={SHOP_TABLE.td}>{qty}</td>
+                  <td className={SHOP_TABLE.td}>{sub.qtyType ?? "unit"}</td>
+                  <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
+                    {formatUnitCost(sub.labourCost ?? 0)}
+                  </td>
                   <td className={`${SHOP_TABLE.td} font-semibold text-blue-700`}>
                     {formatAmount(amount)}
                   </td>
@@ -175,6 +188,8 @@ export default function ShopServicesPage() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [page, setPage] = useState(1);
+  const [makeFilter, setMakeFilter] = useState("");
+  const [modelFilter, setModelFilter] = useState("");
   const { categories: apiCategories, loading, error, refresh } = useShopServices();
   const [categories, setCategories] = useState<ShopServiceCategory[]>([]);
 
@@ -192,16 +207,40 @@ export default function ShopServicesPage() {
 
   const allSubs = activeCategory?.subServices ?? [];
 
-  const allRowIds = useMemo(
-    () => allSubs.map((sub, index) => getSubRowId(sub, index)),
+  const makeOptions = useMemo(
+    () => uniqueSorted(allSubs.map((sub) => sub.make?.trim() ?? "").filter(Boolean)),
     [allSubs],
   );
 
-  const totalPages = Math.max(1, Math.ceil(allSubs.length / PAGE_SIZE));
+  const modelOptions = useMemo(() => {
+    const scoped = makeFilter
+      ? allSubs.filter((sub) => (sub.make?.trim() ?? "") === makeFilter)
+      : allSubs;
+    return uniqueSorted(scoped.map((sub) => sub.model?.trim() ?? "").filter(Boolean));
+  }, [allSubs, makeFilter]);
+
+  const filteredSubs = useMemo(
+    () =>
+      allSubs
+        .map((sub, originalIndex) => ({ sub, originalIndex }))
+        .filter(({ sub }) => {
+          if (makeFilter && (sub.make?.trim() ?? "") !== makeFilter) return false;
+          if (modelFilter && (sub.model?.trim() ?? "") !== modelFilter) return false;
+          return true;
+        }),
+    [allSubs, makeFilter, modelFilter],
+  );
+
+  const allRowIds = useMemo(
+    () => filteredSubs.map(({ sub, originalIndex }) => getSubRowId(sub, originalIndex)),
+    [filteredSubs],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredSubs.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const paginatedSubs = useMemo(
-    () => allSubs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [allSubs, safePage],
+  const paginatedRows = useMemo(
+    () => filteredSubs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filteredSubs, safePage],
   );
 
   useEffect(() => {
@@ -215,13 +254,26 @@ export default function ShopServicesPage() {
     setFormOpen(false);
     setEditIndex(null);
     setSelectedRows(new Set());
+    setMakeFilter("");
+    setModelFilter("");
   }, [activeCategoryId]);
+
+  useEffect(() => {
+    setPage(1);
+    setSelectedRows(new Set());
+  }, [makeFilter, modelFilter]);
 
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
   }, [page, totalPages]);
+
+  useEffect(() => {
+    if (modelFilter && !modelOptions.includes(modelFilter)) {
+      setModelFilter("");
+    }
+  }, [modelFilter, modelOptions]);
 
   const closeForm = () => {
     setFormOpen(false);
@@ -236,7 +288,10 @@ export default function ShopServicesPage() {
   const openEditForm = (index: number) => {
     setEditIndex(index);
     setFormOpen(true);
-    setPage(Math.floor(index / PAGE_SIZE) + 1);
+    const filteredIndex = filteredSubs.findIndex((row) => row.originalIndex === index);
+    if (filteredIndex >= 0) {
+      setPage(Math.floor(filteredIndex / PAGE_SIZE) + 1);
+    }
   };
 
   const toggleRow = (id: string) => {
@@ -290,17 +345,6 @@ export default function ShopServicesPage() {
     }
   };
 
-  const paginatedRows = useMemo(
-    () =>
-      paginatedSubs.map((sub) => ({
-        sub,
-        originalIndex: allSubs.findIndex(
-          (candidate) => candidate.id === sub.id && candidate.name === sub.name,
-        ),
-      })),
-    [paginatedSubs, allSubs],
-  );
-
   const hasBulkSelection = selectedRows.size > 0;
   const showToolbar = activeCategory != null && !formOpen;
 
@@ -333,24 +377,63 @@ export default function ShopServicesPage() {
         ) : error ? (
           <ShopErrorPanel message={error} onRetry={() => void refresh()} />
         ) : categories.length === 0 ? (
-          <p className="text-center text-sm text-gray-600">
-            No service categories yet. Select services from Profile → Operational Services.
-          </p>
+          <>
+            <SubServiceTable
+              rows={[]}
+              allRowIds={[]}
+              checkedIds={selectedRows}
+              onToggleChecked={toggleRow}
+              onToggleAllChecked={toggleAllRows}
+              onEdit={openEditForm}
+            />
+            <ShopListFooter>
+              <p>0 Entries</p>
+            </ShopListFooter>
+          </>
         ) : activeCategory ? (
           <>
             {showToolbar ? (
-              <div className="flex min-h-[2rem] items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleBulkDelete()}
-                    disabled={!hasBulkSelection || bulkDeleting}
-                    className={`${shopHoursBulkButtonClass}${hasBulkSelection ? "" : " invisible"}`}
-                  >
-                    Delete
-                  </button>
+              <div className="flex min-h-[2rem] items-center gap-2 overflow-x-auto whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={() => void handleBulkDelete()}
+                  disabled={!hasBulkSelection || bulkDeleting}
+                  className={`${shopHoursBulkButtonClass} shrink-0${hasBulkSelection ? "" : " invisible"}`}
+                >
+                  Delete
+                </button>
+                <select
+                  className={shopFilterSelectClass}
+                  value={makeFilter}
+                  onChange={(e) => {
+                    setMakeFilter(e.target.value);
+                    setModelFilter("");
+                  }}
+                  aria-label="Filter by make"
+                >
+                  <option value="">All makes</option>
+                  {makeOptions.map((make) => (
+                    <option key={make} value={make}>
+                      {make}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={shopFilterSelectClass}
+                  value={modelFilter}
+                  onChange={(e) => setModelFilter(e.target.value)}
+                  aria-label="Filter by model"
+                >
+                  <option value="">All models</option>
+                  {modelOptions.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
+                <div className="ml-auto shrink-0">
+                  <AddNewButton onClick={openAddForm} />
                 </div>
-                <AddNewButton onClick={openAddForm} />
               </div>
             ) : null}
 
@@ -376,7 +459,7 @@ export default function ShopServicesPage() {
                 />
 
                 <ShopListFooter>
-                  <p>{allSubs.length} Entries</p>
+                  <p>{filteredSubs.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {

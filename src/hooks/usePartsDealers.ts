@@ -9,7 +9,7 @@ export function usePartsDealers() {
   const state = sections.partsDealers;
 
   useEffect(() => {
-    void loadSection("partsDealers");
+    void loadSection("partsDealers", { force: true });
   }, [loadSection]);
 
   const refresh = useCallback(async () => {
@@ -18,7 +18,7 @@ export function usePartsDealers() {
 
   return {
     dealers: state.data ?? [],
-    loading: state.loading && !state.loaded,
+    loading: state.loading,
     refresh,
   };
 }

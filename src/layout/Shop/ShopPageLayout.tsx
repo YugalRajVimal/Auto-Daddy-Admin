@@ -1,4 +1,4 @@
-import { Outlet } from "react-router";
+import { Outlet, useLocation } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import ShopBusinessProfileCard from "../../components/shop/ShopBusinessProfileCard";
@@ -26,6 +26,7 @@ import {
 } from "../../context/ShopPageChromeContext";
 
 export default function ShopPageLayout() {
+  const location = useLocation();
   const { chrome } = useShopPageChromeContext();
 
   const metaTitle = chrome.metaTitle ?? DEFAULT_SHOP_PAGE_CHROME.metaTitle!;
@@ -34,6 +35,8 @@ export default function ShopPageLayout() {
   const useHeroCard = chrome.heroCard !== false;
   const showSearch = chrome.searchPlaceholder != null;
   const showToolbar = showSearch || chrome.headerAction || chrome.heroCardToolbarAlways;
+  // Remount page content on every route change so each page re-fetches fresh API data.
+  const pageOutlet = <Outlet key={location.pathname} />;
 
   const sidebarCell = showBusinessCard ? (
     <ShopBusinessProfileCard />
@@ -48,7 +51,6 @@ export default function ShopPageLayout() {
       loading={chrome.sidebarLoading}
       skeletonCount={chrome.sidebarSkeletonCount}
       shopStyle
-      className="lg:!h-auto lg:!max-h-none"
     >
       {chrome.sidebarExtra}
     </ShopSidebar>
@@ -88,14 +90,14 @@ export default function ShopPageLayout() {
         <div className={scrollRegionClass}>
           <div className={scrollBodyClass}>
             <div className={scrollContentClass}>
-              <Outlet />
+              {pageOutlet}
             </div>
           </div>
         </div>
       </div>
     </ShopProfileHeroPanel>
   ) : (
-    <Outlet />
+    pageOutlet
   );
 
   return (
@@ -119,7 +121,7 @@ export default function ShopPageLayout() {
           className={`order-2 lg:order-1 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:justify-self-stretch lg:self-center ${shopNavRowNavClass}`}
         />
 
-        <div className="order-3 lg:order-2 lg:col-start-1 lg:row-start-2 lg:self-start">
+        <div className="order-3 min-h-0 lg:order-2 lg:col-start-1 lg:row-start-2 lg:self-start">
           {sidebarCell}
         </div>
 
