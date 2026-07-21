@@ -76,6 +76,7 @@ export type AutoshopPageDetailsSubService = {
   tax?: number;
   make?: string;
   model?: string;
+  labourCost?: number;
   odoOutRequired?: boolean;
 };
 
@@ -372,6 +373,7 @@ export function pageDetailsSubServicesToCategories(subs: AutoshopPageDetailsSubS
         qty?: number;
         make?: string;
         model?: string;
+        labourCost?: number;
         odoOutRequired?: boolean;
       }>;
     }
@@ -397,6 +399,8 @@ export function pageDetailsSubServicesToCategories(subs: AutoshopPageDetailsSubS
       typeof sub.quantity === "number" && Number.isFinite(sub.quantity) && sub.quantity > 0
         ? sub.quantity
         : undefined;
+    const labourCost =
+      typeof sub.labourCost === "number" && Number.isFinite(sub.labourCost) ? sub.labourCost : undefined;
     cat.subServices.push({
       name: sub.subServiceName,
       desc: sub.desc,
@@ -404,6 +408,7 @@ export function pageDetailsSubServicesToCategories(subs: AutoshopPageDetailsSubS
       ...(qty != null ? { qty } : {}),
       ...(make ? { make } : {}),
       ...(model ? { model } : {}),
+      ...(labourCost != null ? { labourCost } : {}),
       odoOutRequired: Boolean(sub.odoOutRequired),
     });
   }

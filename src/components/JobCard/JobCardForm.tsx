@@ -106,6 +106,7 @@ type ServiceCategory = {
     qty?: number;
     make?: string;
     model?: string;
+    labourCost?: number;
     odoOutRequired?: boolean;
   }>;
 };
@@ -429,16 +430,18 @@ function emptyTableLine(id: string): ServiceLine {
 function defaultLineForSub(
   catId: string,
   subIdx: number,
-  sub: { desc?: string; price?: number; qty?: number },
+  sub: { desc?: string; price?: number; qty?: number; labourCost?: number },
   categories: ServiceCategory[],
   vehicle: JobCardFormCustomer["myVehicles"][number] | null,
 ) {
   const qty =
     typeof sub?.qty === "number" && Number.isFinite(sub.qty) && sub.qty > 0 ? sub.qty : 1;
+  const labourCost =
+    typeof sub?.labourCost === "number" && Number.isFinite(sub.labourCost) ? sub.labourCost : 0;
   const draft = {
     unitPriceStr: String(sub?.price ?? 0),
     qtyStr: String(qty),
-    labourCostStr: "0",
+    labourCostStr: String(labourCost),
   };
   return {
     subKey: subServiceKey(catId, subIdx),
@@ -646,6 +649,21 @@ export default function JobCardForm({
     }
     return sum;
   }, [activeLines]);
+
+  const labourFromLines = useMemo(
+    () =>
+      activeLines.reduce((sum, line) => sum + parseNumberFromText(line.labourCostStr), 0),
+    [activeLines],
+  );
+
+  useEffect(() => {
+    if (labourFromLines <= 0) return;
+    setForm((f) => {
+      const next = String(labourFromLines);
+      if (f.labourCharge === next) return f;
+      return { ...f, labourCharge: next };
+    });
+  }, [labourFromLines]);
 
   const labourAmount = parseNumberFromText(form.labourCharge);
   const discountAmount = parseNumberFromText(form.discount);
@@ -1479,6 +1497,7 @@ export default function JobCardForm({
                     }
                     inputMode="decimal"
                     placeholder="0"
+                    aria-label="Labour"
                     className={`${formCellInputClass} w-16 max-w-[4.5rem] text-right tabular-nums`}
                   />
                 </div>
