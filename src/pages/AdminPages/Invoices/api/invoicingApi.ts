@@ -151,6 +151,11 @@ export function bulkUpdateInvoices(
   });
 }
 
+// Convenience wrapper for sending a single invoice from the preview modal.
+export function sendInvoiceById(id: string) {
+  return bulkUpdateInvoices([id], "send");
+}
+
 export function copyInvoices(ids: string[], nextInvoiceNumbers: string[]) {
   return request<{ invoices: any[] }>(`/copy`, {
     method: "POST",

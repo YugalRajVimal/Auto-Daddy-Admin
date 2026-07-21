@@ -1,3 +1,5 @@
+
+
 import { useEffect, useState } from "react";
 import { InvoicePreviewData } from "../../../components/shop/invoice-templates/sampleInvoiceData";
 import { InvoiceTemplatePreview } from "../../../components/shop/invoice-templates/InvoiceTemplatePreview";
@@ -14,12 +16,14 @@ type InvoiceLineItemApi = {
 };
 
 type InvoiceApiRow = {
+  _id?: string;
   invoiceNumber: string;
   dateOfIssue: string;
   client: string;
   clientRemark?: string;
   items: InvoiceLineItemApi[];
   gst: number;
+  status?: string;
   // shop/business info — adjust to wherever your admin panel stores this
   shopName?: string;
   shopAddress?: string;
@@ -68,14 +72,21 @@ export default function InvoiceViewModal({
   invoice,
   templateId,
   onClose,
+  onEdit,
+  onSend,
+  sending,
 }: {
   invoice: InvoiceApiRow;
   templateId: string;
   onClose: () => void;
+  onEdit?: () => void;
+  onSend?: () => void;
+  sending?: boolean;
 }) {
   const [data, setData] = useState<InvoicePreviewData | null>(null);
 
   useEffect(() => {
+    console.log(invoice);
     setData(mapToInvoicePreviewData(invoice));
   }, [invoice]);
 
@@ -89,6 +100,8 @@ export default function InvoiceViewModal({
   }, [onClose]);
 
   if (!data) return null;
+
+  const sendDisabled = sending || invoice.status === "Sent" || invoice.status === "Paid";
 
   return (
     <div
@@ -104,6 +117,25 @@ export default function InvoiceViewModal({
             Invoice {invoice.invoiceNumber}
           </span>
           <div className="flex items-center gap-3">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+              >
+                Edit
+              </button>
+            )}
+            {onSend && (
+              <button
+                type="button"
+                onClick={onSend}
+                disabled={sendDisabled}
+                className="rounded bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {sending ? "Sending..." : invoice.status === "Sent" ? "Sent" : "Send"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => window.print()}
