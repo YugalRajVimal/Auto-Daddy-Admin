@@ -27,9 +27,11 @@ const PATH_SECTIONS: Record<string, ShopDataSection[]> = {
 export function normalizeShopPrimaryPath(pathname: string): string | null {
   let best: string | null = null;
   for (const item of shopPrimaryNav) {
-    if (pathname === item.path || pathname.startsWith(`${item.path}/`)) {
-      if (!best || item.path.length > best.length) {
-        best = item.path;
+    const path = item.path;
+    if (!path) continue;
+    if (pathname === path || pathname.startsWith(`${path}/`)) {
+      if (!best || path.length > best.length) {
+        best = path;
       }
     }
   }
