@@ -93,7 +93,7 @@ export type ShopServiceCategory = {
     desc: string;
     price: number;
     qty?: number;
-    quantityType?: "unit" | "days";
+    quantityType?: "Unit" | "Days";
     labourCost?: number;
     tax?: number;
   }[];

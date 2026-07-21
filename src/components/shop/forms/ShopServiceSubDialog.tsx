@@ -22,8 +22,8 @@ type CatalogSub = ShopServiceCategory["subServices"][number];
 type QuantityType = NonNullable<CatalogSub["quantityType"]>;
 
 const QUANTITY_TYPE_OPTIONS: { value: QuantityType; label: string }[] = [
-  { value: "unit", label: "Unit" },
-  { value: "days", label: "Days" },
+  { value: "Unit", label: "Unit" },
+  { value: "Days", label: "Days" },
 ];
 
 type SuggestionEntry = CatalogSub & {
@@ -129,7 +129,7 @@ export default function ShopServiceSubDialog({
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [qty, setQty] = useState("1");
-  const [quantityType, setQuantityType] = useState<QuantityType>("unit");
+  const [quantityType, setQuantityType] = useState<QuantityType>("Unit");
   const [labourCost, setLabourCost] = useState("0");
   const [desc, setDesc] = useState("");
   const [saving, setSaving] = useState(false);
@@ -188,7 +188,7 @@ export default function ShopServiceSubDialog({
       setPrice(String(sub.price));
       setDesc(sub.desc);
       setQty(String(sub.qty != null && sub.qty > 0 ? sub.qty : 1));
-      setQuantityType(sub.quantityType === "days" ? "days" : "unit");
+      setQuantityType(sub.quantityType === "Days" ? "Days" : "Unit");
       setLabourCost(sub.labourCost != null ? String(sub.labourCost) : "0");
     } else {
       setMake("");
@@ -197,7 +197,7 @@ export default function ShopServiceSubDialog({
       setPrice("");
       setDesc("");
       setQty("1");
-      setQuantityType("unit");
+      setQuantityType("Unit");
       setLabourCost("0");
     }
     setShowSuggestions(false);
@@ -329,7 +329,7 @@ export default function ShopServiceSubDialog({
     setDesc(sub.desc ?? "");
     setPrice(String(sub.price ?? ""));
     setQty(String(sub.qty != null && sub.qty > 0 ? sub.qty : 1));
-    setQuantityType(sub.quantityType === "days" ? "days" : "unit");
+    setQuantityType(sub.quantityType === "Days" ? "Days" : "Unit");
     setLabourCost(sub.labourCost != null ? String(sub.labourCost) : "0");
     setShowSuggestions(false);
   };

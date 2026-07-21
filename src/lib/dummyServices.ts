@@ -264,7 +264,8 @@ function parseCatalogSubServices(raw: unknown): ShopServiceCategory["subServices
     const qty = typeof qtyRaw === "number" ? qtyRaw : Number(qtyRaw);
     const tax = typeof taxRaw === "number" ? taxRaw : Number(taxRaw);
     const labourCost = typeof labourRaw === "number" ? labourRaw : Number(labourRaw);
-    const quantityType = qtyTypeRaw === "days" || qtyTypeRaw === "unit" ? qtyTypeRaw : undefined;
+    const quantityType =
+      qtyTypeRaw === "days" ? "Days" : qtyTypeRaw === "unit" ? "Unit" : undefined;
     const make = String(o.make ?? "").trim();
     const model = String(o.model ?? "").trim();
     out.push({

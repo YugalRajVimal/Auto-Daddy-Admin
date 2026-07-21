@@ -290,9 +290,9 @@ export function parseMyServices(payload: unknown): ShopServiceCategory[] {
             : typeof qtyRaw === "string"
               ? parseFloat(qtyRaw)
               : undefined;
-        const qtyTypeRaw = s(sub.quantityType) ?? s(sub.qtyType);
+        const qtyTypeRaw = (s(sub.quantityType) ?? s(sub.qtyType) ?? "").toLowerCase();
         const quantityType =
-          qtyTypeRaw === "days" || qtyTypeRaw === "unit" ? qtyTypeRaw : undefined;
+          qtyTypeRaw === "days" ? "Days" : qtyTypeRaw === "unit" ? "Unit" : undefined;
         const labourRaw = sub.labourCost ?? sub.laborCost ?? sub.labourCharge;
         const labourCost =
           typeof labourRaw === "number"

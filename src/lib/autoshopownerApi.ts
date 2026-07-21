@@ -201,7 +201,7 @@ export type SubServiceInput = {
   desc?: string;
   price?: number;
   quantity?: number;
-  quantityType?: "unit" | "days";
+  quantityType?: "Unit" | "Days";
   labourCost?: number;
   tax?: number;
 };

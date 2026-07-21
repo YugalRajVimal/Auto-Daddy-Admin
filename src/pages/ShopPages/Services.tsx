@@ -52,7 +52,7 @@ function getSubAmount(sub: SubService): number {
 }
 
 function formatQuantityType(value: SubService["quantityType"]): string {
-  return value === "days" ? "Days" : "Unit";
+  return value === "Days" ? "Days" : "Unit";
 }
 
 function formatAmount(amount: number): string {
