@@ -93,10 +93,21 @@ export function fetchMyDeals(token: string) {
   return getJson<unknown>("/api/auto-shop-owner/my-deals", token);
 }
 
-export function fetchMyServices(token: string) {
+export type MyServicesQuery = {
+  make?: string;
+  model?: string;
+};
+
+export function fetchMyServices(token: string, query?: MyServicesQuery) {
   // Prefer the new shop-owner API surface when available.
   // Falls back to the legacy route shape via the backend router mapping.
-  return getJson<unknown>("/api/autoshopowner/services/my", token);
+  return getJson<unknown>(
+    withQuery("/api/autoshopowner/services/my", {
+      make: query?.make?.trim() || undefined,
+      model: query?.model?.trim() || undefined,
+    }),
+    token,
+  );
 }
 
 export function fetchPayments(token: string) {

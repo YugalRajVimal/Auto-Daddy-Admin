@@ -201,7 +201,7 @@ export type SubServiceInput = {
   desc?: string;
   price?: number;
   quantity?: number;
-  qtyType?: "days" | "unit";
+  quantityType?: "unit" | "days";
   labourCost?: number;
   tax?: number;
 };
@@ -218,7 +218,7 @@ export function editSubService(
     update: Partial<
       Pick<
         SubServiceInput,
-        "make" | "model" | "price" | "quantity" | "qtyType" | "labourCost" | "tax" | "name" | "desc"
+        "make" | "model" | "price" | "quantity" | "quantityType" | "labourCost" | "tax" | "name" | "desc"
       >
     >;
   },

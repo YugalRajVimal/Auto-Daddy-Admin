@@ -235,6 +235,20 @@ export function updateAutoshopJobCardPrefix(token: string, prefix: string) {
   );
 }
 
+/** Next estimate / job card number (does not increment). */
+export function fetchAutoshopJobCardNextNumber(token: string) {
+  return getJsonAutoshopowner<unknown>("/api/autoshopowner/jobcard-prefix/next", token);
+}
+
+/** Set the next estimate / job card number. */
+export function updateAutoshopJobCardNextNumber(token: string, nextNumber: number) {
+  return putJsonAutoshopowner<ApiEnvelope>(
+    "/api/autoshopowner/jobcard-prefix/next",
+    { nextNumber },
+    token,
+  );
+}
+
 export function parseAutoshopJobCardPrefix(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
   const root = payload as Record<string, unknown>;
@@ -248,6 +262,26 @@ export function parseAutoshopJobCardPrefix(payload: unknown): string {
     root.jobCardPrefix ??
     root.jobcardPrefix;
   return typeof raw === "string" ? raw.trim() : raw != null ? String(raw).trim() : "";
+}
+
+export function parseAutoshopJobCardNextNumber(payload: unknown): {
+  nextNumber: string;
+  prefix: string;
+} {
+  if (!payload || typeof payload !== "object") return { nextNumber: "1", prefix: "" };
+  const root = payload as Record<string, unknown>;
+  const data =
+    root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : root;
+  const rawNext = data.nextNumber ?? data.jobCardNo ?? root.nextNumber ?? root.jobCardNo;
+  let nextNumber = "1";
+  if (typeof rawNext === "number" && Number.isFinite(rawNext) && rawNext > 0) {
+    nextNumber = String(Math.trunc(rawNext));
+  } else if (typeof rawNext === "string" && rawNext.trim()) {
+    const digits = rawNext.replace(/[^\d]/g, "");
+    if (digits) nextNumber = String(Number(digits) || 1);
+  }
+  const prefix = parseAutoshopJobCardPrefix(payload);
+  return { nextNumber, prefix };
 }
 
 export function parseAutoshopJobCardPageDetails(payload: unknown): AutoshopJobCardPageDetails | null {

@@ -48,7 +48,11 @@ function getSubQty(sub: SubService): number {
 }
 
 function getSubAmount(sub: SubService): number {
-  return sub.price * getSubQty(sub);
+  return sub.price * getSubQty(sub) + (sub.labourCost ?? 0);
+}
+
+function formatQuantityType(value: SubService["quantityType"]): string {
+  return value === "days" ? "Days" : "Unit";
 }
 
 function formatAmount(amount: number): string {
@@ -161,7 +165,7 @@ function SubServiceTable({
                     {formatUnitCost(sub.price)}
                   </td>
                   <td className={SHOP_TABLE.td}>{qty}</td>
-                  <td className={SHOP_TABLE.td}>{sub.qtyType ?? "unit"}</td>
+                  <td className={SHOP_TABLE.td}>{formatQuantityType(sub.quantityType)}</td>
                   <td className={`${SHOP_TABLE.td} font-semibold text-gray-800`}>
                     {formatUnitCost(sub.labourCost ?? 0)}
                   </td>
@@ -190,7 +194,16 @@ export default function ShopServicesPage() {
   const [page, setPage] = useState(1);
   const [makeFilter, setMakeFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
-  const { categories: apiCategories, loading, error, refresh } = useShopServices();
+  const {
+    categories: apiCategories,
+    allCategories,
+    loading,
+    error,
+    refresh,
+  } = useShopServices({
+    make: makeFilter || undefined,
+    model: modelFilter || undefined,
+  });
   const [categories, setCategories] = useState<ShopServiceCategory[]>([]);
 
   useEffect(() => {
@@ -205,42 +218,59 @@ export default function ShopServicesPage() {
   const activeCategory: ShopServiceCategory | null =
     categories.find((c) => c.id === activeCategoryId) ?? categories[0] ?? null;
 
+  const unfilteredCategory: ShopServiceCategory | null =
+    allCategories.find((c) => c.id === (activeCategory?.id ?? activeCategoryId)) ??
+    allCategories[0] ??
+    null;
+
+  const optionSubs = unfilteredCategory?.subServices ?? [];
   const allSubs = activeCategory?.subServices ?? [];
 
   const makeOptions = useMemo(
-    () => uniqueSorted(allSubs.map((sub) => sub.make?.trim() ?? "").filter(Boolean)),
-    [allSubs],
+    () => uniqueSorted(optionSubs.map((sub) => sub.make?.trim() ?? "").filter(Boolean)),
+    [optionSubs],
   );
 
   const modelOptions = useMemo(() => {
     const scoped = makeFilter
-      ? allSubs.filter((sub) => (sub.make?.trim() ?? "") === makeFilter)
-      : allSubs;
+      ? optionSubs.filter((sub) => (sub.make?.trim() ?? "") === makeFilter)
+      : optionSubs;
     return uniqueSorted(scoped.map((sub) => sub.model?.trim() ?? "").filter(Boolean));
-  }, [allSubs, makeFilter]);
+  }, [optionSubs, makeFilter]);
 
-  const filteredSubs = useMemo(
-    () =>
-      allSubs
-        .map((sub, originalIndex) => ({ sub, originalIndex }))
-        .filter(({ sub }) => {
-          if (makeFilter && (sub.make?.trim() ?? "") !== makeFilter) return false;
-          if (modelFilter && (sub.model?.trim() ?? "") !== modelFilter) return false;
-          return true;
-        }),
-    [allSubs, makeFilter, modelFilter],
-  );
+  const tableRows = useMemo(() => {
+    const pool = unfilteredCategory?.subServices ?? [];
+    return allSubs.map((sub, filteredIndex) => {
+      let originalIndex = filteredIndex;
+      if (pool.length > 0) {
+        if (sub.id) {
+          const byId = pool.findIndex((candidate) => candidate.id === sub.id);
+          if (byId >= 0) originalIndex = byId;
+        } else {
+          const byFields = pool.findIndex(
+            (candidate) =>
+              candidate.name === sub.name &&
+              (candidate.make?.trim() ?? "") === (sub.make?.trim() ?? "") &&
+              (candidate.model?.trim() ?? "") === (sub.model?.trim() ?? "") &&
+              candidate.price === sub.price,
+          );
+          if (byFields >= 0) originalIndex = byFields;
+        }
+      }
+      return { sub, originalIndex };
+    });
+  }, [allSubs, unfilteredCategory]);
 
   const allRowIds = useMemo(
-    () => filteredSubs.map(({ sub, originalIndex }) => getSubRowId(sub, originalIndex)),
-    [filteredSubs],
+    () => tableRows.map(({ sub, originalIndex }) => getSubRowId(sub, originalIndex)),
+    [tableRows],
   );
 
-  const totalPages = Math.max(1, Math.ceil(filteredSubs.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(tableRows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paginatedRows = useMemo(
-    () => filteredSubs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [filteredSubs, safePage],
+    () => tableRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [tableRows, safePage],
   );
 
   useEffect(() => {
@@ -288,9 +318,9 @@ export default function ShopServicesPage() {
   const openEditForm = (index: number) => {
     setEditIndex(index);
     setFormOpen(true);
-    const filteredIndex = filteredSubs.findIndex((row) => row.originalIndex === index);
-    if (filteredIndex >= 0) {
-      setPage(Math.floor(filteredIndex / PAGE_SIZE) + 1);
+    const tableIndex = tableRows.findIndex((row) => row.originalIndex === index);
+    if (tableIndex >= 0) {
+      setPage(Math.floor(tableIndex / PAGE_SIZE) + 1);
     }
   };
 
@@ -311,21 +341,21 @@ export default function ShopServicesPage() {
   };
 
   const handleBulkDelete = async () => {
-    if (!activeCategory || selectedRows.size === 0) return;
+    const categoryForDelete = unfilteredCategory ?? activeCategory;
+    if (!categoryForDelete || selectedRows.size === 0) return;
     if (!window.confirm(`Delete ${selectedRows.size} selected sub-service(s)?`)) return;
 
     if (!token) return;
     setBulkDeleting(true);
     try {
-      const indicesToDelete = activeCategory.subServices
-        .map((sub, index) => ({ index, rowId: getSubRowId(sub, index) }))
-        .filter(({ rowId }) => selectedRows.has(rowId))
-        .map(({ index }) => index)
+      const indicesToDelete = tableRows
+        .filter(({ sub, originalIndex }) => selectedRows.has(getSubRowId(sub, originalIndex)))
+        .map(({ originalIndex }) => originalIndex)
         .sort((a, b) => b - a);
 
       for (const subServiceIndex of indicesToDelete) {
         const res = await deleteSubService(token, {
-          serviceId: activeCategory.id,
+          serviceId: categoryForDelete.id,
           subServiceIndex,
         });
         if (!res.ok) {
@@ -335,7 +365,10 @@ export default function ShopServicesPage() {
         }
       }
       toast.success("Deleted.");
-      if (editIndex != null && selectedRows.has(getSubRowId(activeCategory.subServices[editIndex], editIndex))) {
+      if (
+        editIndex != null &&
+        selectedRows.has(getSubRowId(categoryForDelete.subServices[editIndex], editIndex))
+      ) {
         closeForm();
       }
       setSelectedRows(new Set());
@@ -347,6 +380,7 @@ export default function ShopServicesPage() {
 
   const hasBulkSelection = selectedRows.size > 0;
   const showToolbar = activeCategory != null && !formOpen;
+  const formCategory = unfilteredCategory ?? activeCategory;
 
   return (
     <ShopPageShell
@@ -438,13 +472,15 @@ export default function ShopServicesPage() {
             ) : null}
 
             <ShopReveal show={formOpen} clipOverflow={false}>
-              <ShopServiceSubDialog
-                category={activeCategory}
-                editIndex={editIndex}
-                suggestionCategories={categories}
-                onCancel={closeForm}
-                onSaved={() => handleRefresh()}
-              />
+              {formCategory ? (
+                <ShopServiceSubDialog
+                  category={formCategory}
+                  editIndex={editIndex}
+                  suggestionCategories={allCategories.length > 0 ? allCategories : categories}
+                  onCancel={closeForm}
+                  onSaved={() => handleRefresh()}
+                />
+              ) : null}
             </ShopReveal>
 
             {!formOpen ? (
@@ -459,7 +495,7 @@ export default function ShopServicesPage() {
                 />
 
                 <ShopListFooter>
-                  <p>{filteredSubs.length} Entries</p>
+                  <p>{tableRows.length} Entries</p>
                   {totalPages > 1 ? (
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {

@@ -19,9 +19,12 @@ import { apiMessage } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
 
 type CatalogSub = ShopServiceCategory["subServices"][number];
-type QtyType = NonNullable<CatalogSub["qtyType"]>;
+type QuantityType = NonNullable<CatalogSub["quantityType"]>;
 
-const QTY_TYPE_OPTIONS: QtyType[] = ["days", "unit"];
+const QUANTITY_TYPE_OPTIONS: { value: QuantityType; label: string }[] = [
+  { value: "unit", label: "Unit" },
+  { value: "days", label: "Days" },
+];
 
 type SuggestionEntry = CatalogSub & {
   serviceId: string;
@@ -126,7 +129,7 @@ export default function ShopServiceSubDialog({
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [qty, setQty] = useState("1");
-  const [qtyType, setQtyType] = useState<QtyType>("unit");
+  const [quantityType, setQuantityType] = useState<QuantityType>("unit");
   const [labourCost, setLabourCost] = useState("0");
   const [desc, setDesc] = useState("");
   const [saving, setSaving] = useState(false);
@@ -185,7 +188,7 @@ export default function ShopServiceSubDialog({
       setPrice(String(sub.price));
       setDesc(sub.desc);
       setQty(String(sub.qty != null && sub.qty > 0 ? sub.qty : 1));
-      setQtyType(sub.qtyType === "days" ? "days" : "unit");
+      setQuantityType(sub.quantityType === "days" ? "days" : "unit");
       setLabourCost(sub.labourCost != null ? String(sub.labourCost) : "0");
     } else {
       setMake("");
@@ -194,7 +197,7 @@ export default function ShopServiceSubDialog({
       setPrice("");
       setDesc("");
       setQty("1");
-      setQtyType("unit");
+      setQuantityType("unit");
       setLabourCost("0");
     }
     setShowSuggestions(false);
@@ -326,7 +329,7 @@ export default function ShopServiceSubDialog({
     setDesc(sub.desc ?? "");
     setPrice(String(sub.price ?? ""));
     setQty(String(sub.qty != null && sub.qty > 0 ? sub.qty : 1));
-    setQtyType(sub.qtyType === "days" ? "days" : "unit");
+    setQuantityType(sub.quantityType === "days" ? "days" : "unit");
     setLabourCost(sub.labourCost != null ? String(sub.labourCost) : "0");
     setShowSuggestions(false);
   };
@@ -361,7 +364,7 @@ export default function ShopServiceSubDialog({
       desc: desc.trim(),
       price: priceNum,
       qty: qtyNum,
-      qtyType,
+      quantityType,
       labourCost: labourCostNum,
     };
     if (editIndex != null) nextSubs[editIndex] = entry;
@@ -385,7 +388,7 @@ export default function ShopServiceSubDialog({
         desc: desc.trim(),
         price: priceNum,
         quantity: qtyNum,
-        qtyType,
+        quantityType,
         labourCost: labourCostNum,
       };
       const res =
@@ -581,13 +584,13 @@ export default function ShopServiceSubDialog({
         <CompactField label="Qty Type" className="w-[5.5rem] shrink-0">
           <select
             className={shopCompactInputClass}
-            value={qtyType}
-            onChange={(e) => setQtyType(e.target.value as QtyType)}
+            value={quantityType}
+            onChange={(e) => setQuantityType(e.target.value as QuantityType)}
             disabled={saving}
           >
-            {QTY_TYPE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
+            {QUANTITY_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>

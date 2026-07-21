@@ -29,9 +29,12 @@ import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import {
   apiMessageFromEnvelope,
   deleteAutoshopJobCard,
+  fetchAutoshopJobCardNextNumber,
   fetchAutoshopJobCardPrefix,
+  parseAutoshopJobCardNextNumber,
   parseAutoshopJobCardPrefix,
   sendAutoshopJobCardForApproval,
+  updateAutoshopJobCardNextNumber,
   updateAutoshopJobCardPrefix,
 } from "../../lib/autoshopownerJobCardsApi";
 import {
@@ -52,36 +55,8 @@ type JobCardView = "list" | "form" | "detail";
 
 const PAGE_SIZE = 10;
 const JOB_CARDS_SEARCH_INPUT_ID = "shop-job-cards-search";
-const NUMBERING_STORAGE_KEY = "autodaddy.shop.numbering";
 
 const DEFAULT_ESTIMATE_NUMBERING: NumberingValues = { code: "", number: "1" };
-
-function readStoredEstimateNumbering(): NumberingValues {
-  try {
-    const raw = localStorage.getItem(NUMBERING_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_ESTIMATE_NUMBERING };
-    const parsed = JSON.parse(raw) as { estimate?: Partial<NumberingValues> };
-    return {
-      code: parsed.estimate?.code ?? DEFAULT_ESTIMATE_NUMBERING.code,
-      number: parsed.estimate?.number ?? DEFAULT_ESTIMATE_NUMBERING.number,
-    };
-  } catch {
-    return { ...DEFAULT_ESTIMATE_NUMBERING };
-  }
-}
-
-function writeStoredEstimateNumbering(values: NumberingValues) {
-  try {
-    const raw = localStorage.getItem(NUMBERING_STORAGE_KEY);
-    const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-    localStorage.setItem(
-      NUMBERING_STORAGE_KEY,
-      JSON.stringify({ ...prev, estimate: values }),
-    );
-  } catch {
-    // ignore quota / private mode
-  }
-}
 
 const JOB_CARD_SECTIONS = [
   { id: "my-list", label: "My Job Cards", variant: "primary" as const },
@@ -367,7 +342,9 @@ export default function ShopJobCardsPage() {
   const [selectedJobCardIds, setSelectedJobCardIds] = useState<Set<string>>(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [manageEstimatesOpen, setManageEstimatesOpen] = useState(false);
-  const [estimateNumbering, setEstimateNumbering] = useState(readStoredEstimateNumbering);
+  const [estimateNumbering, setEstimateNumbering] = useState<NumberingValues>({
+    ...DEFAULT_ESTIMATE_NUMBERING,
+  });
   const [estimatePrefixLoading, setEstimatePrefixLoading] = useState(false);
   const {
     cards: listCards,
@@ -427,22 +404,37 @@ export default function ShopJobCardsPage() {
     if (!manageEstimatesOpen || !token) return;
     let cancelled = false;
     setEstimatePrefixLoading(true);
-    void fetchAutoshopJobCardPrefix(token)
-      .then((res) => {
+    void (async () => {
+      try {
+        const [prefixRes, nextRes] = await Promise.all([
+          fetchAutoshopJobCardPrefix(token),
+          fetchAutoshopJobCardNextNumber(token),
+        ]);
         if (cancelled) return;
-        if (!res.ok) {
-          toast.error(apiMessageFromEnvelope(res.data) || "Could not load estimate prefix.");
+        if (!prefixRes.ok && !nextRes.ok) {
+          toast.error(
+            apiMessageFromEnvelope(prefixRes.data) ||
+              apiMessageFromEnvelope(nextRes.data) ||
+              "Could not load estimate numbering.",
+          );
           return;
         }
-        const prefix = parseAutoshopJobCardPrefix(res.data);
-        setEstimateNumbering((prev) => ({ ...prev, code: prefix }));
-      })
-      .catch(() => {
-        if (!cancelled) toast.error("Could not load estimate prefix.");
-      })
-      .finally(() => {
+        const fromNext = nextRes.ok
+          ? parseAutoshopJobCardNextNumber(nextRes.data)
+          : { nextNumber: DEFAULT_ESTIMATE_NUMBERING.number, prefix: "" };
+        const prefix = prefixRes.ok
+          ? parseAutoshopJobCardPrefix(prefixRes.data) || fromNext.prefix
+          : fromNext.prefix;
+        setEstimateNumbering({
+          code: prefix,
+          number: fromNext.nextNumber || DEFAULT_ESTIMATE_NUMBERING.number,
+        });
+      } catch {
+        if (!cancelled) toast.error("Could not load estimate numbering.");
+      } finally {
         if (!cancelled) setEstimatePrefixLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -450,21 +442,35 @@ export default function ShopJobCardsPage() {
 
   const saveEstimatePrefix = async (values: NumberingValues): Promise<boolean> => {
     if (!token) {
-      toast.error("Sign in to update estimate prefix.");
+      toast.error("Sign in to update estimate numbering.");
       return false;
     }
     const prefix = values.code.trim();
-    const res = await updateAutoshopJobCardPrefix(token, prefix);
-    if (!res.ok) {
-      toast.error(apiMessageFromEnvelope(res.data) || "Could not update estimate prefix.");
+    const nextNumber = Number.parseInt(values.number.trim(), 10);
+    if (!Number.isInteger(nextNumber) || nextNumber < 1) {
+      toast.error("Estimate Number must be a positive whole number.");
       return false;
     }
+
+    const [prefixRes, nextRes] = await Promise.all([
+      updateAutoshopJobCardPrefix(token, prefix),
+      updateAutoshopJobCardNextNumber(token, nextNumber),
+    ]);
+    if (!prefixRes.ok) {
+      toast.error(apiMessageFromEnvelope(prefixRes.data) || "Could not update estimate code.");
+      return false;
+    }
+    if (!nextRes.ok) {
+      toast.error(apiMessageFromEnvelope(nextRes.data) || "Could not update estimate number.");
+      return false;
+    }
+
+    const parsedNext = parseAutoshopJobCardNextNumber(nextRes.data);
     const next = {
-      code: prefix,
-      number: values.number.trim() || estimateNumbering.number,
+      code: prefix || parsedNext.prefix,
+      number: parsedNext.nextNumber || String(nextNumber),
     };
     setEstimateNumbering(next);
-    writeStoredEstimateNumbering(next);
     return true;
   };
 
