@@ -240,11 +240,14 @@ export function fetchAutoshopJobCardNextNumber(token: string) {
   return getJsonAutoshopowner<unknown>("/api/autoshopowner/jobcard-prefix/next", token);
 }
 
-/** Set the next estimate / job card number. */
-export function updateAutoshopJobCardNextNumber(token: string, nextNumber: number) {
+/** Set the next estimate / job card sequence number. */
+export function updateAutoshopJobCardSeq(
+  token: string,
+  body: { businessProfileId: string; newSeq: number },
+) {
   return putJsonAutoshopowner<ApiEnvelope>(
-    "/api/autoshopowner/jobcard-prefix/next",
-    { nextNumber },
+    "/api/autoshopowner/jobcard-prefix/seq",
+    body,
     token,
   );
 }
@@ -272,7 +275,8 @@ export function parseAutoshopJobCardNextNumber(payload: unknown): {
   const root = payload as Record<string, unknown>;
   const data =
     root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : root;
-  const rawNext = data.nextNumber ?? data.jobCardNo ?? root.nextNumber ?? root.jobCardNo;
+  const rawNext =
+    data.nextNumber ?? data.newSeq ?? data.seq ?? data.jobCardNo ?? root.nextNumber ?? root.newSeq ?? root.jobCardNo;
   let nextNumber = "1";
   if (typeof rawNext === "number" && Number.isFinite(rawNext) && rawNext > 0) {
     nextNumber = String(Math.trunc(rawNext));

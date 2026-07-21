@@ -34,8 +34,8 @@ import {
   parseAutoshopJobCardNextNumber,
   parseAutoshopJobCardPrefix,
   sendAutoshopJobCardForApproval,
-  updateAutoshopJobCardNextNumber,
   updateAutoshopJobCardPrefix,
+  updateAutoshopJobCardSeq,
 } from "../../lib/autoshopownerJobCardsApi";
 import {
   isJobCardApproved,
@@ -326,7 +326,7 @@ function JobCardListTable({
 
 export default function ShopJobCardsPage() {
   const { token } = useAuth();
-  const { faqsHeading, faqsDescription } = useShopOwnerPortal();
+  const { faqsHeading, faqsDescription, business } = useShopOwnerPortal();
   const [section, setSection] = useState<JobCardSection>("my-list");
   const [search, setSearch] = useState("");
   const [faqsOpen, setFaqsOpen] = useState(false);
@@ -445,30 +445,35 @@ export default function ShopJobCardsPage() {
       toast.error("Sign in to update estimate numbering.");
       return false;
     }
+    const businessProfileId = (business?._id ?? business?.id ?? "").trim();
+    if (!businessProfileId) {
+      toast.error("Business profile not loaded. Try again in a moment.");
+      return false;
+    }
     const prefix = values.code.trim();
-    const nextNumber = Number.parseInt(values.number.trim(), 10);
-    if (!Number.isInteger(nextNumber) || nextNumber < 1) {
+    const newSeq = Number.parseInt(values.number.trim(), 10);
+    if (!Number.isInteger(newSeq) || newSeq < 1) {
       toast.error("Estimate Number must be a positive whole number.");
       return false;
     }
 
-    const [prefixRes, nextRes] = await Promise.all([
+    const [prefixRes, seqRes] = await Promise.all([
       updateAutoshopJobCardPrefix(token, prefix),
-      updateAutoshopJobCardNextNumber(token, nextNumber),
+      updateAutoshopJobCardSeq(token, { businessProfileId, newSeq }),
     ]);
     if (!prefixRes.ok) {
       toast.error(apiMessageFromEnvelope(prefixRes.data) || "Could not update estimate code.");
       return false;
     }
-    if (!nextRes.ok) {
-      toast.error(apiMessageFromEnvelope(nextRes.data) || "Could not update estimate number.");
+    if (!seqRes.ok) {
+      toast.error(apiMessageFromEnvelope(seqRes.data) || "Could not update estimate number.");
       return false;
     }
 
-    const parsedNext = parseAutoshopJobCardNextNumber(nextRes.data);
+    const parsedNext = parseAutoshopJobCardNextNumber(seqRes.data);
     const next = {
       code: prefix || parsedNext.prefix,
-      number: parsedNext.nextNumber || String(nextNumber),
+      number: parsedNext.nextNumber || String(newSeq),
     };
     setEstimateNumbering(next);
     return true;
