@@ -55,7 +55,7 @@ export default function ShopBusinessOpenToggle({
           className={`h-2 w-2 rounded-full ${open ? "bg-ad-green" : "bg-red-500"}`}
           aria-hidden
         />
-        {open ? "Shop is Open" : "Shop is Closed"}
+        {open ? "Shop is Open Today" : "Shop is Closed Today"}
       </span>
       <span className="relative inline-flex h-6 w-11 shrink-0">
         <input

@@ -633,7 +633,7 @@ export default function JobCardForm({
     setServiceLines([emptyTableLine(mkLineId())]);
     setVehiclePhotoFiles([]);
     setKeptVehiclePhotoUrls([]);
-    setSelectedBankId(defaultInvoiceBankId(myBanks));
+    setSelectedBankId("");
     setTermsNotes("");
   }
 
@@ -741,7 +741,7 @@ export default function JobCardForm({
         setMyCustomers(data.myCustomers);
         setMyServices(data.myServices);
         setMyBanks(data.myBanks);
-        setSelectedBankId(defaultInvoiceBankId(data.myBanks));
+        setSelectedBankId("");
 
         if (modeProp === "add") {
           const displayNo =

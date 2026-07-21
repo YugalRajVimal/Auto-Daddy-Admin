@@ -56,6 +56,7 @@ export function useShopOwnerPortal() {
   }, [refreshSection]);
 
   const business = profile?.data?.businessProfile;
+  const profileIcon = profile?.data?.userProfile?.profilePhoto;
   const user = profile?.data?.userProfile;
   const teamMembers = profile?.data?.teamMembers ?? [];
 
@@ -102,6 +103,7 @@ export function useShopOwnerPortal() {
   return {
     loading,
     businessNameLoaded,
+    profileIcon,
     refresh,
     displayName,
     city,

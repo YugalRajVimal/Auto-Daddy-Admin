@@ -645,7 +645,7 @@ export function ShopBusinessProfileEditor({
     setBusinessName(business?.businessName ?? "");
     setBusinessPhone(phoneDigits(business?.businessPhone ?? ""));
     setCity(business?.city ?? "");
-    setZip(zipCode ?? "");
+    setZip(business?.pincode ?? "");
     setAddress(business?.address ?? "");
     setEmail(business?.email ?? "");
     setHst((business?.hstNumber ?? "").toUpperCase());
