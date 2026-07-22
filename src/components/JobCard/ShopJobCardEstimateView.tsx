@@ -259,7 +259,14 @@ export default function ShopJobCardEstimateView({
 
   const invoicePreview = actionPreview === "invoice";
   const cashPreview = actionPreview === "cash";
-  const showHst = job ? jobCardShowsInvoiceHst(job) || invoicePreview : false;
+  const alreadyInvoiced = job ? jobCardShowsInvoiceHst(job) : false;
+  /**
+   * Converted cards default to job-card layout; invoice only when toggled (or Wallet force).
+   * Pre-convert "invoice" action preview still shows as invoice for confirm.
+   */
+  const isInvoiceDocument =
+    invoicePreview || showPaymentActions === false;
+  const showHst = isInvoiceDocument;
   const hstRate = parseHstRate(business);
   const effectiveHstRate = showHst ? hstRate : 0;
   const lines = useMemo(
@@ -286,8 +293,7 @@ export default function ShopJobCardEstimateView({
     return listRow ? deriveJobCardPrefixFromDisplayId(pickJobNoFromListRow(listRow)) : "";
   }, [jobCardPrefix, job, listRow]);
 
-  const alreadyInvoiced = job ? jobCardShowsInvoiceHst(job) : false;
-  const showInvoiceDocumentNo = alreadyInvoiced || invoicePreview;
+  const showInvoiceDocumentNo = isInvoiceDocument;
 
   const docNo = useMemo(() => {
     if (showInvoiceDocumentNo) {
@@ -310,8 +316,6 @@ export default function ShopJobCardEstimateView({
       ? "Job card preview — confirm to mark as paid by cash"
       : "This estimate was sent using AutoDaddy";
   /** Invoices use the saved Profile template theme; job cards use the viewer-inspired blue. */
-  const isInvoiceDocument =
-    alreadyInvoiced || invoicePreview || showPaymentActions === false;
   const theme: InvoiceThemeTokens = isInvoiceDocument
     ? resolveInvoiceTheme(business?.invoiceTemplateSlug)
     : JOB_CARD_PREVIEW_THEME;
@@ -465,6 +469,25 @@ export default function ShopJobCardEstimateView({
               <FiEdit2 size={13} aria-hidden />
               Edit
             </button>
+          ) : null}
+          {alreadyInvoiced && showPaymentActions ? (
+            invoicePreview ? (
+              <button
+                type="button"
+                onClick={exitActionPreview}
+                className={OUTLINE_BTN_CLASS}
+              >
+                View Job Card
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setActionPreview("invoice")}
+                className={OUTLINE_BTN_CLASS}
+              >
+                View Invoice
+              </button>
+            )
           ) : null}
           <button type="button" onClick={handlePrint} className={OUTLINE_BTN_CLASS}>
             <FiPrinter size={13} aria-hidden />

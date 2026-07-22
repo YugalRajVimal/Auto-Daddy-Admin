@@ -859,21 +859,21 @@ export default function ShopJobCardsPage() {
                     >
                       Send
                     </button>
-                    {showPaidByCashButton ? (
+                    {showPaidByCashButton && canBulkPaidByCash ? (
                       <button
                         type="button"
                         onClick={handleBulkPaidByCash}
-                        disabled={!canBulkPaidByCash || bulkBusy}
+                        disabled={bulkBusy}
                         className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
                       >
                         Paid by Cash
                       </button>
                     ) : null}
-                    {showConvertToInvoiceButton ? (
+                    {showConvertToInvoiceButton && canBulkConvertToInvoice ? (
                       <button
                         type="button"
                         onClick={handleBulkConvertToInvoice}
-                        disabled={!canBulkConvertToInvoice || bulkBusy}
+                        disabled={bulkBusy}
                         className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
                       >
                         Convert to Invoice
