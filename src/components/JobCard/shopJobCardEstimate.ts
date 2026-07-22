@@ -166,7 +166,6 @@ export function pickJobNoFromRecord(record: Record<string, unknown> | null | und
     nonEmpty(record.jobNumber) ??
     nonEmpty(record.jobCode) ??
     nonEmpty(record.displayJobNo) ??
-    nonEmpty(record.invoiceNumber) ??
     nonEmpty(record.jobCardNo);
   if (direct) return direct;
 
@@ -176,6 +175,19 @@ export function pickJobNoFromRecord(record: Record<string, unknown> | null | und
     if (picked) return picked;
   }
   return undefined;
+}
+
+/** Invoice display id from a job card record (e.g. `"INV-2"`). */
+export function pickInvoiceNoFromRecord(
+  record: Record<string, unknown> | null | undefined,
+): string | undefined {
+  if (!record) return undefined;
+  return (
+    nonEmpty(record.invoiceId) ??
+    nonEmpty(record.invoiceNumber) ??
+    nonEmpty(record.invoiceNo) ??
+    nonEmpty(record.invoice_number)
+  );
 }
 
 export function pickJobNoFromListRow(row: {
@@ -204,13 +216,73 @@ export function formatJobCardTableNo(jobNo: string | undefined): string {
   return `J ${stripped}`;
 }
 
+/** True when value already looks like a prefixed id (e.g. "JBD-121"), not "J # 121". */
+export function isPrefixedJobCardDisplayNo(jobNo: string | undefined): boolean {
+  const raw = (jobNo ?? "").trim().replace(/^#/, "");
+  if (!raw) return false;
+  return /[a-z]/i.test(raw) && !/^j\s*#?\s*\d+$/i.test(raw) && !/^job\s*#?\s*\d+$/i.test(raw);
+}
+
+/** Extract prefix from a display id like "JBD-121" → "JBD". */
+export function deriveJobCardPrefixFromDisplayId(displayId: string | undefined): string {
+  const raw = (displayId ?? "").trim();
+  if (!isPrefixedJobCardDisplayNo(raw)) return "";
+  const match = raw.match(/^(.*?)[-_\s]+(\d+)$/);
+  if (match?.[1]?.trim()) return match[1].trim().replace(/[-_\s]+$/, "");
+  return "";
+}
+
+/**
+ * Build display id as `{prefix}-{jobCardNo}` (e.g. "JBD-121").
+ * Passes through already-prefixed values unchanged.
+ */
+export function composePrefixedJobCardNo(
+  prefix: string | null | undefined,
+  jobCardNo: string | number | null | undefined,
+): string {
+  const rawNo = jobCardNo == null ? "" : String(jobCardNo).trim().replace(/^#/, "");
+  if (!rawNo) return "";
+  if (isPrefixedJobCardDisplayNo(rawNo)) return rawNo;
+
+  const digits = rawNo
+    .replace(/^job\s*#?\s*/i, "")
+    .replace(/^j\s*#?\s*/i, "")
+    .replace(/[^\d]/g, "");
+  if (!digits || !Number.isFinite(Number(digits)) || Number(digits) <= 0) return "";
+
+  const p = (prefix ?? "").trim().replace(/-+$/, "");
+  if (!p) return "";
+  return `${p}-${String(Number(digits))}`;
+}
+
 export function resolveJobCardDisplayNo(
   listRow: { jobNo?: string; raw?: unknown; id?: string } | null | undefined,
   job?: Record<string, unknown> | null,
+  prefix?: string | null,
 ): string {
   const fromList = listRow ? pickJobNoFromListRow(listRow) : undefined;
   const fromJob = job ? pickJobNoFromRecord(job) : undefined;
   const raw = fromList ?? fromJob;
+
+  const numericFromList =
+    listRow && typeof listRow.raw === "object" && listRow.raw
+      ? (() => {
+          const o = listRow.raw as Record<string, unknown>;
+          if (typeof o.jobCardNo === "number" && Number.isFinite(o.jobCardNo)) return o.jobCardNo;
+          return o.jobCardNo ?? o.jobCardNumber ?? null;
+        })()
+      : null;
+  const numericFromJob =
+    job && typeof job.jobCardNo === "number" && Number.isFinite(job.jobCardNo)
+      ? job.jobCardNo
+      : (job?.jobCardNo ?? job?.jobCardNumber ?? null);
+
+  const composed = composePrefixedJobCardNo(
+    prefix,
+    numericFromList ?? numericFromJob ?? raw ?? null,
+  );
+  if (composed) return composed;
+
   if (!raw) return "—";
 
   const documentNo = formatJobCardDocumentNo(raw);
@@ -251,6 +323,8 @@ export function pickBusinessHstNumber(
 export function formatJobCardDocumentNo(jobNo: string | undefined): string {
   const raw = (jobNo ?? "").trim().replace(/^#/, "");
   if (!raw) return "";
+  // Prefixed API ids (e.g. "JBD-121") — show unchanged.
+  if (isPrefixedJobCardDisplayNo(raw)) return raw;
   const stripped = raw.replace(/^job\s*#?\s*/i, "").trim();
   if (!stripped) return "";
   if (/^j\s*#?/i.test(stripped)) {
@@ -263,11 +337,16 @@ export function estimateDocumentNo(
   job: Record<string, unknown>,
   fallbackJobNo?: string | null,
   listRow?: { jobNo?: string; raw?: unknown; id?: string } | null,
+  prefix?: string | null,
 ): string {
-  return resolveJobCardDisplayNo(listRow, {
-    ...job,
-    ...(fallbackJobNo && !pickJobNoFromRecord(job) ? { jobNo: fallbackJobNo } : {}),
-  });
+  return resolveJobCardDisplayNo(
+    listRow,
+    {
+      ...job,
+      ...(fallbackJobNo && !pickJobNoFromRecord(job) ? { jobNo: fallbackJobNo } : {}),
+    },
+    prefix,
+  );
 }
 
 export function buildBusinessBlock(business: ShopProfileBusiness | null | undefined) {

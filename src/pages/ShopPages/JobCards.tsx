@@ -5,7 +5,7 @@ import JobCardForm from "../../components/JobCard/JobCardForm";
 import ShopJobCardEstimateView, {
   type JobCardActionPreview,
 } from "../../components/JobCard/ShopJobCardEstimateView";
-import { pickJobNoFromListRow } from "../../components/JobCard/shopJobCardEstimate";
+import { pickJobNoFromListRow, resolveJobCardDisplayNo } from "../../components/JobCard/shopJobCardEstimate";
 import {
   ADMIN_PANEL_THEAD_ROW_CLASS,
   adminPanelRowClass,
@@ -93,15 +93,8 @@ const SHOP_JOB_CARD_BULK_BUTTON_CLASS =
 const SHOP_JOB_CARD_EDIT_BUTTON_CLASS =
   "rounded border border-ad-purple bg-white px-2 py-0.5 text-xs font-bold text-ad-purple hover:bg-[#f5cce8]";
 
-function displayJobId(jobNo: string | undefined): string {
-  const raw = (jobNo ?? "").trim().replace(/^#/, "");
-  if (!raw) return "—";
-  const stripped = raw.replace(/^job\s*#?\s*/i, "").trim();
-  if (!stripped) return "—";
-  if (/^j/i.test(stripped)) {
-    return stripped.replace(/^j/i, "J ");
-  }
-  return `J ${stripped}`;
+function displayJobId(row: JobCardListRow, prefix?: string): string {
+  return resolveJobCardDisplayNo(row, null, prefix);
 }
 
 function formatJobPrice(
@@ -178,6 +171,7 @@ function jobCardsMatchingSelection(
 function JobCardListTable({
   rows,
   countryCode,
+  jobCardPrefix,
   onEdit,
   onView,
   selectedIds,
@@ -189,6 +183,7 @@ function JobCardListTable({
 }: {
   rows: JobCardListRow[];
   countryCode: string | null | undefined;
+  jobCardPrefix?: string;
   onEdit: (jobCard: JobCardListRow) => void;
   onView: (jobCard: JobCardListRow) => void;
   selectedIds: Set<string>;
@@ -249,6 +244,7 @@ function JobCardListTable({
             {rows.map((jc, index) => {
               const customerName = jc.customerName?.trim() || "—";
               const invoiceNo = pickJobCardInvoiceNumber(jc);
+              const jobIdLabel = displayJobId(jc, jobCardPrefix);
               return (
                 <tr key={jc.id} className={adminPanelRowClass(index)}>
                   <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
@@ -256,7 +252,7 @@ function JobCardListTable({
                       type="checkbox"
                       checked={selectedIds.has(jc.id)}
                       onChange={() => onToggleRow(jc.id)}
-                      aria-label={`Select job ${displayJobId(jc.jobNo)}`}
+                      aria-label={`Select job ${jobIdLabel}`}
                       className={SHOP_TABLE_CHECKBOX_CLASS}
                     />
                   </td>
@@ -265,10 +261,10 @@ function JobCardListTable({
                       type="button"
                       onClick={() => onView(jc)}
                       className="font-semibold text-blue-700 underline hover:text-blue-800"
-                      title={`View ${displayJobId(jc.jobNo)}`}
-                      aria-label={`View ${displayJobId(jc.jobNo)}`}
+                      title={`View ${jobIdLabel}`}
+                      aria-label={`View ${jobIdLabel}`}
                     >
-                      {displayJobId(jc.jobNo)}
+                      {jobIdLabel}
                     </button>
                   </td>
                   {showInvoiceColumn ? (
@@ -346,12 +342,34 @@ export default function ShopJobCardsPage() {
     ...DEFAULT_ESTIMATE_NUMBERING,
   });
   const [estimatePrefixLoading, setEstimatePrefixLoading] = useState(false);
+  const [jobCardPrefix, setJobCardPrefix] = useState("");
   const {
     cards: listCards,
     loading,
     error,
     refresh,
   } = useAutoshopJobCards(section, usesJobCardApiSearch(section) ? search : "");
+
+  useEffect(() => {
+    if (!token) {
+      setJobCardPrefix("");
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchAutoshopJobCardPrefix(token);
+        if (cancelled || !res.ok) return;
+        const prefix = parseAutoshopJobCardPrefix(res.data);
+        if (prefix) setJobCardPrefix(prefix);
+      } catch {
+        /* table falls back until prefix is available */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const filteredListCards = useMemo(() => {
     if (usesJobCardApiSearch(section) || !search.trim()) return listCards;
@@ -380,11 +398,7 @@ export default function ShopJobCardsPage() {
         : SECTION_HEADINGS[section];
 
   const activeSidebarId =
-    view === "list" || view === "form"
-      ? formMode === "add" && view === "form"
-        ? "my-list"
-        : section
-      : null;
+    formMode === "add" && view === "form" ? "my-list" : section;
 
   const hasBulkSelection = selectedJobCardIds.size > 0;
 
@@ -429,6 +443,7 @@ export default function ShopJobCardsPage() {
           code: prefix,
           number: fromNext.nextNumber || DEFAULT_ESTIMATE_NUMBERING.number,
         });
+        if (prefix) setJobCardPrefix(prefix);
       } catch {
         if (!cancelled) toast.error("Could not load estimate numbering.");
       } finally {
@@ -476,6 +491,7 @@ export default function ShopJobCardsPage() {
       number: parsedNext.nextNumber || String(newSeq),
     };
     setEstimateNumbering(next);
+    if (next.code) setJobCardPrefix(next.code);
     return true;
   };
 
@@ -673,6 +689,17 @@ export default function ShopJobCardsPage() {
     setView("form");
   };
 
+  const openJobCardFromPreview = (jc: JobCardListRow) => {
+    setFormMode("edit");
+    setEditJobCardId(jc.id);
+    setEditJobCardNo(pickJobCardNoForApi(jc));
+    setEditListRow(jc);
+    setActionPreviewMode(null);
+    setDetailJobCardId(null);
+    setDetailListRow(null);
+    setView("form");
+  };
+
   const openNewJobCard = () => {
     setSection("my-list");
     setFormMode("add");
@@ -785,6 +812,7 @@ export default function ShopJobCardsPage() {
               jobNoHint={detailListRow ? pickJobNoFromListRow(detailListRow) ?? null : null}
               initialActionPreview={actionPreviewMode}
               onBack={showList}
+              onEdit={detailListRow ? () => openJobCardFromPreview(detailListRow) : undefined}
               onActionPreviewChange={setActionPreviewMode}
               onConverted={() => {
                 setActionPreviewMode(null);
@@ -859,6 +887,7 @@ export default function ShopJobCardsPage() {
                 <JobCardListTable
                   rows={paginatedList}
                   countryCode="+1"
+                  jobCardPrefix={jobCardPrefix}
                   onEdit={openJobCard}
                   onView={openJobCardDetail}
                   selectedIds={selectedJobCardIds}
@@ -866,7 +895,7 @@ export default function ShopJobCardsPage() {
                   onTogglePage={toggleJobCardPageSelection}
                   showStatusColumn
                   showInvoiceColumn={section === "convert-invoice"}
-                  showActions={section !== "approvals"}
+                  showActions={section !== "approvals" && section !== "paid"}
                 />
 
                 <ShopListFooter>

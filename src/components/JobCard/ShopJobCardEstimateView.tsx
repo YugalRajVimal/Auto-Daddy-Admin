@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiArrowLeft, FiPrinter } from "react-icons/fi";
+import { FiArrowLeft, FiEdit2, FiPrinter } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useAuth from "../../auth/useAuth";
 import { useShopOwnerCallingCode } from "../../hooks/useShopOwnerCallingCode";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import { fetchJobCardRecord, jobCardRecordFromListRow } from "../../lib/shopOwnerJobCardsApi";
-import { isJobRecordEligibleForInvoiceConversion, pickJobCardNoForApi } from "../../lib/shopOwnerJobCards";
-import { updateAutoshopJobCardStatus } from "../../lib/autoshopownerJobCardsApi";
+import {
+  isJobCardEditable,
+  isJobRecordEligibleForInvoiceConversion,
+  jobCardRowFromRecord,
+  pickJobCardInvoiceNumber,
+  pickJobCardNoForApi,
+} from "../../lib/shopOwnerJobCards";
+import {
+  fetchAutoshopJobCardPrefix,
+  parseAutoshopJobCardPrefix,
+  updateAutoshopJobCardStatus,
+} from "../../lib/autoshopownerJobCardsApi";
 import { ShopListSkeleton } from "../shop/ShopListSkeletons";
 import { ShopErrorPanel } from "../shop/ShopPanels";
 import {
@@ -20,6 +30,7 @@ import {
   buildBusinessBlock,
   buildCustomerBlock,
   currencyLabelFromCode,
+  deriveJobCardPrefixFromDisplayId,
   estimateDocumentNo,
   estimateTotals,
   extractEstimateLines,
@@ -27,6 +38,7 @@ import {
   formatEstimateMoney,
   jobCardShowsInvoiceHst,
   pickBusinessHstNumber,
+  pickInvoiceNoFromRecord,
   pickJobNoFromListRow,
   pickJobNoFromRecord,
 } from "./shopJobCardEstimate";
@@ -51,37 +63,14 @@ function EstimateMetaRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TotalsRow({
-  label,
-  value,
-  strong = false,
-  strongOnAccent = false,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-  strongOnAccent?: boolean;
-}) {
-  const strongClass = strongOnAccent
-    ? "font-bold text-inherit"
-    : strong
-      ? "font-bold text-gray-900"
-      : "font-semibold text-gray-800";
-  return (
-    <>
-      <span className={`text-right ${strongClass}`}>{label}</span>
-      <span className={`text-right tabular-nums ${strongClass}`}>{value}</span>
-    </>
-  );
-}
-
-function EstimateTotalsBlock({
+function EstimateTotalsFooter({
   subtotal,
   hst,
   roundOff,
   total,
   totalLabel,
   showHst,
+  labelColSpan,
   theme,
 }: {
   subtotal: string;
@@ -90,28 +79,59 @@ function EstimateTotalsBlock({
   total: string;
   totalLabel: string;
   showHst: boolean;
+  labelColSpan: number;
   theme?: InvoiceThemeTokens | null;
 }) {
+  const labelClass =
+    "border-0 bg-transparent px-2 py-1 text-right text-sm font-semibold text-gray-800";
+  const valueClass =
+    "border-0 bg-transparent px-2 py-1 text-right text-sm font-semibold tabular-nums text-gray-800";
+  const totalStyle = theme
+    ? { backgroundColor: theme.accent, color: theme.accentText }
+    : { backgroundColor: "#f3f4f6", color: "#111827" };
+  /** Match table header: `text-xs font-bold` + `px-2 py-2`. */
+  const totalCellClass = "border-0 px-2 py-2 text-xs font-bold leading-none";
+
   return (
-    <div className="ml-auto w-[19rem] text-sm sm:w-[21rem]">
-      <div className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-1">
-        <TotalsRow label="Subtotal :" value={subtotal} />
-        {showHst ? <TotalsRow label="HST :" value={hst} /> : null}
-        {roundOff ? <TotalsRow label="Round Off :" value={roundOff} /> : null}
-        <div
-          className={`col-span-2 grid grid-cols-subgrid gap-x-6 py-2 font-bold ${
-            theme ? "" : "bg-gray-100"
-          }`}
-          style={
-            theme
-              ? { backgroundColor: theme.accent, color: theme.accentText }
-              : undefined
-          }
-        >
-          <TotalsRow label={totalLabel} value={total} strong strongOnAccent={Boolean(theme)} />
-        </div>
-      </div>
-    </div>
+    <tfoot>
+      <tr>
+        <td colSpan={labelColSpan} className={`${labelClass} pt-3`}>
+          Subtotal :
+        </td>
+        <td className={`${valueClass} pt-3`}>{subtotal}</td>
+      </tr>
+      {showHst ? (
+        <tr>
+          <td colSpan={labelColSpan} className={labelClass}>
+            HST :
+          </td>
+          <td className={valueClass}>{hst}</td>
+        </tr>
+      ) : null}
+      {roundOff ? (
+        <tr>
+          <td colSpan={labelColSpan} className={labelClass}>
+            Round Off :
+          </td>
+          <td className={valueClass}>{roundOff}</td>
+        </tr>
+      ) : null}
+      <tr aria-hidden>
+        <td colSpan={labelColSpan + 1} className="border-0 bg-transparent p-0 h-2" />
+      </tr>
+      <tr>
+        <td colSpan={labelColSpan} className="border-0 bg-transparent p-0">
+          <div className="flex justify-end">
+            <div className={`${totalCellClass} flex items-center`} style={totalStyle}>
+              {totalLabel}
+            </div>
+          </div>
+        </td>
+        <td className={`${totalCellClass} text-right tabular-nums`} style={totalStyle}>
+          {total}
+        </td>
+      </tr>
+    </tfoot>
   );
 }
 
@@ -121,9 +141,10 @@ type ShopJobCardEstimateViewProps = {
   jobNoHint?: string | null;
   /** When set, open directly in that action preview (before confirm). */
   initialActionPreview?: JobCardActionPreview | null;
-  /** Hide convert / cash-paid actions (e.g. wallet invoice preview). */
+  /** Hide convert / cash-paid confirm actions (e.g. wallet invoice preview). */
   showPaymentActions?: boolean;
   onBack?: () => void;
+  onEdit?: () => void;
   onConverted?: () => void;
   onCashPaid?: () => void;
   /** Called when action preview mode is entered or left. */
@@ -143,6 +164,7 @@ export default function ShopJobCardEstimateView({
   initialActionPreview = null,
   showPaymentActions = true,
   onBack,
+  onEdit,
   onConverted,
   onCashPaid,
   onActionPreviewChange,
@@ -153,6 +175,7 @@ export default function ShopJobCardEstimateView({
   const [job, setJob] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [jobCardPrefix, setJobCardPrefix] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
   const [actionPreview, setActionPreview] = useState<JobCardActionPreview | null>(
     initialActionPreview,
@@ -165,6 +188,27 @@ export default function ShopJobCardEstimateView({
   useEffect(() => {
     onActionPreviewChange?.(actionPreview);
   }, [actionPreview, onActionPreviewChange]);
+
+  useEffect(() => {
+    if (!token) {
+      setJobCardPrefix("");
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchAutoshopJobCardPrefix(token);
+        if (cancelled || !res.ok) return;
+        const prefix = parseAutoshopJobCardPrefix(res.data);
+        if (prefix) setJobCardPrefix(prefix);
+      } catch {
+        /* keep empty; display falls back */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const load = useCallback(async () => {
     if (!jobCardId) return;
@@ -229,17 +273,36 @@ export default function ShopJobCardEstimateView({
     [job, lines, effectiveHstRate, showHst],
   );
 
-  const docNo = useMemo(
-    () => estimateDocumentNo(job ?? {}, jobNoHint, listRow),
-    [job, jobNoHint, listRow],
-  );
+  const resolvedPrefix = useMemo(() => {
+    if (jobCardPrefix.trim()) return jobCardPrefix.trim();
+    const fromJob = job
+      ? deriveJobCardPrefixFromDisplayId(
+          pickJobNoFromRecord(job) ??
+            (typeof job.jobCardId === "string" ? job.jobCardId : undefined),
+        )
+      : "";
+    if (fromJob) return fromJob;
+    return listRow ? deriveJobCardPrefixFromDisplayId(pickJobNoFromListRow(listRow)) : "";
+  }, [jobCardPrefix, job, listRow]);
+
+  const alreadyInvoiced = job ? jobCardShowsInvoiceHst(job) : false;
+  const showInvoiceDocumentNo = alreadyInvoiced || invoicePreview;
+
+  const docNo = useMemo(() => {
+    if (showInvoiceDocumentNo) {
+      const invoiceNo =
+        pickInvoiceNoFromRecord(job) ||
+        (listRow ? pickJobCardInvoiceNumber(listRow) : "");
+      if (invoiceNo) return invoiceNo;
+    }
+    return estimateDocumentNo(job ?? {}, jobNoHint, listRow, resolvedPrefix);
+  }, [job, jobNoHint, listRow, resolvedPrefix, showInvoiceDocumentNo]);
   const currencyLabel = currencyLabelFromCode(callingCode);
   const businessBlock = buildBusinessBlock(business);
   const customerBlock = job ? buildCustomerBlock(job) : { name: "—", company: "", address: "" };
   const logoUrl = normalizeMediaUrl(business?.businessLogo);
   const hstNumber = pickBusinessHstNumber(business, job) || "—";
-  const alreadyInvoiced = job ? jobCardShowsInvoiceHst(job) : false;
-  const documentNoLabel = alreadyInvoiced || invoicePreview ? "Invoice No. :" : "Job Card No. :";
+  const documentNoLabel = showInvoiceDocumentNo ? "Invoice No. :" : "Job Card No. :";
   const footerNote = invoicePreview && !alreadyInvoiced
     ? "Invoice preview — confirm to convert this job card"
     : cashPreview
@@ -258,19 +321,14 @@ export default function ShopJobCardEstimateView({
     [job, listRow],
   );
   const canMarkPaidByCash = canConvertToInvoice;
+  const canEdit = useMemo(() => {
+    if (!job && !listRow) return false;
+    const row = listRow ?? (job ? jobCardRowFromRecord(job, listRow) : null);
+    return row ? isJobCardEditable(row) : false;
+  }, [job, listRow]);
 
   const handlePrint = () => {
     window.print();
-  };
-
-  const enterInvoicePreview = () => {
-    if (!canConvertToInvoice) return;
-    setActionPreview("invoice");
-  };
-
-  const enterCashPreview = () => {
-    if (!canMarkPaidByCash) return;
-    setActionPreview("cash");
   };
 
   const exitActionPreview = () => {
@@ -353,65 +411,54 @@ export default function ShopJobCardEstimateView({
           </button>
         ) : null}
         <div className={`flex flex-wrap items-center gap-2 ${onBack ? "" : "ml-auto"}`}>
-          {showPaymentActions ? (
-            invoicePreview && !alreadyInvoiced ? (
-              <>
+          {showPaymentActions && invoicePreview && !alreadyInvoiced ? (
+            <>
+              <button
+                type="button"
+                onClick={exitActionPreview}
+                disabled={actionBusy}
+                className={OUTLINE_BTN_CLASS}
+              >
+                Cancel Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmConvertToInvoice()}
+                disabled={!canConvertToInvoice || actionBusy}
+                className={CONVERT_INVOICE_BTN_CLASS}
+              >
+                {actionBusy ? "Converting…" : "Confirm Convert"}
+              </button>
+            </>
+          ) : null}
+          {showPaymentActions && cashPreview ? (
+            <>
+              {onEdit ? (
                 <button
                   type="button"
-                  onClick={exitActionPreview}
+                  onClick={onEdit}
                   disabled={actionBusy}
                   className={OUTLINE_BTN_CLASS}
                 >
-                  Cancel Preview
+                  <FiEdit2 size={13} aria-hidden />
+                  Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void handleConfirmConvertToInvoice()}
-                  disabled={!canConvertToInvoice || actionBusy}
-                  className={CONVERT_INVOICE_BTN_CLASS}
-                >
-                  {actionBusy ? "Converting…" : "Confirm Convert"}
-                </button>
-              </>
-            ) : cashPreview ? (
-              <>
-                <button
-                  type="button"
-                  onClick={exitActionPreview}
-                  disabled={actionBusy}
-                  className={OUTLINE_BTN_CLASS}
-                >
-                  Cancel Preview
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleConfirmPaidByCash()}
-                  disabled={!canMarkPaidByCash || actionBusy}
-                  className={CASH_PAID_BTN_CLASS}
-                >
-                  {actionBusy ? "Marking…" : "Confirm Paid by Cash"}
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={enterCashPreview}
-                  disabled={!canMarkPaidByCash || actionBusy}
-                  className={CASH_PAID_BTN_CLASS}
-                >
-                  Paid by Cash
-                </button>
-                <button
-                  type="button"
-                  onClick={enterInvoicePreview}
-                  disabled={!canConvertToInvoice || actionBusy}
-                  className={CONVERT_INVOICE_BTN_CLASS}
-                >
-                  Convert to Invoice
-                </button>
-              </>
-            )
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void handleConfirmPaidByCash()}
+                disabled={!canMarkPaidByCash || actionBusy}
+                className={CASH_PAID_BTN_CLASS}
+              >
+                {actionBusy ? "Marking…" : "Confirm Paid by Cash"}
+              </button>
+            </>
+          ) : null}
+          {onEdit && canEdit && !actionPreview ? (
+            <button type="button" onClick={onEdit} className={OUTLINE_BTN_CLASS}>
+              <FiEdit2 size={13} aria-hidden />
+              Edit
+            </button>
           ) : null}
           <button type="button" onClick={handlePrint} className={OUTLINE_BTN_CLASS}>
             <FiPrinter size={13} aria-hidden />
@@ -543,23 +590,21 @@ export default function ShopJobCardEstimateView({
                 ))
               )}
             </tbody>
+            <EstimateTotalsFooter
+              subtotal={formatEstimateMoney(totals.subtotal, callingCode)}
+              hst={formatEstimateMoney(totals.hst, callingCode)}
+              roundOff={
+                totals.roundOff !== 0
+                  ? formatEstimateMoney(totals.roundOff, callingCode)
+                  : undefined
+              }
+              total={formatEstimateMoney(totals.total, callingCode)}
+              totalLabel={`Total (${currencyLabel}) :`}
+              showHst={showHst}
+              labelColSpan={showHst ? 5 : 4}
+              theme={theme}
+            />
           </table>
-        </div>
-
-        <div className="relative z-10 mt-4 flex justify-end">
-          <EstimateTotalsBlock
-            subtotal={formatEstimateMoney(totals.subtotal, callingCode)}
-            hst={formatEstimateMoney(totals.hst, callingCode)}
-            roundOff={
-              totals.roundOff !== 0
-                ? formatEstimateMoney(totals.roundOff, callingCode)
-                : undefined
-            }
-            total={formatEstimateMoney(totals.total, callingCode)}
-            totalLabel={`Total (${currencyLabel}) :`}
-            showHst={showHst}
-            theme={theme}
-          />
         </div>
 
         <p className="relative z-10 mt-6 text-right text-[10px] text-gray-500 print:mt-4">

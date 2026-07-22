@@ -261,7 +261,8 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     (typeof o.jobCardNo === "number" && Number.isFinite(o.jobCardNo)
       ? String(o.jobCardNo)
       : s(o.jobCardNo));
-  const invoiceNumber = s(o.invoiceNumber) ?? s(o.invoiceNo) ?? s(o.invoice_number);
+  const invoiceNumber =
+    s(o.invoiceId) ?? s(o.invoiceNumber) ?? s(o.invoiceNo) ?? s(o.invoice_number);
   const vehiclePlate =
     s(o.licensePlateNo) ??
     s(o.registration) ??
@@ -472,6 +473,7 @@ export function pickJobCardInvoiceNumber(row: JobCardListRow): string {
   if (raw && typeof raw === "object") {
     const o = raw as Record<string, unknown>;
     return (
+      s(o.invoiceId) ??
       s(o.invoiceNumber) ??
       s(o.invoiceNo) ??
       s(o.invoice_number) ??

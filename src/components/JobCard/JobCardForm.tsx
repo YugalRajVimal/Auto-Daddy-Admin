@@ -23,7 +23,12 @@ import {
   ADMIN_PANEL_THEAD_ROW_CLASS,
   adminPanelTableClasses,
 } from "../admin/adminPanelTableStyles";
-import { extractSavedJobCardId, pickJobNoFromRecord } from "./shopJobCardEstimate";
+import {
+  composePrefixedJobCardNo,
+  deriveJobCardPrefixFromDisplayId,
+  extractSavedJobCardId,
+  pickJobNoFromRecord,
+} from "./shopJobCardEstimate";
 import {
   fetchJobCardByIdForForm,
   fetchJobCardFormData,
@@ -32,6 +37,11 @@ import {
   saveJobCard,
   type JobCardFormCustomer,
 } from "../../lib/shopOwnerJobCardsApi";
+import {
+  fetchAutoshopJobCardPrefix,
+  parseAutoshopJobCardPrefix,
+} from "../../lib/autoshopownerJobCardsApi";
+import { pickJobCardNoForApi } from "../../lib/shopOwnerJobCards";
 
 const formCellInputClass = shopCompactInputClass;
 
@@ -139,7 +149,7 @@ function displayJobCardNo(jobNo: string | undefined): string {
   const raw = (jobNo ?? "").trim().replace(/^#/, "");
   if (!raw) return "J # ——";
 
-  // Prefixed API ids (e.g. "JBNO-7") — show unchanged.
+  // Prefixed API ids (e.g. "JBD-121") — show unchanged.
   if (/[a-z]/i.test(raw) && !/^j\s*#?\s*\d+$/i.test(raw) && !/^job\s*#?\s*\d+$/i.test(raw)) {
     return raw;
   }
@@ -785,15 +795,26 @@ export default function JobCardForm({
 
     void (async () => {
       try {
-        const data = await fetchJobCardFormData(token);
+        const [data, prefixRes] = await Promise.all([
+          fetchJobCardFormData(token),
+          fetchAutoshopJobCardPrefix(token),
+        ]);
         if (cancelled) return;
         setMyCustomers(data.myCustomers);
         setMyServices(data.myServices);
+
+        const prefixFromApi = prefixRes.ok ? parseAutoshopJobCardPrefix(prefixRes.data) : "";
+        const prefix =
+          prefixFromApi ||
+          deriveJobCardPrefixFromDisplayId(
+            data.nextJobCardNo?.trim() || data.nextJobCard?.jobCardId?.trim() || "",
+          );
 
         if (modeProp === "add") {
           const displayNo =
             data.nextJobCardNo?.trim() ||
             data.nextJobCard?.jobCardId?.trim() ||
+            composePrefixedJobCardNo(prefix, data.nextJobCardNumber) ||
             (data.nextJobCardNumber != null ? String(data.nextJobCardNumber) : "");
           if (displayNo) {
             setDisplayJobNo(displayNo);
@@ -811,7 +832,13 @@ export default function JobCardForm({
 
           const services = normalizeJobCardServiceBlocks(job);
           setEditId(pickJobId(job));
-          setDisplayJobNo(pickJobNo(job));
+          const numericJobNo =
+            pickJobCardNoForApi(job) ??
+            (jobCardNo != null && String(jobCardNo).trim() ? String(jobCardNo).trim() : null) ??
+            pickJobNo(job);
+          setDisplayJobNo(
+            composePrefixedJobCardNo(prefix, numericJobNo) || pickJobNo(job),
+          );
           setServiceDate(
             String(job.serviceDate ?? job.jobDate ?? job.date ?? "").slice(0, 10) || todayIsoDate(),
           );

@@ -63,10 +63,6 @@ import {
   slugifyLabel,
   type CategoryOption,
 } from "../AdminPages/Accounts/ledgerCategories";
-import {
-  getWalletLedgerTab,
-  shortJobBadgeCode,
-} from "../../lib/shopOwnerWallet";
 import useAuth from "../../auth/useAuth";
 
 const PAGE_SIZE = 10;
@@ -301,14 +297,11 @@ function formatWalletPrice(
   return formatCurrencyAmount(total, countryCode, { fallback: "—", includeSign: false });
 }
 
-function displayBillId(row: JobCardListRow, isPaid: boolean): string {
-  const code = shortJobBadgeCode(row.jobNo);
-  if (code === "—") return "—";
-  const ledger = getWalletLedgerTab(row.raw);
-  if (isPaid || ledger === "invoice") {
-    return `B ${code}`;
-  }
-  return `J ${code}`;
+function displayBillId(row: JobCardListRow): string {
+  const invoiceNo = pickJobCardInvoiceNumber(row);
+  if (invoiceNo) return invoiceNo;
+  const jobNo = row.jobNo?.trim();
+  return jobNo || "—";
 }
 
 function matchesSearch(row: JobCardListRow, query: string): boolean {
@@ -831,7 +824,7 @@ function WalletInvoiceTable({
   onPreviewRow: (row: JobCardListRow) => void;
 }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
-  const idHeader = isPaid ? "Bill No." : "Job No.";
+  const idHeader = isPaid ? "Bill No." : "Invoice No.";
   const pageRowIds = rows.map((row) => row.id);
   const allPageSelected = rows.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
   const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
@@ -880,7 +873,7 @@ function WalletInvoiceTable({
                       type="checkbox"
                       checked={selectedIds.has(row.id)}
                       onChange={() => onToggleRow(row.id)}
-                      aria-label={`Select ${displayBillId(row, isPaid)}`}
+                      aria-label={`Select ${displayBillId(row)}`}
                       className={SHOP_TABLE_CHECKBOX_CLASS}
                     />
                   </td>
@@ -890,7 +883,7 @@ function WalletInvoiceTable({
                       onClick={() => onPreviewRow(row)}
                       className="font-semibold text-blue-700 hover:underline"
                     >
-                      {displayBillId(row, isPaid)}
+                      {displayBillId(row)}
                     </button>
                   </td>
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
@@ -914,7 +907,9 @@ function WalletInvoiceTable({
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
                     {formatWalletPrice(row.total, countryCode)}
                   </td>
-                  <td className={SHOP_TABLE_BODY_TD_CLASS}>{row.date ?? "—"}</td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                    {row.date ? formatDisplayDate(row.date) : "—"}
+                  </td>
                 </tr>
               );
             })}

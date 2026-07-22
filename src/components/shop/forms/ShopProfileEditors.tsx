@@ -372,10 +372,12 @@ export function ShopPersonalProfileEditor({
 
   const isDirty = useMemo(() => {
     return (
+      name !== (user?.name ?? "") ||
+      selectedCity !== (city ?? "") ||
       email !== (user?.email ?? "") ||
       profilePhoto !== null
     );
-  }, [email, profilePhoto, user?.email]);
+  }, [name, selectedCity, email, profilePhoto, user?.name, user?.email, city]);
 
   const syncFromUser = () => {
     setName(user?.name ?? "");
@@ -419,13 +421,24 @@ export function ShopPersonalProfileEditor({
 
   const handleUpdate = async () => {
     if (!token) return;
+    const trimmedName = name.trim();
+    const trimmedCity = selectedCity.trim();
+    if (!trimmedName) {
+      toast.error("Name is required.");
+      return;
+    }
+    if (!trimmedCity) {
+      toast.error("City is required.");
+      return;
+    }
     setSaving(true);
     try {
-      // Only email and profilePhoto are editable/updatable here.
       const res = await updatePersonalProfile(token, {
+        name: trimmedName,
+        city: trimmedCity,
         profilePhoto,
       });
- 
+
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save.");
         return;
@@ -466,8 +479,9 @@ export function ShopPersonalProfileEditor({
             <input
               className={shopCompactInputClass}
               value={name}
-              disabled
-              readOnly
+              onChange={(e) => setName(e.target.value)}
+              disabled={saving}
+              maxLength={60}
             />
           </CompactField>
           <CompactField label="Phone">
@@ -482,7 +496,8 @@ export function ShopPersonalProfileEditor({
             <select
               className={shopCompactInputClass}
               value={selectedCity}
-              disabled
+              onChange={(e) => setSelectedCity(e.target.value)}
+              disabled={saving}
             >
               <option value="">Select city</option>
               {citySelectOptions.map((cityName) => (
