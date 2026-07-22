@@ -17,6 +17,7 @@ import {
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopNotifications } from "../../hooks/useShopNotifications";
 import type { ShopOwnerNotification } from "../../types/shopOwner";
+import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
 
 type MessageSection = "notifications" | "received" | "sent";
 
@@ -44,14 +45,14 @@ const SHOP_TABLE_BODY_TD_CLASS = `${SHOP_TABLE.td} h-9 py-0 align-middle`;
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  if (Number.isNaN(d.getTime())) {
+    return /^\d{4}-\d{2}-\d{2}/.test(iso) ? formatDisplayDate(iso) : iso;
+  }
+  const datePart = formatDisplayDate(
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+  );
+  const timePart = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${datePart}, ${timePart}`;
 }
 
 function isMessageSection(id: string): id is MessageSection {

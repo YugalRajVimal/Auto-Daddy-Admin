@@ -269,13 +269,18 @@ export function resolveJobCardDisplayNo(
       ? (() => {
           const o = listRow.raw as Record<string, unknown>;
           if (typeof o.jobCardNo === "number" && Number.isFinite(o.jobCardNo)) return o.jobCardNo;
-          return o.jobCardNo ?? o.jobCardNumber ?? null;
+          if (typeof o.jobCardNumber === "number" && Number.isFinite(o.jobCardNumber)) {
+            return o.jobCardNumber;
+          }
+          return s(o.jobCardNo) || s(o.jobCardNumber) || null;
         })()
       : null;
   const numericFromJob =
     job && typeof job.jobCardNo === "number" && Number.isFinite(job.jobCardNo)
       ? job.jobCardNo
-      : (job?.jobCardNo ?? job?.jobCardNumber ?? null);
+      : job && typeof job.jobCardNumber === "number" && Number.isFinite(job.jobCardNumber)
+        ? job.jobCardNumber
+        : s(job?.jobCardNo) || s(job?.jobCardNumber) || null;
 
   const composed = composePrefixedJobCardNo(
     prefix,

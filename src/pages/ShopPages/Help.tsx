@@ -25,6 +25,7 @@ import {
   parseInviteHelpTickets,
   updateInviteHelpStatus,
 } from "../../lib/inviteHelpApi";
+import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
 
 const PAGE_SIZE = 10;
 const HELP_SEARCH_INPUT_ID = "shop-help-search";
@@ -147,7 +148,9 @@ function HelpTicketTable({
                 <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
                   {ticket.subject}
                 </td>
-                <td className={SHOP_TABLE_BODY_TD_CLASS}>{ticket.date}</td>
+                <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                  {ticket.date ? formatDisplayDate(ticket.date) : "—"}
+                </td>
                 <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
                   {ticketStatusLabel(ticket.status)}
                 </td>

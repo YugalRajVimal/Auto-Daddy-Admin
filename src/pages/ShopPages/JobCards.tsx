@@ -37,6 +37,7 @@ import {
   updateAutoshopJobCardPrefix,
   updateAutoshopJobCardSeq,
 } from "../../lib/autoshopownerJobCardsApi";
+import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
 import {
   isJobCardApproved,
   isJobCardEditable,
@@ -287,7 +288,9 @@ function JobCardListTable({
                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
                     {formatJobPrice(jc.total, countryCode)}
                   </td>
-                  <td className={SHOP_TABLE_BODY_TD_CLASS}>{jc.date ?? "—"}</td>
+                  <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                    {jc.date ? formatDisplayDate(jc.date) : "—"}
+                  </td>
                   {showStatusColumn ? (
                     <td className={SHOP_TABLE_BODY_TD_CLASS}>
                       <span className={`font-semibold ${jobCardStatusClass(jc)}`}>

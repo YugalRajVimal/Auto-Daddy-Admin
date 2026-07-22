@@ -48,6 +48,7 @@ import {
 import { parseCitiesApiResponse } from "../../lib/carOwnerCities";
 import { formatPhoneDisplay, formatPhoneLabel, phoneDigits } from "../../lib/phoneFormat";
 import { resolveCarBrandLogo } from "../../lib/dummyCarBrands";
+import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
 import type { CustomerVehicle, MyCustomer } from "../../types/shopOwner";
 
 type PeopleSection = "my-list" | "approval";
@@ -317,12 +318,7 @@ function customerListDate(customer: MyCustomer): string {
   const raw =
     customer.addedToShopAt ?? customer.linkedAt ?? customer.addedAt ?? customer.createdAt;
   if (!raw?.trim()) return "—";
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return raw.trim();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return formatDisplayDate(raw.trim());
 }
 
 function approvalStatusLabel(customer: MyCustomer): string {

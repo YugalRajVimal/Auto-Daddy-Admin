@@ -32,6 +32,7 @@ import {
 import { dealId, isSalvagesDeal } from "../../lib/shopOwnerParsers";
 import type { MyCustomer, ShopDeal } from "../../types/shopOwner";
 import { printAdminTable } from "../../utils/adminPrintTable";
+import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
 
 type DealSectionId = "service" | "parts" | "salvage" | "completed";
 type DealBoardSectionId = "service" | "parts" | "salvage";
@@ -73,13 +74,8 @@ function toFilter(id: DealSectionId): DealFilter {
 }
 
 function formatDealDate(iso?: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  if (!iso?.trim()) return "—";
+  return formatDisplayDate(iso.trim());
 }
 
 function dealMode(deal: ShopDeal): "service" | "parts" {
