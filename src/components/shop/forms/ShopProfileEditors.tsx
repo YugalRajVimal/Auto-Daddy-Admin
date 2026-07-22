@@ -29,6 +29,7 @@ import {
   shopProfileEditingRowClass,
   shopProfileFormPanelClass,
   shopProfileFormPanelFooterClass,
+  shopTableToolbarCompactClass,
 } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
@@ -1307,24 +1308,28 @@ export function ShopOpenHoursEditor({
   return (
     <div className="space-y-1">
       {!showForm ? (
-        <div className="flex min-h-[2rem] items-center justify-between gap-2">
+        <div className={shopTableToolbarCompactClass}>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void applyBulkStatus(true)}
-              disabled={!hasBulkSelection || saving}
-              className={shopHoursBulkButtonClass}
-            >
-              Open
-            </button>
-            <button
-              type="button"
-              onClick={() => void applyBulkStatus(false)}
-              disabled={!hasBulkSelection || saving}
-              className={shopHoursBulkButtonClass}
-            >
-              Close
-            </button>
+            {hasBulkSelection ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void applyBulkStatus(true)}
+                  disabled={saving}
+                  className={shopHoursBulkButtonClass}
+                >
+                  Open
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void applyBulkStatus(false)}
+                  disabled={saving}
+                  className={shopHoursBulkButtonClass}
+                >
+                  Close
+                </button>
+              </>
+            ) : null}
           </div>
           {headerAction ? <div className="flex shrink-0 items-center">{headerAction}</div> : null}
         </div>
@@ -2519,16 +2524,18 @@ export function ShopOperationalServicesEditor({
   return (
     <div className="space-y-1">
       {!showForm ? (
-        <div className="flex min-h-[2rem] items-center justify-between gap-2">
+        <div className={shopTableToolbarCompactClass}>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void handleBulkDelete()}
-              disabled={!hasBulkSelection || saving}
-              className={`${shopHoursBulkButtonClass}${hasBulkSelection ? "" : " invisible"}`}
-            >
-              Delete
-            </button>
+            {hasBulkSelection ? (
+              <button
+                type="button"
+                onClick={() => void handleBulkDelete()}
+                disabled={saving}
+                className={shopHoursBulkButtonClass}
+              >
+                Delete
+              </button>
+            ) : null}
           </div>
           {headerAction ? <div className="flex shrink-0 items-center">{headerAction}</div> : null}
         </div>

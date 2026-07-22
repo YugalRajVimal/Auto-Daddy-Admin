@@ -43,6 +43,7 @@ import {
   pickJobNoFromRecord,
 } from "./shopJobCardEstimate";
 import type { JobCardListRow } from "../../lib/shopOwnerJobCards";
+import { printDomElement } from "../../utils/printDomElement";
 
 const OUTLINE_BTN_CLASS =
   "inline-flex items-center gap-1.5 rounded border border-gray-400 bg-white px-3 py-1.5 text-xs font-bold text-gray-800 hover:bg-gray-50 disabled:opacity-60";
@@ -328,7 +329,12 @@ export default function ShopJobCardEstimateView({
   }, [job, listRow]);
 
   const handlePrint = () => {
-    window.print();
+    const node = document.getElementById("shop-job-card-estimate-print");
+    if (!(node instanceof HTMLElement)) {
+      toast.error("Nothing to print.");
+      return;
+    }
+    printDomElement(node, documentHeading);
   };
 
   const exitActionPreview = () => {

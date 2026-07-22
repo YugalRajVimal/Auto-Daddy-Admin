@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FiPaperclip } from "react-icons/fi";
+import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 
 const CLIP_IMAGE_TOOLTIP_HEIGHT_PX = 120;
 const CLIP_IMAGE_TOOLTIP_WIDTH_PX = 180;
@@ -27,6 +28,7 @@ export default function ClipImageHover({
   const triggerRef = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const resolvedImageUrl = normalizeMediaUrl(imageUrl) ?? imageUrl;
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -87,7 +89,7 @@ export default function ClipImageHover({
                 width: CLIP_IMAGE_TOOLTIP_WIDTH_PX,
               }}
             >
-              <img src={imageUrl} alt={alt} className="h-full w-full object-contain" />
+              <img src={resolvedImageUrl} alt={alt} className="h-full w-full object-contain" />
             </div>
           </div>,
           document.body

@@ -4,6 +4,7 @@ import {
   apiMessageFromEnvelope,
 } from "./autoshopownerJobCardsApi";
 import { fetchBanks, fetchExpenses } from "./shopOwnerAccountsApi";
+import { normalizeMediaUrl } from "./normalizeMediaUrl";
 import type { BankRow, GstLedgerRow, LedgerRow } from "../pages/AdminPages/Accounts/accountData";
 import { slugifyLabel } from "../pages/AdminPages/Accounts/ledgerCategories";
 
@@ -114,8 +115,14 @@ function mapExpenseToLedgerRow(raw: Record<string, unknown>): ShopReportLedgerRo
     gstAmount: gstRaw != null && gstRaw !== "" && typeof gstRaw !== "boolean" ? String(gstRaw) : null,
     billNumber: raw.billNumber != null ? String(raw.billNumber) : null,
     byCheque: Boolean(raw.byCheque),
-    hasReceipt: Boolean(raw.expenseImage ?? raw.hasReceipt),
-    attachmentUrl: raw.expenseImage != null ? String(raw.expenseImage) : null,
+    hasReceipt: Boolean(raw.expenseImage ?? raw.hasReceipt ?? raw.imagePath),
+    attachmentUrl: normalizeMediaUrl(
+      raw.expenseImage != null
+        ? String(raw.expenseImage)
+        : raw.imagePath != null
+          ? String(raw.imagePath)
+          : null,
+    ),
   };
 }
 

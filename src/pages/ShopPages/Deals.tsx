@@ -13,6 +13,7 @@ import ShopPageShell from "../../components/shop/ShopPageShell";
 import ShopDealsBoard, { ShopDealsBoardSkeleton } from "../../components/shop/ShopDealsBoard";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel } from "../../components/shop/ShopPanels";
+import { shopTableToolbarCompactClass } from "../../components/shop/shopLayoutStyles";
 import useAuth from "../../auth/useAuth";
 import { useShopCustomers } from "../../hooks/useShopCustomers";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
@@ -183,10 +184,10 @@ function dealsMatchingSelection(selectedIds: Set<string>, deals: ShopDeal[]): Sh
 }
 
 function DealsToolbar({
+  showDelete,
   hasSelection,
   canDelete,
   canDeactivate,
-  canPrint,
   canAddNew,
   bulkBusy,
   onDelete,
@@ -194,10 +195,10 @@ function DealsToolbar({
   onPrint,
   onAddNew,
 }: {
+  showDelete: boolean;
   hasSelection: boolean;
   canDelete: boolean;
   canDeactivate: boolean;
-  canPrint: boolean;
   canAddNew: boolean;
   bulkBusy: boolean;
   onDelete: () => void;
@@ -206,32 +207,37 @@ function DealsToolbar({
   onAddNew: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+    <div className={`${shopTableToolbarCompactClass} bg-gray-300 py-2`}>
       <div className="flex flex-wrap gap-1">
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={!canDelete || bulkBusy}
-          className={`${DEAL_TOOLBAR_GRAY_BUTTON_CLASS}${hasSelection ? "" : " invisible"}`}
-        >
-          Delete
-        </button>
-        <button
-          type="button"
-          onClick={onDeactivate}
-          disabled={!canDeactivate || bulkBusy}
-          className={DEAL_TOOLBAR_GRAY_BUTTON_CLASS}
-        >
-          Non-Active
-        </button>
-        <button
-          type="button"
-          onClick={onPrint}
-          disabled={!canPrint}
-          className={DEAL_TOOLBAR_GREEN_BUTTON_CLASS}
-        >
-          Print
-        </button>
+        {hasSelection ? (
+          <>
+            {showDelete ? (
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={!canDelete || bulkBusy}
+                className={DEAL_TOOLBAR_GRAY_BUTTON_CLASS}
+              >
+                Delete
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onDeactivate}
+              disabled={!canDeactivate || bulkBusy}
+              className={DEAL_TOOLBAR_GRAY_BUTTON_CLASS}
+            >
+              Non-Active
+            </button>
+            <button
+              type="button"
+              onClick={onPrint}
+              className={DEAL_TOOLBAR_GREEN_BUTTON_CLASS}
+            >
+              Print
+            </button>
+          </>
+        ) : null}
       </div>
       {canAddNew ? (
         <button type="button" onClick={onAddNew} className={shopAddNewButtonClass}>
@@ -756,10 +762,10 @@ export default function ShopDealsPage() {
           <div className="space-y-0">
             <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
               <DealsToolbar
+                showDelete={activeId !== "completed"}
                 hasSelection={hasBulkSelection}
                 canDelete={canBulkDelete}
                 canDeactivate={canBulkDeactivate}
-                canPrint={canPrint}
                 canAddNew={canAddNew}
                 bulkBusy={bulkBusy}
                 onDelete={() => void handleBulkDelete()}

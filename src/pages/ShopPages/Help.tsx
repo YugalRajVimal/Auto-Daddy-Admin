@@ -14,6 +14,7 @@ import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopListFooter } from "../../components/shop/ShopPanels";
 import ShopSupportPanel from "../../components/shop/ShopSupportPanel";
 import type { ShopTicket } from "../../components/shop/ShopTicketRow";
+import { shopTableToolbarClass } from "../../components/shop/shopLayoutStyles";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
 import { useWebVoiceRecorder } from "../../hooks/useWebVoiceRecorder";
@@ -95,7 +96,7 @@ function HelpSearchBar({
   trailing?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 py-1.5 sm:gap-3">
+    <div className={shopTableToolbarClass}>
       <div className="flex flex-wrap items-center gap-2" />
       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
         <input

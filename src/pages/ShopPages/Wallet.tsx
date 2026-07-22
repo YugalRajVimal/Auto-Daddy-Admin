@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TextareaHTMLAttributes } from "react";
 import { motion } from "framer-motion";
 import AttachImageCheckbox from "../../components/admin/AttachImageCheckbox";
-import ClipImageHover, { adminClipImageUrl } from "../../components/admin/ClipImageHover";
+import ClipImageHover from "../../components/admin/ClipImageHover";
+import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import { toast } from "react-toastify";
 import ComboSelectWithEditor from "../../components/admin/ComboSelectWithEditor";
 import {
@@ -26,6 +27,7 @@ import {
   shopCompactTextareaClass,
   shopProfileFormPanelClass,
   shopProfileFormPanelFooterClass,
+  shopTableToolbarClass,
 } from "../../components/shop/shopLayoutStyles";
 import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
 import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
@@ -788,7 +790,7 @@ function WalletSearchBar({
   trailing?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 py-1.5 sm:gap-3">
+    <div className={shopTableToolbarClass}>
       <div className="flex flex-wrap items-center gap-2">{leading}</div>
       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
         <input
@@ -1235,7 +1237,11 @@ export default function ShopWalletPage() {
               billNumber: e.billNumber != null ? String(e.billNumber) : null,
               byCheque: false,
               hasReceipt: Boolean(e.imagePath),
-              attachmentUrl: e.imagePath ? adminClipImageUrl(String(e.imagePath)) : null,
+              attachmentUrl: normalizeMediaUrl(
+                e.imagePath != null && String(e.imagePath).trim()
+                  ? String(e.imagePath).trim()
+                  : null,
+              ),
             })),
           );
         }
@@ -1609,7 +1615,7 @@ export default function ShopWalletPage() {
     const nextAttachmentUrl = expenseAttachReceipt
       ? expenseReceiptFile
         ? URL.createObjectURL(expenseReceiptFile)
-        : existingExpense?.attachmentUrl ?? adminClipImageUrl(editingExpenseId ?? `exp-${Date.now()}`)
+        : existingExpense?.attachmentUrl ?? null
       : null;
 
     const payload: Omit<ShopWalletExpenseRow, "id"> = {
@@ -2064,12 +2070,12 @@ export default function ShopWalletPage() {
               value={search}
               onChange={setSearch}
               leading={
-                view === "unpaid" ? (
+                view === "unpaid" && hasUnpaidSelection ? (
                   <>
                     <button
                       type="button"
                       onClick={() => void handleMarkAsPaid()}
-                      disabled={!hasUnpaidSelection || bulkBusy}
+                      disabled={bulkBusy}
                       className={WALLET_BULK_BUTTON_CLASS}
                     >
                       Mark as Paid
@@ -2077,7 +2083,7 @@ export default function ShopWalletPage() {
                     <button
                       type="button"
                       onClick={handleSendReminder}
-                      disabled={!hasUnpaidSelection || bulkBusy}
+                      disabled={bulkBusy}
                       className={WALLET_BULK_BUTTON_CLASS}
                     >
                       Send Reminder
@@ -2085,26 +2091,18 @@ export default function ShopWalletPage() {
                     <button
                       type="button"
                       onClick={() => handleViewInvoice(selectedUnpaidRows)}
-                      disabled={!hasUnpaidSelection || bulkBusy}
+                      disabled={bulkBusy}
                       className={WALLET_BULK_BUTTON_CLASS}
                     >
                       View Invoice
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleClearSelection}
-                      disabled={!hasUnpaidSelection || bulkBusy}
-                      className={WALLET_BULK_BUTTON_CLASS}
-                    >
-                      Clear Selection
-                    </button>
                   </>
-                ) : view === "paid" ? (
+                ) : view === "paid" && selectedPaidRows.length > 0 ? (
                   <>
                     <button
                       type="button"
                       onClick={() => handleViewInvoice(selectedPaidRows)}
-                      disabled={selectedPaidRows.length === 0 || bulkBusy}
+                      disabled={bulkBusy}
                       className={WALLET_BULK_BUTTON_CLASS}
                     >
                       View Invoice
@@ -2112,21 +2110,13 @@ export default function ShopWalletPage() {
                     <button
                       type="button"
                       onClick={() => void handleSendNotification(selectedPaidRows, "Receipt")}
-                      disabled={selectedPaidRows.length === 0 || bulkBusy}
+                      disabled={bulkBusy}
                       className={WALLET_BULK_BUTTON_CLASS}
                     >
                       Send Receipt
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleClearSelection}
-                      disabled={selectedPaidRows.length === 0 || bulkBusy}
-                      className={WALLET_BULK_BUTTON_CLASS}
-                    >
-                      Clear Selection
-                    </button>
                   </>
-                ) : view === "banks" ? (
+                ) : view === "banks" && selectedBankRows.length > 0 ? (
                   <>
                     <button
                       type="button"
@@ -2139,7 +2129,6 @@ export default function ShopWalletPage() {
                     <button
                       type="button"
                       onClick={handleClearSelection}
-                      disabled={selectedBankRows.length === 0}
                       className={WALLET_BULK_BUTTON_CLASS}
                     >
                       Clear Selection

@@ -22,6 +22,7 @@ import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
 import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
+import { shopTableToolbarClass } from "../../components/shop/shopLayoutStyles";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useAutoshopJobCards } from "../../hooks/useAutoshopJobCards";
 import { formatCurrencyAmount } from "../../lib/currency";
@@ -144,7 +145,7 @@ function JobCardsSearchBar({
   trailing?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 py-1.5 sm:gap-3">
+    <div className={shopTableToolbarClass}>
       <div className="flex flex-wrap items-center gap-2">{leading}</div>
       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
         <input
@@ -559,6 +560,7 @@ export default function ShopJobCardsPage() {
 
   const showConvertToInvoiceButton = section !== "paid" && section !== "convert-invoice";
   const showPaidByCashButton = section === "approvals" || section === "my-list";
+  const showDeleteButton = section === "my-list";
 
   const runBulkAction = async (
     label: string,
@@ -837,44 +839,48 @@ export default function ShopJobCardsPage() {
               value={search}
               onChange={setSearch}
               leading={
-                <>
-                  <button
-                    type="button"
-                    onClick={() => void handleBulkDelete()}
-                    disabled={!canBulkDelete || bulkBusy}
-                    className={`${SHOP_JOB_CARD_BULK_BUTTON_CLASS}${hasBulkSelection ? "" : " invisible"}`}
-                  >
-                    Delete
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleBulkSend()}
-                    disabled={!hasBulkSelection || bulkBusy}
-                    className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
-                  >
-                    Send
-                  </button>
-                  {showPaidByCashButton ? (
+                hasBulkSelection ? (
+                  <>
+                    {showDeleteButton ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleBulkDelete()}
+                        disabled={!canBulkDelete || bulkBusy}
+                        className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
+                      >
+                        Delete
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      onClick={handleBulkPaidByCash}
-                      disabled={!canBulkPaidByCash || bulkBusy}
+                      onClick={() => void handleBulkSend()}
+                      disabled={bulkBusy}
                       className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
                     >
-                      Paid by Cash
+                      Send
                     </button>
-                  ) : null}
-                  {showConvertToInvoiceButton ? (
-                    <button
-                      type="button"
-                      onClick={handleBulkConvertToInvoice}
-                      disabled={!canBulkConvertToInvoice || bulkBusy}
-                      className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
-                    >
-                      Convert to Invoice
-                    </button>
-                  ) : null}
-                </>
+                    {showPaidByCashButton ? (
+                      <button
+                        type="button"
+                        onClick={handleBulkPaidByCash}
+                        disabled={!canBulkPaidByCash || bulkBusy}
+                        className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
+                      >
+                        Paid by Cash
+                      </button>
+                    ) : null}
+                    {showConvertToInvoiceButton ? (
+                      <button
+                        type="button"
+                        onClick={handleBulkConvertToInvoice}
+                        disabled={!canBulkConvertToInvoice || bulkBusy}
+                        className={SHOP_JOB_CARD_BULK_BUTTON_CLASS}
+                      >
+                        Convert to Invoice
+                      </button>
+                    ) : null}
+                  </>
+                ) : null
               }
               trailing={
                 section === "my-list" ? <AddNewButton onClick={openNewJobCard} /> : null

@@ -13,6 +13,7 @@ import { ShopReveal } from "../../components/shop/ShopAnimated";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
+import { shopTableToolbarCompactClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
@@ -427,45 +428,49 @@ export default function ShopServicesPage() {
         ) : activeCategory ? (
           <>
             {showToolbar ? (
-              <div className="flex min-h-[2rem] items-center gap-2 overflow-x-auto whitespace-nowrap">
-                <button
-                  type="button"
-                  onClick={() => void handleBulkDelete()}
-                  disabled={!hasBulkSelection || bulkDeleting}
-                  className={`${shopHoursBulkButtonClass} shrink-0${hasBulkSelection ? "" : " invisible"}`}
-                >
-                  Delete
-                </button>
-                <select
-                  className={shopFilterSelectClass}
-                  value={makeFilter}
-                  onChange={(e) => {
-                    setMakeFilter(e.target.value);
-                    setModelFilter("");
-                  }}
-                  aria-label="Filter by make"
-                >
-                  <option value="">All makes</option>
-                  {makeOptions.map((make) => (
-                    <option key={make} value={make}>
-                      {make}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className={shopFilterSelectClass}
-                  value={modelFilter}
-                  onChange={(e) => setModelFilter(e.target.value)}
-                  aria-label="Filter by model"
-                >
-                  <option value="">All models</option>
-                  {modelOptions.map((model) => (
-                    <option key={model} value={model}>
-                      {model}
-                    </option>
-                  ))}
-                </select>
-                <div className="ml-auto shrink-0">
+              <div className={`${shopTableToolbarCompactClass} overflow-x-auto`}>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 whitespace-nowrap">
+                  <select
+                    className={shopFilterSelectClass}
+                    value={makeFilter}
+                    onChange={(e) => {
+                      setMakeFilter(e.target.value);
+                      setModelFilter("");
+                    }}
+                    aria-label="Filter by make"
+                  >
+                    <option value="">All makes</option>
+                    {makeOptions.map((make) => (
+                      <option key={make} value={make}>
+                        {make}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className={shopFilterSelectClass}
+                    value={modelFilter}
+                    onChange={(e) => setModelFilter(e.target.value)}
+                    aria-label="Filter by model"
+                  >
+                    <option value="">All models</option>
+                    {modelOptions.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                  {hasBulkSelection ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleBulkDelete()}
+                      disabled={bulkDeleting}
+                      className={`${shopHoursBulkButtonClass} shrink-0`}
+                    >
+                      Delete
+                    </button>
+                  ) : null}
+                </div>
+                <div className="shrink-0">
                   <AddNewButton onClick={openAddForm} />
                 </div>
               </div>

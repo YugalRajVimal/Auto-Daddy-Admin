@@ -94,6 +94,17 @@ export const shopCompactInputClass =
 export const shopHeroCardInlineToolbarClass =
   "flex min-h-[2rem] shrink-0 flex-wrap items-center justify-end gap-3";
 
+/**
+ * Filter / action row above shop tables.
+ * No horizontal inset — left/right controls align with the table card edges.
+ */
+export const shopTableToolbarClass =
+  "flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2 py-1.5 sm:gap-3";
+
+/** Compact variant for shorter bulk-action / filter rows above tables. */
+export const shopTableToolbarCompactClass =
+  "flex min-h-[2rem] shrink-0 flex-wrap items-center justify-between gap-2";
+
 export const shopHeroCardCompactSearchClass = `min-w-[160px] max-w-[240px] sm:min-w-[200px] ${shopCompactInputClass}`;
 
 /** Multiline fields in shop form cards. */

@@ -109,7 +109,9 @@ export function ShopListFooter({
   className?: string;
 }) {
   return (
-    <footer className={`mt-3 flex items-center justify-between gap-3 pt-2 ${shopHeroFooterTextClass} ${className}`.trim()}>
+    <footer
+      className={`mt-3 flex items-center justify-between gap-3 pt-2 ${shopHeroFooterTextClass} ${className}`.trim()}
+    >
       {children}
     </footer>
   );
