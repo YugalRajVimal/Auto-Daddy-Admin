@@ -1,8 +1,8 @@
 
 
 import { useEffect, useState } from "react";
-import { InvoicePreviewData } from "../../../components/shop/invoice-templates/sampleInvoiceData";
-import { InvoiceTemplatePreview } from "../../../components/shop/invoice-templates/InvoiceTemplatePreview";
+import { InvoicePreviewData } from "./invoice-templates/sampleInvoiceData";
+import { InvoiceTemplatePreview } from "./invoice-templates/InvoiceTemplatePreview";
 // import type { InvoicePreviewData } from "./sampleInvoiceData";
 
 // Shape of a single invoice row as returned by your invoices list/detail API.
@@ -24,6 +24,7 @@ type InvoiceApiRow = {
   items: InvoiceLineItemApi[];
   gst: number;
   status?: string;
+  poNumber?: string;  
   // shop/business info — adjust to wherever your admin panel stores this
   shopName?: string;
   shopAddress?: string;
@@ -47,6 +48,7 @@ function mapToInvoicePreviewData(row: InvoiceApiRow): InvoicePreviewData {
     accountId: row.accountId || "",
     taxPercent,
     currency: row.currency || "CAD",
+    poNumber: row.poNumber || "",
     shop: {
       name: row.shopName || "",
       address: row.shopAddress || "",
@@ -87,6 +89,7 @@ export default function InvoiceViewModal({
 
   useEffect(() => {
     console.log(invoice);
+    console.log(data);
     setData(mapToInvoicePreviewData(invoice));
   }, [invoice]);
 
@@ -154,7 +157,20 @@ export default function InvoiceViewModal({
           </div>
         </div>
         <div className="max-h-[80vh] overflow-y-auto">
-          <InvoiceTemplatePreview templateId={templateId} data={data} mode="full" />
+          <InvoiceTemplatePreview
+            templateId={templateId}
+            data={data}
+            mode="full"
+            // Removed poNumber prop because it is not supported by InvoiceTemplatePreview
+    
+            stampStatus={
+              invoice.status === "Paid" || invoice.status === "Unpaid" || invoice.status === "None"
+                ? invoice.status
+                : undefined
+            }
+          />
+    
+    
         </div>
       </div>
     </div>

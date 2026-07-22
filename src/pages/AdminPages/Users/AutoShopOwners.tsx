@@ -479,10 +479,10 @@ const AutoShopAddEditForm: React.FC<{
     setAttempted(false);
     setApiError(null);
     if (isEdit && owner) {
-      setName(owner.businessProfile?.Name || owner.name || "");
+      setName(owner.businessProfile?.businessName || owner.name || "");
       setEmail(owner.email || "");
       setPhone(owner.phone || "");
-      setCity(owner?.city || "");
+      setCity(owner.businessProfile?.city || "");
       setAddress(owner.address || owner.businessProfile?.businessAddress || "");
       setZipCode(owner.pincode || owner.businessProfile?.pincode || "");
       setJoiningDate(fmtDate(owner.createdAt) !== "-" ? fmtDate(owner.createdAt) : "");

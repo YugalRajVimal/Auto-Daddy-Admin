@@ -25,7 +25,7 @@ import {
 } from "./api/invoicingApi";
 
 import InvoiceViewModal from "./InvoiceViewModal";
-import { PaidStampToggle } from "./PaidStampToggle";
+// import { PaidStampToggle } from "./PaidStampToggle";
 
 import { fetchInvoiceSettings, updateInvoiceSettings } from "./api/invoicingApi";
 
@@ -662,10 +662,10 @@ export default function InvoicesPage() {
               <div className="flex items-center justify-center sm:px-4">
           
 
-              <PaidStampToggle
+              {/* <PaidStampToggle
                 paid={form.status === "Paid"}
                 onToggle={() => setForm((f) => ({ ...f, status: f.status === "Paid" ? "Draft" : "Paid" }))}
-              />
+              /> */}
 
               </div>
         
