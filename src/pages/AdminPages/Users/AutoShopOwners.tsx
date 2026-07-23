@@ -483,8 +483,8 @@ const AutoShopAddEditForm: React.FC<{
       setEmail(owner.email || "");
       setPhone(owner.phone || "");
       setCity(owner.businessProfile?.city || "");
-      setAddress(owner.address || owner.businessProfile?.businessAddress || "");
-      setZipCode(owner.pincode || owner.businessProfile?.pincode || "");
+      setAddress(owner.businessProfile?.businessAddress || "");
+      setZipCode(owner.businessProfile?.pincode || "");
       setJoiningDate(fmtDate(owner.createdAt) !== "-" ? fmtDate(owner.createdAt) : "");
       setShopType(ownerShopTypes(owner));
     } else {
