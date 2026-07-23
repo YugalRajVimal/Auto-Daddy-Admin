@@ -8,7 +8,8 @@ import { useCarCompanyCatalog } from "@/hooks/use-car-company-catalog";
 import { useKeyboardBottomInset } from "@/hooks/use-keyboard-bottom-inset";
 import { customerKey, hitKey, useMyCustomers } from "@/hooks/use-my-customers";
 import { useOncePress } from "@/hooks/use-once-press";
-import { toUpdateCustomerVehicleRows, type MyCustomersPeriod } from "@/lib/auto-shop-owner-api";
+import { toUpdateCustomerVehicleRows } from "@/lib/auto-shop-owner-api";
+import type { MyCustomersPeriod } from "@/lib/shop-owner-api";
 import type { DatePeriodTimeFilter } from "@/lib/date-period-labels";
 import {
   loadCustomerCityForForm,

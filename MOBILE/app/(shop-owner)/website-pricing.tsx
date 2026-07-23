@@ -2,6 +2,15 @@ import { AppBar, SurfaceCard, TabScreenFrame, useToast } from "@/components/reus
 import { colors, fontSizes, gradients, radii, spacing, typography } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import { formatCurrencyAmount } from "@/lib/currency";
+import {
+  createSubscriptionCheckout,
+  extractCheckoutSession,
+  formatSubscriptionApiError,
+} from "@/lib/shop-owner-subscription-api";
+import { selectWebsiteTemplate } from "@/lib/shop-owner-website-api";
+import { canOpenStripeCheckout } from "@/lib/stripe-payment";
+import { StripeCheckoutModal } from "@/components/shop-owner/stripe-checkout-modal";
+import type { SubscriptionCheckoutSession } from "@/types/website-subscription";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -44,11 +53,14 @@ function GradientShell({ children }: { children: React.ReactNode }) {
 }
 
 export default function WebsitePricingPage() {
-  const { meta } = useAuth();
+  const { meta, token } = useAuth();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ templateId?: string; templateName?: string }>();
   const templateName = (params.templateName ?? "Template 1").trim() || "Template 1";
+  const templateId = (params.templateId ?? "").trim();
   const { showToast } = useToast();
+  const [checkoutSession, setCheckoutSession] = useState<SubscriptionCheckoutSession | null>(null);
+  const [paying, setPaying] = useState(false);
 
   const rows: PriceRow[] = useMemo(
     () => [
@@ -66,6 +78,43 @@ export default function WebsitePricingPage() {
   const footerBtnHeight = 56;
   const footerGap = 12;
   const footerTextHeight = 18;
+
+  async function handlePay() {
+    if (!accepted) return;
+    if (!token) {
+      showToast("Please sign in again.", { type: "error" });
+      return;
+    }
+    setPaying(true);
+    try {
+      if (templateId) {
+        await selectWebsiteTemplate(token, templateId);
+      }
+      const res = await createSubscriptionCheckout(token, {
+        planId: "yearly",
+        successUrl: "https://app.autodaddy.ca/shop/my-website?checkout=success",
+        cancelUrl: "https://app.autodaddy.ca/shop/my-website?checkout=cancel",
+      });
+      if (!res.ok || res.data?.success === false) {
+        showToast(formatSubscriptionApiError(res.data), { type: "error" });
+        return;
+      }
+      const session = extractCheckoutSession(res.data);
+      if (!session?.checkoutUrl && !session?.stripeSessionId) {
+        showToast("Payment session not returned.", { type: "error" });
+        return;
+      }
+      if (!canOpenStripeCheckout(session)) {
+        showToast("Stripe checkout is not available for this session.", { type: "error" });
+        return;
+      }
+      setCheckoutSession(session);
+    } catch {
+      showToast("Network error starting payment.", { type: "error" });
+    } finally {
+      setPaying(false);
+    }
+  }
 
   return (
     <TabScreenFrame
@@ -191,12 +240,11 @@ export default function WebsitePricingPage() {
         <View style={[styles.footer, { left: spacing.screenHorizontal, right: spacing.screenHorizontal, bottom }]}>
           <BlurView intensity={28} tint="light" style={styles.footerBlur} />
           <Pressable
-            style={[styles.payButton, { minHeight: footerBtnHeight }, !accepted && styles.payButtonDisabled]}
+            style={[styles.payButton, { minHeight: footerBtnHeight }, (!accepted || paying) && styles.payButtonDisabled]}
             onPress={() => {
-              if (!accepted) return;
-              showToast("Payment flow coming soon.", { type: "info" });
+              void handlePay();
             }}
-            disabled={!accepted}
+            disabled={!accepted || paying}
           >
             <LinearGradient
               colors={[colors.primaryDark, colors.primary, "#4F8CFF"]}
@@ -204,12 +252,25 @@ export default function WebsitePricingPage() {
               end={{ x: 1, y: 1 }}
               style={styles.payButtonGradient}
             >
-              <Text style={styles.payButtonText}>🧪 Proceed to Payment</Text>
+              <Text style={styles.payButtonText}>{paying ? "Starting…" : "Proceed to Payment"}</Text>
             </LinearGradient>
           </Pressable>
-          <Text style={styles.secureText}>🔒 Secure payment • SSL encrypted</Text>
+          <Text style={styles.secureText}>Secure payment · SSL encrypted</Text>
         </View>
       </View>
+      <StripeCheckoutModal
+        visible={checkoutSession != null}
+        session={checkoutSession}
+        onClose={() => setCheckoutSession(null)}
+        onComplete={() => {
+          setCheckoutSession(null);
+          showToast("Payment completed.", { type: "success" });
+          router.replace("/(shop-owner)/website");
+        }}
+        onError={(message) => {
+          showToast(message || "Payment failed.", { type: "error" });
+        }}
+      />
     </TabScreenFrame>
   );
 }

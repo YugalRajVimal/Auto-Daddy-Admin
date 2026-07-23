@@ -5,14 +5,19 @@ import { useAuth } from "@/context/auth-provider";
 import { getJson } from "@/lib/api";
 import { getAutoShopOwnerProfile } from "@/lib/auth";
 import {
-  extractPurchaseSubscriptionCheckoutSession,
-  fetchWebsiteTemplates,
   extractPendingSubscriptionCheckout,
   findSubscriptionByOrderId,
-  formatPurchaseSubscriptionError,
   isSubscriptionPaymentPaid,
-  purchaseWebsiteSubscription,
 } from "@/lib/auto-shop-owner-api";
+import {
+  fetchWebsiteTemplates as fetchAutoshopWebsiteTemplates,
+  selectWebsiteTemplate,
+} from "@/lib/shop-owner-website-api";
+import {
+  createSubscriptionCheckout,
+  extractCheckoutSession,
+  formatSubscriptionApiError,
+} from "@/lib/shop-owner-subscription-api";
 import type { SubscriptionCheckoutSession } from "@/types/website-subscription";
 import { canOpenStripeCheckout } from "@/lib/stripe-payment";
 import { formatCurrencyAmount, getCurrencyCode } from "@/lib/currency";
@@ -561,7 +566,7 @@ export default function WebsitePage() {
     }
     setLoading(true);
     try {
-      const res = await fetchWebsiteTemplates(token);
+      const res = await fetchAutoshopWebsiteTemplates(token);
       if (!res.ok) {
         const msg =
           res.data && typeof res.data === "object" && "message" in res.data
@@ -659,28 +664,29 @@ export default function WebsitePage() {
 
     setPaymentLoading(true);
     try {
-      const res = await purchaseWebsiteSubscription(token, {
-        amount: WEBSITE_SUBSCRIPTION_AMOUNT,
-        days: WEBSITE_SUBSCRIPTION_DAYS,
-        paymentMethod: "stripe",
-        referenceId: buildSubscriptionReferenceId(),
-        year: String(new Date().getFullYear()),
-        websiteTemplateId,
+      if (websiteTemplateId) {
+        await selectWebsiteTemplate(token, websiteTemplateId);
+      }
+      const successUrl = "https://app.autodaddy.ca/shop/my-website?checkout=success";
+      const cancelUrl = "https://app.autodaddy.ca/shop/my-website?checkout=cancel";
+      const res = await createSubscriptionCheckout(token, {
+        planId: "yearly",
+        successUrl,
+        cancelUrl,
       });
       const data = res.data;
-      const message = data?.message?.trim() ?? "";
       const succeeded = res.ok && data?.success !== false;
       if (!succeeded) {
-        showToast(formatPurchaseSubscriptionError(data), { type: "error" });
+        showToast(formatSubscriptionApiError(data), { type: "error" });
         return;
       }
-      const checkoutSession = extractPurchaseSubscriptionCheckoutSession(data);
+      const checkoutSession = extractCheckoutSession(data);
       if (!checkoutSession) {
-        showToast(message || "Payment session not returned.", { type: "error" });
+        showToast(data?.message || "Payment session not returned.", { type: "error" });
         return;
       }
-      if (message) {
-        showToast(message, { type: "info" });
+      if (data?.message) {
+        showToast(data.message, { type: "info" });
       }
       openSubscriptionCheckout(checkoutSession);
     } catch {

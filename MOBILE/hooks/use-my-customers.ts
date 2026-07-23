@@ -1,12 +1,14 @@
 import {
-  addCarOwnerToMyCustomers,
+  addExistingCustomer,
+  deleteAddedCustomer,
+  editOnboardedCustomer,
+  fetchAddedCustomers,
+  searchCustomers,
+} from "@/lib/autoshopowner-api";
+import {
   buildMyCustomersQuery,
-  fetchMyCustomers,
   type MyCustomersPeriod,
-  removeCarOwnerFromMyCustomers,
-  searchCarOwners,
-  updateMyCustomer,
-} from "@/lib/auto-shop-owner-api";
+} from "@/lib/shop-owner-api";
 import type {
   CarOwnerSearchHit,
   CustomerVehicle,
@@ -317,9 +319,10 @@ export function useMyCustomers(
       return;
     }
     const query = buildMyCustomersQuery(listPeriod);
+    const status = query.status?.trim() || "approved";
     setLoading(true);
     try {
-      const res = await fetchMyCustomers(token, query);
+      const res = await fetchAddedCustomers(token, status);
       if (!res.ok) {
         const msg =
           res.data && typeof res.data === "object" && "message" in res.data
@@ -364,7 +367,7 @@ export function useMyCustomers(
       }
       setSearching(true);
       try {
-        const res = await searchCarOwners(token, q);
+        const res = await searchCustomers(token, q);
         if (!res.ok) {
           setSearchHits([]);
           return;
@@ -386,7 +389,7 @@ export function useMyCustomers(
         return false;
       }
       try {
-        const res = await addCarOwnerToMyCustomers(token, carOwnerId);
+        const res = await addExistingCustomer(token, { customerId: carOwnerId });
         const msg =
           res.data && typeof res.data === "object" && "message" in res.data
             ? String((res.data as { message?: string }).message ?? "")
@@ -417,7 +420,7 @@ export function useMyCustomers(
         return false;
       }
       try {
-        const res = await removeCarOwnerFromMyCustomers(token, id);
+        const res = await deleteAddedCustomer(token, id);
         const msg =
           res.data && typeof res.data === "object" && "message" in res.data
             ? String((res.data as { message?: string }).message ?? "")
@@ -443,7 +446,20 @@ export function useMyCustomers(
         return false;
       }
       try {
-        const res = await updateMyCustomer(token, payload);
+        const customerId = String(
+          (payload as { carOwnerId?: string; customerId?: string }).carOwnerId ??
+            (payload as { customerId?: string }).customerId ??
+            ""
+        ).trim();
+        if (!customerId) {
+          showToast("Could not update customer (missing id).", { type: "error" });
+          return false;
+        }
+        const patch = { ...(payload as Record<string, unknown>) };
+        delete patch.carOwnerId;
+        delete patch.customerId;
+        delete patch.vehicles;
+        const res = await editOnboardedCustomer(token, customerId, patch);
         const msg =
           res.data && typeof res.data === "object" && "message" in res.data
             ? String((res.data as { message?: string }).message ?? "")

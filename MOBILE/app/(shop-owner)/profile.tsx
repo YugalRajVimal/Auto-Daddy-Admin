@@ -19,13 +19,15 @@ import { colors, fontSizes, gradients, radii, spacing } from "@/constants/autoda
 import { useAuth } from "@/context/auth-provider";
 import { useBusinessProfileEditor } from "@/hooks/profile/use-business-profile-editor";
 import { usePersonalProfileEditor } from "@/hooks/profile/use-personal-profile-editor";
-import { updateBusinessOpenHours } from "@/lib/auto-shop-owner-api";
+import { updateBusinessProfile, updatePersonalProfile, updateWeeklyOpenHours } from "@/lib/autoshopowner-api";
+import { fetchAndMergeShopOwnerPortal } from "@/lib/shop-owner-portal-bootstrap";
 import { useLogoutAction } from "@/hooks/use-logout-action";
 import { useOncePress } from "@/hooks/use-once-press";
 import { useDocumentTemplatePreference } from "@/hooks/use-document-template-preference";
 import { useShopOwnerCarCompanies } from "@/hooks/use-shop-owner-car-companies";
 import { useShopOwnerServices } from "@/hooks/use-shop-owner-services";
 import { API_BASE_URL, getJson, logApiRequest, putJson } from "@/lib/api";
+import { saveAutoShopOwnerProfile } from "@/lib/auth";
 import {
   createDefaultPerDaySchedule,
   formatPerDayScheduleDisplay,
@@ -525,6 +527,12 @@ export default function ProfilePage() {
       params: { backTo: "/(shop-owner)/profile", from: "profile" },
     });
   });
+  const openReportsFromProfile = useOncePress(() => {
+    router.push({
+      pathname: "/(shop-owner)/reports",
+      params: { backTo: "/(shop-owner)/profile", from: "profile" },
+    });
+  });
   const invoiceTemplatePreference = useDocumentTemplatePreference("invoice");
   const jobCardTemplatePreference = useDocumentTemplatePreference("jobcard");
   const savedInvoiceTemplateName = useMemo(() => {
@@ -788,34 +796,35 @@ export default function ProfilePage() {
 
     setPersonalSaving(true);
     try {
-      const editProfilePath = isAutoShopOwnerRole
-        ? "/api/auto-shop-owner/edit-profile"
-        : "/api/user/edit-profile";
-      const response = await putJson<EditProfileResponse>(
-        editProfilePath,
-        personalUpdateBody,
-        { authToken: token }
-      );
+      const response = isAutoShopOwnerRole
+        ? await updatePersonalProfile(token, {
+            name: nextName || undefined,
+            city: undefined,
+          })
+        : await putJson<EditProfileResponse>(
+            "/api/user/edit-profile",
+            personalUpdateBody,
+            { authToken: token }
+          );
 
-      const payload = response.data;
-      if (!response.ok || !payload?.success) {
+      const payload = response.data as EditProfileResponse | null;
+      if (!response.ok || (payload && "success" in payload && payload.success === false)) {
         showToast(payload?.message ?? "Failed to update profile.", { type: "error" });
         await loadProfileFromStore();
         return;
       }
 
       // Show result immediately; refresh happens after.
-      showToast(payload.message ?? "Profile updated successfully.", { type: "success" });
+      showToast(payload?.message ?? "Profile updated successfully.", { type: "success" });
 
       await refreshSession();
-      const updated = parseUserProfilePayload(payload.data ?? payload);
+      const updated = parseUserProfilePayload(payload?.data ?? payload);
       if (isAutoShopOwnerRole) {
-        const freshProfile = await getJson<AutoShopOwnerProfileResponse>("/api/auto-shop-owner/profile", {
-          authToken: token,
-        });
-        if (freshProfile.ok && freshProfile.data?.data?.userProfile) {
-          setServerData(freshProfile.data.data);
-          setServerProfile(freshProfile.data.data.userProfile);
+        const portal = await fetchAndMergeShopOwnerPortal(token);
+        if (portal.profile) {
+          await saveAutoShopOwnerProfile(portal.profile);
+          setServerData(portal.profile.data);
+          setServerProfile(portal.profile.data.userProfile);
         }
       } else if (updated) {
         setUserProfile((prev) => ({
@@ -986,7 +995,7 @@ export default function ProfilePage() {
           },
         });
       }
-      const businessProfileUrl = `${normalizedBase}/api/auto-shop-owner/edit-business-profile`;
+      const businessProfileUrl = `${normalizedBase}/api/autoshopowner/profile/business`;
       logApiRequest("PUT", businessProfileUrl, body);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 45_000);
@@ -1019,12 +1028,11 @@ export default function ProfilePage() {
 
       await refreshSession();
 
-      const freshProfile = await getJson<AutoShopOwnerProfileResponse>("/api/auto-shop-owner/profile", {
-        authToken: token,
-      });
-      if (freshProfile.ok && freshProfile.data?.data?.userProfile) {
-        setServerData(freshProfile.data.data);
-        setServerProfile(freshProfile.data.data.userProfile);
+      const portal = await fetchAndMergeShopOwnerPortal(token);
+      if (portal.profile) {
+        await saveAutoShopOwnerProfile(portal.profile);
+        setServerData(portal.profile.data);
+        setServerProfile(portal.profile.data.userProfile);
       }
     } catch (err) {
       const message =
@@ -1068,7 +1076,15 @@ export default function ProfilePage() {
 
     setActivitySaving(true);
     try {
-      const response = await updateBusinessOpenHours(token, nextPerDayOpenHoursJson);
+      const response = await updateWeeklyOpenHours(
+        token,
+        nextPerDayOpenHours.map((entry) => ({
+          day: entry.day,
+          open: entry.open,
+          close: entry.close,
+          isClosed: entry.isClosed,
+        }))
+      );
       const payload = response.data;
       if (
         !response.ok ||
@@ -1090,12 +1106,11 @@ export default function ProfilePage() {
         { type: "success" }
       );
       await refreshSession();
-      const freshProfile = await getJson<AutoShopOwnerProfileResponse>("/api/auto-shop-owner/profile", {
-        authToken: token,
-      });
-      if (freshProfile.ok && freshProfile.data?.data?.userProfile) {
-        setServerData(freshProfile.data.data);
-        setServerProfile(freshProfile.data.data.userProfile);
+      const portal = await fetchAndMergeShopOwnerPortal(token);
+      if (portal.profile) {
+        await saveAutoShopOwnerProfile(portal.profile);
+        setServerData(portal.profile.data);
+        setServerProfile(portal.profile.data.userProfile);
       }
     } catch {
       showToast("Network error while updating open hours.", { type: "error" });
@@ -1254,6 +1269,15 @@ export default function ProfilePage() {
                     rowLabel="Active Template"
                     rowValue={savedJobCardTemplateName}
                     onPress={() => openJobCardTemplatesFromProfile?.()}
+                  />
+
+                  <DocumentTemplateCard
+                    title="Reports"
+                    icon="bar-chart-outline"
+                    rowIcon="analytics-outline"
+                    rowLabel="Income · Expense · Bank · GST"
+                    rowValue="Open"
+                    onPress={() => openReportsFromProfile?.()}
                   />
                 </>
               ) : null}

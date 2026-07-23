@@ -1,4 +1,9 @@
-import { fetchMyServices, removeMyServiceSubServices, saveMyServices, updateMyServices } from "@/lib/auto-shop-owner-api";
+import {
+  addMyService,
+  addSubServices,
+  deleteSubService,
+} from "@/lib/autoshopowner-api";
+import { fetchMyServices } from "@/lib/shop-owner-api";
 import type { MyServiceCategoryPayload } from "@/types/auto-shop-owner-endpoints";
 import { useCallback, useState } from "react";
 
@@ -59,7 +64,7 @@ function extractServicePayload(payload: unknown): MyShopServiceCategory[] {
               : undefined;
 
     const subRaw = Array.isArray(o.selectedSubServices) ? o.selectedSubServices : o.subServices;
-    const subServices: { name: string; desc: string; price: number }[] = [];
+    const subServices: { id?: string; name: string; desc: string; price: number }[] = [];
     if (Array.isArray(subRaw)) {
       for (const s of subRaw) {
         if (!s || typeof s !== "object") {
@@ -128,16 +133,43 @@ export function useMyShopServices(
         return false;
       }
       try {
-        const res = mode === "create" ? await saveMyServices(token, services) : await updateMyServices(token, services);
-        const msg =
-          res.data && typeof res.data === "object" && "message" in res.data
-            ? String((res.data as { message?: string }).message ?? "")
-            : "";
-        if (!res.ok) {
-          showToast(msg || "Save failed.", { type: "error" });
-          return false;
+        for (const svc of services) {
+          const serviceId = String(svc.id ?? "").trim();
+          if (!serviceId) continue;
+          if (mode === "create") {
+            const today = new Date().toISOString().slice(0, 10);
+            const addRes = await addMyService(token, {
+              serviceId,
+              status: "active",
+              date: today,
+            });
+            if (!addRes.ok) {
+              const msg =
+                addRes.data && typeof addRes.data === "object" && "message" in addRes.data
+                  ? String((addRes.data as { message?: string }).message ?? "")
+                  : "";
+              showToast(msg || "Save failed.", { type: "error" });
+              return false;
+            }
+          }
+          const subs = (svc.subServices ?? []).map((s) => ({
+            name: s.name,
+            desc: s.desc,
+            price: typeof s.price === "number" ? s.price : Number(s.price) || 0,
+          }));
+          if (subs.length > 0) {
+            const subRes = await addSubServices(token, { serviceId, subServices: subs });
+            if (!subRes.ok) {
+              const msg =
+                subRes.data && typeof subRes.data === "object" && "message" in subRes.data
+                  ? String((subRes.data as { message?: string }).message ?? "")
+                  : "";
+              showToast(msg || "Could not save sub-services.", { type: "error" });
+              return false;
+            }
+          }
         }
-        showToast(msg || "Saved.", { type: "success" });
+        showToast("Saved.", { type: "success" });
         await load();
         return true;
       } catch {
@@ -158,10 +190,15 @@ export function useMyShopServices(
         return false;
       }
       try {
-        const res = await removeMyServiceSubServices(token, {
-          id: serviceId.trim(),
-          removeSubServices: true,
-          subServices: [{ name }],
+        const current = categories.find((c) => c.id === serviceId.trim());
+        const idx = (current?.subServices ?? []).findIndex((s) => s.name.trim() === name);
+        if (idx < 0) {
+          showToast("Sub-service not found.", { type: "error" });
+          return false;
+        }
+        const res = await deleteSubService(token, {
+          serviceId: serviceId.trim(),
+          subServiceIndex: idx,
         });
         const msg =
           res.data && typeof res.data === "object" && "message" in res.data
@@ -179,7 +216,7 @@ export function useMyShopServices(
         return false;
       }
     },
-    [load, showToast, token]
+    [categories, load, showToast, token]
   );
 
   return { categories, loading, load, save, removeSubServiceByName };

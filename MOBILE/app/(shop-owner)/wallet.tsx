@@ -3,10 +3,12 @@ import { cardFontSizes, cardTypography, colors, fontSizes, radii, shadows, spaci
 import { useAuth } from "@/context/auth-provider";
 import { useOncePress } from "@/hooks/use-once-press";
 import { useKeyboardBottomInset } from "@/hooks/use-keyboard-bottom-inset";
+import { useShopAccounts } from "@/hooks/use-shop-accounts";
 import { useShopWallet } from "@/hooks/use-shop-wallet";
 import { getAnchoredMenuStyle, type MenuAnchorRect } from "@/lib/anchored-menu-position";
-import { collectJobCardPayment, fetchJobCardById, markJobCardPaymentInvoice, markJobCardPaymentStatus } from "@/lib/auto-shop-owner-api";
-import type { JobCardListRow } from "@/lib/parse-job-card-page";
+import { markAutoshopInvoicePaid, sendAutoshopJobCardForApproval, updateAutoshopJobCardStatus } from "@/lib/autoshopowner-job-cards-api";
+import { fetchJobCardRecord } from "@/lib/shop-owner-job-cards-api";
+import { pickJobCardNoForApi, type JobCardListRow } from "@/lib/shop-owner-job-cards";
 import {
   formatWalletAmount,
   isOnlineInvoicePayment,
@@ -135,7 +137,16 @@ export default function WalletPage() {
     isOwner,
     showToast
   );
+  const {
+    banks,
+    expenses,
+    loading: accountsLoading,
+    refresh: refreshAccounts,
+    addBank,
+    addExpense,
+  } = useShopAccounts(token, isOwner, showToast);
 
+  const [walletSection, setWalletSection] = useState<"invoices" | "banks" | "expenses">("invoices");
   const [statusIndex, setStatusIndex] = useState(0);
   const [ledgerTab, setLedgerTab] = useState<WalletLedgerTab>("cash");
   const [refreshing, setRefreshing] = useState(false);
@@ -229,16 +240,17 @@ export default function WalletPage() {
         router.setParams({ qa: undefined });
       }
       void refresh();
+      void refreshAccounts();
       return undefined;
-    }, [dismissMenu, fromQuickAction, refresh])
+    }, [dismissMenu, fromQuickAction, refresh, refreshAccounts])
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     InteractionManager.runAfterInteractions(() => {
-      void refresh().finally(() => setRefreshing(false));
+      void Promise.all([refresh(), refreshAccounts()]).finally(() => setRefreshing(false));
     });
-  }, [refresh]);
+  }, [refresh, refreshAccounts]);
 
   const stepStatus = useCallback((dir: -1 | 1) => {
     setStatusIndex((i) => (i + dir + STATUS_ORDER.length) % STATUS_ORDER.length);
@@ -268,12 +280,16 @@ export default function WalletPage() {
 
     setJobCardViewer({ open: true, row, loading: true, payload: null, error: null });
 
-    const res = await fetchJobCardById(token, row.id);
-    if (!res.ok) {
-      setJobCardViewer({ open: true, row, loading: false, payload: null, error: "Could not load job card." });
-      return;
+try {
+      const { record } = await fetchJobCardRecord(token, row.id, { jobCardNo: row.jobNo });
+      setJobCardViewer({ open: true, row, loading: false, payload: record, error: null });
+    } catch {
+      if (row.raw) {
+        setJobCardViewer({ open: true, row, loading: false, payload: row.raw, error: null });
+      } else {
+        setJobCardViewer({ open: true, row, loading: false, payload: null, error: "Could not load job card." });
+      }
     }
-    setJobCardViewer({ open: true, row, loading: false, payload: res.data, error: null });
   });
 
   const markPaid = useCallback(
@@ -285,7 +301,12 @@ export default function WalletPage() {
       dismissMenu();
       setMarkingId(row.id);
       try {
-        const res = await markJobCardPaymentStatus(token, row.id, { paymentStatus: "Paid" });
+        const jobCardNo = pickJobCardNoForApi(row);
+        if (!jobCardNo) {
+          showToast("Missing job card number.", { type: "error" });
+          return;
+        }
+        const res = await markAutoshopInvoicePaid(token, jobCardNo);
         const msg =
           res.data && typeof res.data === "object" && "message" in res.data
             ? String((res.data as { message?: string }).message ?? "")
@@ -324,12 +345,16 @@ export default function WalletPage() {
     dismissMenuRef.current();
     await new Promise<void>((r) => setTimeout(r, 50));
     setInvoiceViewer({ open: true, row, loading: true, payload: null, error: null });
-    const res = await fetchJobCardById(token, row.id);
-    if (!res.ok) {
-      setInvoiceViewer({ open: true, row, loading: false, payload: null, error: "Could not load invoice." });
-      return;
+    try {
+      const { record } = await fetchJobCardRecord(token, row.id, { jobCardNo: row.jobNo });
+      setInvoiceViewer({ open: true, row, loading: false, payload: record, error: null });
+    } catch {
+      if (row.raw) {
+        setInvoiceViewer({ open: true, row, loading: false, payload: row.raw, error: null });
+      } else {
+        setInvoiceViewer({ open: true, row, loading: false, payload: null, error: "Could not load invoice." });
+      }
     }
-    setInvoiceViewer({ open: true, row, loading: false, payload: res.data, error: null });
   });
 
   const openBillingPopup = useOncePress(async (row: JobCardListRow) => {
@@ -340,12 +365,16 @@ export default function WalletPage() {
     dismissMenuRef.current();
     await new Promise<void>((r) => setTimeout(r, 50));
     setBillingViewer({ open: true, row, loading: true, payload: null, error: null });
-    const res = await fetchJobCardById(token, row.id);
-    if (!res.ok) {
-      setBillingViewer({ open: true, row, loading: false, payload: null, error: "Could not load billing details." });
-      return;
+    try {
+      const { record } = await fetchJobCardRecord(token, row.id, { jobCardNo: row.jobNo });
+      setBillingViewer({ open: true, row, loading: false, payload: record, error: null });
+    } catch {
+      if (row.raw) {
+        setBillingViewer({ open: true, row, loading: false, payload: row.raw, error: null });
+      } else {
+        setBillingViewer({ open: true, row, loading: false, payload: null, error: "Could not load billing details." });
+      }
     }
-    setBillingViewer({ open: true, row, loading: false, payload: res.data, error: null });
   });
 
   const updateBillingAndMarkPaid = useOncePress(async (row: JobCardListRow, method: "Cash" | "Online") => {
@@ -364,12 +393,12 @@ export default function WalletPage() {
     setBillingViewer((s) => ({ ...s, open: false }));
     setMarkingId(row.id);
     try {
-      const res = await collectJobCardPayment(token, {
-        jobCardId: row.id,
-        paymentMethod: method === "Cash" ? "Cash" : "Online",
-        remark: "",
-        amount: Number.isFinite(amount) ? amount : 0,
-      });
+      const jobCardNo = pickJobCardNoForApi(row);
+      if (!jobCardNo) {
+        showToast("Missing job card number.", { type: "error" });
+        return;
+      }
+      const res = await markAutoshopInvoicePaid(token, jobCardNo);
       if (!res.ok) {
         showToast("Could not update payment method.", { type: "error" });
         return;
@@ -391,7 +420,12 @@ export default function WalletPage() {
     dismissMenuRef.current();
     setMarkingId(row.id);
     try {
-      const res = await markJobCardPaymentInvoice(token, row.id);
+      const jobCardNo = pickJobCardNoForApi(row);
+      if (!jobCardNo) {
+        showToast("Missing job card number.", { type: "error" });
+        return;
+      }
+      const res = await updateAutoshopJobCardStatus(token, jobCardNo, "convertedToInvoice");
       const payload = res.data as unknown;
       const msg =
         payload && typeof payload === "object" && "message" in payload
@@ -445,6 +479,75 @@ export default function WalletPage() {
       scroll={false}
     >
       <View style={styles.page}>
+        <View style={styles.sectionTabs}>
+          {(["invoices", "banks", "expenses"] as const).map((section) => (
+            <Pressable
+              key={section}
+              style={[styles.sectionTab, walletSection === section && styles.sectionTabActive]}
+              onPress={() => setWalletSection(section)}
+            >
+              <Text style={[styles.sectionTabText, walletSection === section && styles.sectionTabTextActive]}>
+                {section === "invoices" ? "Invoices" : section === "banks" ? "Banks" : "Expenses"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {walletSection === "banks" ? (
+          <ScrollView contentContainerStyle={{ paddingBottom: 40, gap: spacing.sm }}>
+            {accountsLoading ? <LoadingProgress /> : null}
+            {banks.map((bank) => (
+              <SurfaceCard key={bank.id} shadow="soft" style={{ padding: spacing.md }}>
+                <Text style={{ fontWeight: "700", color: colors.text }}>{bank.bankName}</Text>
+                <Text style={{ color: colors.textMuted, marginTop: 4 }}>
+                  {bank.accountName || "—"} · {formatCurrencyAmount(bank.totalBalance ?? 0, meta?.countryCode)}
+                </Text>
+              </SurfaceCard>
+            ))}
+            <Pressable
+              style={styles.sectionAddBtn}
+              onPress={() => {
+                void addBank({
+                  bankName: "New Bank",
+                  openingBalance: 0,
+                  accountName: "Primary",
+                });
+              }}
+            >
+              <Text style={styles.sectionAddBtnText}>Add bank</Text>
+            </Pressable>
+          </ScrollView>
+        ) : walletSection === "expenses" ? (
+          <ScrollView contentContainerStyle={{ paddingBottom: 40, gap: spacing.sm }}>
+            {accountsLoading ? <LoadingProgress /> : null}
+            {expenses.map((expense) => (
+              <SurfaceCard key={expense.id} shadow="soft" style={{ padding: spacing.md }}>
+                <Text style={{ fontWeight: "700", color: colors.text }}>{expense.vendor}</Text>
+                <Text style={{ color: colors.textMuted, marginTop: 4 }}>
+                  {expense.date} · {formatCurrencyAmount(expense.amount, meta?.countryCode)}
+                </Text>
+                <Text style={{ color: colors.textLight, marginTop: 2 }}>
+                  {expense.category} / {expense.subCategory}
+                </Text>
+              </SurfaceCard>
+            ))}
+            <Pressable
+              style={styles.sectionAddBtn}
+              onPress={() => {
+                void addExpense({
+                  date: new Date().toISOString().slice(0, 10),
+                  vendor: "Vendor",
+                  amount: 0,
+                  category: "other-expenses",
+                  subCategory: "misc",
+                });
+              }}
+            >
+              <Text style={styles.sectionAddBtnText}>Add expense</Text>
+            </Pressable>
+          </ScrollView>
+        ) : (
+          <>
         <View style={styles.statusStrip}>
           <Pressable style={styles.statusChevron} onPress={() => stepStatus(-1)} hitSlop={10}>
             <Ionicons name="chevron-back" size={22} color={colors.successDark} />
@@ -596,6 +699,8 @@ export default function WalletPage() {
             );
           })}
         </ScrollView>
+          </>
+        )}
 
         <Modal visible={menu != null} transparent animationType="fade" onRequestClose={dismissMenu}>
           <View style={styles.menuModalRoot}>
@@ -910,7 +1015,7 @@ export default function WalletPage() {
                     const jobNo = s((raw as any)?.jobNo ?? invoiceViewer.row?.jobNo);
                     const serviceType = s((raw as any)?.serviceType ?? "");
                     const priority = s((raw as any)?.priorityLevel ?? "");
-                    const paymentMethod = s((raw as any)?.paymentMethod ?? invoiceViewer.row?.paymentMethod ?? "");
+                    const paymentMethod = s((raw as any)?.paymentMethod ?? "");
                     const showInvoiceTax = isOnlineInvoicePayment(paymentMethod);
                     const totalPayable = s((raw as any)?.totalPayableAmount ?? (raw as any)?.total ?? invoiceViewer.row?.total);
 
@@ -1340,6 +1445,35 @@ export default function WalletPage() {
 
 const styles = StyleSheet.create({
   page: { flex: 1 },
+  sectionTabs: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginHorizontal: spacing.screenHorizontal,
+    marginBottom: spacing.sm,
+  },
+  sectionTab: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  sectionTabActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  sectionTabText: { color: colors.text, fontWeight: "700", fontSize: fontSizes.sm },
+  sectionTabTextActive: { color: colors.white },
+  sectionAddBtn: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+  },
+  sectionAddBtnText: { color: colors.white, fontWeight: "700" },
   statusStrip: {
     flexDirection: "row",
     alignItems: "center",

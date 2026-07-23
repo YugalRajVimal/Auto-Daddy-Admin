@@ -1,6 +1,8 @@
 import { SurfaceCard, useToast } from "@/components/reusables";
 import { colors, fontSizes, radii, spacing } from "@/constants/autodaddy";
+import { useAuth } from "@/context/auth-provider";
 import { useDocumentTemplatePreference } from "@/hooks/use-document-template-preference";
+import { updateTemplateSlugs } from "@/lib/autoshopowner-api";
 import {
   type DocumentTemplate,
   type DocumentTemplateKind,
@@ -93,6 +95,7 @@ function TemplatePreviewMock({
 
 export function DocumentTemplatePanel({ kind }: DocumentTemplatePanelProps) {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const { showToast } = useToast();
   const templates = templatesForKind(kind);
   const label = templateKindLabel(kind);
@@ -100,6 +103,7 @@ export function DocumentTemplatePanel({ kind }: DocumentTemplatePanelProps) {
 
   const [selectedId, setSelectedId] = useState(savedId);
   const [active, setActive] = useState(isActive);
+  const [saving, setSaving] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -115,14 +119,38 @@ export function DocumentTemplatePanel({ kind }: DocumentTemplatePanelProps) {
   );
   const hasChanges = selectedId !== savedId || active !== isActive;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedId) {
       showToast(`Select a ${label.toLowerCase()} first.`, { type: "error" });
       return;
     }
-    setSavedId(selectedId);
-    setIsActive(active);
-    showToast(`${label} saved.`, { type: "success" });
+    if (!token) {
+      showToast("Please sign in again.", { type: "error" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const fields =
+        kind === "invoice"
+          ? { invoiceTemplateSlug: selectedId }
+          : { jobCardTemplateSlug: selectedId };
+      const res = await updateTemplateSlugs(token, fields);
+      const msg =
+        res.data && typeof res.data === "object" && "message" in res.data
+          ? String((res.data as { message?: string }).message ?? "")
+          : "";
+      if (!res.ok) {
+        showToast(msg || `Could not save ${label.toLowerCase()}.`, { type: "error" });
+        return;
+      }
+      setSavedId(selectedId);
+      setIsActive(active);
+      showToast(msg || `${label} saved.`, { type: "success" });
+    } catch {
+      showToast("Network error.", { type: "error" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -155,7 +183,7 @@ export function DocumentTemplatePanel({ kind }: DocumentTemplatePanelProps) {
                 onPress={() => setSelectedId(template.id)}
                 style={({ pressed }) => [pressed && styles.templateRowPressed]}
               >
-                <SurfaceCard shadow="soft" style={[styles.templateRow, selected && styles.templateRowSelected]}>
+                <SurfaceCard shadow="soft" style={[styles.templateRow, selected && styles.templateRowSelected] as never}>
                   <View style={styles.templateRowLeft}>
                     <View style={[styles.templateRadio, selected && styles.templateRadioSelected]}>
                       {selected ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
@@ -191,16 +219,18 @@ export function DocumentTemplatePanel({ kind }: DocumentTemplatePanelProps) {
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
         <Pressable
-          onPress={handleSave}
-          disabled={!hasChanges || !selectedId}
+          onPress={() => {
+            void handleSave();
+          }}
+          disabled={!hasChanges || !selectedId || saving}
           style={({ pressed }) => [
             styles.saveBtn,
-            (!hasChanges || !selectedId) && styles.saveBtnDisabled,
-            pressed && hasChanges && selectedId && styles.saveBtnPressed,
+            (!hasChanges || !selectedId || saving) && styles.saveBtnDisabled,
+            pressed && hasChanges && selectedId && !saving && styles.saveBtnPressed,
           ]}
         >
           <Ionicons name="save-outline" size={18} color={colors.white} />
-          <Text style={styles.saveBtnText}>{hasChanges ? "Save" : "Saved"}</Text>
+          <Text style={styles.saveBtnText}>{saving ? "Saving…" : hasChanges ? "Save" : "Saved"}</Text>
         </Pressable>
       </View>
     </View>

@@ -199,7 +199,10 @@ export default function HomePage() {
             ) : null}
 
             <QuickActions />
-            <Overview incomeOverview={dashboardData?.incomeOverview ?? null} />
+            <Overview
+              incomeOverview={dashboardData?.incomeOverview ?? null}
+              subscriptionDaysLeft={dashboardData?.subscriptionDaysLeftCount ?? null}
+            />
             <ThoughtOfTheDay quote={dashboardData?.thoughtOfTheDay} />
             <View style={styles.bottomSpacer} />
           </>

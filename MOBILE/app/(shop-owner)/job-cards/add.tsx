@@ -5,14 +5,9 @@ import { useAuth } from "@/context/auth-provider";
 import { customerKey, parseMyCustomersFromApiPayload } from "@/hooks/use-my-customers";
 import { useMyShopServices } from "@/hooks/use-my-shop-services";
 import { useOncePress } from "@/hooks/use-once-press";
-import {
-  buildMyCustomersQuery,
-  createJobCardMultipart,
-  fetchMyCustomers,
-  MAX_JOB_CARD_VEHICLE_PHOTOS,
-  updateJobCardMultipart,
-  type JobCardVehiclePhotoUpload,
-} from "@/lib/auto-shop-owner-api";
+import { fetchAddedCustomers } from "@/lib/autoshopowner-api";
+import { MAX_JOB_CARD_VEHICLE_PHOTOS, saveJobCard } from "@/lib/shop-owner-job-cards-api";
+import type { UploadPart } from "@/lib/upload-part";
 import { formatCurrencyAmount } from "@/lib/currency";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import { Image } from "expo-image";
@@ -48,7 +43,7 @@ type ServiceLine = {
   priceStr: string;
 };
 
-type PickedVehiclePhoto = JobCardVehiclePhotoUpload;
+type PickedVehiclePhoto = UploadPart;
 
 type SubServiceOption = {
   key: string;
@@ -78,6 +73,7 @@ type ApiJobCard = {
   vehicleId?: { _id?: string; licensePlateNo?: string; make?: { name?: string; model?: string } };
   odometerReading?: number | string;
   dueOdometerReading?: number | string;
+  otherCharges?: number | string;
   labourCharge?: number | string;
   labourDuration?: string | number;
   discount?: string | number;
@@ -345,6 +341,7 @@ export default function NewJobCardPage() {
   const [newVehiclePhotos, setNewVehiclePhotos] = useState<PickedVehiclePhoto[]>([]);
   const [keptVehiclePhotoUrls, setKeptVehiclePhotoUrls] = useState<string[]>([]);
   const [editingJobCardId, setEditingJobCardId] = useState<string | null>(null);
+  const [editingJobCardNo, setEditingJobCardNo] = useState<string | number | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const categoriesWithSubs = useMemo(() => categories.filter((c) => c.subServices.length > 0), [categories]);
@@ -425,19 +422,20 @@ export default function NewJobCardPage() {
       setPageLoading(true);
       void (async () => {
         try {
-          const customersQuery = buildMyCustomersQuery({
-            timeFilter: "Monthly",
-            anchorDate: new Date(),
-          });
-          const [custRes] = await Promise.all([fetchMyCustomers(token, customersQuery), loadServices()]);
+          const [custRes] = await Promise.all([fetchAddedCustomers(token, "approved"), loadServices()]);
           if (!cancelled && custRes.ok) {
             const parsedCustomers = parseMyCustomersFromApiPayload(custRes.data);
             setCustomers(parsedCustomers);
             if (isEditMode && typeof params.jobCard === "string") {
               try {
-                const raw = JSON.parse(decodeURIComponent(params.jobCard)) as ApiJobCard;
+                const raw = JSON.parse(decodeURIComponent(params.jobCard)) as ApiJobCard & {
+                  jobCardNo?: number | string;
+                };
                 if (typeof raw._id === "string" && raw._id) {
                   setEditingJobCardId(raw._id);
+                }
+                if (raw.jobCardNo != null) {
+                  setEditingJobCardNo(raw.jobCardNo);
                 }
                 const customerId = raw.customerId?._id?.trim();
                 const vehicleId = raw.vehicleId?._id?.trim();
@@ -689,11 +687,11 @@ export default function NewJobCardPage() {
     setKeptVehiclePhotoUrls((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function collectVehiclePhotosForUpload(): Promise<JobCardVehiclePhotoUpload[]> {
+  async function collectVehiclePhotosForUpload(): Promise<UploadPart[]> {
     if (!token) {
       return [...newVehiclePhotos];
     }
-    const out: JobCardVehiclePhotoUpload[] = [];
+    const out: UploadPart[] = [];
     for (let i = 0; i < keptVehiclePhotoUrls.length; i++) {
       if (out.length >= MAX_JOB_CARD_VEHICLE_PHOTOS) {
         break;
@@ -709,7 +707,7 @@ export default function NewJobCardPage() {
           headers: { Authorization: token },
         });
         if (downloaded.status === 200 && downloaded.uri) {
-          out.push({ uri: downloaded.uri, fileName: `vehicle-photo-${i + 1}.jpg` });
+          out.push({ uri: downloaded.uri, name: `vehicle-photo-${i + 1}.jpg` });
         }
       } catch {
         // skip failed re-upload of existing photo
@@ -781,23 +779,39 @@ export default function NewJobCardPage() {
 
     setSubmitting(true);
     try {
-      const payload = {
-        customerId: ownerId,
-        vehicleId,
-        odometerReading: odomCurrent.trim() || "0",
-        dueOdometerReading: odomDue.trim() || "0",
-        issueDescription: "Walk-in / scheduled service",
-        serviceType: "Repair",
-        priorityLevel: "Normal",
-        servicesJson: JSON.stringify(blocks),
-        labourCharge: "0",
-        labourDuration: "0",
-        technicalRemarks: tech,
-        vehiclePhotos,
-      };
-      const res = editingJobCardId
-        ? await updateJobCardMultipart(token, editingJobCardId, payload)
-        : await createJobCardMultipart(token, payload);
+      const categoriesForSave = categoriesWithSubs.map((c) => ({
+        id: c.id,
+        name: c.name,
+        subServices: (c.subServices ?? []).map((s) => ({
+          name: s.name,
+          desc: s.desc,
+          price: typeof s.price === "number" ? s.price : Number(s.price) || 0,
+        })),
+      }));
+      const res = await saveJobCard(
+        token,
+        {
+          jobCardId: editingJobCardId ?? undefined,
+          jobCardNo: editingJobCardNo ?? undefined,
+          form: {
+            customerId: ownerId,
+            vehicleId,
+            odometerReading: odomCurrent.trim() || "0",
+            dueOdometerReading: odomDue.trim() || "0",
+            issueDescription: "Walk-in / scheduled service",
+            serviceType: "Repair",
+            priorityLevel: "Normal",
+            services: blocks,
+            labourCharge: "0",
+            labourDuration: "0",
+            technicalRemarks: tech,
+            discount,
+            additionalNotes: "",
+          },
+          vehiclePhotoFiles: vehiclePhotos,
+        },
+        categoriesForSave
+      );
       if (!res.ok) {
         const msg =
           res.data && typeof res.data === "object" && "message" in res.data
@@ -812,8 +826,9 @@ export default function NewJobCardPage() {
       } else {
         router.replace(backTo as never);
       }
-    } catch {
-      showToast("Network error.", { type: "error" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Network error.";
+      showToast(msg, { type: "error" });
     } finally {
       setSubmitting(false);
     }

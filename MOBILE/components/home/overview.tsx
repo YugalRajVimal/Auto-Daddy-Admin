@@ -60,7 +60,13 @@ function cycleSection(current: OverviewSection, delta: -1 | 1): OverviewSection 
   return OVERVIEW_SECTIONS[next];
 }
 
-export function Overview({ incomeOverview }: { incomeOverview?: DashboardIncomeOverview | null }) {
+export function Overview({
+  incomeOverview,
+  subscriptionDaysLeft,
+}: {
+  incomeOverview?: DashboardIncomeOverview | null;
+  subscriptionDaysLeft?: number | null;
+}) {
   const { meta } = useAuth();
   const [timeframe, setTimeframe] = useState<Timeframe>("All");
   const [section, setSection] = useState<OverviewSection>("Income");
@@ -68,6 +74,10 @@ export function Overview({ incomeOverview }: { incomeOverview?: DashboardIncomeO
   const view = useMemo(() => {
     const daily = incomeOverview?.daily;
     const canUseApiDailyIncome = (timeframe === "Daily" || timeframe === "All") && daily != null;
+    const subDays =
+      typeof subscriptionDaysLeft === "number" && Number.isFinite(subscriptionDaysLeft)
+        ? Math.max(0, subscriptionDaysLeft)
+        : DUMMY.subscription.daysLeft;
 
     switch (section) {
       case "Income": {
@@ -207,7 +217,9 @@ export function Overview({ incomeOverview }: { incomeOverview?: DashboardIncomeO
         };
       }
       case "Subscription": {
-        const { daysLeft, planDays, usedDays } = DUMMY.subscription;
+        const planDays = DUMMY.subscription.planDays;
+        const daysLeft = subDays;
+        const usedDays = Math.max(0, planDays - daysLeft);
         return {
           stats: [
             {
@@ -244,7 +256,7 @@ export function Overview({ incomeOverview }: { incomeOverview?: DashboardIncomeO
         return _exhaustive;
       }
     }
-  }, [incomeOverview, meta?.countryCode, section, timeframe]);
+  }, [incomeOverview, meta?.countryCode, section, subscriptionDaysLeft, timeframe]);
 
   return (
     <SurfaceCard shadow="card" style={styles.card}>

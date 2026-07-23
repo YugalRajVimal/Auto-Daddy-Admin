@@ -5,14 +5,13 @@ import { useJobCardPage } from "@/hooks/use-job-card-page";
 import { useKeyboardBottomInset } from "@/hooks/use-keyboard-bottom-inset";
 import { useOncePress } from "@/hooks/use-once-press";
 import {
-  deleteJobCard,
-  fetchJobCardById,
-  markJobCardPaymentStatus,
-  resendJobCardNotification,
-  type MyCustomersPeriod,
-} from "@/lib/auto-shop-owner-api";
+  deleteAutoshopJobCard,
+  markAutoshopInvoicePaid,
+  sendAutoshopJobCardForApproval,
+} from "@/lib/autoshopowner-job-cards-api";
+import { fetchJobCardRecord } from "@/lib/shop-owner-job-cards-api";
+import { pickJobCardNoForApi, type JobCardListRow } from "@/lib/shop-owner-job-cards";
 import { formatCurrencyAmount, getCurrencySign } from "@/lib/currency";
-import type { JobCardListRow } from "@/lib/parse-job-card-page";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
 import { isOnlineInvoicePayment } from "@/lib/wallet-helpers";
@@ -620,16 +619,9 @@ export default function JobCardsPage() {
   const { token, meta } = useAuth();
   const { showToast } = useToast();
   const isOwner = (meta?.role ?? "").toLowerCase() === "autoshopowner";
-  const listPeriod = useMemo<MyCustomersPeriod>(
-    () => ({
-      timeFilter: "All",
-      anchorDate: new Date(),
-    }),
-    []
-  );
-  const { cards, loading, load } = useJobCardPage(token, isOwner, showToast, listPeriod);
-  const showListSkeleton = loading && cards.length === 0;
   const [q, setQ] = useState("");
+  const { cards, loading, load } = useJobCardPage(token, isOwner, showToast, "all", q);
+  const showListSkeleton = loading && cards.length === 0;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedDetail, setExpandedDetail] = useState<{
     id: string;
@@ -735,20 +727,32 @@ export default function JobCardsPage() {
     }
     let cancelled = false;
     setExpandedDetail({ id: expandedId, loading: true, payload: null });
-    void fetchJobCardById(token, expandedId).then((res) => {
-      if (cancelled) {
-        return;
-      }
-      setExpandedDetail({
-        id: expandedId,
-        loading: false,
-        payload: res.ok ? res.data : null,
+    const row = filteredCards.find((c) => c.id === expandedId);
+    void fetchJobCardRecord(token, expandedId, { jobCardNo: row?.jobNo })
+      .then(({ record }) => {
+        if (cancelled) {
+          return;
+        }
+        setExpandedDetail({
+          id: expandedId,
+          loading: false,
+          payload: record,
+        });
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setExpandedDetail({
+          id: expandedId,
+          loading: false,
+          payload: row?.raw ?? null,
+        });
       });
-    });
     return () => {
       cancelled = true;
     };
-  }, [expandedId, token]);
+  }, [expandedId, filteredCards, token]);
 
   const isEmptyState = !showListSkeleton && !loading && filteredCards.length === 0;
   const menuCanEditJobCard = menuRow != null && isJobCardPending(menuRow);
@@ -830,18 +834,24 @@ export default function JobCardsPage() {
         return;
       }
       dismissMenu();
-      const res = await resendJobCardNotification(token, row.id);
+      const jobCardNo = pickJobCardNoForApi(row);
+      if (!jobCardNo) {
+        showToast("Missing job card number.");
+        return;
+      }
+      const res = await sendAutoshopJobCardForApproval(token, jobCardNo);
       const msg =
         res.data && typeof res.data === "object" && "message" in res.data
           ? String((res.data as { message?: string }).message ?? "")
           : "";
       if (!res.ok) {
-        showToast(msg || "Could not resend notification.");
+        showToast(msg || "Could not send for approval.");
         return;
       }
-      showToast(msg || "Notification resent.");
+      showToast(msg || "Sent for approval.");
+      void load();
     },
-    [dismissMenu, showToast, token]
+    [dismissMenu, load, showToast, token]
   );
 
   const openJobCardPopup = useOncePress(async (row: JobCardListRow) => {
@@ -856,12 +866,16 @@ export default function JobCardsPage() {
 
     setJobCardViewer({ open: true, row, loading: true, payload: null, error: null });
 
-    const res = await fetchJobCardById(token, row.id);
-    if (!res.ok) {
-      setJobCardViewer({ open: true, row, loading: false, payload: null, error: "Could not load job card." });
-      return;
+    try {
+      const { record } = await fetchJobCardRecord(token, row.id, { jobCardNo: row.jobNo });
+      setJobCardViewer({ open: true, row, loading: false, payload: record, error: null });
+    } catch {
+      if (row.raw) {
+        setJobCardViewer({ open: true, row, loading: false, payload: row.raw, error: null });
+      } else {
+        setJobCardViewer({ open: true, row, loading: false, payload: null, error: "Could not load job card." });
+      }
     }
-    setJobCardViewer({ open: true, row, loading: false, payload: res.data, error: null });
   });
 
   const markPaid = useCallback(
@@ -877,7 +891,12 @@ export default function JobCardsPage() {
           text: "Mark paid",
           onPress: () => {
             void (async () => {
-              const res = await markJobCardPaymentStatus(token, row.id, { paymentStatus: "Paid" });
+              const jobCardNo = pickJobCardNoForApi(row);
+              if (!jobCardNo) {
+                showToast("Missing job card number.");
+                return;
+              }
+              const res = await markAutoshopInvoicePaid(token, jobCardNo);
               const msg =
                 res.data && typeof res.data === "object" && "message" in res.data
                   ? String((res.data as { message?: string }).message ?? "")
@@ -910,7 +929,12 @@ export default function JobCardsPage() {
           style: "destructive",
           onPress: () => {
             void (async () => {
-              const res = await deleteJobCard(token, row.id);
+              const jobCardNo = pickJobCardNoForApi(row);
+              if (!jobCardNo) {
+                showToast("Missing job card number.");
+                return;
+              }
+              const res = await deleteAutoshopJobCard(token, jobCardNo);
               const payload = res.data as unknown;
               const msg =
                 payload && typeof payload === "object" && "message" in payload
@@ -918,10 +942,8 @@ export default function JobCardsPage() {
                   : "";
               const success =
                 res.ok &&
-                payload &&
-                typeof payload === "object" &&
-                "success" in payload &&
-                (payload as { success?: unknown }).success === true;
+                (!(payload && typeof payload === "object" && "success" in payload) ||
+                  (payload as { success?: unknown }).success === true);
               if (!success) {
                 showToast(msg || "Could not delete job card.");
                 return;

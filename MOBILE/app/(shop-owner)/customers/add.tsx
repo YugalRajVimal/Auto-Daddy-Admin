@@ -9,13 +9,15 @@ import { useAuth } from "@/context/auth-provider";
 import { useCarCompanyCatalog } from "@/hooks/use-car-company-catalog";
 import { useKeyboardBottomInset } from "@/hooks/use-keyboard-bottom-inset";
 import {
-  addCarOwnerToMyCustomers,
-  onboardCarOwner,
+  addExistingCustomer,
+  addVehicleToOnboardedCustomer,
+  editOnboardedCustomer,
+  onboardCustomer,
+  searchCustomers,
+} from "@/lib/autoshopowner-api";
+import {
   pickCustomerVehicleApiId,
-  searchCarOwners,
   toUpdateCustomerVehicleRows,
-  updateMyCustomer,
-  type CustomerImageUploads,
 } from "@/lib/auto-shop-owner-api";
 import { defaultDialCallingCode } from "@/lib/dial-countries";
 import { NATIONAL_PHONE_DISPLAY_MAX_LENGTH, nationalPhoneDisplayFromKeystrokes } from "@/lib/national-phone-format";
@@ -371,7 +373,7 @@ export default function AddCustomerPage() {
     let carOwnerId = extractCarOwnerIdFromPayload(payload);
     if (!carOwnerId && fallbackPhone?.trim()) {
       try {
-        const lookup = await searchCarOwners(token, fallbackPhone.trim());
+        const lookup = await searchCustomers(token, fallbackPhone.trim());
         if (lookup.ok) {
           const list = extractList(lookup.data);
           const normalizedPhone = fallbackPhone.trim();
@@ -393,7 +395,7 @@ export default function AddCustomerPage() {
     if (!carOwnerId) {
       return false;
     }
-    const addRes = await addCarOwnerToMyCustomers(token, carOwnerId);
+    const addRes = await addExistingCustomer(token, { customerId: carOwnerId });
     return addRes.ok;
   }
 
@@ -483,29 +485,52 @@ export default function AddCustomerPage() {
     }
     setSubmitting(true);
     try {
-      const imageUploads: CustomerImageUploads = {
-        profileImage,
-        vehicleImages: vehicles.map((v) => v.vehicleImage ?? null),
-      };
-      const res = isEditMode && editCarOwnerId
-        ? await updateMyCustomer(
-          token,
-          isProfileOnlyEdit
-            ? profilePayload
-            : { ...profilePayload, vehicles: filledVehicles },
-          imageUploads
-        )
-        : await onboardCarOwner(token, {
+      let res;
+      if (isEditMode && editCarOwnerId) {
+        const patch: Record<string, unknown> = {
+          name: profilePayload.name,
+          email: profilePayload.email,
+          phone: profilePayload.phone,
+          pincode: profilePayload.pincode,
+          address: profilePayload.address,
+          ...optionalCityField(selectedCity?.name),
+        };
+        res = await editOnboardedCustomer(token, editCarOwnerId, patch);
+        if (res.ok && !isProfileOnlyEdit && filledVehicles.length > 0) {
+          for (const vehicle of filledVehicles) {
+            await addVehicleToOnboardedCustomer(token, editCarOwnerId, vehicle as unknown as Record<string, unknown>);
+          }
+        }
+      } else {
+        res = await onboardCustomer(token, {
           name: name.trim(),
           email: email.trim(),
-          countryCode: defaultDialCallingCode(),
           phone: phoneDigits,
-          pincode: pinDigits,
-          role: "carowner",
-          address: address.trim().slice(0, 50),
-          vehicles: filledVehicles,
           ...optionalCityField(selectedCity?.name),
-        }, imageUploads);
+        });
+        if (res.ok && filledVehicles.length > 0) {
+          const newId =
+            extractCarOwnerIdFromPayload(res.data) ??
+            (await (async () => {
+              const lookup = await searchCustomers(token, phoneDigits);
+              if (!lookup.ok) return null;
+              const list = extractList(lookup.data);
+              const match = list.find((item) => {
+                if (!item || typeof item !== "object") return false;
+                const o = item as Record<string, unknown>;
+                return typeof o.phone === "string" && o.phone.replace(/\D/g, "") === phoneDigits;
+              });
+              return match && typeof match === "object"
+                ? pickId(match as Record<string, unknown>)
+                : null;
+            })());
+          if (newId) {
+            for (const vehicle of filledVehicles) {
+              await addVehicleToOnboardedCustomer(token, newId, vehicle as unknown as Record<string, unknown>);
+            }
+          }
+        }
+      }
       const msg =
         res.data && typeof res.data === "object" && "message" in res.data
           ? String((res.data as { message?: string }).message ?? "")

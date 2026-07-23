@@ -1,5 +1,5 @@
-import { fetchPaidJobCards, fetchUnpaidJobCards } from "@/lib/auto-shop-owner-api";
-import type { JobCardListRow } from "@/lib/parse-job-card-page";
+import { fetchPaidJobCards, fetchUnpaidJobCards } from "@/lib/shop-owner-api";
+import type { JobCardListRow } from "@/lib/shop-owner-job-cards";
 import { parsePaidWalletPayload, parseUnpaidWalletPayload } from "@/lib/wallet-helpers";
 import { useCallback, useState } from "react";
 
@@ -20,23 +20,20 @@ export function useShopWallet(
     }
     setLoading(true);
     try {
-      const [paid, unpaid] = await Promise.all([
-        fetchPaidJobCards(token),
-        fetchUnpaidJobCards(token),
-      ]);
+      const [paid, unpaid] = await Promise.all([fetchPaidJobCards(token), fetchUnpaidJobCards(token)]);
 
       if (paid.ok) {
         const { cash, online } = parsePaidWalletPayload(paid.data);
-        setPaidCash(cash);
-        setPaidOnline(online);
+        setPaidCash(cash as JobCardListRow[]);
+        setPaidOnline(online as JobCardListRow[]);
       } else {
         setPaidCash([]);
         setPaidOnline([]);
       }
       if (unpaid.ok) {
         const { cash, online } = parseUnpaidWalletPayload(unpaid.data);
-        setUnpaidCash(cash);
-        setUnpaidOnline(online);
+        setUnpaidCash(cash as JobCardListRow[]);
+        setUnpaidOnline(online as JobCardListRow[]);
       } else {
         setUnpaidCash([]);
         setUnpaidOnline([]);

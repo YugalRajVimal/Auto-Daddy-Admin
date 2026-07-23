@@ -1,30 +1,43 @@
 import {
-  buildMyCustomersQuery,
-  fetchJobCards,
-  type MyCustomersPeriod,
-} from "@/lib/auto-shop-owner-api";
-import { parseJobCardsFromPagePayload } from "@/lib/parse-job-card-page";
+  fetchAutoshopJobCards,
+  fetchAutoshopPendingApprovalJobCards,
+  type AutoshopJobCardStatus,
+} from "@/lib/autoshopowner-job-cards-api";
+import { parseJobCardsFromPagePayload } from "@/lib/shop-owner-job-cards";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+
+export type JobCardListSection = "all" | "approvals" | "invoice" | "paid";
+
+function statusForSection(section: JobCardListSection): AutoshopJobCardStatus | undefined {
+  if (section === "invoice") return "convertedToInvoice";
+  if (section === "paid") return "CashPaid";
+  return undefined;
+}
 
 export function useJobCardPage(
   token: string | null,
   enabled: boolean,
   showToast: (message: string, options?: { type?: "error" | "success" | "info" }) => void,
-  listPeriod: MyCustomersPeriod
+  section: JobCardListSection = "all",
+  search?: string
 ) {
   const [payload, setPayload] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
-
-  const periodAnchorMs = listPeriod.anchorDate.getTime();
+  const searchTrimmed = (search ?? "").trim();
 
   const load = useCallback(async () => {
     if (!token || !enabled) {
       return;
     }
-    const query = buildMyCustomersQuery(listPeriod);
     setLoading(true);
     try {
-      const res = await fetchJobCards(token, query);
+      const res =
+        section === "approvals"
+          ? await fetchAutoshopPendingApprovalJobCards(token)
+          : await fetchAutoshopJobCards(token, {
+              status: statusForSection(section),
+              search: searchTrimmed || undefined,
+            });
       if (!res.ok) {
         showToast("Could not load job card overview.", { type: "error" });
         setPayload(null);
@@ -37,18 +50,18 @@ export function useJobCardPage(
     } finally {
       setLoading(false);
     }
-  }, [enabled, listPeriod, showToast, token]);
+  }, [enabled, searchTrimmed, section, showToast, token]);
 
   useLayoutEffect(() => {
     if (!token || !enabled) {
       return;
     }
     setLoading(true);
-  }, [enabled, listPeriod.timeFilter, periodAnchorMs, token]);
+  }, [enabled, searchTrimmed, section, token]);
 
   useEffect(() => {
     void load();
-  }, [load, listPeriod.timeFilter, periodAnchorMs]);
+  }, [load]);
 
   const cards = useMemo(() => parseJobCardsFromPagePayload(payload), [payload]);
 

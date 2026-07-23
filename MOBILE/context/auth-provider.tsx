@@ -17,9 +17,8 @@ import {
   DEV_ASSOCIATE_TOKEN,
   isDevAssociateToken,
 } from "@/lib/dev-associate-session";
-import type { AutoShopOwnerProfileResponse } from "@/types/auto-shop-owner-profile";
 import type { CarOwnerDashboardApiResponse } from "@/types/car-owner-dashboard";
-import type { DashboardDetailsResponse } from "@/types/dashboard-details";
+import { fetchAndMergeShopOwnerPortal } from "@/lib/shop-owner-portal-bootstrap";
 import {
   isAuthSessionUnauthorized,
   isAuthSessionVerified,
@@ -228,38 +227,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (nextMeta.role === "autoshopowner") {
-        options?.onProgress?.("Fetching business profile");
-        const profileResponse = await getJson<AutoShopOwnerProfileResponse>(
-          "/api/auto-shop-owner/profile",
-          { authToken }
-        );
-
-        const userProfile = profileResponse.data?.data?.userProfile;
-        if (profileResponse.ok && userProfile) {
-          await saveAutoShopOwnerProfile(profileResponse.data);
+        options?.onProgress?.("Fetching shop owner portal");
+        const portal = await fetchAndMergeShopOwnerPortal(authToken);
+        if (portal.profile) {
+          await saveAutoShopOwnerProfile(portal.profile);
+        }
+        if (portal.dashboard?.success) {
+          await saveDashboardDetails(portal.dashboard);
+        }
+        const up = portal.userProfileMeta;
+        if (up) {
           nextMeta = mergeSessionPhoneFields(
             {
               ...nextMeta,
-              role: userProfile.role ?? nextMeta.role,
-              name: userProfile.name ?? nextMeta.name,
-              isProfileComplete:
-                userProfile.isProfileComplete ?? nextMeta.isProfileComplete,
+              role: up.role ?? nextMeta.role,
+              name: up.name ?? nextMeta.name,
+              isProfileComplete: up.isProfileComplete ?? nextMeta.isProfileComplete,
               isAutoShopBusinessProfileComplete:
-                userProfile.isAutoShopBusinessProfileComplete ??
+                up.isAutoShopBusinessProfileComplete ??
                 nextMeta.isAutoShopBusinessProfileComplete,
             },
-            userProfile.phone,
-            userProfile.countryCode
+            up.phone,
+            up.countryCode
           );
-        }
-
-        options?.onProgress?.("Fetching dashboard info");
-        const dashboardResponse = await getJson<DashboardDetailsResponse>(
-          "/api/auto-shop-owner/dashboard-details-new",
-          { authToken }
-        );
-        if (dashboardResponse.ok && dashboardResponse.data?.success) {
-          await saveDashboardDetails(dashboardResponse.data);
         }
       }
 

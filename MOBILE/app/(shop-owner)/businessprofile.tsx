@@ -233,7 +233,7 @@ export default function EditBusinessProfile() {
                     businessLogo: shouldUploadBusinessLogo ? logoPart : "unchanged",
                 });
             }
-            const completeProfileUrl = `${baseUrl}/api/auto-shop-owner/complete-business-profile`;
+            const completeProfileUrl = `${baseUrl}/api/autoshopowner/profile/business`;
             logApiRequest("PUT", completeProfileUrl, body);
             const response = await fetch(completeProfileUrl, {
                 method: "PUT",

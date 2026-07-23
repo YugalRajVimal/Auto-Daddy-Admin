@@ -1,4 +1,4 @@
-import { API_BASE_URL, logApiRequest } from "@/lib/api";
+import { fetchAdminServices } from "@/lib/autoshopowner-api";
 import type { ServiceCatalogCategory, ServiceCatalogLine } from "@/types/service-catalog";
 import { useCallback, useState } from "react";
 
@@ -145,16 +145,10 @@ export function useAutoShopServicesCatalog(
     if (!enabled || !token) {
       return;
     }
-    const base = API_BASE_URL.replace(/\/+$/, "");
     setIsLoading(true);
     try {
-      const url = `${base}/api/auto-shop-owner/services`;
-      logApiRequest("GET", url);
-      const response = await fetch(url, {
-        method: "GET",
-        headers: { Authorization: token },
-      });
-      const json = (await response.json().catch(() => null)) as ApiEnvelope | unknown;
+      const response = await fetchAdminServices(token, {});
+      const json = response.data as ApiEnvelope | unknown;
       if (!response.ok) {
         let msg = "Could not load services.";
         if (json && typeof json === "object" && "message" in json) {
