@@ -14,6 +14,11 @@ function statusForSection(section: JobCardListSection): AutoshopJobCardStatus | 
   return undefined;
 }
 
+/** Web parity: only My Job Cards (`all`) sends `search` to the list API. */
+function usesJobCardApiSearch(section: JobCardListSection): boolean {
+  return section === "all";
+}
+
 export function useJobCardPage(
   token: string | null,
   enabled: boolean,
@@ -24,6 +29,7 @@ export function useJobCardPage(
   const [payload, setPayload] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const searchTrimmed = (search ?? "").trim();
+  const apiSearch = usesJobCardApiSearch(section) ? searchTrimmed : "";
 
   const load = useCallback(async () => {
     if (!token || !enabled) {
@@ -36,7 +42,7 @@ export function useJobCardPage(
           ? await fetchAutoshopPendingApprovalJobCards(token)
           : await fetchAutoshopJobCards(token, {
               status: statusForSection(section),
-              search: searchTrimmed || undefined,
+              search: apiSearch || undefined,
             });
       if (!res.ok) {
         showToast("Could not load job card overview.", { type: "error" });
@@ -50,14 +56,14 @@ export function useJobCardPage(
     } finally {
       setLoading(false);
     }
-  }, [enabled, searchTrimmed, section, showToast, token]);
+  }, [apiSearch, enabled, section, showToast, token]);
 
   useLayoutEffect(() => {
     if (!token || !enabled) {
       return;
     }
     setLoading(true);
-  }, [enabled, searchTrimmed, section, token]);
+  }, [apiSearch, enabled, section, token]);
 
   useEffect(() => {
     void load();

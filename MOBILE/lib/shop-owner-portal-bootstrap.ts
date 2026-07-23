@@ -78,8 +78,9 @@ function thoughtOfTheDayToString(value: unknown): string {
   if (typeof value === "string") return value.trim();
   const obj = asRecord(value);
   if (!obj) return "";
-  const desc = pickString(obj.description, obj.desc, obj.text, obj.quote);
-  const title = pickString(obj.title, obj.heading);
+  // New home API uses `notes` + `subject`; keep legacy keys too.
+  const desc = pickString(obj.notes, obj.description, obj.desc, obj.text, obj.quote);
+  const title = pickString(obj.subject, obj.title, obj.heading);
   if (desc && title && desc !== title) return `${title}\n${desc}`;
   return desc || title || "";
 }

@@ -1,6 +1,11 @@
 import { fetchAdminServices } from "@/lib/autoshopowner-api";
+import {
+  SHOP_OWNER_SHOP_TYPES,
+  normalizeShopOwnerShopTypes,
+  type ShopOwnerShopType,
+} from "@/lib/shop-owner-shop-types";
 import type { ServiceCatalogCategory, ServiceCatalogLine } from "@/types/service-catalog";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 type ApiEnvelope = {
   success?: boolean;
@@ -35,11 +40,29 @@ function normalizeLine(raw: unknown): ServiceCatalogLine | null {
         ? o.description
         : undefined;
   const price = o.price;
+  const qtyRaw = o.quantity ?? o.qty;
+  const quantity =
+    typeof qtyRaw === "number"
+      ? qtyRaw
+      : typeof qtyRaw === "string"
+        ? Number.parseFloat(qtyRaw)
+        : undefined;
+  const taxRaw = o.tax;
+  const tax =
+    typeof taxRaw === "number"
+      ? taxRaw
+      : typeof taxRaw === "string"
+        ? Number.parseFloat(taxRaw)
+        : undefined;
   return {
     id: lineId(o),
     name,
     desc: desc?.trim() || undefined,
     price: typeof price === "string" || typeof price === "number" ? price : undefined,
+    make: typeof o.make === "string" ? o.make.trim() || undefined : undefined,
+    model: typeof o.model === "string" ? o.model.trim() || undefined : undefined,
+    quantity: quantity != null && Number.isFinite(quantity) ? quantity : undefined,
+    tax: tax != null && Number.isFinite(tax) ? tax : undefined,
   };
 }
 
@@ -58,22 +81,19 @@ function nestedLines(raw: Record<string, unknown>): ServiceCatalogLine[] {
   return out;
 }
 
-function categoryId(raw: Record<string, unknown>): string | undefined {
-  return lineId(raw);
-}
-
 function normalizeCategory(raw: unknown): ServiceCatalogCategory | null {
   if (!raw || typeof raw !== "object") {
     return null;
   }
   const o = raw as Record<string, unknown>;
+  const id = lineId(o);
   const name =
     typeof o.name === "string"
       ? o.name.trim()
       : typeof o.title === "string"
         ? o.title.trim()
         : "";
-  if (!name) {
+  if (!id || !name) {
     return null;
   }
   const desc =
@@ -82,18 +102,14 @@ function normalizeCategory(raw: unknown): ServiceCatalogCategory | null {
       : typeof o.description === "string"
         ? o.description
         : undefined;
-  let items = nestedLines(o);
-  if (items.length === 0) {
-    const single = normalizeLine(raw);
-    if (single) {
-      items = [single];
-    }
-  }
+  const shopTypeRaw = typeof o.shopType === "string" ? o.shopType.trim() : "";
   return {
-    id: categoryId(o),
+    id,
     name,
     desc: desc?.trim() || undefined,
-    items,
+    shopType: shopTypeRaw || undefined,
+    odoOutRequired: o.odoOutRequired === true,
+    items: nestedLines(o),
   };
 }
 
@@ -133,13 +149,20 @@ export function parseServiceCatalogResponse(payload: unknown): ServiceCatalogCat
   return out;
 }
 
+function resolveShopTypes(shopTypes?: string[] | null): ShopOwnerShopType[] {
+  const normalized = normalizeShopOwnerShopTypes(shopTypes ?? null);
+  return normalized.length > 0 ? normalized : [...SHOP_OWNER_SHOP_TYPES];
+}
+
 export function useAutoShopServicesCatalog(
   token: string | null,
   enabled: boolean,
-  showToast: (message: string, options?: { type?: "error" | "success" | "info" }) => void
+  showToast: (message: string, options?: { type?: "error" | "success" | "info" }) => void,
+  shopTypes?: string[] | null
 ) {
   const [categories, setCategories] = useState<ServiceCatalogCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const typesToFetch = useMemo(() => resolveShopTypes(shopTypes), [shopTypes?.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchCatalog = useCallback(async () => {
     if (!enabled || !token) {
@@ -147,29 +170,48 @@ export function useAutoShopServicesCatalog(
     }
     setIsLoading(true);
     try {
-      const response = await fetchAdminServices(token, {});
-      const json = response.data as ApiEnvelope | unknown;
-      if (!response.ok) {
-        let msg = "Could not load services.";
-        if (json && typeof json === "object" && "message" in json) {
-          const m = (json as ApiEnvelope).message;
-          if (typeof m === "string" && m.trim()) {
-            msg = m;
+      const results = await Promise.all(
+        typesToFetch.map((shopType) => fetchAdminServices(token, { shopType }))
+      );
+
+      const byId = new Map<string, ServiceCatalogCategory>();
+      let anyOk = false;
+      let lastError = "";
+
+      for (const response of results) {
+        const json = response.data as ApiEnvelope | unknown;
+        if (!response.ok) {
+          if (json && typeof json === "object" && "message" in json) {
+            const m = (json as ApiEnvelope).message;
+            if (typeof m === "string" && m.trim()) {
+              lastError = m;
+            }
+          }
+          continue;
+        }
+        anyOk = true;
+        for (const cat of parseServiceCatalogResponse(json)) {
+          const id = cat.id?.trim();
+          if (id && !byId.has(id)) {
+            byId.set(id, cat);
           }
         }
-        showToast(msg, { type: "error" });
+      }
+
+      if (!anyOk) {
+        showToast(lastError || "Could not load services.", { type: "error" });
         setCategories([]);
         return;
       }
-      const parsed = parseServiceCatalogResponse(json);
-      setCategories(parsed);
+
+      setCategories([...byId.values()]);
     } catch {
       showToast("Network error while loading services.", { type: "error" });
       setCategories([]);
     } finally {
       setIsLoading(false);
     }
-  }, [enabled, showToast, token]);
+  }, [enabled, showToast, token, typesToFetch]);
 
   return { categories, isLoading, fetchCatalog };
 }

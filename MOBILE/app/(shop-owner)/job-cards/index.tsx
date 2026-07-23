@@ -1,16 +1,27 @@
+import { ManageEstimatesModal } from "@/components/job-cards";
 import { Fab, LoadingProgress, StackScreenFrame, SurfaceCard, useToast } from "@/components/reusables";
 import { cardFontSizes, cardTypography, colors, fontSizes, radii, shadows, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
-import { useJobCardPage } from "@/hooks/use-job-card-page";
+import { useJobCardPage, type JobCardListSection } from "@/hooks/use-job-card-page";
 import { useKeyboardBottomInset } from "@/hooks/use-keyboard-bottom-inset";
 import { useOncePress } from "@/hooks/use-once-press";
 import {
+  apiMessageFromEnvelope,
   deleteAutoshopJobCard,
-  markAutoshopInvoicePaid,
+  fetchAutoshopJobCardPrefix,
+  parseAutoshopJobCardPrefix,
   sendAutoshopJobCardForApproval,
+  updateAutoshopJobCardStatus,
 } from "@/lib/autoshopowner-job-cards-api";
 import { fetchJobCardRecord } from "@/lib/shop-owner-job-cards-api";
-import { pickJobCardNoForApi, type JobCardListRow } from "@/lib/shop-owner-job-cards";
+import {
+  isEligibleForInvoiceConversion,
+  isJobCardApproved,
+  isJobCardEditable,
+  pickJobCardInvoiceNumber,
+  pickJobCardNoForApi,
+  type JobCardListRow,
+} from "@/lib/shop-owner-job-cards";
 import { formatCurrencyAmount, getCurrencySign } from "@/lib/currency";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
@@ -34,6 +45,13 @@ import {
   TextInput,
   View,
 } from "react-native";
+
+const JOB_CARD_SECTIONS: { id: JobCardListSection; label: string }[] = [
+  { id: "all", label: "My Job Cards" },
+  { id: "approvals", label: "Approvals" },
+  { id: "invoice", label: "Converted" },
+  { id: "paid", label: "Paid Jobs" },
+];
 
 function SkeletonLine({ w }: { w: number | `${number}%` }) {
   return <View style={[styles.skeletonLine, { width: w }]} />;
@@ -63,7 +81,7 @@ function JobCardSkeletonList() {
   );
 }
 
-function displayJobId(jobNo: string | undefined): string {
+function displayJobId(jobNo: string | undefined, prefix?: string): string {
   const raw = (jobNo ?? "").trim().replace(/^#/, "");
   if (!raw) {
     return "—";
@@ -71,6 +89,11 @@ function displayJobId(jobNo: string | undefined): string {
   const stripped = raw.replace(/^job\s*#?\s*/i, "").trim();
   if (!stripped) {
     return "—";
+  }
+  const code = (prefix ?? "").trim();
+  if (code && !stripped.toLowerCase().startsWith(code.toLowerCase())) {
+    const digits = stripped.replace(/^[A-Za-z]+/, "").trim() || stripped;
+    return `${code}${digits}`.toUpperCase();
   }
   if (/^j/i.test(stripped)) {
     return stripped.toUpperCase();
@@ -338,10 +361,21 @@ function collectDisplayStatuses(row: JobCardListRow, raw: Record<string, unknown
   return out;
 }
 
-function isJobCardPending(row: JobCardListRow): boolean {
-  const raw = obj(row.raw);
-  const primaryStatus = collectDisplayStatuses(row, raw)[0] ?? row.status ?? "";
-  return primaryStatus.trim().toLowerCase() === "pending";
+function matchesJobCardSearch(row: JobCardListRow, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  const haystack = [
+    row.customerName,
+    row.phone,
+    row.vehiclePlate,
+    row.jobNo,
+    row.invoiceNumber,
+    pickJobCardInvoiceNumber(row),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(needle);
 }
 
 type JobCardViewerState = {
@@ -619,8 +653,12 @@ export default function JobCardsPage() {
   const { token, meta } = useAuth();
   const { showToast } = useToast();
   const isOwner = (meta?.role ?? "").toLowerCase() === "autoshopowner";
+  const [section, setSection] = useState<JobCardListSection>("all");
   const [q, setQ] = useState("");
-  const { cards, loading, load } = useJobCardPage(token, isOwner, showToast, "all", q);
+  const [jobCardPrefix, setJobCardPrefix] = useState("");
+  const [manageEstimatesOpen, setManageEstimatesOpen] = useState(false);
+  const apiSearch = section === "all" ? q : "";
+  const { cards, loading, load } = useJobCardPage(token, isOwner, showToast, section, apiSearch);
   const showListSkeleton = loading && cards.length === 0;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedDetail, setExpandedDetail] = useState<{
@@ -655,6 +693,33 @@ export default function JobCardsPage() {
   const dismissMenuRef = useRef(dismissMenu);
   dismissMenuRef.current = dismissMenu;
 
+  const selectSection = useCallback((next: JobCardListSection) => {
+    setSection(next);
+    setQ("");
+    setExpandedId(null);
+    setMenuRow(null);
+  }, []);
+
+  useEffect(() => {
+    if (!token || !isOwner) {
+      setJobCardPrefix("");
+      return;
+    }
+    let cancelled = false;
+    void fetchAutoshopJobCardPrefix(token)
+      .then((res) => {
+        if (cancelled || !res.ok) return;
+        const prefix = parseAutoshopJobCardPrefix(res.data);
+        if (prefix) setJobCardPrefix(prefix);
+      })
+      .catch(() => {
+        /* list falls back to local job no formatting */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwner, token]);
+
   useEffect(() => {
     if (menuRow == null) {
       return;
@@ -687,30 +752,12 @@ export default function JobCardsPage() {
   }, [load]);
 
   const filteredCards = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) {
+    // My List uses API search; other sections filter client-side (web parity).
+    if (section === "all" || !q.trim()) {
       return cards;
     }
-    return cards.filter((c) => {
-      const hay = [
-        c.customerName,
-        c.jobNo,
-        c.vehiclePlate,
-        c.vehicleMakeModel,
-        c.phone,
-        c.servicesSummary,
-        c.status,
-        c.paymentStatus,
-        c.issueDescription,
-        c.date,
-        c.listBucket,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(needle);
-    });
-  }, [cards, q]);
+    return cards.filter((c) => matchesJobCardSearch(c, q));
+  }, [cards, q, section]);
 
   const visibleCards = useMemo(() => {
     if (!expandedId) {
@@ -755,7 +802,19 @@ export default function JobCardsPage() {
   }, [expandedId, filteredCards, token]);
 
   const isEmptyState = !showListSkeleton && !loading && filteredCards.length === 0;
-  const menuCanEditJobCard = menuRow != null && isJobCardPending(menuRow);
+  const showActions = section !== "approvals" && section !== "paid";
+  const menuCanEditJobCard = menuRow != null && showActions && isJobCardEditable(menuRow);
+  const menuCanConvert =
+    menuRow != null &&
+    section !== "invoice" &&
+    section !== "paid" &&
+    isEligibleForInvoiceConversion(menuRow);
+  const menuCanCashPay =
+    menuRow != null &&
+    (section === "all" || section === "approvals") &&
+    isEligibleForInvoiceConversion(menuRow);
+  const menuCanDelete =
+    menuRow != null && section === "all" && !isJobCardApproved(menuRow);
 
   const navigateToCreateJobCard = useOncePress(() => {
     router.push({
@@ -765,8 +824,8 @@ export default function JobCardsPage() {
   });
 
   const openJobCardEditor = useOncePress((row: JobCardListRow) => {
-    if (!isJobCardPending(row)) {
-      showToast("Only pending job cards can be edited.", { type: "info" });
+    if (!isJobCardEditable(row)) {
+      showToast("This job card can no longer be edited.", { type: "info" });
       return;
     }
     dismissMenuRef.current();
@@ -840,10 +899,7 @@ export default function JobCardsPage() {
         return;
       }
       const res = await sendAutoshopJobCardForApproval(token, jobCardNo);
-      const msg =
-        res.data && typeof res.data === "object" && "message" in res.data
-          ? String((res.data as { message?: string }).message ?? "")
-          : "";
+      const msg = apiMessageFromEnvelope(res.data) ?? "";
       if (!res.ok) {
         showToast(msg || "Could not send for approval.");
         return;
@@ -878,47 +934,100 @@ export default function JobCardsPage() {
     }
   });
 
-  const markPaid = useCallback(
+  const convertToInvoice = useCallback(
+    (row: JobCardListRow) => {
+      if (!token) {
+        showToast("Sign in to convert job card.");
+        return;
+      }
+      if (!isEligibleForInvoiceConversion(row)) {
+        showToast("This job card is not eligible for invoice conversion.", { type: "info" });
+        return;
+      }
+      dismissMenu();
+      Alert.alert(
+        "Convert to invoice?",
+        `Convert ${displayJobId(row.jobNo, jobCardPrefix)} to an invoice?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Convert",
+            onPress: () => {
+              void (async () => {
+                const jobCardNo = pickJobCardNoForApi(row);
+                if (!jobCardNo) {
+                  showToast("Missing job card number.");
+                  return;
+                }
+                const res = await updateAutoshopJobCardStatus(token, jobCardNo, "convertedToInvoice");
+                const msg = apiMessageFromEnvelope(res.data) ?? "";
+                if (!res.ok) {
+                  showToast(msg || "Could not convert to invoice.");
+                  return;
+                }
+                showToast(msg || "Converted to invoice.");
+                setExpandedId(null);
+                void load();
+              })();
+            },
+          },
+        ]
+      );
+    },
+    [dismissMenu, jobCardPrefix, load, showToast, token]
+  );
+
+  const markPaidByCash = useCallback(
     (row: JobCardListRow) => {
       if (!token) {
         showToast("Sign in to update payment.");
         return;
       }
+      if (!isEligibleForInvoiceConversion(row)) {
+        showToast("This job card is not eligible for cash payment.", { type: "info" });
+        return;
+      }
       dismissMenu();
-      Alert.alert("Mark as paid?", `Update payment status for ${row.jobNo ?? "this job"}?`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Mark paid",
-          onPress: () => {
-            void (async () => {
-              const jobCardNo = pickJobCardNoForApi(row);
-              if (!jobCardNo) {
-                showToast("Missing job card number.");
-                return;
-              }
-              const res = await markAutoshopInvoicePaid(token, jobCardNo);
-              const msg =
-                res.data && typeof res.data === "object" && "message" in res.data
-                  ? String((res.data as { message?: string }).message ?? "")
-                  : "";
-              if (!res.ok) {
-                showToast(msg || "Could not update payment.");
-                return;
-              }
-              showToast(msg || "Marked as paid.");
-              void load();
-            })();
+      Alert.alert(
+        "Paid by cash?",
+        `Mark ${displayJobId(row.jobNo, jobCardPrefix)} as paid by cash?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Mark paid",
+            onPress: () => {
+              void (async () => {
+                const jobCardNo = pickJobCardNoForApi(row);
+                if (!jobCardNo) {
+                  showToast("Missing job card number.");
+                  return;
+                }
+                const res = await updateAutoshopJobCardStatus(token, jobCardNo, "CashPaid");
+                const msg = apiMessageFromEnvelope(res.data) ?? "";
+                if (!res.ok) {
+                  showToast(msg || "Could not mark as paid.");
+                  return;
+                }
+                showToast(msg || "Marked as paid by cash.");
+                setExpandedId(null);
+                void load();
+              })();
+            },
           },
-        },
-      ]);
+        ]
+      );
     },
-    [dismissMenu, load, showToast, token]
+    [dismissMenu, jobCardPrefix, load, showToast, token]
   );
 
   const confirmDeleteJobCard = useCallback(
     (row: JobCardListRow) => {
       if (!token) {
         showToast("Sign in to delete.");
+        return;
+      }
+      if (isJobCardApproved(row)) {
+        showToast("Approved job cards cannot be deleted.", { type: "info" });
         return;
       }
       dismissMenu();
@@ -936,10 +1045,7 @@ export default function JobCardsPage() {
               }
               const res = await deleteAutoshopJobCard(token, jobCardNo);
               const payload = res.data as unknown;
-              const msg =
-                payload && typeof payload === "object" && "message" in payload
-                  ? String((payload as { message?: string }).message ?? "")
-                  : "";
+              const msg = apiMessageFromEnvelope(payload) ?? "";
               const success =
                 res.ok &&
                 (!(payload && typeof payload === "object" && "success" in payload) ||
@@ -959,19 +1065,54 @@ export default function JobCardsPage() {
     [dismissMenu, load, showToast, token]
   );
 
+  const openManageEstimates = useOncePress(() => {
+    setManageEstimatesOpen(true);
+  });
+
   return (
     <StackScreenFrame
       title="Job Card"
       backgroundColor={colors.bgProfile}
       scroll={false}
+      right={
+        <Pressable
+          style={styles.headerIconBtn}
+          onPress={() => openManageEstimates?.()}
+          accessibilityLabel="Manage estimates"
+          hitSlop={8}
+        >
+          <Ionicons name="settings-outline" size={22} color={colors.text} />
+        </Pressable>
+      }
       floatingContent={
-        expandedId == null ? (
+        expandedId == null && section === "all" ? (
           <Fab label="New Job Card" onPress={() => navigateToCreateJobCard?.()} />
         ) : undefined
       }
     >
       <View style={styles.pageWrap}>
         <View style={styles.stickyHeader}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.sectionTabs}
+            style={styles.sectionTabsScroll}
+          >
+            {JOB_CARD_SECTIONS.map((tab) => {
+              const active = section === tab.id;
+              return (
+                <Pressable
+                  key={tab.id}
+                  onPress={() => selectSection(tab.id)}
+                  style={[styles.sectionTab, active && styles.sectionTabActive]}
+                >
+                  <Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
           <View style={styles.searchWrap}>
             <Ionicons name="search" size={20} color={colors.primary} />
             <TextInput
@@ -1023,7 +1164,15 @@ export default function JobCardsPage() {
               <Ionicons name="file-tray-outline" size={40} color={colors.textLight} />
               <Text style={styles.emptyTitle}>No job cards</Text>
               <Text style={styles.emptySub}>
-                {q.trim() ? "Try a different search." : "No job cards yet."}
+                {q.trim()
+                  ? "Try a different search."
+                  : section === "approvals"
+                    ? "No cards awaiting approval."
+                    : section === "invoice"
+                      ? "No converted invoices yet."
+                      : section === "paid"
+                        ? "No paid jobs yet."
+                        : "No job cards yet."}
               </Text>
             </SurfaceCard>
           ) : null}
@@ -1034,6 +1183,7 @@ export default function JobCardsPage() {
               const toggleExpand = () => setExpandedId((prev) => (prev === row.id ? null : row.id));
               const plate = row.vehiclePlate?.trim() || "—";
               const model = row.vehicleMakeModel?.trim() || "—";
+              const invoiceNo = section === "invoice" ? pickJobCardInvoiceNumber(row) : "";
               const detailRaw =
                 expandedDetail?.id === row.id
                   ? pickJobCardFromPayload(expandedDetail.payload) ?? obj(row.raw)
@@ -1048,11 +1198,16 @@ export default function JobCardsPage() {
                   <View style={styles.jobCardRow}>
                     <View style={styles.jobSidebar}>
                       <Text style={styles.jobIdText} numberOfLines={1}>
-                        {displayJobId(row.jobNo)}
+                        {displayJobId(row.jobNo, jobCardPrefix)}
                       </Text>
                       <Text style={styles.jobDateText} numberOfLines={1}>
                         {formatCompactJobDate(row.date)}
                       </Text>
+                      {invoiceNo ? (
+                        <Text style={styles.invoiceNoText} numberOfLines={1}>
+                          {invoiceNo}
+                        </Text>
+                      ) : null}
                     </View>
 
                     <View style={styles.jobCardMain}>
@@ -1112,38 +1267,81 @@ export default function JobCardsPage() {
                   <View style={styles.optionsModalHeaderText}>
                     <Text style={styles.optionsModalTitle}>Job card options</Text>
                     <Text style={styles.optionsModalSub} numberOfLines={1}>
-                      {displayJobId(menuRow.jobNo)} · {menuRow.customerName?.trim() || "Customer"}
+                      {displayJobId(menuRow.jobNo, jobCardPrefix)} ·{" "}
+                      {menuRow.customerName?.trim() || "Customer"}
                     </Text>
                   </View>
                   <Pressable style={styles.optionsModalClose} onPress={dismissMenu} hitSlop={8}>
                     <Ionicons name="close" size={20} color={colors.textMuted} />
                   </Pressable>
                 </View>
-                <Pressable
-                  style={[styles.optionsModalRow, !menuCanEditJobCard && styles.optionsModalRowDisabled]}
-                  disabled={!menuCanEditJobCard}
-                  onPress={() => openJobCardEditor?.(menuRow)}
-                >
-                  <Ionicons name="create-outline" size={22} color={menuCanEditJobCard ? colors.primary : colors.textLight} />
-                  <Text
-                    style={[
-                      styles.optionsModalRowLabel,
-                      !menuCanEditJobCard && styles.optionsModalRowLabelDisabled,
-                    ]}
-                  >
-                    Edit
-                  </Text>
+
+                <Pressable style={styles.optionsModalRow} onPress={() => void openJobCardPopup?.(menuRow)}>
+                  <Ionicons name="eye-outline" size={22} color={colors.primary} />
+                  <Text style={styles.optionsModalRowLabel}>View</Text>
                 </Pressable>
+
+                {showActions ? (
+                  <>
+                    <View style={styles.optionsModalDivider} />
+                    <Pressable
+                      style={[styles.optionsModalRow, !menuCanEditJobCard && styles.optionsModalRowDisabled]}
+                      disabled={!menuCanEditJobCard}
+                      onPress={() => openJobCardEditor?.(menuRow)}
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={22}
+                        color={menuCanEditJobCard ? colors.primary : colors.textLight}
+                      />
+                      <Text
+                        style={[
+                          styles.optionsModalRowLabel,
+                          !menuCanEditJobCard && styles.optionsModalRowLabelDisabled,
+                        ]}
+                      >
+                        Edit
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : null}
+
                 <View style={styles.optionsModalDivider} />
                 <Pressable style={styles.optionsModalRow} onPress={() => void resendJobCard(menuRow)}>
                   <Ionicons name="paper-plane-outline" size={22} color={colors.primary} />
                   <Text style={styles.optionsModalRowLabel}>Resend</Text>
                 </Pressable>
-                <View style={styles.optionsModalDivider} />
-                <Pressable style={styles.optionsModalRow} onPress={() => confirmDeleteJobCard(menuRow)}>
-                  <Ionicons name="trash-outline" size={22} color={colors.danger} />
-                  <Text style={[styles.optionsModalRowLabel, styles.optionsModalRowDanger]}>Delete</Text>
-                </Pressable>
+
+                {menuCanConvert ? (
+                  <>
+                    <View style={styles.optionsModalDivider} />
+                    <Pressable style={styles.optionsModalRow} onPress={() => convertToInvoice(menuRow)}>
+                      <Ionicons name="document-text-outline" size={22} color={colors.primary} />
+                      <Text style={styles.optionsModalRowLabel}>Convert to Invoice</Text>
+                    </Pressable>
+                  </>
+                ) : null}
+
+                {menuCanCashPay ? (
+                  <>
+                    <View style={styles.optionsModalDivider} />
+                    <Pressable style={styles.optionsModalRow} onPress={() => markPaidByCash(menuRow)}>
+                      <Ionicons name="cash-outline" size={22} color={colors.primary} />
+                      <Text style={styles.optionsModalRowLabel}>Paid by Cash</Text>
+                    </Pressable>
+                  </>
+                ) : null}
+
+                {menuCanDelete ? (
+                  <>
+                    <View style={styles.optionsModalDivider} />
+                    <Pressable style={styles.optionsModalRow} onPress={() => confirmDeleteJobCard(menuRow)}>
+                      <Ionicons name="trash-outline" size={22} color={colors.danger} />
+                      <Text style={[styles.optionsModalRowLabel, styles.optionsModalRowDanger]}>Delete</Text>
+                    </Pressable>
+                  </>
+                ) : null}
+
                 <Pressable style={styles.optionsModalCancel} onPress={dismissMenu}>
                   <Text style={styles.optionsModalCancelText}>Cancel</Text>
                 </Pressable>
@@ -1151,6 +1349,15 @@ export default function JobCardsPage() {
             ) : null}
           </View>
         </Modal>
+
+        <ManageEstimatesModal
+          visible={manageEstimatesOpen}
+          authToken={token}
+          onClose={() => setManageEstimatesOpen(false)}
+          onSaved={(prefix) => {
+            if (prefix) setJobCardPrefix(prefix);
+          }}
+        />
 
         <Modal
           visible={jobCardViewer.open}
@@ -1559,6 +1766,44 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgProfile,
     paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionTabsScroll: {
+    flexGrow: 0,
+  },
+  sectionTabs: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.screenHorizontal,
+  },
+  sectionTab: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  sectionTabActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.iconBlueTint,
+  },
+  sectionTabText: {
+    fontSize: fontSizes.sm,
+    fontWeight: "700",
+    color: colors.textMuted,
+  },
+  sectionTabTextActive: {
+    color: colors.primary,
   },
   scroll: { flex: 1 },
   content: {
@@ -1665,6 +1910,14 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textMuted,
     lineHeight: 11,
+    textAlign: "center",
+  },
+  invoiceNoText: {
+    width: "100%",
+    marginTop: 2,
+    fontSize: 9,
+    fontWeight: "700",
+    color: colors.primary,
     textAlign: "center",
   },
   jobCardMain: {

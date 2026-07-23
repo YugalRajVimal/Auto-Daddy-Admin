@@ -12,9 +12,15 @@ import { colors, fontSizes, shadows, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import { useShopOwnerNotifications } from "@/context/shop-owner-notifications-provider";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
-import { getAutoShopOwnerProfile, getDashboardDetails } from "@/lib/auth";
+import { getAutoShopOwnerProfile, getDashboardDetails, saveDashboardDetails } from "@/lib/auth";
+import { fetchShopOwnerHome } from "@/lib/autoshopowner-api";
 import { updateBusinessActiveStatus } from "@/lib/auto-shop-owner-api";
 import { formatStoredNationalPhone } from "@/lib/dial-countries";
+import {
+  parseShopOwnerHome,
+  shopOwnerThoughtToQuoteString,
+  type ShopOwnerHomeView,
+} from "@/lib/parse-shop-owner-home";
 import type { AutoShopOwnerProfileResponse } from "@/types/auto-shop-owner-profile";
 import type { DashboardDetailsResponse } from "@/types/dashboard-details";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +29,48 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+function mergeHomeIntoDashboardCache(
+  cached: DashboardDetailsResponse | null,
+  home: ShopOwnerHomeView
+): DashboardDetailsResponse {
+  const thought = shopOwnerThoughtToQuoteString(home.thoughtOfTheDay);
+  if (cached?.success) {
+    return {
+      ...cached,
+      businessName: home.businessName || cached.businessName,
+      subscriptionDaysLeftCount: home.daysLeftInSubscription,
+      thoughtOfTheDay: thought || cached.thoughtOfTheDay,
+    };
+  }
+  return {
+    success: true,
+    businessName: home.businessName,
+    businessContactNo: "",
+    idBusinessActive: false,
+    incomeOverview: {
+      daily: { date: "", totalSale: 0, received: 0, pending: 0 },
+    },
+    subscriptionDaysLeftCount: home.daysLeftInSubscription,
+    thoughtOfTheDay: thought,
+    aboutUs: { heading: "", desc: "" },
+    privacyPolicy: { heading: "", desc: "" },
+    FAQs: { heading: "", desc: "" },
+    Documents: { heading: "", desc: "" },
+    Disclaimer: { heading: "", desc: "" },
+    businessUserDetails: {
+      name: home.autoShopOwnerName,
+      email: "",
+      countryCode: "",
+      phone: "",
+      pincode: "",
+      address: "",
+      profilePhoto: null,
+      isDisabled: false,
+      isProfileComplete: false,
+    },
+  };
+}
+
 export default function HomePage() {
   const { meta, refreshSession, token } = useAuth();
   const { hasUnread, syncUnreadFromApi } = useShopOwnerNotifications();
@@ -30,35 +78,69 @@ export default function HomePage() {
   const [serverData, setServerData] =
     useState<AutoShopOwnerProfileResponse["data"] | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardDetailsResponse | null>(null);
+  const [homeData, setHomeData] = useState<ShopOwnerHomeView | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingBusinessActive, setUpdatingBusinessActive] = useState(false);
 
+  const loadCachedShell = useCallback(async () => {
+    const [savedProfile, savedDashboard] = await Promise.all([
+      getAutoShopOwnerProfile<AutoShopOwnerProfileResponse>(),
+      getDashboardDetails<DashboardDetailsResponse>(),
+    ]);
+    setServerData(savedProfile?.data ?? null);
+    setDashboardData(savedDashboard);
+    return savedDashboard;
+  }, []);
+
+  const loadHomeFromApi = useCallback(async () => {
+    if (!token) return null;
+    const res = await fetchShopOwnerHome(token);
+    if (!res.ok) return null;
+    const parsed = parseShopOwnerHome(res.data);
+    if (!parsed) return null;
+    setHomeData(parsed);
+    return parsed;
+  }, [token]);
+
   useEffect(() => {
     let mounted = true;
-    async function loadSavedData() {
+    async function bootstrap() {
       try {
-        const [savedProfile, savedDashboard] = await Promise.all([
-          getAutoShopOwnerProfile<AutoShopOwnerProfileResponse>(),
-          getDashboardDetails<DashboardDetailsResponse>(),
-        ]);
-        if (!mounted) {
-          return;
+        const cached = await loadCachedShell();
+        if (!mounted) return;
+
+        // Seed thought/subscription UI from cached dashboard while network loads.
+        if (cached?.success) {
+          setHomeData({
+            autoShopOwnerName: cached.businessUserDetails?.name ?? "",
+            businessName: cached.businessName ?? "",
+            daysLeftInSubscription: cached.subscriptionDaysLeftCount ?? 0,
+            thoughtOfTheDay: cached.thoughtOfTheDay
+              ? {
+                  subject: "",
+                  text: cached.thoughtOfTheDay,
+                  imageUri: null,
+                  likes: 0,
+                }
+              : null,
+          });
         }
-        setServerData(savedProfile?.data ?? null);
-        setDashboardData(savedDashboard);
+
+        const home = await loadHomeFromApi();
+        if (!mounted || !home) return;
+        const nextDashboard = mergeHomeIntoDashboardCache(cached, home);
+        setDashboardData(nextDashboard);
+        await saveDashboardDetails(nextDashboard);
       } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
+        if (mounted) setIsLoading(false);
       }
     }
-    void loadSavedData();
-
+    void bootstrap();
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadCachedShell, loadHomeFromApi]);
 
   const business = serverData?.businessProfile;
   const isShopOwner = (meta?.role ?? "").toLowerCase() === "autoshopowner";
@@ -66,6 +148,13 @@ export default function HomePage() {
   // Source of truth for the toggle: business profile details.
   const isBusinessActive =
     typeof business?.isBusinessActive === "boolean" ? business.isBusinessActive : null;
+
+  const displayBusinessName =
+    homeData?.businessName || dashboardData?.businessName || business?.businessName;
+  const subscriptionDaysLeft =
+    homeData?.daysLeftInSubscription ?? dashboardData?.subscriptionDaysLeftCount ?? 0;
+  const thought = homeData?.thoughtOfTheDay;
+  const thoughtQuote = thought?.text || dashboardData?.thoughtOfTheDay || undefined;
 
   const handleBusinessActiveChange = useCallback(
     async (next: boolean) => {
@@ -101,12 +190,7 @@ export default function HomePage() {
         await refreshSession();
         // Pull the freshly saved business profile from storage so the toggle
         // doesn't "snap back" to stale state while the screen is mounted.
-        const [savedProfile, savedDashboard] = await Promise.all([
-          getAutoShopOwnerProfile<AutoShopOwnerProfileResponse>(),
-          getDashboardDetails<DashboardDetailsResponse>(),
-        ]);
-        setServerData(savedProfile?.data ?? null);
-        setDashboardData(savedDashboard);
+        await loadCachedShell();
         return true;
       } catch {
         showToast("Network error while updating shop status.", { type: "error" });
@@ -115,23 +199,24 @@ export default function HomePage() {
         setUpdatingBusinessActive(false);
       }
     },
-    [refreshSession, showToast, token, updatingBusinessActive]
+    [loadCachedShell, refreshSession, showToast, token, updatingBusinessActive]
   );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await refreshSession();
-      const [savedProfile, savedDashboard] = await Promise.all([
-        getAutoShopOwnerProfile<AutoShopOwnerProfileResponse>(),
-        getDashboardDetails<DashboardDetailsResponse>(),
-      ]);
-      setServerData(savedProfile?.data ?? null);
-      setDashboardData(savedDashboard);
+      const cached = await loadCachedShell();
+      const home = await loadHomeFromApi();
+      if (home) {
+        const nextDashboard = mergeHomeIntoDashboardCache(cached, home);
+        setDashboardData(nextDashboard);
+        await saveDashboardDetails(nextDashboard);
+      }
     } finally {
       setRefreshing(false);
     }
-  }, [refreshSession]);
+  }, [loadCachedShell, loadHomeFromApi, refreshSession]);
 
   useFocusEffect(
     useCallback(() => {
@@ -141,9 +226,7 @@ export default function HomePage() {
           getAutoShopOwnerProfile<AutoShopOwnerProfileResponse>(),
           getDashboardDetails<DashboardDetailsResponse>(),
         ]);
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setServerData(savedProfile?.data ?? null);
         setDashboardData(savedDashboard);
       }
@@ -172,7 +255,7 @@ export default function HomePage() {
             right={
               <Pill variant="white" style={shadows.soft}>
                 <Ionicons name="time-outline" size={16} color={colors.primary} />
-                <Text style={styles.alertNum}>{dashboardData?.subscriptionDaysLeftCount} days left</Text>
+                <Text style={styles.alertNum}>{subscriptionDaysLeft} days left</Text>
               </Pill>
             }
           />
@@ -185,7 +268,7 @@ export default function HomePage() {
           <>
             {isShopOwner ? (
               <GreetingCard
-                businessName={dashboardData?.businessName ?? business?.businessName}
+                businessName={displayBusinessName}
                 businessContactNo={formatStoredNationalPhone(
                   dashboardData?.businessContactNo ?? business?.businessPhone ?? ""
                 )}
@@ -201,9 +284,13 @@ export default function HomePage() {
             <QuickActions />
             <Overview
               incomeOverview={dashboardData?.incomeOverview ?? null}
-              subscriptionDaysLeft={dashboardData?.subscriptionDaysLeftCount ?? null}
+              subscriptionDaysLeft={subscriptionDaysLeft}
             />
-            <ThoughtOfTheDay quote={dashboardData?.thoughtOfTheDay} />
+            <ThoughtOfTheDay
+              quote={thoughtQuote}
+              subject={thought?.subject}
+              imageUri={thought?.imageUri}
+            />
             <View style={styles.bottomSpacer} />
           </>
         )}
@@ -228,4 +315,3 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: { height: spacing.sm },
 });
-

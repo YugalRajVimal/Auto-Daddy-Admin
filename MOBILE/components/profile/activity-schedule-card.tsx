@@ -30,7 +30,7 @@ export function ActivityScheduleCard({
 }: ActivityScheduleCardProps) {
   return (
     <ExpandableCard
-      title="Activity"
+      title="Shop is Open"
       headerIcon="calendar"
       expanded={expanded}
       onToggle={onToggle}
@@ -43,7 +43,7 @@ export function ActivityScheduleCard({
       {editing ? (
         <View style={styles.editBody}>
           <Text style={styles.intro}>
-            Choose which days you are active and set a time range for each enabled day.
+            Choose which days the shop is open and set a time range for each enabled day.
           </Text>
           <PerDayOpenHoursEditor
             schedule={editSchedule}

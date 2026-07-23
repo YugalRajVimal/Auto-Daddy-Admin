@@ -36,6 +36,9 @@ export type CarOwnerSearchHit = {
   vehicles?: CustomerVehicle[];
   createdAt?: string;
   updatedAt?: string;
+  status?: string;
+  linkStatus?: string;
+  approvalStatus?: string;
 };
 
 /** When present, these describe the shop–customer link (preferred for date filters). */
@@ -62,6 +65,10 @@ export type MyCustomer = {
   addedToShopAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** Shop–customer link / onboard status (People: approved | pending | onboarded). */
+  status?: string;
+  linkStatus?: string;
+  approvalStatus?: string;
 };
 
 export type ShopDeal = {
@@ -149,6 +156,12 @@ export type MyServiceSubServicePayload = {
   name: string;
   desc: string;
   price: number;
+  make?: string;
+  model?: string;
+  quantity?: number;
+  quantityType?: "Unit" | "Days";
+  labourCost?: number;
+  tax?: number;
 };
 
 export type MyServiceCategoryPayload = {

@@ -17,7 +17,7 @@ export function ServicesSelectionCard({ totalCount, selectedCount, onPress }: Se
           <View style={styles.iconBubble}>
             <Ionicons name="build-outline" size={18} color={colors.white} />
           </View>
-          <Text style={typography.cardTitle}>Services</Text>
+          <Text style={typography.cardTitle}>Operational Services</Text>
         </View>
       </View>
       <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>

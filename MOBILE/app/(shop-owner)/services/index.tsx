@@ -1,18 +1,19 @@
 import { ModalKeyboardRoot, StackScreenFrame, SurfaceCard, useToast } from "@/components/reusables";
 import { cardFontSizes, colors, fontSizes, radii, shadows, spacing, typography } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
+import { useCarCompanyCatalog } from "@/hooks/use-car-company-catalog";
 import { useKeyboardBottomInset } from "@/hooks/use-keyboard-bottom-inset";
 import { useMyShopServices } from "@/hooks/use-my-shop-services";
 import { useOncePress } from "@/hooks/use-once-press";
 import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
 import { resolveShopOwnerBackTo } from "@/lib/shop-owner-navigation";
-import type { MyServiceCategoryPayload } from "@/types/auto-shop-owner-endpoints";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  FlatList,
   InteractionManager,
   Keyboard,
   Modal,
@@ -26,8 +27,39 @@ import {
   View,
 } from "react-native";
 
-type DraftLine = { id?: string; name: string; desc: string; price: number };
+type QuantityType = "Unit" | "Days";
+
+type DraftLine = {
+  id?: string;
+  name: string;
+  desc: string;
+  price: number;
+  make?: string;
+  model?: string;
+  qty?: number;
+  quantityType?: QuantityType;
+  labourCost?: number;
+  tax?: number;
+};
 type DraftCategory = { id: string; name: string; subServices: DraftLine[] };
+
+const QUANTITY_TYPE_OPTIONS: QuantityType[] = ["Unit", "Days"];
+
+function formatMoney(value: number): string {
+  return Number.isFinite(value) ? (value % 1 === 0 ? String(value) : value.toFixed(2)) : "0";
+}
+
+function lineQty(line: DraftLine): number {
+  return line.qty != null && line.qty > 0 ? line.qty : 1;
+}
+
+function lineLabourCost(line: DraftLine): number {
+  return line.labourCost != null && Number.isFinite(line.labourCost) ? line.labourCost : 0;
+}
+
+function lineAmount(line: DraftLine): number {
+  return line.price * lineQty(line) + lineLabourCost(line);
+}
 
 function SkeletonLine({ w }: { w: number | `${number}%` }) {
   return <View style={[styles.skeletonLine, { width: w }]} />;
@@ -70,11 +102,15 @@ export default function ServicesCatalogPage() {
   const { showToast } = useToast();
   const isAutoShopOwner = (meta?.role ?? "").toLowerCase() === "autoshopowner";
 
-  const { categories: myShopCategories, loading: myShopLoading, load: loadMyShopServices, save, removeSubServiceByName } = useMyShopServices(
-    token,
-    isAutoShopOwner,
-    showToast
-  );
+  const {
+    categories: myShopCategories,
+    loading: myShopLoading,
+    load: loadMyShopServices,
+    addSubServiceLine,
+    editSubServiceLine,
+    removeSubServiceByName,
+  } = useMyShopServices(token, isAutoShopOwner, showToast);
+  const carCatalog = useCarCompanyCatalog(token, isAutoShopOwner);
   const [selectedServiceIndex, setSelectedServiceIndex] = useState(0);
   const [draftCategories, setDraftCategories] = useState<DraftCategory[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -83,12 +119,19 @@ export default function ServicesCatalogPage() {
   const [formName, setFormName] = useState("");
   const [formPrice, setFormPrice] = useState("");
   const [formDesc, setFormDesc] = useState("");
+  const [formMake, setFormMake] = useState("");
+  const [formModel, setFormModel] = useState("");
+  const [formQty, setFormQty] = useState("1");
+  const [formQuantityType, setFormQuantityType] = useState<QuantityType>("Unit");
+  const [formLabourCost, setFormLabourCost] = useState("0");
+  const [vehiclePicker, setVehiclePicker] = useState<null | "make" | "model" | "qtyType">(null);
   const [refreshing, setRefreshing] = useState(false);
   const keyboardBottom = useKeyboardBottomInset();
   const keyboardOpen = keyboardBottom > 0;
 
   const requestCloseSheet = useCallback(() => {
     // Avoid modal "glitch" when closing while an input is focused (Android/iOS).
+    setVehiclePicker(null);
     if (keyboardOpen) {
       Keyboard.dismiss();
       setTimeout(() => setSheetOpen(false), 80);
@@ -97,20 +140,55 @@ export default function ServicesCatalogPage() {
     setSheetOpen(false);
   }, [keyboardOpen]);
 
+  const makeOptions = useMemo(() => {
+    const names = carCatalog.companies.map((c) => c.companyName.trim()).filter(Boolean);
+    const current = formMake.trim();
+    if (current && !names.some((n) => n === current)) {
+      return [current, ...names];
+    }
+    return names;
+  }, [carCatalog.companies, formMake]);
+
+  const modelOptions = useMemo(() => {
+    const models = carCatalog.modelOptionsFor(formMake).map((m) => m.modelName.trim()).filter(Boolean);
+    const current = formModel.trim();
+    if (current && !models.some((n) => n === current)) {
+      return [current, ...models];
+    }
+    return models;
+  }, [carCatalog, formMake, formModel]);
+
+  const vehiclePickerItems =
+    vehiclePicker === "make"
+      ? makeOptions
+      : vehiclePicker === "model"
+        ? modelOptions
+        : QUANTITY_TYPE_OPTIONS;
+
+  const resetFormFields = useCallback(() => {
+    setFormName("");
+    setFormPrice("");
+    setFormDesc("");
+    setFormMake("");
+    setFormModel("");
+    setFormQty("1");
+    setFormQuantityType("Unit");
+    setFormLabourCost("0");
+    setVehiclePicker(null);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       if (fromQuickAction) {
         setSelectedServiceIndex(0);
         setSheetOpen(false);
         setEditingLineIndex(null);
-        setFormName("");
-        setFormPrice("");
-        setFormDesc("");
+        resetFormFields();
         router.setParams(backTo ? { qa: undefined, backTo } : { qa: undefined });
       }
       void loadMyShopServices();
       return undefined;
-    }, [backTo, fromQuickAction, loadMyShopServices])
+    }, [backTo, fromQuickAction, loadMyShopServices, resetFormFields])
   );
 
   const onRefresh = useCallback(() => {
@@ -148,6 +226,12 @@ export default function ServicesCatalogPage() {
         name: s.name,
         desc: s.desc,
         price: s.price,
+        make: s.make,
+        model: s.model,
+        qty: s.qty,
+        quantityType: s.quantityType,
+        labourCost: s.labourCost,
+        tax: s.tax,
       })),
     }));
     setDraftCategories(merged);
@@ -183,9 +267,7 @@ export default function ServicesCatalogPage() {
       return;
     }
     setEditingLineIndex(null);
-    setFormName("");
-    setFormPrice("");
-    setFormDesc("");
+    resetFormFields();
     setSheetOpen(true);
   });
 
@@ -198,31 +280,14 @@ export default function ServicesCatalogPage() {
     setFormName(row.name);
     setFormPrice(String(row.price));
     setFormDesc(row.desc);
+    setFormMake(row.make?.trim() ?? "");
+    setFormModel(row.model?.trim() ?? "");
+    setFormQty(String(lineQty(row)));
+    setFormQuantityType(row.quantityType === "Days" ? "Days" : "Unit");
+    setFormLabourCost(String(lineLabourCost(row)));
+    setVehiclePicker(null);
     setSheetOpen(true);
   });
-
-  async function persist(nextDraft: DraftCategory[]) {
-    const payload: MyServiceCategoryPayload[] = nextDraft.map((cat) => ({
-      id: cat.id,
-      subServices: cat.subServices.map((line) => {
-        const base = {
-          name: line.name.trim(),
-          desc: line.desc.trim(),
-          price: Number.isFinite(line.price) ? line.price : 0,
-        };
-        const sid = line.id?.trim();
-        return sid ? { id: sid, ...base } : base;
-      }),
-    }));
-    setSaving(true);
-    const mode = myShopCategories.length > 0 ? "update" : "create";
-    const ok = await save(payload, mode);
-    if (ok) {
-      setDraftCategories(nextDraft);
-    }
-    setSaving(false);
-    return ok;
-  }
 
   async function onSaveSheet() {
     if (!selectedService) {
@@ -230,30 +295,41 @@ export default function ServicesCatalogPage() {
     }
     const name = formName.trim();
     if (!name) {
-      showToast("Subcategory name is required.", { type: "error" });
+      showToast("Category name is required.", { type: "error" });
       return;
     }
-    const parsed = Number.parseFloat(formPrice.trim());
-    if (!Number.isFinite(parsed)) {
-      showToast("Please enter a valid price.", { type: "error" });
+    const priceNum = Number.parseFloat(formPrice.trim());
+    if (!Number.isFinite(priceNum)) {
+      showToast("Enter a valid unit cost.", { type: "error" });
       return;
     }
+    const qtyNum = Number.parseFloat(formQty.trim());
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      showToast("Enter a valid quantity.", { type: "error" });
+      return;
+    }
+    const labourCostNum = Number.parseFloat(formLabourCost.trim());
+    if (!Number.isFinite(labourCostNum) || labourCostNum < 0) {
+      showToast("Enter a valid labor cost.", { type: "error" });
+      return;
+    }
+    const payload = {
+      name,
+      desc: formDesc.trim(),
+      price: priceNum,
+      make: formMake.trim() || undefined,
+      model: formModel.trim() || undefined,
+      quantity: qtyNum,
+      quantityType: formQuantityType,
+      labourCost: labourCostNum,
+    };
 
-    const next = draftCategories.map((cat) => {
-      if (cat.id !== selectedService.id) {
-        return cat;
-      }
-      const rows = [...cat.subServices];
-      const prevId = editingLineIndex != null ? rows[editingLineIndex]?.id : undefined;
-      const line: DraftLine = { id: prevId, name, desc: formDesc.trim(), price: parsed };
-      if (editingLineIndex == null) {
-        rows.push(line);
-      } else {
-        rows[editingLineIndex] = line;
-      }
-      return { ...cat, subServices: rows };
-    });
-    const ok = await persist(next);
+    setSaving(true);
+    const ok =
+      editingLineIndex == null
+        ? await addSubServiceLine(selectedService.id, payload)
+        : await editSubServiceLine(selectedService.id, editingLineIndex, payload);
+    setSaving(false);
     if (ok) {
       setSheetOpen(false);
     }
@@ -374,38 +450,55 @@ export default function ServicesCatalogPage() {
                 <Text style={styles.emptyRows}>No subcategories yet.</Text>
               ) : (
                 <View style={styles.subServiceCardList}>
-                  {visibleRows.map(({ row: line, index: rowIndex }) => (
-                    <View
-                      key={line.id?.trim() ? line.id : `${line.name}-${rowIndex}`}
-                      style={styles.subServiceCard}
-                    >
-                      <View style={styles.subServiceCardTop}>
-                        <Text style={styles.subServiceName} numberOfLines={2}>
-                          {line.name}
+                  {visibleRows.map(({ row: line, index: rowIndex }) => {
+                    const makeModel = [line.make?.trim(), line.model?.trim()].filter(Boolean).join(" · ");
+                    const qtyType = line.quantityType === "Days" ? "Days" : "Unit";
+                    const labour = lineLabourCost(line);
+                    const amount = lineAmount(line);
+                    const metaBits = [
+                      `Qty ${lineQty(line)} ${qtyType}`,
+                      labour > 0 ? `Labor ${formatMoney(labour)}` : null,
+                      `Amount ${formatMoney(amount)}`,
+                    ].filter(Boolean);
+                    return (
+                      <View
+                        key={line.id?.trim() ? line.id : `${line.name}-${rowIndex}`}
+                        style={styles.subServiceCard}
+                      >
+                        <View style={styles.subServiceCardTop}>
+                          <Text style={styles.subServiceName} numberOfLines={2}>
+                            {line.name}
+                          </Text>
+                          <Text style={styles.subServicePrice}>{formatMoney(line.price)}</Text>
+                        </View>
+                        {makeModel ? (
+                          <Text style={styles.subServiceMeta} numberOfLines={1}>
+                            {makeModel}
+                          </Text>
+                        ) : null}
+                        <Text style={styles.subServiceDesc} numberOfLines={4}>
+                          {line.desc?.trim() ? line.desc : "—"}
                         </Text>
-                        <Text style={styles.subServicePrice}>₹{line.price}</Text>
+                        <Text style={styles.subServiceMeta}>{metaBits.join(" · ")}</Text>
+                        <View style={styles.subServiceActions}>
+                          <Pressable
+                            style={styles.iconBtn}
+                            onPress={() => openEditSheet?.(rowIndex)}
+                            hitSlop={6}
+                          >
+                            <Ionicons name="create-outline" size={16} color={colors.primary} />
+                          </Pressable>
+                          <Pressable
+                            style={[styles.iconBtn, styles.iconBtnDanger]}
+                            onPress={() => confirmDeleteRow(rowIndex, line.name)}
+                            hitSlop={6}
+                          >
+                            <Ionicons name="trash-outline" size={16} color="#D84D4D" />
+                          </Pressable>
+                        </View>
                       </View>
-                      <Text style={styles.subServiceDesc} numberOfLines={4}>
-                        {line.desc?.trim() ? line.desc : "No description"}
-                      </Text>
-                      <View style={styles.subServiceActions}>
-                        <Pressable
-                          style={styles.iconBtn}
-                          onPress={() => openEditSheet?.(rowIndex)}
-                          hitSlop={6}
-                        >
-                          <Ionicons name="create-outline" size={16} color={colors.primary} />
-                        </Pressable>
-                        <Pressable
-                          style={[styles.iconBtn, styles.iconBtnDanger]}
-                          onPress={() => confirmDeleteRow(rowIndex, line.name)}
-                          hitSlop={6}
-                        >
-                          <Ionicons name="trash-outline" size={16} color="#D84D4D" />
-                        </Pressable>
-                      </View>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
 
@@ -446,35 +539,246 @@ export default function ServicesCatalogPage() {
                 <Text style={styles.badgeText}>{selectedService?.name ?? "Service"}</Text>
               </View>
 
-              <Text style={styles.inputLabel}>Subcategory Name *</Text>
-              <TextInput value={formName} onChangeText={setFormName} style={styles.input} placeholder="Subcategory name" />
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>Make</Text>
+                  <Pressable
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setVehiclePicker("make");
+                    }}
+                    disabled={saving || carCatalog.loading}
+                    style={({ pressed }) => [
+                      styles.selectInput,
+                      (saving || carCatalog.loading) && styles.selectInputDisabled,
+                      pressed && styles.selectInputPressed,
+                    ]}
+                  >
+                    <Text
+                      style={[styles.selectInputText, !formMake.trim() && styles.selectInputPlaceholder]}
+                      numberOfLines={1}
+                    >
+                      {carCatalog.loading
+                        ? "Loading..."
+                        : formMake.trim() || "Select make"}
+                    </Text>
+                    <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>Model</Text>
+                  <Pressable
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setVehiclePicker("model");
+                    }}
+                    disabled={saving || !formMake.trim()}
+                    style={({ pressed }) => [
+                      styles.selectInput,
+                      (saving || !formMake.trim()) && styles.selectInputDisabled,
+                      pressed && styles.selectInputPressed,
+                    ]}
+                  >
+                    <Text
+                      style={[styles.selectInputText, !formModel.trim() && styles.selectInputPlaceholder]}
+                      numberOfLines={1}
+                    >
+                      {!formMake.trim()
+                        ? "Select make first"
+                        : formModel.trim() || "Select model"}
+                    </Text>
+                    <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+              </View>
 
-              <Text style={styles.inputLabel}>Price *</Text>
+              <Text style={styles.inputLabel}>Name Category *</Text>
               <TextInput
-                value={formPrice}
-                onChangeText={setFormPrice}
+                value={formName}
+                onChangeText={setFormName}
                 style={styles.input}
-                placeholder="0"
-                keyboardType="numeric"
+                placeholder="Name category"
+                editable={!saving}
               />
 
               <Text style={styles.inputLabel}>Description</Text>
               <TextInput
                 value={formDesc}
                 onChangeText={setFormDesc}
-                style={[styles.input, styles.descInput]}
+                style={styles.input}
                 placeholder="Description"
-                multiline
+                editable={!saving}
               />
+
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>Unit Cost *</Text>
+                  <TextInput
+                    value={formPrice}
+                    onChangeText={setFormPrice}
+                    style={styles.input}
+                    placeholder="0"
+                    keyboardType="decimal-pad"
+                    editable={!saving}
+                  />
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>Qty</Text>
+                  <TextInput
+                    value={formQty}
+                    onChangeText={setFormQty}
+                    style={styles.input}
+                    placeholder="1"
+                    keyboardType="decimal-pad"
+                    editable={!saving}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>Qty Type</Text>
+                  <Pressable
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setVehiclePicker("qtyType");
+                    }}
+                    disabled={saving}
+                    style={({ pressed }) => [
+                      styles.selectInput,
+                      saving && styles.selectInputDisabled,
+                      pressed && styles.selectInputPressed,
+                    ]}
+                  >
+                    <Text style={styles.selectInputText} numberOfLines={1}>
+                      {formQuantityType}
+                    </Text>
+                    <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.inputLabel}>Labor Cost</Text>
+                  <TextInput
+                    value={formLabourCost}
+                    onChangeText={setFormLabourCost}
+                    style={styles.input}
+                    placeholder="0"
+                    keyboardType="decimal-pad"
+                    editable={!saving}
+                  />
+                </View>
+              </View>
 
               <Pressable
                 style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
                 onPress={() => void onSaveSheet()}
                 disabled={saving}
               >
-                <Text style={styles.saveBtnText}>{saving ? "Saving..." : "Save Subcategory"}</Text>
+                <Text style={styles.saveBtnText}>
+                  {saving
+                    ? editingLineIndex == null
+                      ? "Saving..."
+                      : "Updating..."
+                    : editingLineIndex == null
+                      ? "Save"
+                      : "Update"}
+                </Text>
+              </Pressable>
+              <Pressable style={styles.cancelBtn} onPress={requestCloseSheet} disabled={saving}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
             </RNScrollView>
+          </View>
+        </ModalKeyboardRoot>
+      </Modal>
+
+      <Modal
+        transparent
+        visible={vehiclePicker != null}
+        animationType="slide"
+        onRequestClose={() => setVehiclePicker(null)}
+      >
+        <ModalKeyboardRoot onBackdropPress={() => setVehiclePicker(null)} scrimColor="rgba(0,0,0,0.42)">
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>
+                {vehiclePicker === "make"
+                  ? "Select make"
+                  : vehiclePicker === "model"
+                    ? "Select model"
+                    : "Select qty type"}
+              </Text>
+              <Pressable onPress={() => setVehiclePicker(null)} hitSlop={10} accessibilityLabel="Close picker">
+                <Ionicons name="close" size={22} color={colors.textMuted} />
+              </Pressable>
+            </View>
+            <FlatList
+              data={vehiclePickerItems}
+              keyExtractor={(item) => item}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.pickerList}
+              ListHeaderComponent={
+                vehiclePicker === "make" || vehiclePicker === "model" ? (
+                  <Pressable
+                    style={({ pressed }) => [styles.pickerRow, pressed && styles.pickerRowPressed]}
+                    onPress={() => {
+                      if (vehiclePicker === "make") {
+                        setFormMake("");
+                        setFormModel("");
+                      } else {
+                        setFormModel("");
+                      }
+                      setVehiclePicker(null);
+                    }}
+                  >
+                    <Text style={[styles.pickerRowText, styles.selectInputPlaceholder]} numberOfLines={1}>
+                      {vehiclePicker === "make" ? "Select make" : "Select model"}
+                    </Text>
+                  </Pressable>
+                ) : null
+              }
+              renderItem={({ item }) => {
+                const selected =
+                  vehiclePicker === "make"
+                    ? item === formMake.trim()
+                    : vehiclePicker === "model"
+                      ? item === formModel.trim()
+                      : item === formQuantityType;
+                return (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.pickerRow,
+                      pressed && styles.pickerRowPressed,
+                      selected && styles.pickerRowSelected,
+                    ]}
+                    onPress={() => {
+                      if (vehiclePicker === "make") {
+                        setFormMake(item);
+                        setFormModel("");
+                      } else if (vehiclePicker === "model") {
+                        setFormModel(item);
+                      } else {
+                        setFormQuantityType(item as QuantityType);
+                      }
+                      setVehiclePicker(null);
+                    }}
+                  >
+                    <Text style={[styles.pickerRowText, selected && styles.pickerRowTextSelected]} numberOfLines={2}>
+                      {item}
+                    </Text>
+                    {selected ? <Ionicons name="checkmark-circle" size={20} color={colors.primary} /> : null}
+                  </Pressable>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.pickerEmpty}>
+                  <Text style={styles.pickerEmptyTitle}>No options</Text>
+                  <Text style={styles.pickerEmptySub}>
+                    {vehiclePicker === "model" ? "Select a make first." : "Car companies are unavailable."}
+                  </Text>
+                </View>
+              }
+            />
           </View>
         </ModalKeyboardRoot>
       </Modal>
@@ -602,6 +906,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     lineHeight: 20,
   },
+  subServiceMeta: {
+    fontSize: cardFontSizes.sm,
+    color: colors.textLight,
+    fontWeight: "700",
+  },
   subServiceActions: {
     flexDirection: "row",
     gap: spacing.xs,
@@ -688,11 +997,19 @@ const styles = StyleSheet.create({
   sheetFormScroll: {
     flexGrow: 0,
     flexShrink: 1,
-    maxHeight: 360,
+    maxHeight: 420,
   },
   sheetFormScrollContent: {
     gap: spacing.sm,
     paddingBottom: spacing.sm,
+  },
+  formRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  formCol: {
+    flex: 1,
+    minWidth: 0,
   },
   sheetHandle: {
     alignSelf: "center",
@@ -728,6 +1045,29 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     color: colors.text,
   },
+  selectInput: {
+    minHeight: 42,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "#F8FAFF",
+    paddingHorizontal: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  selectInputDisabled: { opacity: 0.55 },
+  selectInputPressed: { opacity: 0.88 },
+  selectInputText: {
+    flex: 1,
+    fontSize: fontSizes.md,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  selectInputPlaceholder: {
+    color: colors.textLight,
+    fontWeight: "600",
+  },
   descInput: { minHeight: 72, paddingTop: spacing.xs, textAlignVertical: "top" },
   saveBtn: {
     marginTop: spacing.sm,
@@ -739,4 +1079,55 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.75 },
   saveBtnText: { color: colors.white, fontSize: fontSizes.lg, fontWeight: "800" },
+  cancelBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.sm,
+  },
+  cancelBtnText: {
+    color: colors.primary,
+    fontSize: fontSizes.md,
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
+  pickerSheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    maxHeight: "80%",
+    width: "100%",
+    ...shadows.card,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: spacing.sm,
+  },
+  pickerTitle: { fontSize: fontSizes.lg, fontWeight: "900", color: colors.text },
+  pickerList: { paddingBottom: spacing.md },
+  pickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    gap: spacing.sm,
+  },
+  pickerRowPressed: { opacity: 0.85 },
+  pickerRowSelected: {
+    backgroundColor: colors.primaryMutedBg,
+    marginHorizontal: -spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.md,
+  },
+  pickerRowText: { flex: 1, fontSize: fontSizes.md, fontWeight: "700", color: colors.text },
+  pickerRowTextSelected: { color: colors.primary },
+  pickerEmpty: { paddingVertical: spacing.xl, alignItems: "center", gap: spacing.xs },
+  pickerEmptyTitle: { fontSize: fontSizes.md, fontWeight: "900", color: colors.text },
+  pickerEmptySub: { fontSize: fontSizes.sm, fontWeight: "700", color: colors.textMuted, textAlign: "center" },
 });

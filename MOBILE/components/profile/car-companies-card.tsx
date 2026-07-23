@@ -17,7 +17,7 @@ export function CarCompaniesCard({ totalCount, selectedCount, onPress }: CarComp
           <View style={styles.iconBubble}>
             <Ionicons name="car-sport" size={18} color={colors.white} />
           </View>
-          <Text style={typography.cardTitle}>Car Companies</Text>
+          <Text style={typography.cardTitle}>Car Brand Specialist</Text>
         </View>
       </View>
       <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>

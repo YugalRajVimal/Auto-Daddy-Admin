@@ -9,8 +9,8 @@ import { useAuth } from "@/context/auth-provider";
 import { useCarCompanyCatalog } from "@/hooks/use-car-company-catalog";
 import { useKeyboardBottomInset } from "@/hooks/use-keyboard-bottom-inset";
 import {
-  addExistingCustomer,
   addVehicleToOnboardedCustomer,
+  buildOnboardedVehicleBody,
   editOnboardedCustomer,
   onboardCustomer,
   searchCustomers,
@@ -18,6 +18,7 @@ import {
 import {
   pickCustomerVehicleApiId,
   toUpdateCustomerVehicleRows,
+  updateMyCustomer,
 } from "@/lib/auto-shop-owner-api";
 import { defaultDialCallingCode } from "@/lib/dial-countries";
 import { NATIONAL_PHONE_DISPLAY_MAX_LENGTH, nationalPhoneDisplayFromKeystrokes } from "@/lib/national-phone-format";
@@ -62,6 +63,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function isValidEmail(v: string) {
   const s = v.trim();
+  if (!s) return true; // optional on create (People)
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
 
@@ -241,6 +243,7 @@ export default function AddCustomerPage() {
   const isEditMode = mode === "edit";
   const encodedCustomer = typeof params.customer === "string" ? params.customer : "";
   const [editCarOwnerId, setEditCarOwnerId] = useState<string | null>(null);
+  const [editCustomerStatus, setEditCustomerStatus] = useState<string | undefined>(undefined);
   /** When set, the form shows one vehicle row but save merges into the full customer list at this index. */
   const [editVehicleListSlot, setEditVehicleListSlot] = useState<number | null>(null);
   const [vehiclesBaseline, setVehiclesBaseline] = useState<FormVehicle[] | null>(null);
@@ -266,6 +269,7 @@ export default function AddCustomerPage() {
 
   const resetForm = () => {
     setEditCarOwnerId(null);
+    setEditCustomerStatus(undefined);
     setEditVehicleListSlot(null);
     setVehiclesBaseline(null);
     setIsAppendingVehicle(false);
@@ -307,6 +311,13 @@ export default function AddCustomerPage() {
             : typeof parsed._id === "string"
               ? parsed._id
               : null
+      );
+      setEditCustomerStatus(
+        typeof parsed.status === "string"
+          ? parsed.status
+          : typeof parsed.approvalStatus === "string"
+            ? parsed.approvalStatus
+            : undefined
       );
       setName(parsed.name ?? "");
       setEmail(parsed.email ?? "");
@@ -366,37 +377,13 @@ export default function AddCustomerPage() {
     };
   }, [encodedCustomer, mode, vehicleIndexParam, appendVehicleParam, token]);
 
-  async function autoAddToMyList(payload: unknown, fallbackPhone?: string) {
-    if (!token) {
-      return false;
+  async function resolveCarCompanyId(makeName: string): Promise<string | null> {
+    const company = carCompanyCatalog.findCompany(makeName);
+    if (!company) {
+      return null;
     }
-    let carOwnerId = extractCarOwnerIdFromPayload(payload);
-    if (!carOwnerId && fallbackPhone?.trim()) {
-      try {
-        const lookup = await searchCustomers(token, fallbackPhone.trim());
-        if (lookup.ok) {
-          const list = extractList(lookup.data);
-          const normalizedPhone = fallbackPhone.trim();
-          const match = list.find((item) => {
-            if (!item || typeof item !== "object") {
-              return false;
-            }
-            const o = item as Record<string, unknown>;
-            return typeof o.phone === "string" && o.phone.trim() === normalizedPhone;
-          });
-          if (match && typeof match === "object") {
-            carOwnerId = pickId(match as Record<string, unknown>);
-          }
-        }
-      } catch {
-        // Best-effort fallback; onboarding and verification still succeed.
-      }
-    }
-    if (!carOwnerId) {
-      return false;
-    }
-    const addRes = await addExistingCustomer(token, { customerId: carOwnerId });
-    return addRes.ok;
+    const id = company._id?.trim() || company.id?.trim();
+    return id || null;
   }
 
   function updateVehicle(index: number, patch: Partial<FormVehicle>) {
@@ -416,8 +403,13 @@ export default function AddCustomerPage() {
     const vehicleOnlySave =
       isEditMode && ((editVehicleListSlot !== null && vehiclesBaseline != null) || isAppendingVehicle);
     if (!vehicleOnlySave) {
-      if (!name.trim() || !email.trim() || !phone.trim() || !pincode.trim()) {
-        showToast("Name, email, phone, and pincode are required.", { type: "error" });
+      // People.tsx: name, phone, city required; email optional.
+      if (!name.trim() || !phone.trim()) {
+        showToast("Name and phone are required.", { type: "error" });
+        return;
+      }
+      if (!selectedCity?.name?.trim()) {
+        showToast("City is required.", { type: "error" });
         return;
       }
       if (name.trim().length > 20) {
@@ -435,7 +427,7 @@ export default function AddCustomerPage() {
       return;
     }
     const pinDigits = normalizePostalCodeForStorage(pincode);
-    if (!vehicleOnlySave && !isValidCanadianPostalCode(pincode)) {
+    if (!vehicleOnlySave && pincode.trim() && !isValidCanadianPostalCode(pincode)) {
       showToast(POSTAL_CODE_ERROR_MESSAGE, { type: "error" });
       return;
     }
@@ -457,7 +449,7 @@ export default function AddCustomerPage() {
     if (!isProfileOnlyEdit) {
       const vehicleRows: FormVehicle[] =
         isEditMode && isAppendingVehicle
-          ? [...(vehiclesBaseline ?? []), { ...(vehicles[0] ?? emptyVehicle()), isNew: true }]
+          ? [{ ...(vehicles[0] ?? emptyVehicle()), isNew: true }]
           : isEditMode && editVehicleListSlot !== null && vehiclesBaseline
             ? vehiclesBaseline.map((v, i) =>
               i === editVehicleListSlot ? (vehicles[0] ?? emptyVehicle()) : v
@@ -487,26 +479,50 @@ export default function AddCustomerPage() {
     try {
       let res;
       if (isEditMode && editCarOwnerId) {
-        const patch: Record<string, unknown> = {
-          name: profilePayload.name,
-          email: profilePayload.email,
-          phone: profilePayload.phone,
-          pincode: profilePayload.pincode,
-          address: profilePayload.address,
-          ...optionalCityField(selectedCity?.name),
-        };
-        res = await editOnboardedCustomer(token, editCarOwnerId, patch);
-        if (res.ok && !isProfileOnlyEdit && filledVehicles.length > 0) {
-          for (const vehicle of filledVehicles) {
-            await addVehicleToOnboardedCustomer(token, editCarOwnerId, vehicle as unknown as Record<string, unknown>);
+        // People: append vehicle → POST …/onboarded/:id/vehicles only.
+        if (isAppendingVehicle && filledVehicles[0]) {
+          const v = filledVehicles[0];
+          const carCompanyId = await resolveCarCompanyId(v.vehicleName);
+          if (!carCompanyId) {
+            showToast("Please select a make from the list.", { type: "error" });
+            return;
+          }
+          res = await addVehicleToOnboardedCustomer(
+            token,
+            editCarOwnerId,
+            buildOnboardedVehicleBody({
+              carCompanyId,
+              make: v.vehicleName,
+              model: v.model,
+              year: v.year,
+              licensePlateNo: v.licensePlateNo,
+              vinNo: v.vinNo,
+              odometerReading: v.odometerReading,
+            })
+          );
+        } else {
+          const isOnboarded = (editCustomerStatus ?? "").toLowerCase() === "onboarded";
+          if (isOnboarded) {
+            res = await editOnboardedCustomer(token, editCarOwnerId, {
+              name: profilePayload.name,
+              email: profilePayload.email,
+              phone: profilePayload.phone,
+              ...optionalCityField(selectedCity?.name),
+            });
+          } else {
+            res = await updateMyCustomer(token, {
+              ...profilePayload,
+              ...(filledVehicles.length > 0 ? { vehicles: filledVehicles } : {}),
+            } as UpdateMyCustomerPayload);
           }
         }
       } else {
+        // People create: POST /api/autoshopowner/customer/onboard { name, phone, city, email }
         res = await onboardCustomer(token, {
           name: name.trim(),
           email: email.trim(),
           phone: phoneDigits,
-          ...optionalCityField(selectedCity?.name),
+          city: selectedCity!.name.trim(),
         });
         if (res.ok && filledVehicles.length > 0) {
           const newId =
@@ -526,7 +542,24 @@ export default function AddCustomerPage() {
             })());
           if (newId) {
             for (const vehicle of filledVehicles) {
-              await addVehicleToOnboardedCustomer(token, newId, vehicle as unknown as Record<string, unknown>);
+              const carCompanyId = await resolveCarCompanyId(vehicle.vehicleName);
+              if (!carCompanyId) {
+                showToast("Please select a make from the list for each vehicle.", { type: "error" });
+                return;
+              }
+              await addVehicleToOnboardedCustomer(
+                token,
+                newId,
+                buildOnboardedVehicleBody({
+                  carCompanyId,
+                  make: vehicle.vehicleName,
+                  model: vehicle.model,
+                  year: vehicle.year,
+                  licensePlateNo: vehicle.licensePlateNo,
+                  vinNo: vehicle.vinNo,
+                  odometerReading: vehicle.odometerReading,
+                })
+              );
             }
           }
         }
@@ -539,13 +572,13 @@ export default function AddCustomerPage() {
         showToast(msg || (isEditMode ? "Could not update customer." : "Could not onboard customer."), { type: "error" });
         return;
       }
-      showToast(msg || (isEditMode ? "Customer updated." : "Customer onboarded."), { type: "success" });
-      if (!isEditMode) {
-        const added = await autoAddToMyList(res.data, phoneDigits);
-        if (added) {
-          showToast("Customer auto-added to My Customers.", { type: "success" });
-        }
-      }
+      showToast(
+        msg ||
+          (isEditMode
+            ? "Customer updated."
+            : "Notification sent for Verification. Pl. wait or contact with Customer."),
+        { type: "success" }
+      );
       if (router.canGoBack()) {
         router.back();
       } else if (backTo) {
@@ -679,19 +712,15 @@ export default function AddCustomerPage() {
                     errorText={attemptedSave && !name.trim() ? "Name is required." : null}
                   />
                   <Field
-                    label="Email Address *"
-                    placeholder="Enter email address"
+                    label="Email Address"
+                    placeholder="Enter email address (optional)"
                     icon="mail-outline"
                     value={email}
                     onChangeText={(t) => setEmail(t.slice(0, 80))}
                     keyboardType="email-address"
                     maxLength={80}
                     errorText={
-                      attemptedSave && !email.trim()
-                        ? "Email is required."
-                        : email.trim() && !isValidEmail(email)
-                          ? "Enter a valid email address."
-                          : null
+                      email.trim() && !isValidEmail(email) ? "Enter a valid email address." : null
                     }
                   />
 
@@ -713,8 +742,8 @@ export default function AddCustomerPage() {
                   ) : null}
 
                   <Field
-                    label="Zip Code *"
-                    placeholder="A1A 1A1"
+                    label="Zip Code"
+                    placeholder="A1A 1A1 (optional)"
                     icon="location-outline"
                     value={pincode}
                     onChangeText={(t) => setPincode(formatPincodeDisplay(t))}
@@ -727,7 +756,7 @@ export default function AddCustomerPage() {
                     }
                   />
                   <View style={styles.fieldWrap}>
-                    <Text style={styles.fieldLabel}>City</Text>
+                    <Text style={styles.fieldLabel}>City *</Text>
                     <Pressable
                       style={({ pressed }) => [styles.citySelect, pressed && styles.citySelectPressed]}
                       onPress={() => setCityPickerOpen(true)}
@@ -741,6 +770,9 @@ export default function AddCustomerPage() {
                       </Text>
                       <Ionicons name="chevron-down" size={18} color={colors.textLight} />
                     </Pressable>
+                    {attemptedSave && !selectedCity?.name?.trim() ? (
+                      <Text style={styles.errorText}>City is required.</Text>
+                    ) : null}
                   </View>
                   <View style={styles.fieldWrap}>
                     <Text style={styles.fieldLabel}>Role</Text>

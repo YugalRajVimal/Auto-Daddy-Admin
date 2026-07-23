@@ -60,7 +60,7 @@ export function PersonalInformationCard({
 }: PersonalInformationCardProps) {
   return (
     <ExpandableCard
-      title="Personal Information"
+      title="Personal Profile"
       headerIcon="person"
       expanded={expanded}
       onToggle={onToggle}

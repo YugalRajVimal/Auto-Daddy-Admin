@@ -103,7 +103,7 @@ export function BusinessInformationCard(props: BusinessInformationCardProps) {
 
   return (
     <ExpandableCard
-      title="Business Information"
+      title="Business Profile"
       headerIcon="storefront"
       expanded={expanded}
       onToggle={onToggle}

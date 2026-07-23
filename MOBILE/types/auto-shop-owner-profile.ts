@@ -62,6 +62,8 @@ export interface AutoShopOwnerBusinessProfile {
   isBusinessActive: boolean;
   carCompanies?: Array<{ _id: string; companyName: string }>;
   myCarCompanies?: Array<{ _id: string; companyName: string }>;
+  shopType?: string;
+  shopTypes?: string[];
   myDeals: unknown[];
   teamMembers: unknown[];
   myServices: BusinessService[];

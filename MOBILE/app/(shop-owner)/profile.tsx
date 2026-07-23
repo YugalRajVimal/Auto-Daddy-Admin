@@ -2,6 +2,7 @@ import {
   ActivityScheduleCard,
   BusinessInformationCard,
   DocumentTemplateCard,
+  ManageInvoicesModal,
   PersonalInformationCard,
   ProfileFooter,
   ProfileHeader,
@@ -46,6 +47,8 @@ import { getQuickDeviceCoordinates } from "@/lib/get-quick-device-coordinates";
 import { templatesForKind } from "@/lib/document-templates";
 import { localImageMultipartPart } from "@/lib/local-image-for-form";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
+import { SHOP_OWNER_HOME } from "@/lib/shop-owner-navigation";
+
 import {
   digitsOnly,
   formatPincodeDisplay,
@@ -61,8 +64,10 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  BackHandler,
   Image,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -224,6 +229,7 @@ export default function ProfilePage() {
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
   const [logoViewerUri, setLogoViewerUri] = useState<string | null>(null);
   const [pendingHeroLogoUpload, setPendingHeroLogoUpload] = useState(false);
+  const [manageInvoicesOpen, setManageInvoicesOpen] = useState(false);
 
   // Important: tabs/screens can stay mounted across auth changes.
   // When logging out, aggressively clear any previous user's in-memory profile data.
@@ -521,20 +527,10 @@ export default function ProfilePage() {
       params: { backTo: "/(shop-owner)/profile", from: "profile" },
     });
   });
-  const openJobCardTemplatesFromProfile = useOncePress(() => {
-    router.push({
-      pathname: "/(shop-owner)/job-card-templates",
-      params: { backTo: "/(shop-owner)/profile", from: "profile" },
-    });
-  });
-  const openReportsFromProfile = useOncePress(() => {
-    router.push({
-      pathname: "/(shop-owner)/reports",
-      params: { backTo: "/(shop-owner)/profile", from: "profile" },
-    });
+  const openManageInvoicesFromProfile = useOncePress(() => {
+    setManageInvoicesOpen(true);
   });
   const invoiceTemplatePreference = useDocumentTemplatePreference("invoice");
-  const jobCardTemplatePreference = useDocumentTemplatePreference("jobcard");
   const savedInvoiceTemplateName = useMemo(() => {
     if (!invoiceTemplatePreference.isActive) {
       return "Not selected";
@@ -544,15 +540,6 @@ export default function ProfilePage() {
     );
     return template?.name ?? "Not selected";
   }, [invoiceTemplatePreference.isActive, invoiceTemplatePreference.savedId]);
-  const savedJobCardTemplateName = useMemo(() => {
-    if (!jobCardTemplatePreference.isActive) {
-      return "Not selected";
-    }
-    const template = templatesForKind("jobcard").find(
-      (item) => item.id === jobCardTemplatePreference.savedId
-    );
-    return template?.name ?? "Not selected";
-  }, [jobCardTemplatePreference.isActive, jobCardTemplatePreference.savedId]);
   const viewableBusinessLogoUri = useMemo(
     () => normalizeMediaUrl(businessProfile?.businessLogo ?? null),
     [businessProfile?.businessLogo]
@@ -589,6 +576,23 @@ export default function ProfilePage() {
   }, [editBusinessLogoUri, isAutoShopOwner, pendingHeroLogoUpload]);
 
   const handleLogout = useLogoutAction();
+  // Prefer replace-to-home over router.back(): when isProfileComplete is false,
+  // back can land on `/` which immediately Redirects back here and traps the user.
+  const handleBackPress = useOncePress(() => {
+    router.replace(SHOP_OWNER_HOME as never);
+  });
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== "android") {
+        return undefined;
+      }
+      const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+        handleBackPress?.();
+        return true;
+      });
+      return () => sub.remove();
+    }, [handleBackPress])
+  );
   const handlePrintAuthToken = useCallback(() => {
     if (!__DEV__) {
       return;
@@ -1144,7 +1148,7 @@ export default function ProfilePage() {
       <TabScreenFrame
         backgroundColor={colors.bgProfile}
         header={
-          <AppBar title="Profile" leadingMode="back" />
+          <AppBar title="Profile" leadingMode="back" onBackPress={() => handleBackPress?.()} />
         }
         bottomInsetExtra={spacing.lg}
         onRefresh={handleRefreshProfile}
@@ -1263,21 +1267,12 @@ export default function ProfilePage() {
                   />
 
                   <DocumentTemplateCard
-                    title="Job Card Templates"
-                    icon="clipboard-outline"
-                    rowIcon="construct-outline"
-                    rowLabel="Active Template"
-                    rowValue={savedJobCardTemplateName}
-                    onPress={() => openJobCardTemplatesFromProfile?.()}
-                  />
-
-                  <DocumentTemplateCard
-                    title="Reports"
-                    icon="bar-chart-outline"
-                    rowIcon="analytics-outline"
-                    rowLabel="Income · Expense · Bank · GST"
-                    rowValue="Open"
-                    onPress={() => openReportsFromProfile?.()}
+                    title="Manage Invoices"
+                    icon="settings-outline"
+                    rowIcon="pricetag-outline"
+                    rowLabel="Invoice Code & Number"
+                    rowValue="Configure"
+                    onPress={() => openManageInvoicesFromProfile?.()}
                   />
                 </>
               ) : null}
@@ -1307,6 +1302,12 @@ export default function ProfilePage() {
                 setEditBusinessCityId(city.id);
                 setEditBusinessCityName(city.name);
               }}
+            />
+
+            <ManageInvoicesModal
+              visible={manageInvoicesOpen}
+              authToken={token}
+              onClose={() => setManageInvoicesOpen(false)}
             />
           </>
         )}

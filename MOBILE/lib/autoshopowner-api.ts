@@ -7,6 +7,7 @@ import {
   putJsonAutoshopowner,
 } from "@/lib/autoshopowner-http";
 import { appendUploadPart, type UploadPart } from "@/lib/upload-part";
+import type { ShopOwnerHomeApiResponse } from "@/types/shop-owner-home";
 
 export type ApiEnvelope = { success?: boolean; message?: string };
 
@@ -21,7 +22,7 @@ function withQuery(path: string, query: Record<string, string | undefined>) {
 
 // ---- Home / Dashboard ----
 export function fetchShopOwnerHome(token: string) {
-  return getJsonAutoshopowner<unknown>("/api/autoshopowner/home", token);
+  return getJsonAutoshopowner<ShopOwnerHomeApiResponse>("/api/autoshopowner/home", token);
 }
 
 // ---- Profile ----
@@ -258,6 +259,42 @@ export function addVehicleToOnboardedCustomer(
     body,
     token,
   );
+}
+
+/** Body for POST …/onboarded/:id/vehicles — matches web People.tsx. */
+export type OnboardedCustomerVehicleBody = {
+  carCompanyId: string;
+  make: string;
+  model: string;
+  year: number;
+  licensePlateNo: string;
+  vinNo: string;
+  odometerReading: number;
+};
+
+export function buildOnboardedVehicleBody(input: {
+  carCompanyId: string;
+  make: string;
+  model: string;
+  year: string | number;
+  licensePlateNo: string;
+  vinNo?: string;
+  odometerReading?: string | number;
+}): OnboardedCustomerVehicleBody {
+  const odoRaw = input.odometerReading;
+  const odoNum =
+    typeof odoRaw === "number"
+      ? odoRaw
+      : Number(String(odoRaw ?? "").trim().replace(/[^\d.]/g, "")) || 0;
+  return {
+    carCompanyId: input.carCompanyId.trim(),
+    make: input.make.trim(),
+    model: input.model.trim(),
+    year: Number(String(input.year).trim()),
+    licensePlateNo: input.licensePlateNo.trim().slice(0, 14),
+    vinNo: (input.vinNo ?? "").trim(),
+    odometerReading: odoNum,
+  };
 }
 
 export function searchCustomers(token: string, search: string) {

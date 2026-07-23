@@ -1,13 +1,30 @@
 import { useAuth } from "@/context/auth-provider";
 import { useAutoShopServicesCatalog } from "@/hooks/use-auto-shop-services-catalog";
 import { useMyShopServices } from "@/hooks/use-my-shop-services";
+import { addMyService } from "@/lib/autoshopowner-api";
 import { updateServiceWeWorkWith } from "@/lib/auto-shop-owner-api";
+import { getAutoShopOwnerProfile } from "@/lib/shop-owner-auth-cache";
+import {
+  SHOP_OWNER_SHOP_TYPES,
+  normalizeShopOwnerShopTypes,
+} from "@/lib/shop-owner-shop-types";
 import type { MyServiceCategoryPayload } from "@/types/auto-shop-owner-endpoints";
+import type { AutoShopOwnerProfileResponse } from "@/types/auto-shop-owner-profile";
 import type { ServiceCatalogCategory } from "@/types/service-catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 function uniqNonEmpty(ids: string[]) {
   return Array.from(new Set(ids.map((x) => x.trim()).filter(Boolean)));
+}
+
+function readShopTypesFromProfile(profile: AutoShopOwnerProfileResponse | null): string[] {
+  const business = profile?.data?.businessProfile;
+  const user = profile?.data?.userProfile as
+    | (AutoShopOwnerProfileResponse["data"]["userProfile"] & { shopType?: string })
+    | undefined;
+  const fromBusiness = normalizeShopOwnerShopTypes(business?.shopTypes ?? business?.shopType ?? null);
+  if (fromBusiness.length > 0) return fromBusiness;
+  return normalizeShopOwnerShopTypes(user?.shopType ?? null);
 }
 
 export function useShopOwnerServices(options?: {
@@ -34,20 +51,37 @@ export function useShopOwnerServices(options?: {
         showSuccessToastRef.current?.(message);
         return;
       }
-      // Default to error-style toast (catalog/my-services hooks only use error+success anyway).
       showErrorToastRef.current?.(message);
     },
     []
   );
 
-  // Catalog (all available categories)
-  const { categories: catalogCategories, isLoading: catalogLoading, fetchCatalog } = useAutoShopServicesCatalog(
-    token,
-    isAutoShopOwner,
-    toastAdapter
-  );
+  const [shopTypes, setShopTypes] = useState<string[]>([...SHOP_OWNER_SHOP_TYPES]);
+  const shopTypesKey = useMemo(() => shopTypes.join("|"), [shopTypes]);
 
-  // Selected (my-services)
+  useEffect(() => {
+    if (!isAutoShopOwner) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const profile = await getAutoShopOwnerProfile<AutoShopOwnerProfileResponse>();
+        if (cancelled) return;
+        const resolved = readShopTypesFromProfile(profile);
+        setShopTypes(resolved.length > 0 ? resolved : [...SHOP_OWNER_SHOP_TYPES]);
+      } catch {
+        if (!cancelled) setShopTypes([...SHOP_OWNER_SHOP_TYPES]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAutoShopOwner]);
+
+  // Catalog (all available categories for the shop's vendor types)
+  const { categories: catalogCategories, isLoading: catalogLoading, fetchCatalog } =
+    useAutoShopServicesCatalog(token, isAutoShopOwner, toastAdapter, shopTypes);
+
+  // Selected (my-services via GET /api/autoshopowner/services/my)
   const { categories: myCategories, loading: myLoading, load: loadMy, save } = useMyShopServices(
     token,
     isAutoShopOwner,
@@ -71,7 +105,7 @@ export function useShopOwnerServices(options?: {
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh, shopTypesKey]);
 
   const toggle = useCallback(
     async (serviceCategory: ServiceCatalogCategory, nextSelected: boolean) => {
@@ -111,6 +145,12 @@ export function useShopOwnerServices(options?: {
                 name: s.name,
                 desc: s.desc,
                 price: s.price,
+                make: s.make,
+                model: s.model,
+                quantity: s.qty,
+                quantityType: s.quantityType,
+                labourCost: s.labourCost,
+                tax: s.tax,
               })) ?? [],
           };
         });
@@ -118,7 +158,6 @@ export function useShopOwnerServices(options?: {
         const mode = myCategories.length > 0 ? "update" : "create";
         const ok = await save(payload, mode);
         if (!ok) {
-          // revert optimistic
           setOptimisticIds(null);
           return false;
         }
@@ -139,9 +178,9 @@ export function useShopOwnerServices(options?: {
   );
 
   /**
-   * Bulk save the current selection by sending `serviceWeWorkWith` (a JSON
-   * stringified array of catalog service IDs) to the edit-business-profile
-   * endpoint. Used by the checkbox + Save button flow.
+   * Bulk save selection:
+   * - newly selected IDs → PUT /api/autoshopowner/services/add
+   * - removals → sync remaining IDs via serviceWeWorkWith
    */
   const saveServiceWeWorkWith = useCallback(
     async (ids: string[]) => {
@@ -150,18 +189,53 @@ export function useShopOwnerServices(options?: {
         return false;
       }
       const cleaned = uniqNonEmpty(ids);
+      const previous = new Set(serverMyServiceIds);
+      const next = new Set(cleaned);
+      const toAdd = cleaned.filter((id) => !previous.has(id));
+      const toRemove = serverMyServiceIds.filter((id) => !next.has(id));
+
       setSaving(true);
       setOptimisticIds(cleaned);
       try {
-        const res = await updateServiceWeWorkWith(token, cleaned);
-        const ok = res.ok && (res.data?.success ?? true);
-        const msg = typeof res.data?.message === "string" ? res.data.message : "";
-        if (!ok) {
-          showErrorToastRef.current?.(msg || "Could not update services.");
-          setOptimisticIds(null);
-          return false;
+        const today = new Date().toISOString().slice(0, 10);
+        for (const serviceId of toAdd) {
+          const addRes = await addMyService(token, {
+            serviceId,
+            status: "Active",
+            date: today,
+          });
+          const ok = addRes.ok && ((addRes.data as { success?: boolean } | null)?.success ?? true);
+          if (!ok) {
+            const msg =
+              addRes.data && typeof addRes.data === "object" && "message" in addRes.data
+                ? String((addRes.data as { message?: string }).message ?? "")
+                : "";
+            showErrorToastRef.current?.(msg || "Could not add service.");
+            setOptimisticIds(null);
+            return false;
+          }
         }
-        showSuccessToastRef.current?.(msg || "Services updated.");
+
+        if (toRemove.length > 0) {
+          const res = await updateServiceWeWorkWith(token, cleaned);
+          const ok = res.ok && (res.data?.success ?? true);
+          const msg = typeof res.data?.message === "string" ? res.data.message : "";
+          if (!ok) {
+            showErrorToastRef.current?.(msg || "Could not update services.");
+            setOptimisticIds(null);
+            return false;
+          }
+        }
+
+        showSuccessToastRef.current?.(
+          toAdd.length === 0 && toRemove.length === 0
+            ? "Services updated."
+            : toRemove.length > 0
+              ? "Services updated."
+              : toAdd.length === 1
+                ? "Service added."
+                : "Services updated."
+        );
         await onChangedRef.current?.();
         await refresh();
         setOptimisticIds(null);
@@ -174,7 +248,7 @@ export function useShopOwnerServices(options?: {
         setSaving(false);
       }
     },
-    [refresh, token]
+    [refresh, serverMyServiceIds, token]
   );
 
   const loading = catalogLoading || myLoading;
@@ -183,6 +257,8 @@ export function useShopOwnerServices(options?: {
     allServices,
     myServiceIds,
     myServiceIdSet,
+    myCategories,
+    shopTypes,
     loading,
     updatingId,
     saving,
@@ -191,4 +267,3 @@ export function useShopOwnerServices(options?: {
     saveServiceWeWorkWith,
   };
 }
-

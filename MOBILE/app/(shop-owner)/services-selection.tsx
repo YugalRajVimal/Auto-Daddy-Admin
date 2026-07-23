@@ -3,6 +3,7 @@ import { colors, fontSizes, radii, spacing, typography } from "@/constants/autod
 import { useAuth } from "@/context/auth-provider";
 import { useShopOwnerServices } from "@/hooks/use-shop-owner-services";
 import { resolveShopOwnerBackTo } from "@/lib/shop-owner-navigation";
+import { shopOwnerShopTypeLabel } from "@/lib/shop-owner-shop-types";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
@@ -101,7 +102,7 @@ export default function ServicesSelectionPage() {
 
   return (
     <StackScreenFrame
-      title="Services"
+      title="Operational Services"
       backgroundColor={colors.bgProfile}
       scroll={false}
       backTo={backTo}
@@ -141,7 +142,7 @@ export default function ServicesSelectionPage() {
           </View>
 
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>All services</Text>
+            <Text style={styles.sectionTitle}>Operational services</Text>
             {services.loading && totalCount === 0 ? <ActivityIndicator size="small" color={colors.primary} /> : null}
           </View>
 
@@ -163,6 +164,8 @@ export default function ServicesSelectionPage() {
                 const id = c.id?.trim() ?? "";
                 const selected = id ? draftIds.includes(id) : false;
                 const disabled = !id || services.saving;
+                const typeLabel = c.shopType ? shopOwnerShopTypeLabel(c.shopType) : "";
+                const subtitle = [typeLabel, c.desc?.trim()].filter(Boolean).join(" · ");
                 return (
                   <Pressable
                     key={id || c.name}
@@ -179,9 +182,9 @@ export default function ServicesSelectionPage() {
                           <Text style={styles.rowTitle} numberOfLines={2}>
                             {c.name}
                           </Text>
-                          {c.desc?.trim() ? (
+                          {subtitle ? (
                             <Text style={styles.rowSub} numberOfLines={2}>
-                              {c.desc}
+                              {subtitle}
                             </Text>
                           ) : null}
                         </View>

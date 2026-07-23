@@ -31,8 +31,12 @@ export type CustomerCardProps = {
   onToggleExpand: () => void;
   showAddButton?: boolean;
   addLabelInList?: string;
+  /** Defaults to “+ Invite” (People search invite). */
+  addButtonLabel?: string;
   onAddToMine?: () => void;
   addingToMine?: boolean;
+  /** Approval / link status shown under phone (Approval tab). */
+  statusLabel?: string;
   onView?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -64,8 +68,10 @@ export function CustomerCard({
   onToggleExpand,
   showAddButton,
   addLabelInList,
+  addButtonLabel = "+ Invite",
   onAddToMine,
   addingToMine = false,
+  statusLabel,
   onView,
   onEdit,
   onDelete,
@@ -99,6 +105,11 @@ export function CustomerCard({
             <Text style={styles.phone} numberOfLines={2} ellipsizeMode="tail">
               {phone}
             </Text>
+            {statusLabel ? (
+              <View style={styles.statusBadge}>
+                <Text style={styles.statusBadgeText}>{statusLabel}</Text>
+              </View>
+            ) : null}
             {variant === "directory" && showAddButton && onAddToMine ? (
               <Pressable
                 style={[styles.addOutline, addingToMine && styles.addOutlineDisabled]}
@@ -108,10 +119,10 @@ export function CustomerCard({
                 {addingToMine ? (
                   <View style={styles.addOutlineLoadingRow}>
                     <ActivityIndicator size="small" color={colors.successDark} />
-                    <Text style={styles.addOutlineText}>Adding…</Text>
+                    <Text style={styles.addOutlineText}>Inviting…</Text>
                   </View>
                 ) : (
-                  <Text style={styles.addOutlineText}>+ Add To My Customer</Text>
+                  <Text style={styles.addOutlineText}>{addButtonLabel}</Text>
                 )}
               </Pressable>
             ) : null}
@@ -287,6 +298,16 @@ const styles = StyleSheet.create({
   titleBlock: { flex: 1, minWidth: 0, justifyContent: "center" },
   name: { fontSize: cardFontSizes.md, fontWeight: "800", color: colors.text },
   phone: { fontSize: cardFontSizes.sm, color: colors.textMuted, marginTop: 2, marginBottom: 4 },
+  statusBadge: {
+    alignSelf: "flex-start",
+    marginTop: 2,
+    marginBottom: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.md,
+    backgroundColor: colors.iconBlueTint,
+  },
+  statusBadgeText: { fontSize: cardFontSizes.xs, fontWeight: "700", color: colors.primary },
   addOutline: {
     borderWidth: 1.5,
     borderColor: colors.success,

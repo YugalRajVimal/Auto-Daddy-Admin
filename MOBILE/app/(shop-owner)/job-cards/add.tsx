@@ -793,6 +793,7 @@ export default function NewJobCardPage() {
         {
           jobCardId: editingJobCardId ?? undefined,
           jobCardNo: editingJobCardNo ?? undefined,
+          sendForApproval: !isEditMode,
           form: {
             customerId: ownerId,
             vehicleId,

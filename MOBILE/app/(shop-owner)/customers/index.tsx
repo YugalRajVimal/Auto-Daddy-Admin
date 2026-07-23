@@ -1,16 +1,21 @@
 import { CustomerCard } from "@/components/customers";
 import { CustomerVehicleFields } from "@/components/customers/customer-vehicle-fields";
-import { DatePeriodFilter, Fab, ModalKeyboardRoot, Pill, StackScreenFrame, SurfaceCard, useToast } from "@/components/reusables";
+import { Fab, ModalKeyboardRoot, Pill, StackScreenFrame, SurfaceCard, useToast } from "@/components/reusables";
 import { ShopOwnerCityPickerModal } from "@/components/shop-owner/shop-owner-city-picker-modal";
 import { colors, fontSizes, radii, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import { useCarCompanyCatalog } from "@/hooks/use-car-company-catalog";
 import { useKeyboardBottomInset } from "@/hooks/use-keyboard-bottom-inset";
-import { customerKey, hitKey, useMyCustomers } from "@/hooks/use-my-customers";
+import {
+  approvalStatusLabel,
+  customerKey,
+  hitKey,
+  matchesMyCustomerSearch,
+  useMyCustomers,
+  type PeopleSection,
+} from "@/hooks/use-my-customers";
 import { useOncePress } from "@/hooks/use-once-press";
 import { toUpdateCustomerVehicleRows } from "@/lib/auto-shop-owner-api";
-import type { MyCustomersPeriod } from "@/lib/shop-owner-api";
-import type { DatePeriodTimeFilter } from "@/lib/date-period-labels";
 import {
   loadCustomerCityForForm,
   optionalCityField,
@@ -30,7 +35,7 @@ import type { UserCity } from "@/types/user-cities";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -46,6 +51,11 @@ import {
   TextInput,
   View,
 } from "react-native";
+
+const PEOPLE_SECTIONS: { id: PeopleSection; label: string }[] = [
+  { id: "my-list", label: "My Customer List" },
+  { id: "approval", label: "Approval" },
+];
 
 function isValidEmail(v: string) {
   const s = v.trim();
@@ -130,12 +140,7 @@ export default function CustomersPage() {
   const isOwner = (meta?.role ?? "").toLowerCase() === "autoshopowner";
 
   const [searchText, setSearchText] = useState("");
-  const [timeFilter, setTimeFilter] = useState<DatePeriodTimeFilter>("All");
-  const [anchorDate, setAnchorDate] = useState(() => new Date());
-  const anchorRef = useRef<Date>(anchorDate);
-  useEffect(() => {
-    anchorRef.current = anchorDate;
-  }, [anchorDate]);
+  const [section, setSection] = useState<PeopleSection>("my-list");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<MyCustomer | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -186,21 +191,8 @@ export default function CustomersPage() {
     };
   }, [editorOpen, selectedCustomer, token]);
 
-  const listPeriod = useMemo<MyCustomersPeriod>(
-    () => ({
-      timeFilter,
-      anchorDate,
-    }),
-    [timeFilter, anchorDate]
-  );
-  const periodKey = `${timeFilter}:${anchorDate.getTime()}`;
-  const loadedPeriodRef = useRef<string>("");
-  const [periodSwitchKey, setPeriodSwitchKey] = useState<string | null>(null);
-  const sawLoadingForSwitchRef = useRef(false);
-
   const {
     customers,
-    searchHits,
     loading,
     searching,
     loadCustomers,
@@ -208,66 +200,49 @@ export default function CustomersPage() {
     addCustomer,
     removeCustomer,
     updateCustomer,
-    setSearchHits,
-  } = useMyCustomers(token, isOwner, showToast, listPeriod);
+    directorySearchActive,
+    isCustomerAlreadyAdded,
+  } = useMyCustomers(token, isOwner, showToast, section);
 
-  const addCustomerGuarded = useOncePress(async (id: string) => {
+  const inviteCustomerGuarded = useOncePress(async (customer: MyCustomer) => {
+    const id = customerKey(customer);
     if (!id || addingId) {
       return;
     }
     setAddingId(id);
     try {
-      await addCustomer(id);
+      const ok = await addCustomer(id, {
+        name: customer.name,
+        email: customer.email,
+        city: customer.city,
+      });
+      if (ok) {
+        setSearchText("");
+        setSection("approval");
+      }
     } finally {
       setAddingId(null);
     }
   });
 
-  useEffect(() => {
-    if (!loading) {
-      loadedPeriodRef.current = periodKey;
-    }
-  }, [loading, periodKey]);
-
-  const isDirectoryMode = searchText.trim().length > 0;
-  useEffect(() => {
-    if (!periodSwitchKey || periodSwitchKey !== periodKey) {
-      return;
-    }
-    if (loading) {
-      sawLoadingForSwitchRef.current = true;
-      return;
-    }
-    if (sawLoadingForSwitchRef.current) {
-      setPeriodSwitchKey(null);
-      sawLoadingForSwitchRef.current = false;
-    }
-  }, [loading, periodKey, periodSwitchKey]);
-  const showPeriodSkeleton =
-    !isDirectoryMode &&
-    ((periodSwitchKey === periodKey && periodSwitchKey != null) || (loading && loadedPeriodRef.current !== periodKey));
+  /** Directory search only on My Customer List (People); Approval filters client-side. */
+  const isDirectoryMode = section === "my-list" && directorySearchActive && searchText.trim().length > 0;
 
   useEffect(() => {
+    if (section !== "my-list") {
+      return;
+    }
     const t = setTimeout(() => {
-      if (!searchText.trim()) {
-        setSearchHits([]);
-        return;
-      }
       void runSearch(searchText);
-    }, 450);
+    }, 250);
     return () => clearTimeout(t);
-  }, [searchText, runSearch, setSearchHits]);
+  }, [searchText, runSearch, section]);
 
   useFocusEffect(
     useCallback(() => {
       if (fromQuickAction) {
-        const nextAnchor = new Date();
-        setPeriodSwitchKey(`All:${nextAnchor.getTime()}`);
-        sawLoadingForSwitchRef.current = false;
-        setTimeFilter("All");
-        setAnchorDate(nextAnchor);
+        setSection("my-list");
         setSearchText("");
-        setSearchHits([]);
         setExpandedId(null);
         setEditorOpen(false);
         setSelectedCustomer(null);
@@ -276,7 +251,7 @@ export default function CustomersPage() {
       }
       void loadCustomers();
       return undefined;
-    }, [fromQuickAction, loadCustomers, setSearchHits])
+    }, [fromQuickAction, loadCustomers])
   );
 
   const onRefresh = useCallback(() => {
@@ -320,28 +295,22 @@ export default function CustomersPage() {
     });
   });
 
-  /** Server-filtered list for the selected Daily / Weekly / Monthly period. */
-  const filteredMine = useMemo(() => customers, [customers]);
-
-  const myIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const c of customers) {
-      const id = customerKey(c);
-      if (id) {
-        s.add(id);
-      }
+  /** Server list for section; Approval applies local search like People.tsx. */
+  const filteredMine = useMemo(() => {
+    if (section === "approval") {
+      return customers.filter((c) => matchesMyCustomerSearch(c, searchText));
     }
-    return s;
-  }, [customers]);
+    return customers;
+  }, [customers, searchText, section]);
 
   const rows: ListRow[] = useMemo(() => {
     if (isDirectoryMode) {
-      return searchHits.map((hit) => ({ kind: "hit" as const, hit }));
+      return filteredMine.map((customer) => ({ kind: "hit" as const, hit: customer }));
     }
     return filteredMine.map((customer) => ({ kind: "mine" as const, customer }));
-  }, [isDirectoryMode, searchHits, filteredMine]);
+  }, [isDirectoryMode, filteredMine]);
 
-  const headerCount = isDirectoryMode ? searchHits.length : filteredMine.length;
+  const headerCount = filteredMine.length;
 
   function toggleExpanded(id: string) {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -449,6 +418,7 @@ export default function CustomersPage() {
       address: editAddress.trim().slice(0, 50),
       ...optionalCityField(editCity?.name),
       vehicles,
+      status: c.status,
     });
     setEditorSaving(false);
     if (ok) {
@@ -500,6 +470,7 @@ export default function CustomersPage() {
         address: (customer.address ?? "").trim().slice(0, 50),
         ...optionalCityField(customer.city),
         vehicles,
+        status: customer.status,
       });
     },
     [showToast, updateCustomer]
@@ -519,23 +490,31 @@ export default function CustomersPage() {
     [removeVehicleFromCustomer]
   );
 
-  /** Daily: ±1 day · Weekly: ±7 days (Mon–Sun blocks) · Monthly: ±1 calendar month */
-  function stepPeriod(direction: -1 | 1) {
-    const base = new Date(anchorRef.current);
-    if (timeFilter === "Daily") {
-      base.setDate(base.getDate() + direction);
-    } else if (timeFilter === "Weekly") {
-      base.setDate(base.getDate() + direction * 7);
-    } else {
-      base.setMonth(base.getMonth() + direction);
-    }
-    setPeriodSwitchKey(`${timeFilter}:${base.getTime()}`);
-    sawLoadingForSwitchRef.current = false;
-    setAnchorDate(base);
-  }
+  const selectSection = (next: PeopleSection) => {
+    setSection(next);
+    setSearchText("");
+    setExpandedId(null);
+    setEditorOpen(false);
+    setSelectedCustomer(null);
+  };
 
   const listHeader = (
     <View style={styles.stickyHeader}>
+      <View style={styles.sectionTabs}>
+        {PEOPLE_SECTIONS.map((tab) => {
+          const active = section === tab.id;
+          return (
+            <Pressable
+              key={tab.id}
+              onPress={() => selectSection(tab.id)}
+              style={[styles.sectionTab, active && styles.sectionTabActive]}
+            >
+              <Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>{tab.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View style={styles.searchWrap}>
         <Ionicons name="search" size={20} color={colors.primary} />
         <TextInput
@@ -551,7 +530,6 @@ export default function CustomersPage() {
         <Pressable
           onPress={() => {
             setSearchText("");
-            setSearchHits([]);
           }}
           hitSlop={8}
         >
@@ -559,29 +537,21 @@ export default function CustomersPage() {
         </Pressable>
       </View>
 
-      <DatePeriodFilter
-        timeFilter={timeFilter}
-        onTimeFilterChange={(item) => {
-          const nextAnchor = new Date();
-          setPeriodSwitchKey(`${item}:${nextAnchor.getTime()}`);
-          sawLoadingForSwitchRef.current = false;
-          setTimeFilter(item);
-          setAnchorDate(nextAnchor);
-        }}
-        anchorDate={anchorDate}
-        onStepPeriod={stepPeriod}
-        interactionDisabled={isDirectoryMode}
-      />
+      {isDirectoryMode ? (
+        <Text style={styles.inviteHint}>
+          If this customer is not on your list, Invite to add them to your permanent customer list.
+        </Text>
+      ) : null}
     </View>
   );
 
   const showEmpty =
     !loading &&
     (isDirectoryMode
-      ? !searching && searchHits.length === 0
+      ? !searching && filteredMine.length === 0
       : filteredMine.length === 0);
 
-  const showSearchLoading = isDirectoryMode && searching && searchHits.length === 0;
+  const showSearchLoading = isDirectoryMode && searching && filteredMine.length === 0;
   const showSkeleton = !isDirectoryMode && loading && rows.length === 0;
 
   return (
@@ -598,19 +568,13 @@ export default function CustomersPage() {
         </Pill>
       }
       floatingContent={
-        expandedId == null ? (
+        section === "my-list" && expandedId == null ? (
           <Fab label="Add Customer" icon="person-add" onPress={() => openAddCustomer?.()} />
         ) : undefined
       }
     >
       <View style={styles.listWrap}>
-        {showPeriodSkeleton ? (
-          <View style={{ flex: 1 }}>
-            {listHeader}
-            <CustomerSkeletonList />
-          </View>
-        ) : (
-          <FlatList
+        <FlatList
             data={rows}
             keyExtractor={(row, index) =>
               row.kind === "mine"
@@ -644,7 +608,9 @@ export default function CustomersPage() {
               ) : showEmpty ? (
                 <View style={styles.emptyWrap}>
                   <Ionicons name="people-outline" size={62} color="#9DB7E8" />
-                  <Text style={styles.emptyText}>No customers found</Text>
+                  <Text style={styles.emptyText}>
+                    {section === "approval" ? "No customers awaiting approval" : "No customers found"}
+                  </Text>
                 </View>
               ) : loading ? (
                 <View style={styles.centerEmpty}>
@@ -669,7 +635,8 @@ export default function CustomersPage() {
                     city={c.city}
                     pincode={c.pincode}
                     vehicles={c.vehicles ?? []}
-                    footerTime={c.updatedAt ?? c.createdAt}
+                    footerTime={c.updatedAt ?? c.createdAt ?? c.addedToShopAt}
+                    statusLabel={section === "approval" ? approvalStatusLabel(c) : undefined}
                     expanded={expanded}
                     onToggleExpand={toggle}
                     onView={() => openCustomerForm?.("view", c)}
@@ -687,9 +654,19 @@ export default function CustomersPage() {
                         },
                       ]);
                     }}
-                    onEditVehicle={(vehicleIndex) => openCustomerForm?.("edit", c, vehicleIndex)}
-                    onRemoveVehicle={(vehicleIndex) => confirmRemoveCustomerVehicle(c, vehicleIndex)}
-                    onAddVehicle={() => openAddVehicleForCustomer?.(c)}
+                    onEditVehicle={
+                      section === "my-list"
+                        ? (vehicleIndex) => openCustomerForm?.("edit", c, vehicleIndex)
+                        : undefined
+                    }
+                    onRemoveVehicle={
+                      section === "my-list"
+                        ? (vehicleIndex) => confirmRemoveCustomerVehicle(c, vehicleIndex)
+                        : undefined
+                    }
+                    onAddVehicle={
+                      section === "my-list" ? () => openAddVehicleForCustomer?.(c) : undefined
+                    }
                   />
                 );
               }
@@ -699,7 +676,8 @@ export default function CustomersPage() {
               const rowKey = hid || h.name || "hit";
               const expanded = (hid || rowKey) === expandedId;
               const toggle = () => toggleExpanded(hid || rowKey);
-              const inList = Boolean(hid && myIds.has(hid));
+              const asCustomer = h as MyCustomer;
+              const inList = isCustomerAlreadyAdded(asCustomer);
               return (
                 <CustomerCard
                   variant="directory"
@@ -716,7 +694,7 @@ export default function CustomersPage() {
                   showAddButton={Boolean(hid) && !inList}
                   addLabelInList={inList ? "In your list" : undefined}
                   addingToMine={Boolean(hid && addingId === hid)}
-                  onAddToMine={hid ? () => addCustomerGuarded?.(hid) : undefined}
+                  onAddToMine={hid ? () => inviteCustomerGuarded?.(asCustomer) : undefined}
                   onView={() => {
                     if (!expanded) {
                       toggle();
@@ -726,7 +704,6 @@ export default function CustomersPage() {
               );
             }}
           />
-        )}
         {loading && !refreshing && !isDirectoryMode && rows.length > 0 ? (
           <View style={styles.listLoadingOverlay} pointerEvents="auto">
             <View style={styles.miniSkeletonOverlay}>
@@ -927,6 +904,42 @@ const styles = StyleSheet.create({
   stickyHeader: {
     backgroundColor: colors.bgProfile,
     paddingTop: spacing.sm,
+  },
+  sectionTabs: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginHorizontal: spacing.screenHorizontal,
+    marginBottom: spacing.sm,
+  },
+  sectionTab: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  sectionTabActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.iconBlueTint,
+  },
+  sectionTabText: {
+    fontSize: fontSizes.sm,
+    fontWeight: "700",
+    color: colors.textMuted,
+  },
+  sectionTabTextActive: {
+    color: colors.primary,
+  },
+  inviteHint: {
+    marginHorizontal: spacing.screenHorizontal,
+    marginBottom: spacing.sm,
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+    fontStyle: "italic",
+    lineHeight: 16,
   },
   listLoadingOverlay: {
     ...StyleSheet.absoluteFillObject,

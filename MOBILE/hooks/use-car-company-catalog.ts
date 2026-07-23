@@ -7,6 +7,8 @@ export type CarCompanyCatalogModel = {
 };
 
 export type CarCompanyCatalogItem = {
+  _id?: string;
+  id?: string;
   companyName: string;
   models: CarCompanyCatalogModel[];
 };
@@ -29,7 +31,9 @@ export function useCarCompanyCatalog(authToken: string | null, enabled = true) {
     async function load() {
       setLoading(true);
       try {
-        const res = await getJson<CarCompaniesResponse>("/api/user/car-companies", { authToken });
+        const res = await getJson<CarCompaniesResponse>("/api/user/car-companies", {
+          authToken: authToken ?? undefined,
+        });
         if (cancelled) {
           return;
         }

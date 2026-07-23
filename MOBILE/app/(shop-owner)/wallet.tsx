@@ -1,40 +1,265 @@
-import { LoadingProgress, StackScreenFrame, SurfaceCard, useToast } from "@/components/reusables";
+import {
+  ChevronLabelBar,
+  Fab,
+  LoadingProgress,
+  ModalKeyboardRoot,
+  StackScreenFrame,
+  SurfaceCard,
+  useToast,
+} from "@/components/reusables";
 import { cardFontSizes, cardTypography, colors, fontSizes, radii, shadows, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
-import { useOncePress } from "@/hooks/use-once-press";
-import { useKeyboardBottomInset } from "@/hooks/use-keyboard-bottom-inset";
-import { useShopAccounts } from "@/hooks/use-shop-accounts";
+import { useShopAccounts, type ShopBankRow, type ShopExpenseRow } from "@/hooks/use-shop-accounts";
 import { useShopWallet } from "@/hooks/use-shop-wallet";
+import {
+  markAutoshopInvoicePaid,
+  sendAutoshopJobCardForApproval,
+} from "@/lib/autoshopowner-job-cards-api";
 import { getAnchoredMenuStyle, type MenuAnchorRect } from "@/lib/anchored-menu-position";
-import { markAutoshopInvoicePaid, sendAutoshopJobCardForApproval, updateAutoshopJobCardStatus } from "@/lib/autoshopowner-job-cards-api";
-import { fetchJobCardRecord } from "@/lib/shop-owner-job-cards-api";
-import { pickJobCardNoForApi, type JobCardListRow } from "@/lib/shop-owner-job-cards";
+import { formatCurrencyAmount } from "@/lib/currency";
+import {
+  categoryLabel,
+  cloneCategories,
+  dedupeLabels,
+  EXPENSE_CATEGORIES,
+  slugifyLabel,
+  type CategoryOption,
+} from "@/lib/expense-categories";
+import { localImageMultipartPart } from "@/lib/local-image-for-form";
+import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
+import {
+  pickJobCardInvoiceNumber,
+  pickJobCardNoForApi,
+  type JobCardListRow,
+} from "@/lib/shop-owner-job-cards";
+import type { UploadPart } from "@/lib/upload-part";
 import {
   formatWalletAmount,
-  isOnlineInvoicePayment,
   pickWalletWhen,
   shortJobBadgeCode,
-  type WalletLedgerTab,
 } from "@/lib/wallet-helpers";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "@react-navigation/native";
-import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
-import { formatCurrencyAmount } from "@/lib/currency";
+import * as ImagePicker from "expo-image-picker";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   InteractionManager,
-  Keyboard,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
+  Switch,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
-import { ScrollView } from "react-native";
+
+type WalletSection = "invoices" | "expenses" | "banks";
+type InvoiceStatus = "Paid" | "Unpaid";
+
+type InvoiceMenuState = { row: JobCardListRow; isPaid: boolean } | null;
+type ExpenseMenuState = { row: ShopExpenseRow } | null;
+type BankMenuState = { row: ShopBankRow } | null;
+
+const SECTION_TABS: { id: WalletSection; label: string }[] = [
+  { id: "invoices", label: "Invoices" },
+  { id: "expenses", label: "Expenses" },
+  { id: "banks", label: "Manage Banks" },
+];
+
+const STATUS_ORDER: InvoiceStatus[] = ["Paid", "Unpaid"];
+
+function todayYMD() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatDisplayDate(iso: string) {
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return iso;
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}
+
+function ymdToDate(ymd: string): Date {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return new Date();
+  return new Date(y, m - 1, d);
+}
+
+function dateToYmd(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function normalizeVendorLabel(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function displayBillId(row: JobCardListRow): string {
+  const invoiceNo = pickJobCardInvoiceNumber(row);
+  if (invoiceNo) return invoiceNo;
+  return row.jobNo?.trim() || "—";
+}
+
+function matchesInvoiceSearch(row: JobCardListRow, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [row.customerName, row.phone, row.vehiclePlate, row.jobNo, pickJobCardInvoiceNumber(row)]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(q);
+}
+
+function matchesExpenseSearch(row: ShopExpenseRow, query: string, categories: CategoryOption[]): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const labels = categoryLabel(categories, row.category, row.subCategory);
+  return [
+    row.date,
+    formatDisplayDate(row.date),
+    row.vendor,
+    String(row.amount),
+    labels.category,
+    labels.subcategory,
+    row.notes,
+    row.billNumber ?? "",
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(q);
+}
+
+function FieldLabel({ label, required }: { label: string; required?: boolean }) {
+  return (
+    <Text style={styles.fieldLabel}>
+      {label}
+      {required ? <Text style={styles.required}> *</Text> : null}
+    </Text>
+  );
+}
+
+function FormInput(props: {
+  value: string;
+  onChangeText: (t: string) => void;
+  placeholder?: string;
+  keyboardType?: "default" | "decimal-pad" | "numeric";
+  multiline?: boolean;
+  editable?: boolean;
+}) {
+  const { value, onChangeText, placeholder, keyboardType = "default", multiline, editable = true } = props;
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor={colors.textLight}
+      keyboardType={keyboardType}
+      multiline={multiline}
+      editable={editable}
+      style={[styles.input, multiline && styles.inputTall, !editable && styles.inputDisabled]}
+    />
+  );
+}
+
+function CheckRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <Pressable style={styles.checkRow} onPress={() => onChange(!checked)}>
+      <Switch
+        value={checked}
+        onValueChange={onChange}
+        trackColor={{ false: colors.border, true: colors.primaryMutedBg }}
+        thumbColor={checked ? colors.primary : colors.textLight}
+      />
+      <Text style={styles.checkLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function OptionPickerModal({
+  visible,
+  title,
+  options,
+  selected,
+  onSelect,
+  onClose,
+  onEditAddNew,
+}: {
+  visible: boolean;
+  title: string;
+  options: string[];
+  selected: string;
+  onSelect: (value: string) => void;
+  onClose: () => void;
+  onEditAddNew?: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <ModalKeyboardRoot onBackdropPress={onClose} scrimColor="rgba(0,0,0,0.42)">
+        <View style={styles.pickerSheet}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>{title}</Text>
+            <Pressable onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={22} color={colors.textMuted} />
+            </Pressable>
+          </View>
+          <ScrollView style={styles.pickerList} keyboardShouldPersistTaps="handled">
+            {options.length === 0 ? (
+              <Text style={styles.pickerEmpty}>No options</Text>
+            ) : (
+              options.map((opt, idx) => {
+                const active = opt === selected;
+                return (
+                  <Pressable
+                    key={`${opt}-${idx}`}
+                    style={[styles.pickerItem, active && styles.pickerItemActive]}
+                    onPress={() => {
+                      onSelect(opt);
+                      onClose();
+                    }}
+                  >
+                    <Text style={[styles.pickerItemText, active && styles.pickerItemTextActive]}>{opt}</Text>
+                  </Pressable>
+                );
+              })
+            )}
+          </ScrollView>
+          {onEditAddNew ? (
+            <Pressable
+              style={styles.pickerEditBtn}
+              onPress={() => {
+                onClose();
+                onEditAddNew();
+              }}
+            >
+              <Text style={styles.pickerEditBtnText}>Edit / Add New</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </ModalKeyboardRoot>
+    </Modal>
+  );
+}
 
 function SkeletonLine({ w }: { w: number | `${number}%` }) {
   return <View style={[styles.skeletonLine, { width: w }]} />;
@@ -43,7 +268,7 @@ function SkeletonLine({ w }: { w: number | `${number}%` }) {
 function WalletSkeletonList() {
   return (
     <View style={styles.skeletonList} pointerEvents="none">
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: 5 }).map((_, i) => (
         <SurfaceCard key={i} shadow="card" style={styles.skeletonCard}>
           <View style={styles.skeletonRow}>
             <View style={styles.skeletonBadge} />
@@ -63,234 +288,536 @@ function WalletSkeletonList() {
   );
 }
 
-const STATUS_ORDER = ["Paid", "Unpaid"] as const;
-type WalletStatusLabel = (typeof STATUS_ORDER)[number];
-
-type WalletMenuState = {
-  row: JobCardListRow;
-  isPaid: boolean;
-  ledger: WalletLedgerTab;
-} | null;
-
-type JobCardViewerState = {
-  open: boolean;
-  row: JobCardListRow | null;
-  loading: boolean;
-  payload: unknown | null;
-  error: string | null;
-};
-
-type InvoiceViewerState = {
-  open: boolean;
-  row: JobCardListRow | null;
-  loading: boolean;
-  payload: unknown | null;
-  error: string | null;
-};
-
-type BillingViewerState = {
-  open: boolean;
-  row: JobCardListRow | null;
-  loading: boolean;
-  payload: unknown | null;
-  error: string | null;
-};
-
-function s(v: unknown): string {
-  if (typeof v === "string") return v.trim();
-  if (typeof v === "number" && Number.isFinite(v)) return String(v);
-  return "";
-}
-
-function obj(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
-}
-
-function pickJobCardFromPayload(payload: unknown): Record<string, unknown> | null {
-  const root = obj(payload);
-  if (!root) return null;
-  const data = obj(root.data);
-  const direct = obj(root.jobCard) ?? obj(root.card);
-  if (direct) return direct;
-  if (data) {
-    return obj(data.jobCard) ?? obj(data.card) ?? (data as Record<string, unknown>);
-  }
-  return root;
-}
-
-function getNested(o: Record<string, unknown> | null, key: string): Record<string, unknown> | null {
-  if (!o) return null;
-  const v = o[key];
-  return obj(v);
-}
-
 export default function WalletPage() {
-  const { qa: qaParam } = useLocalSearchParams<{ qa?: string }>();
-  const fromQuickAction = qaParam === "1" || qaParam === "true";
-  const { width: windowWidth } = useWindowDimensions();
-  const menuBtnRefs = useRef<Record<string, View | null>>({});
   const { token, meta } = useAuth();
   const { showToast } = useToast();
+  const { width: windowWidth } = useWindowDimensions();
   const isOwner = (meta?.role ?? "").toLowerCase() === "autoshopowner";
-  const { paidCash, paidOnline, unpaidCash, unpaidOnline, loading, refresh } = useShopWallet(
-    token,
-    isOwner,
-    showToast
-  );
+  const countryCode = meta?.countryCode;
+
+  const { paid, unpaid, loading, refresh } = useShopWallet(token, isOwner, showToast);
   const {
     banks,
     expenses,
     loading: accountsLoading,
     refresh: refreshAccounts,
-    addBank,
-    addExpense,
+    saveBank,
+    saveExpense,
   } = useShopAccounts(token, isOwner, showToast);
 
-  const [walletSection, setWalletSection] = useState<"invoices" | "banks" | "expenses">("invoices");
+  const [section, setSection] = useState<WalletSection>("invoices");
   const [statusIndex, setStatusIndex] = useState(0);
-  const [ledgerTab, setLedgerTab] = useState<WalletLedgerTab>("cash");
+  const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [menu, setMenu] = useState<WalletMenuState>(null);
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
+  const [previewRow, setPreviewRow] = useState<JobCardListRow | null>(null);
+
+  const menuBtnRefs = useRef<Record<string, View | null>>({});
+  const [invoiceMenu, setInvoiceMenu] = useState<InvoiceMenuState>(null);
+  const [expenseMenu, setExpenseMenu] = useState<ExpenseMenuState>(null);
+  const [bankMenu, setBankMenu] = useState<BankMenuState>(null);
   const [menuAnchor, setMenuAnchor] = useState<MenuAnchorRect | null>(null);
-  const [markingId, setMarkingId] = useState<string | null>(null);
-  const [jobCardViewer, setJobCardViewer] = useState<JobCardViewerState>({
-    open: false,
-    row: null,
-    loading: false,
-    payload: null,
-    error: null,
-  });
-  const [invoiceViewer, setInvoiceViewer] = useState<InvoiceViewerState>({
-    open: false,
-    row: null,
-    loading: false,
-    payload: null,
-    error: null,
-  });
-  const [billingViewer, setBillingViewer] = useState<BillingViewerState>({
-    open: false,
-    row: null,
-    loading: false,
-    payload: null,
-    error: null,
-  });
 
-  const keyboardBottom = useKeyboardBottomInset();
-  const keyboardOpen = keyboardBottom > 0;
-  const formatAmount = useCallback(
-    (amount: number | string | null | undefined, options?: { decimals?: number }) =>
-      formatCurrencyAmount(amount, meta?.countryCode, {
-        fallback: "—",
-        minimumFractionDigits: options?.decimals,
-        maximumFractionDigits: options?.decimals,
-      }),
-    [meta?.countryCode]
+  const [expenseCategories, setExpenseCategories] = useState<CategoryOption[]>(() =>
+    cloneCategories(EXPENSE_CATEGORIES)
   );
+  const effectiveCategories =
+    expenseCategories.length > 0 ? expenseCategories : EXPENSE_CATEGORIES;
 
-  const closeBillingViewer = useCallback(() => {
-    if (keyboardOpen) {
-      Keyboard.dismiss();
-      setTimeout(() => setBillingViewer((s) => ({ ...s, open: false })), 80);
-      return;
-    }
-    setBillingViewer((s) => ({ ...s, open: false }));
-  }, [keyboardOpen]);
+  const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseDate, setExpenseDate] = useState(todayYMD());
+  const [expenseVendor, setExpenseVendor] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("");
+  const [expenseSubcategory, setExpenseSubcategory] = useState("");
+  const [expenseNotes, setExpenseNotes] = useState("");
+  const [expenseGst, setExpenseGst] = useState(false);
+  const [expenseGstAmount, setExpenseGstAmount] = useState("");
+  const [expenseHasBillNumber, setExpenseHasBillNumber] = useState(false);
+  const [expenseBillNumber, setExpenseBillNumber] = useState("");
+  const [expenseByCheque, setExpenseByCheque] = useState(false);
+  const [expenseChequeAccount, setExpenseChequeAccount] = useState("");
+  const [expenseAttachReceipt, setExpenseAttachReceipt] = useState(false);
+  const [expenseReceiptPart, setExpenseReceiptPart] = useState<UploadPart | null>(null);
+  const [savingExpense, setSavingExpense] = useState(false);
 
-  const closeInvoiceViewer = useCallback(() => {
-    if (keyboardOpen) {
-      Keyboard.dismiss();
-      setTimeout(() => setInvoiceViewer((s) => ({ ...s, open: false })), 80);
-      return;
-    }
-    setInvoiceViewer((s) => ({ ...s, open: false }));
-  }, [keyboardOpen]);
+  const [bankSheetOpen, setBankSheetOpen] = useState(false);
+  const [editingBankId, setEditingBankId] = useState<string | null>(null);
+  const [bankLabel, setBankLabel] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankBalance, setBankBalance] = useState("");
+  const [bankAssignToInvoice, setBankAssignToInvoice] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
 
-  const closeJobCardViewer = useCallback(() => {
-    if (keyboardOpen) {
-      Keyboard.dismiss();
-      setTimeout(() => setJobCardViewer((s) => ({ ...s, open: false })), 80);
-      return;
-    }
-    setJobCardViewer((s) => ({ ...s, open: false }));
-  }, [keyboardOpen]);
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [subcategoryPickerOpen, setSubcategoryPickerOpen] = useState(false);
+  const [chequePickerOpen, setChequePickerOpen] = useState(false);
+  const [vendorSuggestionsOpen, setVendorSuggestionsOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [subcategoriesPopupOpen, setSubcategoriesPopupOpen] = useState(false);
+  const [subcategoriesDraft, setSubcategoriesDraft] = useState<string[]>([""]);
 
-  const dismissMenu = useCallback(() => {
-    setMenu(null);
-    setMenuAnchor(null);
-  }, []);
-  const dismissMenuRef = useRef(dismissMenu);
-  dismissMenuRef.current = dismissMenu;
-
-  const statusLabel: WalletStatusLabel = STATUS_ORDER[statusIndex % STATUS_ORDER.length];
+  const statusLabel = STATUS_ORDER[statusIndex % STATUS_ORDER.length];
   const isPaidView = statusLabel === "Paid";
 
-  const visibleRows = useMemo(() => {
-    if (isPaidView) {
-      return ledgerTab === "cash" ? paidCash : paidOnline;
+  const dismissMenus = useCallback(() => {
+    setInvoiceMenu(null);
+    setExpenseMenu(null);
+    setBankMenu(null);
+    setMenuAnchor(null);
+  }, []);
+  const dismissMenusRef = useRef(dismissMenus);
+  dismissMenusRef.current = dismissMenus;
+
+  const formatAmount = useCallback(
+    (amount: number | string | null | undefined) =>
+      formatCurrencyAmount(amount, countryCode, { fallback: "—" }),
+    [countryCode]
+  );
+
+  useEffect(() => {
+    if (expenseCategories.length === 0) {
+      setExpenseCategories(cloneCategories(EXPENSE_CATEGORIES));
     }
-    return ledgerTab === "cash" ? unpaidCash : unpaidOnline;
-  }, [isPaidView, ledgerTab, paidCash, paidOnline, unpaidCash, unpaidOnline]);
+  }, [expenseCategories.length]);
 
   useFocusEffect(
     useCallback(() => {
-      if (fromQuickAction) {
-        setStatusIndex(0);
-        setLedgerTab("cash");
-        dismissMenu();
-        router.setParams({ qa: undefined });
-      }
       void refresh();
-      void refreshAccounts();
+      void refreshAccounts(effectiveCategories);
       return undefined;
-    }, [dismissMenu, fromQuickAction, refresh, refreshAccounts])
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- seed categories once per focus
+    }, [refresh, refreshAccounts])
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     InteractionManager.runAfterInteractions(() => {
-      void Promise.all([refresh(), refreshAccounts()]).finally(() => setRefreshing(false));
+      void Promise.all([refresh(), refreshAccounts(effectiveCategories)]).finally(() =>
+        setRefreshing(false)
+      );
     });
-  }, [refresh, refreshAccounts]);
+  }, [effectiveCategories, refresh, refreshAccounts]);
+
+  const invoiceList = isPaidView ? paid : unpaid;
+  const filteredInvoices = useMemo(
+    () => invoiceList.filter((row) => matchesInvoiceSearch(row, search)),
+    [invoiceList, search]
+  );
+  const filteredExpenses = useMemo(
+    () => expenses.filter((row) => matchesExpenseSearch(row, search, effectiveCategories)),
+    [expenses, search, effectiveCategories]
+  );
+  const filteredBanks = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return banks;
+    return banks.filter((row) =>
+      [row.bankName, row.accountName, row.accountNumber].join(" ").toLowerCase().includes(q)
+    );
+  }, [banks, search]);
+
+  const selectedExpenseCategory = useMemo(
+    () => effectiveCategories.find((cat) => cat.value === expenseCategory),
+    [effectiveCategories, expenseCategory]
+  );
+  const expenseCategoryLabels = useMemo(
+    () => effectiveCategories.map((cat) => cat.label),
+    [effectiveCategories]
+  );
+  const expenseSubcategoryLabels = useMemo(
+    () => selectedExpenseCategory?.subcategories.map((sub) => sub.label) ?? [],
+    [selectedExpenseCategory]
+  );
+  const expenseSubcategoryOptions = useMemo(
+    () => selectedExpenseCategory?.subcategories ?? [],
+    [selectedExpenseCategory]
+  );
+  const selectedExpenseCategoryLabel = selectedExpenseCategory?.label ?? "";
+  const selectedExpenseSubcategoryLabel =
+    selectedExpenseCategory?.subcategories.find((sub) => sub.value === expenseSubcategory)?.label ??
+    "";
+
+  const expenseVendorOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const row of expenses) {
+      const normalized = normalizeVendorLabel(row.vendor);
+      if (!normalized) continue;
+      const key = normalized.toLowerCase();
+      if (!seen.has(key)) seen.set(key, normalized);
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [expenses]);
+
+  const filteredVendorOptions = useMemo(() => {
+    const q = normalizeVendorLabel(expenseVendor).toLowerCase();
+    const base = expenseVendorOptions;
+    if (!q) return base.slice(0, 25);
+    return base.filter((opt) => opt.toLowerCase().includes(q)).slice(0, 25);
+  }, [expenseVendor, expenseVendorOptions]);
+
+  const chequeAccountOptions = useMemo(
+    () => banks.map((bank) => bank.bankName).filter(Boolean),
+    [banks]
+  );
+
+  useEffect(() => {
+    setSearch("");
+    setPreviewRow(null);
+    dismissMenus();
+    setExpenseSheetOpen(false);
+    setBankSheetOpen(false);
+  }, [section, dismissMenus]);
+
+  useEffect(() => {
+    dismissMenus();
+  }, [statusIndex, dismissMenus]);
 
   const stepStatus = useCallback((dir: -1 | 1) => {
     setStatusIndex((i) => (i + dir + STATUS_ORDER.length) % STATUS_ORDER.length);
   }, []);
 
-  const openJobCard = useOncePress((row: JobCardListRow) => {
-    dismissMenuRef.current();
-    router.push({
-      pathname: "/(shop-owner)/job-cards/add",
-      params: {
-        mode: "edit",
-        jobCard: encodeURIComponent(JSON.stringify(row.raw)),
-        backTo: "/(shop-owner)/wallet",
-      },
-    });
-  });
+  const openCardMenu = useCallback(
+    (
+      id: string,
+      open: () => void
+    ) => {
+      const node = menuBtnRefs.current[id];
+      if (node && "measureInWindow" in node && typeof node.measureInWindow === "function") {
+        node.measureInWindow((x, y, w, h) => {
+          setMenuAnchor({ x, y, w, h });
+          open();
+        });
+      } else {
+        setMenuAnchor(null);
+        open();
+      }
+    },
+    []
+  );
 
-  const openJobCardPopup = useOncePress(async (row: JobCardListRow) => {
-    if (!token) {
-      showToast("Sign in to view job card.", { type: "error" });
+  const resetExpenseForm = useCallback(() => {
+    setEditingExpenseId(null);
+    setExpenseAmount("");
+    setExpenseDate(todayYMD());
+    setExpenseVendor("");
+    setExpenseCategory("");
+    setExpenseSubcategory("");
+    setExpenseNotes("");
+    setExpenseGst(false);
+    setExpenseGstAmount("");
+    setExpenseHasBillNumber(false);
+    setExpenseBillNumber("");
+    setExpenseByCheque(false);
+    setExpenseChequeAccount("");
+    setExpenseAttachReceipt(false);
+    setExpenseReceiptPart(null);
+  }, []);
+
+  const openAddExpenseSheet = useCallback(() => {
+    dismissMenus();
+    resetExpenseForm();
+    const firstCategory = effectiveCategories[0];
+    if (firstCategory) {
+      setExpenseCategory(firstCategory.value);
+      const firstSub = firstCategory.subcategories?.[0];
+      if (firstSub) setExpenseSubcategory(firstSub.value);
+    }
+    setExpenseSheetOpen(true);
+  }, [dismissMenus, effectiveCategories, resetExpenseForm]);
+
+  const openEditExpenseSheet = useCallback(
+    (row: ShopExpenseRow) => {
+      dismissMenus();
+      setEditingExpenseId(row.id);
+      setExpenseAmount(String(row.amount));
+      setExpenseDate(row.date);
+      setExpenseVendor(row.vendor);
+      setExpenseCategory(row.category);
+      setExpenseSubcategory(row.subCategory);
+      setExpenseNotes(row.notes);
+      setExpenseGst(row.gst);
+      setExpenseGstAmount(row.gstAmount ? String(row.gstAmount) : "");
+      setExpenseHasBillNumber(Boolean(row.billNumber));
+      setExpenseBillNumber(row.billNumber ?? "");
+      setExpenseByCheque(row.byCheque);
+      setExpenseChequeAccount(row.account ?? "");
+      setExpenseAttachReceipt(row.hasReceipt);
+      setExpenseReceiptPart(null);
+      setExpenseSheetOpen(true);
+    },
+    [dismissMenus]
+  );
+
+  const closeExpenseSheet = useCallback(() => {
+    resetExpenseForm();
+    setExpenseSheetOpen(false);
+  }, [resetExpenseForm]);
+
+  const handleExpenseCategoryChange = useCallback(
+    (nextCategoryLabel: string) => {
+      if (!nextCategoryLabel) {
+        setExpenseCategory("");
+        setExpenseSubcategory("");
+        return;
+      }
+      const match = effectiveCategories.find((cat) => cat.label === nextCategoryLabel);
+      setExpenseCategory(match?.value ?? slugifyLabel(nextCategoryLabel));
+      setExpenseSubcategory("");
+    },
+    [effectiveCategories]
+  );
+
+  const handleExpenseSubcategoryChange = useCallback(
+    (nextSubcategoryLabel: string) => {
+      if (!nextSubcategoryLabel) {
+        setExpenseSubcategory("");
+        return;
+      }
+      const match = expenseSubcategoryOptions.find((sub) => sub.label === nextSubcategoryLabel);
+      setExpenseSubcategory(match?.value ?? slugifyLabel(nextSubcategoryLabel));
+    },
+    [expenseSubcategoryOptions]
+  );
+
+  const openSubcategoriesPopup = useCallback(() => {
+    if (!expenseCategory) return;
+    setSubcategoriesDraft(expenseSubcategoryLabels.length ? [...expenseSubcategoryLabels] : [""]);
+    setSubcategoriesPopupOpen(true);
+  }, [expenseCategory, expenseSubcategoryLabels]);
+
+  const saveSubcategoriesPopup = useCallback(() => {
+    if (!expenseCategory) return;
+    const labels = dedupeLabels(subcategoriesDraft);
+    const previousLabels = new Set(expenseSubcategoryLabels.map((label) => label.toLowerCase()));
+    const newlyAdded = labels.filter((label) => !previousLabels.has(label.toLowerCase()));
+
+    const nextSubcategories = labels.map((label) => {
+      const existing = expenseSubcategoryOptions.find(
+        (sub) => sub.label.toLowerCase() === label.toLowerCase()
+      );
+      if (existing) return { ...existing, label };
+      let value = slugifyLabel(label);
+      if (expenseSubcategoryOptions.some((sub) => sub.value === value)) {
+        value = `${value}-${Date.now()}`;
+      }
+      return { value, label };
+    });
+
+    setExpenseCategories((prev) =>
+      prev.map((cat) =>
+        cat.value === expenseCategory ? { ...cat, subcategories: nextSubcategories } : cat
+      )
+    );
+
+    if (newlyAdded.length > 0) {
+      const lastAdded = newlyAdded[newlyAdded.length - 1];
+      const match = nextSubcategories.find(
+        (sub) => sub.label.toLowerCase() === lastAdded.toLowerCase()
+      );
+      if (match) setExpenseSubcategory(match.value);
+    } else if (
+      expenseSubcategory &&
+      !nextSubcategories.some((sub) => sub.value === expenseSubcategory)
+    ) {
+      setExpenseSubcategory(nextSubcategories[0]?.value ?? "");
+    }
+
+    setSubcategoriesPopupOpen(false);
+  }, [
+    expenseCategory,
+    expenseSubcategory,
+    expenseSubcategoryLabels,
+    expenseSubcategoryOptions,
+    subcategoriesDraft,
+  ]);
+
+  const pickReceiptImage = useCallback(async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      showToast("Photo library permission is required.", { type: "error" });
       return;
     }
-    // Android can fail to show a second Modal if we open it while the menu Modal is still visible.
-    // Close menu first, then open the viewer on the next tick.
-    dismissMenuRef.current();
-    await new Promise<void>((r) => setTimeout(r, 50));
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.85,
+      allowsMultipleSelection: false,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset?.uri) return;
+    setExpenseReceiptPart(
+      localImageMultipartPart(asset.uri, {
+        mimeType: asset.mimeType,
+        fileName: asset.fileName,
+        fallbackBase: "receipt",
+      })
+    );
+    setExpenseAttachReceipt(true);
+  }, [showToast]);
 
-    setJobCardViewer({ open: true, row, loading: true, payload: null, error: null });
+  const handleSaveExpense = useCallback(async () => {
+    const trimmedVendor = expenseVendor.trim();
+    const parsedAmount = Number.parseFloat(expenseAmount);
+    const parsedGst = Number.parseFloat(expenseGstAmount);
 
-try {
-      const { record } = await fetchJobCardRecord(token, row.id, { jobCardNo: row.jobNo });
-      setJobCardViewer({ open: true, row, loading: false, payload: record, error: null });
-    } catch {
-      if (row.raw) {
-        setJobCardViewer({ open: true, row, loading: false, payload: row.raw, error: null });
-      } else {
-        setJobCardViewer({ open: true, row, loading: false, payload: null, error: "Could not load job card." });
-      }
+    if (!expenseAmount.trim() || !Number.isFinite(parsedAmount)) {
+      showToast("Amount is required.", { type: "error" });
+      return;
     }
-  });
+    if (!expenseDate) {
+      showToast("Date is required.", { type: "error" });
+      return;
+    }
+    if (!trimmedVendor) {
+      showToast("Vendor is required.", { type: "error" });
+      return;
+    }
+    if (!expenseCategory) {
+      showToast("Category is required.", { type: "error" });
+      return;
+    }
+    if (!expenseSubcategory) {
+      showToast("Subcategory is required.", { type: "error" });
+      return;
+    }
+    if (!token) {
+      showToast("Sign in to save expense.", { type: "error" });
+      return;
+    }
+
+    setSavingExpense(true);
+    try {
+      const ok = await saveExpense(
+        {
+          date: expenseDate,
+          vendor: trimmedVendor,
+          amount: parsedAmount,
+          category: expenseCategory,
+          subCategory: expenseSubcategory,
+          notes: expenseNotes,
+          gst: expenseGst ? (Number.isFinite(parsedGst) ? parsedGst : 0) : 0,
+          billNumber:
+            expenseHasBillNumber && expenseBillNumber.trim()
+              ? expenseBillNumber.trim()
+              : undefined,
+          account: expenseByCheque ? expenseChequeAccount : undefined,
+          expenseImage: expenseAttachReceipt ? expenseReceiptPart : null,
+        },
+        editingExpenseId
+      );
+      if (ok) {
+        await refreshAccounts(effectiveCategories);
+        closeExpenseSheet();
+      }
+    } finally {
+      setSavingExpense(false);
+    }
+  }, [
+    closeExpenseSheet,
+    editingExpenseId,
+    effectiveCategories,
+    expenseAmount,
+    expenseAttachReceipt,
+    expenseBillNumber,
+    expenseByCheque,
+    expenseCategory,
+    expenseChequeAccount,
+    expenseDate,
+    expenseGst,
+    expenseGstAmount,
+    expenseHasBillNumber,
+    expenseNotes,
+    expenseReceiptPart,
+    expenseSubcategory,
+    expenseVendor,
+    refreshAccounts,
+    saveExpense,
+    showToast,
+    token,
+  ]);
+
+  const openAddBankSheet = useCallback(() => {
+    dismissMenus();
+    setEditingBankId(null);
+    setBankLabel("");
+    setBankAccountName("");
+    setBankAccountNumber("");
+    setBankBalance("");
+    setBankAssignToInvoice(banks.length === 0);
+    setBankSheetOpen(true);
+  }, [banks.length, dismissMenus]);
+
+  const openEditBankSheet = useCallback(
+    (row: ShopBankRow) => {
+      dismissMenus();
+      setEditingBankId(row.id);
+      setBankLabel(row.bankName);
+      setBankAccountName(row.accountName === "—" ? "" : row.accountName);
+      setBankAccountNumber(row.accountNumber === "—" ? "" : row.accountNumber);
+      setBankBalance(String(row.totalBalance));
+      setBankAssignToInvoice(row.assignToInvoice);
+      setBankSheetOpen(true);
+    },
+    [dismissMenus]
+  );
+
+  const closeBankSheet = useCallback(() => {
+    setBankSheetOpen(false);
+    setEditingBankId(null);
+  }, []);
+
+  const handleSaveBank = useCallback(async () => {
+    const trimmedLabel = bankLabel.trim();
+    if (!trimmedLabel) {
+      showToast("Enter a bank or wallet label.", { type: "error" });
+      return;
+    }
+    const balance = Number(bankBalance);
+    if (!Number.isFinite(balance)) {
+      showToast("Enter a valid balance.", { type: "error" });
+      return;
+    }
+    if (!token) {
+      showToast("Sign in to save bank.", { type: "error" });
+      return;
+    }
+
+    setSavingBank(true);
+    try {
+      const ok = await saveBank(
+        {
+          bankName: trimmedLabel,
+          openingBalance: balance,
+          totalBalance: balance,
+          accountName: bankAccountName.trim() || undefined,
+          accountNumber: bankAccountNumber.trim() || undefined,
+          assignToInvoice: bankAssignToInvoice,
+        },
+        editingBankId
+      );
+      if (ok) {
+        await refreshAccounts(effectiveCategories);
+        closeBankSheet();
+      }
+    } finally {
+      setSavingBank(false);
+    }
+  }, [
+    bankAccountName,
+    bankAccountNumber,
+    bankAssignToInvoice,
+    bankBalance,
+    bankLabel,
+    closeBankSheet,
+    editingBankId,
+    effectiveCategories,
+    refreshAccounts,
+    saveBank,
+    showToast,
+    token,
+  ]);
 
   const markPaid = useCallback(
     async (row: JobCardListRow) => {
@@ -298,8 +825,8 @@ try {
         showToast("Sign in to update payment.", { type: "error" });
         return;
       }
-      dismissMenu();
-      setMarkingId(row.id);
+      dismissMenus();
+      setActionBusyId(row.id);
       try {
         const jobCardNo = pickJobCardNoForApi(row);
         if (!jobCardNo) {
@@ -307,28 +834,24 @@ try {
           return;
         }
         const res = await markAutoshopInvoicePaid(token, jobCardNo);
-        const msg =
-          res.data && typeof res.data === "object" && "message" in res.data
-            ? String((res.data as { message?: string }).message ?? "")
-            : "";
         if (!res.ok) {
-          showToast(msg || "Could not update payment.", { type: "error" });
+          showToast("Could not update payment.", { type: "error" });
           return;
         }
-        showToast(msg || "Marked as paid.", { type: "success" });
+        showToast("Marked as paid.", { type: "success" });
         await refresh();
       } catch {
         showToast("Network error.", { type: "error" });
       } finally {
-        setMarkingId(null);
+        setActionBusyId(null);
       }
     },
-    [dismissMenu, refresh, showToast, token]
+    [dismissMenus, refresh, showToast, token]
   );
 
   const confirmMarkPaid = useCallback(
     (row: JobCardListRow) => {
-      Alert.alert("Update payment?", "Mark this job card as paid?", [
+      Alert.alert("Mark as paid?", "Mark this invoice as paid?", [
         { text: "Cancel", style: "cancel" },
         { text: "Mark paid", onPress: () => void markPaid(row) },
       ]);
@@ -336,121 +859,47 @@ try {
     [markPaid]
   );
 
-  const openInvoicePopup = useOncePress(async (row: JobCardListRow) => {
-    if (!token) {
-      showToast("Sign in to view invoice.", { type: "error" });
-      return;
-    }
-    // Close menu first; Android can drop a second modal otherwise.
-    dismissMenuRef.current();
-    await new Promise<void>((r) => setTimeout(r, 50));
-    setInvoiceViewer({ open: true, row, loading: true, payload: null, error: null });
-    try {
-      const { record } = await fetchJobCardRecord(token, row.id, { jobCardNo: row.jobNo });
-      setInvoiceViewer({ open: true, row, loading: false, payload: record, error: null });
-    } catch {
-      if (row.raw) {
-        setInvoiceViewer({ open: true, row, loading: false, payload: row.raw, error: null });
-      } else {
-        setInvoiceViewer({ open: true, row, loading: false, payload: null, error: "Could not load invoice." });
-      }
-    }
-  });
-
-  const openBillingPopup = useOncePress(async (row: JobCardListRow) => {
-    if (!token) {
-      showToast("Sign in to update billing.", { type: "error" });
-      return;
-    }
-    dismissMenuRef.current();
-    await new Promise<void>((r) => setTimeout(r, 50));
-    setBillingViewer({ open: true, row, loading: true, payload: null, error: null });
-    try {
-      const { record } = await fetchJobCardRecord(token, row.id, { jobCardNo: row.jobNo });
-      setBillingViewer({ open: true, row, loading: false, payload: record, error: null });
-    } catch {
-      if (row.raw) {
-        setBillingViewer({ open: true, row, loading: false, payload: row.raw, error: null });
-      } else {
-        setBillingViewer({ open: true, row, loading: false, payload: null, error: "Could not load billing details." });
-      }
-    }
-  });
-
-  const updateBillingAndMarkPaid = useOncePress(async (row: JobCardListRow, method: "Cash" | "Online") => {
-    if (!token) {
-      showToast("Sign in to update billing.", { type: "error" });
-      return;
-    }
-    // Use latest fetched payload if available to pick the correct amount.
-    const raw = pickJobCardFromPayload(billingViewer.payload) ?? obj(row.raw) ?? null;
-    const payable = getNested(raw, "payableAmounts");
-    const invoiceTotal = Number(s(payable?.invoiceTotal ?? (raw as any)?.totalPayableAmount ?? row.total) || "0");
-    const cashAmt = Number(s(payable?.cash ?? invoiceTotal) || "0");
-    const onlineAmt = Number(s(payable?.online ?? invoiceTotal) || "0");
-    const amount = method === "Cash" ? cashAmt : onlineAmt;
-
-    setBillingViewer((s) => ({ ...s, open: false }));
-    setMarkingId(row.id);
-    try {
-      const jobCardNo = pickJobCardNoForApi(row);
-      if (!jobCardNo) {
-        showToast("Missing job card number.", { type: "error" });
+  const sendNotification = useCallback(
+    async (row: JobCardListRow, label: string) => {
+      if (!token) {
+        showToast("Sign in to send notification.", { type: "error" });
         return;
       }
-      const res = await markAutoshopInvoicePaid(token, jobCardNo);
-      if (!res.ok) {
-        showToast("Could not update payment method.", { type: "error" });
-        return;
+      dismissMenus();
+      setActionBusyId(row.id);
+      try {
+        const jobCardNo = pickJobCardNoForApi(row);
+        if (!jobCardNo) {
+          showToast("Missing job card number.", { type: "error" });
+          return;
+        }
+        const res = await sendAutoshopJobCardForApproval(token, jobCardNo);
+        if (!res.ok) {
+          showToast(`${label} failed.`, { type: "error" });
+          return;
+        }
+        showToast(`${label} sent.`, { type: "success" });
+      } catch {
+        showToast("Network error.", { type: "error" });
+      } finally {
+        setActionBusyId(null);
       }
-      showToast("Payment collected.", { type: "success" });
-      await refresh();
-    } catch {
-      showToast("Network error.", { type: "error" });
-    } finally {
-      setMarkingId(null);
-    }
-  });
+    },
+    [dismissMenus, showToast, token]
+  );
 
-  const convertToInvoice = useOncePress(async (row: JobCardListRow) => {
-    if (!token) {
-      showToast("Sign in to update billing.", { type: "error" });
-      return;
-    }
-    dismissMenuRef.current();
-    setMarkingId(row.id);
-    try {
-      const jobCardNo = pickJobCardNoForApi(row);
-      if (!jobCardNo) {
-        showToast("Missing job card number.", { type: "error" });
-        return;
-      }
-      const res = await updateAutoshopJobCardStatus(token, jobCardNo, "convertedToInvoice");
-      const payload = res.data as unknown;
-      const msg =
-        payload && typeof payload === "object" && "message" in payload
-          ? String((payload as { message?: string }).message ?? "")
-          : "";
-      if (!res.ok) {
-        showToast(msg || "Could not convert to invoice.", { type: "error" });
-        return;
-      }
-      showToast(msg || "Converted to invoice.", { type: "success" });
-      await refresh();
-    } catch {
-      showToast("Network error.", { type: "error" });
-    } finally {
-      setMarkingId(null);
-    }
-  });
+  const openInvoicePreview = useCallback(
+    (row: JobCardListRow) => {
+      dismissMenus();
+      setPreviewRow(row);
+    },
+    [dismissMenus]
+  );
 
+  const activeMenu = invoiceMenu ?? expenseMenu ?? bankMenu;
   const menuCardLayoutStyle = useMemo(() => {
-    if (!menu) {
-      return null;
-    }
-    if (menuAnchor) {
-      return getAnchoredMenuStyle(menuAnchor);
-    }
+    if (!activeMenu) return null;
+    if (menuAnchor) return getAnchoredMenuStyle(menuAnchor);
     return {
       position: "absolute" as const,
       top: "30%" as const,
@@ -458,18 +907,26 @@ try {
       minWidth: 228,
       zIndex: 2,
     };
-  }, [menu, menuAnchor, windowWidth]);
+  }, [activeMenu, menuAnchor, windowWidth]);
+
+  const listLoading = section === "invoices" ? loading : accountsLoading;
+  const listEmpty =
+    section === "invoices"
+      ? filteredInvoices.length === 0
+      : section === "expenses"
+        ? filteredExpenses.length === 0
+        : filteredBanks.length === 0;
+
+  const emptySecondary =
+    section === "invoices"
+      ? isPaidView
+        ? "No paid invoices available"
+        : "No unpaid invoices available"
+      : section === "expenses"
+        ? "No expenses yet"
+        : "No bank accounts yet";
 
   const headerGradient = [colors.tabBarBg, "#EEF6FF", colors.white] as const;
-
-  const emptyPrimary = "No Data Yet";
-  const emptySecondary = isPaidView
-    ? ledgerTab === "cash"
-      ? "No paid cash transactions available"
-      : "No paid invoice transactions available"
-    : ledgerTab === "cash"
-      ? "No unpaid cash transactions available"
-      : "No unpaid invoice transactions available";
 
   return (
     <StackScreenFrame
@@ -477,116 +934,50 @@ try {
       backgroundColor={colors.bgProfile}
       headerGradient={headerGradient}
       scroll={false}
+      floatingContent={
+        section === "expenses" ? (
+          <Fab label="Add Expense" icon="add" onPress={openAddExpenseSheet} />
+        ) : section === "banks" ? (
+          <Fab label="Add Bank" icon="add" onPress={openAddBankSheet} />
+        ) : undefined
+      }
     >
       <View style={styles.page}>
         <View style={styles.sectionTabs}>
-          {(["invoices", "banks", "expenses"] as const).map((section) => (
-            <Pressable
-              key={section}
-              style={[styles.sectionTab, walletSection === section && styles.sectionTabActive]}
-              onPress={() => setWalletSection(section)}
-            >
-              <Text style={[styles.sectionTabText, walletSection === section && styles.sectionTabTextActive]}>
-                {section === "invoices" ? "Invoices" : section === "banks" ? "Banks" : "Expenses"}
-              </Text>
-            </Pressable>
-          ))}
+          {SECTION_TABS.map((tab) => {
+            const active = section === tab.id;
+            return (
+              <Pressable
+                key={tab.id}
+                style={[styles.sectionTab, active && styles.sectionTabActive]}
+                onPress={() => setSection(tab.id)}
+              >
+                <Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
-        {walletSection === "banks" ? (
-          <ScrollView contentContainerStyle={{ paddingBottom: 40, gap: spacing.sm }}>
-            {accountsLoading ? <LoadingProgress /> : null}
-            {banks.map((bank) => (
-              <SurfaceCard key={bank.id} shadow="soft" style={{ padding: spacing.md }}>
-                <Text style={{ fontWeight: "700", color: colors.text }}>{bank.bankName}</Text>
-                <Text style={{ color: colors.textMuted, marginTop: 4 }}>
-                  {bank.accountName || "—"} · {formatCurrencyAmount(bank.totalBalance ?? 0, meta?.countryCode)}
-                </Text>
-              </SurfaceCard>
-            ))}
-            <Pressable
-              style={styles.sectionAddBtn}
-              onPress={() => {
-                void addBank({
-                  bankName: "New Bank",
-                  openingBalance: 0,
-                  accountName: "Primary",
-                });
-              }}
-            >
-              <Text style={styles.sectionAddBtnText}>Add bank</Text>
-            </Pressable>
-          </ScrollView>
-        ) : walletSection === "expenses" ? (
-          <ScrollView contentContainerStyle={{ paddingBottom: 40, gap: spacing.sm }}>
-            {accountsLoading ? <LoadingProgress /> : null}
-            {expenses.map((expense) => (
-              <SurfaceCard key={expense.id} shadow="soft" style={{ padding: spacing.md }}>
-                <Text style={{ fontWeight: "700", color: colors.text }}>{expense.vendor}</Text>
-                <Text style={{ color: colors.textMuted, marginTop: 4 }}>
-                  {expense.date} · {formatCurrencyAmount(expense.amount, meta?.countryCode)}
-                </Text>
-                <Text style={{ color: colors.textLight, marginTop: 2 }}>
-                  {expense.category} / {expense.subCategory}
-                </Text>
-              </SurfaceCard>
-            ))}
-            <Pressable
-              style={styles.sectionAddBtn}
-              onPress={() => {
-                void addExpense({
-                  date: new Date().toISOString().slice(0, 10),
-                  vendor: "Vendor",
-                  amount: 0,
-                  category: "other-expenses",
-                  subCategory: "misc",
-                });
-              }}
-            >
-              <Text style={styles.sectionAddBtnText}>Add expense</Text>
-            </Pressable>
-          </ScrollView>
-        ) : (
-          <>
-        <View style={styles.statusStrip}>
-          <Pressable style={styles.statusChevron} onPress={() => stepStatus(-1)} hitSlop={10}>
-            <Ionicons name="chevron-back" size={22} color={colors.successDark} />
-          </Pressable>
-          <Text style={styles.statusStripText}>{statusLabel}</Text>
-          <Pressable style={styles.statusChevron} onPress={() => stepStatus(1)} hitSlop={10}>
-            <Ionicons name="chevron-forward" size={22} color={colors.successDark} />
-          </Pressable>
-        </View>
+        {section === "invoices" ? (
+          <ChevronLabelBar
+            label={statusLabel}
+            edgeAligned
+            style={styles.statusBar}
+            onPrevious={() => stepStatus(-1)}
+            onNext={() => stepStatus(1)}
+          />
+        ) : null}
 
-        <View style={styles.ledgerTabs}>
-          <Pressable
-            style={[styles.ledgerTab, ledgerTab === "cash" && styles.ledgerTabActive]}
-            onPress={() => setLedgerTab("cash")}
-          >
-            <Text
-              style={[styles.ledgerTabText, ledgerTab === "cash" && styles.ledgerTabTextOnPrimary]}
-            >
-              💰 Cash
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.ledgerTab, ledgerTab === "invoice" && styles.ledgerTabActiveInvoice]}
-            onPress={() => setLedgerTab("invoice")}
-          >
-            <Ionicons
-              name="document-text"
-              size={18}
-              color={ledgerTab === "invoice" ? colors.white : colors.tabInactive}
-            />
-            <Text
-              style={[
-                styles.ledgerTabTextInvoice,
-                ledgerTab === "invoice" && styles.ledgerTabTextOnPrimary,
-              ]}
-            >
-              Invoice
-            </Text>
-          </Pressable>
+        <View style={styles.toolbar}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search"
+            placeholderTextColor={colors.textLight}
+            style={styles.searchInput}
+          />
         </View>
 
         <ScrollView
@@ -594,8 +985,6 @@ try {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
-          alwaysBounceVertical
           {...androidRefreshScrollProps(onRefresh)}
           refreshControl={
             <RefreshControl
@@ -606,839 +995,657 @@ try {
             />
           }
         >
-          {loading && visibleRows.length === 0 ? <WalletSkeletonList /> : null}
+          {listLoading && listEmpty ? <WalletSkeletonList /> : null}
 
-          {!loading && visibleRows.length === 0 ? (
+          {!listLoading && listEmpty ? (
             <View style={styles.emptyBlock}>
-              <Ionicons name="document-text-outline" size={48} color={colors.textLight} />
-              <Text style={styles.emptyTitle}>{emptyPrimary}</Text>
+              <Ionicons name="wallet-outline" size={48} color={colors.textLight} />
+              <Text style={styles.emptyTitle}>No Data Yet</Text>
               <Text style={styles.emptySub}>{emptySecondary}</Text>
             </View>
           ) : null}
 
-          {visibleRows.map((row) => {
-            const { time, dateLabel } = pickWalletWhen(row, row.raw);
-            const badge = shortJobBadgeCode(row.jobNo);
-            const amountStr = formatWalletAmount(row.total, isPaidView, meta?.countryCode);
-            const amountColor = isPaidView ? colors.success : colors.danger;
-            const badgeBg = isPaidView ? colors.success : colors.danger;
-            const busy = markingId === row.id;
+          {section === "invoices" &&
+            filteredInvoices.map((row) => {
+              const { time, dateLabel } = pickWalletWhen(row, row.raw);
+              const badge = shortJobBadgeCode(row.jobNo);
+              const amountStr = formatWalletAmount(row.total, isPaidView, countryCode);
+              const amountColor = isPaidView ? colors.success : colors.danger;
+              const badgeBg = isPaidView ? colors.success : colors.danger;
+              const busy = actionBusyId === row.id;
 
-            return (
+              return (
+                <SurfaceCard key={row.id} shadow="card" style={styles.txCard}>
+                  <View style={styles.txRow}>
+                    <View style={{ ...styles.jobBadge, backgroundColor: badgeBg }}>
+                      <Text style={styles.jobBadgeLine1}>JobCard</Text>
+                      <Text style={styles.jobBadgeLine2}>{badge}</Text>
+                    </View>
+
+                    <View style={styles.txMain}>
+                      <Text style={styles.txName} numberOfLines={1}>
+                        {row.customerName ?? "Customer"}
+                      </Text>
+                      <View style={styles.phonePill}>
+                        <Ionicons name="call-outline" size={14} color={colors.primary} />
+                        <Text style={styles.phonePillText} numberOfLines={1}>
+                          {row.phone?.trim() ? row.phone : "—"}
+                        </Text>
+                      </View>
+                      <View style={styles.txMeta}>
+                        <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+                        <Text style={styles.txMetaText}>{time}</Text>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={14}
+                          color={colors.textMuted}
+                          style={styles.metaCal}
+                        />
+                        <Text style={styles.txMetaText}>{dateLabel}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.txRight}>
+                      <Text style={{ ...styles.txAmount, color: amountColor }}>{amountStr}</Text>
+                      <View
+                        collapsable={false}
+                        ref={(el) => {
+                          menuBtnRefs.current[row.id] = el;
+                        }}
+                      >
+                        <Pressable
+                          style={styles.txMenuBtn}
+                          hitSlop={6}
+                          disabled={busy}
+                          onPress={() =>
+                            openCardMenu(row.id, () =>
+                              setInvoiceMenu({ row, isPaid: isPaidView })
+                            )
+                          }
+                        >
+                          <Ionicons
+                            name={busy ? "time-outline" : "ellipsis-vertical"}
+                            size={18}
+                            color={busy ? colors.textLight : colors.primary}
+                          />
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+                </SurfaceCard>
+              );
+            })}
+
+          {section === "expenses" &&
+            filteredExpenses.map((row) => {
+              const labels = categoryLabel(effectiveCategories, row.category, row.subCategory);
+              return (
+                <SurfaceCard key={row.id} shadow="card" style={styles.txCard}>
+                  <View style={styles.txRow}>
+                    <View style={styles.expenseIcon}>
+                      <Ionicons name="receipt-outline" size={22} color={colors.primary} />
+                    </View>
+                    <Pressable style={styles.txMain} onPress={() => openEditExpenseSheet(row)}>
+                      <Text style={styles.txName} numberOfLines={1}>
+                        {row.vendor || "Vendor"}
+                      </Text>
+                      <Text style={styles.txMetaText}>
+                        {formatDisplayDate(row.date)} · {labels.category}
+                      </Text>
+                      {labels.subcategory ? (
+                        <Text style={styles.txMetaText}>{labels.subcategory}</Text>
+                      ) : null}
+                    </Pressable>
+                    <View style={styles.txRight}>
+                      <Text style={styles.txAmount}>{formatAmount(row.amount)}</Text>
+                      <View
+                        collapsable={false}
+                        ref={(el) => {
+                          menuBtnRefs.current[`exp-${row.id}`] = el;
+                        }}
+                      >
+                        <Pressable
+                          style={styles.txMenuBtn}
+                          hitSlop={6}
+                          onPress={() =>
+                            openCardMenu(`exp-${row.id}`, () => setExpenseMenu({ row }))
+                          }
+                        >
+                          <Ionicons name="ellipsis-vertical" size={18} color={colors.primary} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+                </SurfaceCard>
+              );
+            })}
+
+          {section === "banks" &&
+            filteredBanks.map((row) => (
               <SurfaceCard key={row.id} shadow="card" style={styles.txCard}>
                 <View style={styles.txRow}>
-                  <View style={[styles.jobBadge, { backgroundColor: badgeBg }]}>
-                    <Text style={styles.jobBadgeLine1}>JobCard</Text>
-                    <Text style={styles.jobBadgeLine2}>{badge}</Text>
-                    <View style={styles.jobBadgePlus}>
-                      <Ionicons name="add" size={10} color={colors.white} />
-                    </View>
+                  <View style={styles.bankIcon}>
+                    <Ionicons name="business-outline" size={22} color={colors.primary} />
                   </View>
-
-                  <View style={styles.txMain}>
+                  <Pressable style={styles.txMain} onPress={() => openEditBankSheet(row)}>
                     <Text style={styles.txName} numberOfLines={1}>
-                      {row.customerName ?? "Customer"}
+                      {row.bankName}
                     </Text>
-                    <View style={styles.phonePill}>
-                      <Ionicons name="call-outline" size={14} color={colors.primary} />
-                      <Text style={styles.phonePillText} numberOfLines={1}>
-                        {row.phone?.trim() ? row.phone : "—"}
-                      </Text>
-                    </View>
-                    <View style={styles.txMeta}>
-                      <Ionicons name="time-outline" size={14} color={colors.textMuted} />
-                      <Text style={styles.txMetaText}>{time}</Text>
-                      <Ionicons
-                        name="calendar-outline"
-                        size={14}
-                        color={colors.textMuted}
-                        style={styles.metaCal}
-                      />
-                      <Text style={styles.txMetaText}>{dateLabel}</Text>
-                    </View>
-                  </View>
-
+                    <Text style={styles.txMetaText}>{row.accountName}</Text>
+                    <Text style={styles.txMetaText}>{row.accountNumber}</Text>
+                    {row.assignToInvoice ? (
+                      <Text style={styles.assignedHint}>Assigned to invoice</Text>
+                    ) : null}
+                  </Pressable>
                   <View style={styles.txRight}>
-                    <Text style={[styles.txAmount, { color: amountColor }]}>{amountStr}</Text>
+                    <Text style={styles.txAmount}>{formatAmount(row.totalBalance)}</Text>
                     <View
                       collapsable={false}
                       ref={(el) => {
-                        menuBtnRefs.current[row.id] = el;
+                        menuBtnRefs.current[`bank-${row.id}`] = el;
                       }}
                     >
                       <Pressable
                         style={styles.txMenuBtn}
                         hitSlop={6}
-                        disabled={busy}
-                        onPress={() => {
-                          const node = menuBtnRefs.current[row.id];
-                          const open = () => {
-                            setMenu({ row, isPaid: isPaidView, ledger: ledgerTab });
-                            setMenuAnchor(null);
-                          };
-                          if (node && "measureInWindow" in node && typeof node.measureInWindow === "function") {
-                            node.measureInWindow((x, y, w, h) => {
-                              setMenuAnchor({ x, y, w, h });
-                              setMenu({ row, isPaid: isPaidView, ledger: ledgerTab });
-                            });
-                          } else {
-                            open();
-                          }
-                        }}
+                        onPress={() =>
+                          openCardMenu(`bank-${row.id}`, () => setBankMenu({ row }))
+                        }
                       >
-                        <Ionicons
-                          name={busy ? "time-outline" : "ellipsis-vertical"}
-                          size={busy ? 18 : 18}
-                          color={busy ? colors.textLight : colors.primary}
-                        />
+                        <Ionicons name="ellipsis-vertical" size={18} color={colors.primary} />
                       </Pressable>
                     </View>
                   </View>
                 </View>
               </SurfaceCard>
-            );
-          })}
+            ))}
         </ScrollView>
-          </>
-        )}
+      </View>
 
-        <Modal visible={menu != null} transparent animationType="fade" onRequestClose={dismissMenu}>
-          <View style={styles.menuModalRoot}>
-            <Pressable style={styles.menuBackdrop} onPress={dismissMenu} />
-            {menu && menuCardLayoutStyle ? (
-              <View style={[styles.menuCard, menuCardLayoutStyle]}>
-                {menu.isPaid ? (
+      <Modal visible={activeMenu != null} transparent animationType="fade" onRequestClose={dismissMenus}>
+        <View style={styles.menuModalRoot}>
+          <Pressable style={styles.menuBackdrop} onPress={dismissMenus} />
+          {activeMenu && menuCardLayoutStyle ? (
+            <View style={{ ...styles.menuCard, ...menuCardLayoutStyle }}>
+              {invoiceMenu ? (
+                invoiceMenu.isPaid ? (
                   <>
-                    <Pressable style={styles.menuRowBtn} onPress={() => openInvoicePopup?.(menu.row)}>
+                    <Pressable
+                      style={styles.menuRowBtn}
+                      onPress={() => openInvoicePreview(invoiceMenu.row)}
+                    >
                       <Text style={styles.menuRowLabel}>View Invoice</Text>
                     </Pressable>
-                    <Pressable style={styles.menuRowBtn} onPress={() => openJobCardPopup?.(menu.row)}>
-                      <Text style={styles.menuRowLabel}>View Job Card</Text>
+                    <Pressable
+                      style={styles.menuRowBtn}
+                      onPress={() => void sendNotification(invoiceMenu.row, "Receipt")}
+                    >
+                      <Text style={styles.menuRowLabel}>Send Receipt</Text>
                     </Pressable>
                   </>
-                ) : null}
-                {!menu.isPaid && menu.ledger === "cash" ? (
-                  <Pressable
-                    style={styles.menuRowBtn}
-                    onPress={() => {
-                      void openBillingPopup?.(menu.row);
-                    }}
-                  >
-                    <Text style={styles.menuRowLabel}>Update Billing</Text>
-                  </Pressable>
-                ) : null}
-                {!menu.isPaid && menu.ledger === "invoice" ? (
-                  <Pressable
-                    style={styles.menuRowBtn}
-                    onPress={() => {
-                      void openBillingPopup?.(menu.row);
-                    }}
-                  >
-                    <Text style={styles.menuRowLabel}>Update Payment</Text>
-                  </Pressable>
-                ) : null}
-                {!menu.isPaid && menu.ledger === "cash" ? (
-                  <Pressable style={styles.menuRowBtn} onPress={() => openJobCardPopup?.(menu.row)}>
-                    <Text style={styles.menuRowLabel}>View Job Card</Text>
-                  </Pressable>
-                ) : null}
-                {!menu.isPaid && menu.ledger === "cash" ? (
-                  <Pressable style={styles.menuRowBtn} onPress={() => convertToInvoice?.(menu.row)}>
-                    <Text style={styles.menuRowLabel}>Convert to Invoice</Text>
-                  </Pressable>
-                ) : null}
-                {!menu.isPaid && menu.ledger === "invoice" ? (
-                  <Pressable style={styles.menuRowBtn} onPress={() => openJobCardPopup?.(menu.row)}>
-                    <Text style={styles.menuRowLabel}>View Job Card</Text>
-                  </Pressable>
-                ) : null}
+                ) : (
+                  <>
+                    <Pressable
+                      style={styles.menuRowBtn}
+                      onPress={() => confirmMarkPaid(invoiceMenu.row)}
+                    >
+                      <Text style={styles.menuRowLabel}>Mark as Paid</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.menuRowBtn}
+                      onPress={() => void sendNotification(invoiceMenu.row, "Reminder")}
+                    >
+                      <Text style={styles.menuRowLabel}>Send Reminder</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.menuRowBtn}
+                      onPress={() => openInvoicePreview(invoiceMenu.row)}
+                    >
+                      <Text style={styles.menuRowLabel}>View Invoice</Text>
+                    </Pressable>
+                  </>
+                )
+              ) : null}
+
+              {expenseMenu ? (
+                <Pressable
+                  style={styles.menuRowBtn}
+                  onPress={() => openEditExpenseSheet(expenseMenu.row)}
+                >
+                  <Text style={styles.menuRowLabel}>Edit Expense</Text>
+                </Pressable>
+              ) : null}
+
+              {bankMenu ? (
+                <Pressable
+                  style={styles.menuRowBtn}
+                  onPress={() => openEditBankSheet(bankMenu.row)}
+                >
+                  <Text style={styles.menuRowLabel}>Edit Bank</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      </Modal>
+
+      <Modal
+        visible={previewRow != null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPreviewRow(null)}
+      >
+        <ModalKeyboardRoot onBackdropPress={() => setPreviewRow(null)} scrimColor="rgba(0,0,0,0.42)">
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetTitleRow}>
+              <Text style={styles.sheetTitle}>Invoice Preview</Text>
+              <Pressable style={styles.sheetClose} onPress={() => setPreviewRow(null)}>
+                <Ionicons name="close" size={18} color="#D84D4D" />
+              </Pressable>
+            </View>
+            {previewRow ? (
+              <View style={styles.previewBody}>
+                <Text style={styles.previewBill}>{displayBillId(previewRow)}</Text>
+                <Text style={styles.previewName}>{previewRow.customerName?.trim() || "—"}</Text>
+                <Text style={styles.previewMeta}>{previewRow.phone?.trim() || "—"}</Text>
+                <Text style={styles.previewMeta}>{previewRow.vehiclePlate?.trim() || "—"}</Text>
+                <Text style={styles.previewAmount}>{formatAmount(previewRow.total)}</Text>
+                <Text style={styles.previewMeta}>
+                  {previewRow.date ? formatDisplayDate(previewRow.date) : "—"}
+                </Text>
               </View>
             ) : null}
           </View>
-        </Modal>
+        </ModalKeyboardRoot>
+      </Modal>
 
-        <Modal
-          visible={billingViewer.open}
-          transparent
-          animationType="fade"
-          onRequestClose={closeBillingViewer}
-        >
-          <View style={styles.viewerBackdrop}>
-            <Pressable style={styles.viewerBackdropPress} onPress={closeBillingViewer} />
-            <View style={styles.billingCard}>
-              <View style={styles.invoiceHeader}>
-                {(() => {
-                  const raw = pickJobCardFromPayload(billingViewer.payload) ?? obj(billingViewer.row?.raw) ?? null;
-                  const business = getNested(raw, "business") ?? getNested(raw, "shop");
-                  const businessName = s(business?.businessName ?? business?.name) || "Billing";
-                  const inv = s((raw as any)?.invoiceNumber ?? "");
-                  return (
-                    <View style={styles.invoiceHeaderLeft}>
-                      <Text style={styles.invoiceHeaderTitle}>{businessName}</Text>
-                      <Text style={styles.invoiceHeaderSub}>{inv || "Update Billing"}</Text>
-                    </View>
-                  );
-                })()}
-                <Pressable hitSlop={8} onPress={closeBillingViewer} style={styles.invoiceClose}>
-                  <Ionicons name="close" size={18} color={colors.white} />
-                </Pressable>
-              </View>
-
-              <ScrollView style={styles.viewerScroll} contentContainerStyle={styles.invoiceContent} showsVerticalScrollIndicator={false}>
-                {billingViewer.loading ? (
-                  <View style={styles.viewerLoading}>
-                    <LoadingProgress />
-                  </View>
-                ) : billingViewer.error ? (
-                  <Text style={styles.viewerError}>{billingViewer.error}</Text>
-                ) : (
-                  (() => {
-                    const raw = pickJobCardFromPayload(billingViewer.payload) ?? obj(billingViewer.row?.raw) ?? null;
-                    const customer = getNested(raw, "customerId") ?? getNested(raw, "customer");
-                    const vehicle = getNested(raw, "vehicleId") ?? getNested(raw, "vehicle");
-                    const vehicleMake = getNested(vehicle, "make");
-                    const payable = getNested(raw, "payableAmounts");
-                    const servicesArr = Array.isArray((raw as any)?.services) ? ((raw as any).services as unknown[]) : [];
-
-                    const jobNo = s((raw as any)?.jobNo ?? billingViewer.row?.jobNo);
-                    const serviceType = s((raw as any)?.serviceType ?? "");
-                    const priority = s((raw as any)?.priorityLevel ?? "");
-                    const totalPayable = s((raw as any)?.totalPayableAmount ?? (raw as any)?.total ?? billingViewer.row?.total);
-
-                    const subtotal = s(payable?.invoiceTotal ?? payable?.subtotal ?? "");
-                    const gstAmount = s(payable?.gstAmount ?? "");
-                    const gstRate = s(payable?.gstRate ?? "");
-                    const invoiceTotal = s(payable?.invoiceTotal ?? payable?.total ?? "");
-                    const cashAmt = s(payable?.cash ?? "");
-                    const onlineAmt = s(payable?.online ?? "");
-
-                    const customerName = s(customer?.name ?? billingViewer.row?.customerName) || "Customer";
-                    const customerPhone = s(customer?.phone ?? billingViewer.row?.phone);
-                    const customerAddr = s(customer?.address);
-
-                    const plate = s(vehicle?.licensePlateNo ?? billingViewer.row?.vehiclePlate);
-                    const make = s(vehicleMake?.name ?? vehicle?.make);
-                    const odo = s((raw as any)?.odometerReading ?? billingViewer.row?.odometerCurrent);
-                    const due = s((raw as any)?.dueOdometerReading ?? billingViewer.row?.odometerDue);
-
-                    return (
-                      <>
-                        <View style={styles.invoiceMetaRow}>
-                          <View style={styles.invoiceChip}>
-                            <Text style={styles.invoiceChipText}>{jobNo ? `Job #${jobNo}` : "Job"}</Text>
-                          </View>
-                          {priority ? (
-                            <View style={styles.invoiceChipMuted}>
-                              <Text style={styles.invoiceChipMutedText}>{priority}</Text>
-                            </View>
-                          ) : null}
-                          {serviceType ? (
-                            <View style={styles.invoiceChipMuted}>
-                              <Text style={styles.invoiceChipMutedText}>{serviceType}</Text>
-                            </View>
-                          ) : null}
-                        </View>
-
-                        <View style={styles.invoiceInfoGrid}>
-                          <View style={styles.invoiceInfoCard}>
-                            <Text style={styles.invoiceInfoTitle}>CUSTOMER</Text>
-                            <Text style={styles.invoiceInfoMain}>{customerName}</Text>
-                            {customerPhone ? <Text style={styles.invoiceInfoSub}>{customerPhone}</Text> : null}
-                            {customerAddr ? <Text style={styles.invoiceInfoSub} numberOfLines={2}>{customerAddr}</Text> : null}
-                          </View>
-                          <View style={styles.invoiceInfoCard}>
-                            <Text style={styles.invoiceInfoTitle}>VEHICLE</Text>
-                            <Text style={styles.invoiceInfoMain}>{make || "—"}</Text>
-                            {plate ? <Text style={styles.invoiceInfoSub}>{plate}</Text> : null}
-                            <View style={styles.invoiceOdoRow}>
-                              <View style={styles.invoiceOdoCol}>
-                                <Text style={styles.invoiceOdoLabel}>ODO IN</Text>
-                                <Text style={styles.invoiceOdoValue}>{odo ? `${odo} km` : "—"}</Text>
-                              </View>
-                              <View style={styles.invoiceOdoCol}>
-                                <Text style={styles.invoiceOdoLabel}>DUE ODO</Text>
-                                <Text style={[styles.invoiceOdoValue, styles.invoiceOdoDue]}>{due ? `${due} km` : "—"}</Text>
-                              </View>
-                            </View>
-                          </View>
-                        </View>
-
-                        <View style={styles.invoiceSection}>
-                          <Text style={styles.invoiceSectionTitle}>SERVICES</Text>
-                          <View style={styles.invoiceTableHead}>
-                            <Text style={styles.invoiceThLeft}>Description</Text>
-                            <Text style={styles.invoiceThRight}>Amount</Text>
-                          </View>
-                          <View style={styles.invoiceTableBody}>
-                            {servicesArr.length === 0 ? (
-                              <Text style={styles.viewerHint}>—</Text>
-                            ) : (
-                              servicesArr.flatMap((svc, i) => {
-                                const svcObj = obj(svc);
-                                const subs = Array.isArray(svcObj?.subServices) ? (svcObj?.subServices as unknown[]) : [];
-                                return subs.map((sub, j) => {
-                                  const subObj = obj(sub);
-                                  const nm = s(subObj?.name);
-                                  const desc = s(subObj?.desc);
-                                  const price = s(subObj?.price);
-                                  return (
-                                    <View key={`bill-line-${i}-${j}`} style={styles.invoiceLine}>
-                                      <View style={styles.invoiceLineLeft}>
-                                        <Text style={styles.invoiceLineName}>{nm || "—"}</Text>
-                                        {desc ? <Text style={styles.invoiceLineDesc}>{desc}</Text> : null}
-                                      </View>
-                                      <Text style={styles.invoiceLineAmt}>
-                                        {price ? formatAmount(price, { decimals: 2 }) : "—"}
-                                      </Text>
-                                    </View>
-                                  );
-                                });
-                              })
-                            )}
-                          </View>
-                        </View>
-
-                        <View style={styles.invoiceTotals}>
-                          <View style={styles.invoiceTotalRow}>
-                            <Text style={styles.invoiceTotalLabel}>Subtotal</Text>
-                            <Text style={styles.invoiceTotalValue}>
-                              {subtotal ? formatAmount(subtotal) : totalPayable ? formatAmount(totalPayable) : "—"}
-                            </Text>
-                          </View>
-                          {(payable?.gstRate || payable?.gstAmount) ? (
-                            <View style={styles.invoiceTotalRow}>
-                              <Text style={styles.invoiceTotalLabel}>
-                                HST {gstRate ? `(${gstRate}%)` : ""} — Invoice only
-                              </Text>
-                              <Text style={styles.invoiceTotalValue}>{gstAmount ? formatAmount(gstAmount) : "—"}</Text>
-                            </View>
-                          ) : null}
-                          <View style={[styles.invoiceTotalRow, styles.invoiceTotalRowStrong]}>
-                            <Text style={styles.invoiceTotalStrongLabel}>Invoice Total</Text>
-                            <Text style={styles.invoiceTotalStrongValue}>
-                              {invoiceTotal ? formatAmount(invoiceTotal) : totalPayable ? formatAmount(totalPayable) : "—"}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.invoiceFooterHint}>
-                          <Text style={styles.invoiceFooterText}>Choose Payment Method</Text>
-                        </View>
-                        <View style={styles.billingButtonsRow}>
-                          <Pressable
-                            style={[styles.billingBtn, styles.billingBtnCash, markingId === billingViewer.row?.id && styles.billingBtnDisabled]}
-                            disabled={markingId === billingViewer.row?.id}
-                            onPress={() => {
-                              if (billingViewer.row) {
-                                void updateBillingAndMarkPaid?.(billingViewer.row, "Cash");
-                              }
-                            }}
-                          >
-                            <Ionicons name="cash-outline" size={18} color={colors.white} />
-                            <View>
-                              <Text style={styles.billingBtnTitle}>Cash</Text>
-                              <Text style={styles.billingBtnSub}>
-                                {cashAmt ? formatAmount(cashAmt) : invoiceTotal ? formatAmount(invoiceTotal) : "—"}
-                              </Text>
-                            </View>
-                          </Pressable>
-                          <Pressable
-                            style={[styles.billingBtn, styles.billingBtnInvoice, markingId === billingViewer.row?.id && styles.billingBtnDisabled]}
-                            disabled={markingId === billingViewer.row?.id}
-                            onPress={() => {
-                              if (billingViewer.row) {
-                                void updateBillingAndMarkPaid?.(billingViewer.row, "Online");
-                              }
-                            }}
-                          >
-                            <Ionicons name="document-text-outline" size={18} color={colors.white} />
-                            <View>
-                              <Text style={styles.billingBtnTitle}>Invoice</Text>
-                              <Text style={styles.billingBtnSub}>
-                                {onlineAmt ? formatAmount(onlineAmt) : invoiceTotal ? formatAmount(invoiceTotal) : "—"}
-                              </Text>
-                            </View>
-                          </Pressable>
-                        </View>
-                      </>
-                    );
-                  })()
-                )}
-              </ScrollView>
+      <Modal
+        transparent
+        visible={expenseSheetOpen}
+        animationType="slide"
+        onRequestClose={closeExpenseSheet}
+      >
+        <ModalKeyboardRoot onBackdropPress={closeExpenseSheet} scrimColor="rgba(0,0,0,0.38)">
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetTitleRow}>
+              <Text style={styles.sheetTitle}>
+                {editingExpenseId ? "Edit Expense" : "Add Expense"}
+              </Text>
+              <Pressable style={styles.sheetClose} onPress={closeExpenseSheet}>
+                <Ionicons name="close" size={18} color="#D84D4D" />
+              </Pressable>
             </View>
-          </View>
-        </Modal>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              automaticallyAdjustKeyboardInsets
+              showsVerticalScrollIndicator={false}
+              style={styles.sheetFormScroll}
+              contentContainerStyle={styles.sheetFormScrollContent}
+            >
+              <FieldLabel label="Amount" required />
+              <FormInput
+                value={expenseAmount}
+                onChangeText={setExpenseAmount}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+              />
 
-        <Modal
-          visible={invoiceViewer.open}
-          transparent
-          animationType="fade"
-          onRequestClose={closeInvoiceViewer}
-        >
-          <View style={styles.viewerBackdrop}>
-            <Pressable style={styles.viewerBackdropPress} onPress={closeInvoiceViewer} />
-            <View style={styles.invoiceCard}>
-              <View style={styles.invoiceHeader}>
-                {(() => {
-                  const raw = pickJobCardFromPayload(invoiceViewer.payload) ?? obj(invoiceViewer.row?.raw) ?? null;
-                  const business = getNested(raw, "business") ?? getNested(raw, "shop");
-                  const businessName = s(business?.businessName ?? business?.name) || "Invoice";
-                  const inv = s((raw as any)?.invoiceNumber ?? "");
-                  return (
-                    <View style={styles.invoiceHeaderLeft}>
-                      <Text style={styles.invoiceHeaderTitle}>{businessName}</Text>
-                      <Text style={styles.invoiceHeaderSub}>{inv || "Invoice"}</Text>
-                    </View>
-                  );
-                })()}
-                <Pressable hitSlop={8} onPress={closeInvoiceViewer} style={styles.invoiceClose}>
-                  <Ionicons name="close" size={18} color={colors.white} />
-                </Pressable>
-              </View>
+              <FieldLabel label="Date" required />
+              <Pressable style={styles.dateBtn} onPress={() => setDatePickerOpen(true)}>
+                <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                <Text style={styles.dateBtnText}>{formatDisplayDate(expenseDate)}</Text>
+              </Pressable>
 
-              <ScrollView style={styles.viewerScroll} contentContainerStyle={styles.invoiceContent} showsVerticalScrollIndicator={false}>
-                {invoiceViewer.loading ? (
-                  <View style={styles.viewerLoading}>
-                    <LoadingProgress />
-                  </View>
-                ) : invoiceViewer.error ? (
-                  <Text style={styles.viewerError}>{invoiceViewer.error}</Text>
-                ) : (
-                  (() => {
-                    const raw = pickJobCardFromPayload(invoiceViewer.payload) ?? obj(invoiceViewer.row?.raw) ?? null;
-                    const customer = getNested(raw, "customerId") ?? getNested(raw, "customer");
-                    const vehicle = getNested(raw, "vehicleId") ?? getNested(raw, "vehicle");
-                    const vehicleMake = getNested(vehicle, "make");
-                    const payable = getNested(raw, "payableAmounts");
-                    const servicesArr = Array.isArray((raw as any)?.services) ? ((raw as any).services as unknown[]) : [];
-
-                    const jobNo = s((raw as any)?.jobNo ?? invoiceViewer.row?.jobNo);
-                    const serviceType = s((raw as any)?.serviceType ?? "");
-                    const priority = s((raw as any)?.priorityLevel ?? "");
-                    const paymentMethod = s((raw as any)?.paymentMethod ?? "");
-                    const showInvoiceTax = isOnlineInvoicePayment(paymentMethod);
-                    const totalPayable = s((raw as any)?.totalPayableAmount ?? (raw as any)?.total ?? invoiceViewer.row?.total);
-
-                    const subtotal = s(payable?.invoiceTotal ?? payable?.subtotal ?? "");
-                    const gstAmount = s(payable?.gstAmount ?? "");
-                    const gstRate = s(payable?.gstRate ?? "");
-                    const cashTotal = s(payable?.cash ?? "");
-                    const onlineTotal = s(payable?.online ?? "");
-                    const invoiceTotal = showInvoiceTax
-                      ? onlineTotal || totalPayable || s(payable?.invoiceTotal ?? payable?.total ?? "")
-                      : cashTotal || totalPayable || s(payable?.invoiceTotal ?? payable?.total ?? "");
-
-                    const customerName = s(customer?.name ?? invoiceViewer.row?.customerName) || "Customer";
-                    const customerPhone = s(customer?.phone ?? invoiceViewer.row?.phone);
-                    const customerAddr = s(customer?.address);
-
-                    const plate = s(vehicle?.licensePlateNo ?? invoiceViewer.row?.vehiclePlate);
-                    const make = s(vehicleMake?.name ?? vehicle?.make);
-                    const odo = s((raw as any)?.odometerReading ?? invoiceViewer.row?.odometerCurrent);
-                    const due = s((raw as any)?.dueOdometerReading ?? invoiceViewer.row?.odometerDue);
-
-                    return (
-                      <>
-                        <View style={styles.invoiceMetaRow}>
-                          <View style={styles.invoiceChip}>
-                            <Text style={styles.invoiceChipText}>{jobNo ? `Job #${jobNo}` : "Job"}</Text>
-                          </View>
-                          {priority ? (
-                            <View style={styles.invoiceChipMuted}>
-                              <Text style={styles.invoiceChipMutedText}>{priority}</Text>
-                            </View>
-                          ) : null}
-                          {serviceType ? (
-                            <View style={styles.invoiceChipMuted}>
-                              <Text style={styles.invoiceChipMutedText}>{serviceType}</Text>
-                            </View>
-                          ) : null}
-                        </View>
-
-                        <View style={styles.invoiceInfoGrid}>
-                          <View style={styles.invoiceInfoCard}>
-                            <Text style={styles.invoiceInfoTitle}>CUSTOMER</Text>
-                            <Text style={styles.invoiceInfoMain}>{customerName}</Text>
-                            {customerPhone ? <Text style={styles.invoiceInfoSub}>{customerPhone}</Text> : null}
-                            {customerAddr ? <Text style={styles.invoiceInfoSub} numberOfLines={2}>{customerAddr}</Text> : null}
-                          </View>
-                          <View style={styles.invoiceInfoCard}>
-                            <Text style={styles.invoiceInfoTitle}>VEHICLE</Text>
-                            <Text style={styles.invoiceInfoMain}>{make || "—"}</Text>
-                            {plate ? <Text style={styles.invoiceInfoSub}>{plate}</Text> : null}
-                            <View style={styles.invoiceOdoRow}>
-                              <View style={styles.invoiceOdoCol}>
-                                <Text style={styles.invoiceOdoLabel}>ODO IN</Text>
-                                <Text style={styles.invoiceOdoValue}>{odo ? `${odo} km` : "—"}</Text>
-                              </View>
-                              <View style={styles.invoiceOdoCol}>
-                                <Text style={styles.invoiceOdoLabel}>DUE ODO</Text>
-                                <Text style={[styles.invoiceOdoValue, styles.invoiceOdoDue]}>{due ? `${due} km` : "—"}</Text>
-                              </View>
-                            </View>
-                          </View>
-                        </View>
-
-                        <View style={styles.invoiceSection}>
-                          <Text style={styles.invoiceSectionTitle}>SERVICES</Text>
-                          <View style={styles.invoiceTableHead}>
-                            <Text style={styles.invoiceThLeft}>Description</Text>
-                            <Text style={styles.invoiceThRight}>Amount</Text>
-                          </View>
-                          <View style={styles.invoiceTableBody}>
-                            {servicesArr.length === 0 ? (
-                              <Text style={styles.viewerHint}>—</Text>
-                            ) : (
-                              servicesArr.flatMap((svc, i) => {
-                                const svcObj = obj(svc);
-                                const subs = Array.isArray(svcObj?.subServices) ? (svcObj?.subServices as unknown[]) : [];
-                                return subs.map((sub, j) => {
-                                  const subObj = obj(sub);
-                                  const nm = s(subObj?.name);
-                                  const desc = s(subObj?.desc);
-                                  const price = s(subObj?.price);
-                                  return (
-                                    <View key={`inv-line-${i}-${j}`} style={styles.invoiceLine}>
-                                      <View style={styles.invoiceLineLeft}>
-                                        <Text style={styles.invoiceLineName}>{nm || "—"}</Text>
-                                        {desc ? <Text style={styles.invoiceLineDesc}>{desc}</Text> : null}
-                                      </View>
-                                      <Text style={styles.invoiceLineAmt}>
-                                        {price ? formatAmount(price, { decimals: 2 }) : "—"}
-                                      </Text>
-                                    </View>
-                                  );
-                                });
-                              })
-                            )}
-                          </View>
-                        </View>
-
-                        <View style={styles.invoiceTotals}>
-                          <View style={styles.invoiceTotalRow}>
-                            <Text style={styles.invoiceTotalLabel}>Subtotal</Text>
-                            <Text style={styles.invoiceTotalValue}>
-                              {subtotal ? formatAmount(subtotal) : totalPayable ? formatAmount(totalPayable) : "—"}
-                            </Text>
-                          </View>
-                          {showInvoiceTax && (payable?.gstRate || payable?.gstAmount) ? (
-                            <View style={styles.invoiceTotalRow}>
-                              <Text style={styles.invoiceTotalLabel}>HST {gstRate ? `(${gstRate}%)` : ""}</Text>
-                              <Text style={styles.invoiceTotalValue}>{gstAmount ? formatAmount(gstAmount) : "—"}</Text>
-                            </View>
-                          ) : null}
-                          <View style={[styles.invoiceTotalRow, styles.invoiceTotalRowStrong]}>
-                            <Text style={styles.invoiceTotalStrongLabel}>Invoice Total</Text>
-                            <Text style={styles.invoiceTotalStrongValue}>
-                              {invoiceTotal ? formatAmount(invoiceTotal) : totalPayable ? formatAmount(totalPayable) : "—"}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {/* <View style={styles.invoiceFooterHint}>
-                          <Text style={styles.invoiceFooterText}>Choose Payment Method</Text>
-                        </View> */}
-                      </>
-                    );
-                  })()
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
-        <Modal
-          visible={jobCardViewer.open}
-          transparent
-          animationType="fade"
-          onRequestClose={closeJobCardViewer}
-        >
-          <View style={styles.viewerBackdrop}>
-            <Pressable style={styles.viewerBackdropPress} onPress={closeJobCardViewer} />
-            <View style={styles.viewerCard}>
-              <View style={styles.viewerHeader}>
-                <View style={styles.viewerHeaderLeft}>
-                  <Text style={styles.viewerTitle}>{jobCardViewer.row?.jobNo?.trim() || "Job Card"}</Text>
-                  <Text style={styles.viewerSub}>Job Card Details</Text>
+              <FieldLabel label="Vendor" required />
+              <FormInput
+                value={expenseVendor}
+                onChangeText={(t) => {
+                  setExpenseVendor(t);
+                  setVendorSuggestionsOpen(true);
+                }}
+                placeholder="Vendor name"
+              />
+              {vendorSuggestionsOpen && filteredVendorOptions.length > 0 ? (
+                <View style={styles.suggestBox}>
+                  {filteredVendorOptions.map((opt) => (
+                    <Pressable
+                      key={opt}
+                      style={styles.suggestItem}
+                      onPress={() => {
+                        setExpenseVendor(opt);
+                        setVendorSuggestionsOpen(false);
+                      }}
+                    >
+                      <Text style={styles.suggestText}>{opt}</Text>
+                    </Pressable>
+                  ))}
                 </View>
-                <View style={styles.viewerHeaderRight}>
-                  {(() => {
-                    const raw = pickJobCardFromPayload(jobCardViewer.payload) ?? obj(jobCardViewer.row?.raw) ?? null;
-                    const status = s((raw as any)?.status ?? jobCardViewer.row?.status);
-                    return status ? (
-                      <View style={styles.viewerStatusPill}>
-                        <Text style={styles.viewerStatusText}>{status}</Text>
-                      </View>
-                    ) : null;
-                  })()}
-                  <Pressable
-                    hitSlop={8}
-                    onPress={closeJobCardViewer}
-                    style={styles.viewerClose}
-                  >
-                    <Ionicons name="close" size={18} color={colors.textMuted} />
+              ) : null}
+
+              <FieldLabel label="Category" required />
+              <Pressable style={styles.selectBtn} onPress={() => setCategoryPickerOpen(true)}>
+                <Text style={styles.selectBtnText}>
+                  {selectedExpenseCategoryLabel || "Select category"}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+              </Pressable>
+
+              <FieldLabel label="Subcategory" required />
+              <Pressable
+                style={[styles.selectBtn, !expenseCategory && styles.inputDisabled]}
+                onPress={() => expenseCategory && setSubcategoryPickerOpen(true)}
+              >
+                <Text style={styles.selectBtnText}>
+                  {selectedExpenseSubcategoryLabel || "Select subcategory"}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+              </Pressable>
+
+              <FieldLabel label="Notes" />
+              <FormInput
+                value={expenseNotes}
+                onChangeText={setExpenseNotes}
+                placeholder="Notes"
+                multiline
+              />
+
+              <CheckRow
+                label="Attach Image of Receipt"
+                checked={expenseAttachReceipt}
+                onChange={(v) => {
+                  setExpenseAttachReceipt(v);
+                  if (!v) setExpenseReceiptPart(null);
+                }}
+              />
+              {expenseAttachReceipt ? (
+                <Pressable style={styles.secondaryBtn} onPress={() => void pickReceiptImage()}>
+                  <Text style={styles.secondaryBtnText}>
+                    {expenseReceiptPart?.name || "Choose receipt image"}
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              <CheckRow
+                label="Bill Number"
+                checked={expenseHasBillNumber}
+                onChange={(v) => {
+                  setExpenseHasBillNumber(v);
+                  if (!v) setExpenseBillNumber("");
+                }}
+              />
+              {expenseHasBillNumber ? (
+                <FormInput
+                  value={expenseBillNumber}
+                  onChangeText={setExpenseBillNumber}
+                  placeholder="Bill number"
+                />
+              ) : null}
+
+              <CheckRow
+                label="By Cheque"
+                checked={expenseByCheque}
+                onChange={(v) => {
+                  setExpenseByCheque(v);
+                  if (!v) setExpenseChequeAccount("");
+                }}
+              />
+              {expenseByCheque ? (
+                <Pressable style={styles.selectBtn} onPress={() => setChequePickerOpen(true)}>
+                  <Text style={styles.selectBtnText}>
+                    {expenseChequeAccount || "Select account"}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+                </Pressable>
+              ) : null}
+
+              <CheckRow
+                label="GST"
+                checked={expenseGst}
+                onChange={(v) => {
+                  setExpenseGst(v);
+                  if (!v) setExpenseGstAmount("");
+                }}
+              />
+              {expenseGst ? (
+                <FormInput
+                  value={expenseGstAmount}
+                  onChangeText={setExpenseGstAmount}
+                  placeholder="GST amount"
+                  keyboardType="decimal-pad"
+                />
+              ) : null}
+
+              <Pressable
+                style={[styles.saveBtn, savingExpense && styles.saveBtnDisabled]}
+                disabled={savingExpense}
+                onPress={() => void handleSaveExpense()}
+              >
+                <Text style={styles.saveBtnText}>
+                  {savingExpense
+                    ? editingExpenseId
+                      ? "Updating..."
+                      : "Saving..."
+                    : editingExpenseId
+                      ? "Update"
+                      : "Save"}
+                </Text>
+              </Pressable>
+              <Pressable style={styles.cancelBtn} onPress={closeExpenseSheet} disabled={savingExpense}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </ModalKeyboardRoot>
+      </Modal>
+
+      <Modal transparent visible={bankSheetOpen} animationType="slide" onRequestClose={closeBankSheet}>
+        <ModalKeyboardRoot onBackdropPress={closeBankSheet} scrimColor="rgba(0,0,0,0.38)">
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetTitleRow}>
+              <Text style={styles.sheetTitle}>
+                {editingBankId ? "Edit Bank Account" : "Add Bank Account"}
+              </Text>
+              <Pressable style={styles.sheetClose} onPress={closeBankSheet}>
+                <Ionicons name="close" size={18} color="#D84D4D" />
+              </Pressable>
+            </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              automaticallyAdjustKeyboardInsets
+              showsVerticalScrollIndicator={false}
+              style={styles.sheetFormScroll}
+              contentContainerStyle={styles.sheetFormScrollContent}
+            >
+              <FieldLabel label="Bank / Wallet Label" required />
+              <FormInput
+                value={bankLabel}
+                onChangeText={setBankLabel}
+                placeholder="e.g. Business Chequing"
+              />
+
+              <FieldLabel label="Account Name" />
+              <FormInput
+                value={bankAccountName}
+                onChangeText={setBankAccountName}
+                placeholder="Account holder name"
+              />
+
+              <FieldLabel label="Account Number" />
+              <FormInput
+                value={bankAccountNumber}
+                onChangeText={setBankAccountNumber}
+                placeholder="****1234"
+              />
+
+              <FieldLabel label="Balance" required />
+              <FormInput
+                value={bankBalance}
+                onChangeText={setBankBalance}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+              />
+
+              <CheckRow
+                label="Assign to invoice"
+                checked={bankAssignToInvoice}
+                onChange={setBankAssignToInvoice}
+              />
+
+              <Pressable
+                style={[styles.saveBtn, savingBank && styles.saveBtnDisabled]}
+                disabled={savingBank}
+                onPress={() => void handleSaveBank()}
+              >
+                <Text style={styles.saveBtnText}>
+                  {savingBank
+                    ? editingBankId
+                      ? "Updating..."
+                      : "Saving..."
+                    : editingBankId
+                      ? "Update"
+                      : "Save"}
+                </Text>
+              </Pressable>
+              <Pressable style={styles.cancelBtn} onPress={closeBankSheet} disabled={savingBank}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </ModalKeyboardRoot>
+      </Modal>
+
+      <OptionPickerModal
+        visible={categoryPickerOpen}
+        title="Category"
+        options={expenseCategoryLabels}
+        selected={selectedExpenseCategoryLabel}
+        onSelect={handleExpenseCategoryChange}
+        onClose={() => setCategoryPickerOpen(false)}
+      />
+      <OptionPickerModal
+        visible={subcategoryPickerOpen}
+        title="Subcategory"
+        options={expenseSubcategoryLabels}
+        selected={selectedExpenseSubcategoryLabel}
+        onSelect={handleExpenseSubcategoryChange}
+        onClose={() => setSubcategoryPickerOpen(false)}
+        onEditAddNew={openSubcategoriesPopup}
+      />
+      <OptionPickerModal
+        visible={chequePickerOpen}
+        title="Cheque account"
+        options={chequeAccountOptions}
+        selected={expenseChequeAccount}
+        onSelect={setExpenseChequeAccount}
+        onClose={() => setChequePickerOpen(false)}
+      />
+
+      {datePickerOpen ? (
+        Platform.OS === "ios" ? (
+          <Modal transparent visible animationType="fade" onRequestClose={() => setDatePickerOpen(false)}>
+            <ModalKeyboardRoot onBackdropPress={() => setDatePickerOpen(false)} scrimColor="rgba(0,0,0,0.35)">
+              <View style={styles.iosDateSheet}>
+                <View style={styles.iosDateHeader}>
+                  <Pressable onPress={() => setDatePickerOpen(false)} hitSlop={8}>
+                    <Text style={styles.iosDateBtn}>Cancel</Text>
+                  </Pressable>
+                  <Text style={styles.iosDateTitle}>Date</Text>
+                  <Pressable onPress={() => setDatePickerOpen(false)} hitSlop={8}>
+                    <Text style={[styles.iosDateBtn, styles.iosDateBtnPrimary]}>Done</Text>
                   </Pressable>
                 </View>
+                <DateTimePicker
+                  value={ymdToDate(expenseDate)}
+                  mode="date"
+                  display="spinner"
+                  onChange={(_, d) => {
+                    if (d) setExpenseDate(dateToYmd(d));
+                  }}
+                />
               </View>
+            </ModalKeyboardRoot>
+          </Modal>
+        ) : (
+          <DateTimePicker
+            value={ymdToDate(expenseDate)}
+            mode="date"
+            display="default"
+            onChange={(_, d) => {
+              setDatePickerOpen(false);
+              if (d) setExpenseDate(dateToYmd(d));
+            }}
+          />
+        )
+      ) : null}
 
-              <ScrollView style={styles.viewerScroll} contentContainerStyle={styles.viewerContent} showsVerticalScrollIndicator={false}>
-                {jobCardViewer.loading ? (
-                  <View style={styles.viewerLoading}>
-                    <LoadingProgress />
-                  </View>
-                ) : jobCardViewer.error ? (
-                  <Text style={styles.viewerError}>{jobCardViewer.error}</Text>
-                ) : (
-                  (() => {
-                    const raw =
-                      pickJobCardFromPayload(jobCardViewer.payload) ??
-                      obj(jobCardViewer.row?.raw) ??
-                      null;
-
-                    // Matches your API payload shape:
-                    // data.business, data.customerId, data.vehicleId, payableAmounts, services[]
-                    const business =
-                      getNested(raw, "business") ??
-                      getNested(raw, "businessProfile") ??
-                      getNested(raw, "shop");
-                    const customer =
-                      getNested(raw, "customerId") ??
-                      getNested(raw, "customer") ??
-                      getNested(raw, "carOwner");
-                    const vehicle =
-                      getNested(raw, "vehicleId") ??
-                      getNested(raw, "vehicle");
-                    const vehicleMake = getNested(vehicle, "make");
-                    const payable = getNested(raw, "payableAmounts");
-                    const servicesArr = Array.isArray((raw as any)?.services) ? ((raw as any).services as unknown[]) : [];
-
-                    const jobNo = s((raw as any)?.jobNo ?? (raw as any)?.jobNumber ?? jobCardViewer.row?.jobNo);
-                    const invoiceNo = s((raw as any)?.invoiceNumber ?? (raw as any)?.invoiceNo ?? "");
-                    const status = s((raw as any)?.status ?? jobCardViewer.row?.status);
-                    const paymentStatus = s((raw as any)?.paymentStatus ?? jobCardViewer.row?.paymentStatus);
-                    const paymentMethod = s((raw as any)?.paymentMethod ?? "");
-                    const priority = s((raw as any)?.priorityLevel ?? (raw as any)?.priority ?? "");
-                    const serviceType = s((raw as any)?.serviceType ?? (raw as any)?.type ?? "");
-                    const issue = s((raw as any)?.issueDescription ?? jobCardViewer.row?.issueDescription);
-                    const totalPayable = s((raw as any)?.totalPayableAmount ?? (raw as any)?.totalPayable ?? (raw as any)?.totalAmount ?? (raw as any)?.total ?? jobCardViewer.row?.total);
-
-                    const payableCash = s(payable?.cash ?? "");
-                    const payableOnline = s(payable?.online ?? "");
-                    const gstAmount = s(payable?.gstAmount ?? "");
-                    const gstRate = s(payable?.gstRate ?? "");
-                    const invoiceTotal = s(payable?.invoiceTotal ?? payable?.total ?? "");
-
-                    return (
-                      <>
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="business-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Business Information</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Name:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(business?.businessName ?? business?.name) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Address:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(business?.businessAddress ?? business?.address) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Phone:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(business?.businessPhone ?? business?.phone) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Email:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(business?.businessEmail ?? business?.email) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>GST/HST:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(business?.businessHSTNumber ?? business?.gstNumber ?? business?.gst) || "—"}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="person-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Customer Information</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Name:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(customer?.name ?? jobCardViewer.row?.customerName) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Phone:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(customer?.phone ?? jobCardViewer.row?.phone) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Email:</Text>
-                            <Text style={styles.viewerValue}>{s(customer?.email) || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Address:</Text>
-                            <Text style={styles.viewerValue}>{s(customer?.address) || "—"}</Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="car-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Vehicle Information</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>License Plate:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(vehicle?.licensePlateNo ?? vehicle?.licensePlate ?? jobCardViewer.row?.vehiclePlate) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Make:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(vehicleMake?.name ?? vehicle?.make ?? vehicle?.vehicleName ?? "") || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Current KM:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s((raw as any)?.odometerReading ?? jobCardViewer.row?.odometerCurrent) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Due KM:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s((raw as any)?.dueOdometerReading ?? jobCardViewer.row?.odometerDue) || "—"}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="document-text-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Job Details</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Job:</Text>
-                            <Text style={styles.viewerValue}>{jobNo || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Invoice:</Text>
-                            <Text style={styles.viewerValue}>{invoiceNo || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Status:</Text>
-                            <Text style={styles.viewerValue}>{status || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Payment:</Text>
-                            <Text style={styles.viewerValue}>
-                              {(paymentStatus || "—") + (paymentMethod ? ` (${paymentMethod})` : "")}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Type:</Text>
-                            <Text style={styles.viewerValue}>{serviceType || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Priority:</Text>
-                            <Text style={styles.viewerValue}>{priority || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Issue:</Text>
-                            <Text style={styles.viewerValue}>{issue || "—"}</Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="construct-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Services</Text>
-                          </View>
-                          {servicesArr.length === 0 ? (
-                            <Text style={styles.viewerHint}>—</Text>
-                          ) : (
-                            servicesArr.map((svc, i) => {
-                              const svcObj = obj(svc);
-                              const subs = Array.isArray(svcObj?.subServices) ? (svcObj?.subServices as unknown[]) : [];
-                              return (
-                                <View key={`svc-${i}`} style={styles.viewerServiceBlock}>
-                                  {subs.length === 0 ? (
-                                    <Text style={styles.viewerHint}>—</Text>
-                                  ) : (
-                                    subs.map((sub, j) => {
-                                      const subObj = obj(sub);
-                                      const nm = s(subObj?.name);
-                                      const desc = s(subObj?.desc);
-                                      const price = s(subObj?.price);
-                                      return (
-                                        <View key={`sub-${i}-${j}`} style={styles.viewerServiceRow}>
-                                          <View style={styles.viewerServiceLeft}>
-                                            <Text style={styles.viewerServiceName}>{nm || "—"}</Text>
-                                            {desc ? <Text style={styles.viewerServiceDesc}>{desc}</Text> : null}
-                                          </View>
-                                          <Text style={styles.viewerServicePrice}>
-                                            {price ? formatAmount(price) : "—"}
-                                          </Text>
-                                        </View>
-                                      );
-                                    })
-                                  )}
-                                </View>
-                              );
-                            })
-                          )}
-                        </View>
-
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="cash-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Charges and Amount</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Total:</Text>
-                            <Text style={styles.viewerValue}>{totalPayable ? formatAmount(totalPayable) : "—"}</Text>
-                          </View>
-                          {invoiceTotal ? (
-                            <View style={styles.viewerHintRow}>
-                              <Text style={styles.viewerHint}>
-                                Invoice Total: {invoiceTotal ? formatAmount(invoiceTotal) : "—"}
-                                {isOnlineInvoicePayment(paymentMethod) && (gstRate || gstAmount)
-                                  ? `  |  HST: ${gstRate ? `${gstRate}%` : "—"} (${gstAmount ? formatAmount(gstAmount) : "—"})`
-                                  : ""}
-                              </Text>
-                            </View>
-                          ) : null}
-                          {payableCash || payableOnline ? (
-                            <View style={styles.viewerHintRow}>
-                              <Text style={styles.viewerHint}>
-                                Cash: {payableCash ? formatAmount(payableCash) : "—"}  |  Online:{" "}
-                                {payableOnline ? formatAmount(payableOnline) : "—"}
-                              </Text>
-                            </View>
-                          ) : null}
-                        </View>
-                      </>
-                    );
-                  })()
-                )}
-              </ScrollView>
+      <Modal
+        visible={subcategoriesPopupOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSubcategoriesPopupOpen(false)}
+      >
+        <ModalKeyboardRoot
+          onBackdropPress={() => setSubcategoriesPopupOpen(false)}
+          scrimColor="rgba(0,0,0,0.42)"
+        >
+          <View style={styles.pickerSheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>
+                Edit / Add Subcategories
+                {selectedExpenseCategoryLabel ? ` — ${selectedExpenseCategoryLabel}` : ""}
+              </Text>
+              <Pressable onPress={() => setSubcategoriesPopupOpen(false)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={colors.textMuted} />
+              </Pressable>
             </View>
+            <ScrollView style={styles.pickerList} keyboardShouldPersistTaps="handled">
+              {subcategoriesDraft.map((item, index) => (
+                <View key={`sub-draft-${index}`} style={styles.subDraftRow}>
+                  <TextInput
+                    value={item}
+                    onChangeText={(t) =>
+                      setSubcategoriesDraft((prev) =>
+                        prev.map((v, i) => (i === index ? t : v))
+                      )
+                    }
+                    placeholder="Subcategory name"
+                    placeholderTextColor={colors.textLight}
+                    style={[styles.input, styles.subDraftInput]}
+                  />
+                  <Pressable
+                    onPress={() =>
+                      setSubcategoriesDraft((prev) =>
+                        prev.length <= 1 ? [""] : prev.filter((_, i) => i !== index)
+                      )
+                    }
+                    hitSlop={6}
+                  >
+                    <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                  </Pressable>
+                </View>
+              ))}
+              <Pressable
+                style={styles.secondaryBtn}
+                onPress={() => setSubcategoriesDraft((prev) => [...prev, ""])}
+              >
+                <Text style={styles.secondaryBtnText}>+ Add row</Text>
+              </Pressable>
+            </ScrollView>
+            <Pressable style={styles.saveBtn} onPress={saveSubcategoriesPopup}>
+              <Text style={styles.saveBtnText}>Save</Text>
+            </Pressable>
+            <Pressable style={styles.cancelBtn} onPress={() => setSubcategoriesPopupOpen(false)}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </Pressable>
           </View>
-        </Modal>
-      </View>
+        </ModalKeyboardRoot>
+      </Modal>
     </StackScreenFrame>
   );
 }
@@ -1466,81 +1673,43 @@ const styles = StyleSheet.create({
   },
   sectionTabText: { color: colors.text, fontWeight: "700", fontSize: fontSizes.sm },
   sectionTabTextActive: { color: colors.white },
-  sectionAddBtn: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.primary,
-    borderRadius: radii.md,
-    paddingVertical: spacing.sm,
-    alignItems: "center",
-  },
-  sectionAddBtnText: { color: colors.white, fontWeight: "700" },
-  statusStrip: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  statusBar: {
     marginHorizontal: spacing.screenHorizontal,
     marginBottom: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.successMuted,
-    borderRadius: radii.xl,
+    paddingVertical: 0,
+    minHeight: 34,
     borderWidth: 1,
-    borderColor: "#86EFAC",
-  },
-  statusChevron: { padding: spacing.xs },
-  statusStripText: {
-    fontSize: cardFontSizes.lg,
-    fontWeight: "800",
-    color: colors.successDark,
-  },
-  ledgerTabs: {
-    flexDirection: "row",
-    marginHorizontal: spacing.screenHorizontal,
-    marginBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  ledgerTab: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: spacing.sm,
+    borderColor: colors.success,
     borderRadius: radii.lg,
-    backgroundColor: colors.white,
+  },
+  toolbar: {
+    marginHorizontal: spacing.screenHorizontal,
+    marginBottom: spacing.sm,
+  },
+  searchInput: {
+    height: 40,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  ledgerTabActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  ledgerTabActiveInvoice: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  ledgerTabText: {
-    fontSize: cardFontSizes.md,
-    fontWeight: "700",
-    color: colors.tabInactive,
-  },
-  ledgerTabTextInvoice: {
-    fontSize: cardFontSizes.md,
-    fontWeight: "700",
-    color: colors.tabInactive,
-  },
-  ledgerTabTextOnPrimary: {
-    color: colors.white,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.white,
+    color: colors.text,
+    fontSize: fontSizes.sm,
   },
   scroll: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: spacing.screenHorizontal,
-    paddingBottom: spacing.xxl * 2,
+    paddingBottom: spacing.xxl * 3,
     gap: spacing.md,
   },
-  loading: { alignItems: "center", paddingVertical: spacing.xl, gap: spacing.sm },
-  loadingText: { color: colors.textMuted, fontSize: fontSizes.md },
+  emptyBlock: {
+    alignItems: "center",
+    paddingVertical: spacing.xxl * 2,
+    gap: spacing.sm,
+  },
+  emptyTitle: { ...cardTypography.cardTitle, marginTop: spacing.sm },
+  emptySub: { fontSize: cardFontSizes.sm, color: colors.textMuted, textAlign: "center" },
   skeletonList: { gap: spacing.md, paddingTop: spacing.sm },
   skeletonCard: { padding: spacing.md },
   skeletonRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
@@ -1549,13 +1718,6 @@ const styles = StyleSheet.create({
   skeletonRight: { alignItems: "flex-end", gap: spacing.sm, paddingTop: 2 },
   skeletonLine: { height: 12, borderRadius: 8, backgroundColor: "#EDF2F7" },
   skeletonDot: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#EDF2F7" },
-  emptyBlock: {
-    alignItems: "center",
-    paddingVertical: spacing.xxl * 2,
-    gap: spacing.sm,
-  },
-  emptyTitle: { ...cardTypography.cardTitle, marginTop: spacing.sm },
-  emptySub: { fontSize: cardFontSizes.sm, color: colors.textMuted, textAlign: "center" },
   txCard: { padding: spacing.md },
   txRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   jobBadge: {
@@ -1565,13 +1727,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 6,
-    position: "relative",
   },
   jobBadgeLine1: {
     fontSize: cardFontSizes.micro + 1,
     fontWeight: "800",
     color: colors.white,
-    letterSpacing: 0.2,
   },
   jobBadgeLine2: {
     fontSize: cardFontSizes.md,
@@ -1579,14 +1739,19 @@ const styles = StyleSheet.create({
     color: colors.white,
     marginTop: 2,
   },
-  jobBadgePlus: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "rgba(255,255,255,0.25)",
+  expenseIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.md,
+    backgroundColor: colors.primaryMutedBg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bankIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.md,
+    backgroundColor: colors.primaryMutedBg,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1607,8 +1772,9 @@ const styles = StyleSheet.create({
   txMeta: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4, marginTop: 2 },
   metaCal: { marginLeft: spacing.xs },
   txMetaText: { fontSize: cardFontSizes.xs, color: colors.textMuted, fontWeight: "600" },
+  assignedHint: { fontSize: cardFontSizes.xs, color: colors.primary, fontWeight: "700" },
   txRight: { alignItems: "flex-end", gap: spacing.sm },
-  txAmount: { fontSize: cardFontSizes.md, fontWeight: "800" },
+  txAmount: { fontSize: cardFontSizes.md, fontWeight: "800", color: colors.text },
   txMenuBtn: {
     width: 34,
     height: 34,
@@ -1617,9 +1783,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  menuModalRoot: {
-    flex: 1,
-  },
+  menuModalRoot: { flex: 1 },
   menuBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.35)",
@@ -1635,191 +1799,202 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   menuRowLabel: { fontSize: cardFontSizes.md, color: colors.text, fontWeight: "600" },
-
-  viewerBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.screenHorizontal,
-  },
-  viewerBackdropPress: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  viewerCard: {
+  sheet: {
     width: "100%",
-    height: "86%",
-    minHeight: 260,
+    maxHeight: "92%",
     backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
     ...shadows.card,
   },
-  viewerHeader: {
+  sheetHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#D0D7E2",
+    marginBottom: spacing.sm,
+  },
+  sheetTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
+  },
+  sheetTitle: { fontSize: fontSizes.lg, fontWeight: "900", color: colors.text },
+  sheetClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEECEC",
+  },
+  sheetFormScroll: { maxHeight: "100%" },
+  sheetFormScrollContent: { paddingBottom: spacing.xxl, gap: 2 },
+  previewBody: { gap: 6, paddingBottom: spacing.lg },
+  previewBill: { fontSize: fontSizes.lg, fontWeight: "900", color: colors.primary },
+  previewName: { fontSize: fontSizes.md, fontWeight: "800", color: colors.text },
+  previewMeta: { fontSize: fontSizes.sm, color: colors.textMuted, fontWeight: "600" },
+  previewAmount: { fontSize: fontSizes.xl, fontWeight: "900", color: colors.text, marginTop: 8 },
+  fieldLabel: {
+    marginTop: spacing.sm,
+    marginBottom: 4,
+    fontSize: fontSizes.sm,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  required: { color: colors.danger },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: Platform.OS === "ios" ? 10 : 8,
+    backgroundColor: colors.white,
+    color: colors.text,
+    fontSize: fontSizes.sm,
+  },
+  inputTall: { minHeight: 72, textAlignVertical: "top" },
+  inputDisabled: { opacity: 0.55 },
+  dateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 10,
+    backgroundColor: colors.white,
+  },
+  dateBtnText: { color: colors.text, fontWeight: "700", fontSize: fontSizes.sm },
+  selectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 10,
+    backgroundColor: colors.white,
+  },
+  selectBtnText: { color: colors.text, fontWeight: "600", fontSize: fontSizes.sm, flex: 1 },
+  checkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  checkLabel: { color: colors.text, fontWeight: "700", fontSize: fontSizes.sm },
+  saveBtn: {
+    marginTop: spacing.md,
+    minHeight: 44,
+    borderRadius: radii.lg,
+    backgroundColor: "#5A50C8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveBtnDisabled: { opacity: 0.75 },
+  saveBtnText: { color: colors.white, fontSize: fontSizes.lg, fontWeight: "800" },
+  cancelBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.sm,
+  },
+  cancelBtnText: {
+    color: colors.primary,
+    fontSize: fontSizes.md,
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
+  secondaryBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+    backgroundColor: colors.white,
+    marginTop: spacing.xs,
+  },
+  secondaryBtnText: { color: colors.primary, fontWeight: "700", fontSize: fontSizes.sm },
+  suggestBox: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    backgroundColor: colors.white,
+    maxHeight: 160,
+    overflow: "hidden",
+  },
+  suggestItem: { paddingHorizontal: spacing.sm, paddingVertical: spacing.sm },
+  suggestText: { color: colors.text, fontSize: fontSizes.sm, fontWeight: "600" },
+  pickerSheet: {
+    width: "100%",
+    maxHeight: "80%",
+    backgroundColor: colors.white,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    ...shadows.card,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
+  },
+  pickerTitle: {
+    flex: 1,
+    fontSize: fontSizes.md,
+    fontWeight: "800",
+    color: colors.text,
+    paddingRight: spacing.sm,
+  },
+  pickerList: { maxHeight: 320 },
+  pickerEmpty: { color: colors.textMuted, paddingVertical: spacing.md, textAlign: "center" },
+  pickerItem: { paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: radii.md },
+  pickerItemActive: { backgroundColor: colors.primaryMutedBg },
+  pickerItemText: { color: colors.text, fontSize: fontSizes.sm, fontWeight: "600" },
+  pickerItemTextActive: { color: colors.primary, fontWeight: "800" },
+  pickerEditBtn: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+  },
+  pickerEditBtnText: { color: colors.white, fontWeight: "800" },
+  subDraftRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  subDraftInput: { flex: 1 },
+  iosDateSheet: {
+    width: "100%",
+    backgroundColor: colors.white,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    paddingBottom: spacing.lg,
+  },
+  iosDateHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: "#1E5AAE",
-    borderBottomWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  viewerHeaderLeft: { flex: 1, minWidth: 0 },
-  viewerHeaderRight: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  viewerTitle: { fontSize: fontSizes.lg, fontWeight: "900", color: colors.white },
-  viewerSub: { fontSize: fontSizes.xs, fontWeight: "700", color: "rgba(255,255,255,0.85)", marginTop: 2 },
-  viewerStatusPill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.round,
-    backgroundColor: "rgba(245,158,11,0.95)",
-  },
-  viewerStatusText: { fontSize: fontSizes.xs, fontWeight: "900", color: "#1E293B" },
-  viewerClose: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.95)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 0,
-  },
-  viewerScroll: { flex: 1 },
-  viewerContent: { padding: spacing.md, gap: spacing.sm, paddingBottom: spacing.xxl },
-  viewerLoading: { alignItems: "center", paddingVertical: spacing.lg },
-  viewerError: { color: colors.danger, fontSize: fontSizes.md, paddingVertical: spacing.lg, textAlign: "center" },
-  viewerSection: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    backgroundColor: "#F8FAFF",
-    gap: 6,
-  },
-  viewerSectionHeader: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: 4 },
-  viewerSectionTitle: { fontSize: fontSizes.sm, fontWeight: "900", color: colors.primary },
-  viewerRow: { flexDirection: "row", gap: spacing.sm },
-  viewerLabel: { width: 92, fontSize: fontSizes.sm, color: colors.textMuted, fontWeight: "700" },
-  viewerValue: { flex: 1, fontSize: fontSizes.sm, color: colors.text, fontWeight: "700" },
-  viewerHintRow: { marginTop: 4 },
-  viewerHint: { fontSize: fontSizes.xs, color: colors.textMuted, fontWeight: "700" },
-  viewerServiceBlock: { gap: 6 },
-  viewerServiceRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
-  viewerServiceLeft: { flex: 1, minWidth: 0, gap: 2 },
-  viewerServiceName: { fontSize: fontSizes.sm, fontWeight: "800", color: colors.text },
-  viewerServiceDesc: { fontSize: fontSizes.xs, fontWeight: "600", color: colors.textMuted },
-  viewerServicePrice: { fontSize: fontSizes.sm, fontWeight: "900", color: colors.primary },
-
-  invoiceCard: {
-    width: "100%",
-    height: "88%",
-    minHeight: 260,
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    overflow: "hidden",
-    ...shadows.card,
-  },
-  invoiceHeader: {
-    backgroundColor: "#1E5AAE",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  invoiceHeaderLeft: { flex: 1, minWidth: 0 },
-  invoiceHeaderTitle: { color: colors.white, fontSize: fontSizes.xl, fontWeight: "900" },
-  invoiceHeaderSub: { color: "rgba(255,255,255,0.9)", fontSize: fontSizes.sm, fontWeight: "800", marginTop: 2 },
-  invoiceClose: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
-  invoiceContent: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xxl },
-  invoiceMetaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
-  invoiceChip: { backgroundColor: "#1E5AAE", paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radii.round },
-  invoiceChipText: { color: colors.white, fontSize: fontSizes.sm, fontWeight: "900" },
-  invoiceChipMuted: { backgroundColor: "rgba(15, 23, 42, 0.06)", paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radii.round },
-  invoiceChipMutedText: { color: colors.textMuted, fontSize: fontSizes.sm, fontWeight: "800" },
-  invoiceInfoGrid: { flexDirection: "row", gap: spacing.sm },
-  invoiceInfoCard: {
-    flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: 4,
-  },
-  invoiceInfoTitle: { fontSize: 11, fontWeight: "900", color: colors.primary, letterSpacing: 0.5 },
-  invoiceInfoMain: { fontSize: fontSizes.md, fontWeight: "900", color: colors.text },
-  invoiceInfoSub: { fontSize: fontSizes.xs, fontWeight: "700", color: colors.textMuted },
-  invoiceOdoRow: { flexDirection: "row", justifyContent: "space-between", marginTop: spacing.sm },
-  invoiceOdoCol: { gap: 2 },
-  invoiceOdoLabel: { fontSize: 10, fontWeight: "900", color: colors.textMuted, letterSpacing: 0.4 },
-  invoiceOdoValue: { fontSize: fontSizes.sm, fontWeight: "900", color: colors.text },
-  invoiceOdoDue: { color: colors.warning },
-  invoiceSection: {
-    backgroundColor: colors.white,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
-  },
-  invoiceSectionTitle: { padding: spacing.md, paddingBottom: spacing.sm, fontSize: fontSizes.sm, fontWeight: "900", color: colors.textMuted },
-  invoiceTableHead: { flexDirection: "row", backgroundColor: "#1E5AAE", paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  invoiceThLeft: { flex: 1, color: colors.white, fontSize: fontSizes.sm, fontWeight: "900" },
-  invoiceThRight: { width: 110, textAlign: "right", color: colors.white, fontSize: fontSizes.sm, fontWeight: "900" },
-  invoiceTableBody: { padding: spacing.md, gap: spacing.sm },
-  invoiceLine: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
-  invoiceLineLeft: { flex: 1, minWidth: 0, gap: 2 },
-  invoiceLineName: { fontSize: fontSizes.sm, fontWeight: "900", color: colors.text },
-  invoiceLineDesc: { fontSize: fontSizes.xs, fontWeight: "700", color: colors.textMuted },
-  invoiceLineAmt: { width: 110, textAlign: "right", fontSize: fontSizes.sm, fontWeight: "900", color: colors.text },
-  invoiceTotals: {
-    backgroundColor: colors.white,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: 8,
-  },
-  invoiceTotalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  invoiceTotalLabel: { color: colors.textMuted, fontSize: fontSizes.sm, fontWeight: "800" },
-  invoiceTotalValue: { color: colors.text, fontSize: fontSizes.sm, fontWeight: "900" },
-  invoiceTotalRowStrong: { paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
-  invoiceTotalStrongLabel: { color: colors.text, fontSize: fontSizes.md, fontWeight: "900" },
-  invoiceTotalStrongValue: { color: colors.primary, fontSize: fontSizes.lg, fontWeight: "900" },
-  invoiceFooterHint: { alignItems: "center", paddingTop: spacing.sm },
-  invoiceFooterText: { fontSize: fontSizes.sm, fontWeight: "800", color: colors.textMuted },
-
-  billingCard: {
-    width: "100%",
-    height: "92%",
-    minHeight: 320,
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    overflow: "hidden",
-    ...shadows.card,
-  },
-  billingButtonsRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-    paddingBottom: spacing.sm,
-  },
-  billingBtn: {
-    flex: 1,
-    minHeight: 56,
-    borderRadius: radii.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    ...shadows.soft,
-  },
-  billingBtnCash: { backgroundColor: "#2E7D32" },
-  billingBtnInvoice: { backgroundColor: "#1976D2" },
-  billingBtnDisabled: { opacity: 0.6 },
-  billingBtnTitle: { color: colors.white, fontSize: fontSizes.md, fontWeight: "900" },
-  billingBtnSub: { color: "rgba(255,255,255,0.95)", fontSize: fontSizes.sm, fontWeight: "800", marginTop: 2 },
+  iosDateTitle: { fontWeight: "800", color: colors.text },
+  iosDateBtn: { color: colors.textMuted, fontWeight: "700" },
+  iosDateBtnPrimary: { color: colors.primary },
 });

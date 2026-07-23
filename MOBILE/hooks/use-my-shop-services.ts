@@ -2,100 +2,69 @@ import {
   addMyService,
   addSubServices,
   deleteSubService,
+  editSubService,
+  type SubServiceInput,
 } from "@/lib/autoshopowner-api";
 import { fetchMyServices } from "@/lib/shop-owner-api";
+import { parseMyServices } from "@/lib/shop-owner-parsers";
 import type { MyServiceCategoryPayload } from "@/types/auto-shop-owner-endpoints";
+import type { ShopServiceCategory } from "@/types/shop-owner";
 import { useCallback, useState } from "react";
+
+export type MyShopSubService = ShopServiceCategory["subServices"][number];
 
 export type MyShopServiceCategory = {
   id: string;
   name?: string;
   desc?: string;
-  subServices: { id?: string; name: string; desc: string; price: number }[];
+  shopType?: string;
+  odoOutRequired?: boolean;
+  subServices: MyShopSubService[];
 };
 
-function extractServicePayload(payload: unknown): MyShopServiceCategory[] {
-  if (!payload || typeof payload !== "object") {
-    return [];
-  }
-  const root = payload as Record<string, unknown>;
-  const raw =
-    root.services ??
-    (root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>).services : null);
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-  const out: MyShopServiceCategory[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-    const o = item as Record<string, unknown>;
+function toMyShopCategories(payload: unknown): MyShopServiceCategory[] {
+  return parseMyServices(payload).map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    desc: cat.desc,
+    shopType: cat.shopType,
+    odoOutRequired: cat.odoOutRequired,
+    subServices: cat.subServices,
+  }));
+}
 
-    const nestedService = o.service && typeof o.service === "object" ? (o.service as Record<string, unknown>) : null;
-    const id =
-      typeof o.id === "string"
-        ? o.id
-        : typeof o._id === "string"
-          ? o._id
-          : typeof nestedService?.id === "string"
-            ? nestedService.id
-            : typeof nestedService?._id === "string"
-              ? nestedService._id
-              : "";
-    if (!id) {
-      continue;
-    }
-    const name =
-      typeof o.name === "string"
-        ? o.name
-        : typeof nestedService?.name === "string"
-          ? nestedService.name
-          : undefined;
-    const desc =
-      typeof o.desc === "string"
-        ? o.desc
-        : typeof o.description === "string"
-          ? o.description
-          : typeof nestedService?.desc === "string"
-            ? nestedService.desc
-            : typeof nestedService?.description === "string"
-              ? nestedService.description
-              : undefined;
+function toSubServiceInput(s: {
+  name: string;
+  desc?: string;
+  price?: number;
+  make?: string;
+  model?: string;
+  quantity?: number;
+  qty?: number;
+  quantityType?: "Unit" | "Days";
+  labourCost?: number;
+  tax?: number;
+}): SubServiceInput {
+  const quantity = s.quantity ?? s.qty;
+  return {
+    name: s.name.trim(),
+    desc: (s.desc ?? "").trim(),
+    price: typeof s.price === "number" && Number.isFinite(s.price) ? s.price : 0,
+    make: s.make?.trim() || undefined,
+    model: s.model?.trim() || undefined,
+    quantity: quantity != null && Number.isFinite(quantity) && quantity > 0 ? quantity : undefined,
+    quantityType: s.quantityType,
+    labourCost: s.labourCost != null && Number.isFinite(s.labourCost) ? s.labourCost : undefined,
+    tax: s.tax != null && Number.isFinite(s.tax) ? s.tax : undefined,
+  };
+}
 
-    const subRaw = Array.isArray(o.selectedSubServices) ? o.selectedSubServices : o.subServices;
-    const subServices: { id?: string; name: string; desc: string; price: number }[] = [];
-    if (Array.isArray(subRaw)) {
-      for (const s of subRaw) {
-        if (!s || typeof s !== "object") {
-          continue;
-        }
-        const sub = s as Record<string, unknown>;
-        const name = typeof sub.name === "string" ? sub.name : "";
-        const desc = typeof sub.desc === "string" ? sub.desc : typeof sub.description === "string" ? sub.description : "";
-        const price =
-          typeof sub.price === "number" ? sub.price : typeof sub.price === "string" ? parseFloat(sub.price) : 0;
-        const subId =
-          typeof sub.id === "string"
-            ? sub.id
-            : typeof sub._id === "string"
-              ? sub._id
-              : typeof (sub as { subServiceId?: unknown }).subServiceId === "string"
-                ? String((sub as { subServiceId: string }).subServiceId)
-                : undefined;
-        if (name) {
-          subServices.push({
-            id: subId?.trim() || undefined,
-            name,
-            desc,
-            price: Number.isFinite(price) ? price : 0,
-          });
-        }
-      }
-    }
-    out.push({ id, name: name?.trim() || undefined, desc: desc?.trim() || undefined, subServices });
+function apiMessage(data: unknown): string {
+  if (data && typeof data === "object" && "message" in data) {
+    const msg = (data as { message?: unknown }).message;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
   }
-  return out;
+  return "";
 }
 
 export function useMyShopServices(
@@ -118,7 +87,7 @@ export function useMyShopServices(
         setCategories([]);
         return;
       }
-      setCategories(extractServicePayload(res.data));
+      setCategories(toMyShopCategories(res.data));
     } catch {
       showToast("Network error.", { type: "error" });
       setCategories([]);
@@ -140,36 +109,75 @@ export function useMyShopServices(
             const today = new Date().toISOString().slice(0, 10);
             const addRes = await addMyService(token, {
               serviceId,
-              status: "active",
+              status: "Active",
               date: today,
             });
             if (!addRes.ok) {
-              const msg =
-                addRes.data && typeof addRes.data === "object" && "message" in addRes.data
-                  ? String((addRes.data as { message?: string }).message ?? "")
-                  : "";
-              showToast(msg || "Save failed.", { type: "error" });
+              showToast(apiMessage(addRes.data) || "Save failed.", { type: "error" });
               return false;
             }
           }
-          const subs = (svc.subServices ?? []).map((s) => ({
-            name: s.name,
-            desc: s.desc,
-            price: typeof s.price === "number" ? s.price : Number(s.price) || 0,
-          }));
+          const subs = (svc.subServices ?? []).map((s) => toSubServiceInput(s));
           if (subs.length > 0) {
             const subRes = await addSubServices(token, { serviceId, subServices: subs });
             if (!subRes.ok) {
-              const msg =
-                subRes.data && typeof subRes.data === "object" && "message" in subRes.data
-                  ? String((subRes.data as { message?: string }).message ?? "")
-                  : "";
-              showToast(msg || "Could not save sub-services.", { type: "error" });
+              showToast(apiMessage(subRes.data) || "Could not save sub-services.", { type: "error" });
               return false;
             }
           }
         }
         showToast("Saved.", { type: "success" });
+        await load();
+        return true;
+      } catch {
+        showToast("Network error.", { type: "error" });
+        return false;
+      }
+    },
+    [load, showToast, token]
+  );
+
+  const addSubServiceLine = useCallback(
+    async (serviceId: string, line: SubServiceInput) => {
+      if (!token) return false;
+      const id = serviceId.trim();
+      if (!id || !line.name.trim()) return false;
+      try {
+        const res = await addSubServices(token, {
+          serviceId: id,
+          subServices: [toSubServiceInput(line)],
+        });
+        if (!res.ok) {
+          showToast(apiMessage(res.data) || "Could not add subcategory.", { type: "error" });
+          return false;
+        }
+        showToast(apiMessage(res.data) || "Subcategory added.", { type: "success" });
+        await load();
+        return true;
+      } catch {
+        showToast("Network error.", { type: "error" });
+        return false;
+      }
+    },
+    [load, showToast, token]
+  );
+
+  const editSubServiceLine = useCallback(
+    async (serviceId: string, subServiceIndex: number, update: SubServiceInput) => {
+      if (!token) return false;
+      const id = serviceId.trim();
+      if (!id || subServiceIndex < 0) return false;
+      try {
+        const res = await editSubService(token, {
+          serviceId: id,
+          subServiceIndex,
+          update: toSubServiceInput(update),
+        });
+        if (!res.ok) {
+          showToast(apiMessage(res.data) || "Could not update subcategory.", { type: "error" });
+          return false;
+        }
+        showToast(apiMessage(res.data) || "Subcategory updated.", { type: "success" });
         await load();
         return true;
       } catch {
@@ -200,10 +208,7 @@ export function useMyShopServices(
           serviceId: serviceId.trim(),
           subServiceIndex: idx,
         });
-        const msg =
-          res.data && typeof res.data === "object" && "message" in res.data
-            ? String((res.data as { message?: string }).message ?? "")
-            : "";
+        const msg = apiMessage(res.data);
         if (!res.ok) {
           showToast(msg || "Delete failed.", { type: "error" });
           return false;
@@ -219,5 +224,13 @@ export function useMyShopServices(
     [categories, load, showToast, token]
   );
 
-  return { categories, loading, load, save, removeSubServiceByName };
+  return {
+    categories,
+    loading,
+    load,
+    save,
+    addSubServiceLine,
+    editSubServiceLine,
+    removeSubServiceByName,
+  };
 }
