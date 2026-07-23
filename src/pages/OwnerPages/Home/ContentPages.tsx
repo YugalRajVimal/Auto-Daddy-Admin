@@ -8,12 +8,7 @@ import {
   type CarOwnerContentBlock,
 } from "../../../hooks/useOwnerPortal";
 import { Skeleton } from "../../../components/common/Skeleton";
-import {
-  DUMMY_OWNER_FAQS,
-  withDummyFeatures,
-  withDummyPrivacy,
-  type DummyFaqItem,
-} from "../../../lib/dummyOwnerHomeProfile";
+import type { DummyFaqItem } from "../../../lib/dummyOwnerHomeProfile";
 
 const FEATURE_ACCENTS = [
   { soft: "bg-sky-50", tint: "text-sky-700", ring: "ring-sky-100", blob: "bg-sky-100" },
@@ -26,42 +21,37 @@ const FEATURE_ACCENTS = [
 
 type FaqItem = DummyFaqItem;
 
-function DemoBadge() {
-  return (
-    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800 ring-1 ring-amber-100">
-      Demo content
-    </span>
-  );
-}
-
 function PageIntro({
   eyebrow,
   title,
   subtitle,
   icon,
   accentClass,
-  demo,
 }: {
   eyebrow: string;
   title: string;
   subtitle: string;
   icon: ReactNode;
   accentClass: string;
-  demo?: boolean;
 }) {
   return (
     <div className={`${ownerPageIntroClass} flex flex-wrap items-start justify-between gap-3`}>
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium text-slate-500">{eyebrow}</p>
-          {demo ? <DemoBadge /> : null}
-        </div>
+        <p className="text-sm font-medium text-slate-500">{eyebrow}</p>
         <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 md:text-2xl">{title}</h2>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">{subtitle}</p>
       </div>
       <span className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${accentClass}`}>
         {icon}
       </span>
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-4 py-10 text-center text-sm text-slate-500">
+      {message}
     </div>
   );
 }
@@ -194,9 +184,7 @@ function LoadingBlock() {
 }
 
 export function OwnerFaqsPage() {
-  const { loading, faqsHeading, items: liveItems } = useCarOwnerFaqs("carowner");
-  const usingDummy = !loading && liveItems.length === 0;
-  const items = usingDummy ? DUMMY_OWNER_FAQS : liveItems;
+  const { loading, faqsHeading, items } = useCarOwnerFaqs("carowner");
 
   return (
     <OwnerPageShell pageHeading="" metaTitle="FAQs | AutoDaddy" metaDescription="FAQs for car owners" noPanel>
@@ -207,9 +195,14 @@ export function OwnerFaqsPage() {
           subtitle="Quick answers about your garage, shops, and paperwork."
           icon={<FiHelpCircle size={20} className="text-sky-700" />}
           accentClass="bg-sky-50 text-sky-700"
-          demo={usingDummy}
         />
-        {loading ? <LoadingBlock /> : <FaqAccordion items={items} />}
+        {loading ? (
+          <LoadingBlock />
+        ) : items.length > 0 ? (
+          <FaqAccordion items={items} />
+        ) : (
+          <EmptyState message="No FAQs available yet." />
+        )}
       </div>
     </OwnerPageShell>
   );
@@ -220,7 +213,8 @@ export function OwnerPrivacyPage() {
     country: "canada",
     type: "privacy",
   });
-  const privacy = withDummyPrivacy(privacyHeading, privacyDescription);
+  const heading = privacyHeading?.trim() || "Privacy Policy";
+  const description = privacyDescription?.trim() ?? "";
 
   return (
     <OwnerPageShell
@@ -232,16 +226,17 @@ export function OwnerPrivacyPage() {
       <div className="space-y-4">
         <PageIntro
           eyebrow="Trust & safety"
-          title={privacy.heading}
+          title={heading}
           subtitle="How AutoDaddy handles your personal and vehicle information."
           icon={<FiLock size={20} className="text-emerald-700" />}
           accentClass="bg-emerald-50 text-emerald-700"
-          demo={!loading && privacy.usingDummy}
         />
         {loading ? (
           <LoadingBlock />
+        ) : description ? (
+          <PrivacyDocument heading={heading} description={description} />
         ) : (
-          <PrivacyDocument heading={privacy.heading} description={privacy.description} />
+          <EmptyState message="Privacy policy is not available yet." />
         )}
       </div>
     </OwnerPageShell>
@@ -253,7 +248,6 @@ export function OwnerFeaturesPage() {
     country: "canada",
     role: "carowner",
   });
-  const features = withDummyFeatures(sections);
 
   return (
     <OwnerPageShell
@@ -269,9 +263,14 @@ export function OwnerFeaturesPage() {
           subtitle="Everything built into your car-owner workspace."
           icon={<FiStar size={20} className="text-amber-700" />}
           accentClass="bg-amber-50 text-amber-700"
-          demo={!loading && features.usingDummy}
         />
-        {loading ? <LoadingBlock /> : <FeatureCards sections={features.sections} />}
+        {loading ? (
+          <LoadingBlock />
+        ) : sections.length > 0 ? (
+          <FeatureCards sections={sections} />
+        ) : (
+          <EmptyState message="No features listed yet." />
+        )}
       </div>
     </OwnerPageShell>
   );

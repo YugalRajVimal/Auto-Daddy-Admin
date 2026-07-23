@@ -34,7 +34,6 @@ import {
 } from "../../lib/carOwnerOdometer";
 import type { OwnerShopType } from "../../lib/serviceCatalog";
 import type { CarOwnerVehicle } from "../../lib/carOwnerVehicles";
-import { withDummyVehicles } from "../../lib/dummyOwnerHomeProfile";
 import { Skeleton } from "../common/Skeleton";
 
 const SHOP_TYPE_LABELS: Record<OwnerShopType, string> = {
@@ -312,7 +311,7 @@ export default function OwnerDashboardGrid() {
     displayName,
   } = useCarOwnerDashboard();
 
-  const { vehicles: apiVehicles, loading: vehiclesLoading, refresh: refreshVehicles } = useCarOwnerVehicles();
+  const { vehicles, loading: vehiclesLoading, refresh: refreshVehicles } = useCarOwnerVehicles();
   const { readings, loading: readingsLoading, refresh: refreshReadings } = useCarOwnerOdometerReadings();
   const { invoiceRows, paidInvoices, unpaidInvoices, loading: invoicesLoading } = useCarOwnerInvoices();
   const { items: jobCards, loading: jobCardsLoading } = useCarOwnerJobCards();
@@ -321,9 +320,6 @@ export default function OwnerDashboardGrid() {
   const { favoriteIds, loading: favoritesLoading } = useCarOwnerFavoriteShops();
   const { shops, loading: shopsLoading } = useCarOwnerAutoShops({ serviceIds: [] });
   const { indoor, outdoor, loading: servicesLoading } = useCarOwnerServiceSidebar();
-
-  const vehicleSource = withDummyVehicles(apiVehicles);
-  const vehicles = vehicleSource.vehicles;
 
   const vehiclesForOdo = useMemo(
     () => mergeVehiclesWithOdometerReadings(vehicles, readings),
@@ -464,16 +460,9 @@ export default function OwnerDashboardGrid() {
     <div className="space-y-3 2xl:space-y-4">
       <div className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-2 2xl:gap-3`}>
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium text-slate-500">
-              Welcome back{displayName ? `, ${displayName}` : ""}
-            </p>
-            {vehicleSource.usingDummy ? (
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800 ring-1 ring-amber-100">
-                Demo garage
-              </span>
-            ) : null}
-          </div>
+          <p className="text-sm font-medium text-slate-500">
+            Welcome back{displayName ? `, ${displayName}` : ""}
+          </p>
           <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 2xl:text-2xl">
             Garage overview
           </h2>
