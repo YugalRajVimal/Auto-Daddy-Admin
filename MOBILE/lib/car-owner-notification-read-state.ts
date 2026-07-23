@@ -74,6 +74,7 @@ export async function syncCarOwnerUnreadFromApi(authToken: string): Promise<void
   const res = await getJson<unknown>("/api/user/get-notifications?page=1&limit=1", {
     authToken,
   });
+  if (!res.ok) return;
   const parsed = parseCarOwnerNotificationsResponse(res.data, 1);
   const latest = latestCarOwnerNotificationTime(parsed.items);
   if (!latest) return;

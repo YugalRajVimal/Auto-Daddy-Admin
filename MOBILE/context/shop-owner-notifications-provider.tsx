@@ -54,8 +54,12 @@ export function ShopOwnerNotificationsProvider({ children }: { children: React.R
 
   const syncUnreadFromApi = useCallback(async () => {
     if (!isShopOwner || !token) return;
-    await syncShopOwnerUnreadFromApi(token);
-    await refreshBadge();
+    try {
+      await syncShopOwnerUnreadFromApi(token);
+      await refreshBadge();
+    } catch {
+      // Network / storage blips should not surface as uncaught rejections.
+    }
   }, [isShopOwner, refreshBadge, token]);
 
   const value = useMemo(

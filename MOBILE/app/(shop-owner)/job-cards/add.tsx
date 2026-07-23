@@ -2,17 +2,14 @@ import { CustomerCard } from "@/components/customers";
 import { ExpandableCard, LoadingProgress, StackScreenFrame, SurfaceCard, useToast } from "@/components/reusables";
 import { colors, fontSizes, radii, shadows, spacing, typography } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
-import { customerKey, parseMyCustomersFromApiPayload } from "@/hooks/use-my-customers";
-import { useMyShopServices } from "@/hooks/use-my-shop-services";
+import { customerKey } from "@/hooks/use-my-customers";
 import { useOncePress } from "@/hooks/use-once-press";
-import { fetchAddedCustomers } from "@/lib/autoshopowner-api";
-import { MAX_JOB_CARD_VEHICLE_PHOTOS, saveJobCard } from "@/lib/shop-owner-job-cards-api";
-import type { UploadPart } from "@/lib/upload-part";
-import { formatCurrencyAmount } from "@/lib/currency";
-import { normalizeMediaUrl } from "@/lib/normalize-media-url";
-import { Image } from "expo-image";
-import * as FileSystem from "expo-file-system/legacy";
-import * as ImagePicker from "expo-image-picker";
+import { formatCurrencyAmount, getCurrencySign } from "@/lib/currency";
+import {
+  fetchJobCardFormData,
+  saveJobCard,
+  type JobCardFormCustomer,
+} from "@/lib/shop-owner-job-cards-api";
 import type { CustomerVehicle, MyCustomer } from "@/types/auto-shop-owner-endpoints";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -39,11 +36,26 @@ type ServiceLine = {
   desc: string;
   unitPriceStr: string;
   qtyStr: string;
-  labourCostStr: string;
   priceStr: string;
+  labourCostStr: string;
+  odoOutStr?: string;
 };
 
-type PickedVehiclePhoto = UploadPart;
+type ServiceCategoryLike = {
+  id: string;
+  name?: string;
+  odoOutRequired?: boolean;
+  subServices: Array<{
+    name: string;
+    desc?: string;
+    price?: number;
+    qty?: number;
+    make?: string;
+    model?: string;
+    labourCost?: number;
+    odoOutRequired?: boolean;
+  }>;
+};
 
 type SubServiceOption = {
   key: string;
@@ -52,6 +64,8 @@ type SubServiceOption = {
   label: string;
   desc: string;
   price: number;
+  qty: number;
+  labourCost: number;
   categoryName?: string;
 };
 
@@ -65,6 +79,9 @@ type ApiJobCardSubService = {
   labourCost?: number | string;
   labourCharge?: number | string;
   labourDuration?: string | number;
+  dueOdometerReading?: string | number;
+  odoOut?: string | number;
+  odoOutReading?: string | number;
 };
 
 type ApiJobCard = {
@@ -72,12 +89,14 @@ type ApiJobCard = {
   customerId?: { _id?: string; name?: string; email?: string; phone?: string };
   vehicleId?: { _id?: string; licensePlateNo?: string; make?: { name?: string; model?: string } };
   odometerReading?: number | string;
+  odoIn?: number | string;
   dueOdometerReading?: number | string;
   otherCharges?: number | string;
   labourCharge?: number | string;
   labourDuration?: string | number;
   discount?: string | number;
-  vehiclePhotos?: string[];
+  terms?: string;
+  additionalNotes?: string;
   services?: Array<{ service?: string; subServices?: ApiJobCardSubService[] }>;
 };
 
@@ -88,6 +107,40 @@ function displayPhone(c: MyCustomer) {
     return `${cc} ${p}`;
   }
   return p ?? "";
+}
+
+function mapPageDetailsVehicle(
+  v: JobCardFormCustomer["myVehicles"][number]
+): CustomerVehicle {
+  const makeObj = v.make && typeof v.make === "object" ? v.make : null;
+  return {
+    _id: v._id,
+    vId: v.vId,
+    licensePlateNo: v.licensePlateNo?.trim() || v.regNo?.trim() || undefined,
+    vinNo: v.vinNo?.trim() || v.vin?.trim() || undefined,
+    vehicleName: v.vehicleName?.trim() || makeObj?.name?.trim() || v.brand?.trim() || undefined,
+    model: v.model?.trim() || makeObj?.model?.trim() || undefined,
+    year: v.year != null && String(v.year).trim() ? String(v.year) : undefined,
+    odometerReading:
+      v.odometerReading != null && String(v.odometerReading).trim()
+        ? String(v.odometerReading)
+        : undefined,
+    dueOdometerReading:
+      v.dueOdometerReading != null && String(v.dueOdometerReading).trim()
+        ? String(v.dueOdometerReading)
+        : undefined,
+  };
+}
+
+function mapPageDetailsCustomer(c: JobCardFormCustomer): MyCustomer {
+  return {
+    _id: c._id,
+    name: c.name,
+    phone: c.phone,
+    countryCode: c.countryCode,
+    city: c.city,
+    vehicles: (c.myVehicles ?? []).map(mapPageDetailsVehicle),
+  };
 }
 
 function vehicleApiId(v: CustomerVehicle): string | undefined {
@@ -102,6 +155,40 @@ function vehicleLabel(v: CustomerVehicle): string {
   }
   const mm = [v.vehicleName, v.model].filter(Boolean).join(" ");
   return mm || "Vehicle";
+}
+
+function vehicleMakeModelKey(vehicle: CustomerVehicle | null): { make: string; model: string } {
+  if (!vehicle) return { make: "", model: "" };
+  const make = (vehicle.vehicleName ?? "").trim().toLowerCase();
+  const model = (vehicle.model ?? "").trim().toLowerCase();
+  return { make, model };
+}
+
+/** Keep unscoped subs (no make/model) for any vehicle; match scoped ones by make+model. */
+function subServiceMatchesVehicle(
+  sub: { make?: string; model?: string },
+  vehicle: CustomerVehicle | null
+): boolean {
+  if (!vehicle) return false;
+  const subMake = (sub.make ?? "").trim().toLowerCase();
+  const subModel = (sub.model ?? "").trim().toLowerCase();
+  if (!subMake && !subModel) return true;
+  const { make, model } = vehicleMakeModelKey(vehicle);
+  if (!make || !model) return false;
+  return subMake === make && subModel === model;
+}
+
+function filterCategoriesForVehicle(
+  categories: ServiceCategoryLike[],
+  vehicle: CustomerVehicle | null
+): ServiceCategoryLike[] {
+  if (!vehicle) return [];
+  return categories
+    .map((cat) => ({
+      ...cat,
+      subServices: (cat.subServices || []).filter((sub) => subServiceMatchesVehicle(sub, vehicle)),
+    }))
+    .filter((cat) => cat.subServices.length > 0);
 }
 
 function customerSearchHay(c: MyCustomer): string {
@@ -145,15 +232,59 @@ function parseSubServiceKey(key: string): { catId: string; subIdx: number } | nu
   return { catId, subIdx };
 }
 
-function calcLinePrice(line: Pick<ServiceLine, "unitPriceStr" | "qtyStr" | "labourCostStr">): number {
-  const unit = parseAmount(line.unitPriceStr);
-  const qty = parseAmount(line.qtyStr);
-  const labour = parseAmount(line.labourCostStr);
-  return unit * qty + labour;
+function categoryRequiresOdoOut(catId: string, categories: ServiceCategoryLike[]): boolean {
+  return Boolean(categories.find((c) => c.id === catId)?.odoOutRequired);
 }
 
-function priceStrFromLine(line: Pick<ServiceLine, "unitPriceStr" | "qtyStr" | "labourCostStr">): string {
-  const total = calcLinePrice(line);
+function lineRequiresOdoOut(line: ServiceLine, categories: ServiceCategoryLike[]): boolean {
+  const parsed = parseSubServiceKey(line.subKey ?? "");
+  if (!parsed) return false;
+  const cat = categories.find((c) => c.id === parsed.catId);
+  if (!cat) return false;
+  if (cat.odoOutRequired) return true;
+  return Boolean(cat.subServices?.[parsed.subIdx]?.odoOutRequired);
+}
+
+function vehicleOdoOutPlaceholder(vehicle: CustomerVehicle | null): string {
+  if (!vehicle) return "Out";
+  const dueRaw = vehicle.dueOdometerReading;
+  if (dueRaw != null && String(dueRaw).trim() !== "") {
+    return String(dueRaw).trim();
+  }
+  const inVal = vehicle.odometerReading?.trim() || "0";
+  const n = Number(inVal);
+  return String(Number.isFinite(n) ? n + 500 : 500);
+}
+
+function defaultOdoOutForCategory(
+  catId: string,
+  categories: ServiceCategoryLike[],
+  vehicle: CustomerVehicle | null
+): string {
+  if (!categoryRequiresOdoOut(catId, categories)) return "";
+  return vehicleOdoOutPlaceholder(vehicle).replace(/\D/g, "");
+}
+
+function resolveDueOdometerReading(lines: ServiceLine[], categories: ServiceCategoryLike[]): string {
+  let max = 0;
+  let any = false;
+  for (const line of lines) {
+    if (!line.subKey || !lineRequiresOdoOut(line, categories)) continue;
+    const val = parseAmount(line.odoOutStr ?? "");
+    if (val > 0) {
+      any = true;
+      if (val > max) max = val;
+    }
+  }
+  return any ? String(max) : "0";
+}
+
+function calcLineAmount(line: Pick<ServiceLine, "unitPriceStr" | "qtyStr">): number {
+  return parseAmount(line.unitPriceStr) * parseAmount(line.qtyStr);
+}
+
+function priceStrFromLine(line: Pick<ServiceLine, "unitPriceStr" | "qtyStr">): string {
+  const total = calcLineAmount(line);
   return Number.isFinite(total) ? String(total) : "0";
 }
 
@@ -161,34 +292,50 @@ function defaultLineForSub(
   id: string,
   catId: string,
   subIdx: number,
-  sub: { desc?: string; price?: number }
+  sub: { desc?: string; price?: number; qty?: number; labourCost?: number },
+  categories: ServiceCategoryLike[],
+  vehicle: CustomerVehicle | null
 ): ServiceLine {
+  const labourCost =
+    typeof sub?.labourCost === "number" && Number.isFinite(sub.labourCost) ? sub.labourCost : 0;
+  const qty =
+    typeof sub?.qty === "number" && Number.isFinite(sub.qty) && sub.qty > 0 ? sub.qty : 1;
   const draft = {
     unitPriceStr: String(sub?.price ?? 0),
-    qtyStr: "1",
-    labourCostStr: "0",
+    qtyStr: String(qty),
   };
   return {
     id,
     subKey: subServiceKey(catId, subIdx),
     desc: sub?.desc ?? "",
+    labourCostStr: String(labourCost),
+    odoOutStr: defaultOdoOutForCategory(catId, categories, vehicle),
     ...draft,
     priceStr: priceStrFromLine(draft),
   };
 }
 
 function emptyServiceLine(id: string): ServiceLine {
-  return { id, subKey: null, desc: "", unitPriceStr: "", qtyStr: "1", labourCostStr: "0", priceStr: "0" };
+  return {
+    id,
+    subKey: null,
+    desc: "",
+    unitPriceStr: "",
+    qtyStr: "1",
+    priceStr: "0",
+    labourCostStr: "0",
+    odoOutStr: "",
+  };
 }
 
 function buildLabourTechnicalRemarks(
-  labourSubTotal: number,
+  labourCharge: number,
   discountStr: string,
   countryCode: string | null | undefined
 ): string {
   const other = String(discountStr ?? "").trim();
   const otherAmt = parseAmount(other);
-  if (labourSubTotal <= 0 && !other) {
+  if (labourCharge <= 0 && !other) {
     return "";
   }
   const fmt = (x: number) =>
@@ -198,8 +345,8 @@ function buildLabourTechnicalRemarks(
       fallback: "",
     });
   const parts: string[] = [];
-  if (labourSubTotal > 0) {
-    parts.push(fmt(labourSubTotal));
+  if (labourCharge > 0) {
+    parts.push(fmt(labourCharge));
   }
   if (other) {
     parts.push(otherAmt > 0 ? `Discount: ${fmt(otherAmt)}` : `Discount: ${other}`);
@@ -209,10 +356,12 @@ function buildLabourTechnicalRemarks(
 
 function apiServiceBlocksToLines(
   blocks: ApiJobCard["services"],
-  categories: { id: string; subServices: { name: string; desc?: string; price?: number }[] }[]
+  categories: ServiceCategoryLike[],
+  dueOdometerReading?: string
 ): ServiceLine[] {
   const lines: ServiceLine[] = [];
   let n = 0;
+  const dueFallback = String(dueOdometerReading ?? "").replace(/\D/g, "");
   for (const block of blocks || []) {
     const catId = String(block.service || "").trim();
     if (!catId) {
@@ -232,10 +381,9 @@ function apiServiceBlocksToLines(
         continue;
       }
       const catalogSub = cat.subServices[subIdx];
-      const qtyStr = String(ss.qty ?? ss.unit ?? ss.labourDuration ?? "1");
-      const labourCostStr = String(ss.labourCost ?? ss.labourCharge ?? "0");
+      const qtyStr = String(ss.qty ?? ss.unit ?? "1");
       const qty = parseAmount(qtyStr) || 1;
-      const labour = parseAmount(labourCostStr);
+      const labour = parseAmount(String(ss.labourCost ?? ss.labourCharge ?? "0"));
       const savedTotal = parseAmount(String(ss.price ?? ""));
       let unitPriceStr = ss.unitPrice != null ? String(ss.unitPrice) : "";
       if (!unitPriceStr && savedTotal > 0 && qty > 0) {
@@ -244,11 +392,20 @@ function apiServiceBlocksToLines(
         unitPriceStr = String(catalogSub?.price ?? 0);
       }
       n += 1;
-      const draft = { unitPriceStr, qtyStr, labourCostStr };
+      const draft = { unitPriceStr, qtyStr };
+      const odoRaw = ss.dueOdometerReading ?? ss.odoOutReading ?? ss.odoOut ?? "";
+      let odoOutStr = String(odoRaw).replace(/\D/g, "");
+      const needsOdo =
+        Boolean(cat.odoOutRequired) || Boolean(catalogSub?.odoOutRequired);
+      if (needsOdo && !odoOutStr && dueFallback) {
+        odoOutStr = dueFallback;
+      }
       lines.push({
         id: `line-${n}`,
         subKey: subServiceKey(catId, subIdx),
         desc: ss.desc ?? "",
+        labourCostStr: String(labour),
+        odoOutStr: needsOdo ? odoOutStr : "",
         ...draft,
         priceStr: priceStrFromLine(draft),
       });
@@ -257,10 +414,7 @@ function apiServiceBlocksToLines(
   return lines;
 }
 
-function serviceLinesToBlocks(
-  lines: ServiceLine[],
-  categories: { id: string; subServices: { name: string; desc?: string }[] }[]
-) {
+function serviceLinesToBlocks(lines: ServiceLine[], categories: ServiceCategoryLike[]) {
   const map = new Map<string, Array<Record<string, unknown>>>();
   for (const line of lines) {
     if (!line.subKey) {
@@ -277,39 +431,39 @@ function serviceLinesToBlocks(
     }
     const bucket = map.get(parsed.catId) ?? [];
     const qty = String(line.qtyStr || "").trim();
-    const labourCost = parseAmount(line.labourCostStr);
     const unitPrice = parseAmount(line.unitPriceStr);
-    bucket.push({
+    const amount = calcLineAmount(line);
+    const labourCost = parseAmount(line.labourCostStr);
+    const entry: Record<string, unknown> = {
       name: sub.name,
       desc: String(line.desc || "").trim(),
       unit: qty,
       qty,
       unitPrice,
-      price: calcLinePrice(line),
+      price: amount,
       labourCharge: labourCost,
       labourCost,
-    });
+    };
+    if (lineRequiresOdoOut(line, categories)) {
+      const odoOutReading = parseAmount(line.odoOutStr ?? "");
+      if (odoOutReading > 0) {
+        entry.dueOdometerReading = String(odoOutReading);
+        entry.odoOut = String(odoOutReading);
+        entry.odoOutReading = odoOutReading;
+      }
+    }
+    bucket.push(entry);
     map.set(parsed.catId, bucket);
   }
   return [...map.entries()].map(([service, subServices]) => ({ service, subServices }));
 }
 
-function extractJobCardPhotoPaths(raw: ApiJobCard): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const item of raw.vehiclePhotos ?? []) {
-    const path = String(item ?? "").trim();
-    if (!path || seen.has(path)) {
-      continue;
-    }
-    seen.add(path);
-    out.push(path);
-  }
-  return out;
-}
-
 function formatJobCardDate(d = new Date()): string {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function extractTermsNotes(raw: ApiJobCard): string {
+  return (raw.terms || raw.additionalNotes || "").trim();
 }
 
 export default function NewJobCardPage() {
@@ -322,10 +476,10 @@ export default function NewJobCardPage() {
     typeof params.backTo === "string" && params.backTo.startsWith("/") ? params.backTo : "/(shop-owner)/job-cards";
   const isEditMode = params.mode === "edit";
 
-  const { categories, loading: servicesLoading, load: loadServices } = useMyShopServices(token, isOwner, showToast);
-
   const [pageLoading, setPageLoading] = useState(true);
   const [customers, setCustomers] = useState<MyCustomer[]>([]);
+  const [categories, setCategories] = useState<ServiceCategoryLike[]>([]);
+  const [displayJobNo, setDisplayJobNo] = useState("");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("customer");
@@ -336,16 +490,34 @@ export default function NewJobCardPage() {
   const didAutoExpandServiceCatRef = useRef(false);
   const lineIdRef = useRef(0);
   const [odomCurrent, setOdomCurrent] = useState("");
-  const [odomDue, setOdomDue] = useState("");
   const [discount, setDiscount] = useState("");
-  const [newVehiclePhotos, setNewVehiclePhotos] = useState<PickedVehiclePhoto[]>([]);
-  const [keptVehiclePhotoUrls, setKeptVehiclePhotoUrls] = useState<string[]>([]);
+  const [labourCharge, setLabourCharge] = useState("");
+  const [termsNotes, setTermsNotes] = useState("");
   const [editingJobCardId, setEditingJobCardId] = useState<string | null>(null);
   const [editingJobCardNo, setEditingJobCardNo] = useState<string | number | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const categoriesWithSubs = useMemo(() => categories.filter((c) => c.subServices.length > 0), [categories]);
+  const allCategoriesWithSubs = useMemo(
+    () =>
+      categories
+        .filter((c) => c.subServices.length > 0)
+        .map((c) => ({
+          ...c,
+          subServices: c.subServices.map((s) => ({
+            ...s,
+            labourCost: typeof s.labourCost === "number" ? s.labourCost : Number(s.labourCost) || 0,
+            odoOutRequired: Boolean(s.odoOutRequired),
+          })),
+        })),
+    [categories]
+  );
+
+  const categoriesWithSubs = useMemo(
+    () => filterCategoriesForVehicle(allCategoriesWithSubs, selectedVehicle),
+    [allCategoriesWithSubs, selectedVehicle]
+  );
   const hasShopServices = categories.length > 0;
+  const hasAnySubServices = allCategoriesWithSubs.length > 0;
 
   const subServiceOptions = useMemo<SubServiceOption[]>(() => {
     const out: SubServiceOption[] = [];
@@ -358,6 +530,8 @@ export default function NewJobCardPage() {
           label: sub.name,
           desc: sub.desc ?? "",
           price: sub.price ?? 0,
+          qty: typeof sub.qty === "number" && sub.qty > 0 ? sub.qty : 1,
+          labourCost: typeof sub.labourCost === "number" ? sub.labourCost : 0,
           categoryName: cat.name,
         });
       });
@@ -394,6 +568,9 @@ export default function NewJobCardPage() {
     );
   }
 
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
+
   useFocusEffect(
     useCallback(() => {
       setPhase(isEditMode ? "configure" : "customer");
@@ -403,12 +580,13 @@ export default function NewJobCardPage() {
       setExpandedId(null);
       setServiceLines([]);
       setDiscount("");
-      setNewVehiclePhotos([]);
-      setKeptVehiclePhotoUrls([]);
+      setLabourCharge("");
+      setTermsNotes("");
       setEditingJobCardId(null);
+      setEditingJobCardNo(null);
+      setDisplayJobNo("");
       if (!isEditMode) {
         setOdomCurrent("");
-        setOdomDue("");
       }
 
       let cancelled = false;
@@ -422,59 +600,94 @@ export default function NewJobCardPage() {
       setPageLoading(true);
       void (async () => {
         try {
-          const [custRes] = await Promise.all([fetchAddedCustomers(token, "approved"), loadServices()]);
-          if (!cancelled && custRes.ok) {
-            const parsedCustomers = parseMyCustomersFromApiPayload(custRes.data);
-            setCustomers(parsedCustomers);
-            if (isEditMode && typeof params.jobCard === "string") {
-              try {
-                const raw = JSON.parse(decodeURIComponent(params.jobCard)) as ApiJobCard & {
-                  jobCardNo?: number | string;
-                };
-                if (typeof raw._id === "string" && raw._id) {
-                  setEditingJobCardId(raw._id);
-                }
-                if (raw.jobCardNo != null) {
-                  setEditingJobCardNo(raw.jobCardNo);
-                }
-                const customerId = raw.customerId?._id?.trim();
-                const vehicleId = raw.vehicleId?._id?.trim();
-                const matchedCustomer =
-                  parsedCustomers.find((c) => customerId && customerKey(c) === customerId) ??
-                  (raw.customerId
-                    ? ({
-                      _id: raw.customerId._id,
-                      name: raw.customerId.name,
-                      email: raw.customerId.email,
-                      phone: raw.customerId.phone,
-                      vehicles: [],
-                    } as MyCustomer)
-                    : null);
-                if (matchedCustomer) {
-                  setSelectedCustomer(matchedCustomer);
-                }
-                const matchedVehicle =
-                  (matchedCustomer?.vehicles ?? []).find((v) => vehicleId && vehicleApiId(v) === vehicleId) ??
-                  (raw.vehicleId
-                    ? ({
-                      _id: raw.vehicleId._id,
-                      licensePlateNo: raw.vehicleId.licensePlateNo,
-                      vehicleName: raw.vehicleId.make?.name,
-                      model: raw.vehicleId.make?.model,
-                    } as CustomerVehicle)
-                    : null);
-                if (matchedVehicle) {
-                  setSelectedVehicle(matchedVehicle);
-                }
-                setOdomCurrent(String(raw.odometerReading ?? "0"));
-                setOdomDue(String(raw.dueOdometerReading ?? "0"));
-                setDiscount(String(raw.otherCharges ?? raw.labourDuration ?? ""));
-                setKeptVehiclePhotoUrls(extractJobCardPhotoPaths(raw));
-                setNewVehiclePhotos([]);
-              } catch {
-                showToast("Could not open job card in edit mode.", { type: "error" });
+          const formData = await fetchJobCardFormData(token);
+          if (cancelled) return;
+
+          const parsedCustomers = formData.myCustomers.map(mapPageDetailsCustomer);
+          setCustomers(parsedCustomers);
+          setCategories(
+            formData.myServices.map((c) => ({
+              id: c.id,
+              name: c.name,
+              odoOutRequired: c.odoOutRequired,
+              subServices: (c.subServices ?? []).map((s) => ({
+                name: s.name,
+                desc: s.desc,
+                price: s.price,
+                qty: s.qty,
+                make: s.make,
+                model: s.model,
+                labourCost: s.labourCost,
+                odoOutRequired: s.odoOutRequired,
+              })),
+            }))
+          );
+
+          if (!isEditMode) {
+            const displayNo =
+              formData.nextJobCardNo?.trim() ||
+              formData.nextJobCard?.jobCardId?.trim() ||
+              (formData.nextJobCardNumber != null ? String(formData.nextJobCardNumber) : "");
+            if (displayNo) setDisplayJobNo(displayNo);
+          }
+
+          if (isEditMode && typeof params.jobCard === "string") {
+            try {
+              const raw = JSON.parse(decodeURIComponent(params.jobCard)) as ApiJobCard & {
+                jobCardNo?: number | string;
+                jobNo?: number | string;
+              };
+              if (typeof raw._id === "string" && raw._id) {
+                setEditingJobCardId(raw._id);
               }
+              const jobNo = raw.jobCardNo ?? raw.jobNo;
+              if (jobNo != null) {
+                setEditingJobCardNo(jobNo);
+                setDisplayJobNo(String(jobNo));
+              }
+              const customerId = raw.customerId?._id?.trim();
+              const vehicleId = raw.vehicleId?._id?.trim();
+              const matchedCustomer =
+                parsedCustomers.find((c) => customerId && customerKey(c) === customerId) ??
+                (raw.customerId
+                  ? ({
+                    _id: raw.customerId._id,
+                    name: raw.customerId.name,
+                    email: raw.customerId.email,
+                    phone: raw.customerId.phone,
+                    vehicles: [],
+                  } as MyCustomer)
+                  : null);
+              if (matchedCustomer) {
+                setSelectedCustomer(matchedCustomer);
+              }
+              const matchedVehicle =
+                (matchedCustomer?.vehicles ?? []).find((v) => vehicleId && vehicleApiId(v) === vehicleId) ??
+                (raw.vehicleId
+                  ? ({
+                    _id: raw.vehicleId._id,
+                    licensePlateNo: raw.vehicleId.licensePlateNo,
+                    vehicleName: raw.vehicleId.make?.name,
+                    model: raw.vehicleId.make?.model,
+                  } as CustomerVehicle)
+                  : null);
+              if (matchedVehicle) {
+                setSelectedVehicle(matchedVehicle);
+              }
+              setOdomCurrent(String(raw.odometerReading ?? raw.odoIn ?? "0"));
+              setDiscount(String(raw.otherCharges ?? raw.discount ?? ""));
+              setLabourCharge(String(raw.labourCharge ?? ""));
+              setTermsNotes(extractTermsNotes(raw));
+            } catch {
+              showToastRef.current("Could not open job card in edit mode.", { type: "error" });
             }
+          }
+        } catch (err) {
+          if (!cancelled) {
+            const msg = err instanceof Error ? err.message : "Could not load job card form data.";
+            showToastRef.current(msg, { type: "error" });
+            setCustomers([]);
+            setCategories([]);
           }
         } finally {
           if (!cancelled) {
@@ -486,38 +699,46 @@ export default function NewJobCardPage() {
       return () => {
         cancelled = true;
       };
-    }, [token, isOwner, loadServices, isEditMode, params.jobCard, showToast])
+    }, [token, isOwner, isEditMode, params.jobCard])
   );
 
   const vid = selectedVehicle ? vehicleApiId(selectedVehicle) : undefined;
   useEffect(() => {
-    if (!selectedVehicle || !vid) {
+    if (!selectedVehicle || !vid || isEditMode) {
       return;
     }
     const cur = selectedVehicle.odometerReading?.trim() ?? "0";
     setOdomCurrent(cur);
-    const curN = parseAmount(cur);
-    setOdomDue(String(Number.isFinite(curN) ? curN + 500 : 500));
-  }, [vid, selectedVehicle]);
+  }, [vid, selectedVehicle, isEditMode]);
 
   useEffect(() => {
-    if (!isEditMode || typeof params.jobCard !== "string" || categoriesWithSubs.length === 0) {
+    if (!isEditMode || typeof params.jobCard !== "string" || allCategoriesWithSubs.length === 0) {
       return;
     }
     try {
       const raw = JSON.parse(decodeURIComponent(params.jobCard)) as ApiJobCard;
-      const lines = apiServiceBlocksToLines(raw.services, categoriesWithSubs).map((line) => ({
-        ...line,
-        id: mkLineId(),
-      }));
-      setServiceLines(lines.length > 0 ? lines : [emptyServiceLine(mkLineId())]);
-      setDiscount(String(raw.otherCharges ?? raw.labourDuration ?? ""));
-      setKeptVehiclePhotoUrls(extractJobCardPhotoPaths(raw));
-      setNewVehiclePhotos([]);
+      const dueOdo = String(raw.dueOdometerReading ?? "");
+      let lines = apiServiceBlocksToLines(
+        raw.services,
+        categoriesWithSubs.length > 0 ? categoriesWithSubs : allCategoriesWithSubs,
+        dueOdo
+      );
+      if (lines.length === 0 && categoriesWithSubs.length > 0) {
+        lines = apiServiceBlocksToLines(raw.services, allCategoriesWithSubs, dueOdo);
+      }
+      setServiceLines(
+        (lines.length > 0 ? lines : [emptyServiceLine(mkLineId())]).map((line) => ({
+          ...line,
+          id: mkLineId(),
+        }))
+      );
+      setDiscount(String(raw.otherCharges ?? raw.discount ?? ""));
+      setLabourCharge(String(raw.labourCharge ?? ""));
+      setTermsNotes(extractTermsNotes(raw));
     } catch {
       // ignore malformed payload
     }
-  }, [isEditMode, params.jobCard, categoriesWithSubs, mkLineId]);
+  }, [isEditMode, params.jobCard, allCategoriesWithSubs, categoriesWithSubs, mkLineId]);
 
   const searchLower = search.trim().toLowerCase();
 
@@ -538,12 +759,12 @@ export default function NewJobCardPage() {
   const partsSubTotal = useMemo(() => {
     let sum = 0;
     for (const line of activeLines) {
-      sum += parseAmount(line.unitPriceStr) * parseAmount(line.qtyStr);
+      sum += calcLineAmount(line);
     }
     return sum;
   }, [activeLines]);
 
-  const labourSubTotal = useMemo(() => {
+  const labourFromLines = useMemo(() => {
     let sum = 0;
     for (const line of activeLines) {
       sum += parseAmount(line.labourCostStr);
@@ -551,10 +772,18 @@ export default function NewJobCardPage() {
     return sum;
   }, [activeLines]);
 
+  // Match web: keep Labour total in sync with included sub-service labour costs.
+  useEffect(() => {
+    if (labourFromLines <= 0) return;
+    setLabourCharge((prev) => {
+      const next = String(labourFromLines);
+      return prev === next ? prev : next;
+    });
+  }, [labourFromLines]);
+
+  const labourAmount = parseAmount(labourCharge);
   const discountAmount = parseAmount(discount);
-  const grandTotal = partsSubTotal + labourSubTotal - discountAmount;
-  const totalPhotoCount = keptVehiclePhotoUrls.length + newVehiclePhotos.length;
-  const canAddMorePhotos = totalPhotoCount < MAX_JOB_CARD_VEHICLE_PHOTOS;
+  const grandTotal = partsSubTotal + labourAmount - discountAmount;
 
   const optionByKey = useMemo(() => {
     const map = new Map<string, SubServiceOption>();
@@ -600,7 +829,7 @@ export default function NewJobCardPage() {
       if (!parsed) {
         continue;
       }
-      map.set(parsed.catId, (map.get(parsed.catId) ?? 0) + calcLinePrice(line));
+      map.set(parsed.catId, (map.get(parsed.catId) ?? 0) + calcLineAmount(line));
     }
     return map;
   }, [activeLines]);
@@ -616,10 +845,19 @@ export default function NewJobCardPage() {
         const next = prev.filter((l) => l.id !== existing.id);
         return next.length > 0 ? next : [emptyServiceLine(mkLineId())];
       }
-      const nextLine = defaultLineForSub(mkLineId(), catId, subIdx, {
-        desc: opt.desc,
-        price: opt.price,
-      });
+      const nextLine = defaultLineForSub(
+        mkLineId(),
+        catId,
+        subIdx,
+        {
+          desc: opt.desc,
+          price: opt.price,
+          qty: opt.qty,
+          labourCost: opt.labourCost,
+        },
+        categoriesWithSubs,
+        selectedVehicle
+      );
       const base = prev.length === 1 && !prev[0]?.subKey ? [] : prev;
       return [...base, nextLine];
     });
@@ -627,7 +865,7 @@ export default function NewJobCardPage() {
 
   function updateServiceLine(
     lineId: string,
-    patch: Partial<Pick<ServiceLine, "desc" | "unitPriceStr" | "qtyStr" | "labourCostStr">>
+    patch: Partial<Pick<ServiceLine, "desc" | "unitPriceStr" | "qtyStr" | "odoOutStr">>
   ) {
     setServiceLines((prev) =>
       prev.map((line) => {
@@ -635,91 +873,12 @@ export default function NewJobCardPage() {
           return line;
         }
         const next = { ...line, ...patch };
-        if ("unitPriceStr" in patch || "qtyStr" in patch || "labourCostStr" in patch) {
+        if ("unitPriceStr" in patch || "qtyStr" in patch) {
           next.priceStr = priceStrFromLine(next);
         }
         return next;
       })
     );
-  }
-
-  async function pickVehiclePhotos() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      showToast("Photo library permission is required.", { type: "error" });
-      return;
-    }
-    const room = MAX_JOB_CARD_VEHICLE_PHOTOS - totalPhotoCount;
-    if (room <= 0) {
-      showToast(`Maximum ${MAX_JOB_CARD_VEHICLE_PHOTOS} images allowed.`, { type: "error" });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsMultipleSelection: true,
-      selectionLimit: room,
-      quality: 0.85,
-    });
-    if (result.canceled) {
-      return;
-    }
-    const picked = (result.assets ?? [])
-      .filter((a) => a.uri)
-      .slice(0, room)
-      .map((a) => ({
-        uri: a.uri,
-        mimeType: a.mimeType,
-        fileName: a.fileName,
-      }));
-    if (picked.length) {
-      setNewVehiclePhotos((prev) => {
-        const maxNew = MAX_JOB_CARD_VEHICLE_PHOTOS - keptVehiclePhotoUrls.length;
-        return [...prev, ...picked].slice(0, maxNew);
-      });
-    }
-  }
-
-  function removeNewVehiclePhoto(index: number) {
-    setNewVehiclePhotos((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function removeKeptVehiclePhoto(index: number) {
-    setKeptVehiclePhotoUrls((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  async function collectVehiclePhotosForUpload(): Promise<UploadPart[]> {
-    if (!token) {
-      return [...newVehiclePhotos];
-    }
-    const out: UploadPart[] = [];
-    for (let i = 0; i < keptVehiclePhotoUrls.length; i++) {
-      if (out.length >= MAX_JOB_CARD_VEHICLE_PHOTOS) {
-        break;
-      }
-      const absolute = normalizeMediaUrl(keptVehiclePhotoUrls[i]);
-      if (!absolute || absolute.startsWith("file:") || absolute.startsWith("content:")) {
-        out.push({ uri: absolute ?? keptVehiclePhotoUrls[i] });
-        continue;
-      }
-      try {
-        const dest = `${FileSystem.cacheDirectory ?? ""}jc-photo-${Date.now()}-${i}.jpg`;
-        const downloaded = await FileSystem.downloadAsync(absolute, dest, {
-          headers: { Authorization: token },
-        });
-        if (downloaded.status === 200 && downloaded.uri) {
-          out.push({ uri: downloaded.uri, name: `vehicle-photo-${i + 1}.jpg` });
-        }
-      } catch {
-        // skip failed re-upload of existing photo
-      }
-    }
-    for (const photo of newVehiclePhotos) {
-      if (out.length >= MAX_JOB_CARD_VEHICLE_PHOTOS) {
-        break;
-      }
-      out.push(photo);
-    }
-    return out.slice(0, MAX_JOB_CARD_VEHICLE_PHOTOS);
   }
 
   function toggleExpanded(id: string) {
@@ -766,26 +925,38 @@ export default function NewJobCardPage() {
 
     if (blocks.length === 0) {
       showToast(
-        categoriesWithSubs.length === 0
+        !hasAnySubServices
           ? "Add sub-services under My Services before creating a job card."
-          : "Select at least one sub-service.",
+          : categoriesWithSubs.length === 0
+            ? "No sub-services match this vehicle's make and model."
+            : "Select at least one sub-service.",
         { type: "error" }
       );
       return;
     }
 
-    const tech = buildLabourTechnicalRemarks(labourSubTotal, discount, meta?.countryCode);
-    const vehiclePhotos = await collectVehiclePhotosForUpload();
+    const activeForSave = serviceLines.filter((line) => Boolean(line.subKey));
+    const missingOdoOut = activeForSave.some(
+      (line) => lineRequiresOdoOut(line, categoriesWithSubs) && parseAmount(line.odoOutStr ?? "") <= 0
+    );
+    if (missingOdoOut) {
+      showToast("Enter odometer out reading for all services that require it.", { type: "error" });
+      return;
+    }
+
+    const tech = buildLabourTechnicalRemarks(labourAmount, discount, meta?.countryCode);
 
     setSubmitting(true);
     try {
-      const categoriesForSave = categoriesWithSubs.map((c) => ({
+      const categoriesForSave = allCategoriesWithSubs.map((c) => ({
         id: c.id,
         name: c.name,
+        odoOutRequired: Boolean(c.odoOutRequired),
         subServices: (c.subServices ?? []).map((s) => ({
           name: s.name,
           desc: s.desc,
           price: typeof s.price === "number" ? s.price : Number(s.price) || 0,
+          odoOutRequired: Boolean(s.odoOutRequired),
         })),
       }));
       const res = await saveJobCard(
@@ -793,23 +964,24 @@ export default function NewJobCardPage() {
         {
           jobCardId: editingJobCardId ?? undefined,
           jobCardNo: editingJobCardNo ?? undefined,
+          terms: termsNotes.trim() || undefined,
           sendForApproval: !isEditMode,
           form: {
             customerId: ownerId,
             vehicleId,
             odometerReading: odomCurrent.trim() || "0",
-            dueOdometerReading: odomDue.trim() || "0",
+            dueOdometerReading: resolveDueOdometerReading(activeForSave, categoriesWithSubs),
             issueDescription: "Walk-in / scheduled service",
             serviceType: "Repair",
             priorityLevel: "Normal",
             services: blocks,
-            labourCharge: "0",
+            labourCharge: labourCharge.trim() || "0",
             labourDuration: "0",
             technicalRemarks: tech,
             discount,
-            additionalNotes: "",
+            additionalNotes: termsNotes.trim(),
           },
-          vehiclePhotoFiles: vehiclePhotos,
+          vehiclePhotoFiles: [],
         },
         categoriesForSave
       );
@@ -933,7 +1105,14 @@ export default function NewJobCardPage() {
           <SurfaceCard shadow="card" style={styles.jobSheet}>
             <View style={styles.jobSheetTop}>
               <Text style={styles.jobSheetTitle}>{editingJobCardId ? "Edit Job Card" : "New Job Card"}</Text>
-              <Text style={styles.jobSheetDate}>{formatJobCardDate()}</Text>
+              <View style={styles.jobSheetMeta}>
+                {displayJobNo ? (
+                  <Text style={styles.jobSheetJobNo} numberOfLines={1}>
+                    {displayJobNo}
+                  </Text>
+                ) : null}
+                <Text style={styles.jobSheetDate}>{formatJobCardDate()}</Text>
+              </View>
             </View>
 
             <View style={styles.partyRow}>
@@ -977,23 +1156,10 @@ export default function NewJobCardPage() {
                   />
                 </View>
               </View>
-              <View style={styles.odoBlock}>
-                <Text style={styles.odoLabelOut}>ODO OUT</Text>
-                <View style={styles.odoValueBox}>
-                  <TextInput
-                    style={styles.odoInput}
-                    keyboardType="number-pad"
-                    value={odomDue}
-                    onChangeText={(t) => setOdomDue(t.replace(/\D/g, ""))}
-                    placeholder="—"
-                    placeholderTextColor={colors.textLight}
-                  />
-                </View>
-              </View>
             </View>
           </SurfaceCard>
 
-          {servicesLoading && !hasShopServices ? (
+          {pageLoading && !hasShopServices ? (
             <View style={styles.servicesLoading}>
               <ActivityIndicator color={colors.primary} />
             </View>
@@ -1013,7 +1179,7 @@ export default function NewJobCardPage() {
                 </Pressable>
               </View>
             </SurfaceCard>
-          ) : categoriesWithSubs.length === 0 ? (
+          ) : !hasAnySubServices ? (
             <SurfaceCard shadow="card" style={styles.emptyCard}>
               <View style={styles.emptyWrap}>
                 <View style={styles.emptyIcon}>
@@ -1037,11 +1203,25 @@ export default function NewJobCardPage() {
                 </Pressable>
               </View>
             </SurfaceCard>
+          ) : categoriesWithSubs.length === 0 ? (
+            <SurfaceCard shadow="card" style={styles.emptyCard}>
+              <View style={styles.emptyWrap}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="car-outline" size={56} color={colors.textLight} />
+                </View>
+                <Text style={styles.emptyTitle}>No matching sub-services</Text>
+                <Text style={styles.emptySub}>
+                  No sub-services match this vehicle's make and model.
+                </Text>
+              </View>
+            </SurfaceCard>
           ) : (
             <View style={styles.servicesCardsWrap}>
               {categoriesWithSubs.map((cat) => {
                 const expanded = cat.id === expandedServiceCatId;
                 const catSubTotal = subTotalsByCatId.get(cat.id) ?? 0;
+                const showOdoOut = Boolean(cat.odoOutRequired);
+                const odoPlaceholder = vehicleOdoOutPlaceholder(selectedVehicle);
                 return (
                   <View key={cat.id} style={styles.serviceCardOuter}>
                     <ExpandableCard
@@ -1051,15 +1231,17 @@ export default function NewJobCardPage() {
                       onToggle={() => setExpandedServiceCatId((prev) => (prev === cat.id ? null : cat.id))}
                     >
                       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View style={styles.servicesListPanel}>
+                        <View style={[styles.servicesListPanel, showOdoOut && styles.servicesListPanelWithOdo]}>
                           <View style={styles.servicesTableHead}>
                             <Text style={[styles.servicesTh, styles.colIncl]}>INCL</Text>
                             <Text style={[styles.servicesTh, styles.colService]}>SUB</Text>
                             <Text style={[styles.servicesTh, styles.colDesc]}>DESC</Text>
+                            {showOdoOut ? (
+                              <Text style={[styles.servicesTh, styles.colOdo]}>ODO OUT</Text>
+                            ) : null}
                             <Text style={[styles.servicesTh, styles.colUnit]}>UNIT</Text>
                             <Text style={[styles.servicesTh, styles.colQty]}>QTY</Text>
-                            <Text style={[styles.servicesTh, styles.colLabour]}>LAB</Text>
-                            <Text style={[styles.servicesTh, styles.colTotal]}>PRICE</Text>
+                            <Text style={[styles.servicesTh, styles.colTotal]}>AMOUNT</Text>
                           </View>
 
                           {cat.subServices.map((sub, subIdx) => {
@@ -1068,7 +1250,7 @@ export default function NewJobCardPage() {
                             const included = Boolean(line);
                             const lineId = line?.id ?? "";
                             const renderAmountInput = (
-                              field: "unitPriceStr" | "qtyStr" | "labourCostStr",
+                              field: "unitPriceStr" | "qtyStr",
                               value: string,
                               widthStyle: object
                             ) => (
@@ -1127,6 +1309,29 @@ export default function NewJobCardPage() {
                                   />
                                 </View>
 
+                                {showOdoOut ? (
+                                  <View style={styles.colOdo}>
+                                    <View style={[styles.priceWrap, styles.colOdo, !included && styles.priceWrapDisabled]}>
+                                      <TextInput
+                                        style={[styles.priceInput, !included && styles.priceInputDisabled]}
+                                        keyboardType="number-pad"
+                                        value={included ? line?.odoOutStr ?? "" : ""}
+                                        onChangeText={(t) => {
+                                          if (!lineId) return;
+                                          updateServiceLine(lineId, { odoOutStr: t.replace(/\D/g, "") });
+                                        }}
+                                        editable={included}
+                                        placeholder={odoPlaceholder}
+                                        placeholderTextColor={colors.textLight}
+                                        multiline={false}
+                                        scrollEnabled={false}
+                                        textAlignVertical={Platform.OS === "android" ? "center" : "auto"}
+                                        underlineColorAndroid="transparent"
+                                      />
+                                    </View>
+                                  </View>
+                                ) : null}
+
                                 <View style={styles.colUnit}>
                                   {renderAmountInput(
                                     "unitPriceStr",
@@ -1137,14 +1342,11 @@ export default function NewJobCardPage() {
                                 <View style={styles.colQty}>
                                   {renderAmountInput("qtyStr", line?.qtyStr ?? "1", styles.colQty)}
                                 </View>
-                                <View style={styles.colLabour}>
-                                  {renderAmountInput("labourCostStr", line?.labourCostStr ?? "0", styles.colLabour)}
-                                </View>
                                 <View style={styles.colTotal}>
                                   <View style={[styles.priceWrap, styles.colTotal, styles.priceWrapReadOnly, !included && styles.priceWrapDisabled]}>
                                     <Text style={[styles.lineTotalText, !included && styles.priceInputDisabled]}>
                                       {included && line
-                                        ? formatCurrencyAmount(calcLinePrice(line), meta?.countryCode, {
+                                        ? formatCurrencyAmount(calcLineAmount(line), meta?.countryCode, {
                                             fallback: "0",
                                             signSpacing: false,
                                           })
@@ -1171,50 +1373,6 @@ export default function NewJobCardPage() {
             </View>
           )}
 
-          <SurfaceCard shadow="soft" style={styles.photosCard}>
-            <View style={styles.sectionHead}>
-              <Ionicons name="images-outline" size={18} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Upload images</Text>
-            </View>
-            <Text style={styles.photosHint}>
-              Up to {MAX_JOB_CARD_VEHICLE_PHOTOS} photos ({totalPhotoCount}/{MAX_JOB_CARD_VEHICLE_PHOTOS} selected)
-            </Text>
-            <Pressable
-              style={[styles.uploadPhotosBtn, !canAddMorePhotos && styles.actionBtnDisabled]}
-              disabled={!canAddMorePhotos || submitting}
-              onPress={() => void pickVehiclePhotos()}
-            >
-              <Ionicons name="cloud-upload-outline" size={18} color={colors.primary} />
-              <Text style={styles.uploadPhotosBtnText}>Choose images</Text>
-            </Pressable>
-            {totalPhotoCount > 0 ? (
-              <View style={styles.photoThumbRow}>
-                {keptVehiclePhotoUrls.map((photo, i) => {
-                  const src = normalizeMediaUrl(photo);
-                  if (!src) return null;
-                  return (
-                    <View key={`saved-${i}`} style={styles.photoThumbWrap}>
-                      <Image source={{ uri: src }} style={styles.photoThumb} contentFit="cover" />
-                      <Pressable style={styles.photoRemoveBtn} onPress={() => removeKeptVehiclePhoto(i)} hitSlop={6}>
-                        <Ionicons name="close" size={14} color={colors.white} />
-                      </Pressable>
-                    </View>
-                  );
-                })}
-                {newVehiclePhotos.map((photo, i) => (
-                  <View key={`new-${photo.uri}-${i}`} style={styles.photoThumbWrap}>
-                    <Image source={{ uri: photo.uri }} style={styles.photoThumb} contentFit="cover" />
-                    <Pressable style={styles.photoRemoveBtn} onPress={() => removeNewVehiclePhoto(i)} hitSlop={6}>
-                      <Ionicons name="close" size={14} color={colors.white} />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={styles.photosEmpty}>No images yet.</Text>
-            )}
-          </SurfaceCard>
-
           {categoriesWithSubs.length > 0 ? (
             <SurfaceCard shadow="soft" style={styles.totalsCard}>
               <View style={styles.totalsRow}>
@@ -1224,30 +1382,61 @@ export default function NewJobCardPage() {
                 </Text>
               </View>
               <View style={styles.totalsRow}>
-                <Text style={styles.amountRowLabel}>Labour cost</Text>
-                <Text style={styles.totalsValue}>
-                  {formatCurrencyAmount(labourSubTotal, meta?.countryCode, { fallback: "—", signSpacing: true })}
-                </Text>
+                <Text style={styles.amountRowLabel}>Labour</Text>
+                <View style={styles.labourInputWrap}>
+                  <Text style={styles.labourCurrencySign}>{getCurrencySign(meta?.countryCode)}</Text>
+                  <TextInput
+                    style={styles.labourInput}
+                    keyboardType="decimal-pad"
+                    value={labourCharge}
+                    onChangeText={(t) => setLabourCharge(t.replace(/[^0-9.]/g, ""))}
+                    placeholder="0"
+                    placeholderTextColor={colors.textLight}
+                  />
+                </View>
               </View>
               <View style={styles.totalsRow}>
                 <Text style={styles.amountRowLabel}>Discount</Text>
-                <TextInput
-                  style={styles.discountInput}
-                  keyboardType="decimal-pad"
-                  value={discount}
-                  onChangeText={setDiscount}
-                  placeholder="0.00"
-                  placeholderTextColor={colors.textLight}
-                />
+                <View style={styles.labourInputWrap}>
+                  <Text style={styles.labourCurrencySign}>{getCurrencySign(meta?.countryCode)}</Text>
+                  <TextInput
+                    style={styles.labourInput}
+                    keyboardType="decimal-pad"
+                    value={discount}
+                    onChangeText={(t) => setDiscount(t.replace(/[^0-9.]/g, ""))}
+                    placeholder="0"
+                    placeholderTextColor={colors.textLight}
+                  />
+                </View>
               </View>
               <View style={styles.grandTotalRow}>
                 <Text style={styles.grandTotalLabel}>Total</Text>
                 <Text style={styles.amountRowValue}>
-                  {formatCurrencyAmount(grandTotal, meta?.countryCode, { fallback: "—", signSpacing: true })}
+                  {formatCurrencyAmount(grandTotal, meta?.countryCode, {
+                    fallback: "—",
+                    signSpacing: true,
+                  })}
                 </Text>
               </View>
             </SurfaceCard>
           ) : null}
+
+          <SurfaceCard shadow="soft" style={styles.notesCard}>
+            <View style={styles.sectionHead}>
+              <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+              <Text style={styles.sectionTitle}>Terms</Text>
+            </View>
+            <TextInput
+              style={styles.notesInput}
+              value={termsNotes}
+              onChangeText={setTermsNotes}
+              placeholder="Enter terms and conditions"
+              placeholderTextColor={colors.textLight}
+              multiline
+              textAlignVertical="top"
+              maxLength={1200}
+            />
+          </SurfaceCard>
 
           <View style={styles.actionRow}>
             <Pressable
@@ -1374,6 +1563,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   jobSheetTitle: { fontSize: fontSizes.lg, fontWeight: "800", color: colors.primary },
+  jobSheetMeta: { alignItems: "flex-end", gap: 2, minWidth: 0, flexShrink: 1 },
+  jobSheetJobNo: { fontSize: fontSizes.sm, fontWeight: "800", color: colors.primary },
   jobSheetDate: { fontSize: fontSizes.sm, fontWeight: "600", color: colors.textMuted },
   partyRow: { flexDirection: "row", gap: spacing.sm },
   partyBox: {
@@ -1425,13 +1616,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     letterSpacing: 0.3,
   },
-  odoLabelOut: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: colors.danger,
-    textAlign: "center",
-    letterSpacing: 0.3,
-  },
   odoValueBox: {
     borderRadius: radii.md,
     borderWidth: 1,
@@ -1464,8 +1648,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 6,
     gap: 0,
-    minWidth: 560,
+    minWidth: 460,
   },
+  servicesListPanelWithOdo: { minWidth: 540 },
   servicesTableHead: {
     flexDirection: "row",
     alignItems: "center",
@@ -1485,9 +1670,9 @@ const styles = StyleSheet.create({
   },
   colService: { width: 72, justifyContent: "center" },
   colDesc: { width: 120, justifyContent: "center" },
+  colOdo: { width: 72, justifyContent: "center" },
   colUnit: { width: 88, justifyContent: "center" },
   colQty: { width: 52, justifyContent: "center" },
-  colLabour: { width: 88, justifyContent: "center" },
   colTotal: { width: 88, justifyContent: "center" },
   colIncl: { width: 44, alignItems: "center", justifyContent: "center" },
   priceWrapReadOnly: { backgroundColor: colors.bgAlt },
@@ -1568,41 +1753,24 @@ const styles = StyleSheet.create({
   },
   amountRowLabel: { fontSize: fontSizes.md, fontWeight: "800", color: colors.text },
   amountRowValue: { fontSize: fontSizes.xl, fontWeight: "800", color: colors.primary },
-  photosCard: {
+  notesCard: {
     marginHorizontal: spacing.screenHorizontal,
     marginBottom: spacing.md,
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  photosHint: { fontSize: fontSizes.xs, color: colors.textMuted, fontWeight: "600" },
-  uploadPhotosBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    alignSelf: "flex-start",
-    minHeight: 40,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
+  notesInput: {
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: radii.md,
     backgroundColor: colors.white,
+    minHeight: 96,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    fontSize: fontSizes.sm,
+    fontWeight: "600",
+    color: colors.text,
   },
-  uploadPhotosBtnText: { fontSize: fontSizes.sm, fontWeight: "700", color: colors.primary },
-  photoThumbRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
-  photoThumbWrap: { position: "relative" },
-  photoThumb: { width: 72, height: 56, borderRadius: radii.sm, borderWidth: 1, borderColor: colors.border },
-  photoRemoveBtn: {
-    position: "absolute",
-    top: -6,
-    right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.danger,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  photosEmpty: { fontSize: fontSizes.xs, color: colors.textMuted, marginTop: spacing.xs },
   totalsCard: {
     marginHorizontal: spacing.screenHorizontal,
     marginBottom: spacing.md,
@@ -1616,6 +1784,31 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   totalsValue: { fontSize: fontSizes.md, fontWeight: "800", color: colors.text },
+  labourInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 112,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.white,
+  },
+  labourCurrencySign: {
+    fontSize: fontSizes.md,
+    fontWeight: "800",
+    color: colors.primary,
+    marginRight: 2,
+  },
+  labourInput: {
+    flex: 1,
+    minWidth: 64,
+    paddingVertical: spacing.xs,
+    fontSize: fontSizes.md,
+    fontWeight: "800",
+    color: colors.primary,
+    textAlign: "right",
+  },
   discountInput: {
     minWidth: 96,
     borderWidth: 1,

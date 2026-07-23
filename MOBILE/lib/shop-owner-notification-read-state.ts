@@ -74,6 +74,7 @@ export async function syncShopOwnerUnreadFromApi(authToken: string): Promise<voi
     "/api/auto-shop-owner/get-notifications?page=1&limit=1",
     { authToken }
   );
+  if (!res.ok) return;
   const parsed = parseShopOwnerNotificationsResponse(res.data, 1);
   const latest = latestShopOwnerNotificationTime(parsed.items);
   if (!latest) return;

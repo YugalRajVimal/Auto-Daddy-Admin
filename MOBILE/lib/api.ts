@@ -192,6 +192,16 @@ export function logApiResponse(
   console.log(`[api response] ${method} ${url} ${status} ${ok ? "ok" : "error"}`, safeStringify(data));
 }
 
+const NETWORK_ERROR_STATUS = 0;
+
+function networkFailureResponse<TData>(method: string, url: string, error: unknown): ApiResponse<TData> {
+  if (__DEV__) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[api] ${method} ${url} network error:`, message);
+  }
+  return { ok: false, status: NETWORK_ERROR_STATUS, data: null };
+}
+
 async function requestJson<TData>(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
@@ -215,24 +225,30 @@ async function requestJson<TData>(
   const controller = new AbortController();
   const timeoutMs = options?.timeoutMs ?? DEFAULT_API_TIMEOUT_MS;
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  const response = await fetch(fullUrl, {
-    method,
-    headers: {
-      ...(needsJsonContentType ? { "Content-Type": "application/json" } : {}),
-      ...(options?.authToken ? { Authorization: options.authToken } : {}),
-    },
-    ...(options?.body ? { body: JSON.stringify(options.body) } : {}),
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeoutId));
+  try {
+    const response = await fetch(fullUrl, {
+      method,
+      headers: {
+        ...(needsJsonContentType ? { "Content-Type": "application/json" } : {}),
+        ...(options?.authToken ? { Authorization: options.authToken } : {}),
+      },
+      ...(options?.body ? { body: JSON.stringify(options.body) } : {}),
+      signal: controller.signal,
+    });
 
-  const data = (await response.json().catch(() => null)) as TData | null;
-  logApiResponse(method, fullUrl, response.status, response.ok, data);
+    const data = (await response.json().catch(() => null)) as TData | null;
+    logApiResponse(method, fullUrl, response.status, response.ok, data);
 
-  return {
-    ok: response.ok,
-    status: response.status,
-    data,
-  };
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+    };
+  } catch (error) {
+    return networkFailureResponse<TData>(method, fullUrl, error);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function sendFormData<TData>(
@@ -248,21 +264,27 @@ async function sendFormData<TData>(
   const controller = new AbortController();
   const timeoutMs = options?.timeoutMs ?? DEFAULT_API_TIMEOUT_MS;
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  const response = await fetch(fullUrl, {
-    method,
-    headers: {
-      ...(options?.authToken ? { Authorization: options.authToken } : {}),
-    },
-    body,
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeoutId));
-  const data = (await response.json().catch(() => null)) as TData | null;
-  logApiResponse(method, fullUrl, response.status, response.ok, data);
-  return {
-    ok: response.ok,
-    status: response.status,
-    data,
-  };
+  try {
+    const response = await fetch(fullUrl, {
+      method,
+      headers: {
+        ...(options?.authToken ? { Authorization: options.authToken } : {}),
+      },
+      body,
+      signal: controller.signal,
+    });
+    const data = (await response.json().catch(() => null)) as TData | null;
+    logApiResponse(method, fullUrl, response.status, response.ok, data);
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+    };
+  } catch (error) {
+    return networkFailureResponse<TData>(method, fullUrl, error);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /** POST `multipart/form-data`. Do not set `Content-Type`; the runtime sets the boundary. */

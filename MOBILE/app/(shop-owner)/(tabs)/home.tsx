@@ -132,6 +132,8 @@ export default function HomePage() {
         const nextDashboard = mergeHomeIntoDashboardCache(cached, home);
         setDashboardData(nextDashboard);
         await saveDashboardDetails(nextDashboard);
+      } catch {
+        // Keep cached shell; network failures are returned as ok:false from the API layer.
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -213,10 +215,12 @@ export default function HomePage() {
         setDashboardData(nextDashboard);
         await saveDashboardDetails(nextDashboard);
       }
+    } catch {
+      showToast("Could not refresh. Check your connection.", { type: "error" });
     } finally {
       setRefreshing(false);
     }
-  }, [loadCachedShell, loadHomeFromApi, refreshSession]);
+  }, [loadCachedShell, loadHomeFromApi, refreshSession, showToast]);
 
   useFocusEffect(
     useCallback(() => {

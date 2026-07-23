@@ -54,8 +54,12 @@ export function CarOwnerNotificationsProvider({ children }: { children: React.Re
 
   const syncUnreadFromApi = useCallback(async () => {
     if (!isCarOwner || !token) return;
-    await syncCarOwnerUnreadFromApi(token);
-    await refreshBadge();
+    try {
+      await syncCarOwnerUnreadFromApi(token);
+      await refreshBadge();
+    } catch {
+      // Network / storage blips should not surface as uncaught rejections.
+    }
   }, [isCarOwner, refreshBadge, token]);
 
   const value = useMemo(
