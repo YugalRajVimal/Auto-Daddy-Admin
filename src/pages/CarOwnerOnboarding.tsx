@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router";
 import { toast } from "react-toastify";
-import { putJson } from "../api/mobileAuth";
+import { getJson, putJson } from "../api/mobileAuth";
 import { useAuth } from "../auth";
 import {
   CompactField,
@@ -11,10 +11,13 @@ import {
   compactInputClass,
 } from "../components/admin/ContentPanel";
 import {
+  formatPincodeDisplay,
   isValidEmail,
   normalizePostalCodeForStorage,
+  parseUserProfilePayload,
   PROFILE_ADDRESS_MAX_LENGTH,
   PROFILE_NAME_MAX_LENGTH,
+  type UserProfileResponse,
 } from "../lib/carOwnerProfile";
 
 type CompleteProfileResponse = {
@@ -35,8 +38,42 @@ export default function CarOwnerOnboardingPage() {
   const [pincode, setPincode] = useState("");
   const [address, setAddress] = useState("");
   const [saving, setSaving] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!token || role !== "car_owner") {
+      setProfileLoading(false);
+      return;
+    }
+    if (session?.meta?.isProfileComplete === true) {
+      setProfileLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      setProfileLoading(true);
+      try {
+        const res = await getJson<UserProfileResponse>("/api/user/profile", token);
+        if (cancelled) return;
+        const parsed = parseUserProfilePayload(res.data);
+        if (!parsed) return;
+
+        if (parsed.name?.trim()) setName(parsed.name.trim());
+        if (parsed.email?.trim()) setEmail(parsed.email.trim());
+        if (parsed.pincode?.trim()) setPincode(formatPincodeDisplay(parsed.pincode));
+        if (parsed.address?.trim()) setAddress(parsed.address.trim());
+      } finally {
+        if (!cancelled) setProfileLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, role, session?.meta?.isProfileComplete]);
+
+  if (isLoading || profileLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />

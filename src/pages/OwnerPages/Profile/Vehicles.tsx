@@ -29,6 +29,7 @@ import {
   formatJobCardDate,
   jobCardLicensePlate,
   jobChipLabel,
+  resolveCarOwnerJobCardForViewer,
   serviceTypeLabel,
 } from "../../../lib/carOwnerJobCards";
 import { formatCurrencyAmount } from "../../../lib/currency";
@@ -38,7 +39,6 @@ import {
 } from "../../../lib/carOwnerDocuments";
 import { type CarOwnerVehicle } from "../../../lib/carOwnerVehicles";
 import { resolveCarBrandLogo } from "../../../lib/dummyCarBrands";
-import { withDummyVehicles } from "../../../lib/dummyOwnerHomeProfile";
 import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
 import type { CarOwnerJobCard } from "../../../types/carOwnerJobCards";
 import {
@@ -153,10 +153,7 @@ export default function OwnerVehiclesPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const countryCode = "+1";
-  const { vehicles: apiVehicles, loading, error, refresh } = useCarOwnerVehicles();
-  const vehicleSource = withDummyVehicles(apiVehicles);
-  const vehicles = vehicleSource.vehicles;
-  const usingDummy = vehicleSource.usingDummy;
+  const { vehicles, loading, error, refresh } = useCarOwnerVehicles();
   const { sections, loading: docsLoading, mutating, busyField, uploadDocumentField } = useCarOwnerDocuments();
 
   const [showForm, setShowForm] = useState(false);
@@ -242,11 +239,11 @@ export default function OwnerVehiclesPage() {
   const documentSection = sections.find((s) => s.vehicleId === selectedVehicleId) ?? null;
 
   useEffect(() => {
-    if (!loading && !error && apiVehicles.length === 0 && !addFormDismissed && !usingDummy) {
+    if (!loading && !error && vehicles.length === 0 && !addFormDismissed) {
       setShowForm(false);
       setActiveSection(null);
     }
-  }, [loading, error, apiVehicles.length, addFormDismissed, usingDummy]);
+  }, [loading, error, vehicles.length, addFormDismissed]);
 
   const resetSidebar = useCallback(() => {
     setShowForm(false);
@@ -259,10 +256,6 @@ export default function OwnerVehiclesPage() {
 
   const deleteVehicleFromList = useCallback(
     async (vehicleId: string) => {
-      if (usingDummy || vehicleId.startsWith("dummy-")) {
-        toast.info("Demo vehicles can’t be removed. Add a real vehicle to manage your garage.");
-        return;
-      }
       if (!token) {
         toast.error("Please log in again.");
         return;
@@ -286,7 +279,7 @@ export default function OwnerVehiclesPage() {
       setVehicleDetailsMode("view");
       void refresh();
     },
-    [refresh, token, usingDummy]
+    [refresh, token]
   );
 
   const handleDocumentUpload = async (vehicleId: string, field: VehicleDocumentFieldKey, file: File) => {
@@ -306,7 +299,8 @@ export default function OwnerVehiclesPage() {
 
       const res = await fetchCarOwnerJobCardById(token, id);
       if (res.ok && res.data) {
-        return res.data;
+        const resolved = resolveCarOwnerJobCardForViewer(res.data);
+        if (resolved) return resolved;
       }
 
       const cached = findJobCardById(id) ?? jobCardsRef.current.find((jc) => jc._id === id);
@@ -367,7 +361,7 @@ export default function OwnerVehiclesPage() {
       );
     }
 
-    if (apiVehicles.length === 0 && !usingDummy) {
+    if (vehicles.length === 0) {
       return (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-5 py-12 text-center">
           <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
@@ -472,10 +466,6 @@ export default function OwnerVehiclesPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              if (usingDummy) {
-                                toast.info("Demo vehicle — add a real vehicle to edit details.");
-                                return;
-                              }
                               setSelectedVehicleId(v.id);
                               setActiveSection("vehicle-details");
                               setVehicleDetailsMode("edit");
@@ -552,13 +542,7 @@ export default function OwnerVehiclesPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (usingDummy) {
-                            toast.info("Demo vehicle — documents open for real vehicles.");
-                            return;
-                          }
-                          navigate(`/owner/documents/${v.id}`);
-                        }}
+                        onClick={() => navigate(`/owner/documents/${v.id}`)}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 ring-1 ring-teal-100 transition hover:bg-teal-100"
                       >
                         <FiUpload size={13} /> Docs
@@ -734,11 +718,6 @@ export default function OwnerVehiclesPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-slate-500">Garage</p>
-              {usingDummy ? (
-                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800 ring-1 ring-amber-100">
-                  Demo vehicles
-                </span>
-              ) : null}
             </div>
             <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 md:text-2xl">
               {mainSectionLabel || "My vehicles"}

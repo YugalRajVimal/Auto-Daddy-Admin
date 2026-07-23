@@ -147,14 +147,26 @@ export default function AdminSignInPage() {
     try {
       const profileRes = await getJson<{
         success?: boolean;
-        data?: { name?: string; city?: string; phone?: string; profilePhoto?: string | null };
+        data?: {
+          name?: string;
+          email?: string;
+          city?: string;
+          phone?: string;
+          profilePhoto?: string | null;
+        };
+        name?: string;
+        email?: string;
+        city?: string;
+        phone?: string;
+        profilePhoto?: string | null;
       }>("/api/user/profile", token);
-      const p = profileRes.data?.data;
+      const p = profileRes.data?.data ?? profileRes.data;
       if (profileRes.ok && p) {
         login({
           ...session,
           profile: {
             name: p.name ?? verifyData.name,
+            email: p.email,
             phone: p.phone ?? phone,
             city: p.city,
             profilePhoto: p.profilePhoto ?? verifyData.profilePhoto ?? null,

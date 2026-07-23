@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../auth";
 import PortalHelpPage from "../../components/portal/PortalHelpPage";
 import { useCarOwnerServiceSidebar } from "../../hooks/useOwnerPortal";
+import { DUMMY_OWNER_HELP_SUBJECTS } from "../../lib/dummyOwnerHelp";
 import {
   apiMessage,
   audioBlobToFile,
@@ -13,13 +14,12 @@ export default function OwnerHelpPage() {
   const { token } = useAuth();
   const { indoor, outdoor, loading: servicesLoading } = useCarOwnerServiceSidebar();
 
-  const services = useMemo(
-    () =>
-      [...indoor, ...outdoor]
-        .map((c) => ({ id: c.id?.trim() || "", name: c.name?.trim() || "" }))
-        .filter((s) => s.id && s.name),
-    [indoor, outdoor],
-  );
+  const services = useMemo(() => {
+    const fromApi = [...indoor, ...outdoor]
+      .map((c) => ({ id: c.id?.trim() || "", name: c.name?.trim() || "" }))
+      .filter((s) => s.id && s.name);
+    return fromApi.length > 0 ? fromApi : DUMMY_OWNER_HELP_SUBJECTS;
+  }, [indoor, outdoor]);
 
   return (
     <PortalHelpPage

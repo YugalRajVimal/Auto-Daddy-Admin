@@ -5,7 +5,6 @@ import {
   formatCurrencyNumber,
   getCurrencyCode,
   getCallingCodeFromProfileResponse,
-  isOnlineInvoicePayment,
   normalizeMediaUrl,
 } from "./utils.js";
 import "./invoice-job-card-viewer.css";
@@ -45,6 +44,15 @@ function formatMoney(value, countryCode, { withCode = true, decimals = 2 } = {})
 function parseNumber(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function resolveJobTotal(job) {
+  return (
+    parseNumber(job?.totalPayableAmount) ||
+    parseNumber(job?.totalAmount) ||
+    parseNumber(job?.total) ||
+    0
+  );
 }
 
 function pickBusiness(job, cachedProfile) {
@@ -97,24 +105,53 @@ function splitFirstLine(text) {
   return { first, rest };
 }
 
+function serviceCategoryName(svc) {
+  return (
+    s(svc?.service?.name) ||
+    s(nested(svc?.service)?.name) ||
+    s(svc?.category) ||
+    s(svc?.service)
+  );
+}
+
 function flattenServiceLines(services) {
   const lines = [];
   for (const svc of services || []) {
-    const category =
-      s(svc?.service?.name) ??
-      s(nested(svc?.service)?.name) ??
-      s(svc?.service);
-    for (const sub of svc?.subServices || []) {
-      const price = parseNumber(sub?.price);
-      const labour = parseNumber(sub?.labourCharge ?? sub?.labourCost);
-      const descParts = [s(sub?.name), s(sub?.desc)].filter(Boolean);
+    const category = serviceCategoryName(svc);
+    const subs = Array.isArray(svc?.subServices) ? svc.subServices : [];
+    if (subs.length > 0) {
+      for (const sub of subs) {
+        const price = parseNumber(sub?.price ?? sub?.unitPrice ?? sub?.unitCost);
+        const labour = parseNumber(sub?.labourCharge ?? sub?.labourCost);
+        const qty = parseNumber(sub?.unit ?? sub?.qty ?? sub?.labourDuration ?? 1) || 1;
+        const descParts = [s(sub?.name), s(sub?.desc)].filter(Boolean);
+        const amount = parseNumber(sub?.amount);
+        lines.push({
+          category,
+          description: descParts.join(" — ") || category || "Service",
+          unitCost: price,
+          units: String(qty),
+          labour,
+          amount: amount > 0 ? amount : price * qty + labour,
+        });
+      }
+      continue;
+    }
+
+    // Flat API lines: { service, category, desc, unitCost, qty, amount }
+    const unitCost = parseNumber(svc?.unitCost ?? svc?.unitPrice ?? svc?.price);
+    const qty = parseNumber(svc?.qty ?? svc?.unit ?? 1) || 1;
+    const labour = parseNumber(svc?.labourCharge ?? svc?.labourCost);
+    const amount = parseNumber(svc?.amount);
+    const desc = s(svc?.desc) || category || "Service";
+    if (category || desc || unitCost > 0 || amount > 0) {
       lines.push({
         category,
-        description: descParts.join(" — ") || "Service",
-        unitCost: price,
-        units: s(sub?.unit ?? sub?.qty ?? sub?.labourDuration) || "1",
+        description: category && desc && category !== desc ? `${category} — ${desc}` : desc,
+        unitCost: unitCost > 0 ? unitCost : amount > 0 ? amount / qty : 0,
+        units: String(qty),
         labour,
-        amount: price + labour,
+        amount: amount > 0 ? amount : unitCost * qty + labour,
       });
     }
   }
@@ -144,14 +181,32 @@ function PaymentChip({ status }) {
 function extractJobCardServiceLines(services) {
   const lines = [];
   for (const svc of services || []) {
-    for (const sub of svc?.subServices || []) {
-      const price = parseNumber(sub?.price);
-      const labourCharge = parseNumber(sub?.labourCharge ?? sub?.labourCost);
+    const category = serviceCategoryName(svc);
+    const subs = Array.isArray(svc?.subServices) ? svc.subServices : [];
+    if (subs.length > 0) {
+      for (const sub of subs) {
+        const price = parseNumber(sub?.price ?? sub?.amount ?? sub?.unitPrice);
+        const labourCharge = parseNumber(sub?.labourCharge ?? sub?.labourCost);
+        lines.push({
+          name: s(sub?.name) || category || "Service",
+          desc: s(sub?.desc) || "—",
+          price: price > 0 ? price : 0,
+          labourCharge,
+        });
+      }
+      continue;
+    }
+
+    const unitCost = parseNumber(svc?.unitCost ?? svc?.unitPrice ?? svc?.price);
+    const qty = parseNumber(svc?.qty ?? 1) || 1;
+    const amount = parseNumber(svc?.amount);
+    const price = amount > 0 ? amount : unitCost * qty;
+    if (category || s(svc?.desc) || price > 0) {
       lines.push({
-        name: s(sub?.name) || "Service",
-        desc: s(sub?.desc) || "—",
+        name: category || "Service",
+        desc: s(svc?.desc) || "—",
         price,
-        labourCharge,
+        labourCharge: parseNumber(svc?.labourCharge ?? svc?.labourCost),
       });
     }
   }
@@ -161,16 +216,38 @@ function extractJobCardServiceLines(services) {
 function extractJobCardDetailedLines(services) {
   const lines = [];
   for (const svc of services || []) {
-    for (const sub of svc?.subServices || []) {
-      const unitPrice = parseNumber(sub?.unitPrice);
-      const qty = parseNumber(sub?.qty ?? sub?.unit ?? sub?.labourDuration ?? 1) || 1;
-      const labourCost = parseNumber(sub?.labourCost ?? sub?.labourCharge);
-      const rawPrice = parseNumber(sub?.price);
-      const computed = unitPrice > 0 ? unitPrice * qty + labourCost : rawPrice + labourCost;
-      const price = rawPrice > 0 ? rawPrice : computed;
+    const category = serviceCategoryName(svc);
+    const subs = Array.isArray(svc?.subServices) ? svc.subServices : [];
+    if (subs.length > 0) {
+      for (const sub of subs) {
+        const unitPrice = parseNumber(sub?.unitPrice ?? sub?.unitCost);
+        const qty = parseNumber(sub?.qty ?? sub?.unit ?? sub?.labourDuration ?? 1) || 1;
+        const labourCost = parseNumber(sub?.labourCost ?? sub?.labourCharge);
+        const rawPrice = parseNumber(sub?.price ?? sub?.amount);
+        const computed = unitPrice > 0 ? unitPrice * qty + labourCost : rawPrice + labourCost;
+        const price = rawPrice > 0 ? rawPrice : computed;
+        lines.push({
+          description: s(sub?.name) || category || "Service",
+          details: s(sub?.desc) || "—",
+          unitPrice: unitPrice > 0 ? unitPrice : Math.max(0, (price - labourCost) / qty),
+          qty,
+          labourCost,
+          price,
+        });
+      }
+      continue;
+    }
+
+    // Flat API lines: { service/{name}, category, desc, unitCost, qty, amount }
+    const unitPrice = parseNumber(svc?.unitCost ?? svc?.unitPrice ?? svc?.price);
+    const qty = parseNumber(svc?.qty ?? svc?.unit ?? 1) || 1;
+    const labourCost = parseNumber(svc?.labourCost ?? svc?.labourCharge);
+    const amount = parseNumber(svc?.amount);
+    const price = amount > 0 ? amount : unitPrice * qty + labourCost;
+    if (category || s(svc?.desc) || unitPrice > 0 || price > 0) {
       lines.push({
-        description: s(sub?.name) || "Service",
-        details: s(sub?.desc) || "—",
+        description: category || "Service",
+        details: s(svc?.desc) || "—",
         unitPrice: unitPrice > 0 ? unitPrice : Math.max(0, (price - labourCost) / qty),
         qty,
         labourCost,
@@ -179,6 +256,19 @@ function extractJobCardDetailedLines(services) {
     }
   }
   return lines;
+}
+
+function resolveOdoOutFromServices(services) {
+  let max = 0;
+  for (const svc of services || []) {
+    const n = parseNumber(svc?.odoOutReading);
+    if (n > max) max = n;
+    for (const sub of svc?.subServices || []) {
+      const sn = parseNumber(sub?.odoOutReading);
+      if (sn > max) max = sn;
+    }
+  }
+  return max > 0 ? max : null;
 }
 
 function extractLabourFromJob(job) {
@@ -322,7 +412,18 @@ function InvoiceDocument({
   const isInvoice = variant === "invoice";
   const currencyCode = getCurrencyCode(countryCode);
   const customer =
-    nested(job?.customerId) ?? nested(job?.customer) ?? nested(job?.carOwner);
+    nested(job?.customerId) ??
+    nested(job?.customer) ??
+    nested(job?.carOwner) ??
+    (s(job?.customerName) || s(job?.phone) || s(job?.email) || s(job?.city)
+      ? {
+          name: s(job?.customerName),
+          phone: s(job?.phone),
+          email: s(job?.email),
+          city: s(job?.city),
+          address: s(job?.address),
+        }
+      : null);
   const vehicle = nested(job?.vehicleId) ?? nested(job?.vehicle);
   const make = nested(vehicle?.make);
   const payable = nested(job?.payableAmounts);
@@ -337,38 +438,46 @@ function InvoiceDocument({
     [isInvoice, job, apiBaseUrl]
   );
   const labour = extractLabourFromJob(job);
-  const showTax = isInvoice && isOnlineInvoicePayment(job?.paymentMethod);
+  // Invoice documents always show HST (same as shop estimate invoice preview).
+  const showTax = isInvoice;
 
   const servicesSubTotal = jobCardLines.reduce((sum, line) => sum + line.price, 0);
   const lineSubtotal = invoiceLines.reduce((sum, line) => sum + line.amount, 0);
+  const labourOnInvoice = isInvoice ? labour.charge : 0;
+  const resolvedTotal = resolveJobTotal(job);
   const subtotal = isInvoice
-    ? parseNumber(payable?.invoiceTotal) || lineSubtotal
+    ? parseNumber(payable?.invoiceTotal) ||
+      (lineSubtotal > 0 ? lineSubtotal + labourOnInvoice : 0) ||
+      resolvedTotal
     : servicesSubTotal;
   const taxableAmt = subtotal;
-  const gstRate = showTax ? parseNumber(payable?.gstRate ?? business?.gst) : 0;
+  const rawGstRate = parseNumber(
+    payable?.gstRate ?? business?.gstPercent ?? business?.gst ?? business?.hst,
+  );
+  // Match shop invoice preview: default Canadian HST when rate is not on the record.
+  const gstRate = showTax ? (rawGstRate > 0 ? rawGstRate : 13) : 0;
   const gstAmount = showTax ? parseNumber(payable?.gstAmount) : 0;
   const roundOff = showTax ? parseNumber(payable?.roundOff) : 0;
   const totalTax = showTax
-    ? gstAmount || (gstRate > 0 ? (taxableAmt * gstRate) / 100 : 0)
+    ? gstAmount || (gstRate > 0 && taxableAmt > 0 ? (taxableAmt * gstRate) / 100 : 0)
     : 0;
-  const invoiceTotal = showTax
-    ? parseNumber(job?.totalPayableAmount) ||
-      parseNumber(payable?.online) ||
-      subtotal + totalTax + roundOff
-    : parseNumber(payable?.cash) ||
-      parseNumber(job?.totalPayableAmount) ||
-      subtotal;
-  const jobTotal =
-    parseNumber(job?.totalPayableAmount) > 0
-      ? parseNumber(job?.totalPayableAmount)
-      : servicesSubTotal + labour.charge;
+  const computedInvoiceTotal = taxableAmt + totalTax + roundOff;
+  const apiInvoiceTotal =
+    parseNumber(payable?.online) || parseNumber(payable?.cash) || resolvedTotal;
+  const invoiceTotal =
+    apiInvoiceTotal > 0 && Math.abs(apiInvoiceTotal - computedInvoiceTotal) < 0.01
+      ? apiInvoiceTotal
+      : computedInvoiceTotal > 0
+        ? computedInvoiceTotal
+        : apiInvoiceTotal;
+  const jobTotal = resolvedTotal > 0 ? resolvedTotal : servicesSubTotal + labour.charge;
   const documentTotal = isInvoice ? invoiceTotal : jobTotal;
   const paymentTone = chipToneFromPaymentStatus(job?.paymentStatus);
   const isPendingPayment = !isInvoice && paymentTone === "unpaid";
 
   const docNo = isInvoice
-    ? s(job?.invoiceNumber) || s(job?.jobNo)?.padStart(5, "0")
-    : s(job?.jobNo);
+    ? s(job?.invoiceNumber) || s(job?.invoiceId) || s(job?.jobNo)?.padStart(5, "0")
+    : s(job?.jobNo) || s(job?.jobCardNo);
   const docLabel = isInvoice ? "Invoice #" : "Job #";
   const dateLabel = isInvoice ? "Invoice Date" : "Job Date";
   const totalLabel = isInvoice ? `Due Amt (${currencyCode})` : `Total (${currencyCode})`;
@@ -385,7 +494,14 @@ function InvoiceDocument({
 
   const billTo = isInvoice ? buildCustomerAddress(customer) : buildJobCardBillTo(customer);
   const billToSplit = splitFirstLine(billTo);
-  const vehiclePlate = s(vehicle?.licensePlateNo ?? vehicle?.licensePlate ?? vehicle?.regNo ?? vehicle?.plateNo);
+  const vehiclePlate = s(
+    vehicle?.licensePlateNo ??
+      vehicle?.licensePlate ??
+      vehicle?.regNo ??
+      vehicle?.plateNo ??
+      job?.licensePlateNo ??
+      job?.licensePlate
+  );
   const vehicleName = [
     make?.name ?? vehicle?.brand ?? vehicle?.makeName,
     make?.model ?? vehicle?.model ?? vehicle?.vehicleName,
@@ -395,18 +511,11 @@ function InvoiceDocument({
     .trim();
   const vehicleVin = s(vehicle?.vin ?? vehicle?.vinNo ?? vehicle?.VIN);
   const vehicleCin = s(vehicle?.cin ?? vehicle?.CIN ?? vehicle?.chassisNo ?? vehicle?.chasisNo);
-  const odoIn = formatOdometer(job?.odometerReading);
-  const odoOut = formatOdometer(job?.dueOdometerReading);
+  const odoOutFromServices = resolveOdoOutFromServices(job?.services);
+  const odoIn = formatOdometer(job?.odometerReading ?? job?.odoIn);
+  const odoOut = formatOdometer(job?.dueOdometerReading ?? job?.odoOut ?? odoOutFromServices);
   const odometerLabel =
     odoIn !== "—" || odoOut !== "—" ? `Odo In: ${odoIn}  ·  Odo Out: ${odoOut}` : "";
-
-  const paymentMethodText = paymentMethodLabel(s(job?.paymentMethod));
-  const paymentStatusShort = (() => {
-    const tone = chipToneFromPaymentStatus(job?.paymentStatus);
-    if (tone === "paid") return "Paid";
-    if (tone === "unpaid") return "Unpaid";
-    return s(job?.paymentStatus) || "—";
-  })();
 
   const accountName =
     s(business?.accountName ?? business?.paymentAccountName) || businessName;
@@ -415,8 +524,10 @@ function InvoiceDocument({
   const terms = isInvoice
     ? s(business?.termsAndConditions ?? business?.terms) ||
       s(job?.additionalNotes) ||
+      s(job?.terms) ||
       s(job?.technicalRemarks)
-    : s(job?.additionalNotes);
+    : s(job?.additionalNotes) || s(job?.terms);
+  const jobDate = formatInvoiceDate(job?.createdAt ?? job?.date);
 
   return (
     <div className="invoice-viewer-document">
@@ -447,8 +558,8 @@ function InvoiceDocument({
           ) : null}
           <div className="invoice-viewer-meta-grid">
             <MetaRow label={docLabel} value={docNo} />
-            <MetaRow label={dateLabel} value={formatInvoiceDate(job?.createdAt)} />
-            {isInvoice ? <MetaRow label="P.O. #" value={s(job?.jobNo)} /> : null}
+            <MetaRow label={dateLabel} value={jobDate} />
+            {isInvoice ? <MetaRow label="P.O. #" value={s(job?.jobNo) || s(job?.jobCardNo)} /> : null}
             <MetaRow label={headerAmountLabel} value={formatMoney(documentTotal, countryCode)} strong />
           </div>
         </div>
@@ -494,7 +605,7 @@ function InvoiceDocument({
               <th>Description</th>
               <th className="text-right">{isInvoice ? "Unit Cost" : "Unit price"}</th>
               <th className="text-right">Qty</th>
-              <th className="text-right">Labor cost</th>
+              {isInvoice ? <th className="text-right">Labor cost</th> : null}
               <th className="text-right">Price</th>
             </tr>
           </thead>
@@ -520,7 +631,7 @@ function InvoiceDocument({
               )
             ) : jobCardDetailedLines.length === 0 ? (
               <tr>
-                <td colSpan={6} className="invoice-viewer-empty">
+                <td colSpan={5} className="invoice-viewer-empty">
                   No services listed
                 </td>
               </tr>
@@ -534,7 +645,6 @@ function InvoiceDocument({
                   </td>
                   <td className="text-right tabular-nums">{formatMoney(line.unitPrice, countryCode, { withCode: false })}</td>
                   <td className="text-right tabular-nums">{line.qty}</td>
-                  <td className="text-right tabular-nums">{formatMoney(line.labourCost, countryCode, { withCode: false })}</td>
                   <td className="text-right tabular-nums">{formatMoney(line.price, countryCode, { withCode: false })}</td>
                 </tr>
               ))
@@ -576,27 +686,7 @@ function InvoiceDocument({
                 </table>
               ) : null}
             </>
-          ) : (
-            <>
-              <h4 className="invoice-viewer-payment-title">Payment Transfer Information</h4>
-              <p className="invoice-viewer-payment-line">
-                <span>Method :</span> {paymentMethodText || "—"}
-              </p>
-              <p className="invoice-viewer-payment-line">
-                <span>Status :</span> <PaymentChip status={paymentStatusShort} />
-              </p>
-              {accountName ? (
-                <p className="invoice-viewer-payment-line">
-                  <span>Account Name :</span> {accountName}
-                </p>
-              ) : null}
-              {interac ? (
-                <p className="invoice-viewer-payment-line">
-                  <span>Interac e-Transfer :</span> {interac}
-                </p>
-              ) : null}
-            </>
-          )}
+          ) : null}
         </div>
 
         <div className="invoice-viewer-totals">

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   FiCalendar,
   FiChevronLeft,
@@ -362,23 +363,23 @@ export default function OwnerDigitalDiaryPage() {
       metaTitle="Digital Diary | AutoDaddy"
       metaDescription="Car owner digital diary notes"
       noPanel
-      headerAction={
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-ad-purple to-ad-purple-dark px-4 py-2 text-sm font-semibold text-white shadow-[0_6px_14px_rgba(155,48,141,0.28)] transition hover:brightness-105"
-        >
-          <FiPlus size={15} aria-hidden />
-          New Note
-        </button>
-      }
     >
       <div className="flex flex-col gap-4">
-        <header className={`${ownerPageIntroClass} space-y-1`}>
-          <p className="text-sm text-slate-500">Reminders, service dates, and personal notes</p>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-            Digital Diary
-          </h1>
+        <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm text-slate-500">Reminders, service dates, and personal notes</p>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+              Digital Diary
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-ad-purple to-ad-purple-dark px-4 py-2 text-sm font-semibold text-white shadow-[0_6px_14px_rgba(155,48,141,0.28)] transition hover:brightness-105"
+          >
+            <FiPlus size={15} aria-hidden />
+            New Note
+          </button>
         </header>
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
@@ -554,182 +555,188 @@ export default function OwnerDigitalDiaryPage() {
         </div>
       </div>
 
-      {modalMode !== null ? (
-        <div className="fixed inset-0 z-[100000] flex items-start justify-center overflow-y-auto px-4 pt-[8vh] pb-10 sm:pt-[12vh]">
-          <button
-            type="button"
-            aria-label="Close"
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px]"
-            onClick={closeModal}
-          />
-          <form
-            onSubmit={handleSave}
-            className="relative z-10 w-full max-w-[520px] overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] ring-1 ring-black/5"
-          >
-            <div className="border-b border-slate-100 px-6 py-4">
-              <h2 className="text-lg font-bold tracking-tight text-slate-900">
-                {modalMode === "edit" ? "Edit Note" : "New Note"}
-              </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
-                {modalMode === "edit" ? "Update this diary entry" : "Add a reminder or note"}
-              </p>
-            </div>
+      {modalMode !== null
+        ? createPortal(
+            <div className="fixed inset-0 z-[100000] flex items-start justify-center overflow-y-auto px-4 pt-[8vh] pb-10 sm:pt-[12vh]">
+              <button
+                type="button"
+                aria-label="Close"
+                className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px]"
+                onClick={closeModal}
+              />
+              <form
+                onSubmit={handleSave}
+                className="relative z-10 w-full max-w-[520px] overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] ring-1 ring-black/5"
+              >
+                <div className="border-b border-slate-100 px-6 py-4">
+                  <h2 className="text-lg font-bold tracking-tight text-slate-900">
+                    {modalMode === "edit" ? "Edit Note" : "New Note"}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    {modalMode === "edit" ? "Update this diary entry" : "Add a reminder or note"}
+                  </p>
+                </div>
 
-            <div className="space-y-3.5 px-6 py-5">
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className={ownerVehicleLabelClass}>
-                    Date <span className="text-rose-600">*</span>
-                  </span>
-                  <div className="relative">
+                <div className="space-y-3.5 px-6 py-5">
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className={ownerVehicleLabelClass}>
+                        Date <span className="text-rose-600">*</span>
+                      </span>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={form.date}
+                          onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                          placeholder="DD/MM/YYYY"
+                          className={`${ownerVehicleFieldClass} pr-9`}
+                          required
+                        />
+                        <FiCalendar
+                          className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-slate-400"
+                          size={15}
+                        />
+                      </div>
+                    </label>
+
+                    <label className="block">
+                      <span className={ownerVehicleLabelClass}>Time</span>
+                      <select
+                        value={form.time}
+                        onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+                        className={ownerVehicleSelectClass}
+                      >
+                        {TIME_OPTIONS.map((t) => (
+                          <option key={t || "none"} value={t}>
+                            {t || "—"}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <label className="block">
+                    <span className={ownerVehicleLabelClass}>
+                      Title <span className="text-rose-600">*</span>
+                    </span>
                     <input
                       type="text"
-                      value={form.date}
-                      onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                      placeholder="DD/MM/YYYY"
-                      className={`${ownerVehicleFieldClass} pr-9`}
+                      value={form.title}
+                      onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                      className={ownerVehicleFieldClass}
                       required
                     />
-                    <FiCalendar
-                      className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-slate-400"
-                      size={15}
+                  </label>
+
+                  <label className="block">
+                    <span className={ownerVehicleLabelClass}>Description</span>
+                    <textarea
+                      value={form.description}
+                      onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                      rows={4}
+                      className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                     />
+                  </label>
+
+                  <div className="flex flex-wrap items-end justify-between gap-4 pt-1">
+                    <label className="inline-flex cursor-pointer items-center gap-2 pb-1 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={form.urgent}
+                        onChange={(e) => setForm((f) => ({ ...f, urgent: e.target.checked }))}
+                        className="h-4 w-4 accent-rose-600"
+                      />
+                      <span className="font-semibold text-rose-600">Mark Urgent</span>
+                    </label>
+
+                    <label className="block min-w-[200px] flex-1 sm:max-w-[240px]">
+                      <span className={ownerVehicleLabelClass}>Attachment</span>
+                      <input
+                        type="file"
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            attachmentName: e.target.files?.[0]?.name ?? "",
+                          }))
+                        }
+                        className="block w-full text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700"
+                      />
+                    </label>
                   </div>
-                </label>
+                </div>
 
-                <label className="block">
-                  <span className={ownerVehicleLabelClass}>Time</span>
-                  <select
-                    value={form.time}
-                    onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                    className={ownerVehicleSelectClass}
-                  >
-                    {TIME_OPTIONS.map((t) => (
-                      <option key={t || "none"} value={t}>
-                        {t || "—"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3.5">
+                  <p className="text-sm text-slate-600">
+                    {modalMode === "edit" ? "You are editing this note" : "You are creating a new note"}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-gradient-to-br from-ad-purple to-ad-purple-dark px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-105"
+                    >
+                      {modalMode === "edit" ? "Update" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="text-sm font-semibold text-sky-700 hover:underline"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>,
+            document.body,
+          )
+        : null}
 
-              <label className="block">
-                <span className={ownerVehicleLabelClass}>
-                  Title <span className="text-rose-600">*</span>
-                </span>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  className={ownerVehicleFieldClass}
-                  required
-                />
-              </label>
-
-              <label className="block">
-                <span className={ownerVehicleLabelClass}>Description</span>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  rows={4}
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                />
-              </label>
-
-              <div className="flex flex-wrap items-end justify-between gap-4 pt-1">
-                <label className="inline-flex cursor-pointer items-center gap-2 pb-1 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.urgent}
-                    onChange={(e) => setForm((f) => ({ ...f, urgent: e.target.checked }))}
-                    className="h-4 w-4 accent-rose-600"
-                  />
-                  <span className="font-semibold text-rose-600">Mark Urgent</span>
-                </label>
-
-                <label className="block min-w-[200px] flex-1 sm:max-w-[240px]">
-                  <span className={ownerVehicleLabelClass}>Attachment</span>
-                  <input
-                    type="file"
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        attachmentName: e.target.files?.[0]?.name ?? "",
-                      }))
-                    }
-                    className="block w-full text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3.5">
-              <p className="text-sm text-slate-600">
-                {modalMode === "edit" ? "You are editing this note" : "You are creating a new note"}
-              </p>
-              <div className="flex items-center gap-3">
-                <button
-                  type="submit"
-                  className="rounded-xl bg-gradient-to-br from-ad-purple to-ad-purple-dark px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-105"
-                >
-                  {modalMode === "edit" ? "Update" : "Save"}
-                </button>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="text-sm font-semibold text-sky-700 hover:underline"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      ) : null}
-
-      {assigningId !== null ? (
-        <div className="fixed inset-0 z-[100000] flex items-start justify-center overflow-y-auto px-4 pt-[12vh] pb-10">
-          <button
-            type="button"
-            aria-label="Close"
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px]"
-            onClick={() => setAssigningId(null)}
-          />
-          <div className="relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] ring-1 ring-black/5">
-            <div className="border-b border-slate-100 px-6 py-4">
-              <h2 className="text-lg font-bold tracking-tight text-slate-900">Assign Date</h2>
-              <p className="mt-0.5 text-sm text-slate-500">Move this note to another day</p>
-            </div>
-            <div className="px-6 py-5">
-              <label className="block">
-                <span className={ownerVehicleLabelClass}>Date</span>
-                <input
-                  type="date"
-                  value={assignDateValue}
-                  onChange={(e) => setAssignDateValue(e.target.value)}
-                  className={ownerVehicleFieldClass}
-                />
-              </label>
-            </div>
-            <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3.5">
+      {assigningId !== null
+        ? createPortal(
+            <div className="fixed inset-0 z-[100000] flex items-start justify-center overflow-y-auto px-4 pt-[12vh] pb-10">
               <button
                 type="button"
-                onClick={applyAssignDate}
-                className="rounded-xl bg-gradient-to-br from-ad-purple to-ad-purple-dark px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-105"
-              >
-                Update
-              </button>
-              <button
-                type="button"
+                aria-label="Close"
+                className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px]"
                 onClick={() => setAssigningId(null)}
-                className="text-sm font-semibold text-sky-700 hover:underline"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+              />
+              <div className="relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] ring-1 ring-black/5">
+                <div className="border-b border-slate-100 px-6 py-4">
+                  <h2 className="text-lg font-bold tracking-tight text-slate-900">Assign Date</h2>
+                  <p className="mt-0.5 text-sm text-slate-500">Move this note to another day</p>
+                </div>
+                <div className="px-6 py-5">
+                  <label className="block">
+                    <span className={ownerVehicleLabelClass}>Date</span>
+                    <input
+                      type="date"
+                      value={assignDateValue}
+                      onChange={(e) => setAssignDateValue(e.target.value)}
+                      className={ownerVehicleFieldClass}
+                    />
+                  </label>
+                </div>
+                <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3.5">
+                  <button
+                    type="button"
+                    onClick={applyAssignDate}
+                    className="rounded-xl bg-gradient-to-br from-ad-purple to-ad-purple-dark px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-105"
+                  >
+                    Update
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAssigningId(null)}
+                    className="text-sm font-semibold text-sky-700 hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </OwnerPageShell>
   );
 }

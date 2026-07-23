@@ -161,7 +161,9 @@ export default function OwnerShopExpandedPanel({
   const directions = mapsUrl(shop);
   const website = websiteUrl(shop);
   const hoursText = shop.openHoursText?.trim() || shop.timing || "Hours not listed";
-  const addressLine = [shop.address, shop.city].filter(Boolean).join(", ") || "Address not available";
+  // Address already includes city when present — avoid "City, City".
+  const addressLine = shop.address.trim() || shop.city.trim() || "Address not available";
+  const email = shop.email?.trim() ?? "";
   const carBrands = shop.carCompanies;
   const services = shop.mainServiceItems;
 
@@ -267,8 +269,17 @@ export default function OwnerShopExpandedPanel({
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-700 shadow-sm">
-              <span className="font-semibold text-slate-900">Contact :</span> {addressLine}
+              <span className="font-semibold text-slate-900">Address :</span> {addressLine}
             </div>
+
+            {email ? (
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-700 shadow-sm">
+                <span className="font-semibold text-slate-900">Email :</span>{" "}
+                <a href={`mailto:${email}`} className="text-sky-700 hover:underline">
+                  {email}
+                </a>
+              </div>
+            ) : null}
 
             <div>
               <button
@@ -276,7 +287,14 @@ export default function OwnerShopExpandedPanel({
                 onClick={() => setBrandsOpen((open) => !open)}
                 className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm transition hover:border-sky-200"
               >
-                <span>Specialist of Car Brands</span>
+                <span>
+                  Specialist of Car Brands
+                  {carBrands.length > 0 ? (
+                    <span className="ml-1.5 text-xs font-semibold text-slate-400">
+                      ({carBrands.length})
+                    </span>
+                  ) : null}
+                </span>
                 <FiChevronDown
                   size={16}
                   className={`text-slate-400 transition-transform ${brandsOpen ? "rotate-180" : ""}`}

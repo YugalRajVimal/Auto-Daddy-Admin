@@ -1,6 +1,6 @@
 import type { OwnerReportType } from "../components/owner/OwnerReportsSidebar";
 import type { DummyInvoiceRow } from "./dummyOwnerReports";
-import { formatJobCardDate, businessName, serviceTypeLabel, jobCardLicensePlate } from "./carOwnerJobCards";
+import { formatJobCardDate, businessName, serviceTypeLabel, jobCardLicensePlate, resolveJobCardNo, resolveJobCardTotal } from "./carOwnerJobCards";
 import type { CarOwnerAutoShopListItem } from "../types/carOwnerAutoShops";
 import type { CarOwnerJobCard } from "../types/carOwnerJobCards";
 import { notificationDisplay, type CarOwnerNotification } from "../types/carOwnerNotifications";
@@ -55,16 +55,17 @@ function rowDate(iso: string): string {
 }
 
 export function jobCardToReportRow(jc: CarOwnerJobCard): OwnerReportRow {
+  const jobNo = resolveJobCardNo(jc);
   return {
     id: jc._id,
-    date: rowDate(jc.createdAt),
+    date: rowDate(jc.createdAt || jc.date || ""),
     vendor: businessName(jc.business),
     category: serviceTypeLabel(jc),
     project: jobCardLicensePlate(jc),
-    notes: [jc.jobNo?.trim() ? `Job ${jc.jobNo.trim()}` : "", jc.status?.trim(), jc.paymentStatus?.trim()]
+    notes: [jobNo ? `Job ${jobNo}` : "", jc.status?.trim(), jc.paymentStatus?.trim()]
       .filter(Boolean)
       .join(" · "),
-    amount: jc.totalPayableAmount ?? 0,
+    amount: resolveJobCardTotal(jc),
   };
 }
 

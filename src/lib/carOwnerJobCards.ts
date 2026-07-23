@@ -2,6 +2,27 @@ import { getJson } from "../api/mobileAuth";
 import { digitsOnly, formatNationalPhoneDisplay } from "./carOwnerProfile";
 import type { CarOwnerJobCard } from "../types/carOwnerJobCards";
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asString(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
+function asFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 export function businessName(business: CarOwnerJobCard["business"]): string {
   if (!business || typeof business === "string") return "Auto shop";
   return business.businessName?.trim() || "Auto shop";
@@ -24,24 +45,69 @@ function jobCardServiceName(service: NonNullable<CarOwnerJobCard["services"]>[nu
   return typeof name === "string" ? name.trim() : "";
 }
 
+export function resolveJobCardNo(jc: CarOwnerJobCard | Record<string, unknown>): string {
+  const o = jc as Record<string, unknown>;
+  return (
+    asString(o.jobNo) ||
+    asString(o.jobCardNo) ||
+    asString(o.jobCardNumber) ||
+    asString(o.jobNumber) ||
+    ""
+  );
+}
+
+export function resolveJobCardTotal(jc: CarOwnerJobCard | Record<string, unknown>): number {
+  const o = jc as Record<string, unknown>;
+  return (
+    asFiniteNumber(o.totalPayableAmount) ??
+    asFiniteNumber(o.totalAmount) ??
+    asFiniteNumber(o.total) ??
+    asFiniteNumber(o.grandTotal) ??
+    asFiniteNumber(o.amount) ??
+    0
+  );
+}
+
+export function resolveInvoiceNo(jc: CarOwnerJobCard | Record<string, unknown>): string {
+  const o = jc as Record<string, unknown>;
+  return (
+    asString(o.invoiceId) ||
+    asString(o.invoiceNumber) ||
+    asString(o.invoiceNo) ||
+    asString(o.invoice_number) ||
+    ""
+  );
+}
+
 export function serviceTypeLabel(jc: CarOwnerJobCard): string {
   const fromServices = jc.services
-    ?.map((s) => jobCardServiceName(s.service))
+    ?.map((s) => {
+      const name = jobCardServiceName(s.service);
+      if (name) return name;
+      const line = s as { category?: string; desc?: string };
+      return line.category?.trim() || line.desc?.trim() || "";
+    })
     .filter((name): name is string => Boolean(name));
-  if (fromServices?.length) return fromServices.join(", ");
+  if (fromServices?.length) {
+    return [...new Set(fromServices)].join(", ");
+  }
   const direct = jc.serviceType?.trim();
   if (direct) return direct;
-  return jc.jobNo?.trim() || "—";
+  return resolveJobCardNo(jc) || "—";
 }
 
 export function jobChipLabel(jc: CarOwnerJobCard): string {
-  const jobNo = jc.jobNo?.trim();
+  const jobNo = resolveJobCardNo(jc);
   if (!jobNo) return "Job";
   return jobNo.toLowerCase().startsWith("job") ? jobNo : `Job # ${jobNo}`;
 }
 
 export function jobCardLicensePlate(jc: CarOwnerJobCard): string {
-  return jc.vehicleId?.licensePlateNo?.trim().toUpperCase() || "—";
+  const fromVehicle = jc.vehicleId?.licensePlateNo?.trim();
+  if (fromVehicle) return fromVehicle.toUpperCase();
+  const top = jc.licensePlateNo?.trim();
+  if (top) return top.toUpperCase();
+  return "—";
 }
 
 export function formatJobCardDate(iso: string): string {
@@ -54,7 +120,11 @@ export function formatJobCardDate(iso: string): string {
 }
 
 export function isPaidJobCard(jc: CarOwnerJobCard): boolean {
-  return (jc.paymentStatus ?? "").trim().toLowerCase() === "paid";
+  if (jc.invoicePaid === true) return true;
+  const payment = (jc.paymentStatus ?? "").trim().toLowerCase();
+  if (payment === "paid") return true;
+  const status = (jc.status ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  return status === "cashpaid";
 }
 
 /** True when the customer has accepted / approved the job card estimate. */
@@ -75,7 +145,9 @@ export function isCarOwnerJobCardPendingApproval(jc: CarOwnerJobCard): boolean {
 /** Display label — API keeps status "pending" after approval; prefer approvedByCustomer. */
 export function carOwnerJobCardStatusLabel(jc: CarOwnerJobCard): string {
   const norm = (jc.status ?? "").trim().toLowerCase().replace(/\s+/g, "");
-  if (norm === "convertedtoinvoice") return "Converted to Invoice";
+  if (norm === "convertedtoinvoice") {
+    return isPaidJobCard(jc) ? "Invoice · Paid" : "Converted to Invoice";
+  }
   if (norm === "cashpaid") return "Cash Paid";
   if (jc.approvedByCustomer === true || norm === "approved" || norm === "accepted") {
     return "Approved";
@@ -103,27 +175,88 @@ export function resolveJobCardsBuckets(payload: Record<string, unknown> | undefi
   return undefined;
 }
 
+/** Map mixed API field names onto the shape the owner UI expects. */
+export function canonicalizeCarOwnerJobCard(raw: unknown): CarOwnerJobCard | null {
+  const obj = asRecord(raw);
+  if (!obj) return null;
+  const id = asString(obj._id ?? obj.id);
+  if (!id) return null;
+
+  const jobNo = resolveJobCardNo(obj);
+  const total = resolveJobCardTotal(obj);
+  const invoiceNo = resolveInvoiceNo(obj);
+  const invoicePaid = obj.invoicePaid === true;
+  const status = asString(obj.status) || "Pending";
+  const paymentFromApi = asString(obj.paymentStatus);
+  const paymentStatus =
+    paymentFromApi ||
+    (invoicePaid || status.toLowerCase().replace(/\s+/g, "") === "cashpaid" ? "Paid" : "Unpaid");
+
+  const vehicleRaw = obj.vehicleId ?? obj.vehicle;
+  const vehicle =
+    vehicleRaw && typeof vehicleRaw === "object" && !Array.isArray(vehicleRaw)
+      ? (vehicleRaw as CarOwnerJobCard["vehicleId"])
+      : null;
+
+  return {
+    ...(obj as unknown as CarOwnerJobCard),
+    _id: id,
+    jobNo,
+    jobCardNo: (obj.jobCardNo as CarOwnerJobCard["jobCardNo"]) ?? (jobNo || undefined),
+    totalPayableAmount: total,
+    totalAmount: asFiniteNumber(obj.totalAmount) ?? total,
+    invoiceId: invoiceNo || null,
+    invoiceNumber: invoiceNo || undefined,
+    invoicePaid,
+    paymentStatus,
+    status,
+    approvedByCustomer: obj.approvedByCustomer === true,
+    licensePlateNo: asString(obj.licensePlateNo) || vehicle?.licensePlateNo || undefined,
+    vehicleId: vehicle,
+    createdAt: asString(obj.createdAt ?? obj.date) || asString(obj.updatedAt),
+    updatedAt: asString(obj.updatedAt) || asString(obj.createdAt ?? obj.date),
+    date: asString(obj.date) || undefined,
+    labourCharge: asFiniteNumber(obj.labourCharge) ?? undefined,
+  };
+}
+
 export function normalizeJobCardsPayload(payload: Record<string, unknown> | undefined): CarOwnerJobCard[] {
   if (!payload) return [];
-  const pending = (Array.isArray(payload.pending) ? payload.pending : []).map((jc) => {
-    const row = jc as CarOwnerJobCard;
-    return {
-      ...row,
-      status: row.status?.trim() ? row.status : "Pending",
-      approvedByCustomer: row.approvedByCustomer === true,
-    };
+
+  const mapBucket = (list: unknown[], defaults: Partial<CarOwnerJobCard>): CarOwnerJobCard[] => {
+    const out: CarOwnerJobCard[] = [];
+    for (const item of list) {
+      const next = canonicalizeCarOwnerJobCard(item);
+      if (!next) continue;
+      out.push({
+        ...next,
+        ...defaults,
+        status: defaults.status
+          ? next.status?.trim()
+            ? next.status
+            : String(defaults.status)
+          : next.status,
+        approvedByCustomer:
+          defaults.approvedByCustomer !== undefined
+            ? defaults.approvedByCustomer
+            : next.approvedByCustomer,
+      });
+    }
+    return out;
+  };
+
+  const pending = mapBucket(Array.isArray(payload.pending) ? payload.pending : [], {
+    status: "Pending",
+    approvedByCustomer: false,
   });
-  const approved = (Array.isArray(payload.approved) ? (payload.approved as CarOwnerJobCard[]) : []).map(
-    (row) => ({
-      ...row,
-      approvedByCustomer: row.approvedByCustomer !== false,
-    }),
-  );
-  const rejected = Array.isArray(payload.rejected) ? (payload.rejected as CarOwnerJobCard[]) : [];
-  const autoRejected = (Array.isArray(payload.autoRejected) ? payload.autoRejected : []).map((jc) => ({
-    ...(jc as CarOwnerJobCard),
-    status: (jc as CarOwnerJobCard).status?.trim() ? (jc as CarOwnerJobCard).status : "AutoRejected",
-  }));
+  const approved = mapBucket(Array.isArray(payload.approved) ? payload.approved : [], {
+    approvedByCustomer: true,
+  });
+  const rejected = mapBucket(Array.isArray(payload.rejected) ? payload.rejected : [], {});
+  const autoRejected = mapBucket(Array.isArray(payload.autoRejected) ? payload.autoRejected : [], {
+    status: "AutoRejected",
+  });
+
   return [...pending, ...approved, ...rejected, ...autoRejected];
 }
 
@@ -134,4 +267,21 @@ export function fetchCarOwnerJobCardById(token: string, jobCardId: string) {
     return Promise.resolve({ ok: false, status: 400, data: null });
   }
   return getJson<unknown>(`/api/user/job-cards/${encodeURIComponent(id)}`, token);
+}
+
+/** Unwrap list/detail API envelopes into a canonical job card for the document viewer. */
+export function resolveCarOwnerJobCardForViewer(payload: unknown): CarOwnerJobCard | null {
+  if (!payload || typeof payload !== "object") return null;
+  const root = payload as Record<string, unknown>;
+
+  const direct = canonicalizeCarOwnerJobCard(root);
+  if (direct) return direct;
+
+  const data = asRecord(root.data);
+  if (data) {
+    const nestedCard = asRecord(data.jobCard) ?? asRecord(data.card) ?? data;
+    return canonicalizeCarOwnerJobCard(nestedCard);
+  }
+
+  return null;
 }

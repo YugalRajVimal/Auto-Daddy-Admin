@@ -1,10 +1,16 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { FiChevronLeft, FiCreditCard, FiFileText, FiTrash2 } from "react-icons/fi";
+import { FiChevronLeft, FiCreditCard, FiFileText } from "react-icons/fi";
 import { toast } from "react-toastify";
+import {
+  InvoiceViewerDialog,
+  JobCardViewerDialog,
+} from "../../../../invoice-job-card-viewer/InvoiceJobCardViewer.jsx";
 import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "../../../hooks/useCarOwnerInvoices";
+import { fetchCarOwnerJobCardById, resolveCarOwnerJobCardForViewer } from "../../../lib/carOwnerJobCards";
 import { formatCurrencyAmount } from "../../../lib/currency";
 import {
   OWNER_PANEL_TABLE,
@@ -18,6 +24,10 @@ import {
   ownerVehicleSelectClass,
 } from "../../../components/owner/ownerVehicleFormUtils";
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
+
+type ViewerKind = "invoice" | "jobcard";
+
 function formatInvoiceDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
@@ -25,27 +35,38 @@ function formatInvoiceDate(iso: string): string {
 }
 
 function statusLabel(row: CarOwnerInvoiceRow): { label: string; className: string } {
-  const payment = (row.paymentStatus || "Unpaid").trim();
-  const paid = payment.toLowerCase() === "paid";
-  const approval = row.approvalStatus?.trim();
-  const label =
-    approval && approval !== "—"
-      ? paid
-        ? `${approval} · Paid`
-        : approval.toLowerCase().includes("approve") || approval.toLowerCase().includes("accept")
-          ? `${approval} · Unpaid`
-          : approval
-      : paid
+  const paid = (row.paymentStatus || "").trim().toLowerCase() === "paid";
+  const approval = row.approvalStatus?.trim() || "";
+  const isCash = approval.toLowerCase().includes("cash");
+  const label = paid
+    ? isCash
+      ? "Cash Paid"
+      : approval.toLowerCase().includes("invoice")
         ? "Paid"
-        : "Unpaid";
+        : "Paid"
+    : approval && approval !== "—"
+      ? approval
+      : "Unpaid";
   return {
     label,
     className: paid
       ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-      : approval?.toLowerCase().includes("reject")
+      : approval.toLowerCase().includes("reject")
         ? "bg-rose-50 text-rose-700 ring-rose-100"
         : "bg-amber-50 text-amber-800 ring-amber-100",
   };
+}
+
+function invoiceNoDisplay(row: CarOwnerInvoiceRow): string {
+  const no = row.invoiceNo?.trim();
+  if (!no || no === "—") return "—";
+  return no.toUpperCase().startsWith("INV") ? no : `INV-${no}`;
+}
+
+function jobNoDisplay(row: CarOwnerInvoiceRow): string {
+  const no = row.jobNo?.trim();
+  if (!no || no === "—") return "—";
+  return `J # ${no.replace(/^J\s*#\s*/i, "")}`;
 }
 
 function selectedSetFromArray(ids: string[]): Set<string> {
@@ -72,14 +93,12 @@ function ToolbarButton({
   children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
-  variant?: "muted" | "danger" | "primary";
+  variant?: "muted" | "primary";
 }) {
   const styles =
-    variant === "danger"
-      ? "bg-rose-600 text-white hover:bg-rose-700"
-      : variant === "primary"
-        ? "bg-gradient-to-br from-ad-purple to-ad-purple-dark text-white shadow-[0_6px_14px_rgba(155,48,141,0.22)] hover:brightness-105"
-        : "bg-slate-600 text-white hover:bg-slate-700";
+    variant === "primary"
+      ? "bg-gradient-to-br from-ad-purple to-ad-purple-dark text-white shadow-[0_6px_14px_rgba(155,48,141,0.22)] hover:brightness-105"
+      : "bg-slate-600 text-white hover:bg-slate-700";
   return (
     <button
       type="button"
@@ -94,18 +113,55 @@ function ToolbarButton({
 
 export default function OwnerInvoicesPage() {
   const countryCode = "+1";
-  const { loading, error, refresh, invoiceRows } = useCarOwnerInvoices();
+  const { token } = useAuth();
+  const { loading, error, refresh, invoiceRows, findJobCardById } = useCarOwnerInvoices();
 
   const [view, setView] = useState<"list" | "payment">("list");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const selected = useMemo(() => selectedSetFromArray(selectedIds), [selectedIds]);
+  const [viewerKind, setViewerKind] = useState<ViewerKind | null>(null);
+  const [selectedJobCardId, setSelectedJobCardId] = useState<string | null>(null);
 
   const resetSidebar = useCallback(() => {
     setView("list");
     setSelectedIds([]);
+    setViewerKind(null);
+    setSelectedJobCardId(null);
   }, []);
 
   useOwnerNavReset(resetSidebar);
+
+  const fetchJobCardForViewer = useCallback(
+    async (id: string) => {
+      if (!token) {
+        throw new Error("Please log in again.");
+      }
+      const res = await fetchCarOwnerJobCardById(token, id);
+      if (res.ok && res.data) {
+        const resolved = resolveCarOwnerJobCardForViewer(res.data);
+        if (resolved) return resolved;
+      }
+      const cached = findJobCardById(id);
+      if (cached) return cached;
+      throw new Error("Could not load job card.");
+    },
+    [token, findJobCardById],
+  );
+
+  const openInvoicePreview = (row: CarOwnerInvoiceRow) => {
+    setSelectedJobCardId(row.id);
+    setViewerKind("invoice");
+  };
+
+  const openJobCardPreview = (row: CarOwnerInvoiceRow) => {
+    setSelectedJobCardId(row.id);
+    setViewerKind("jobcard");
+  };
+
+  const closeViewer = () => {
+    setViewerKind(null);
+    setSelectedJobCardId(null);
+  };
 
   const paymentRow = useMemo(() => {
     if (selectedIds.length === 0) return null;
@@ -118,10 +174,11 @@ export default function OwnerInvoicesPage() {
   const [paymentMethod, setPaymentMethod] = useState<"Partial" | "Full">("Partial");
   const [paymentNote, setPaymentNote] = useState("");
 
-  const enterPayment = () => {
-    if (selectedIds.length === 0) return;
-    if (!paymentRow) return;
-    setPaymentAmount(String(paymentRow.amount ?? ""));
+  const enterPayment = (row?: CarOwnerInvoiceRow | null) => {
+    const target = row ?? paymentRow;
+    if (!target) return;
+    setSelectedIds([target.id]);
+    setPaymentAmount(String(target.amount ?? ""));
     setPaymentDate(new Date().toISOString().slice(0, 10));
     setPaymentMethod("Partial");
     setPaymentNote("");
@@ -183,8 +240,8 @@ export default function OwnerInvoicesPage() {
           <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/95 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5">
             <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-ad-purple/95 to-ad-purple-dark px-4 py-3.5 text-white sm:px-5">
               <div>
-                <p className="text-xs text-white/70">Job card</p>
-                <p className="font-semibold tracking-wide">#{paymentRow.jobNo}</p>
+                <p className="text-xs text-white/70">Invoice</p>
+                <p className="font-semibold tracking-wide">{invoiceNoDisplay(paymentRow)}</p>
               </div>
               <button
                 type="button"
@@ -204,8 +261,10 @@ export default function OwnerInvoicesPage() {
 
               <div className="rounded-2xl border border-emerald-100 bg-white/90 p-4 sm:p-5">
                 <div className="text-center">
-                  <p className="text-base font-bold text-slate-900">Job Card # {paymentRow.jobNo}</p>
-                  <p className="mt-1 text-xs text-slate-500">Record the balance due on this job</p>
+                  <p className="text-base font-bold text-slate-900">{invoiceNoDisplay(paymentRow)}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Job card {jobNoDisplay(paymentRow)} · Record the balance due
+                  </p>
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -275,21 +334,9 @@ export default function OwnerInvoicesPage() {
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <ToolbarButton
-                variant="danger"
-                disabled={selectedIds.length === 0}
-                onClick={() => {
-                  if (selectedIds.length === 0) return;
-                  toast.success("Deleted.");
-                  setSelectedIds([]);
-                }}
-              >
-                <FiTrash2 size={13} aria-hidden />
-                Delete
-              </ToolbarButton>
-              <ToolbarButton
                 variant="primary"
                 disabled={selectedIds.length !== 1}
-                onClick={enterPayment}
+                onClick={() => enterPayment()}
               >
                 <FiCreditCard size={13} aria-hidden />
                 Enter Payment
@@ -343,26 +390,31 @@ export default function OwnerInvoicesPage() {
                                   return Array.from(next);
                                 });
                               }}
-                              aria-label={`Select invoice ${row.jobNo}`}
+                              aria-label={`Select invoice ${row.invoiceNo || row.jobNo}`}
                             />
                           </td>
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>
                             <button
                               type="button"
                               className="font-semibold text-sky-700 hover:underline"
-                              onClick={() => {
-                                setSelectedIds([row.id]);
-                                enterPayment();
-                              }}
+                              onClick={() => openInvoicePreview(row)}
                             >
-                              # {row.jobNo}
+                              {invoiceNoDisplay(row)}
                             </button>
                           </td>
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>
                             {formatInvoiceDate(row.createdAt)}
                           </td>
                           <td className={OWNER_TABLE_BODY_TD_CLASS}>{row.shopName}</td>
-                          <td className={OWNER_TABLE_BODY_TD_CLASS}>J # {row.jobNo}</td>
+                          <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                            <button
+                              type="button"
+                              className="font-semibold text-sky-700 hover:underline"
+                              onClick={() => openJobCardPreview(row)}
+                            >
+                              {jobNoDisplay(row)}
+                            </button>
+                          </td>
                           <td className={`${OWNER_TABLE_BODY_TD_CLASS} font-semibold text-slate-900`}>
                             {amount}
                           </td>
@@ -386,6 +438,23 @@ export default function OwnerInvoicesPage() {
           </div>
         )}
       </div>
+
+      <InvoiceViewerDialog
+        open={viewerKind === "invoice"}
+        onClose={closeViewer}
+        jobCardId={selectedJobCardId ?? undefined}
+        fetchJobCard={fetchJobCardForViewer}
+        countryCode={countryCode}
+        apiBaseUrl={API_BASE_URL}
+      />
+      <JobCardViewerDialog
+        open={viewerKind === "jobcard"}
+        onClose={closeViewer}
+        jobCardId={selectedJobCardId ?? undefined}
+        fetchJobCard={fetchJobCardForViewer}
+        countryCode={countryCode}
+        apiBaseUrl={API_BASE_URL}
+      />
     </OwnerPageShell>
   );
 }

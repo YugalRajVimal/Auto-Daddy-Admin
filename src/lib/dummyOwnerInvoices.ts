@@ -5,6 +5,7 @@ export const DUMMY_OWNER_INVOICES: CarOwnerInvoiceRow[] = [
   {
     id: "dummy-invoice-paid",
     jobNo: "1256",
+    invoiceNo: "INV-1",
     shopName: "A.B Auto shop",
     plate: "GVTY 884",
     vehicle: "",
@@ -18,6 +19,7 @@ export const DUMMY_OWNER_INVOICES: CarOwnerInvoiceRow[] = [
   {
     id: "dummy-invoice-unpaid",
     jobNo: "1256",
+    invoiceNo: "INV-2",
     shopName: "A.B Auto shop",
     plate: "GVTY 884",
     vehicle: "",

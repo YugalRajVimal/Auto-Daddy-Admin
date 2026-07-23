@@ -6,6 +6,7 @@ import {
   isPaidJobCard,
   jobCardLicensePlate,
   jobChipLabel,
+  resolveJobCardTotal,
   serviceTypeLabel,
 } from "../../lib/carOwnerJobCards";
 import type { CarOwnerJobCard } from "../../types/carOwnerJobCards";
@@ -22,8 +23,8 @@ export default function OwnerJobCardRow({ jc, countryCode, onClick }: OwnerJobCa
   const phone = formatBusinessPhone(jc.business);
   const plate = jobCardLicensePlate(jc);
   const service = serviceTypeLabel(jc);
-  const date = formatJobCardDate(jc.createdAt);
-  const amount = formatCurrencyAmount(jc.totalPayableAmount, countryCode);
+  const date = formatJobCardDate(jc.createdAt || jc.date || "");
+  const amount = formatCurrencyAmount(resolveJobCardTotal(jc), countryCode);
 
   return (
     <article

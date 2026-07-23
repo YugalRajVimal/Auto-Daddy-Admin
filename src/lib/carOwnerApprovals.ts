@@ -1,5 +1,5 @@
 import { getJson, postJson } from "../api/mobileAuth";
-import { normalizeJobCardsPayload, resolveJobCardsBuckets } from "./carOwnerJobCards";
+import { canonicalizeCarOwnerJobCard, normalizeJobCardsPayload, resolveJobCardsBuckets } from "./carOwnerJobCards";
 import { normalizeMediaUrl } from "./normalizeMediaUrl";
 import type {
   CarOwnerCustomerRequest,
@@ -118,29 +118,7 @@ export function rejectCarOwnerCustomerRequest(token: string, businessId: string,
 }
 
 function asJobCard(raw: unknown): CarOwnerJobCard | null {
-  const obj = asRecord(raw);
-  if (!obj) return null;
-  const id = asString(obj._id ?? obj.id);
-  if (!id) return null;
-  const approvedByCustomer = obj.approvedByCustomer === true;
-  return {
-    ...(obj as unknown as CarOwnerJobCard),
-    _id: id,
-    status: asString(obj.status) || "Pending",
-    approvedByCustomer,
-    totalPayableAmount:
-      typeof obj.totalPayableAmount === "number" && Number.isFinite(obj.totalPayableAmount)
-        ? obj.totalPayableAmount
-        : typeof obj.totalAmount === "number" && Number.isFinite(obj.totalAmount)
-          ? obj.totalAmount
-          : Number(obj.totalPayableAmount ?? obj.totalAmount) || 0,
-    jobNo: asString(obj.jobNo ?? obj.jobCardNo ?? obj.jobCardNumber),
-    createdAt: asString(obj.createdAt ?? obj.date),
-    updatedAt: asString(obj.updatedAt),
-    paymentStatus: asString(obj.paymentStatus) || "Unpaid",
-    vehicleId: (obj.vehicleId ?? obj.vehicle) as CarOwnerJobCard["vehicleId"],
-    business: (obj.business ?? obj.autoShop ?? obj.shop) as CarOwnerJobCard["business"],
-  };
+  return canonicalizeCarOwnerJobCard(raw);
 }
 
 export function normalizeCarOwnerJobCardApprovalsPayload(payload: unknown): CarOwnerJobCard[] {

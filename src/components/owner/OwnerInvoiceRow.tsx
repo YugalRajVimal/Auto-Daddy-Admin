@@ -9,9 +9,10 @@ type OwnerInvoiceRowProps = {
 };
 
 function invoiceChipLabel(row: CarOwnerInvoiceRow): string {
-  const no = row.jobNo?.trim();
-  if (!no) return "Invoice";
-  return no.toLowerCase().startsWith("invoice") ? no : `Invoice No # ${no}`;
+  const no = (row.invoiceNo || row.jobNo)?.trim();
+  if (!no || no === "—") return "Invoice";
+  if (no.toLowerCase().startsWith("invoice")) return no;
+  return no.toUpperCase().startsWith("INV") ? no : `Invoice No # ${no}`;
 }
 
 export default function OwnerInvoiceRow({ row, countryCode, onClick }: OwnerInvoiceRowProps) {

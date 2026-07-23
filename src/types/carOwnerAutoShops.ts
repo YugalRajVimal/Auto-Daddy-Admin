@@ -21,10 +21,13 @@ export type CarOwnerAutoShopListItem = {
   subServices: string[];
   /** Hierarchical services from `myServices` (preferred for filters). */
   serviceOfferings: CarOwnerShopServiceOffering[];
-  /** Car company / brand names the shop specializes in. */
+  /** Car company / brand names the shop specializes in (resolved for display). */
   carCompanies: string[];
+  /** Raw car company ids from API (`carCompanies: [{ _id }]`) when names are not populated. */
+  carCompanyIds: string[];
   address: string;
   phone: string;
+  email: string;
   website: string;
   mapLat: number | null;
   mapLng: number | null;

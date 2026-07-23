@@ -8,6 +8,7 @@ import {
   isPaidJobCard,
   jobCardLicensePlate,
   jobChipLabel,
+  resolveJobCardTotal,
   serviceTypeLabel,
 } from "../../lib/carOwnerJobCards";
 import { formatCurrencyAmount } from "../../lib/currency";
@@ -131,7 +132,7 @@ export function OwnerJobCardsTable({ rows, countryCode, onRowClick }: OwnerJobCa
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>{jobCardLicensePlate(jc)}</td>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>{serviceTypeLabel(jc)}</td>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                    {formatCurrencyAmount(jc.totalPayableAmount, countryCode)}
+                    {formatCurrencyAmount(resolveJobCardTotal(jc), countryCode)}
                   </td>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>{formatJobCardDate(jc.createdAt)}</td>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>{paid ? "Paid" : "Unpaid"}</td>
@@ -152,9 +153,9 @@ type OwnerInvoicesTableProps = {
 };
 
 function invoiceNoLabel(row: CarOwnerInvoiceRow): string {
-  const no = row.jobNo?.trim();
-  if (!no) return "—";
-  return no.toLowerCase().startsWith("invoice") ? no : `Invoice #${no}`;
+  const no = (row.invoiceNo || row.jobNo)?.trim();
+  if (!no || no === "—") return "—";
+  return no.toUpperCase().startsWith("INV") ? no : `Invoice #${no}`;
 }
 
 export function OwnerInvoicesTable({ rows, countryCode, onRowClick }: OwnerInvoicesTableProps) {

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { getJson } from "../api/mobileAuth";
-import { normalizeCarOwnerAutoShopsPayload } from "../lib/carOwnerAutoShops";
+import {
+  applyCarCompanyCatalogNames,
+  carCompanyNameByIdMap,
+  normalizeCarOwnerAutoShopsPayload,
+} from "../lib/carOwnerAutoShops";
 import type { CarOwnerAutoShopListItem } from "../types/carOwnerAutoShops";
 import { useAuth } from "../auth";
 
@@ -68,23 +72,27 @@ export function useCarOwnerAutoShops(filters: CarOwnerAutoShopsFilters) {
     setLoading(true);
     setError(null);
 
-    const res = await getJson<unknown>(
-      autoShopsPath({
-        serviceIds,
-        carCompanyIds,
-        shopType,
-        search,
-      }),
-      token
-    );
-    if (!res.ok) {
+    const [shopsRes, companiesRes] = await Promise.all([
+      getJson<unknown>(
+        autoShopsPath({
+          serviceIds,
+          carCompanyIds,
+          shopType,
+          search,
+        }),
+        token,
+      ),
+      getJson<unknown>("/api/user/car-companies", token),
+    ]);
+
+    if (!shopsRes.ok) {
       setShops([]);
       setError("Could not load auto shops.");
       setLoading(false);
       return;
     }
 
-    const payload = res.data;
+    const payload = shopsRes.data;
     if (payload && typeof payload === "object" && "success" in payload) {
       const success = (payload as { success?: boolean }).success;
       if (success === false) {
@@ -95,7 +103,13 @@ export function useCarOwnerAutoShops(filters: CarOwnerAutoShopsFilters) {
       }
     }
 
-    setShops(normalizeCarOwnerAutoShopsPayload(payload));
+    let next = normalizeCarOwnerAutoShopsPayload(payload);
+    // API often returns carCompanies as `[{ _id }]` only — resolve names from catalog.
+    if (companiesRes.ok) {
+      next = applyCarCompanyCatalogNames(next, carCompanyNameByIdMap(companiesRes.data));
+    }
+
+    setShops(next);
     setLoading(false);
   }, [token, enabled, serviceKey, companyKey, shopType, search]);
 

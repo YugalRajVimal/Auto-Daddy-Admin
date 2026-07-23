@@ -2,72 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getJson } from "../api/mobileAuth";
 import {
   businessName,
-  formatBusinessPhone,
-  serviceTypeLabel,
   carOwnerJobCardStatusLabel,
+  formatBusinessPhone,
+  isPaidJobCard,
+  jobCardLicensePlate,
+  normalizeJobCardsPayload,
+  resolveInvoiceNo,
+  resolveJobCardNo,
+  resolveJobCardTotal,
+  resolveJobCardsBuckets,
+  serviceTypeLabel,
 } from "../lib/carOwnerJobCards";
-import type {
-  CarOwnerJobCard,
-  CarOwnerJobCardsBuckets,
-  CarOwnerJobCardsResponse,
-} from "../types/carOwnerJobCards";
+import type { CarOwnerJobCard, CarOwnerJobCardsResponse } from "../types/carOwnerJobCards";
 import { useAuth } from "../auth";
-
-function resolveJobCardsBuckets(payload: CarOwnerJobCardsResponse | undefined): CarOwnerJobCardsBuckets | undefined {
-  if (!payload || typeof payload !== "object") return undefined;
-
-  const hasBuckets = (obj: Record<string, unknown>) =>
-    "pending" in obj || "approved" in obj || "rejected" in obj || "autoRejected" in obj;
-
-  if (hasBuckets(payload as Record<string, unknown>)) {
-    return payload as CarOwnerJobCardsBuckets;
-  }
-
-  const data = payload.data;
-  if (data && typeof data === "object" && hasBuckets(data as Record<string, unknown>)) {
-    return data;
-  }
-
-  return undefined;
-}
-
-function normalizeJobCardsPayload(payload: CarOwnerJobCardsBuckets | undefined): CarOwnerJobCard[] {
-  if (!payload) return [];
-  const pending = (Array.isArray(payload.pending) ? payload.pending : []).map((jc) => ({
-    ...jc,
-    status: jc.status?.trim() ? jc.status : "Pending",
-  }));
-  const approved = Array.isArray(payload.approved) ? payload.approved : [];
-  const rejected = Array.isArray(payload.rejected) ? payload.rejected : [];
-  const autoRejected = (Array.isArray(payload.autoRejected) ? payload.autoRejected : []).map((jc) => ({
-    ...jc,
-    status: jc.status?.trim() ? jc.status : "AutoRejected",
-  }));
-  return [...pending, ...approved, ...rejected, ...autoRejected];
-}
-
-function isApprovedInvoice(jc: CarOwnerJobCard): boolean {
-  if (jc.approvedByCustomer === true) return true;
-  const status = (jc.status ?? "").toLowerCase().replace(/\s+/g, "");
-  if (status.includes("reject") || status.includes("cancel")) return false;
-  if (status === "pending") return false;
-  return (
-    status.includes("approve") ||
-    status.includes("accept") ||
-    status.includes("complete") ||
-    status.includes("done") ||
-    status.includes("convertedtoinvoice") ||
-    status.includes("cashpaid")
-  );
-}
-
-function isPaidInvoice(jc: CarOwnerJobCard): boolean {
-  return (jc.paymentStatus ?? "").trim().toLowerCase() === "paid";
-}
-
-function vehiclePlate(jc: CarOwnerJobCard): string {
-  return jc.vehicleId?.licensePlateNo?.trim().toUpperCase() || "";
-}
 
 function vehicleLabel(jc: CarOwnerJobCard): string {
   const make = jc.vehicleId?.make?.name?.trim() ?? "";
@@ -75,9 +22,25 @@ function vehicleLabel(jc: CarOwnerJobCard): string {
   return [make, model].filter(Boolean).join(" ");
 }
 
+function isInvoiceEligible(jc: CarOwnerJobCard): boolean {
+  const status = (jc.status ?? "").toLowerCase().replace(/\s+/g, "");
+  // Invoices list is for online/invoice flow only — never Cash Paid.
+  if (status === "cashpaid" || status.includes("cashpaid")) return false;
+  if (status.includes("reject") || status.includes("cancel") || status === "pending") return false;
+
+  if (status.includes("convertedtoinvoice")) return true;
+  if (jc.invoicePaid === true) return true;
+
+  const payment = (jc.paymentStatus ?? "").trim().toLowerCase();
+  return payment === "paid";
+}
+
 export type CarOwnerInvoiceRow = {
   id: string;
+  /** Job card number (e..g. "12"). */
   jobNo: string;
+  /** Invoice id from API (e.g. "INV-4"). */
+  invoiceNo: string;
   shopName: string;
   plate: string;
   vehicle: string;
@@ -96,17 +59,21 @@ export function isPaidInvoiceRow(row: CarOwnerInvoiceRow): boolean {
 
 function toInvoiceRow(jc: CarOwnerJobCard): CarOwnerInvoiceRow {
   const phone = formatBusinessPhone(jc.business);
+  const invoiceNo = resolveInvoiceNo(jc);
+  const jobNo = resolveJobCardNo(jc);
+  const paid = isPaidJobCard(jc);
   return {
     id: jc._id,
-    jobNo: jc.jobNo?.trim() || "—",
+    jobNo: jobNo || "—",
+    invoiceNo: invoiceNo || "—",
     shopName: businessName(jc.business),
-    plate: vehiclePlate(jc),
+    plate: jobCardLicensePlate(jc) === "—" ? "" : jobCardLicensePlate(jc),
     vehicle: vehicleLabel(jc),
-    amount: jc.totalPayableAmount ?? 0,
-    createdAt: jc.createdAt,
-    paymentStatus: jc.paymentStatus ?? "",
+    amount: resolveJobCardTotal(jc),
+    createdAt: jc.createdAt || jc.date || "",
+    paymentStatus: paid ? "Paid" : "Unpaid",
     approvalStatus: carOwnerJobCardStatusLabel(jc),
-    paymentMethod: jc.paymentMethod,
+    paymentMethod: jc.paymentMethod || jc.bankName,
     phone: phone || undefined,
     service: serviceTypeLabel(jc),
   };
@@ -139,7 +106,9 @@ export function useCarOwnerInvoices() {
       return;
     }
 
-    const next = normalizeJobCardsPayload(resolveJobCardsBuckets(res.data));
+    const next = normalizeJobCardsPayload(
+      resolveJobCardsBuckets(res.data as unknown as Record<string, unknown>),
+    );
     setItems(next);
     setLoading(false);
     setError(null);
@@ -150,28 +119,31 @@ export function useCarOwnerInvoices() {
   }, [load]);
 
   const invoiceRows = useMemo(() => {
-    const approved = items.filter(isApprovedInvoice);
-    return approved.map(toInvoiceRow).sort((a, b) => {
-      const at = Date.parse(a.createdAt);
-      const bt = Date.parse(b.createdAt);
-      if (Number.isFinite(at) && Number.isFinite(bt)) return bt - at;
-      return String(b.createdAt).localeCompare(String(a.createdAt));
-    });
+    return items
+      .filter(isInvoiceEligible)
+      .filter((jc) => Boolean(resolveInvoiceNo(jc)))
+      .map(toInvoiceRow)
+      .sort((a, b) => {
+        const at = Date.parse(a.createdAt);
+        const bt = Date.parse(b.createdAt);
+        if (Number.isFinite(at) && Number.isFinite(bt)) return bt - at;
+        return String(b.createdAt).localeCompare(String(a.createdAt));
+      });
   }, [items]);
 
   const paidInvoices = useMemo(
-    () => invoiceRows.filter((row) => items.some((jc) => jc._id === row.id && isPaidInvoice(jc))),
-    [invoiceRows, items]
+    () => invoiceRows.filter((row) => isPaidInvoiceRow(row)),
+    [invoiceRows],
   );
 
   const unpaidInvoices = useMemo(
-    () => invoiceRows.filter((row) => items.some((jc) => jc._id === row.id && !isPaidInvoice(jc))),
-    [invoiceRows, items]
+    () => invoiceRows.filter((row) => !isPaidInvoiceRow(row)),
+    [invoiceRows],
   );
 
   const findJobCardById = useCallback(
     (id: string) => items.find((jc) => jc._id === id) ?? null,
-    [items]
+    [items],
   );
 
   return {

@@ -168,7 +168,15 @@ function extractServices(raw: Record<string, unknown>): {
   };
 }
 
-function extractCarCompanies(raw: Record<string, unknown>): string[] {
+/** Mongo-style ObjectId (24 hex) — API often sends bare ids as strings. */
+function looksLikeObjectId(value: string): boolean {
+  return /^[a-f\d]{24}$/i.test(value.trim());
+}
+
+function extractCarCompanies(raw: Record<string, unknown>): {
+  names: string[];
+  ids: string[];
+} {
   const roots = [
     raw.carCompanies,
     raw.myCarCompanies,
@@ -177,22 +185,76 @@ function extractCarCompanies(raw: Record<string, unknown>): string[] {
     raw.car_companies,
   ];
   const names: string[] = [];
+  const ids: string[] = [];
 
   for (const root of roots) {
     if (!Array.isArray(root)) continue;
     for (const item of root) {
       if (typeof item === "string") {
         const t = item.trim();
-        if (t) names.push(t);
+        if (!t) continue;
+        if (looksLikeObjectId(t)) ids.push(t);
+        else names.push(t);
         continue;
       }
       if (!isShopRecord(item)) continue;
+      const id = pickString(item._id, item.id, item.carCompanyId);
+      if (id) ids.push(id);
       const nm = pickString(item.companyName, item.name, item.brandName, item.title);
       if (nm) names.push(nm);
     }
   }
 
-  return [...new Set(names)];
+  return {
+    names: [...new Set(names)],
+    ids: [...new Set(ids)],
+  };
+}
+
+/** Build id → companyName map from GET /api/user/car-companies. */
+export function carCompanyNameByIdMap(payload: unknown): Map<string, string> {
+  const map = new Map<string, string>();
+  const rows = (() => {
+    if (Array.isArray(payload)) return payload;
+    if (!isShopRecord(payload)) return [];
+    const data = payload.data;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(payload.companies)) return payload.companies;
+    return [];
+  })();
+
+  for (const row of rows) {
+    if (!isShopRecord(row)) continue;
+    const id = pickString(row._id, row.id);
+    const name = pickString(row.companyName, row.name, row.brandName, row.title);
+    if (id && name) map.set(id, name);
+  }
+  return map;
+}
+
+/** Prefer inline names; otherwise resolve ids via catalog. */
+export function resolveCarOwnerShopCarCompanies(
+  shop: Pick<CarOwnerAutoShopListItem, "carCompanies" | "carCompanyIds">,
+  nameById: Map<string, string>,
+): string[] {
+  if (shop.carCompanies.length > 0) return shop.carCompanies;
+  const resolved: string[] = [];
+  for (const id of shop.carCompanyIds) {
+    const name = nameById.get(id)?.trim();
+    if (name) resolved.push(name);
+  }
+  return [...new Set(resolved)];
+}
+
+export function applyCarCompanyCatalogNames(
+  shops: CarOwnerAutoShopListItem[],
+  nameById: Map<string, string>,
+): CarOwnerAutoShopListItem[] {
+  if (nameById.size === 0) return shops;
+  return shops.map((shop) => ({
+    ...shop,
+    carCompanies: resolveCarOwnerShopCarCompanies(shop, nameById),
+  }));
 }
 
 /** Recursively JSON-parse strings / flatten arrays until we have leaf strings (handles double-encoded openDays). */
@@ -427,8 +489,21 @@ export function extractAutoShopsArray(payload: unknown): Record<string, unknown>
 
 export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwnerAutoShopListItem | null {
   const id = pickString(raw._id, raw.id, raw.autoShopId);
-  const name = pickString(raw.businessName, raw.name, raw.shopName, raw.title);
-  if (!id || !name) return null;
+  if (!id) return null;
+
+  const contact = raw.contactDetails;
+  const phone = isShopRecord(contact)
+    ? pickString(contact.phone, contact.mobile, contact.landline, raw.businessPhone, raw.phone, raw.mobile, raw.contactPhone)
+    : pickString(raw.businessPhone, raw.phone, raw.mobile, raw.contactPhone);
+  const email = isShopRecord(contact)
+    ? pickString(contact.email, contact.mail, raw.businessEmail, raw.email)
+    : pickString(raw.businessEmail, raw.email);
+
+  // Some list rows omit businessName — keep them visible with a sensible fallback.
+  const name =
+    pickString(raw.businessName, raw.name, raw.shopName, raw.title) ||
+    (phone ? `Shop · ${phone}` : "") ||
+    "Auto shop";
 
   const daySchedule = resolvePerDaySchedule(raw);
   const openWeekdays = enabledWeekdaysFromSchedule(daySchedule);
@@ -456,23 +531,23 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
     address = `${address}, ${city}`;
   }
 
-  const contact = raw.contactDetails;
-  const phone = isShopRecord(contact)
-    ? pickString(contact.phone, contact.mobile, contact.landline, raw.businessPhone, raw.phone, raw.mobile, raw.contactPhone)
-    : pickString(raw.businessPhone, raw.phone, raw.mobile, raw.contactPhone);
-
   const websiteFromContact =
     isShopRecord(contact) && typeof contact["website"] === "string" ? contact["website"] : undefined;
   const website = pickString(raw.website, raw.businessWebsite, raw.webUrl, raw.url, websiteFromContact);
 
-  const rating = Math.min(5, Math.max(0, pickNumber(raw.rating, raw.avgRating, raw.averageRating)));
+  // Treat null/missing avgRating as 0 (unset) rather than inventing a score.
+  const ratingRaw = raw.rating ?? raw.avgRating ?? raw.averageRating;
+  const rating =
+    ratingRaw == null || ratingRaw === ""
+      ? 0
+      : Math.min(5, Math.max(0, pickNumber(ratingRaw)));
 
   const logoRaw =
     raw.businessProfileImage ?? raw.businessLogo ?? raw.logo ?? raw.logoUrl ?? raw.image ?? raw.profilePhoto;
   const logoUrl = typeof logoRaw === "string" ? normalizeMediaUrl(logoRaw) : null;
 
   const services = extractServices(raw);
-  const carCompanies = extractCarCompanies(raw);
+  const { names: carCompanies, ids: carCompanyIds } = extractCarCompanies(raw);
   const coords = parseWgs84MapLocation(raw);
   // API may send `shopType` as a string ("autoShop") or array (["autoShop","carWash",…]).
   const shopTypes = normalizeShopTypes(
@@ -501,8 +576,10 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
     subServices: services.subServices,
     serviceOfferings: services.serviceOfferings,
     carCompanies,
+    carCompanyIds,
     address,
     phone,
+    email,
     website,
     mapLat: coords?.lat ?? null,
     mapLng: coords?.lng ?? null,
@@ -544,8 +621,17 @@ export async function fetchCarOwnerAutoShopById(
   }
 
   const shops = normalizeCarOwnerAutoShopsPayload(payload);
-  const shop = shops.find((s) => s.id === id);
+  let shop = shops.find((s) => s.id === id);
   if (!shop) return { ok: false, error: "Shop not found." };
+
+  if (shop.carCompanies.length === 0 && shop.carCompanyIds.length > 0) {
+    const catalogRes = await getJson<unknown>("/api/user/car-companies", options.authToken);
+    if (catalogRes.ok) {
+      const nameById = carCompanyNameByIdMap(catalogRes.data);
+      shop = applyCarCompanyCatalogNames([shop], nameById)[0] ?? shop;
+    }
+  }
+
   return { ok: true, shop };
 }
 
