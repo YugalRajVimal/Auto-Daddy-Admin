@@ -26,24 +26,32 @@ function shopDealTitle(deal: ShopDeal): string {
   if (dealMode(deal) === "parts") {
     return deal.partName?.trim() || deal.productName?.trim() || "Deal";
   }
-  return deal.service?.name?.trim() || deal.productName?.trim() || deal.description?.trim() || "Deal";
+  return deal.productName?.trim() || deal.service?.name?.trim() || deal.description?.trim() || "Deal";
 }
 
-function shopDealDiscountPercent(deal: ShopDeal): string | null {
-  const price = Number(deal.price);
+function shopDealDiscountLabel(deal: ShopDeal): string | null {
   const discounted = Number(deal.discountedPrice);
-  if (!Number.isFinite(price) || !Number.isFinite(discounted) || price <= 0 || discounted <= 0 || discounted >= price) {
-    if (Number.isFinite(discounted) && discounted > 0) return `${discounted}%`;
-    return null;
+  // Spare-part / salvage deals store the price after discount (not a percent).
+  if (dealMode(deal) === "parts") {
+    if (!Number.isFinite(discounted) || discounted <= 0) return null;
+    return String(discounted);
   }
-  return `${Math.round((1 - discounted / price) * 100)}%`;
+  // Service deals store discount as a percent in discountedPrice.
+  const price = Number(deal.price);
+  if (Number.isFinite(price) && price > 0 && Number.isFinite(discounted) && discounted > 0 && discounted < price) {
+    return `${Math.round((1 - discounted / price) * 100)}%`;
+  }
+  if (!Number.isFinite(discounted) || discounted <= 0) return null;
+  return `${discounted}%`;
 }
 
 function dealDiscountHeading(deal: ShopDeal): string {
   const description = deal.description?.trim();
   if (description) return description;
-  const percent = shopDealDiscountPercent(deal);
-  if (percent) return `Overall ${percent} discount`;
+  const discount = shopDealDiscountLabel(deal);
+  if (discount) {
+    return dealMode(deal) === "parts" ? discount : `Overall ${discount} discount`;
+  }
   return "Special offer";
 }
 

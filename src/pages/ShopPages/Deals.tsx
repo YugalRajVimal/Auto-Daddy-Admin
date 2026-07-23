@@ -88,17 +88,23 @@ function shopDealTitle(deal: ShopDeal): string {
   if (dealMode(deal) === "parts") {
     return deal.partName?.trim() || deal.productName?.trim() || "—";
   }
-  return deal.service?.name?.trim() || deal.productName?.trim() || deal.description?.trim() || "—";
+  return deal.productName?.trim() || deal.service?.name?.trim() || deal.description?.trim() || "—";
 }
 
-function shopDealDiscountPercent(deal: ShopDeal): string {
-  const price = Number(deal.price);
+function shopDealDiscountLabel(deal: ShopDeal): string {
   const discounted = Number(deal.discountedPrice);
-  if (!Number.isFinite(price) || !Number.isFinite(discounted) || price <= 0 || discounted <= 0 || discounted >= price) {
-    if (Number.isFinite(discounted) && discounted > 0) return `${discounted}%`;
-    return "—";
+  // Spare-part / salvage deals store the price after discount (not a percent).
+  if (dealMode(deal) === "parts") {
+    if (!Number.isFinite(discounted) || discounted <= 0) return "—";
+    return String(discounted);
   }
-  return `${Math.round((1 - discounted / price) * 100)}%`;
+  // Service deals store discount as a percent in discountedPrice.
+  const price = Number(deal.price);
+  if (Number.isFinite(price) && price > 0 && Number.isFinite(discounted) && discounted > 0 && discounted < price) {
+    return `${Math.round((1 - discounted / price) * 100)}%`;
+  }
+  if (!Number.isFinite(discounted) || discounted <= 0) return "—";
+  return `${discounted}%`;
 }
 
 function dealStatusLabel(deal: ShopDeal): string {
@@ -172,9 +178,9 @@ function dealToFormFields(deal: ShopDeal, overrides?: Partial<AutoshopDealFormFi
     fields.originalPrice =
       deal.price != null ? String(deal.price) : fields.discountedPrice;
   } else {
-    fields.serviceId = deal.serviceId;
-    fields.originalPrice =
-      deal.price != null ? String(deal.price) : fields.discountedPrice;
+    fields.serviceId = deal.serviceId ?? deal.service?.id;
+    fields.productName = deal.productName ?? deal.service?.name;
+    if (deal.price != null) fields.originalPrice = String(deal.price);
   }
   return fields;
 }
@@ -185,24 +191,30 @@ function dealsMatchingSelection(selectedIds: Set<string>, deals: ShopDeal[]): Sh
 
 function DealsToolbar({
   showDelete,
+  showDeactivate,
   hasSelection,
   canDelete,
   canDeactivate,
+  canEdit,
   canAddNew,
   bulkBusy,
   onDelete,
   onDeactivate,
+  onEdit,
   onPrint,
   onAddNew,
 }: {
   showDelete: boolean;
+  showDeactivate: boolean;
   hasSelection: boolean;
   canDelete: boolean;
   canDeactivate: boolean;
+  canEdit: boolean;
   canAddNew: boolean;
   bulkBusy: boolean;
   onDelete: () => void;
   onDeactivate: () => void;
+  onEdit: () => void;
   onPrint: () => void;
   onAddNew: () => void;
 }) {
@@ -211,6 +223,16 @@ function DealsToolbar({
       <div className="flex flex-wrap gap-1">
         {hasSelection ? (
           <>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={onEdit}
+                disabled={bulkBusy}
+                className={DEAL_TOOLBAR_GRAY_BUTTON_CLASS}
+              >
+                Edit
+              </button>
+            ) : null}
             {showDelete ? (
               <button
                 type="button"
@@ -221,14 +243,16 @@ function DealsToolbar({
                 Delete
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={onDeactivate}
-              disabled={!canDeactivate || bulkBusy}
-              className={DEAL_TOOLBAR_GRAY_BUTTON_CLASS}
-            >
-              Non-Active
-            </button>
+            {showDeactivate ? (
+              <button
+                type="button"
+                onClick={onDeactivate}
+                disabled={!canDeactivate || bulkBusy}
+                className={DEAL_TOOLBAR_GRAY_BUTTON_CLASS}
+              >
+                Non-Active
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onPrint}
@@ -276,7 +300,9 @@ function DealsListTable({
   const selectAllRef = useRef<HTMLInputElement>(null);
   const isCompleted = section === "completed";
   const showVehicleColumns = section !== "service";
-  const nameHeader = section === "service" ? "Service Name" : "Part Name";
+  const showSoldTo = section !== "service";
+  const nameHeader = section === "service" ? "Subservice" : "Part Name";
+  const discountHeader = section === "service" ? "Discount (%)" : "Discounted Price";
   const pageRowIds = deals.map((deal) => dealId(deal));
   const allPageSelected = deals.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
   const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
@@ -311,9 +337,9 @@ function DealsListTable({
                 <th className={SHOP_TABLE_HEAD_TH_CLASS}>Year</th>
               </>
             ) : null}
-            <th className={SHOP_TABLE_HEAD_TH_CLASS}>Discount</th>
+            <th className={SHOP_TABLE_HEAD_TH_CLASS}>{discountHeader}</th>
             <th className={SHOP_TABLE_HEAD_TH_CLASS}>Status</th>
-            <th className={SHOP_TABLE_HEAD_TH_CLASS}>Sold To</th>
+            {showSoldTo ? <th className={SHOP_TABLE_HEAD_TH_CLASS}>Sold To</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -366,47 +392,49 @@ function DealsListTable({
                   </>
                 ) : null}
                 <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
-                  {shopDealDiscountPercent(deal)}
+                  {shopDealDiscountLabel(deal)}
                 </td>
                 <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
                   {dealStatusLabel(deal)}
                 </td>
-                <td
-                  className={SHOP_TABLE_BODY_TD_CLASS}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {sold || isCompleted ? (
-                    <span className="font-semibold text-gray-800">{dealSoldToLabel(deal)}</span>
-                  ) : (
-                    <div className="inline-flex items-center gap-1.5">
-                      <select
-                        value={draftCustomerId}
-                        onChange={(e) => onSoldDraftChange(id, e.target.value)}
-                        aria-label={`Sold to for ${title}`}
-                        className={DEAL_SOLD_TO_SELECT_CLASS}
-                      >
-                        <option value="">None</option>
-                        {customers.map((customer) => {
-                          const cid = customerRecordId(customer);
-                          if (!cid) return null;
-                          return (
-                            <option key={cid} value={cid}>
-                              {customerDisplayName(customer)}
-                            </option>
-                          );
-                        })}
-                      </select>
-                      <button
-                        type="button"
-                        disabled={!canSell}
-                        onClick={() => onSell(deal)}
-                        className={DEAL_SELL_BUTTON_CLASS}
-                      >
-                        {sellingDealId === id ? "…" : "Sell"}
-                      </button>
-                    </div>
-                  )}
-                </td>
+                {showSoldTo ? (
+                  <td
+                    className={SHOP_TABLE_BODY_TD_CLASS}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {sold || isCompleted ? (
+                      <span className="font-semibold text-gray-800">{dealSoldToLabel(deal)}</span>
+                    ) : (
+                      <div className="inline-flex items-center gap-1.5">
+                        <select
+                          value={draftCustomerId}
+                          onChange={(e) => onSoldDraftChange(id, e.target.value)}
+                          aria-label={`Sold to for ${title}`}
+                          className={DEAL_SOLD_TO_SELECT_CLASS}
+                        >
+                          <option value="">None</option>
+                          {customers.map((customer) => {
+                            const cid = customerRecordId(customer);
+                            if (!cid) return null;
+                            return (
+                              <option key={cid} value={cid}>
+                                {customerDisplayName(customer)}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={!canSell}
+                          onClick={() => onSell(deal)}
+                          className={DEAL_SELL_BUTTON_CLASS}
+                        >
+                          {sellingDealId === id ? "…" : "Sell"}
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                ) : null}
               </tr>
             );
           })}
@@ -472,6 +500,8 @@ export default function ShopDealsPage() {
     selectedDeals.some((deal) => deal.dealEnabled !== false);
   const canPrint = hasBulkSelection;
   const canAddNew = activeId !== "completed";
+  const canEditSelected =
+    activeId !== "completed" && !bulkBusy && selectedDeals.length === 1;
 
   useEffect(() => {
     setFormOpen(false);
@@ -505,6 +535,11 @@ export default function ShopDealsPage() {
     setEditingDeal(deal);
     setFormMode(dealMode(deal));
     setFormOpen(true);
+  };
+
+  const openEditSelected = () => {
+    if (selectedDeals.length !== 1) return;
+    openEdit(selectedDeals[0]);
   };
 
   const openDealDetail = (deal: ShopDeal) => {
@@ -663,14 +698,15 @@ export default function ShopDealsPage() {
   const handlePrint = () => {
     if (!canPrint) return;
     const showVehicleColumns = activeId !== "service";
+    const showSoldTo = activeId !== "service";
     const headers = [
       "Opening Date",
       "Closing Date",
-      activeId === "service" ? "Service Name" : "Part Name",
+      activeId === "service" ? "Subservice" : "Part Name",
       ...(showVehicleColumns ? ["Vehicle", "Year"] : []),
-      "Discount",
+      activeId === "service" ? "Discount (%)" : "Discounted Price",
       "Status",
-      "Sold To",
+      ...(showSoldTo ? ["Sold To"] : []),
     ];
     const rows = selectedDeals.map((deal) => {
       const base = [
@@ -681,7 +717,8 @@ export default function ShopDealsPage() {
       if (showVehicleColumns) {
         base.push(dealVehicleLabel(deal), dealVehicleYear(deal));
       }
-      base.push(shopDealDiscountPercent(deal), dealStatusLabel(deal), dealSoldToLabel(deal));
+      base.push(shopDealDiscountLabel(deal), dealStatusLabel(deal));
+      if (showSoldTo) base.push(dealSoldToLabel(deal));
       return base;
     });
     printAdminTable({ title: "Deals On Board", headers, rows });
@@ -763,13 +800,16 @@ export default function ShopDealsPage() {
             <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
               <DealsToolbar
                 showDelete={activeId !== "completed"}
+                showDeactivate={activeId !== "completed"}
                 hasSelection={hasBulkSelection}
                 canDelete={canBulkDelete}
                 canDeactivate={canBulkDeactivate}
+                canEdit={canEditSelected}
                 canAddNew={canAddNew}
                 bulkBusy={bulkBusy}
                 onDelete={() => void handleBulkDelete()}
                 onDeactivate={() => void handleBulkDeactivate()}
+                onEdit={openEditSelected}
                 onPrint={handlePrint}
                 onAddNew={openCreate}
               />

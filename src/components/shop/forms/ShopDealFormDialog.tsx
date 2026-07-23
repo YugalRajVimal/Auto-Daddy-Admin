@@ -19,13 +19,18 @@ import { fetchVehicleTypesAndServices } from "../../../lib/shopOwnerMutations";
 import { dealId } from "../../../lib/shopOwnerParsers";
 import { useShopServices } from "../../../hooks/useShopServices";
 import type { ShopDeal } from "../../../types/shopOwner";
+import ShopDatePicker from "./ShopDatePicker";
 
 type DealMode = "service" | "parts";
 
 const dealFormRowClass = "flex-nowrap items-start gap-x-3 overflow-x-auto";
 const dealFormCol1Class = "min-w-0 flex-[1_1_0%]";
+const dealFormDateClass = "min-w-[10.5rem] flex-[1_1_0%]";
 const dealFormCol3Class = "min-w-0 flex-[3_1_0%]";
-const dealFormCol4Class = "min-w-0 flex-[4_1_0%]";
+
+function defaultOfferEndDate() {
+  return new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+}
 
 type DealSectionId = "service" | "parts" | "salvage";
 
@@ -77,7 +82,6 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
   const { token } = useAuth();
   const { categories } = useShopServices();
   const [serviceId, setServiceId] = useState("");
-  const [productName, setProductName] = useState("");
   const [partName, setPartName] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
@@ -85,18 +89,28 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
   const [discountedPrice, setDiscountedPrice] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
-  const [offerEnd, setOfferEnd] = useState("");
+  const [offerEnd, setOfferEnd] = useState(defaultOfferEndDate);
   const [attachDealImage, setAttachDealImage] = useState(false);
   const [dealImage, setDealImage] = useState<File | null>(null);
   const [vehicleCatalog, setVehicleCatalog] = useState<VehicleCatalogEntry[]>([]);
   const [saving, setSaving] = useState(false);
 
   const serviceOptions = useMemo(() => {
-    const out: Array<{ id: string; label: string }> = [];
+    const out: Array<{ value: string; serviceId: string; label: string; subName: string }> = [];
     for (const cat of categories) {
-      for (const sub of cat.subServices) {
-        out.push({ id: cat.id, label: `${cat.name ?? "Service"} — ${sub.name}` });
-      }
+      const catId = cat.id?.trim() ?? "";
+      if (!catId) continue;
+      (cat.subServices ?? []).forEach((sub, index) => {
+        const subLabel = sub.name?.trim();
+        if (!subLabel) return;
+        const subId = sub.id?.trim() ?? "";
+        out.push({
+          value: subId || `${catId}::${index}`,
+          serviceId: subId || catId,
+          label: subLabel,
+          subName: subLabel,
+        });
+      });
     }
     return out;
   }, [categories]);
@@ -114,15 +128,31 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
   }, [mode, token]);
 
   useEffect(() => {
-    setServiceId(deal?.serviceId ?? "");
-    setProductName(deal?.productName ?? "");
+    const dealServiceId = deal?.serviceId ?? deal?.service?.id ?? "";
+    setServiceId(dealServiceId);
     setPartName(deal?.partName ?? "");
-    setDiscountedPrice(deal?.discountedPrice != null ? String(deal.discountedPrice) : "");
     setPrice(deal?.price != null ? String(deal.price) : "");
     setDescription(deal?.description ?? "");
-    setOfferEnd(deal?.offersEndOnDate?.slice(0, 10) ?? "");
+    setOfferEnd(deal?.offersEndOnDate?.slice(0, 10) || defaultOfferEndDate());
     setAttachDealImage(Boolean(deal?.dealImage ?? deal?.productImage));
     setDealImage(null);
+    if (mode === "service" && deal) {
+      const discounted = Number(deal.discountedPrice);
+      const original = Number(deal.price);
+      if (
+        Number.isFinite(original) &&
+        original > 0 &&
+        Number.isFinite(discounted) &&
+        discounted > 0 &&
+        discounted < original
+      ) {
+        setDiscountedPrice(String(Math.round((1 - discounted / original) * 100)));
+      } else {
+        setDiscountedPrice(deal.discountedPrice != null ? String(deal.discountedPrice) : "");
+      }
+    } else {
+      setDiscountedPrice(deal?.discountedPrice != null ? String(deal.discountedPrice) : "");
+    }
     if (mode === "parts" && deal) {
       setVehicleId(deal.vehicleId ?? deal.selectedVehicle?.id ?? "");
       setVehicleModel(deal.selectedVehicle?.model ?? "");
@@ -134,7 +164,27 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
     }
   }, [deal, mode]);
 
+  useEffect(() => {
+    if (mode !== "service" || serviceOptions.length === 0) return;
+    const dealServiceId = deal?.serviceId ?? deal?.service?.id ?? "";
+    const dealProductName = deal?.productName?.trim() || deal?.service?.name?.trim() || "";
+    setServiceId((current) => {
+      if (current && serviceOptions.some((o) => o.value === current)) return current;
+      const matched =
+        serviceOptions.find((o) => o.value === dealServiceId || o.serviceId === dealServiceId) ??
+        (dealProductName
+          ? serviceOptions.find(
+              (o) =>
+                o.subName.toLowerCase() === dealProductName.toLowerCase() ||
+                o.label.toLowerCase().endsWith(dealProductName.toLowerCase()),
+            )
+          : undefined);
+      return matched?.value ?? (dealServiceId && serviceOptions.some((o) => o.value === dealServiceId) ? dealServiceId : current);
+    });
+  }, [deal, mode, serviceOptions]);
+
   const selectedVehicle = vehicleCatalog.find((v) => v.id === vehicleId);
+  const selectedServiceOption = serviceOptions.find((o) => o.value === serviceId);
 
   const resolveDealType = (): AutoshopDealType => {
     if (deal) {
@@ -150,8 +200,29 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
   const handleSave = async () => {
     if (!token) return;
     if (!discountedPrice.trim()) {
-      toast.error("Discounted price is required.");
+      toast.error(mode === "service" ? "Discount (%) is required." : "Discounted price is required.");
       return;
+    }
+    if (mode === "service") {
+      const pct = Number(discountedPrice.trim());
+      if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+        toast.error("Enter a discount between 1 and 100%.");
+        return;
+      }
+    }
+    if (!offerEnd.trim()) {
+      toast.error("Offer ends on date is required.");
+      return;
+    }
+    {
+      const selected = new Date(`${offerEnd.trim()}T00:00:00`);
+      const tomorrow = new Date();
+      tomorrow.setHours(0, 0, 0, 0);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      if (Number.isNaN(selected.getTime()) || selected < tomorrow) {
+        toast.error("Offer ends on must be a future date.");
+        return;
+      }
     }
     const dealType = resolveDealType();
     const imageRequired = dealType !== "Parts";
@@ -162,8 +233,8 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
     const fields: AutoshopDealFormFields = {
       dealType,
       discountedPrice: discountedPrice.trim(),
-      description: description.trim(),
-      offersEndOnDate: offerEnd || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+      description: mode === "parts" ? description.trim() : "",
+      offersEndOnDate: offerEnd.trim(),
       dealImage: attachDealImage ? dealImage : null,
     };
     if (mode === "parts") {
@@ -178,12 +249,12 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
       fields.vehicleYear = vehicleYear;
       fields.originalPrice = price.trim() || discountedPrice.trim();
     } else {
-      if (!serviceId) {
-        toast.error("Select a service.");
+      if (!serviceId || !selectedServiceOption) {
+        toast.error("Select a subservice.");
         return;
       }
-      fields.serviceId = serviceId;
-      fields.originalPrice = price.trim() || discountedPrice.trim();
+      fields.serviceId = selectedServiceOption.serviceId;
+      fields.productName = selectedServiceOption.subName;
     }
     setSaving(true);
     try {
@@ -204,6 +275,7 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
   const isEditing = Boolean(deal);
   const saveLabel = isEditing ? "Update" : "Save";
   const savingLabel = isEditing ? "Updating…" : "Saving…";
+  const imageRequired = mode === "service" || section === "salvage";
 
   return (
     <CompactFormPanel
@@ -238,25 +310,32 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
 
       {mode === "service" ? (
         <CompactFormRow className={dealFormRowClass}>
-          <CompactField label="Service" required className={dealFormCol1Class}>
+          <CompactField label="Subservice" required className={dealFormCol1Class}>
             <select className={shopCompactInputClass} value={serviceId} onChange={(e) => setServiceId(e.target.value)} disabled={saving}>
-              <option value="">Select service</option>
+              <option value="">Select subservice</option>
               {serviceOptions.map((o) => (
-                <option key={`${o.id}-${o.label}`} value={o.id}>{o.label}</option>
+                <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
           </CompactField>
-          <CompactField label="Product name" className={dealFormCol1Class}>
-            <input className={shopCompactInputClass} placeholder="Product name" value={productName} onChange={(e) => setProductName(e.target.value)} disabled={saving} />
+          <CompactField label="Discount (%)" required className={dealFormCol1Class}>
+            <input
+              className={shopCompactInputClass}
+              placeholder="e.g. 20"
+              inputMode="decimal"
+              value={discountedPrice}
+              onChange={(e) => setDiscountedPrice(e.target.value)}
+              disabled={saving}
+            />
           </CompactField>
-          <CompactField label="Original price" className={dealFormCol1Class}>
-            <input className={shopCompactInputClass} placeholder="Original price" value={price} onChange={(e) => setPrice(e.target.value)} disabled={saving} />
-          </CompactField>
-          <CompactField label="Discounted price" required className={dealFormCol1Class}>
-            <input className={shopCompactInputClass} placeholder="Discounted price" value={discountedPrice} onChange={(e) => setDiscountedPrice(e.target.value)} disabled={saving} />
-          </CompactField>
-          <CompactField label="Offer ends on" className={dealFormCol1Class}>
-            <input className={shopCompactInputClass} type="date" value={offerEnd} onChange={(e) => setOfferEnd(e.target.value)} disabled={saving} />
+          <CompactField label="Offer ends on" required className={dealFormDateClass}>
+            <ShopDatePicker
+              id="shop-deal-offer-end-service"
+              value={offerEnd}
+              onChange={setOfferEnd}
+              disabled={saving}
+              futureOnly
+            />
           </CompactField>
         </CompactFormRow>
       ) : (
@@ -301,19 +380,32 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
 
       <CompactFormRow className={dealFormRowClass}>
         {mode === "parts" ? (
-          <CompactField label="Offer ends on" className={dealFormCol1Class}>
-            <input className={shopCompactInputClass} type="date" value={offerEnd} onChange={(e) => setOfferEnd(e.target.value)} disabled={saving} />
-          </CompactField>
+          <>
+            <CompactField label="Offer ends on" required className={dealFormDateClass}>
+              <ShopDatePicker
+                id="shop-deal-offer-end-parts"
+                value={offerEnd}
+                onChange={setOfferEnd}
+                disabled={saving}
+                futureOnly
+              />
+            </CompactField>
+            <CompactField label="Description" className={dealFormCol3Class}>
+              <textarea
+                className={`${shopCompactInputClass} resize-none`}
+                placeholder="Description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={1}
+                disabled={saving}
+              />
+            </CompactField>
+          </>
         ) : null}
-        <CompactField
-          label="Description"
-          className={mode === "parts" ? dealFormCol3Class : dealFormCol4Class}
-        >
-          <textarea className={`${shopCompactInputClass} resize-none`} placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={1} disabled={saving} />
-        </CompactField>
         <div className={`${dealFormCol1Class} self-start`}>
           <AttachImageCheckbox
             label="Attach Image"
+            required={imageRequired}
             checked={attachDealImage}
             onCheckedChange={setAttachDealImage}
             file={dealImage}

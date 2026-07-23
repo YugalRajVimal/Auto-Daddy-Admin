@@ -2,6 +2,7 @@ import { useRef } from "react";
 
 type AttachImageCheckboxProps = {
   label?: string;
+  required?: boolean;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   file: File | null;
@@ -13,6 +14,7 @@ type AttachImageCheckboxProps = {
 
 export default function AttachImageCheckbox({
   label = "Attach Image",
+  required = false,
   checked,
   onCheckedChange,
   file,
@@ -40,7 +42,10 @@ export default function AttachImageCheckbox({
           onChange={(e) => handleCheckedChange(e.target.checked)}
           className="h-3.5 w-3.5 accent-ad-purple"
         />
-        {label}
+        <span>
+          {label}
+          {required ? <span className="text-red-600"> *</span> : null}
+        </span>
       </label>
       {checked ? (
         <label className="inline-block cursor-pointer rounded border border-gray-400 bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
@@ -56,5 +61,4 @@ export default function AttachImageCheckbox({
       ) : null}
     </div>
   );
-
 }

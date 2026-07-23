@@ -651,6 +651,18 @@
   @apply !flex !items-center !text-theme-sm !font-medium !text-gray-800 dark:!text-white/90 dark:hover:!border-gray-300 dark:hover:!bg-gray-900;
 }
 
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.flatpickr-disabled:hover,
+.flatpickr-day.prevMonthDay.flatpickr-disabled,
+.flatpickr-day.nextMonthDay.flatpickr-disabled,
+.flatpickr-day.notAllowed,
+.flatpickr-day.notAllowed.prevMonthDay,
+.flatpickr-day.notAllowed.nextMonthDay {
+  @apply !cursor-not-allowed !border-transparent !bg-transparent !text-gray-300 !opacity-40 dark:!text-gray-600;
+  filter: blur(0.4px);
+  pointer-events: none;
+}
+
 .flatpickr-day.nextMonthDay,
 .flatpickr-day.prevMonthDay {
   @apply !text-gray-400;
