@@ -256,6 +256,29 @@ export default function ShopProfilePage() {
           return;
         }
         const { prefix } = parseInvoicePrefix(res.data);
+
+console.log(res.data)
+        // Set the invoice number to invoiceCounter from the API response, if present
+        // Property 'data' does not exist on type 'ApiEnvelope', so we access invoiceCounter based on known structure
+        const invoiceCounter = (res.data as any)?.data?.invoiceCounter;
+
+        setNumbering((prev) => {
+          const next = {
+            ...prev,
+            invoice: {
+              ...prev.invoice,
+              code: prefix,
+              number: invoiceCounter != null ? String(invoiceCounter) : prev.invoice.number,
+            }
+          };
+          try {
+            localStorage.setItem(NUMBERING_STORAGE_KEY, JSON.stringify(next));
+          } catch {
+            // ignore quota / private mode errors
+          }
+          return next;
+        });
+
         setNumbering((prev) => {
           const next = { ...prev, invoice: { ...prev.invoice, code: prefix } };
           try {
