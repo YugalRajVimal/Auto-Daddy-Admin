@@ -1,3 +1,4 @@
+import { CarOwnerEstimatePreview } from "@/components/car-owner/car-owner-estimate-preview";
 import { CarOwnerStackScreenFrame } from "@/components/car-owner/car-owner-stack-screen-frame";
 import {
   normalizeVehicleList,
@@ -12,15 +13,13 @@ import { useAuth } from "@/context/auth-provider";
 import { useCarOwnerJobCards } from "@/hooks/use-car-owner-job-cards";
 import { useCarOwnerJobCardApprovals } from "@/hooks/use-car-owner-job-card-approvals";
 import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "@/hooks/use-car-owner-invoices";
-import { useSidebarUser } from "@/hooks/use-sidebar-user";
 import { getJson } from "@/lib/api";
 import {
-  fetchCarOwnerJobCardById,
   isCarOwnerJobCardPendingApproval,
-  resolveCarOwnerJobCardForViewer,
+  jobCardLicensePlate,
+  serviceTypeLabel as resolveServiceTypeLabel,
 } from "@/lib/car-owner-job-cards";
 import { formatCurrencyAmount } from "@/lib/currency";
-import { formatStoredNationalPhone } from "@/lib/dial-countries";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import type { CarOwnerJobCard } from "@/types/car-owner-job-cards";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,56 +41,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-function formatMoneyDecimal(amount: unknown, countryCode: string | null | undefined): string {
-  return formatCurrencyAmount(amount as number | string | null | undefined, countryCode, {
-    fallback: "—",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+type EstimateViewerState = {
+  variant: "jobcard" | "invoice";
+  jobCardId: string;
+  cachedJobCard: CarOwnerJobCard | null;
+  invoiceNoHint?: string | null;
+};
 
 function formatMoneyPlain(amount: unknown, countryCode: string | null | undefined): string {
   return formatCurrencyAmount(amount as number | string | null | undefined, countryCode, { fallback: "—" });
-}
-
-function businessLocationLabel(business: CarOwnerJobCard["business"] | undefined): string {
-  if (!business || typeof business === "string") return "";
-  const city =
-    typeof business.city === "string"
-      ? business.city
-      : typeof business.cityName === "string"
-        ? business.cityName
-        : "";
-  return city.trim();
-}
-
-function jobChipLabel(jc: CarOwnerJobCard): string {
-  const jobNo = jc.jobNo?.trim();
-  if (!jobNo) return "Job";
-  return jobNo.toLowerCase().startsWith("job") ? jobNo : `Job #${jobNo}`;
-}
-
-function resolveCustomerInfo(
-  jc: CarOwnerJobCard,
-  fallbackName: string,
-  fallbackPhone: string
-): { name: string; phone: string; location: string } {
-  const raw = jc.customerId as unknown;
-  if (raw && typeof raw === "object") {
-    const c = raw as Record<string, unknown>;
-    const name = typeof c.name === "string" ? c.name.trim() : fallbackName;
-    const phoneRaw = typeof c.phone === "string" ? c.phone.trim() : fallbackPhone;
-    const phone = phoneRaw ? formatStoredNationalPhone(phoneRaw) || phoneRaw : "";
-    const location =
-      (typeof c.city === "string" ? c.city.trim() : "") ||
-      (typeof c.address === "string" ? c.address.trim() : "");
-    return { name: name || "—", phone, location };
-  }
-  return {
-    name: fallbackName || "—",
-    phone: fallbackPhone ? formatStoredNationalPhone(fallbackPhone) || fallbackPhone : "",
-    location: "",
-  };
 }
 
 function safeDateLabel(iso: string): string {
@@ -100,26 +58,12 @@ function safeDateLabel(iso: string): string {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
-function jobCardNoLabel(jc: CarOwnerJobCard): string {
-  const no = jc.jobNo?.trim();
-  if (no) return no;
-  return "—";
-}
-
-function jobCardServiceName(service: CarOwnerJobCard["services"][number]["service"]): string {
-  if (typeof service === "string") return service.trim();
-  const name = service?.name;
-  return typeof name === "string" ? name.trim() : "";
+function jobCardDateIso(jc: CarOwnerJobCard): string {
+  return jc.createdAt || jc.date || "";
 }
 
 function serviceTypeLabel(jc: CarOwnerJobCard): string {
-  const fromServices = jc.services
-    ?.map((s) => jobCardServiceName(s.service))
-    .filter((name): name is string => Boolean(name));
-  if (fromServices?.length) return fromServices.join(", ");
-  const direct = jc.serviceType?.trim();
-  if (direct) return direct;
-  return jobCardNoLabel(jc);
+  return resolveServiceTypeLabel(jc);
 }
 
 function vehicleBarLabel(v: Vehicle | null): string {
@@ -130,8 +74,8 @@ function vehicleBarLabel(v: Vehicle | null): string {
 }
 
 function jobCardPlateLabel(jc: CarOwnerJobCard): string {
-  const plate = jc.vehicleId?.licensePlateNo?.trim();
-  return plate ? plate.toUpperCase() : "";
+  const plate = jobCardLicensePlate(jc);
+  return plate === "—" ? "" : plate;
 }
 
 function jobCardImagePaths(jc: CarOwnerJobCard): string[] {
@@ -169,36 +113,6 @@ function isPendingEstimate(jc: CarOwnerJobCard): boolean {
 function businessPhoneRaw(business: CarOwnerJobCard["business"] | undefined): string {
   if (!business || typeof business === "string") return "";
   return business.businessPhone?.trim() || business.phone?.trim() || "";
-}
-
-function vehicleMakeModelLabel(vehicle: CarOwnerJobCard["vehicleId"] | undefined): string {
-  if (!vehicle?.make) return "";
-  const make = vehicle.make.name?.trim() ?? "";
-  const model = vehicle.make.model?.trim() ?? "";
-  return [make, model].filter(Boolean).join(" ");
-}
-
-function formatKm(value: unknown): string {
-  const n = typeof value === "number" ? value : Number(value ?? 0);
-  if (!Number.isFinite(n)) return "0";
-  return Math.round(n).toLocaleString();
-}
-
-function parseLabourHours(jc: CarOwnerJobCard): number | undefined {
-  const raw = jc as Record<string, unknown>;
-  const direct = raw.labourHours ?? raw.labourHour ?? raw.labourDuration ?? raw.laborDuration;
-  if (typeof direct === "number" && direct > 0) return direct;
-  if (typeof direct === "string") {
-    const n = Number(direct);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  const notes = `${jc.additionalNotes ?? ""} ${jc.technicalRemarks ?? ""}`;
-  const match = /labour:\s*(\d+(?:\.\d+)?)\s*hr/i.exec(notes);
-  if (match) {
-    const n = Number(match[1]);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return undefined;
 }
 
 const cardChrome = Platform.select({
@@ -272,7 +186,6 @@ function JobCardThumb({ uri, onPress }: { uri: string | null; onPress?: () => vo
 export default function CarOwnerServiceHistory() {
   const { showToast } = useToast();
   const { token, meta } = useAuth();
-  const { userName, userPhone } = useSidebarUser();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
@@ -315,7 +228,7 @@ export default function CarOwnerServiceHistory() {
   useFocusEffect(
     useCallback(() => {
       return () => {
-        setViewerJob(null);
+        setEstimateViewer(null);
         setActionById({});
         setActionErrorById({});
       };
@@ -362,7 +275,7 @@ export default function CarOwnerServiceHistory() {
   );
 
   const [activeTab, setActiveTab] = useState<"all" | "pending" | "approved" | "rejected">("all");
-  const [viewerJob, setViewerJob] = useState<CarOwnerJobCard | null>(null);
+  const [estimateViewer, setEstimateViewer] = useState<EstimateViewerState | null>(null);
   const [actionById, setActionById] = useState<Record<string, "approve" | "reject" | null>>({});
   const [actionErrorById, setActionErrorById] = useState<Record<string, string | null>>({});
   const [imageViewer, setImageViewer] = useState<{ title: string; uris: string[] } | null>(null);
@@ -373,26 +286,17 @@ export default function CarOwnerServiceHistory() {
   }, []);
 
   const closeViewer = useCallback(() => {
-    setViewerJob(null);
+    setEstimateViewer(null);
   }, []);
 
-  const openViewer = useCallback(
-    async (jc: CarOwnerJobCard) => {
-      setActionErrorById((prev) => ({ ...prev, [jc._id]: null }));
-      setViewerJob(jc);
-      if (!token) return;
-      try {
-        const res = await fetchCarOwnerJobCardById(token, jc._id);
-        if (res.ok) {
-          const detailed = resolveCarOwnerJobCardForViewer(res.data, jc);
-          if (detailed) setViewerJob(detailed);
-        }
-      } catch {
-        // Keep list payload if detail fetch fails.
-      }
-    },
-    [token]
-  );
+  const openJobCardViewer = useCallback((jc: CarOwnerJobCard) => {
+    setActionErrorById((prev) => ({ ...prev, [jc._id]: null }));
+    setEstimateViewer({
+      variant: "jobcard",
+      jobCardId: jc._id,
+      cachedJobCard: jc,
+    });
+  }, []);
 
   const toggleSelected = useCallback((id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -436,24 +340,15 @@ export default function CarOwnerServiceHistory() {
   }, [pendingSelectedIds, refresh, refreshInvoices, rejectMany, showToast]);
 
   const openInvoiceViewer = useCallback(
-    async (row: CarOwnerInvoiceRow) => {
-      const fromList = findJobCardById(row.id);
-      if (fromList) {
-        await openViewer(fromList);
-        return;
-      }
-      if (!token) return;
-      try {
-        const res = await fetchCarOwnerJobCardById(token, row.id);
-        if (res.ok) {
-          const detailed = resolveCarOwnerJobCardForViewer(res.data, null);
-          if (detailed) setViewerJob(detailed);
-        }
-      } catch {
-        // Ignore detail fetch failures for invoice rows without cache.
-      }
+    (row: CarOwnerInvoiceRow) => {
+      setEstimateViewer({
+        variant: "invoice",
+        jobCardId: row.id,
+        cachedJobCard: findJobCardById(row.id),
+        invoiceNoHint: row.invoiceNo,
+      });
     },
-    [findJobCardById, openViewer, token]
+    [findJobCardById]
   );
 
   const onCallShop = useCallback(
@@ -478,14 +373,14 @@ export default function CarOwnerServiceHistory() {
   });
 
   const sortedForUi = [...filteredItems].sort((a, b) => {
-    const at = Date.parse(a.createdAt);
-    const bt = Date.parse(b.createdAt);
+    const at = Date.parse(jobCardDateIso(a));
+    const bt = Date.parse(jobCardDateIso(b));
     if (Number.isFinite(at) && Number.isFinite(bt)) return bt - at;
-    return String(b.createdAt).localeCompare(String(a.createdAt));
+    return jobCardDateIso(b).localeCompare(jobCardDateIso(a));
   });
 
   const sections = sortedForUi.reduce<Record<string, typeof items>>((acc, jc) => {
-    const key = monthSectionLabel(jc.createdAt);
+    const key = monthSectionLabel(jobCardDateIso(jc));
     acc[key] = acc[key] ? [...acc[key], jc] : [jc];
     return acc;
   }, {});
@@ -627,7 +522,7 @@ export default function CarOwnerServiceHistory() {
                     {sections[key]?.map((jc) => {
                       const isPending = isPendingEstimate(jc);
                       const serviceLabel = serviceTypeLabel(jc);
-                      const dateLabel = safeDateLabel(jc.createdAt);
+                      const dateLabel = safeDateLabel(jobCardDateIso(jc));
                       const plateLabel = jobCardPlateLabel(jc);
                       const imageUris = jobCardImageUris(jc);
                       const thumbUri = imageUris[0] ?? null;
@@ -661,7 +556,7 @@ export default function CarOwnerServiceHistory() {
                               <View style={styles.selectHitSpacer} />
                             )}
                             <Pressable
-                              onPress={() => void openViewer(jc)}
+                              onPress={() => openJobCardViewer(jc)}
                               style={({ pressed }) => [
                                 styles.collapsedSummary,
                                 pressed && styles.collapsedSummaryPressed,
@@ -748,7 +643,7 @@ export default function CarOwnerServiceHistory() {
                 {visibleInvoiceRows.map((row) => (
                   <Pressable
                     key={row.id}
-                    onPress={() => void openInvoiceViewer(row)}
+                    onPress={() => openInvoiceViewer(row)}
                     style={({ pressed }) => [styles.invoiceRowCard, pressed && styles.collapsedSummaryPressed]}
                   >
                     <View style={styles.invoiceRowTop}>
@@ -836,24 +731,43 @@ export default function CarOwnerServiceHistory() {
         </Pressable>
       </Modal>
 
-      <Modal visible={viewerJob != null} transparent animationType="fade" onRequestClose={closeViewer}>
+      <Modal
+        visible={estimateViewer != null}
+        transparent
+        animationType="fade"
+        onRequestClose={closeViewer}
+      >
         <View style={styles.viewerBackdrop}>
           <Pressable style={styles.viewerBackdropPress} onPress={closeViewer} />
-          {viewerJob ? (
-            <View style={styles.invoiceCard}>
-              <View style={styles.invoiceHeader}>
-                <View style={styles.invoiceHeaderLeft}>
-                  <Text style={styles.invoiceHeaderTitle}>
-                    {typeof viewerJob.business === "string"
-                      ? viewerJob.business.trim() || "Auto shop"
-                      : viewerJob.business?.businessName?.trim() || "Auto shop"}
-                  </Text>
-                  <Text style={styles.invoiceHeaderSub}>
-                    {businessLocationLabel(viewerJob.business) || "—"}
-                  </Text>
-                </View>
-                <Pressable hitSlop={8} onPress={closeViewer} style={styles.invoiceClose}>
-                  <Ionicons name="close" size={18} color={colors.white} />
+          {estimateViewer ? (
+            <View
+              style={[
+                styles.invoiceCard,
+                estimateViewer.variant === "invoice"
+                  ? styles.invoiceCardInvoiceBorder
+                  : styles.invoiceCardJobBorder,
+              ]}
+            >
+              <View
+                style={[
+                  styles.previewToolbar,
+                  estimateViewer.variant === "invoice"
+                    ? styles.previewToolbarInvoice
+                    : styles.previewToolbarJob,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.previewToolbarTitle,
+                    estimateViewer.variant === "invoice"
+                      ? styles.previewToolbarTitleInvoice
+                      : styles.previewToolbarTitleJob,
+                  ]}
+                >
+                  {estimateViewer.variant === "invoice" ? "Invoice Preview" : "Job Card Preview"}
+                </Text>
+                <Pressable hitSlop={8} onPress={closeViewer} style={styles.previewCloseBtn}>
+                  <Ionicons name="close" size={18} color={colors.text} />
                 </Pressable>
               </View>
 
@@ -862,202 +776,110 @@ export default function CarOwnerServiceHistory() {
                 contentContainerStyle={styles.invoiceContent}
                 showsVerticalScrollIndicator={false}
               >
-                {(() => {
-                  const jc = viewerJob;
-                  const customer = resolveCustomerInfo(jc, meta?.name ?? userName ?? "", userPhone ?? "");
-                  const dateLabel = safeDateLabel(jc.createdAt);
-                  const plate = jobCardPlateLabel(jc);
-                  const make = vehicleMakeModelLabel(jc.vehicleId) || "—";
-                  const odo = formatKm(jc.odometerReading);
-                  const due =
-                    Number(jc.dueOdometerReading) > 0 ? formatKm(jc.dueOdometerReading) : "";
-                  const totalAmount = jc.totalPayableAmount;
-                  const serviceRows = (jc.services ?? []).flatMap((svc, si) =>
-                    (svc.subServices ?? []).map((sub, sj) => ({
-                      key: `${si}-${sj}`,
-                      name: sub.name?.trim() || "—",
-                      desc: sub.desc?.trim() ?? "",
-                      price: Number(sub.price) || 0,
-                    }))
-                  );
-                  const labourCharge = Number(jc.labourCharge) || 0;
-                  const labourHours = parseLabourHours(jc);
-
-                  return (
-                    <>
-                      <View style={styles.invoiceMetaRow}>
-                        <View style={styles.invoiceChip}>
-                          <Text style={styles.invoiceChipText}>{jobChipLabel(jc)}</Text>
-                        </View>
-                        {dateLabel ? (
-                          <View style={styles.invoiceChipMuted}>
-                            <Text style={styles.invoiceChipMutedText}>{dateLabel}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-
-                      <View style={styles.invoiceInfoGrid}>
-                        <View style={styles.invoiceInfoCard}>
-                          <Text style={styles.invoiceInfoTitle}>CUSTOMER</Text>
-                          <Text style={styles.invoiceInfoMain}>{customer.name}</Text>
-                          {customer.phone ? (
-                            <Text style={styles.invoiceInfoSub}>{customer.phone}</Text>
-                          ) : null}
-                          {customer.location ? (
-                            <Text style={styles.invoiceInfoSub} numberOfLines={2}>
-                              {customer.location}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <View style={styles.invoiceInfoCard}>
-                          <Text style={styles.invoiceInfoTitle}>VEHICLE</Text>
-                          <Text style={styles.invoiceInfoMain}>{make}</Text>
-                          {plate ? <Text style={styles.invoiceInfoSub}>{plate}</Text> : null}
-                          <View style={styles.invoiceOdoRow}>
-                            <View style={styles.invoiceOdoCol}>
-                              <Text style={styles.invoiceOdoLabel}>ODO IN</Text>
-                              <Text style={styles.invoiceOdoValue}>{odo ? `${odo} km` : "—"}</Text>
-                            </View>
-                            <View style={styles.invoiceOdoCol}>
-                              <Text style={styles.invoiceOdoLabel}>DUE ODO</Text>
-                              <Text style={[styles.invoiceOdoValue, styles.invoiceOdoDue]}>
-                                {due ? `${due} km` : "—"}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-
-                      <View style={styles.invoiceSection}>
-                        <Text style={styles.invoiceSectionTitle}>SERVICES</Text>
-                        <View style={styles.invoiceTableHead}>
-                          <Text style={styles.invoiceThLeft}>Description</Text>
-                          <Text style={styles.invoiceThRight}>Amount</Text>
-                        </View>
-                        <View style={styles.invoiceTableBody}>
-                          {serviceRows.length === 0 && labourCharge <= 0 ? (
-                            <Text style={styles.invoiceHint}>—</Text>
-                          ) : (
-                            <>
-                              {serviceRows.map((row) => (
-                                <View key={row.key} style={styles.invoiceLine}>
-                                  <View style={styles.invoiceLineLeft}>
-                                    <Text style={styles.invoiceLineName}>{row.name}</Text>
-                                    {row.desc ? (
-                                      <Text style={styles.invoiceLineDesc}>{row.desc}</Text>
-                                    ) : null}
-                                  </View>
-                                  <Text style={styles.invoiceLineAmt}>{formatMoneyDecimal(row.price, meta?.countryCode)}</Text>
-                                </View>
-                              ))}
-                              {labourCharge > 0 ? (
-                                <View style={styles.invoiceLine}>
-                                  <View style={styles.invoiceLineLeft}>
-                                    <Text style={styles.invoiceLineName}>Labour</Text>
-                                    {labourHours ? (
-                                      <Text style={styles.invoiceLineDesc}>{labourHours} hr</Text>
-                                    ) : null}
-                                  </View>
-                                  <Text style={styles.invoiceLineAmt}>{formatMoneyDecimal(labourCharge, meta?.countryCode)}</Text>
-                                </View>
-                              ) : null}
-                            </>
-                          )}
-                        </View>
-                      </View>
-
-                      <View style={styles.invoiceTotals}>
-                        <View style={styles.invoiceTotalRow}>
-                          <Text style={styles.invoiceTotalStrongLabel}>Subtotal Amount</Text>
-                          <Text style={styles.invoiceTotalStrongValue}>{formatMoneyPlain(totalAmount, meta?.countryCode)}</Text>
-                        </View>
-                      </View>
-                    </>
-                  );
-                })()}
+                <CarOwnerEstimatePreview
+                  jobCardId={estimateViewer.jobCardId}
+                  variant={estimateViewer.variant}
+                  cachedJobCard={estimateViewer.cachedJobCard}
+                  invoiceNoHint={estimateViewer.invoiceNoHint}
+                  callingCode={meta?.countryCode}
+                />
               </ScrollView>
 
-              <View style={styles.invoiceFooter}>
-                {businessPhoneRaw(viewerJob.business) ? (
-                  <Pressable
-                    onPress={() => onCallShop(viewerJob)}
-                    style={({ pressed }) => [styles.invoiceCallBtn, pressed && styles.actionBtnPressed]}
-                    android_ripple={{ color: "rgba(255,255,255,0.2)" }}
-                  >
-                    <Ionicons name="call-outline" size={18} color={colors.white} />
-                    <Text style={styles.invoiceCallBtnText}>Call shop</Text>
-                  </Pressable>
-                ) : null}
+              {(() => {
+                const jc =
+                  estimateViewer.cachedJobCard ??
+                  items.find((row) => row._id === estimateViewer.jobCardId) ??
+                  null;
+                if (!jc) return null;
+                const showPendingActions =
+                  estimateViewer.variant === "jobcard" && isPendingEstimate(jc);
+                const showCall = Boolean(businessPhoneRaw(jc.business));
+                if (!showPendingActions && !showCall) return null;
 
-                {isPendingEstimate(viewerJob) ? (
-                  <View style={styles.invoiceActionsRow}>
-                    <Pressable
-                      disabled={Boolean(actionById[viewerJob._id])}
-                      onPress={async () => {
-                        const id = viewerJob._id;
-                        setActionById((prev) => ({ ...prev, [id]: "approve" }));
-                        setActionErrorById((prev) => ({ ...prev, [id]: null }));
-                        const r = await approveJobCard(id);
-                        setActionById((prev) => ({ ...prev, [id]: null }));
-                        if (!r.ok) {
-                          setActionErrorById((prev) => ({
-                            ...prev,
-                            [id]: r.error ?? "Could not approve.",
-                          }));
-                          return;
-                        }
-                        await refreshInvoices();
-                        closeViewer();
-                      }}
-                      style={({ pressed }) => [
-                        styles.pendingActionBtn,
-                        styles.pendingApproveBtn,
-                        pressed ? styles.actionBtnPressed : null,
-                        actionById[viewerJob._id] ? styles.actionBtnDisabled : null,
-                      ]}
-                      android_ripple={{ color: "rgba(255,255,255,0.2)" }}
-                    >
-                      <Text style={styles.pendingActionBtnText}>Approve</Text>
-                    </Pressable>
+                return (
+                  <View style={styles.invoiceFooter}>
+                    {showCall ? (
+                      <Pressable
+                        onPress={() => onCallShop(jc)}
+                        style={({ pressed }) => [styles.invoiceCallBtn, pressed && styles.actionBtnPressed]}
+                        android_ripple={{ color: "rgba(255,255,255,0.2)" }}
+                      >
+                        <Ionicons name="call-outline" size={18} color={colors.white} />
+                        <Text style={styles.invoiceCallBtnText}>Call shop</Text>
+                      </Pressable>
+                    ) : null}
 
-                    <Pressable
-                      disabled={Boolean(actionById[viewerJob._id])}
-                      onPress={async () => {
-                        const id = viewerJob._id;
-                        setActionById((prev) => ({ ...prev, [id]: "reject" }));
-                        setActionErrorById((prev) => ({ ...prev, [id]: null }));
-                        const r = await rejectJobCard(id);
-                        setActionById((prev) => ({ ...prev, [id]: null }));
-                        if (!r.ok) {
-                          setActionErrorById((prev) => ({
-                            ...prev,
-                            [id]: r.error ?? "Could not discard.",
-                          }));
-                          return;
-                        }
-                        await refreshInvoices();
-                        closeViewer();
-                      }}
-                      style={({ pressed }) => [
-                        styles.pendingActionBtn,
-                        styles.pendingDiscardBtn,
-                        pressed ? styles.actionBtnPressed : null,
-                        actionById[viewerJob._id] ? styles.actionBtnDisabled : null,
-                      ]}
-                      android_ripple={{ color: "rgba(255,255,255,0.2)" }}
-                    >
-                      <Text style={styles.pendingActionBtnText}>Discard</Text>
-                    </Pressable>
+                    {showPendingActions ? (
+                      <View style={styles.invoiceActionsRow}>
+                        <Pressable
+                          disabled={Boolean(actionById[jc._id])}
+                          onPress={async () => {
+                            const id = jc._id;
+                            setActionById((prev) => ({ ...prev, [id]: "approve" }));
+                            setActionErrorById((prev) => ({ ...prev, [id]: null }));
+                            const r = await approveJobCard(id);
+                            setActionById((prev) => ({ ...prev, [id]: null }));
+                            if (!r.ok) {
+                              setActionErrorById((prev) => ({
+                                ...prev,
+                                [id]: r.error ?? "Could not approve.",
+                              }));
+                              return;
+                            }
+                            await refreshInvoices();
+                            closeViewer();
+                          }}
+                          style={({ pressed }) => [
+                            styles.pendingActionBtn,
+                            styles.pendingApproveBtn,
+                            pressed ? styles.actionBtnPressed : null,
+                            actionById[jc._id] ? styles.actionBtnDisabled : null,
+                          ]}
+                          android_ripple={{ color: "rgba(255,255,255,0.2)" }}
+                        >
+                          <Text style={styles.pendingActionBtnText}>Approve</Text>
+                        </Pressable>
+
+                        <Pressable
+                          disabled={Boolean(actionById[jc._id])}
+                          onPress={async () => {
+                            const id = jc._id;
+                            setActionById((prev) => ({ ...prev, [id]: "reject" }));
+                            setActionErrorById((prev) => ({ ...prev, [id]: null }));
+                            const r = await rejectJobCard(id);
+                            setActionById((prev) => ({ ...prev, [id]: null }));
+                            if (!r.ok) {
+                              setActionErrorById((prev) => ({
+                                ...prev,
+                                [id]: r.error ?? "Could not discard.",
+                              }));
+                              return;
+                            }
+                            await refreshInvoices();
+                            closeViewer();
+                          }}
+                          style={({ pressed }) => [
+                            styles.pendingActionBtn,
+                            styles.pendingDiscardBtn,
+                            pressed ? styles.actionBtnPressed : null,
+                            actionById[jc._id] ? styles.actionBtnDisabled : null,
+                          ]}
+                          android_ripple={{ color: "rgba(255,255,255,0.2)" }}
+                        >
+                          <Text style={styles.pendingActionBtnText}>Discard</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+
+                    {actionErrorById[jc._id] ? (
+                      <View style={styles.inlineErrorRow}>
+                        <Ionicons name="alert-circle-outline" size={16} color="#991B1B" />
+                        <Text style={styles.inlineErrorText}>{actionErrorById[jc._id]}</Text>
+                      </View>
+                    ) : null}
                   </View>
-                ) : null}
-
-                {actionErrorById[viewerJob._id] ? (
-                  <View style={styles.inlineErrorRow}>
-                    <Ionicons name="alert-circle-outline" size={16} color="#991B1B" />
-                    <Text style={styles.inlineErrorText}>{actionErrorById[viewerJob._id]}</Text>
-                  </View>
-                ) : null}
-              </View>
+                );
+              })()}
             </View>
           ) : null}
         </View>
@@ -1346,6 +1168,8 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   collapsedSummary: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: "row",
     height: COLLAPSED_ROW_HEIGHT,
     alignItems: "stretch",
@@ -1366,40 +1190,40 @@ const styles = StyleSheet.create({
   collapsedMain: {
     flex: 1,
     minWidth: 0,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    gap: spacing.sm,
+    gap: 4,
     backgroundColor: colors.white,
   },
   serviceTypePill: {
     backgroundColor: colors.successDark,
-    paddingVertical: 8,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
     borderRadius: radii.round,
     maxWidth: "100%",
-    alignSelf: "center",
+    alignSelf: "flex-start",
   },
   serviceTypePillText: {
     fontSize: fontSizes.sm,
     fontWeight: "800",
     color: colors.white,
     letterSpacing: 0.2,
-    textAlign: "center",
+    textAlign: "left",
   },
   collapsedDate: {
     fontSize: fontSizes.sm,
     fontWeight: "600",
     color: colors.textMuted,
-    textAlign: "center",
+    textAlign: "left",
   },
   collapsedPlate: {
     fontSize: fontSizes.sm,
     fontWeight: "800",
     color: colors.successDark,
     letterSpacing: 0.4,
-    textAlign: "center",
+    textAlign: "left",
   },
   viewerBackdrop: {
     flex: 1,
@@ -1418,96 +1242,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: radii.xl,
     overflow: "hidden",
+    borderWidth: 1,
     ...shadows.card,
   },
-  invoiceHeader: {
-    backgroundColor: colors.successDark,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+  invoiceCardJobBorder: { borderColor: "#d6ebfb" },
+  invoiceCardInvoiceBorder: { borderColor: "#f5c6d6" },
+  previewToolbar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.97)",
   },
-  invoiceHeaderLeft: { flex: 1, minWidth: 0 },
-  invoiceHeaderTitle: { color: colors.white, fontSize: fontSizes.xl, fontWeight: "900" },
-  invoiceHeaderSub: { color: "rgba(255,255,255,0.9)", fontSize: fontSizes.sm, fontWeight: "800", marginTop: 2 },
-  invoiceClose: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  previewToolbarJob: { borderBottomColor: "#d6ebfb" },
+  previewToolbarInvoice: { borderBottomColor: "#f5c6d6" },
+  previewToolbarTitle: { flex: 1, fontSize: fontSizes.sm, fontWeight: "800" },
+  previewToolbarTitleJob: { color: "#1976d2" },
+  previewToolbarTitleInvoice: { color: "#d81b60" },
+  previewCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+  },
   viewerScroll: { flex: 1 },
   invoiceContent: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.lg },
-  invoiceMetaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
-  invoiceChip: {
-    backgroundColor: colors.successDark,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radii.round,
-  },
-  invoiceChipText: { color: colors.white, fontSize: fontSizes.sm, fontWeight: "900" },
-  invoiceChipMuted: {
-    backgroundColor: colors.successMuted,
-    borderWidth: 1,
-    borderColor: "rgba(22,101,52,0.14)",
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radii.round,
-  },
-  invoiceChipMutedText: { color: colors.successDark, fontSize: fontSizes.sm, fontWeight: "800" },
-  invoiceInfoGrid: { flexDirection: "row", gap: spacing.sm },
-  invoiceInfoCard: {
-    flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: "rgba(22,101,52,0.14)",
-    padding: spacing.md,
-    gap: 4,
-  },
-  invoiceInfoTitle: { fontSize: 11, fontWeight: "900", color: colors.successDark, letterSpacing: 0.5 },
-  invoiceInfoMain: { fontSize: fontSizes.md, fontWeight: "900", color: colors.text },
-  invoiceInfoSub: { fontSize: fontSizes.xs, fontWeight: "700", color: colors.textMuted },
-  invoiceOdoRow: { flexDirection: "row", justifyContent: "space-between", marginTop: spacing.sm },
-  invoiceOdoCol: { gap: 2 },
-  invoiceOdoLabel: { fontSize: 10, fontWeight: "900", color: colors.textMuted, letterSpacing: 0.4 },
-  invoiceOdoValue: { fontSize: fontSizes.sm, fontWeight: "900", color: colors.text },
-  invoiceOdoDue: { color: colors.warning },
-  invoiceSection: {
-    backgroundColor: colors.white,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: "rgba(22,101,52,0.14)",
-    overflow: "hidden",
-  },
-  invoiceSectionTitle: {
-    padding: spacing.md,
-    paddingBottom: spacing.sm,
-    fontSize: fontSizes.sm,
-    fontWeight: "900",
-    color: colors.textMuted,
-  },
-  invoiceTableHead: {
-    flexDirection: "row",
-    backgroundColor: colors.successDark,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  invoiceThLeft: { flex: 1, color: colors.white, fontSize: fontSizes.sm, fontWeight: "900" },
-  invoiceThRight: { width: 110, textAlign: "right", color: colors.white, fontSize: fontSizes.sm, fontWeight: "900" },
-  invoiceTableBody: { padding: spacing.md, gap: spacing.sm },
-  invoiceHint: { fontSize: fontSizes.xs, color: colors.textMuted, fontWeight: "700" },
-  invoiceLine: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
-  invoiceLineLeft: { flex: 1, minWidth: 0, gap: 2 },
-  invoiceLineName: { fontSize: fontSizes.sm, fontWeight: "900", color: colors.text },
-  invoiceLineDesc: { fontSize: fontSizes.xs, fontWeight: "700", color: colors.textMuted },
-  invoiceLineAmt: { width: 110, textAlign: "right", fontSize: fontSizes.sm, fontWeight: "900", color: colors.text },
-  invoiceTotals: {
-    backgroundColor: colors.successMuted,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: "rgba(22,101,52,0.18)",
-    padding: spacing.md,
-  },
-  invoiceTotalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  invoiceTotalStrongLabel: { color: colors.successDark, fontSize: fontSizes.md, fontWeight: "900" },
-  invoiceTotalStrongValue: { color: colors.successDark, fontSize: fontSizes.lg, fontWeight: "900" },
   invoiceFooter: {
     gap: spacing.sm,
     paddingHorizontal: spacing.md,

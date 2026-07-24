@@ -122,14 +122,15 @@ function jobCardServiceName(
 }
 
 export function serviceTypeLabel(jc: CarOwnerJobCard): string {
-  const fromServices = jc.services
-    ?.map((s) => {
+  const fromServices = (jc.services ?? [])
+    .map((s) => {
       const name = jobCardServiceName(s.service);
       if (name) return name;
-      return "";
+      const category = (s as { category?: unknown }).category;
+      return typeof category === "string" ? category.trim() : "";
     })
     .filter((name): name is string => Boolean(name));
-  if (fromServices?.length) {
+  if (fromServices.length) {
     return [...new Set(fromServices)].join(", ");
   }
   const direct = jc.serviceType?.trim();

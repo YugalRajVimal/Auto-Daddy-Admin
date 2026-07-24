@@ -5,6 +5,13 @@ export type CarOwnerJobCardBusiness = {
   cityName?: string;
   businessPhone?: string;
   phone?: string;
+  address?: string;
+  businessAddress?: string;
+  pincode?: string;
+  businessLogo?: string;
+  businessHSTNumber?: string;
+  gst?: number;
+  gstPercent?: number;
 };
 
 export type CarOwnerJobCardCustomer = {
