@@ -68,7 +68,9 @@ export function useMyDeals(
     setLoading(true);
     try {
       const res = await fetchAutoshopMyDeals(token);
+      
       if (!res.ok) {
+        console.log(res.data);
         const msg =
           res.data && typeof res.data === "object" && "message" in res.data
             ? String((res.data as { message?: string }).message ?? "")

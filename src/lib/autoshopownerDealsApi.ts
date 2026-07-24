@@ -17,6 +17,7 @@ export type AutoshopDealFormFields = {
   dealImage?: File | null;
   serviceId?: string;
   productName?: string;
+  subServiceName?: string; // Added field
   partName?: string;
   vehicleId?: string;
   vehicleName?: string;

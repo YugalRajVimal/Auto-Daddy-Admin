@@ -92,7 +92,11 @@ function shopDealTitle(deal: ShopDeal): string {
 }
 
 function shopDealDiscountLabel(deal: ShopDeal): string {
-  const discounted = Number(deal.discountedPrice);
+  const discounted = dealMode(deal) === "service"
+    ? Number(deal.discountPercentage)
+    : Number(deal.discountedPrice);
+
+    console.log(discounted);
   // Spare-part / salvage deals store the price after discount (not a percent).
   if (dealMode(deal) === "parts") {
     if (!Number.isFinite(discounted) || discounted <= 0) return "—";
@@ -308,6 +312,7 @@ function DealsListTable({
   const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
 
   useEffect(() => {
+
     if (selectAllRef.current) {
       selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
     }

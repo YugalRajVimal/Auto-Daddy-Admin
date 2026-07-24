@@ -137,19 +137,24 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
     setAttachDealImage(Boolean(deal?.dealImage ?? deal?.productImage));
     setDealImage(null);
     if (mode === "service" && deal) {
-      const discounted = Number(deal.discountedPrice);
-      const original = Number(deal.price);
-      if (
-        Number.isFinite(original) &&
-        original > 0 &&
-        Number.isFinite(discounted) &&
-        discounted > 0 &&
-        discounted < original
-      ) {
-        setDiscountedPrice(String(Math.round((1 - discounted / original) * 100)));
+      if (deal.discountPercentage != null) {
+        setDiscountedPrice(String(deal.discountPercentage));
       } else {
-        setDiscountedPrice(deal.discountedPrice != null ? String(deal.discountedPrice) : "");
+        const discounted = Number(deal.discountedPrice);
+        const original = Number(deal.price);
+        if (
+          Number.isFinite(original) &&
+          original > 0 &&
+          Number.isFinite(discounted) &&
+          discounted > 0 &&
+          discounted < original
+        ) {
+          setDiscountedPrice(String(Math.round((1 - discounted / original) * 100)));
+        } else {
+          setDiscountedPrice(deal.discountedPrice != null ? String(deal.discountedPrice) : "");
+        }
       }
+ 
     } else {
       setDiscountedPrice(deal?.discountedPrice != null ? String(deal.discountedPrice) : "");
     }
@@ -255,7 +260,9 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
       }
       fields.serviceId = selectedServiceOption.serviceId;
       fields.productName = selectedServiceOption.subName;
+      fields.subServiceName = selectedServiceOption.subName; // add subServiceName as required
     }
+    console.log(fields);
     setSaving(true);
     try {
       const id = deal ? dealId(deal) : "";
@@ -324,9 +331,24 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
               placeholder="e.g. 20"
               inputMode="decimal"
               value={discountedPrice}
-              onChange={(e) => setDiscountedPrice(e.target.value)}
+              max={100}
+              min={0}
+              onChange={(e) => {
+                let v = e.target.value.replace(/[^0-9.]/g, "");
+                let nextValue: string = v;
+                if (v) {
+                  const n = parseFloat(v);
+                  if (isNaN(n)) nextValue = "";
+                  else if (n > 100) nextValue = "100";
+                  else if (n < 0) nextValue = "0";
+                  else nextValue = n.toString();
+                }
+                setDiscountedPrice(nextValue);
+              }}
               disabled={saving}
             />
+      
+      
           </CompactField>
           <CompactField label="Offer ends on" required className={dealFormDateClass}>
             <ShopDatePicker

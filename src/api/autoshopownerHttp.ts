@@ -42,6 +42,8 @@ export async function getJsonAutoshopowner<T>(path: string, token: string) {
     headers: authHeader(token),
   });
   const data = (await res.json().catch(() => null)) as T | null;
+  console.log(data);
+
   const out = { ok: res.ok, status: res.status, data };
   debugLog("GET", url, null, out);
   return out;

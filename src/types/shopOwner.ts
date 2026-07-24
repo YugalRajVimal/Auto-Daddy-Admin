@@ -48,6 +48,7 @@ export type ShopDeal = {
   description?: string;
   price?: number | string;
   discountedPrice?: number | string;
+  discountPercentage?:number | string;
   dealEnabled?: boolean;
   offersEndOnDate?: string;
   createdAt?: string;
