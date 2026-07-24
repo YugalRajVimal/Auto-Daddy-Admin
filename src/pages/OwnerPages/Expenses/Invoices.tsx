@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { FiChevronLeft, FiCreditCard, FiFileText } from "react-icons/fi";
+import { FiChevronLeft, FiFileText } from "react-icons/fi";
 import { toast } from "react-toastify";
 import {
   InvoiceViewerDialog,
@@ -84,33 +84,6 @@ function EmptyState({ children }: { children: ReactNode }) {
   );
 }
 
-function ToolbarButton({
-  children,
-  onClick,
-  disabled,
-  variant = "muted",
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  variant?: "muted" | "primary";
-}) {
-  const styles =
-    variant === "primary"
-      ? "bg-gradient-to-br from-ad-purple to-ad-purple-dark text-white shadow-[0_6px_14px_rgba(155,48,141,0.22)] hover:brightness-105"
-      : "bg-slate-600 text-white hover:bg-slate-700";
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition disabled:opacity-40 ${styles}`}
-    >
-      {children}
-    </button>
-  );
-}
-
 export default function OwnerInvoicesPage() {
   const countryCode = "+1";
   const { token } = useAuth();
@@ -173,17 +146,6 @@ export default function OwnerInvoicesPage() {
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState<"Partial" | "Full">("Partial");
   const [paymentNote, setPaymentNote] = useState("");
-
-  const enterPayment = (row?: CarOwnerInvoiceRow | null) => {
-    const target = row ?? paymentRow;
-    if (!target) return;
-    setSelectedIds([target.id]);
-    setPaymentAmount(String(target.amount ?? ""));
-    setPaymentDate(new Date().toISOString().slice(0, 10));
-    setPaymentMethod("Partial");
-    setPaymentNote("");
-    setView("payment");
-  };
 
   const cancelPayment = () => {
     setView("list");
@@ -332,17 +294,6 @@ export default function OwnerInvoicesPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {/* <div className="flex flex-wrap items-center gap-2">
-              <ToolbarButton
-                variant="primary"
-                disabled={selectedIds.length !== 1}
-                onClick={() => enterPayment()}
-              >
-                <FiCreditCard size={13} aria-hidden />
-                Enter Payment
-              </ToolbarButton>
-            </div> */}
-
             <div className={OWNER_TABLE_SURFACE_CLASS}>
               <div className="overflow-x-auto">
                 <table className={OWNER_PANEL_TABLE.table}>
