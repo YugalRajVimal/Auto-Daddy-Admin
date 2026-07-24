@@ -30,7 +30,7 @@ import {
   removeDealSale,
   writeDealSale,
 } from "../../lib/shopDealSales";
-import { dealId, isSalvagesDeal } from "../../lib/shopOwnerParsers";
+import { dealId, isSalvagesDeal, shopDealDiscountLabel } from "../../lib/shopOwnerParsers";
 import type { MyCustomer, ShopDeal } from "../../types/shopOwner";
 import { printAdminTable } from "../../utils/adminPrintTable";
 import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
@@ -88,27 +88,13 @@ function shopDealTitle(deal: ShopDeal): string {
   if (dealMode(deal) === "parts") {
     return deal.partName?.trim() || deal.productName?.trim() || "—";
   }
-  return deal.productName?.trim() || deal.service?.name?.trim() || deal.description?.trim() || "—";
-}
-
-function shopDealDiscountLabel(deal: ShopDeal): string {
-  const discounted = dealMode(deal) === "service"
-    ? Number(deal.discountPercentage)
-    : Number(deal.discountedPrice);
-
-    console.log(discounted);
-  // Spare-part / salvage deals store the price after discount (not a percent).
-  if (dealMode(deal) === "parts") {
-    if (!Number.isFinite(discounted) || discounted <= 0) return "—";
-    return String(discounted);
-  }
-  // Service deals store discount as a percent in discountedPrice.
-  const price = Number(deal.price);
-  if (Number.isFinite(price) && price > 0 && Number.isFinite(discounted) && discounted > 0 && discounted < price) {
-    return `${Math.round((1 - discounted / price) * 100)}%`;
-  }
-  if (!Number.isFinite(discounted) || discounted <= 0) return "—";
-  return `${discounted}%`;
+  return (
+    deal.subServiceName?.trim() ||
+    deal.productName?.trim() ||
+    deal.description?.trim() ||
+    deal.service?.name?.trim() ||
+    "—"
+  );
 }
 
 function dealStatusLabel(deal: ShopDeal): string {
@@ -183,8 +169,25 @@ function dealToFormFields(deal: ShopDeal, overrides?: Partial<AutoshopDealFormFi
       deal.price != null ? String(deal.price) : fields.discountedPrice;
   } else {
     fields.serviceId = deal.serviceId ?? deal.service?.id;
-    fields.productName = deal.productName ?? deal.service?.name;
+    fields.productName = deal.subServiceName ?? deal.productName ?? deal.service?.name;
+    fields.subServiceName = deal.subServiceName ?? deal.productName;
     if (deal.price != null) fields.originalPrice = String(deal.price);
+    // Service API expects discountedPrice as a percent (or discountPercentage on read).
+    if (deal.discountPercentage != null && String(deal.discountPercentage).trim() !== "") {
+      fields.discountedPrice = String(deal.discountPercentage);
+    } else {
+      const original = Number(deal.price);
+      const discounted = Number(deal.discountedPrice);
+      if (
+        Number.isFinite(original) &&
+        original > 0 &&
+        Number.isFinite(discounted) &&
+        discounted >= 0 &&
+        discounted < original
+      ) {
+        fields.discountedPrice = String(Math.round((1 - discounted / original) * 100));
+      }
+    }
   }
   return fields;
 }

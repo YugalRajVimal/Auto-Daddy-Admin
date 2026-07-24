@@ -47,10 +47,11 @@ export function AssociateTabBar() {
   const insets = useSafeAreaInsets();
   const active = resolveActiveTab(pathname, segments);
 
+  // Fake tabs must replace, not push — otherwise Home ↔ tab screens loop on Android back.
   const toHome = useOncePress(() => router.replace(`${BASE}/(tabs)/home` as never));
-  const toBrochure = useOncePress(() => router.push(`${BASE}/brochure` as never));
-  const toProfile = useOncePress(() => router.push(`${BASE}/profile` as never));
-  const toWebsite = useOncePress(() => router.push(`${BASE}/website` as never));
+  const toBrochure = useOncePress(() => router.replace(`${BASE}/brochure` as never));
+  const toProfile = useOncePress(() => router.replace(`${BASE}/profile` as never));
+  const toWebsite = useOncePress(() => router.replace(`${BASE}/website` as never));
 
   return (
     <View

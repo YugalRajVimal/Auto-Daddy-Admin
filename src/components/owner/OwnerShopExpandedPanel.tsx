@@ -161,6 +161,7 @@ export default function OwnerShopExpandedPanel({
   const directions = mapsUrl(shop);
   const website = websiteUrl(shop);
   const hoursText = shop.openHoursText?.trim() || shop.timing || "Hours not listed";
+  const todayHours = shop.todayHoursText?.trim() || "";
   // Address already includes city when present — avoid "City, City".
   const addressLine = shop.address.trim() || shop.city.trim() || "Address not available";
   const email = shop.email?.trim() ?? "";
@@ -203,6 +204,11 @@ export default function OwnerShopExpandedPanel({
           >
             {openToday ? "Open" : "Closed"}
           </span>
+          {todayHours ? (
+            <span className="max-w-[10rem] text-right text-[11px] font-medium text-slate-500">
+              {todayHours}
+            </span>
+          ) : null}
           <div className="flex items-center gap-2">
             <CompactStarRating rating={localRating} busy={ratingBusy} onRate={(v) => void handleRate(v)} />
             {onToggleFavorite ? (
@@ -259,7 +265,10 @@ export default function OwnerShopExpandedPanel({
               </button>
               {hoursOpen ? (
                 <div className="mt-2 rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-xs leading-relaxed text-slate-600">
-                  <p>{hoursText}</p>
+                  {todayHours ? (
+                    <p className="font-semibold text-slate-800">Today: {todayHours}</p>
+                  ) : null}
+                  <p className={todayHours ? "mt-1" : undefined}>{hoursText}</p>
                   {shop.openDaysText ? <p className="mt-1 text-emerald-700">Open: {shop.openDaysText}</p> : null}
                   {shop.closedScheduleText ? (
                     <p className="mt-1 text-slate-500">Closed: {shop.closedScheduleText}</p>

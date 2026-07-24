@@ -1,6 +1,7 @@
 import { Screen, useToast } from "@/components/reusables";
 import { colors, fontSizes, spacing, stackHeaderKeyboardOffset } from "@/constants/autodaddy";
 import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
+import { navigateToAppHome } from "@/lib/shop-owner-navigation";
 import { Ionicons } from "@expo/vector-icons";
 import { DrawerActions, useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
@@ -65,7 +66,7 @@ export function CarOwnerStackScreenFrame({
       router.back();
       return;
     }
-    router.replace((resolvedBackTo ?? "/(car-owner)/(tabs)/home") as never);
+    navigateToAppHome(resolvedBackTo ?? "/(car-owner)/(tabs)/home");
   }, [navigation, onBack, resolvedBackTo]);
 
   useFocusEffect(

@@ -8,6 +8,7 @@ import {
   parseAutoshopJobCardPageDetails,
   updateAutoshopJobCard,
   type AutoshopJobCardServiceInput,
+  type AutoshopPageDetailsServiceDeal,
   type CreateAutoshopJobCardInput,
   type JobCardFormCustomer,
 } from "./autoshopownerJobCardsApi";
@@ -16,6 +17,7 @@ import { MAX_JOB_CARD_VEHICLE_PHOTOS } from "./shopOwnerMutations";
 
 export { MAX_JOB_CARD_VEHICLE_PHOTOS };
 export type { JobCardFormCustomer };
+export type { AutoshopPageDetailsServiceDeal };
 
 export type SaveJobCardInput = {
   jobCardId?: string;
@@ -91,6 +93,15 @@ function legacyBlocksToAutoshopServices(
       if (subRequiresOdoOut(cat, subName) || odoOutReading > 0) {
         item.odoOutReading = odoOutReading;
       }
+      const discountPercentage = parseNumber(ss.discountPercentage);
+      const dealId = String(ss.dealId ?? "").trim();
+      if (dealId && discountPercentage > 0) {
+        const amountBeforeDiscount =
+          parseNumber(ss.amountBeforeDiscount) || unitCost * qty;
+        item.discountPercentage = discountPercentage;
+        item.amountBeforeDiscount = amountBeforeDiscount;
+        item.dealId = dealId;
+      }
       out.push(item);
     }
   }
@@ -115,6 +126,15 @@ function flatServicesToAutoshopServices(services: unknown[]): AutoshopJobCardSer
     };
     const odo = parseNumber(s.odoOutReading);
     if (odo > 0) item.odoOutReading = odo;
+    const discountPercentage = parseNumber(s.discountPercentage);
+    const dealId = String(s.dealId ?? "").trim();
+    if (dealId && discountPercentage > 0) {
+      const amountBeforeDiscount =
+        parseNumber(s.amountBeforeDiscount) || unitCost * qty;
+      item.discountPercentage = discountPercentage;
+      item.amountBeforeDiscount = amountBeforeDiscount;
+      item.dealId = dealId;
+    }
     out.push(item);
   }
   return out;
@@ -164,6 +184,7 @@ export async function fetchJobCardFormData(token: string) {
     myCustomers: parsed.myCustomers.filter((c) => c._id),
     myServices: pageDetailsSubServicesToCategories(parsed.myAllSubServices),
     myBanks: parsed.myAllBanks,
+    serviceDeals: parsed.serviceDeals,
     nextJobCardNo: parsed.nextJobCardNo,
     nextJobCardNumber: parsed.nextJobCardNumber,
     nextJobCard: parsed.nextJobCard,
@@ -305,6 +326,9 @@ export function normalizeJobCardServiceBlocks(job: Record<string, unknown>): unk
       dueOdometerReading: s.odoOutReading ?? s.dueOdometerReading ?? s.odoOut,
       odoOut: s.odoOutReading ?? s.odoOut,
       odoOutReading: s.odoOutReading,
+      discountPercentage: s.discountPercentage,
+      amountBeforeDiscount: s.amountBeforeDiscount,
+      dealId: s.dealId,
     });
     byService.set(serviceId, bucket);
   }

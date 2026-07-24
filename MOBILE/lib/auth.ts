@@ -20,7 +20,6 @@ export const AUTH_DASHBOARD_DETAILS_KEY = "autoShopDashboardDetails";
 export type PostAuthRoute =
   | "/(shop-owner)/(tabs)/home"
   | "/(shop-owner)/profile"
-  | "/(shop-owner)/businessprofile"
   | "/(car-owner)/(tabs)/home"
   | "/(car-owner)/profile"
   | "/(associate)/(tabs)/home";
@@ -72,11 +71,9 @@ export function getPostAuthRoute(
   const role = (meta.role ?? "").toLowerCase();
 
   if (role === "autoshopowner") {
-    // Only force completion flows when we *know* it's incomplete.
+    // Match web shop portal: incomplete business profile does not block the app.
+    // Owners edit it anytime under Profile. Still force personal profile when known incomplete.
     // On cold start meta flags can be null briefly; don't trap users in profile screens.
-    if (meta.isAutoShopBusinessProfileComplete === false) {
-      return "/(shop-owner)/businessprofile";
-    }
     if (meta.isProfileComplete === false) {
       return "/(shop-owner)/profile";
     }

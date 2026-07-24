@@ -1,5 +1,5 @@
 import { AssociatePlaceholderScreen } from "@/components/associate";
-import { router } from "expo-router";
+import { navigateToAppHome } from "@/lib/shop-owner-navigation";
 
 export default function AssociateWalletPage() {
   return (
@@ -8,7 +8,7 @@ export default function AssociateWalletPage() {
       subtitle="Collections and wallet — coming soon"
       showTabBar={false}
       leadingMode="back"
-      onBackPress={() => router.replace("/(associate)/(tabs)/home")}
+      onBackPress={() => navigateToAppHome("/(associate)/(tabs)/home")}
     />
   );
 }

@@ -16,6 +16,14 @@ export type CarOwnerAutoShopListItem = {
   openHoursText: string;
   openDaysText: string;
   closedScheduleText: string;
+  /** Today's hours label, e.g. "9.00 Am - 6.00 Pm" or "Closed today". */
+  todayHoursText: string;
+  /** True when today's currentWeekTimings row (or weekday schedule) is closed. */
+  isClosedToday: boolean;
+  /** Today's open time from API (`HH:mm`), null when closed or not provided. */
+  todayOpen: string | null;
+  /** Today's close time from API (`HH:mm`), null when closed or not provided. */
+  todayClose: string | null;
   mainServices: string[];
   mainServiceItems: { id: string; name: string }[];
   subServices: string[];

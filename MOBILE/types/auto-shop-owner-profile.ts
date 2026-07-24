@@ -81,6 +81,8 @@ export interface AutoShopOwnerUserProfile {
   phone: string;
   pincode: string;
   address: string;
+  city?: string;
+  profilePhoto?: string | null;
   isProfileComplete: boolean;
   status: string;
   isDisabled: boolean;

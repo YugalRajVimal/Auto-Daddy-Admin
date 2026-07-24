@@ -47,20 +47,21 @@ export function MainTabBar() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const active = resolveActiveTab(pathname, segments);
+  // Fake tabs must replace, not push — otherwise Home ↔ Deals/Profile loops on Android back.
   const toHome = useOncePress(() => {
     router.replace(`${base}/(tabs)/home` as any);
   });
   const toDeals = useOncePress(() => {
-    router.push(`${base}/deals` as any);
+    router.replace(`${base}/deals` as any);
   });
   const toProfile = useOncePress(() => {
-    router.push(`${base}/profile` as any);
+    router.replace(`${base}/profile` as any);
   });
   const toWebsite = useOncePress(() => {
-    router.push(`${base}/website` as any);
+    router.replace(`${base}/website` as any);
   });
   const toInviteHelp = useOncePress(() => {
-    router.push(`${base}/invite-help` as any);
+    router.replace(`${base}/invite-help` as any);
   });
 
   const TABS: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [

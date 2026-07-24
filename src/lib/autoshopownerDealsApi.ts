@@ -69,6 +69,7 @@ function buildAutoshopDealFormData(fields: AutoshopDealFormFields) {
   if (dealType === "Service") {
     appendText(fd, "serviceId", fields.serviceId);
     appendText(fd, "productName", fields.productName);
+    appendText(fd, "subServiceName", fields.subServiceName ?? fields.productName);
   } else {
     appendText(fd, "partName", fields.partName);
     appendText(fd, "vehicleId", fields.vehicleId);

@@ -57,3 +57,16 @@ export function shopOwnerShopTypeLabel(value?: string | null): string {
       return "Auto Shop";
   }
 }
+
+export const SHOP_OWNER_SHOP_TYPE_OPTIONS: { value: ShopOwnerShopType; label: string }[] = [
+  { value: "autoShop", label: "Auto Shop" },
+  { value: "tyreShop", label: "Tyre Shop" },
+  { value: "carWash", label: "Car Wash" },
+  { value: "towTruck", label: "Tow Truck" },
+];
+
+export function shopOwnerShopTypeLabels(value?: string | string[] | null): string {
+  const types = normalizeShopOwnerShopTypes(value);
+  if (types.length === 0) return "Not provided";
+  return types.map((type) => shopOwnerShopTypeLabel(type)).join(", ");
+}

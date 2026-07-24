@@ -11,6 +11,7 @@ import { MainTabBar, MAIN_TAB_BAR_OFFSET } from "@/components/layout/main-tab-ba
 import { colors, fontSizes, shadows, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import { useShopOwnerNotifications } from "@/context/shop-owner-notifications-provider";
+import { useAndroidExitOnBack } from "@/hooks/use-android-exit-on-back";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import { getAutoShopOwnerProfile, getDashboardDetails, saveDashboardDetails } from "@/lib/auth";
 import { fetchShopOwnerHome } from "@/lib/autoshopowner-api";
@@ -73,6 +74,7 @@ function mergeHomeIntoDashboardCache(
 
 export default function HomePage() {
   const { meta, refreshSession, token } = useAuth();
+  useAndroidExitOnBack();
   const { hasUnread, syncUnreadFromApi } = useShopOwnerNotifications();
   const { showToast } = useToast();
   const [serverData, setServerData] =

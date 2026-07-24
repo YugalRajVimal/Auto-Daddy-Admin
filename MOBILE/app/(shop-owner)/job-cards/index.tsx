@@ -1,5 +1,5 @@
-import { ManageEstimatesModal } from "@/components/job-cards";
-import { Fab, LoadingProgress, StackScreenFrame, SurfaceCard, useToast } from "@/components/reusables";
+import { ManageEstimatesModal, ShopJobCardEstimateView, type JobCardActionPreview } from "@/components/job-cards";
+import { Fab, StackScreenFrame, SurfaceCard, useToast } from "@/components/reusables";
 import { cardFontSizes, cardTypography, colors, fontSizes, radii, shadows, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import { useJobCardPage, type JobCardListSection } from "@/hooks/use-job-card-page";
@@ -11,7 +11,6 @@ import {
   fetchAutoshopJobCardPrefix,
   parseAutoshopJobCardPrefix,
   sendAutoshopJobCardForApproval,
-  updateAutoshopJobCardStatus,
 } from "@/lib/autoshopowner-job-cards-api";
 import { fetchJobCardRecord } from "@/lib/shop-owner-job-cards-api";
 import {
@@ -22,12 +21,9 @@ import {
   pickJobCardNoForApi,
   type JobCardListRow,
 } from "@/lib/shop-owner-job-cards";
-import { formatCurrencyAmount, getCurrencySign } from "@/lib/currency";
-import { normalizeMediaUrl } from "@/lib/normalize-media-url";
+import { formatCurrencyAmount } from "@/lib/currency";
 import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
-import { isOnlineInvoicePayment } from "@/lib/wallet-helpers";
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -271,50 +267,6 @@ function extractNotes(raw: Record<string, unknown> | null): string {
   );
 }
 
-function formatJobCardStatus(status: string | undefined): string {
-  const t = (status ?? "").trim();
-  if (!t) return "—";
-  if (t === "AutoRejected") return "Auto Rejected";
-  return t;
-}
-
-function formatOdometer(value: unknown): string {
-  if (value == null || value === "") return "—";
-  return s(value) || "—";
-}
-
-function extractJobCardPhotoUris(raw: Record<string, unknown> | null): string[] {
-  if (!raw) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const key of ["vehiclePhotos", "images"]) {
-    const list = raw[key];
-    if (!Array.isArray(list)) continue;
-    for (const item of list) {
-      const path = s(item);
-      if (!path || seen.has(path)) continue;
-      seen.add(path);
-      const uri = normalizeMediaUrl(path);
-      if (uri) out.push(uri);
-    }
-  }
-  return out;
-}
-
-function sumServicePrices(servicesArr: unknown[]): number {
-  let total = 0;
-  for (const svc of servicesArr) {
-    const svcObj = obj(svc);
-    const subs = Array.isArray(svcObj?.subServices) ? (svcObj.subServices as unknown[]) : [];
-    for (const sub of subs) {
-      const subObj = obj(sub);
-      const n = num(subObj?.price);
-      if (n != null) total += n;
-    }
-  }
-  return total;
-}
-
 function pickCustomerCity(raw: Record<string, unknown> | null): string {
   const customer =
     getNested(raw, "customerId") ?? getNested(raw, "customer") ?? getNested(raw, "carOwner");
@@ -381,9 +333,7 @@ function matchesJobCardSearch(row: JobCardListRow, query: string): boolean {
 type JobCardViewerState = {
   open: boolean;
   row: JobCardListRow | null;
-  loading: boolean;
-  payload: unknown | null;
-  error: string | null;
+  actionPreview: JobCardActionPreview | null;
 };
 
 function s(v: unknown): string {
@@ -671,9 +621,7 @@ export default function JobCardsPage() {
   const [jobCardViewer, setJobCardViewer] = useState<JobCardViewerState>({
     open: false,
     row: null,
-    loading: false,
-    payload: null,
-    error: null,
+    actionPreview: null,
   });
 
   const keyboardBottom = useKeyboardBottomInset();
@@ -681,10 +629,13 @@ export default function JobCardsPage() {
   const closeJobCardViewer = useCallback(() => {
     if (keyboardOpen) {
       Keyboard.dismiss();
-      setTimeout(() => setJobCardViewer((prev) => ({ ...prev, open: false })), 80);
+      setTimeout(
+        () => setJobCardViewer({ open: false, row: null, actionPreview: null }),
+        80,
+      );
       return;
     }
-    setJobCardViewer((prev) => ({ ...prev, open: false }));
+    setJobCardViewer({ open: false, row: null, actionPreview: null });
   }, [keyboardOpen]);
 
   const dismissMenu = useCallback(() => {
@@ -916,26 +867,29 @@ export default function JobCardsPage() {
       return;
     }
     // Android can fail to show a second Modal if we open it while the menu Modal is still visible.
-    // Close menu first, then open the viewer on the next tick.
     dismissMenuRef.current();
     await new Promise<void>((r) => setTimeout(r, 50));
+    setJobCardViewer({ open: true, row, actionPreview: null });
+  });
 
-    setJobCardViewer({ open: true, row, loading: true, payload: null, error: null });
-
-    try {
-      const { record } = await fetchJobCardRecord(token, row.id, { jobCardNo: row.jobNo });
-      setJobCardViewer({ open: true, row, loading: false, payload: record, error: null });
-    } catch {
-      if (row.raw) {
-        setJobCardViewer({ open: true, row, loading: false, payload: row.raw, error: null });
-      } else {
-        setJobCardViewer({ open: true, row, loading: false, payload: null, error: "Could not load job card." });
-      }
+  const openJobCardEditorFromPreview = useOncePress((row: JobCardListRow) => {
+    if (!isJobCardEditable(row)) {
+      showToast("This job card can no longer be edited.", { type: "info" });
+      return;
     }
+    closeJobCardViewer();
+    router.push({
+      pathname: "/(shop-owner)/job-cards/add",
+      params: {
+        mode: "edit",
+        jobCard: encodeURIComponent(JSON.stringify(row.raw)),
+        backTo: "/(shop-owner)/job-cards",
+      },
+    });
   });
 
   const convertToInvoice = useCallback(
-    (row: JobCardListRow) => {
+    async (row: JobCardListRow) => {
       if (!token) {
         showToast("Sign in to convert job card.");
         return;
@@ -944,41 +898,15 @@ export default function JobCardsPage() {
         showToast("This job card is not eligible for invoice conversion.", { type: "info" });
         return;
       }
-      dismissMenu();
-      Alert.alert(
-        "Convert to invoice?",
-        `Convert ${displayJobId(row.jobNo, jobCardPrefix)} to an invoice?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Convert",
-            onPress: () => {
-              void (async () => {
-                const jobCardNo = pickJobCardNoForApi(row);
-                if (!jobCardNo) {
-                  showToast("Missing job card number.");
-                  return;
-                }
-                const res = await updateAutoshopJobCardStatus(token, jobCardNo, "convertedToInvoice");
-                const msg = apiMessageFromEnvelope(res.data) ?? "";
-                if (!res.ok) {
-                  showToast(msg || "Could not convert to invoice.");
-                  return;
-                }
-                showToast(msg || "Converted to invoice.");
-                setExpandedId(null);
-                void load();
-              })();
-            },
-          },
-        ]
-      );
+      dismissMenuRef.current();
+      await new Promise<void>((r) => setTimeout(r, 50));
+      setJobCardViewer({ open: true, row, actionPreview: "invoice" });
     },
-    [dismissMenu, jobCardPrefix, load, showToast, token]
+    [showToast, token],
   );
 
   const markPaidByCash = useCallback(
-    (row: JobCardListRow) => {
+    async (row: JobCardListRow) => {
       if (!token) {
         showToast("Sign in to update payment.");
         return;
@@ -987,37 +915,11 @@ export default function JobCardsPage() {
         showToast("This job card is not eligible for cash payment.", { type: "info" });
         return;
       }
-      dismissMenu();
-      Alert.alert(
-        "Paid by cash?",
-        `Mark ${displayJobId(row.jobNo, jobCardPrefix)} as paid by cash?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Mark paid",
-            onPress: () => {
-              void (async () => {
-                const jobCardNo = pickJobCardNoForApi(row);
-                if (!jobCardNo) {
-                  showToast("Missing job card number.");
-                  return;
-                }
-                const res = await updateAutoshopJobCardStatus(token, jobCardNo, "CashPaid");
-                const msg = apiMessageFromEnvelope(res.data) ?? "";
-                if (!res.ok) {
-                  showToast(msg || "Could not mark as paid.");
-                  return;
-                }
-                showToast(msg || "Marked as paid by cash.");
-                setExpandedId(null);
-                void load();
-              })();
-            },
-          },
-        ]
-      );
+      dismissMenuRef.current();
+      await new Promise<void>((r) => setTimeout(r, 50));
+      setJobCardViewer({ open: true, row, actionPreview: "cash" });
     },
-    [dismissMenu, jobCardPrefix, load, showToast, token]
+    [showToast, token],
   );
 
   const confirmDeleteJobCard = useCallback(
@@ -1315,7 +1217,7 @@ export default function JobCardsPage() {
                 {menuCanConvert ? (
                   <>
                     <View style={styles.optionsModalDivider} />
-                    <Pressable style={styles.optionsModalRow} onPress={() => convertToInvoice(menuRow)}>
+                    <Pressable style={styles.optionsModalRow} onPress={() => void convertToInvoice(menuRow)}>
                       <Ionicons name="document-text-outline" size={22} color={colors.primary} />
                       <Text style={styles.optionsModalRowLabel}>Convert to Invoice</Text>
                     </Pressable>
@@ -1325,7 +1227,7 @@ export default function JobCardsPage() {
                 {menuCanCashPay ? (
                   <>
                     <View style={styles.optionsModalDivider} />
-                    <Pressable style={styles.optionsModalRow} onPress={() => markPaidByCash(menuRow)}>
+                    <Pressable style={styles.optionsModalRow} onPress={() => void markPaidByCash(menuRow)}>
                       <Ionicons name="cash-outline" size={22} color={colors.primary} />
                       <Text style={styles.optionsModalRowLabel}>Paid by Cash</Text>
                     </Pressable>
@@ -1360,7 +1262,7 @@ export default function JobCardsPage() {
         />
 
         <Modal
-          visible={jobCardViewer.open}
+          visible={jobCardViewer.open && jobCardViewer.row != null}
           transparent
           animationType="fade"
           onRequestClose={closeJobCardViewer}
@@ -1368,390 +1270,30 @@ export default function JobCardsPage() {
           <View style={styles.viewerBackdrop}>
             <Pressable style={styles.viewerBackdropPress} onPress={closeJobCardViewer} />
             <View style={styles.viewerCard}>
-              <View style={styles.viewerHeader}>
-                <View style={styles.viewerHeaderLeft}>
-                  <Text style={styles.viewerTitle}>{jobCardViewer.row?.jobNo?.trim() || "Job Card"}</Text>
-                  <Text style={styles.viewerSub}>Job Card Details</Text>
-                </View>
-                <View style={styles.viewerHeaderRight}>
-                  {(() => {
-                    const raw = pickJobCardFromPayload(jobCardViewer.payload) ?? obj(jobCardViewer.row?.raw) ?? null;
-                    const status = formatJobCardStatus(
-                      s((raw as any)?.status ?? jobCardViewer.row?.status)
-                    );
-                    return status && status !== "—" ? (
-                      <View style={styles.viewerStatusPill}>
-                        <Text style={styles.viewerStatusText}>{status}</Text>
-                      </View>
-                    ) : null;
-                  })()}
-                  <Pressable hitSlop={8} onPress={closeJobCardViewer} style={styles.viewerClose}>
-                    <Ionicons name="close" size={18} color={colors.textMuted} />
-                  </Pressable>
-                </View>
-              </View>
-
-              <ScrollView
-                style={styles.viewerScroll}
-                contentContainerStyle={styles.viewerContent}
-                showsVerticalScrollIndicator={false}
-              >
-                {jobCardViewer.loading ? (
-                  <View style={styles.viewerLoading}>
-                    <LoadingProgress />
-                  </View>
-                ) : jobCardViewer.error ? (
-                  <Text style={styles.viewerError}>{jobCardViewer.error}</Text>
-                ) : (
-                  (() => {
-                    const raw =
-                      pickJobCardFromPayload(jobCardViewer.payload) ??
-                      obj(jobCardViewer.row?.raw) ??
-                      null;
-
-                    const business =
-                      getNested(raw, "business") ??
-                      getNested(raw, "businessProfile") ??
-                      getNested(raw, "shop");
-                    const customer =
-                      getNested(raw, "customerId") ??
-                      getNested(raw, "customer") ??
-                      getNested(raw, "carOwner");
-                    const vehicle =
-                      getNested(raw, "vehicleId") ??
-                      getNested(raw, "vehicle");
-                    const vehicleMake = getNested(vehicle, "make");
-                    const payable = getNested(raw, "payableAmounts");
-                    const servicesArr = Array.isArray((raw as any)?.services)
-                      ? ((raw as any).services as unknown[])
-                      : [];
-
-                    const jobNo = s((raw as any)?.jobNo ?? (raw as any)?.jobNumber ?? jobCardViewer.row?.jobNo);
-                    const invoiceNo = s((raw as any)?.invoiceNumber ?? (raw as any)?.invoiceNo ?? "");
-                    const status = formatJobCardStatus(
-                      s((raw as any)?.status ?? jobCardViewer.row?.status)
-                    );
-                    const paymentStatus = s((raw as any)?.paymentStatus ?? jobCardViewer.row?.paymentStatus);
-                    const paymentMethod = s((raw as any)?.paymentMethod ?? "");
-                    const priority = s((raw as any)?.priorityLevel ?? (raw as any)?.priority ?? "");
-                    const serviceType = s((raw as any)?.serviceType ?? (raw as any)?.type ?? "");
-                    const issue = s((raw as any)?.issueDescription ?? jobCardViewer.row?.issueDescription);
-                    const notes = extractNotes(raw);
-                    const technicalRemarks = s((raw as any)?.technicalRemarks);
-                    const photoUris = extractJobCardPhotoUris(raw);
-                    const servicesSubTotal = sumServicePrices(servicesArr);
-                    const totalPayable = s(
-                      (raw as any)?.totalPayableAmount ??
-                      (raw as any)?.totalPayable ??
-                      (raw as any)?.totalAmount ??
-                      (raw as any)?.total ??
-                      jobCardViewer.row?.total
-                    );
-
-                    const payableCash = s(payable?.cash ?? "");
-                    const payableOnline = s(payable?.online ?? "");
-                    const gstAmount = s(payable?.gstAmount ?? "");
-                    const gstRate = s(payable?.gstRate ?? "");
-                    const invoiceTotal = s(payable?.invoiceTotal ?? payable?.total ?? "");
-                    const labour = extractLabour(raw);
-                    const labourH = labour.hours;
-                    const labourC = labour.charge ?? 0;
-                    const grandTotal = (() => {
-                      const n = num(totalPayable);
-                      if (n != null && n > 0) return n;
-                      return servicesSubTotal + labourC;
-                    })();
-
-                    return (
-                      <>
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="business-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Business Information</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Name:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(business?.businessName ?? business?.name) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Address:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(business?.businessAddress ?? business?.address) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Phone:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(business?.businessPhone ?? business?.phone) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Email:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(business?.businessEmail ?? business?.email) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>GST/HST:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(business?.businessHSTNumber ?? business?.gstNumber ?? business?.gst) || "—"}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="person-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Customer Information</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Name:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(customer?.name ?? jobCardViewer.row?.customerName) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Phone:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(customer?.phone ?? jobCardViewer.row?.phone) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Email:</Text>
-                            <Text style={styles.viewerValue}>{s(customer?.email) || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Address:</Text>
-                            <Text style={styles.viewerValue}>{s(customer?.address) || "—"}</Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="car-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Vehicle Information</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>License Plate:</Text>
-                            <Text style={styles.viewerValue}>
-                              {s(
-                                vehicle?.licensePlateNo ??
-                                vehicle?.licensePlate ??
-                                jobCardViewer.row?.vehiclePlate
-                              ) || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Make:</Text>
-                            <Text style={styles.viewerValue}>
-                              {[
-                                s(vehicleMake?.name ?? vehicle?.make ?? vehicle?.vehicleName),
-                                s(vehicleMake?.model ?? vehicle?.model),
-                              ]
-                                .filter(Boolean)
-                                .join(" ") || "—"}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Current KM:</Text>
-                            <Text style={styles.viewerValue}>
-                              {formatOdometer((raw as any)?.odometerReading ?? jobCardViewer.row?.odometerCurrent)}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Due KM:</Text>
-                            <Text style={styles.viewerValue}>
-                              {formatOdometer((raw as any)?.dueOdometerReading ?? jobCardViewer.row?.odometerDue)}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="document-text-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Job Details</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Job:</Text>
-                            <Text style={styles.viewerValue}>{jobNo || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Invoice:</Text>
-                            <Text style={styles.viewerValue}>{invoiceNo || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Status:</Text>
-                            <Text style={styles.viewerValue}>{status || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Payment:</Text>
-                            <Text style={styles.viewerValue}>
-                              {(paymentStatus || "—") + (paymentMethod ? ` (${paymentMethod})` : "")}
-                            </Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Type:</Text>
-                            <Text style={styles.viewerValue}>{serviceType || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Priority:</Text>
-                            <Text style={styles.viewerValue}>{priority || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Issue:</Text>
-                            <Text style={styles.viewerValue}>{issue || "—"}</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Notes:</Text>
-                            <Text style={styles.viewerValue}>{notes || "—"}</Text>
-                          </View>
-                          {technicalRemarks ? (
-                            <View style={styles.viewerRow}>
-                              <Text style={styles.viewerLabel}>Technical:</Text>
-                              <Text style={styles.viewerValue}>{technicalRemarks}</Text>
-                            </View>
-                          ) : null}
-                        </View>
-
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="construct-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Services</Text>
-                          </View>
-                          {servicesArr.length === 0 ? (
-                            <Text style={styles.viewerHint}>—</Text>
-                          ) : (
-                            servicesArr.map((svc, i) => {
-                              const svcObj = obj(svc);
-                              const subs = Array.isArray(svcObj?.subServices)
-                                ? (svcObj?.subServices as unknown[])
-                                : [];
-                              return (
-                                <View key={`svc-${i}`} style={styles.viewerServiceBlock}>
-                                  {subs.length === 0 ? (
-                                    <Text style={styles.viewerHint}>—</Text>
-                                  ) : (
-                                    subs.map((sub, j) => {
-                                      const subObj = obj(sub);
-                                      const nm = s(subObj?.name);
-                                      const desc = s(subObj?.desc);
-                                      const price = s(subObj?.price);
-                                      const subLabour = num(subObj?.labourCharge);
-                                      return (
-                                        <View key={`sub-${i}-${j}`} style={styles.viewerServiceRow}>
-                                          <View style={styles.viewerServiceLeft}>
-                                            <Text style={styles.viewerServiceName}>{nm || "—"}</Text>
-                                            {desc ? <Text style={styles.viewerServiceDesc}>{desc}</Text> : null}
-                                            {subLabour != null && subLabour > 0 ? (
-                                              <Text style={styles.viewerServiceDesc}>
-                                                Labour:{" "}
-                                                {formatCurrencyAmount(subLabour, meta?.countryCode, { fallback: "—" })}
-                                              </Text>
-                                            ) : null}
-                                          </View>
-                                          <Text style={styles.viewerServicePrice}>
-                                            {price
-                                              ? formatCurrencyAmount(price, meta?.countryCode, { fallback: "—" })
-                                              : "—"}
-                                          </Text>
-                                        </View>
-                                      );
-                                    })
-                                  )}
-                                </View>
-                              );
-                            })
-                          )}
-                        </View>
-
-                        <View style={styles.viewerSection}>
-                          <View style={styles.viewerSectionHeader}>
-                            <Ionicons name="cash-outline" size={16} color={colors.primary} />
-                            <Text style={styles.viewerSectionTitle}>Charges and Amount</Text>
-                          </View>
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Sub Total:</Text>
-                            <Text style={styles.viewerValue}>
-                              {formatCurrencyAmount(servicesSubTotal, meta?.countryCode, { fallback: "—" })}
-                            </Text>
-                          </View>
-                          {labourH != null && labourH > 0 ? (
-                            <View style={styles.viewerRow}>
-                              <Text style={styles.viewerLabel}>Labour:</Text>
-                              <Text style={styles.viewerValue}>{`${labourH} hr`}</Text>
-                            </View>
-                          ) : null}
-                          {labourC > 0 ? (
-                            <View style={styles.viewerRow}>
-                              <Text style={styles.viewerLabel}>Labour {getCurrencySign(meta?.countryCode)}:</Text>
-                              <Text style={styles.viewerValue}>
-                                {formatCurrencyAmount(labourC, meta?.countryCode, { fallback: "—" })}
-                              </Text>
-                            </View>
-                          ) : null}
-                          <View style={styles.viewerRow}>
-                            <Text style={styles.viewerLabel}>Total:</Text>
-                            <Text style={styles.viewerValue}>
-                              {grandTotal > 0
-                                ? formatCurrencyAmount(grandTotal, meta?.countryCode, { fallback: "—" })
-                                : totalPayable
-                                  ? formatCurrencyAmount(totalPayable, meta?.countryCode, { fallback: "—" })
-                                  : "—"}
-                            </Text>
-                          </View>
-                          {invoiceTotal ? (
-                            <View style={styles.viewerHintRow}>
-                              <Text style={styles.viewerHint}>
-                                Invoice Total:{" "}
-                                {invoiceTotal
-                                  ? formatCurrencyAmount(invoiceTotal, meta?.countryCode, { fallback: "—" })
-                                  : "—"}
-                                {isOnlineInvoicePayment(paymentMethod) && (gstRate || gstAmount)
-                                  ? `  |  HST: ${gstRate ? `${gstRate}%` : "—"} (${
-                                      gstAmount
-                                        ? formatCurrencyAmount(gstAmount, meta?.countryCode, { fallback: "—" })
-                                        : "—"
-                                    })`
-                                  : ""}
-                              </Text>
-                            </View>
-                          ) : null}
-                          {payableCash || payableOnline ? (
-                            <View style={styles.viewerHintRow}>
-                              <Text style={styles.viewerHint}>
-                                Cash:{" "}
-                                {payableCash
-                                  ? formatCurrencyAmount(payableCash, meta?.countryCode, { fallback: "—" })
-                                  : "—"}{" "}
-                                | Online:{" "}
-                                {payableOnline
-                                  ? formatCurrencyAmount(payableOnline, meta?.countryCode, { fallback: "—" })
-                                  : "—"}
-                              </Text>
-                            </View>
-                          ) : null}
-                        </View>
-
-                        {photoUris.length > 0 ? (
-                          <View style={styles.viewerSection}>
-                            <View style={styles.viewerSectionHeader}>
-                              <Ionicons name="images-outline" size={16} color={colors.primary} />
-                              <Text style={styles.viewerSectionTitle}>Vehicle Photos</Text>
-                            </View>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.viewerPhotosRow}>
-                              {photoUris.map((uri) => (
-                                <Image key={uri} source={{ uri }} style={styles.viewerPhoto} contentFit="cover" />
-                              ))}
-                            </ScrollView>
-                          </View>
-                        ) : null}
-                      </>
-                    );
-                  })()
-                )}
-              </ScrollView>
+              {jobCardViewer.row ? (
+                <ShopJobCardEstimateView
+                  key={jobCardViewer.row.id}
+                  jobCardId={jobCardViewer.row.id}
+                  listRow={jobCardViewer.row}
+                  jobNoHint={jobCardViewer.row.jobNo ?? null}
+                  initialActionPreview={jobCardViewer.actionPreview}
+                  onBack={closeJobCardViewer}
+                  onEdit={() => openJobCardEditorFromPreview?.(jobCardViewer.row!)}
+                  onActionPreviewChange={(preview) =>
+                    setJobCardViewer((prev) => ({ ...prev, actionPreview: preview }))
+                  }
+                  onConverted={() => {
+                    setExpandedId(null);
+                    closeJobCardViewer();
+                    void load();
+                  }}
+                  onCashPaid={() => {
+                    setExpandedId(null);
+                    closeJobCardViewer();
+                    void load();
+                  }}
+                />
+              ) : null}
             </View>
           </View>
         </Modal>
@@ -2431,61 +1973,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...shadows.card,
   },
-  viewerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: "#1E5AAE",
-    borderBottomWidth: 0,
-  },
-  viewerHeaderLeft: { flex: 1, minWidth: 0 },
-  viewerHeaderRight: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  viewerTitle: { fontSize: fontSizes.lg, fontWeight: "900", color: colors.white },
-  viewerSub: { fontSize: fontSizes.xs, fontWeight: "700", color: "rgba(255,255,255,0.85)", marginTop: 2 },
-  viewerStatusPill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.round,
-    backgroundColor: "rgba(245,158,11,0.95)",
-  },
-  viewerStatusText: { fontSize: fontSizes.xs, fontWeight: "900", color: "#1E293B" },
-  viewerClose: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.95)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 0,
-  },
-  viewerScroll: { flex: 1 },
-  viewerContent: { padding: spacing.md, gap: spacing.sm, paddingBottom: spacing.xxl },
-  viewerLoading: { alignItems: "center", paddingVertical: spacing.lg },
-  viewerError: { color: colors.danger, fontSize: fontSizes.md, paddingVertical: spacing.lg, textAlign: "center" },
-  viewerSection: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    backgroundColor: "#F8FAFF",
-    gap: 6,
-  },
-  viewerSectionHeader: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: 4 },
-  viewerSectionTitle: { fontSize: fontSizes.sm, fontWeight: "900", color: colors.primary },
-  viewerRow: { flexDirection: "row", gap: spacing.sm },
-  viewerLabel: { width: 92, fontSize: fontSizes.sm, color: colors.textMuted, fontWeight: "700" },
-  viewerValue: { flex: 1, fontSize: fontSizes.sm, color: colors.text, fontWeight: "700" },
-  viewerHintRow: { marginTop: 4 },
-  viewerHint: { fontSize: fontSizes.xs, color: colors.textMuted, fontWeight: "700" },
-  viewerServiceBlock: { gap: 6 },
-  viewerServiceRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
-  viewerServiceLeft: { flex: 1, minWidth: 0, gap: 2 },
-  viewerServiceName: { fontSize: fontSizes.sm, fontWeight: "800", color: colors.text },
-  viewerServiceDesc: { fontSize: fontSizes.xs, fontWeight: "600", color: colors.textMuted },
-  viewerServicePrice: { fontSize: fontSizes.sm, fontWeight: "900", color: colors.primary },
-  viewerPhotosRow: { flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.xs },
-  viewerPhoto: { width: 88, height: 88, borderRadius: radii.sm, backgroundColor: colors.border },
+
 });
 

@@ -11,11 +11,12 @@ export function CarOwnerHomeTabBar() {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, spacing.md);
 
+  // Fake tabs must replace, not push — otherwise Home ↔ tab screens loop on Android back.
   function go(tab: "home" | "deals" | "documents" | "profile") {
     if (tab === "home") router.replace("/(car-owner)/(tabs)/home");
-    else if (tab === "deals") router.push("/(car-owner)/deals");
-    else if (tab === "documents") router.push("/(car-owner)/vehicle-documents");
-    else router.push("/(car-owner)/profile");
+    else if (tab === "deals") router.replace("/(car-owner)/deals");
+    else if (tab === "documents") router.replace("/(car-owner)/vehicle-documents");
+    else router.replace("/(car-owner)/profile");
   }
 
   return (

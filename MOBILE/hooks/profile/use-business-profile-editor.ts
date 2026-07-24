@@ -1,9 +1,13 @@
 import { digitsFromNationalPhoneDisplay, formatNationalPhoneDisplay } from "@/lib/national-phone-format";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
+import {
+  normalizeShopOwnerShopTypes,
+  type ShopOwnerShopType,
+} from "@/lib/shop-owner-shop-types";
 import { formatPincodeDisplay } from "@/lib/validation";
 import type { AutoShopOwnerProfileResponse } from "@/types/auto-shop-owner-profile";
 import * as ImagePicker from "expo-image-picker";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type BusinessProfile = AutoShopOwnerProfileResponse["data"]["businessProfile"] | null | undefined;
 
@@ -39,19 +43,15 @@ export function useBusinessProfileEditor(
   const [editBusinessPincode, setEditBusinessPincode] = useState("");
   const [editBusinessHstNumber, setEditBusinessHstNumber] = useState("");
   const [editBusinessGstPercent, setEditBusinessGstPercent] = useState("");
-  const [editBusinessLat, setEditBusinessLat] = useState("");
-  const [editBusinessLng, setEditBusinessLng] = useState("");
+  const [editShopTypes, setEditShopTypes] = useState<ShopOwnerShopType[]>(["autoShop"]);
   const [editBusinessLogoUri, setEditBusinessLogoUri] = useState("");
   const [editBusinessLogoMime, setEditBusinessLogoMime] = useState<string | null>(null);
   const [editBusinessLogoFileName, setEditBusinessLogoFileName] = useState<string | null>(null);
   const [businessLogoRemoved, setBusinessLogoRemoved] = useState(false);
-  const [editBusinessBannerUri, setEditBusinessBannerUri] = useState("");
-  const [editBusinessBannerMime, setEditBusinessBannerMime] = useState<string | null>(null);
-  const [editBusinessBannerFileName, setEditBusinessBannerFileName] = useState<string | null>(null);
-  const [businessBannerRemoved, setBusinessBannerRemoved] = useState(false);
 
-  function applyBusinessProfileDraft(profile: BusinessProfile) {
+  const applyBusinessProfileDraft = useCallback((profile: BusinessProfile) => {
     const city = pickBusinessCity(profile);
+    const types = normalizeShopOwnerShopTypes(profile?.shopTypes ?? profile?.shopType ?? null);
     setEditBusinessName(profile?.businessName ?? "");
     setEditBusinessEmail(profile?.businessEmail ?? "");
     setEditBusinessPhone(
@@ -61,97 +61,61 @@ export function useBusinessProfileEditor(
     setEditBusinessCityId(city?.id ?? "");
     setEditBusinessCityName(city?.name ?? "");
     setEditBusinessPincode(formatPincodeDisplay(profile?.pincode ?? ""));
-    setEditBusinessHstNumber(profile?.businessHSTNumber ?? "");
+    setEditBusinessHstNumber((profile?.businessHSTNumber ?? "").toUpperCase());
     setEditBusinessGstPercent(
       profile?.gst != null && String(profile.gst).trim().length > 0 ? String(profile.gst) : ""
     );
-    setEditBusinessLat(String(profile?.businessMapLocation?.lat ?? ""));
-    setEditBusinessLng(String(profile?.businessMapLocation?.lng ?? ""));
+    setEditShopTypes(types.length > 0 ? types : ["autoShop"]);
     setEditBusinessLogoUri(normalizeMediaUrl(profile?.businessLogo ?? null) ?? "");
     setEditBusinessLogoMime(null);
     setEditBusinessLogoFileName(null);
     setBusinessLogoRemoved(false);
-    setEditBusinessBannerUri(normalizeMediaUrl(profile?.bannerImage ?? null) ?? "");
-    setEditBusinessBannerMime(null);
-    setEditBusinessBannerFileName(null);
-    setBusinessBannerRemoved(false);
-  }
+  }, []);
 
   useEffect(() => {
     if (isBusinessEditing) {
       return;
     }
     applyBusinessProfileDraft(businessProfile);
-  }, [businessProfile, isBusinessEditing]);
+  }, [applyBusinessProfileDraft, businessProfile, isBusinessEditing]);
 
-  function resetBusinessDrafts() {
+  const resetBusinessDrafts = useCallback(() => {
     applyBusinessProfileDraft(businessProfile);
-  }
+  }, [applyBusinessProfileDraft, businessProfile]);
 
-  function cancelBusinessEdit() {
-    resetBusinessDrafts();
+  const cancelBusinessEdit = useCallback(() => {
+    applyBusinessProfileDraft(businessProfile);
     setIsBusinessEditing(false);
-  }
+  }, [applyBusinessProfileDraft, businessProfile]);
 
-  function clearBusinessLogo() {
+  const toggleShopType = useCallback((value: ShopOwnerShopType) => {
+    setEditShopTypes((prev) => {
+      if (prev.includes(value)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((type) => type !== value);
+      }
+      return [...prev, value];
+    });
+  }, []);
+
+  const clearBusinessLogo = useCallback(() => {
     setEditBusinessLogoUri("");
     setEditBusinessLogoMime(null);
     setEditBusinessLogoFileName(null);
     setBusinessLogoRemoved(true);
-  }
+  }, []);
 
-  async function pickBusinessLogo() {
-    await pickBusinessImage({
-      aspect: [1, 1],
-      onPicked: (asset) => {
-        setEditBusinessLogoUri(asset.uri);
-        setEditBusinessLogoMime(asset.mimeType);
-        setEditBusinessLogoFileName(asset.fileName);
-        setBusinessLogoRemoved(false);
-      },
-      deniedMessage: "Please allow gallery access to select a logo.",
-    });
-  }
-
-  function clearBusinessBanner() {
-    setEditBusinessBannerUri("");
-    setEditBusinessBannerMime(null);
-    setEditBusinessBannerFileName(null);
-    setBusinessBannerRemoved(true);
-  }
-
-  async function pickBusinessBanner() {
-    await pickBusinessImage({
-      aspect: [16, 9],
-      onPicked: (asset) => {
-        setEditBusinessBannerUri(asset.uri);
-        setEditBusinessBannerMime(asset.mimeType);
-        setEditBusinessBannerFileName(asset.fileName);
-        setBusinessBannerRemoved(false);
-      },
-      deniedMessage: "Please allow gallery access to select a banner.",
-    });
-  }
-
-  async function pickBusinessImage({
-    aspect,
-    onPicked,
-    deniedMessage,
-  }: {
-    aspect: [number, number];
-    onPicked: (asset: { uri: string; mimeType: string | null; fileName: string | null }) => void;
-    deniedMessage: string;
-  }) {
+  const pickBusinessLogo = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      showErrorToast(deniedMessage);
+      showErrorToast("Please allow gallery access to select a logo.");
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
-      aspect,
+      aspect: [1, 1],
       quality: 1,
     });
 
@@ -160,12 +124,11 @@ export function useBusinessProfileEditor(
     }
 
     const picked = result.assets[0];
-    onPicked({
-      uri: picked.uri,
-      mimeType: picked.mimeType ?? null,
-      fileName: picked.fileName ?? null,
-    });
-  }
+    setEditBusinessLogoUri(picked.uri);
+    setEditBusinessLogoMime(picked.mimeType ?? null);
+    setEditBusinessLogoFileName(picked.fileName ?? null);
+    setBusinessLogoRemoved(false);
+  }, [showErrorToast]);
 
   return {
     isBusinessEditing,
@@ -188,24 +151,16 @@ export function useBusinessProfileEditor(
     setEditBusinessHstNumber,
     editBusinessGstPercent,
     setEditBusinessGstPercent,
-    editBusinessLat,
-    setEditBusinessLat,
-    editBusinessLng,
-    setEditBusinessLng,
+    editShopTypes,
+    toggleShopType,
     editBusinessLogoUri,
     setEditBusinessLogoUri,
     editBusinessLogoMime,
     editBusinessLogoFileName,
     businessLogoRemoved,
     clearBusinessLogo,
-    editBusinessBannerUri,
-    editBusinessBannerMime,
-    editBusinessBannerFileName,
-    businessBannerRemoved,
-    clearBusinessBanner,
     resetBusinessDrafts,
     cancelBusinessEdit,
     pickBusinessLogo,
-    pickBusinessBanner,
   };
 }

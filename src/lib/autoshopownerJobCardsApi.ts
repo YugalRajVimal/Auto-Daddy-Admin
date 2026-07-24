@@ -43,6 +43,11 @@ export type AutoshopJobCardServiceInput = {
   unitCost: number;
   qty: number;
   odoOutReading?: number;
+  /** Percent off when a matching service deal applies. */
+  discountPercentage?: number;
+  /** Line amount (unitCost × qty) before deal discount. */
+  amountBeforeDiscount?: number;
+  dealId?: string;
 };
 
 export type CreateAutoshopJobCardInput = {
@@ -87,6 +92,16 @@ export type AutoshopPageDetailsBank = {
   assignToInvoice?: boolean;
 };
 
+export type AutoshopPageDetailsServiceDeal = {
+  _id: string;
+  serviceId: string;
+  subServiceName?: string;
+  discountPercentage?: number;
+  offerEndsOnDate?: string;
+  dealImage?: string | null;
+  createdAt?: string;
+};
+
 export type AutoshopNextJobCard = {
   jobCardNo?: number;
   jobCardId?: string;
@@ -103,6 +118,7 @@ export type AutoshopJobCardPageDetails = {
   nextJobCard?: AutoshopNextJobCard;
   myAllSubServices: AutoshopPageDetailsSubService[];
   myAllBanks: AutoshopPageDetailsBank[];
+  serviceDeals: AutoshopPageDetailsServiceDeal[];
 };
 
 function withQuery(path: string, query: Record<string, string | undefined>) {
@@ -304,6 +320,43 @@ export function parseAutoshopJobCardPageDetails(payload: unknown): AutoshopJobCa
   const myAllBanks = Array.isArray(data.myAllBanks)
     ? (data.myAllBanks as AutoshopPageDetailsBank[])
     : [];
+  const serviceDealsRaw = Array.isArray(data.serviceDeals) ? data.serviceDeals : [];
+  const serviceDeals: AutoshopPageDetailsServiceDeal[] = [];
+  for (const raw of serviceDealsRaw) {
+    if (!raw || typeof raw !== "object") continue;
+    const o = raw as Record<string, unknown>;
+    const id = typeof o._id === "string" ? o._id.trim() : "";
+    const serviceId = typeof o.serviceId === "string" ? o.serviceId.trim() : "";
+    if (!id || !serviceId) continue;
+    const pctRaw = o.discountPercentage;
+    const discountPercentage =
+      typeof pctRaw === "number"
+        ? pctRaw
+        : typeof pctRaw === "string" && pctRaw.trim()
+          ? Number(pctRaw)
+          : undefined;
+    const subServiceName =
+      typeof o.subServiceName === "string" && o.subServiceName.trim()
+        ? o.subServiceName.trim()
+        : undefined;
+    const offerEndsOnDate =
+      typeof o.offerEndsOnDate === "string"
+        ? o.offerEndsOnDate
+        : typeof o.offersEndOnDate === "string"
+          ? o.offersEndOnDate
+          : undefined;
+    serviceDeals.push({
+      _id: id,
+      serviceId,
+      ...(subServiceName ? { subServiceName } : {}),
+      ...(typeof discountPercentage === "number" && Number.isFinite(discountPercentage)
+        ? { discountPercentage }
+        : {}),
+      ...(offerEndsOnDate ? { offerEndsOnDate } : {}),
+      dealImage: (o.dealImage as string | null | undefined) ?? null,
+      createdAt: typeof o.createdAt === "string" ? o.createdAt : undefined,
+    });
+  }
   const nextJobCardObj =
     data.nextJobCard && typeof data.nextJobCard === "object"
       ? (data.nextJobCard as Record<string, unknown>)
@@ -355,7 +408,47 @@ export function parseAutoshopJobCardPageDetails(payload: unknown): AutoshopJobCa
     nextJobCard,
     myAllSubServices,
     myAllBanks,
+    serviceDeals,
   };
+}
+
+/** True when a service deal still applies (has % off and offer end date not past). */
+export function isAutoshopServiceDealApplicable(
+  deal: Pick<AutoshopPageDetailsServiceDeal, "discountPercentage" | "offerEndsOnDate">,
+  asOf: Date = new Date(),
+): boolean {
+  const pct = Number(deal.discountPercentage);
+  if (!Number.isFinite(pct) || pct <= 0) return false;
+  if (!deal.offerEndsOnDate) return true;
+  const end = new Date(deal.offerEndsOnDate);
+  if (!Number.isFinite(end.getTime())) return true;
+  const endOfDay = new Date(end);
+  endOfDay.setHours(23, 59, 59, 999);
+  return asOf <= endOfDay;
+}
+
+/** Match an active deal for a sub-service (serviceId + subServiceName). */
+export function findAutoshopServiceDealForSub(
+  deals: AutoshopPageDetailsServiceDeal[],
+  serviceId: string,
+  subServiceName: string,
+): AutoshopPageDetailsServiceDeal | null {
+  const sid = String(serviceId ?? "").trim();
+  const name = String(subServiceName ?? "").trim().toLowerCase();
+  if (!sid || !name) return null;
+  const matches = deals.filter(
+    (d) =>
+      d.serviceId === sid &&
+      String(d.subServiceName ?? "")
+        .trim()
+        .toLowerCase() === name &&
+      isAutoshopServiceDealApplicable(d),
+  );
+  if (matches.length === 0) return null;
+  // Prefer the highest discount when multiple deals match the same sub-service.
+  return matches.reduce((best, cur) =>
+    Number(cur.discountPercentage) > Number(best.discountPercentage) ? cur : best,
+  );
 }
 
 export function pageDetailsSubServicesToCategories(subs: AutoshopPageDetailsSubService[]) {

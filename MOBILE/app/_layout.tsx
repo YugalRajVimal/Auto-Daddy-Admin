@@ -71,6 +71,9 @@ export default function RootLayout() {
             <View style={styles.root}>
               <Drawer
                 drawerContent={(props) => <AppDrawerContent {...props} />}
+                // Don't pop drawer sibling history on Android back — home screens exit the app,
+                // and stack frames handle their own back. Prevents Home ↔ prior-screen loops.
+                backBehavior="none"
                 screenOptions={{
                   headerShown: false,
                   // iOS back-swipe uses the left edge; drawer swipe interferes with it.

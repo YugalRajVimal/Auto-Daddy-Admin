@@ -555,13 +555,18 @@ export default function OwnerAutoShopsPage() {
                         </p>
                       </div>
 
-                      <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold text-white ${
-                          open ? "bg-emerald-600" : "bg-slate-400"
-                        }`}
-                      >
-                        {open ? "Shop is Open" : "Closed"}
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span
+                          className={`rounded-full px-3 py-1 text-[11px] font-bold text-white ${
+                            open ? "bg-emerald-600" : "bg-slate-400"
+                          }`}
+                        >
+                          {open ? "Shop is Open" : "Closed"}
+                        </span>
+                        <span className="max-w-[9.5rem] truncate text-right text-[10px] font-medium text-slate-500">
+                          {shop.todayHoursText}
+                        </span>
+                      </div>
 
                       <span
                         role="button"

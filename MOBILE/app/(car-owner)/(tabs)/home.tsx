@@ -7,6 +7,7 @@ import { LoadingProgress, NetworkStatusStrip, useToast } from "@/components/reus
 import { colors, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import { useCarOwnerNotifications } from "@/context/car-owner-notifications-provider";
+import { useAndroidExitOnBack } from "@/hooks/use-android-exit-on-back";
 import { isCarOwnerRole } from "@/lib/car-owner-notification-read-state";
 import { useCarOwnerDashboard } from "@/hooks/use-car-owner-dashboard";
 import { useCarOwnerOdometerReadings } from "@/hooks/use-car-owner-odometer-readings";
@@ -22,6 +23,7 @@ import { Pressable, Text, View } from "react-native";
 
 export default function CarOwnerHome() {
   const { meta, token } = useAuth();
+  useAndroidExitOnBack();
   const { hasUnread, syncUnreadFromApi } = useCarOwnerNotifications();
   const isCarOwner = isCarOwnerRole(meta?.role ?? null);
   const { data, loading, refresh } = useCarOwnerDashboard();

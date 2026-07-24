@@ -39,7 +39,9 @@ import {
 } from "../../lib/shopOwnerJobCardsApi";
 import {
   fetchAutoshopJobCardPrefix,
+  findAutoshopServiceDealForSub,
   parseAutoshopJobCardPrefix,
+  type AutoshopPageDetailsServiceDeal,
 } from "../../lib/autoshopownerJobCardsApi";
 import { pickJobCardNoForApi } from "../../lib/shopOwnerJobCards";
 
@@ -387,7 +389,11 @@ function apiServiceBlocksToLines(blocks: unknown[], categories: ServiceCategory[
   return lines;
 }
 
-function serviceLinesToBlocks(lines: ServiceLine[], categories: ServiceCategory[]) {
+function serviceLinesToBlocks(
+  lines: ServiceLine[],
+  categories: ServiceCategory[],
+  serviceDeals: AutoshopPageDetailsServiceDeal[] = [],
+) {
   const map = new Map<string, Array<Record<string, unknown>>>();
   for (const line of lines) {
     if (!line.subKey) continue;
@@ -400,6 +406,7 @@ function serviceLinesToBlocks(lines: ServiceLine[], categories: ServiceCategory[
     const qty = String(line.qtyStr || "").trim();
     const labourCost = parseNumberFromText(line.labourCostStr);
     const unitPrice = parseNumberFromText(line.unitPriceStr);
+    const qtyNum = parseNumberFromText(line.qtyStr) || 1;
     const entry: Record<string, unknown> = {
       name: sub.name,
       desc: String(line.desc || "").trim(),
@@ -418,10 +425,39 @@ function serviceLinesToBlocks(lines: ServiceLine[], categories: ServiceCategory[
         entry.odoOutReading = odoOutReading;
       }
     }
+    const deal = findAutoshopServiceDealForSub(serviceDeals, parsed.catId, sub.name);
+    if (deal) {
+      const discountPercentage = Number(deal.discountPercentage);
+      if (Number.isFinite(discountPercentage) && discountPercentage > 0) {
+        entry.discountPercentage = discountPercentage;
+        entry.amountBeforeDiscount = unitPrice * qtyNum;
+        entry.dealId = deal._id;
+      }
+    }
     bucket.push(entry);
     map.set(parsed.catId, bucket);
   }
   return [...map.entries()].map(([service, subServices]) => ({ service, subServices }));
+}
+
+function lineDealDiscount(
+  line: ServiceLine,
+  categories: ServiceCategory[],
+  serviceDeals: AutoshopPageDetailsServiceDeal[],
+): number {
+  if (!line.subKey) return 0;
+  const parsed = parseSubServiceKey(line.subKey);
+  if (!parsed) return 0;
+  const cat = categories.find((c) => c.id === parsed.catId);
+  const sub = cat?.subServices?.[parsed.subIdx];
+  if (!sub?.name) return 0;
+  const deal = findAutoshopServiceDealForSub(serviceDeals, parsed.catId, sub.name);
+  if (!deal) return 0;
+  const pct = Number(deal.discountPercentage);
+  if (!Number.isFinite(pct) || pct <= 0) return 0;
+  const amountBefore =
+    parseNumberFromText(line.unitPriceStr) * (parseNumberFromText(line.qtyStr) || 1);
+  return (amountBefore * pct) / 100;
 }
 
 function emptyTableLine(id: string): ServiceLine {
@@ -556,6 +592,7 @@ export default function JobCardForm({
   const [serviceDate, setServiceDate] = useState(todayIsoDate);
   const [myCustomers, setMyCustomers] = useState<JobCardFormCustomer[]>([]);
   const [myServices, setMyServices] = useState<ServiceCategory[]>([]);
+  const [serviceDeals, setServiceDeals] = useState<AutoshopPageDetailsServiceDeal[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [serviceLines, setServiceLines] = useState<ServiceLine[]>([]);
@@ -660,6 +697,14 @@ export default function JobCardForm({
     return sum;
   }, [activeLines]);
 
+  const dealDiscountTotal = useMemo(() => {
+    let sum = 0;
+    for (const line of activeLines) {
+      sum += lineDealDiscount(line, normalizedCategories, serviceDeals);
+    }
+    return sum;
+  }, [activeLines, normalizedCategories, serviceDeals]);
+
   const labourFromLines = useMemo(
     () =>
       activeLines.reduce((sum, line) => sum + parseNumberFromText(line.labourCostStr), 0),
@@ -676,7 +721,9 @@ export default function JobCardForm({
   }, [labourFromLines]);
 
   const labourAmount = parseNumberFromText(form.labourCharge);
-  const discountAmount = parseNumberFromText(form.discount);
+  const manualDiscountAmount =
+    dealDiscountTotal > 0 ? 0 : parseNumberFromText(form.discount);
+  const discountAmount = dealDiscountTotal > 0 ? dealDiscountTotal : manualDiscountAmount;
   const grandTotal = partsSubTotal + labourAmount - discountAmount;
 
   function resetForm() {
@@ -802,6 +849,7 @@ export default function JobCardForm({
         if (cancelled) return;
         setMyCustomers(data.myCustomers);
         setMyServices(data.myServices);
+        setServiceDeals(data.serviceDeals ?? []);
 
         const prefixFromApi = prefixRes.ok ? parseAutoshopJobCardPrefix(prefixRes.data) : "";
         const prefix =
@@ -959,9 +1007,12 @@ export default function JobCardForm({
     if (!token) return;
     setFormLoading(true);
     setSaveError(null);
-    const categories = normalizeServiceCategories(myServices);
+    const allCategories = normalizeServiceCategories(myServices);
+    const vehicleCategories = filterCategoriesForVehicle(allCategories, formSelectedVehicle);
+    const categories =
+      vehicleCategories.length > 0 ? vehicleCategories : allCategories;
     const linesToSave = collectLinesForSave(serviceLines);
-    const services = serviceLinesToBlocks(linesToSave, categories);
+    const services = serviceLinesToBlocks(linesToSave, categories, serviceDeals);
     if (!form.customerId) {
       setSaveError(
         customerPhone.length === 10
@@ -991,7 +1042,11 @@ export default function JobCardForm({
       return;
     }
     try {
-      const tech = buildLabourTechnicalRemarks(form.labourCharge, form.discount, callingCode);
+      const tech = buildLabourTechnicalRemarks(
+        form.labourCharge,
+        dealDiscountTotal > 0 ? String(dealDiscountTotal) : form.discount,
+        callingCode,
+      );
       const res = await saveJobCard(
         token,
         {
@@ -1530,17 +1585,23 @@ export default function JobCardForm({
                 </div>
                 <div className="flex items-center justify-between gap-4 py-1">
                   <span className="font-semibold text-gray-800">Discount</span>
-                  <input
-                    value={form.discount}
-                    disabled={formLoading}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, discount: e.target.value }))
-                    }
-                    inputMode="decimal"
-                    placeholder="0"
-                    aria-label="Discount"
-                    className={`${formCellInputClass} w-16 max-w-[4.5rem] text-right tabular-nums`}
-                  />
+                  {dealDiscountTotal > 0 ? (
+                    <span className="font-semibold tabular-nums text-emerald-700">
+                      −{formatMoney(dealDiscountTotal)}
+                    </span>
+                  ) : (
+                    <input
+                      value={form.discount}
+                      disabled={formLoading}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, discount: e.target.value }))
+                      }
+                      inputMode="decimal"
+                      placeholder="0"
+                      aria-label="Discount"
+                      className={`${formCellInputClass} w-16 max-w-[4.5rem] text-right tabular-nums`}
+                    />
+                  )}
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-4 border-t border-gray-300 pt-2">
                   <span className="text-base font-bold text-gray-900">Total {currencyLabel}</span>

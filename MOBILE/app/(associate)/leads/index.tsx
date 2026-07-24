@@ -6,8 +6,8 @@ import {
   type DummyLead,
   type DummyLeadStatus,
 } from "@/lib/associate-dummy-data";
+import { navigateToAppHome } from "@/lib/shop-owner-navigation";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   Modal,
@@ -64,7 +64,7 @@ export default function AssociateLeadsPage() {
       title="My Leads"
       showTabBar={false}
       leadingMode="back"
-      onBackPress={() => router.replace("/(associate)/(tabs)/home")}
+      onBackPress={() => navigateToAppHome("/(associate)/(tabs)/home")}
     >
       <Text style={styles.subtitle}>Shops assigned from the admin panel (sample data).</Text>
 

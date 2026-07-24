@@ -20,14 +20,14 @@ import { colors, fontSizes, gradients, radii, spacing } from "@/constants/autoda
 import { useAuth } from "@/context/auth-provider";
 import { useBusinessProfileEditor } from "@/hooks/profile/use-business-profile-editor";
 import { usePersonalProfileEditor } from "@/hooks/profile/use-personal-profile-editor";
-import { updateBusinessProfile, updatePersonalProfile, updateWeeklyOpenHours } from "@/lib/autoshopowner-api";
+import { updatePersonalProfile, updateWeeklyOpenHours } from "@/lib/autoshopowner-api";
 import { fetchAndMergeShopOwnerPortal } from "@/lib/shop-owner-portal-bootstrap";
 import { useLogoutAction } from "@/hooks/use-logout-action";
 import { useOncePress } from "@/hooks/use-once-press";
 import { useDocumentTemplatePreference } from "@/hooks/use-document-template-preference";
 import { useShopOwnerCarCompanies } from "@/hooks/use-shop-owner-car-companies";
 import { useShopOwnerServices } from "@/hooks/use-shop-owner-services";
-import { API_BASE_URL, getJson, logApiRequest, putJson } from "@/lib/api";
+import { API_BASE_URL, getJson, logApiRequest } from "@/lib/api";
 import { saveAutoShopOwnerProfile } from "@/lib/auth";
 import {
   createDefaultPerDaySchedule,
@@ -43,11 +43,11 @@ import {
   defaultDialCallingCode,
   formatStoredNationalPhone,
 } from "@/lib/dial-countries";
-import { getQuickDeviceCoordinates } from "@/lib/get-quick-device-coordinates";
 import { templatesForKind } from "@/lib/document-templates";
 import { localImageMultipartPart } from "@/lib/local-image-for-form";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
-import { SHOP_OWNER_HOME } from "@/lib/shop-owner-navigation";
+import { SHOP_OWNER_HOME, navigateToAppHome } from "@/lib/shop-owner-navigation";
+import { shopOwnerShopTypeLabels } from "@/lib/shop-owner-shop-types";
 
 import {
   digitsOnly,
@@ -62,7 +62,7 @@ import type { UserCity } from "@/types/user-cities";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BackHandler,
   Image,
@@ -79,8 +79,8 @@ const DEFAULT_PROFILE = {
   email: "",
   countryCode: defaultDialCallingCode(),
   phone: "",
-  address: "",
-  pincode: "",
+  city: "",
+  profilePhoto: null as string | null,
   role: "",
 };
 
@@ -89,8 +89,8 @@ type UserProfileData = {
   email: string;
   phone: string;
   countryCode: string;
-  pincode: string;
-  address: string;
+  city?: string;
+  profilePhoto?: string | null;
   role: string;
 };
 
@@ -202,8 +202,8 @@ function parseUserProfilePayload(payload: unknown): UserProfileData | null {
     email: typeof source.email === "string" ? source.email : "",
     phone: typeof source.phone === "string" ? source.phone : "",
     countryCode: typeof source.countryCode === "string" ? source.countryCode : "",
-    pincode: typeof source.pincode === "string" ? source.pincode : "",
-    address: typeof source.address === "string" ? source.address : "",
+    city: typeof source.city === "string" ? source.city : "",
+    profilePhoto: typeof source.profilePhoto === "string" ? source.profilePhoto : null,
     role: typeof source.role === "string" ? source.role : "",
   };
 }
@@ -218,6 +218,7 @@ export default function ProfilePage() {
   const [activitySaving, setActivitySaving] = useState(false);
   const [activitySchedule, setActivitySchedule] = useState<PerDaySchedule>(createDefaultPerDaySchedule);
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [cityPickerTarget, setCityPickerTarget] = useState<"personal" | "business">("business");
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [personalSaving, setPersonalSaving] = useState(false);
@@ -279,18 +280,47 @@ export default function ProfilePage() {
     }, [loadProfileFromStore])
   );
 
-  const displayProfile = {
-    name: serverProfile?.name ?? userProfile?.name ?? meta?.name ?? DEFAULT_PROFILE.name,
-    email: serverProfile?.email ?? userProfile?.email ?? DEFAULT_PROFILE.email,
-    countryCode: serverProfile?.countryCode ?? userProfile?.countryCode ?? DEFAULT_PROFILE.countryCode,
-    phone: serverProfile?.phone ?? userProfile?.phone ?? DEFAULT_PROFILE.phone,
-    address: serverProfile?.address ?? userProfile?.address ?? DEFAULT_PROFILE.address,
-    pincode: serverProfile?.pincode ?? userProfile?.pincode ?? DEFAULT_PROFILE.pincode,
-    role: serverProfile?.role ?? userProfile?.role ?? meta?.role ?? DEFAULT_PROFILE.role,
-  };
+  const displayProfile = useMemo(
+    () => ({
+      name: serverProfile?.name ?? userProfile?.name ?? meta?.name ?? DEFAULT_PROFILE.name,
+      email: serverProfile?.email ?? userProfile?.email ?? DEFAULT_PROFILE.email,
+      countryCode: serverProfile?.countryCode ?? userProfile?.countryCode ?? DEFAULT_PROFILE.countryCode,
+      phone: serverProfile?.phone ?? userProfile?.phone ?? DEFAULT_PROFILE.phone,
+      city: (serverProfile?.city ?? userProfile?.city ?? DEFAULT_PROFILE.city).trim(),
+      profilePhoto:
+        serverProfile?.profilePhoto ??
+        userProfile?.profilePhoto ??
+        meta?.profilePhoto ??
+        DEFAULT_PROFILE.profilePhoto,
+      role: serverProfile?.role ?? userProfile?.role ?? meta?.role ?? DEFAULT_PROFILE.role,
+    }),
+    [
+      meta?.name,
+      meta?.profilePhoto,
+      meta?.role,
+      serverProfile?.city,
+      serverProfile?.countryCode,
+      serverProfile?.email,
+      serverProfile?.name,
+      serverProfile?.phone,
+      serverProfile?.profilePhoto,
+      serverProfile?.role,
+      userProfile?.city,
+      userProfile?.countryCode,
+      userProfile?.email,
+      userProfile?.name,
+      userProfile?.phone,
+      userProfile?.profilePhoto,
+      userProfile?.role,
+    ]
+  );
   const isAutoShopOwner =
     typeof displayProfile.role === "string" &&
     displayProfile.role.toLowerCase() === "autoshopowner";
+  const showProfileErrorToast = useCallback(
+    (message: string) => showToast(message, { type: "error" }),
+    [showToast]
+  );
   const {
     isPersonalEditing,
     setIsPersonalEditing,
@@ -299,29 +329,48 @@ export default function ProfilePage() {
     editEmail,
     setEditEmail,
     editPhone,
-    setEditPhone,
-    editPincode,
-    setEditPincode,
-    editAddress,
-    setEditAddress,
+    editCityId,
+    setEditCityId,
+    editCityName,
+    setEditCityName,
+    editProfilePhotoUri,
+    editProfilePhotoMime,
+    editProfilePhotoFileName,
+    clearProfilePhoto,
+    pickProfilePhoto,
     cancelPersonalEdit,
-  } = usePersonalProfileEditor(displayProfile);
+  } = usePersonalProfileEditor(displayProfile, showProfileErrorToast);
 
   const personalFields = useMemo(
     () => [
-      { label: "Full Name", value: displayProfile.name, icon: "person-outline" as const },
-      { label: "Email Address", value: displayProfile.email || "Not provided", icon: "mail-outline" as const },
+      { label: "Name", value: displayProfile.name || "Not provided", icon: "person-outline" as const },
       {
-        label: "Mobile Number",
+        label: "Phone",
         value: displayProfile.phone
-          ? `${displayProfile.countryCode} ${formatStoredNationalPhone(displayProfile.phone)}`.trim()
+          ? formatStoredNationalPhone(displayProfile.phone)
           : "Not provided",
         icon: "call-outline" as const,
       },
-      { label: "Address", value: displayProfile.address || "Not provided", icon: "location-outline" as const },
-      { label: "Zip Code", value: formatPincodeDisplay(displayProfile.pincode) || "Not provided", icon: "map-outline" as const },
+      {
+        label: "City",
+        value: editCityName.trim() || displayProfile.city || "Not provided",
+        icon: "business-outline" as const,
+      },
+      { label: "Email", value: displayProfile.email || "Not provided", icon: "mail-outline" as const },
+      {
+        label: "Upload Image",
+        value: displayProfile.profilePhoto ? "Image uploaded" : "No image uploaded",
+        icon: "image-outline" as const,
+      },
     ],
-    [displayProfile.address, displayProfile.countryCode, displayProfile.email, displayProfile.name, displayProfile.phone, displayProfile.pincode]
+    [
+      displayProfile.city,
+      displayProfile.email,
+      displayProfile.name,
+      displayProfile.phone,
+      displayProfile.profilePhoto,
+      editCityName,
+    ]
   );
   const businessProfile = serverData?.businessProfile;
   const carCompanies = useShopOwnerCarCompanies({
@@ -361,24 +410,16 @@ export default function ProfilePage() {
     setEditBusinessHstNumber,
     editBusinessGstPercent,
     setEditBusinessGstPercent,
-    editBusinessLat,
-    setEditBusinessLat,
-    editBusinessLng,
-    setEditBusinessLng,
+    editShopTypes,
+    toggleShopType,
     editBusinessLogoUri,
     editBusinessLogoMime,
     editBusinessLogoFileName,
     businessLogoRemoved,
     clearBusinessLogo,
-    editBusinessBannerUri,
-    editBusinessBannerMime,
-    editBusinessBannerFileName,
-    businessBannerRemoved,
-    clearBusinessBanner,
     cancelBusinessEdit,
     pickBusinessLogo,
-    pickBusinessBanner,
-  } = useBusinessProfileEditor(businessProfile, (message) => showToast(message, { type: "error" }));
+  } = useBusinessProfileEditor(businessProfile, showProfileErrorToast);
 
   const resolvedActivitySchedule = useMemo(
     () => resolvePerDaySchedule(businessProfile as unknown as Record<string, unknown> | null | undefined),
@@ -396,6 +437,13 @@ export default function ProfilePage() {
     setActivitySchedule(resolvedActivitySchedule);
   }, [isActivityEditing, resolvedActivitySchedule]);
 
+  const cancelPersonalEditRef = useRef(cancelPersonalEdit);
+  cancelPersonalEditRef.current = cancelPersonalEdit;
+  const cancelBusinessEditRef = useRef(cancelBusinessEdit);
+  cancelBusinessEditRef.current = cancelBusinessEdit;
+  const resolvedActivityScheduleRef = useRef(resolvedActivitySchedule);
+  resolvedActivityScheduleRef.current = resolvedActivitySchedule;
+
   useFocusEffect(
     useCallback(() => {
       // Reset UI state whenever Profile regains focus (tabs keep screens mounted).
@@ -405,21 +453,13 @@ export default function ProfilePage() {
       setLogoViewerUri(null);
 
       // Exit edit modes and revert any unsaved drafts.
-      setIsPersonalEditing(false);
-      cancelPersonalEdit();
-      setIsBusinessEditing(false);
-      cancelBusinessEdit();
+      cancelPersonalEditRef.current();
+      cancelBusinessEditRef.current();
       setIsActivityEditing(false);
-      setActivitySchedule(resolvedActivitySchedule);
+      setActivitySchedule(resolvedActivityScheduleRef.current);
 
       return undefined;
-    }, [
-      cancelBusinessEdit,
-      cancelPersonalEdit,
-      resolvedActivitySchedule,
-      setIsBusinessEditing,
-      setIsPersonalEditing,
-    ])
+    }, [])
   );
 
   useFocusEffect(
@@ -441,9 +481,11 @@ export default function ProfilePage() {
         icon: "storefront-outline" as const,
       },
       {
-        label: "Business Address",
-        value: businessProfile?.businessAddress?.trim() || "Not provided",
-        icon: "location-outline" as const,
+        label: "Business Phone",
+        value: businessProfile?.businessPhone?.trim()
+          ? formatStoredNationalPhone(businessProfile.businessPhone)
+          : "Not provided",
+        icon: "call-outline" as const,
       },
       {
         label: "City",
@@ -451,11 +493,16 @@ export default function ProfilePage() {
           editBusinessCityName?.trim() ||
           String(
             (businessProfile as unknown as Record<string, unknown> | null)?.city ??
-            (businessProfile as unknown as Record<string, unknown> | null)?.cityName ??
-            ""
+              (businessProfile as unknown as Record<string, unknown> | null)?.cityName ??
+              ""
           ) ||
           "Not provided",
         icon: "business-outline" as const,
+      },
+      {
+        label: "Address",
+        value: businessProfile?.businessAddress?.trim() || "Not provided",
+        icon: "location-outline" as const,
       },
       {
         label: "Zip Code",
@@ -465,24 +512,12 @@ export default function ProfilePage() {
         icon: "map-outline" as const,
       },
       {
-        label: "Business Phone",
-        value: businessProfile?.businessPhone?.trim()
-          ? formatStoredNationalPhone(businessProfile.businessPhone)
-          : "Not provided",
-        icon: "call-outline" as const,
-      },
-      {
-        label: "Business Email",
-        value: businessProfile?.businessEmail?.trim() || "Not provided",
-        icon: "mail-outline" as const,
-      },
-      {
-        label: "Business HST Number",
-        value: businessProfile?.businessHSTNumber ?? "Not provided",
+        label: "TAX ID No",
+        value: businessProfile?.businessHSTNumber?.trim() || "Not provided",
         icon: "receipt-outline" as const,
       },
       {
-        label: "GST %",
+        label: "Tax %",
         value:
           businessProfile?.gst != null && String(businessProfile.gst).trim().length > 0
             ? `${String(businessProfile.gst).trim()}%`
@@ -490,22 +525,21 @@ export default function ProfilePage() {
         icon: "cash-outline" as const,
       },
       {
-        label: "Latitude",
-        value: String(businessProfile?.businessMapLocation?.lat ?? "Not provided"),
-        icon: "navigate-outline" as const,
+        label: "E mail",
+        value: businessProfile?.businessEmail?.trim() || "Not provided",
+        icon: "mail-outline" as const,
       },
       {
-        label: "Longitude",
-        value: String(businessProfile?.businessMapLocation?.lng ?? "Not provided"),
-        icon: "compass-outline" as const,
-      },
-      {
-        label: "Business Logo",
+        label: "Upload Logo",
         value: businessProfile?.businessLogo ? "Tap to view logo" : "No logo uploaded",
         icon: "image-outline" as const,
       },
+      {
+        label: "Business Types",
+        value: shopOwnerShopTypeLabels(businessProfile?.shopTypes ?? businessProfile?.shopType),
+        icon: "options-outline" as const,
+      },
     ],
-    // Note: we include editBusinessCityName so the value updates while editing.
     [businessProfile, editBusinessCityName]
   );
   const businessNameLabel = businessProfile?.businessName?.trim() || "Business";
@@ -544,18 +578,10 @@ export default function ProfilePage() {
     () => normalizeMediaUrl(businessProfile?.businessLogo ?? null),
     [businessProfile?.businessLogo]
   );
-  const viewableBusinessBannerUri = useMemo(() => {
-    if (isBusinessEditing && businessBannerRemoved) {
-      return null;
-    }
-    const draft = editBusinessBannerUri.trim();
-    if (draft.length > 0) {
-      return draft.startsWith("file://") || draft.startsWith("content://")
-        ? draft
-        : normalizeMediaUrl(draft);
-    }
-    return normalizeMediaUrl(businessProfile?.bannerImage ?? null);
-  }, [businessBannerRemoved, businessProfile?.bannerImage, editBusinessBannerUri, isBusinessEditing]);
+  const viewableBusinessBannerUri = useMemo(
+    () => normalizeMediaUrl(businessProfile?.bannerImage ?? null),
+    [businessProfile?.bannerImage]
+  );
 
   // If the user changed logo via the hero avatar pencil, auto-upload it immediately.
   useEffect(() => {
@@ -576,10 +602,11 @@ export default function ProfilePage() {
   }, [editBusinessLogoUri, isAutoShopOwner, pendingHeroLogoUpload]);
 
   const handleLogout = useLogoutAction();
-  // Prefer replace-to-home over router.back(): when isProfileComplete is false,
+  // Prefer dismiss/replace-to-home over router.back(): when isProfileComplete is false,
   // back can land on `/` which immediately Redirects back here and traps the user.
+  // dismissTo also clears sibling tab screens so Home ↔ Deals does not loop on Android back.
   const handleBackPress = useOncePress(() => {
-    router.replace(SHOP_OWNER_HOME as never);
+    navigateToAppHome(SHOP_OWNER_HOME);
   });
   useFocusEffect(
     useCallback(() => {
@@ -738,78 +765,58 @@ export default function ProfilePage() {
     if (__DEV__) {
       console.log("[profile] auth token", token);
     }
-    const role = meta?.role?.toLowerCase() ?? "";
-    const isAutoShopOwnerRole = role === "autoshopowner";
     const nextName = editName.trim();
     const nextEmail = editEmail.trim();
-    const nextPhone = digitsOnly(editPhone).slice(0, 10);
-    const nextPincode = normalizePostalCodeForStorage(editPincode);
-    const nextAddress = editAddress.trim();
-    if (nextName.length > 20) {
-      showToast("Name must be at most 20 characters.", { type: "error" });
+    const nextCity = editCityName.trim();
+    const nextPhotoUri = editProfilePhotoUri.trim();
+    const shouldUploadPhoto =
+      nextPhotoUri.length > 0 &&
+      (nextPhotoUri.startsWith("file://") || nextPhotoUri.startsWith("content://"));
+
+    if (!nextName) {
+      showToast("Name is required.", { type: "error" });
+      return;
+    }
+    if (!nextCity) {
+      showToast("City is required.", { type: "error" });
       return;
     }
     if (nextEmail.length > 0 && !isValidEmail(nextEmail)) {
       showToast("Enter a valid email address.", { type: "error" });
       return;
     }
-    if (nextPhone.length > 0 && nextPhone.length !== 10) {
-      showToast("Phone number must be 10 digits.", { type: "error" });
-      return;
-    }
-    if (nextPincode.length > 0 && !isValidCanadianPostalCode(editPincode)) {
-      showToast(POSTAL_CODE_ERROR_MESSAGE, { type: "error" });
-      return;
-    }
-    if (nextAddress.length > 50) {
-      showToast("Address must be at most 50 characters.", { type: "error" });
-      return;
-    }
-    const personalUpdateBody: Record<string, string> = {};
-    if (nextName.length > 0) personalUpdateBody.name = nextName;
-    if (nextEmail.length > 0) personalUpdateBody.email = nextEmail;
-    if (nextPhone.length > 0) {
-      personalUpdateBody.phone = nextPhone;
-      personalUpdateBody.countryCode = defaultDialCallingCode();
-    }
-    if (nextPincode.length > 0) personalUpdateBody.pincode = nextPincode;
-    if (nextAddress.length > 0) personalUpdateBody.address = nextAddress.slice(0, 50);
 
-    // Optimistic UI: close edit instantly and reflect values immediately.
     setIsPersonalEditing(false);
-    if (isAutoShopOwnerRole) {
-      setServerProfile((prev) => (prev ? {
-        ...prev,
-        name: nextName || prev.name,
-        email: nextEmail || prev.email,
-        phone: nextPhone || prev.phone,
-        pincode: nextPincode || prev.pincode,
-        address: nextAddress || prev.address,
-      } : prev));
-    } else {
-      setUserProfile((prev) => ({
-        name: nextName || prev?.name || displayProfile.name,
-        email: nextEmail || prev?.email || displayProfile.email,
-        phone: nextPhone || prev?.phone || displayProfile.phone,
-        pincode: nextPincode || prev?.pincode || displayProfile.pincode,
-        address: nextAddress || prev?.address || displayProfile.address,
-        role: prev?.role ?? displayProfile.role ?? "",
-        countryCode: prev?.countryCode ?? displayProfile.countryCode ?? "",
-      }));
-    }
+    setServerProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            name: nextName || prev.name,
+            email: nextEmail || prev.email,
+            ...(nextCity ? { city: nextCity } : null),
+            ...(shouldUploadPhoto
+              ? { profilePhoto: nextPhotoUri }
+              : null),
+          }
+        : prev
+    );
 
     setPersonalSaving(true);
     try {
-      const response = isAutoShopOwnerRole
-        ? await updatePersonalProfile(token, {
-            name: nextName || undefined,
-            city: undefined,
+      const photoPart = shouldUploadPhoto
+        ? localImageMultipartPart(nextPhotoUri, {
+            mimeType: editProfilePhotoMime,
+            fileName: editProfilePhotoFileName,
+            fallbackBase: "profile-photo",
           })
-        : await putJson<EditProfileResponse>(
-            "/api/user/edit-profile",
-            personalUpdateBody,
-            { authToken: token }
-          );
+        : null;
+      const response = await updatePersonalProfile(token, {
+        name: nextName,
+        city: nextCity,
+        profilePhoto: photoPart
+          ? { uri: photoPart.uri, name: photoPart.name, type: photoPart.type }
+          : null,
+      });
 
       const payload = response.data as EditProfileResponse | null;
       if (!response.ok || (payload && "success" in payload && payload.success === false)) {
@@ -818,25 +825,14 @@ export default function ProfilePage() {
         return;
       }
 
-      // Show result immediately; refresh happens after.
       showToast(payload?.message ?? "Profile updated successfully.", { type: "success" });
 
       await refreshSession();
-      const updated = parseUserProfilePayload(payload?.data ?? payload);
-      if (isAutoShopOwnerRole) {
-        const portal = await fetchAndMergeShopOwnerPortal(token);
-        if (portal.profile) {
-          await saveAutoShopOwnerProfile(portal.profile);
-          setServerData(portal.profile.data);
-          setServerProfile(portal.profile.data.userProfile);
-        }
-      } else if (updated) {
-        setUserProfile((prev) => ({
-          ...prev,
-          ...updated,
-          role: prev?.role ?? displayProfile.role ?? "",
-          countryCode: prev?.countryCode ?? displayProfile.countryCode ?? "",
-        }));
+      const portal = await fetchAndMergeShopOwnerPortal(token);
+      if (portal.profile) {
+        await saveAutoShopOwnerProfile(portal.profile);
+        setServerData(portal.profile.data);
+        setServerProfile(portal.profile.data.userProfile);
       }
     } catch {
       showToast("Network error while updating profile.", { type: "error" });
@@ -859,74 +855,69 @@ export default function ProfilePage() {
     }
     const nextBusinessName = editBusinessName.trim();
     const nextBusinessAddress = editBusinessAddress.trim();
-    const nextBusinessCityId = editBusinessCityId.trim();
-    const nextBusinessCityName = editBusinessCityName.trim();
-    const nextBusinessCity = nextBusinessCityName;
+    const nextBusinessCity = editBusinessCityName.trim();
     const nextBusinessPincode = normalizePostalCodeForStorage(editBusinessPincode);
-    const nextBusinessPhone = digitsOnly(editBusinessPhone).slice(0, 10);
+    const nextBusinessPhone = digitsOnly(editBusinessPhone);
     const nextBusinessEmail = editBusinessEmail.trim();
-    const nextBusinessHst = editBusinessHstNumber.trim();
+    const nextBusinessHst = editBusinessHstNumber.trim().toUpperCase();
     const nextBusinessGstDigits = digitsOnly(editBusinessGstPercent).slice(0, 3);
     const nextBusinessGst =
-      nextBusinessGstDigits.length > 0 && Number(nextBusinessGstDigits) <= 100 ? nextBusinessGstDigits : "";
-    if (nextBusinessGstDigits.length > 0 && Number(nextBusinessGstDigits) > 100) {
-      showToast("GST % must be 0–100.", { type: "error" });
+      nextBusinessGstDigits.length > 0 && Number(nextBusinessGstDigits) <= 50
+        ? nextBusinessGstDigits
+        : "";
+
+    if (editShopTypes.length === 0) {
+      showToast("Select at least one business type.", { type: "error" });
       return;
     }
-    if (nextBusinessEmail.length > 0 && !isValidEmail(nextBusinessEmail)) {
+    if (!nextBusinessEmail || !isValidEmail(nextBusinessEmail)) {
       showToast("Enter a valid business email address.", { type: "error" });
       return;
     }
-    if (nextBusinessPhone.length > 0 && nextBusinessPhone.length !== 10) {
-      showToast("Business phone must be 10 digits.", { type: "error" });
+    if (nextBusinessPhone.length < 10 || nextBusinessPhone.length > 15) {
+      showToast("Enter a valid phone number (10-15 digits).", { type: "error" });
       return;
     }
-    if (nextBusinessPincode.length > 0 && !isValidCanadianPostalCode(editBusinessPincode)) {
+    if (!nextBusinessPincode || !isValidCanadianPostalCode(editBusinessPincode)) {
       showToast(POSTAL_CODE_ERROR_MESSAGE, { type: "error" });
       return;
     }
+    if (nextBusinessHst.length > 0 && nextBusinessHst.length !== 17) {
+      showToast("Enter a valid TAX ID No (17 uppercase alphanumeric characters).", { type: "error" });
+      return;
+    }
+    if (nextBusinessGstDigits.length > 0 && Number(nextBusinessGstDigits) > 50) {
+      showToast("Enter a valid tax percentage (0 - 50).", { type: "error" });
+      return;
+    }
+
     const nextBusinessLogo = editBusinessLogoUri.trim();
     const shouldUploadBusinessLogo =
       nextBusinessLogo.length > 0 &&
       (nextBusinessLogo.startsWith("file://") || nextBusinessLogo.startsWith("content://"));
-    const nextBusinessBanner = editBusinessBannerUri.trim();
-    const shouldUploadBusinessBanner =
-      nextBusinessBanner.length > 0 &&
-      (nextBusinessBanner.startsWith("file://") || nextBusinessBanner.startsWith("content://"));
-    const nextLatText = editBusinessLat.trim();
-    const nextLngText = editBusinessLng.trim();
-    const nextLat = nextLatText.length > 0 ? Number(nextLatText) : null;
-    const nextLng = nextLngText.length > 0 ? Number(nextLngText) : null;
-    // Optimistic UI: keep the section expanded, leave edit mode, and reflect edits.
+
     setBusinessOpen(true);
     setIsBusinessEditing(false);
     setServerData((prev) => {
       if (!prev) {
         return prev;
       }
-      const prevBusiness: any = prev.businessProfile as any;
+      const prevBusiness = prev.businessProfile;
       return {
         ...prev,
         businessProfile: {
           ...prevBusiness,
-          businessName: nextBusinessName || prev.businessProfile.businessName,
-          businessAddress: nextBusinessAddress || prev.businessProfile.businessAddress,
-          ...(nextBusinessCityId.length > 0 ? { cityId: nextBusinessCityId } : null),
+          businessName: nextBusinessName || prevBusiness.businessName,
+          businessAddress: nextBusinessAddress || prevBusiness.businessAddress,
           ...(nextBusinessCity.length > 0 ? { city: nextBusinessCity } : null),
-          pincode: nextBusinessPincode || prev.businessProfile.pincode,
-          businessPhone: nextBusinessPhone || prev.businessProfile.businessPhone,
-          businessEmail: nextBusinessEmail || prev.businessProfile.businessEmail,
-          businessHSTNumber: nextBusinessHst || prev.businessProfile.businessHSTNumber,
-          gst: nextBusinessGst || (prevBusiness as any).gst || prev.businessProfile.gst,
-          businessLogo: nextBusinessLogo || null,
-          bannerImage: businessBannerRemoved
-            ? null
-            : (nextBusinessBanner || prevBusiness?.bannerImage) ?? null,
-          businessMapLocation: {
-            ...prev.businessProfile.businessMapLocation,
-            lat: nextLat ?? prev.businessProfile.businessMapLocation.lat,
-            lng: nextLng ?? prev.businessProfile.businessMapLocation.lng,
-          },
+          pincode: nextBusinessPincode || prevBusiness.pincode,
+          businessPhone: nextBusinessPhone || prevBusiness.businessPhone,
+          businessEmail: nextBusinessEmail || prevBusiness.businessEmail,
+          businessHSTNumber: nextBusinessHst || prevBusiness.businessHSTNumber,
+          gst: nextBusinessGst || prevBusiness.gst,
+          shopTypes: editShopTypes,
+          shopType: editShopTypes[0],
+          businessLogo: businessLogoRemoved ? null : nextBusinessLogo || prevBusiness.businessLogo,
         },
       };
     });
@@ -938,19 +929,14 @@ export default function ProfilePage() {
       if (nextBusinessAddress.length > 0) body.append("businessAddress", nextBusinessAddress);
       if (nextBusinessCity.length > 0) body.append("city", nextBusinessCity);
       if (nextBusinessPincode.length > 0) body.append("pincode", nextBusinessPincode);
-      if (nextLatText.length > 0) body.append("lat", nextLatText);
-      if (nextLngText.length > 0) body.append("lng", nextLngText);
       if (nextBusinessPhone.length > 0) body.append("businessPhone", nextBusinessPhone);
       if (nextBusinessEmail.length > 0) body.append("businessEmail", nextBusinessEmail);
       if (nextBusinessHst.length > 0) body.append("businessHSTNumber", nextBusinessHst);
-      if (nextBusinessGst.length > 0) body.append("gst", nextBusinessGst);
+      body.append("gst", nextBusinessGst || "0");
+      body.append("shopTypes", JSON.stringify(editShopTypes));
 
       if (businessLogoRemoved) {
         body.append("removeBusinessLogo", "true");
-      }
-
-      if (businessBannerRemoved) {
-        body.append("removeBannerImage", "true");
       }
 
       if (shouldUploadBusinessLogo) {
@@ -966,36 +952,21 @@ export default function ProfilePage() {
         } as unknown as Blob);
       }
 
-      if (shouldUploadBusinessBanner) {
-        const bannerPart = localImageMultipartPart(nextBusinessBanner, {
-          mimeType: editBusinessBannerMime,
-          fileName: editBusinessBannerFileName,
-          fallbackBase: "business-banner",
-        });
-        body.append("bannerImage", {
-          uri: bannerPart.uri,
-          name: bannerPart.name,
-          type: bannerPart.type,
-        } as unknown as Blob);
-      }
-
       const normalizedBase = API_BASE_URL.replace(/\/+$/, "");
       if (__DEV__) {
         console.log("[update-business-profile] request", {
-          endpoint: `${normalizedBase}/api/auto-shop-owner/edit-business-profile`,
+          endpoint: `${normalizedBase}/api/autoshopowner/profile/business`,
           fields: {
             businessName: nextBusinessName,
             businessAddress: nextBusinessAddress,
             city: nextBusinessCity,
             pincode: nextBusinessPincode,
-            lat: nextLatText,
-            lng: nextLngText,
             businessPhone: nextBusinessPhone,
             businessEmail: nextBusinessEmail,
             businessHSTNumber: nextBusinessHst,
-            gst: nextBusinessGst,
+            gst: nextBusinessGst || "0",
+            shopTypes: editShopTypes,
             businessLogo: shouldUploadBusinessLogo ? "attached" : "unchanged",
-            bannerImage: shouldUploadBusinessBanner ? "attached" : businessBannerRemoved ? "removed" : "unchanged",
           },
         });
       }
@@ -1006,7 +977,6 @@ export default function ProfilePage() {
       const response = await fetch(businessProfileUrl, {
         method: "PUT",
         headers: {
-          // Let React Native set the multipart boundary automatically.
           Authorization: token,
         },
         body,
@@ -1027,7 +997,6 @@ export default function ProfilePage() {
         return;
       }
 
-      // Show result immediately; refresh happens after.
       showToast(payload.message ?? "Business profile updated successfully.", { type: "success" });
 
       await refreshSession();
@@ -1124,25 +1093,6 @@ export default function ProfilePage() {
     }
   }
 
-  const requestBusinessGps = useCallback(async () => {
-    if (!token) {
-      showToast("You are not authenticated. Please log in again.", { type: "error" });
-      return;
-    }
-    try {
-      const { lat, lng } = await getQuickDeviceCoordinates();
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        showToast("Could not read GPS coordinates.", { type: "error" });
-        return;
-      }
-      setEditBusinessLat(String(lat));
-      setEditBusinessLng(String(lng));
-      showToast("GPS coordinates updated.", { type: "success" });
-    } catch {
-      showToast("Could not fetch GPS coordinates.", { type: "error" });
-    }
-  }, [setEditBusinessLat, setEditBusinessLng, showToast, token]);
-
   return (
     <>
       <TabScreenFrame
@@ -1183,11 +1133,14 @@ export default function ProfilePage() {
                 editEmail={editEmail}
                 setEditEmail={setEditEmail}
                 editPhone={editPhone}
-                setEditPhone={setEditPhone}
-                editPincode={editPincode}
-                setEditPincode={setEditPincode}
-                editAddress={editAddress}
-                setEditAddress={setEditAddress}
+                editCityName={editCityName}
+                onPickCity={() => {
+                  setCityPickerTarget("personal");
+                  setCityPickerOpen(true);
+                }}
+                editProfilePhotoUri={editProfilePhotoUri}
+                onPickProfilePhoto={() => void pickProfilePhoto()}
+                onRemoveProfilePhoto={clearProfilePhoto}
               />
 
               {isAutoShopOwner ? (
@@ -1203,7 +1156,6 @@ export default function ProfilePage() {
                     businessFields={businessFields}
                     viewableBusinessLogoUri={viewableBusinessLogoUri}
                     onViewLogo={setLogoViewerUri}
-                    onRequestDeviceLocation={requestBusinessGps}
                     editBusinessName={editBusinessName}
                     setEditBusinessName={setEditBusinessName}
                     editBusinessEmail={editBusinessEmail}
@@ -1213,23 +1165,21 @@ export default function ProfilePage() {
                     editBusinessAddress={editBusinessAddress}
                     setEditBusinessAddress={setEditBusinessAddress}
                     editBusinessCityName={editBusinessCityName}
-                    onPickBusinessCity={() => setCityPickerOpen(true)}
+                    onPickBusinessCity={() => {
+                      setCityPickerTarget("business");
+                      setCityPickerOpen(true);
+                    }}
                     editBusinessPincode={editBusinessPincode}
                     setEditBusinessPincode={setEditBusinessPincode}
-                    editBusinessLat={editBusinessLat}
-                    setEditBusinessLat={setEditBusinessLat}
-                    editBusinessLng={editBusinessLng}
-                    setEditBusinessLng={setEditBusinessLng}
                     editBusinessHstNumber={editBusinessHstNumber}
                     setEditBusinessHstNumber={setEditBusinessHstNumber}
                     editBusinessGstPercent={editBusinessGstPercent}
                     setEditBusinessGstPercent={setEditBusinessGstPercent}
+                    editShopTypes={editShopTypes}
+                    onToggleShopType={toggleShopType}
                     editBusinessLogoUri={editBusinessLogoUri}
                     onPickBusinessLogo={handlePickBusinessLogo}
                     onRemoveBusinessLogo={clearBusinessLogo}
-                    editBusinessBannerUri={editBusinessBannerUri}
-                    onPickBusinessBanner={pickBusinessBanner}
-                    onRemoveBusinessBanner={clearBusinessBanner}
                   />
 
                   <ActivityScheduleCard
@@ -1297,10 +1247,19 @@ export default function ProfilePage() {
               visible={cityPickerOpen}
               onClose={() => setCityPickerOpen(false)}
               authToken={token}
-              selectedId={editBusinessCityId || null}
+              selectedId={
+                cityPickerTarget === "personal"
+                  ? editCityId || null
+                  : editBusinessCityId || null
+              }
               onSelect={(city: UserCity) => {
-                setEditBusinessCityId(city.id);
-                setEditBusinessCityName(city.name);
+                if (cityPickerTarget === "personal") {
+                  setEditCityId(city.id);
+                  setEditCityName(city.name);
+                } else {
+                  setEditBusinessCityId(city.id);
+                  setEditBusinessCityName(city.name);
+                }
               }}
             />
 

@@ -9,6 +9,7 @@ import { AppBar, NetworkStatusStrip, TabScreenFrame } from "@/components/reusabl
 import { associateColors, associateGradients } from "@/constants/associate-theme";
 import { spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
+import { useAndroidExitOnBack } from "@/hooks/use-android-exit-on-back";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import { useCallback, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -18,6 +19,7 @@ const PLACEHOLDER_QUOTE =
 
 export default function AssociateHomePage() {
   const { meta } = useAuth();
+  useAndroidExitOnBack();
   const [refreshing, setRefreshing] = useState(false);
 
   const displayName = meta?.name?.trim() || "Associate";

@@ -332,7 +332,7 @@ export default function OwnerInvoicesPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2">
+            {/* <div className="flex flex-wrap items-center gap-2">
               <ToolbarButton
                 variant="primary"
                 disabled={selectedIds.length !== 1}
@@ -341,7 +341,7 @@ export default function OwnerInvoicesPage() {
                 <FiCreditCard size={13} aria-hidden />
                 Enter Payment
               </ToolbarButton>
-            </div>
+            </div> */}
 
             <div className={OWNER_TABLE_SURFACE_CLASS}>
               <div className="overflow-x-auto">
