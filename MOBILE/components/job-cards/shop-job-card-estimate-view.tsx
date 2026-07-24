@@ -42,7 +42,7 @@ import type { AutoShopOwnerProfileResponse } from "@/types/auto-shop-owner-profi
 import type { ShopProfileBusiness } from "@/types/shop-owner";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -107,14 +107,16 @@ export function ShopJobCardEstimateView({
   const [actionPreview, setActionPreview] = useState<JobCardActionPreview | null>(
     initialActionPreview,
   );
+  const onActionPreviewChangeRef = useRef(onActionPreviewChange);
+  onActionPreviewChangeRef.current = onActionPreviewChange;
 
   useEffect(() => {
-    setActionPreview(initialActionPreview);
+    setActionPreview((prev) => (prev === initialActionPreview ? prev : initialActionPreview));
   }, [initialActionPreview, jobCardId]);
 
   useEffect(() => {
-    onActionPreviewChange?.(actionPreview);
-  }, [actionPreview, onActionPreviewChange]);
+    onActionPreviewChangeRef.current?.(actionPreview);
+  }, [actionPreview]);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,7 +230,7 @@ export function ShopJobCardEstimateView({
     () =>
       job
         ? estimateTotals(lines, effectiveHstRate, job, { includeHst: showHst })
-        : { subtotal: 0, hst: 0, roundOff: 0, total: 0 },
+        : { subtotal: 0, discount: 0, hst: 0, roundOff: 0, total: 0 },
     [job, lines, effectiveHstRate, showHst],
   );
 
@@ -556,6 +558,14 @@ export function ShopJobCardEstimateView({
                   {formatEstimateMoney(totals.subtotal, countryCode)}
                 </Text>
               </View>
+              {totals.discount > 0 ? (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Discount :</Text>
+                  <Text style={[styles.totalValue, styles.discountValue]}>
+                    −{formatEstimateMoney(totals.discount, countryCode)}
+                  </Text>
+                </View>
+              ) : null}
               {showHst ? (
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>HST :</Text>
@@ -786,6 +796,9 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     fontWeight: "700",
     color: colors.text,
+  },
+  discountValue: {
+    color: "#047857",
   },
   grandTotalRow: {
     flexDirection: "row",

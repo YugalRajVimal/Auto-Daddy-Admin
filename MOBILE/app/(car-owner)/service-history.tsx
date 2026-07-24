@@ -10,8 +10,15 @@ import { ChevronLabelBar, useToast } from "@/components/reusables";
 import { cardFontSizes, colors, fontSizes, radii, shadows, spacing, typography } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import { useCarOwnerJobCards } from "@/hooks/use-car-owner-job-cards";
+import { useCarOwnerJobCardApprovals } from "@/hooks/use-car-owner-job-card-approvals";
+import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "@/hooks/use-car-owner-invoices";
 import { useSidebarUser } from "@/hooks/use-sidebar-user";
 import { getJson } from "@/lib/api";
+import {
+  fetchCarOwnerJobCardById,
+  isCarOwnerJobCardPendingApproval,
+  resolveCarOwnerJobCardForViewer,
+} from "@/lib/car-owner-job-cards";
 import { formatCurrencyAmount } from "@/lib/currency";
 import { formatStoredNationalPhone } from "@/lib/dial-countries";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
@@ -156,11 +163,7 @@ function jobCardImageUris(jc: CarOwnerJobCard): string[] {
 }
 
 function isPendingEstimate(jc: CarOwnerJobCard): boolean {
-  const v = (jc.status ?? "").toLowerCase();
-  if (v.includes("pending")) return true;
-  if (v.includes("reject") || v.includes("cancel")) return false;
-  if (v.includes("approve") || v.includes("complete") || v.includes("done")) return false;
-  return false;
+  return isCarOwnerJobCardPendingApproval(jc);
 }
 
 function businessPhoneRaw(business: CarOwnerJobCard["business"] | undefined): string {
@@ -275,8 +278,22 @@ export default function CarOwnerServiceHistory() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [vehiclePickerOpen, setVehiclePickerOpen] = useState(false);
 
-  const { items, loading, error, refresh, approveJobCard, rejectJobCard } = useCarOwnerJobCards(selectedVehicleId);
+  const { items, loading, error, refresh, approveJobCard, rejectJobCard } =
+    useCarOwnerJobCards(selectedVehicleId);
+  const { acting, approveMany, rejectMany } = useCarOwnerJobCardApprovals();
+  const {
+    loading: invoicesLoading,
+    error: invoicesError,
+    refresh: refreshInvoices,
+    invoiceRows,
+    paidInvoices,
+    unpaidInvoices,
+    findJobCardById,
+  } = useCarOwnerInvoices();
   const insets = useSafeAreaInsets();
+  const [mainSegment, setMainSegment] = useState<"jobcards" | "invoices">("jobcards");
+  const [invoicePaidTab, setInvoicePaidTab] = useState<"paid" | "unpaid">("unpaid");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const loadVehicles = useCallback(async () => {
     if (!token) {
@@ -359,10 +376,85 @@ export default function CarOwnerServiceHistory() {
     setViewerJob(null);
   }, []);
 
-  const openViewer = useCallback((jc: CarOwnerJobCard) => {
-    setActionErrorById((prev) => ({ ...prev, [jc._id]: null }));
-    setViewerJob(jc);
+  const openViewer = useCallback(
+    async (jc: CarOwnerJobCard) => {
+      setActionErrorById((prev) => ({ ...prev, [jc._id]: null }));
+      setViewerJob(jc);
+      if (!token) return;
+      try {
+        const res = await fetchCarOwnerJobCardById(token, jc._id);
+        if (res.ok) {
+          const detailed = resolveCarOwnerJobCardForViewer(res.data, jc);
+          if (detailed) setViewerJob(detailed);
+        }
+      } catch {
+        // Keep list payload if detail fetch fails.
+      }
+    },
+    [token]
+  );
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }, []);
+
+  const pendingSelectedIds = useMemo(
+    () =>
+      selectedIds.filter((id) => {
+        const jc = items.find((row) => row._id === id);
+        return jc ? isPendingEstimate(jc) : false;
+      }),
+    [items, selectedIds]
+  );
+
+  const onBatchApprove = useCallback(async () => {
+    if (pendingSelectedIds.length === 0) {
+      showToast("Select pending estimates to approve.", { type: "info" });
+      return;
+    }
+    const result = await approveMany(pendingSelectedIds);
+    showToast(result.message, { type: result.ok ? "success" : "error" });
+    if (result.ok) {
+      setSelectedIds([]);
+      await refresh();
+      await refreshInvoices();
+    }
+  }, [approveMany, pendingSelectedIds, refresh, refreshInvoices, showToast]);
+
+  const onBatchDiscard = useCallback(async () => {
+    if (pendingSelectedIds.length === 0) {
+      showToast("Select pending estimates to discard.", { type: "info" });
+      return;
+    }
+    const result = await rejectMany(pendingSelectedIds);
+    showToast(result.message, { type: result.ok ? "success" : "error" });
+    if (result.ok) {
+      setSelectedIds([]);
+      await refresh();
+      await refreshInvoices();
+    }
+  }, [pendingSelectedIds, refresh, refreshInvoices, rejectMany, showToast]);
+
+  const openInvoiceViewer = useCallback(
+    async (row: CarOwnerInvoiceRow) => {
+      const fromList = findJobCardById(row.id);
+      if (fromList) {
+        await openViewer(fromList);
+        return;
+      }
+      if (!token) return;
+      try {
+        const res = await fetchCarOwnerJobCardById(token, row.id);
+        if (res.ok) {
+          const detailed = resolveCarOwnerJobCardForViewer(res.data, null);
+          if (detailed) setViewerJob(detailed);
+        }
+      } catch {
+        // Ignore detail fetch failures for invoice rows without cache.
+      }
+    },
+    [findJobCardById, openViewer, token]
+  );
 
   const onCallShop = useCallback(
     (jc: CarOwnerJobCard) => {
@@ -398,16 +490,26 @@ export default function CarOwnerServiceHistory() {
     return acc;
   }, {});
 
+  const visibleInvoiceRows = invoicePaidTab === "paid" ? paidInvoices : unpaidInvoices;
+
   const sectionKeys = Object.keys(sections);
 
   return (
     <CarOwnerStackScreenFrame
-      title="Estimates"
+      title="Expenses"
       scroll={false}
       bodyStyle={styles.frameBodyNoPadding}
       contentContainerStyle={styles.frameBodyNoPadding}
       right={
-        <Pressable hitSlop={10} onPress={refresh} style={styles.headerIconBtn}>
+        <Pressable
+          hitSlop={10}
+          onPress={() => {
+            void loadVehicles();
+            void refresh();
+            void refreshInvoices();
+          }}
+          style={styles.headerIconBtn}
+        >
           <Ionicons name="refresh" size={20} color={colors.successDark} />
         </Pressable>
       }
@@ -418,154 +520,256 @@ export default function CarOwnerServiceHistory() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={loading || vehiclesLoading}
+            refreshing={loading || vehiclesLoading || invoicesLoading}
             onRefresh={() => {
               void loadVehicles();
               void refresh();
+              void refreshInvoices();
             }}
             tintColor={colors.successDark}
           />
         }
       >
-        <ChevronLabelBar
-          label={currentVehicleBarLabel}
-          bordered
-          edgeAligned
-          style={styles.vehicleChevronBar}
-          onPrevious={canCycleVehicles ? () => cycleVehicle(-1) : undefined}
-          onNext={canCycleVehicles ? () => cycleVehicle(1) : undefined}
-          onPressLabel={() => setVehiclePickerOpen(true)}
-        />
-
-        {/* <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabsRow}
-          style={{ flexGrow: 0, marginBottom: spacing.lg, marginTop: spacing.md }}
-        >
-          {(["all", "pending", "approved", "rejected"] as const).map((tab) => {
-            const isActive = activeTab === tab;
-            const isPending = tab === "pending";
-            const isApproved = tab === "approved";
-            const isRejected = tab === "rejected";
+        <View style={styles.segmentRow}>
+          {([
+            { id: "jobcards" as const, label: "Job cards" },
+            { id: "invoices" as const, label: "Invoices" },
+          ]).map((seg) => {
+            const active = mainSegment === seg.id;
             return (
               <Pressable
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                style={[
-                  styles.tab,
-                  isActive && styles.tabActive,
-                  isActive && isPending ? styles.tabActivePending : null,
-                  isActive && isApproved ? styles.tabActiveApproved : null,
-                  isActive && isRejected ? styles.tabActiveRejected : null,
-                ]}
+                key={seg.id}
+                onPress={() => setMainSegment(seg.id)}
+                style={[styles.segmentBtn, active && styles.segmentBtnActive]}
               >
-                <Text
-                  style={[
-                    styles.tabText,
-                    isActive && styles.tabTextActive,
-                    isActive && isPending ? styles.tabTextActivePending : null,
-                    isActive && isApproved ? styles.tabTextActiveApproved : null,
-                    isActive && isRejected ? styles.tabTextActiveRejected : null,
-                  ]}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </Text>
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{seg.label}</Text>
               </Pressable>
             );
           })}
-        </ScrollView> */}
+        </View>
 
-        {error ? (
-          <View style={styles.centerBlock}>
-            <Ionicons name="cloud-offline-outline" size={44} color={colors.textLight} />
-            <Text style={styles.emptyTitle}>Couldn’t load service history</Text>
-            <Text style={styles.emptySubtitle}>{error}</Text>
-            <Pressable onPress={refresh} style={styles.retryBtn} android_ripple={{ color: "rgba(22,101,52,0.12)" }}>
-              <Ionicons name="refresh-outline" size={18} color={colors.successDark} />
-              <Text style={styles.retryBtnText}>Try again</Text>
-            </Pressable>
-          </View>
-        ) : loading && items.length === 0 ? (
-          <View style={styles.centerBlock}>
-            <ActivityIndicator color={colors.successDark} />
-            <Text style={styles.emptySubtitle}>Loading your service history…</Text>
-          </View>
-        ) : items.length === 0 ? (
-          <View style={styles.centerBlock}>
-            <Ionicons name="time-outline" size={44} color={colors.textLight} />
-            <Text style={styles.emptyTitle}>
-              {selectedVehicleId ? "No service history for this vehicle" : "No service history yet"}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {selectedVehicleId
-                ? "Try another vehicle or view all vehicles."
-                : "Your completed and pending services will show up here."}
-            </Text>
-          </View>
-        ) : sortedForUi.length === 0 ? (
-          <View style={styles.centerBlock}>
-            <Ionicons name="document-text-outline" size={44} color={colors.textLight} />
-            <Text style={styles.emptyTitle}>No {activeTab} services</Text>
-            <Text style={styles.emptySubtitle}>There are no services in this category.</Text>
-          </View>
-        ) : (
-          <View style={{ gap: spacing.lg }}>
-            {sectionKeys.map((key) => (
-              <View key={key} style={{ gap: spacing.md }}>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionHeader}>{key}</Text>
-                  <View style={styles.sectionHeaderRule} />
+        {mainSegment === "jobcards" ? (
+          <>
+            <ChevronLabelBar
+              label={currentVehicleBarLabel}
+              bordered
+              edgeAligned
+              style={styles.vehicleChevronBar}
+              onPrevious={canCycleVehicles ? () => cycleVehicle(-1) : undefined}
+              onNext={canCycleVehicles ? () => cycleVehicle(1) : undefined}
+              onPressLabel={() => setVehiclePickerOpen(true)}
+            />
+
+            {pendingSelectedIds.length > 0 ? (
+              <View style={styles.batchBar}>
+                <Text style={styles.batchBarText}>{pendingSelectedIds.length} selected</Text>
+                <View style={styles.batchBarActions}>
+                  <Pressable
+                    disabled={acting}
+                    onPress={() => void onBatchApprove()}
+                    style={[styles.batchApproveBtn, acting && styles.actionBtnDisabled]}
+                  >
+                    <Text style={styles.batchBtnText}>Approve</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={acting}
+                    onPress={() => void onBatchDiscard()}
+                    style={[styles.batchDiscardBtn, acting && styles.actionBtnDisabled]}
+                  >
+                    <Text style={styles.batchBtnText}>Discard</Text>
+                  </Pressable>
                 </View>
-
-                {sections[key]?.map((jc) => {
-                  const isPending = isPendingEstimate(jc);
-                  const serviceLabel = serviceTypeLabel(jc);
-                  const dateLabel = safeDateLabel(jc.createdAt);
-                  const plateLabel = jobCardPlateLabel(jc);
-                  const imageUris = jobCardImageUris(jc);
-                  const thumbUri = imageUris[0] ?? null;
-                  const imageViewerTitle = plateLabel || serviceLabel;
-                  const openImages = () => openJobCardImages(imageViewerTitle, imageUris);
-
-                  return (
-                    <View key={jc._id} style={styles.jobCard}>
-                      {isPending ? (
-                        <View style={styles.pendingEstimateTag} accessibilityRole="text">
-                          <Text style={styles.pendingEstimateTagText}>Pending</Text>
-                        </View>
-                      ) : null}
-                      <Pressable
-                        onPress={() => openViewer(jc)}
-                        style={({ pressed }) => [styles.collapsedSummary, pressed && styles.collapsedSummaryPressed]}
-                        accessibilityRole="button"
-                        accessibilityLabel="View estimate details"
-                      >
-                        <JobCardThumb uri={thumbUri} onPress={imageUris.length > 0 ? openImages : undefined} />
-                        <View style={styles.collapsedMain}>
-                          <View style={styles.serviceTypePill}>
-                            <Text style={styles.serviceTypePillText} numberOfLines={2}>
-                              {serviceLabel}
-                            </Text>
-                          </View>
-                          {plateLabel ? (
-                            <Text style={styles.collapsedPlate} numberOfLines={1}>
-                              {plateLabel}
-                            </Text>
-                          ) : null}
-                          {dateLabel ? (
-                            <Text style={styles.collapsedDate} numberOfLines={1}>
-                              {dateLabel}
-                            </Text>
-                          ) : null}
-                        </View>
-                      </Pressable>
-                    </View>
-                  );
-                })}
               </View>
-            ))}
-          </View>
+            ) : null}
+
+            {error ? (
+              <View style={styles.centerBlock}>
+                <Ionicons name="cloud-offline-outline" size={44} color={colors.textLight} />
+                <Text style={styles.emptyTitle}>Couldn’t load job cards</Text>
+                <Text style={styles.emptySubtitle}>{error}</Text>
+                <Pressable onPress={refresh} style={styles.retryBtn} android_ripple={{ color: "rgba(22,101,52,0.12)" }}>
+                  <Ionicons name="refresh-outline" size={18} color={colors.successDark} />
+                  <Text style={styles.retryBtnText}>Try again</Text>
+                </Pressable>
+              </View>
+            ) : loading && items.length === 0 ? (
+              <View style={styles.centerBlock}>
+                <ActivityIndicator color={colors.successDark} />
+                <Text style={styles.emptySubtitle}>Loading your job cards…</Text>
+              </View>
+            ) : items.length === 0 ? (
+              <View style={styles.centerBlock}>
+                <Ionicons name="time-outline" size={44} color={colors.textLight} />
+                <Text style={styles.emptyTitle}>
+                  {selectedVehicleId ? "No job cards for this vehicle" : "No job cards yet"}
+                </Text>
+                <Text style={styles.emptySubtitle}>
+                  {selectedVehicleId
+                    ? "Try another vehicle or view all vehicles."
+                    : "Pending and completed job cards will show up here."}
+                </Text>
+              </View>
+            ) : sortedForUi.length === 0 ? (
+              <View style={styles.centerBlock}>
+                <Ionicons name="document-text-outline" size={44} color={colors.textLight} />
+                <Text style={styles.emptyTitle}>No {activeTab} services</Text>
+                <Text style={styles.emptySubtitle}>There are no services in this category.</Text>
+              </View>
+            ) : (
+              <View style={{ gap: spacing.lg }}>
+                {sectionKeys.map((key) => (
+                  <View key={key} style={{ gap: spacing.md }}>
+                    <View style={styles.sectionHeaderRow}>
+                      <Text style={styles.sectionHeader}>{key}</Text>
+                      <View style={styles.sectionHeaderRule} />
+                    </View>
+
+                    {sections[key]?.map((jc) => {
+                      const isPending = isPendingEstimate(jc);
+                      const serviceLabel = serviceTypeLabel(jc);
+                      const dateLabel = safeDateLabel(jc.createdAt);
+                      const plateLabel = jobCardPlateLabel(jc);
+                      const imageUris = jobCardImageUris(jc);
+                      const thumbUri = imageUris[0] ?? null;
+                      const imageViewerTitle = plateLabel || serviceLabel;
+                      const openImages = () => openJobCardImages(imageViewerTitle, imageUris);
+                      const selected = selectedIds.includes(jc._id);
+
+                      return (
+                        <View key={jc._id} style={styles.jobCard}>
+                          {isPending ? (
+                            <View style={styles.pendingEstimateTag} accessibilityRole="text">
+                              <Text style={styles.pendingEstimateTagText}>Pending</Text>
+                            </View>
+                          ) : null}
+                          <View style={styles.collapsedRow}>
+                            {isPending ? (
+                              <Pressable
+                                onPress={() => toggleSelected(jc._id)}
+                                hitSlop={8}
+                                style={styles.selectHit}
+                                accessibilityRole="checkbox"
+                                accessibilityState={{ checked: selected }}
+                              >
+                                <Ionicons
+                                  name={selected ? "checkbox" : "square-outline"}
+                                  size={22}
+                                  color={colors.successDark}
+                                />
+                              </Pressable>
+                            ) : (
+                              <View style={styles.selectHitSpacer} />
+                            )}
+                            <Pressable
+                              onPress={() => void openViewer(jc)}
+                              style={({ pressed }) => [
+                                styles.collapsedSummary,
+                                pressed && styles.collapsedSummaryPressed,
+                              ]}
+                              accessibilityRole="button"
+                              accessibilityLabel="View estimate details"
+                            >
+                              <JobCardThumb
+                                uri={thumbUri}
+                                onPress={imageUris.length > 0 ? openImages : undefined}
+                              />
+                              <View style={styles.collapsedMain}>
+                                <View style={styles.serviceTypePill}>
+                                  <Text style={styles.serviceTypePillText} numberOfLines={2}>
+                                    {serviceLabel}
+                                  </Text>
+                                </View>
+                                {plateLabel ? (
+                                  <Text style={styles.collapsedPlate} numberOfLines={1}>
+                                    {plateLabel}
+                                  </Text>
+                                ) : null}
+                                {dateLabel ? (
+                                  <Text style={styles.collapsedDate} numberOfLines={1}>
+                                    {dateLabel}
+                                  </Text>
+                                ) : null}
+                              </View>
+                            </Pressable>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            <View style={styles.segmentRow}>
+              {([
+                { id: "unpaid" as const, label: `Unpaid (${unpaidInvoices.length})` },
+                { id: "paid" as const, label: `Paid (${paidInvoices.length})` },
+              ]).map((tab) => {
+                const active = invoicePaidTab === tab.id;
+                return (
+                  <Pressable
+                    key={tab.id}
+                    onPress={() => setInvoicePaidTab(tab.id)}
+                    style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+                  >
+                    <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{tab.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {invoicesError ? (
+              <View style={styles.centerBlock}>
+                <Text style={styles.emptyTitle}>Couldn’t load invoices</Text>
+                <Text style={styles.emptySubtitle}>{invoicesError}</Text>
+                <Pressable
+                  onPress={() => void refreshInvoices()}
+                  style={styles.retryBtn}
+                  android_ripple={{ color: "rgba(22,101,52,0.12)" }}
+                >
+                  <Text style={styles.retryBtnText}>Try again</Text>
+                </Pressable>
+              </View>
+            ) : invoicesLoading && invoiceRows.length === 0 ? (
+              <View style={styles.centerBlock}>
+                <ActivityIndicator color={colors.successDark} />
+                <Text style={styles.emptySubtitle}>Loading invoices…</Text>
+              </View>
+            ) : visibleInvoiceRows.length === 0 ? (
+              <View style={styles.centerBlock}>
+                <Ionicons name="receipt-outline" size={44} color={colors.textLight} />
+                <Text style={styles.emptyTitle}>No {invoicePaidTab} invoices</Text>
+                <Text style={styles.emptySubtitle}>Invoices converted from job cards will appear here.</Text>
+              </View>
+            ) : (
+              <View style={{ gap: spacing.md }}>
+                {visibleInvoiceRows.map((row) => (
+                  <Pressable
+                    key={row.id}
+                    onPress={() => void openInvoiceViewer(row)}
+                    style={({ pressed }) => [styles.invoiceRowCard, pressed && styles.collapsedSummaryPressed]}
+                  >
+                    <View style={styles.invoiceRowTop}>
+                      <Text style={styles.invoiceRowNo}>{row.invoiceNo}</Text>
+                      <Text style={styles.invoiceRowAmount}>
+                        {formatMoneyPlain(row.amount, meta?.countryCode)}
+                      </Text>
+                    </View>
+                    <Text style={styles.invoiceRowMeta} numberOfLines={1}>
+                      {[row.shopName, row.vehicle, row.plate].filter(Boolean).join(" · ")}
+                    </Text>
+                    <Text style={styles.invoiceRowMeta} numberOfLines={1}>
+                      Job {row.jobNo}
+                      {row.createdAt ? ` · ${safeDateLabel(row.createdAt)}` : ""}
+                      {` · ${row.paymentStatus}`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -640,7 +844,9 @@ export default function CarOwnerServiceHistory() {
               <View style={styles.invoiceHeader}>
                 <View style={styles.invoiceHeaderLeft}>
                   <Text style={styles.invoiceHeaderTitle}>
-                    {viewerJob.business?.businessName?.trim() || "Auto shop"}
+                    {typeof viewerJob.business === "string"
+                      ? viewerJob.business.trim() || "Auto shop"
+                      : viewerJob.business?.businessName?.trim() || "Auto shop"}
                   </Text>
                   <Text style={styles.invoiceHeaderSub}>
                     {businessLocationLabel(viewerJob.business) || "—"}
@@ -658,7 +864,7 @@ export default function CarOwnerServiceHistory() {
               >
                 {(() => {
                   const jc = viewerJob;
-                  const customer = resolveCustomerInfo(jc, meta?.name ?? userName, userPhone);
+                  const customer = resolveCustomerInfo(jc, meta?.name ?? userName ?? "", userPhone ?? "");
                   const dateLabel = safeDateLabel(jc.createdAt);
                   const plate = jobCardPlateLabel(jc);
                   const make = vehicleMakeModelLabel(jc.vehicleId) || "—";
@@ -800,6 +1006,7 @@ export default function CarOwnerServiceHistory() {
                           }));
                           return;
                         }
+                        await refreshInvoices();
                         closeViewer();
                       }}
                       style={({ pressed }) => [
@@ -828,6 +1035,7 @@ export default function CarOwnerServiceHistory() {
                           }));
                           return;
                         }
+                        await refreshInvoices();
                         closeViewer();
                       }}
                       style={({ pressed }) => [
@@ -872,6 +1080,70 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenHorizontal,
     paddingBottom: spacing.xxl,
   },
+  segmentRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  segmentBtn: {
+    flex: 1,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: "rgba(22,101,52,0.16)",
+  },
+  segmentBtnActive: {
+    backgroundColor: colors.successDark,
+    borderColor: colors.successDark,
+  },
+  segmentText: {
+    fontSize: fontSizes.sm,
+    fontWeight: "800",
+    color: colors.successDark,
+  },
+  segmentTextActive: { color: colors.white },
+  batchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: "rgba(22,101,52,0.08)",
+  },
+  batchBarText: { fontSize: fontSizes.sm, fontWeight: "800", color: colors.successDark },
+  batchBarActions: { flexDirection: "row", gap: spacing.sm },
+  batchApproveBtn: {
+    backgroundColor: colors.successDark,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  batchDiscardBtn: {
+    backgroundColor: "#991B1B",
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  batchBtnText: { color: colors.white, fontWeight: "800", fontSize: fontSizes.sm },
+  collapsedRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  selectHit: { paddingHorizontal: 2, paddingVertical: 8 },
+  selectHitSpacer: { width: 26 },
+  invoiceRowCard: {
+    backgroundColor: colors.white,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: "rgba(22,101,52,0.12)",
+    gap: 4,
+  },
+  invoiceRowTop: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },
+  invoiceRowNo: { fontWeight: "900", color: colors.text, fontSize: fontSizes.md },
+  invoiceRowAmount: { fontWeight: "900", color: colors.successDark, fontSize: fontSizes.md },
+  invoiceRowMeta: { fontSize: fontSizes.xs, fontWeight: "700", color: colors.textMuted },
   vehicleChevronBar: {
     backgroundColor: colors.white,
     marginHorizontal: 0,

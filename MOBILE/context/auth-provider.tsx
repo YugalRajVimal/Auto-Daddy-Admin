@@ -18,6 +18,7 @@ import {
   isDevAssociateToken,
 } from "@/lib/dev-associate-session";
 import type { CarOwnerDashboardApiResponse } from "@/types/car-owner-dashboard";
+import { coalesceCarOwnerHomePayload, fetchCarOwnerHome } from "@/lib/car-owner-home-api";
 import { fetchAndMergeShopOwnerPortal } from "@/lib/shop-owner-portal-bootstrap";
 import {
   isAuthSessionUnauthorized,
@@ -255,21 +256,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (isCarOwnerRole(nextMeta.role)) {
         options?.onProgress?.("Fetching dashboard");
-        const carOwnerDashboardResponse = await getJson<CarOwnerDashboardApiResponse>(
-          "/api/user/dashboard",
-          { authToken }
-        );
-        if (carOwnerDashboardResponse.ok && carOwnerDashboardResponse.data?.success) {
-          await saveCarOwnerDashboardDetails(carOwnerDashboardResponse.data);
-          const up = carOwnerDashboardResponse.data.userProfile;
-          if (up) {
-            nextMeta = mergeSessionPhoneFields({
-              ...nextMeta,
-              role: up.role ?? nextMeta.role,
-              name: up.name ?? nextMeta.name,
-              isProfileComplete: up.isProfileComplete ?? nextMeta.isProfileComplete,
-              profilePhoto: up.profilePhoto ?? nextMeta.profilePhoto,
-            }, up.phone, up.countryCode);
+        const carOwnerDashboardResponse = await fetchCarOwnerHome(authToken);
+        if (carOwnerDashboardResponse.ok && carOwnerDashboardResponse.data) {
+          const home =
+            coalesceCarOwnerHomePayload(carOwnerDashboardResponse.data) ??
+            carOwnerDashboardResponse.data;
+          if (home.success !== false) {
+            await saveCarOwnerDashboardDetails(home);
+            const up = home.userProfile;
+            if (up) {
+              nextMeta = mergeSessionPhoneFields(
+                {
+                  ...nextMeta,
+                  role: up.role ?? nextMeta.role,
+                  name: up.name ?? nextMeta.name,
+                  isProfileComplete: up.isProfileComplete ?? nextMeta.isProfileComplete,
+                  profilePhoto: up.profilePhoto ?? nextMeta.profilePhoto,
+                },
+                up.phone,
+                up.countryCode
+              );
+            }
           }
         }
       }

@@ -1,5 +1,8 @@
 import { useAuth } from "@/context/auth-provider";
-import { getJson } from "@/lib/api";
+import {
+  coalesceCarOwnerHomePayload,
+  fetchCarOwnerHome,
+} from "@/lib/car-owner-home-api";
 import { getCarOwnerDashboardDetails, saveCarOwnerDashboardDetails } from "@/lib/auth";
 import type { CarOwnerDashboardApiResponse } from "@/types/car-owner-dashboard";
 import { useCallback, useEffect, useState } from "react";
@@ -17,21 +20,22 @@ export function useCarOwnerDashboard() {
     }
 
     const cached = await getCarOwnerDashboardDetails<CarOwnerDashboardApiResponse>();
-    const hadCache = Boolean(cached?.success);
+    const hadCache = Boolean(cached);
     if (hadCache) {
-      setData(cached);
+      setData(coalesceCarOwnerHomePayload(cached) ?? cached);
       setLoading(false);
     } else {
       setLoading(true);
     }
 
-    const res = await getJson<CarOwnerDashboardApiResponse>("/api/user/dashboard", {
-      authToken: token,
-    });
-    if (res.ok && res.data?.success) {
-      await saveCarOwnerDashboardDetails(res.data);
-      await syncCarOwnerProfileFromDashboard(res.data.userProfile);
-      setData(res.data);
+    const res = await fetchCarOwnerHome(token);
+    if (res.ok && res.data) {
+      const next = coalesceCarOwnerHomePayload(res.data) ?? res.data;
+      if (next.success !== false) {
+        await saveCarOwnerDashboardDetails(next);
+        await syncCarOwnerProfileFromDashboard(next.userProfile);
+        setData(next);
+      }
     }
     setLoading(false);
   }, [syncCarOwnerProfileFromDashboard, token]);

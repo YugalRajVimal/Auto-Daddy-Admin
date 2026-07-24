@@ -22,7 +22,7 @@ const CAR_OWNER_ITEMS = [
   { label: "Dashboard", icon: "home-outline", tone: "#16A34A", route: "/(car-owner)/(tabs)/home" },
   { label: "My Vehicles", icon: "car-outline", tone: "#166534", route: "/(car-owner)/my-vehicles" },
   { label: "Schedule Service", icon: "calendar-outline", tone: "#22C55E", route: "/(car-owner)/schedule-service" },
-  { label: "Service History", icon: "time-outline", tone: "#0EA5E9", route: "/(car-owner)/service-history" },
+  { label: "Expenses", icon: "time-outline", tone: "#0EA5E9", route: "/(car-owner)/service-history" },
   { label: "Settings", icon: "settings-outline", tone: "#64748B", route: "/(car-owner)/settings" },
 ] as const;
 
@@ -55,7 +55,7 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
       : "/profile";
   const generalItems = isCarOwner
     ? ([
-      { label: "About Us", icon: "information-circle-outline", tone: "#F59E0B", route: "/(car-owner)/about" },
+      { label: "Features", icon: "information-circle-outline", tone: "#F59E0B", route: "/(car-owner)/about" },
       { label: "Privacy Policy", icon: "shield-checkmark-outline", tone: "#3B82F6", route: "/(car-owner)/privacypolicy" },
       { label: "FAQs", icon: "help-circle-outline", tone: "#8B5CF6", route: "/(car-owner)/faqs" },
       { label: "Documents", icon: "document-text-outline", tone: "#7C3AED", route: "/(car-owner)/documents" },

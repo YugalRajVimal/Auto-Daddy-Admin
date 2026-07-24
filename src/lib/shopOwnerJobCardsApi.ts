@@ -90,6 +90,7 @@ function legacyBlocksToAutoshopServices(
         unitCost,
         qty,
       };
+      if (subName) item.subServiceName = subName;
       if (subRequiresOdoOut(cat, subName) || odoOutReading > 0) {
         item.odoOutReading = odoOutReading;
       }
@@ -124,6 +125,8 @@ function flatServicesToAutoshopServices(services: unknown[]): AutoshopJobCardSer
       unitCost,
       qty,
     };
+    const subServiceName = String(s.subServiceName ?? s.name ?? "").trim();
+    if (subServiceName) item.subServiceName = subServiceName;
     const odo = parseNumber(s.odoOutReading);
     if (odo > 0) item.odoOutReading = odo;
     const discountPercentage = parseNumber(s.discountPercentage);
@@ -317,12 +320,15 @@ export function normalizeJobCardServiceBlocks(job: Record<string, unknown>): unk
     if (!serviceId) continue;
     const bucket = byService.get(serviceId) ?? [];
     const subName = String(s.subServiceName ?? s.name ?? "").trim();
+    const desc = String(s.desc ?? "").trim();
     bucket.push({
-      name: subName,
-      desc: String(s.desc ?? ""),
+      name: subName || desc,
+      desc,
       qty: s.qty ?? 1,
       unitPrice: s.unitCost ?? s.unitPrice ?? s.amount,
       price: s.amount ?? s.unitCost,
+      labourCost: s.labourCost ?? s.labourCharge,
+      labourCharge: s.labourCharge ?? s.labourCost,
       dueOdometerReading: s.odoOutReading ?? s.dueOdometerReading ?? s.odoOut,
       odoOut: s.odoOutReading ?? s.odoOut,
       odoOutReading: s.odoOutReading,

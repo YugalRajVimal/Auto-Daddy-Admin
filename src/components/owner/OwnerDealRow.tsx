@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { FiCalendar, FiHeart, FiPhone, FiTag } from "react-icons/fi";
+import { FiCalendar, FiHeart, FiMapPin, FiPhone, FiTag } from "react-icons/fi";
 import {
   dealDiscountPercent,
   dealKindLabel,
@@ -58,8 +58,26 @@ function shopPhone(deal: CarOwnerDeal): string | undefined {
     c.mobile ??
     c.contactPhone ??
     c.contactDetails?.phone ??
-    c.contactDetails?.mobile
+    c.contactDetails?.mobile ??
+    c.contactDetails?.landline
   );
+}
+
+function shopAddressLine(deal: CarOwnerDeal): string | null {
+  const address = deal.createdBy.businessAddress?.trim();
+  const city = deal.createdBy.city?.trim();
+  if (address && city) {
+    const cityLower = city.toLowerCase();
+    if (address.toLowerCase().includes(cityLower)) return address;
+    return `${address}, ${city}`;
+  }
+  return address || city || null;
+}
+
+function shopDirectionsUrl(deal: CarOwnerDeal): string | null {
+  const query = shopAddressLine(deal);
+  if (!query) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
 function SpecPill({ icon: Icon, children }: { icon: typeof FiTag; children: ReactNode }) {
@@ -92,7 +110,10 @@ export default function OwnerDealRow({
   const description = deal.description?.trim();
   const phone = shopPhone(deal)?.trim();
   const logoUri = normalizeMediaUrl(deal.createdBy.businessLogo);
-  const shopCity = deal.createdBy.city?.trim().toUpperCase();
+  const shopName = deal.createdBy.businessName.trim();
+  const shopCity = deal.createdBy.city?.trim();
+  const locationLine = shopAddressLine(deal);
+  const directionsUrl = shopDirectionsUrl(deal);
   const ribbonLabel = !active ? "ENDED" : isJustArrived(deal) ? "JUST ARRIVED" : "ACTIVE";
 
   const className = `group overflow-hidden rounded-2xl border bg-white/95 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(15,23,42,0.1)] ${
@@ -172,35 +193,78 @@ export default function OwnerDealRow({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-slate-100/90 bg-gradient-to-b from-slate-50/40 to-white/80 px-4 py-3 sm:px-5">
-        <div className="flex min-w-0 items-center gap-2.5">
-          {logoUri ? (
-            <img
-              src={logoUri}
-              alt=""
-              className="size-9 shrink-0 rounded-xl border border-slate-200/80 object-cover"
-            />
-          ) : (
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50 text-xs font-bold text-slate-500">
-              {deal.createdBy.businessName.charAt(0).toUpperCase()}
+      <div className="border-t border-slate-100/90 bg-gradient-to-b from-slate-50/40 to-white/80 px-4 py-3 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-2.5">
+            {logoUri ? (
+              <img
+                src={logoUri}
+                alt=""
+                className="size-10 shrink-0 rounded-xl border border-slate-200/80 object-cover"
+              />
+            ) : (
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50 text-sm font-bold text-slate-500">
+                {shopName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                Shop details
+              </p>
+              <p className="truncate text-sm font-bold text-slate-900">{shopName}</p>
+              {locationLine ? (
+                <p className="line-clamp-2 text-xs leading-relaxed text-slate-500">
+                  <FiMapPin size={11} className="mr-1 inline -mt-0.5 text-slate-400" aria-hidden />
+                  {locationLine}
+                </p>
+              ) : shopCity ? (
+                <p className="truncate text-xs text-slate-500">{shopCity}</p>
+              ) : null}
+              {phone ? (
+                <a
+                  href={`tel:${phone.replace(/\s/g, "")}`}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FiPhone size={11} aria-hidden />
+                  {phone}
+                </a>
+              ) : (
+                <p className="text-xs text-slate-400">Phone not listed</p>
+              )}
             </div>
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-slate-900">{deal.createdBy.businessName}</p>
-            {shopCity ? <p className="truncate text-xs text-slate-500">{shopCity}</p> : null}
+          </div>
+
+          <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+            {phone ? (
+              <a
+                href={`tel:${phone.replace(/\s/g, "")}`}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FiPhone size={14} aria-hidden />
+                Call shop
+              </a>
+            ) : null}
+            {directionsUrl ? (
+              <a
+                href={directionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-800"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FiMapPin size={14} aria-hidden />
+                Directions
+              </a>
+            ) : null}
+            {!phone && !directionsUrl ? (
+              <span className="inline-flex items-center rounded-xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-500">
+                Contact info unavailable
+              </span>
+            ) : null}
           </div>
         </div>
-
-        {phone ? (
-          <a
-            href={`tel:${phone.replace(/\s/g, "")}`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-sky-50 px-3 py-1.5 text-sm font-semibold text-sky-700 ring-1 ring-sky-100 transition hover:bg-sky-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <FiPhone size={14} aria-hidden />
-            Contact
-          </a>
-        ) : null}
       </div>
     </>
   );
@@ -215,3 +279,4 @@ export default function OwnerDealRow({
 
   return <article className={className}>{inner}</article>;
 }
+

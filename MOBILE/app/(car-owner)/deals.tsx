@@ -31,7 +31,8 @@ function safeDateLabel(iso: string): string {
 
 function dealKindLabel(dealType: string | undefined): "Service" | "Parts" {
   const v = (dealType ?? "").trim().toLowerCase();
-  return v === "parts" ? "Parts" : "Service";
+  if (v === "parts" || v.includes("salvage")) return "Parts";
+  return "Service";
 }
 
 function dealTitle(d: CarOwnerDeal): string {

@@ -165,7 +165,8 @@ export default function AutoShopDetailScreen() {
   }, [shopFromParams, shopId, token]);
 
   const openToday = shop ? isCarOwnerShopOpenToday(shop) : false;
-  const openPillText = shop ? (openToday ? "Open" : "Closed") : "";
+  const openPillText = shop ? (openToday ? "Shop is Open" : "Closed") : "";
+  const todayHoursText = shop?.todayHoursText?.trim() || "";
 
   const hasPhone = Boolean(shop?.phone?.trim());
   const hasWebsite = Boolean(shop?.website?.trim());
@@ -350,10 +351,17 @@ export default function AutoShopDetailScreen() {
                   {shop.name}
                 </Text>
                 <StarRow rating={shop.rating} />
-                <View style={[styles.openPill, openToday ? styles.openPillOpen : styles.openPillClosed]}>
-                  <Text style={styles.openPillText} numberOfLines={1}>
-                    {openPillText}
-                  </Text>
+                <View style={styles.statusBlock}>
+                  <View style={[styles.openPill, openToday ? styles.openPillOpen : styles.openPillClosed]}>
+                    <Text style={styles.openPillText} numberOfLines={1}>
+                      {openPillText}
+                    </Text>
+                  </View>
+                  {todayHoursText ? (
+                    <Text style={styles.todayHoursText} numberOfLines={1}>
+                      {todayHoursText}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
             </View>
@@ -414,11 +422,16 @@ export default function AutoShopDetailScreen() {
             onToggle={() => setHoursOpen((v) => !v)}
           >
             <View style={{ gap: spacing.sm }}>
-              <Text style={styles.hoursLine}>
+              {todayHoursText ? (
+                <Text style={styles.hoursLine}>Today: {todayHoursText}</Text>
+              ) : null}
+              <Text style={todayHoursText ? styles.hoursMuted : styles.hoursLine}>
                 {shop.openHoursText?.trim() ? shop.openHoursText : shop.timing}
               </Text>
               {shop.openDaysText?.trim() ? <Text style={styles.hoursMuted}>{shop.openDaysText}</Text> : null}
-              {shop.closedScheduleText?.trim() ? <Text style={styles.hoursMuted}>Closed: {shop.closedScheduleText}</Text> : null}
+              {shop.closedScheduleText?.trim() ? (
+                <Text style={styles.hoursMuted}>Closed: {shop.closedScheduleText}</Text>
+              ) : null}
             </View>
           </ExpandableCard>
 
@@ -570,22 +583,31 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     letterSpacing: -0.3,
   },
+  statusBlock: {
+    marginTop: 2,
+    gap: 4,
+    alignItems: "flex-start",
+  },
   openPill: {
-    alignSelf: "stretch",
-    paddingVertical: 8,
-    paddingHorizontal: spacing.xl,
+    alignSelf: "flex-start",
+    paddingVertical: 4,
+    paddingHorizontal: spacing.md,
     borderRadius: radii.round,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 2,
   },
   openPillOpen: { backgroundColor: colors.successDark },
-  openPillClosed: { backgroundColor: "rgba(148,163,184,0.35)" },
+  openPillClosed: { backgroundColor: "rgba(148,163,184,0.85)" },
   openPillText: {
-    fontSize: fontSizes.sm,
+    fontSize: 11,
     fontWeight: "800",
     color: colors.white,
     letterSpacing: 0.2,
+  },
+  todayHoursText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: colors.textMuted,
   },
   stars: { flexDirection: "row", alignItems: "center", gap: 2 },
   ratingNum: { marginLeft: 6, fontSize: fontSizes.sm, fontWeight: "800", color: colors.text },

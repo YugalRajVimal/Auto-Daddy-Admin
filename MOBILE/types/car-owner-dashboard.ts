@@ -1,4 +1,5 @@
 export type CarOwnerContentBlock = {
+  _id?: string;
   heading: string;
   desc: string;
 };
@@ -16,15 +17,16 @@ export type CarOwnerDashboardVehicle = {
 };
 
 export type CarOwnerUserProfile = {
-  _id: string;
-  phone: string;
+  _id?: string;
+  phone?: string;
   countryCode?: string;
-  isProfileComplete: boolean;
-  createdAt: string;
+  isProfileComplete?: boolean;
+  createdAt?: string;
   email?: string;
-  name: string;
-  role: string;
-  myVehicles: CarOwnerDashboardVehicle[];
+  name?: string;
+  role?: string;
+  city?: string;
+  myVehicles?: CarOwnerDashboardVehicle[];
   profilePhoto?: string | null;
   thoughtOfTheDayLiked?: boolean;
 };
@@ -93,9 +95,17 @@ export type CarOwnerDashboardPayload = {
 };
 
 export type CarOwnerDashboardApiResponse = {
-  success: boolean;
-  dashboard: CarOwnerDashboardPayload;
-  userProfile: CarOwnerUserProfile;
-  nextService: CarOwnerNextService | null;
+  success?: boolean;
+  dashboard?: CarOwnerDashboardPayload;
+  userProfile?: CarOwnerUserProfile;
+  nextService?: CarOwnerNextService | null;
   thoughtOfTheDayLiked?: boolean;
+  /** Nested home payload from GET /api/carowner/home */
+  data?: {
+    thoughtOfTheDay?: string | CarOwnerThoughtOfTheDayApi;
+    thoughtOfTheDayLike?: number;
+    carOwnerName?: string;
+    name?: string | null;
+    city?: string | null;
+  };
 };

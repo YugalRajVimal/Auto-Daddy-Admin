@@ -2,10 +2,8 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { FiCheck, FiClipboard, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
-import {
-  JobCardViewerDialog,
-} from "../../../../invoice-job-card-viewer/InvoiceJobCardViewer.jsx";
 import { Skeleton } from "../../../components/common/Skeleton";
+import OwnerJobCardViewerDialog from "../../../components/owner/OwnerJobCardViewerDialog";
 import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
@@ -335,7 +333,7 @@ export default function OwnerExpensesJobCardsPage() {
         )}
       </div>
 
-      <JobCardViewerDialog
+      <OwnerJobCardViewerDialog
         open={viewerKind === "jobcard"}
         onClose={closeViewer}
         jobCardId={selectedJobCardId ?? undefined}

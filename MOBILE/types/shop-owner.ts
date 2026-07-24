@@ -48,6 +48,7 @@ export type ShopDeal = {
   description?: string;
   price?: number | string;
   discountedPrice?: number | string;
+  discountPercentage?: number | string;
   dealEnabled?: boolean;
   offersEndOnDate?: string;
   createdAt?: string;
@@ -55,6 +56,8 @@ export type ShopDeal = {
   soldToCustomerName?: string;
   soldAt?: string;
   serviceId?: string;
+  /** When set, deal applies to this catalog sub-service name. */
+  subServiceName?: string;
   vehicleId?: string;
   service?: { id?: string; name?: string; desc?: string };
   selectedVehicle?: {

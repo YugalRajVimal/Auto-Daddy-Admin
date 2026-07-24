@@ -118,6 +118,51 @@ export function extractEstimateLines(job: Record<string, unknown>, hstRate: numb
   return lines;
 }
 
+/** Deal discount on a single service / sub-service record. */
+function serviceRecordDiscount(rec: Record<string, unknown>): number {
+  const pct = parseNum(rec.discountPercentage);
+  if (pct <= 0) return 0;
+  const qty = parseNum(rec.qty ?? rec.unit ?? 1) || 1;
+  const unitCost = parseNum(rec.unitCost ?? rec.unitPrice ?? rec.price);
+  const before = parseNum(rec.amountBeforeDiscount);
+  const base = before > 0 ? before : unitCost * qty;
+  if (base <= 0) return 0;
+  return (base * pct) / 100;
+}
+
+/** Sum of deal discounts on job services, or job-level discount fields if present. */
+export function extractEstimateDiscount(job: Record<string, unknown>): number {
+  const payable = nested(job.payableAmounts);
+  const fromPayable =
+    parseNum(payable?.discount) ||
+    parseNum(payable?.discountAmount) ||
+    parseNum(payable?.totalDiscount);
+  const fromJob =
+    parseNum(job.discount) ||
+    parseNum(job.discountAmount) ||
+    parseNum(job.totalDiscount);
+  if (fromPayable > 0) return fromPayable;
+  if (fromJob > 0) return fromJob;
+
+  let sum = 0;
+  const services = job.services;
+  if (!Array.isArray(services)) return 0;
+  for (const svc of services) {
+    const block = nested(svc);
+    if (!block) continue;
+    const subs = block.subServices ?? block.selectedSubServices;
+    if (Array.isArray(subs)) {
+      for (const subRaw of subs) {
+        const sub = nested(subRaw);
+        if (sub) sum += serviceRecordDiscount(sub);
+      }
+      continue;
+    }
+    sum += serviceRecordDiscount(block);
+  }
+  return sum;
+}
+
 export function formatEstimateMoney(
   amount: number | string | null | undefined,
   countryCode: string | null | undefined,
@@ -383,6 +428,8 @@ export function estimateTotals(
 ) {
   const includeHst = options?.includeHst !== false;
   const subtotal = lines.reduce((sum, line) => sum + line.price, 0);
+  const discount = extractEstimateDiscount(job);
+  const taxable = Math.max(0, subtotal - discount);
   const payable = nested(job.payableAmounts);
   const gstAmount = parseNum(payable?.gstAmount);
   const roundOff = parseNum(payable?.roundOff);
@@ -390,10 +437,10 @@ export function estimateTotals(
     ? gstAmount > 0
       ? gstAmount
       : hstRate > 0
-        ? (subtotal * hstRate) / 100
+        ? (taxable * hstRate) / 100
         : 0
     : 0;
-  const computedTotal = subtotal + hst + roundOff;
+  const computedTotal = taxable + hst + roundOff;
   const apiTotal = includeHst
     ? parseNum(job.totalPayableAmount) ||
       parseNum(job.totalAmount) ||
@@ -410,7 +457,7 @@ export function estimateTotals(
       : computedTotal > 0
         ? computedTotal
         : apiTotal;
-  return { subtotal, hst, roundOff, total };
+  return { subtotal, discount, hst, roundOff, total };
 }
 
 export function extractJobNoFromApiEnvelope(resp: unknown): string | undefined {

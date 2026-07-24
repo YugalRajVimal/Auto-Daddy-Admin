@@ -226,11 +226,11 @@ export function CarOwnerHomeDashboard({
                 <ActionTile
                   icon="calendar-outline"
                   label="Auto Shops Nearby"
-                  href={CAR_OWNER_SHOP_TYPE_SCREENS.autoShops.href}
+                  href={CAR_OWNER_SHOP_TYPE_SCREENS.autoShop.href}
                 />
               </View>
               <View style={styles.actionCell}>
-                <ActionTile icon="time-outline" label="Estimates" href="/(car-owner)/service-history" />
+                <ActionTile icon="time-outline" label="Expenses" href="/(car-owner)/service-history" />
               </View>
             </View>
             <View style={styles.actionRow}>

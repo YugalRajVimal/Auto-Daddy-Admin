@@ -3,8 +3,13 @@ import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import {
   enabledWeekdaysFromSchedule,
   closedWeekdaysFromSchedule,
+  formatOpenHoursRangeDisplay,
   formatPerDayScheduleDisplay,
+  isNowWithinOpenClose,
+  pickCurrentWeekTimingForToday,
   resolvePerDaySchedule,
+  WEEK_DAYS,
+  type WeekDay,
 } from "@/lib/per-day-open-hours";
 import { formatPincodeDisplay } from "@/lib/validation";
 import type { CarOwnerAutoShopListItem } from "@/types/car-owner-auto-shops";
@@ -264,10 +269,22 @@ export function canonicalWeekdayToday(): string {
 }
 
 /**
- * Uses API open/closed weekday lists. If only `closedWeekdays` is set, any day not listed stays eligible.
- * If `openWeekdays` is non-empty, today must be included. Unknown schedule (both empty) is treated as open.
+ * Open now / open today from `currentWeekTimings` when present; otherwise weekday lists.
+ * When today's open/close times are known, also requires the current clock time to fall in range.
  */
-export function isCarOwnerShopOpenToday(shop: CarOwnerAutoShopListItem): boolean {
+export function isCarOwnerShopOpenToday(
+  shop: CarOwnerAutoShopListItem,
+  now = new Date()
+): boolean {
+  if (typeof shop.isClosedToday === "boolean") {
+    if (shop.isClosedToday) return false;
+    if (shop.todayOpen && shop.todayClose) {
+      return isNowWithinOpenClose(shop.todayOpen, shop.todayClose, now);
+    }
+    // Open today but hours not listed on the timing row.
+    return true;
+  }
+
   const today = canonicalWeekdayToday();
   if (shop.closedWeekdays.includes(today)) return false;
   if (shop.openWeekdays.length > 0) return shop.openWeekdays.includes(today);
@@ -330,6 +347,48 @@ function parseWgs84MapLocation(raw: Record<string, unknown>): { lat: number; lng
   return { lat, lng };
 }
 
+/** Collect all shop categories. API may send `shopType` as a string or string[]. */
+function extractShopTypes(raw: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  const pushOne = (value: string) => {
+    const t = value.trim();
+    if (!t || seen.has(t)) return;
+    seen.add(t);
+    out.push(t);
+  };
+
+  const push = (value: unknown) => {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      if (trimmed.startsWith("[")) {
+        try {
+          push(JSON.parse(trimmed));
+          return;
+        } catch {
+          pushOne(trimmed);
+          return;
+        }
+      }
+      pushOne(trimmed);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) push(item);
+    }
+  };
+
+  // Prefer explicit plural, then singular `shopType` (often an array on list APIs).
+  push(raw.shopTypes);
+  push(raw.shopType);
+  push(raw.shop_type);
+  push(raw.type);
+
+  return out;
+}
+
 /** Pull an array of shop-like objects from common API envelope shapes. */
 export function extractAutoShopsArray(payload: unknown): Record<string, unknown>[] {
   if (payload == null) return [];
@@ -371,6 +430,29 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
         }
       : buildScheduleDisplay(raw, normalizeWeekdayList(raw.openDays), normalizeWeekdayList(raw.closedDays));
 
+  const todayFromApi = pickCurrentWeekTimingForToday(raw);
+  const todayDay = WEEK_DAYS[(new Date().getDay() + 6) % 7] as WeekDay;
+  const todayEntry = daySchedule[todayDay];
+  const isClosedToday = todayFromApi ? todayFromApi.isClosed : !todayEntry?.enabled;
+  const todayOpen = todayFromApi
+    ? todayFromApi.open
+    : todayEntry?.enabled
+      ? todayEntry.start
+      : null;
+  const todayClose = todayFromApi
+    ? todayFromApi.close
+    : todayEntry?.enabled
+      ? todayEntry.end
+      : null;
+  const todayHoursText = (() => {
+    if (isClosedToday) return "Closed today";
+    if (todayOpen && todayClose) return formatOpenHoursRangeDisplay(todayOpen, todayClose);
+    // API marked the day open without open/close — don't invent hours.
+    if (todayFromApi) return "Hours not listed";
+    if (todayEntry?.enabled) return formatOpenHoursRangeDisplay(todayEntry.start, todayEntry.end);
+    return pickString(schedule.openHoursText) || "Hours not listed";
+  })();
+
   const pincode = pickString(raw.pincode, raw.postalCode, raw.zip);
   const pincodeForDisplay = formatPincodeDisplay(pincode) || pincode;
   const line1 = pickString(raw.businessAddress, raw.address, raw.fullAddress);
@@ -400,7 +482,8 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
 
   const services = extractServices(raw);
   const coords = parseWgs84MapLocation(raw);
-  const shopType = pickString(raw.shopType, raw.shop_type, raw.type);
+  const shopTypes = extractShopTypes(raw);
+  const shopType = shopTypes[0] ?? "";
 
   return {
     id,
@@ -412,6 +495,10 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
     openHoursText: schedule.openHoursText,
     openDaysText: schedule.openDaysText,
     closedScheduleText: schedule.closedScheduleText,
+    todayHoursText,
+    isClosedToday,
+    todayOpen,
+    todayClose,
     mainServices: services.mainServices,
     mainServiceItems: services.mainServiceItems,
     subServices: services.subServices,
@@ -424,6 +511,7 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
     closedWeekdays,
     isFavorite: false,
     shopType,
+    shopTypes,
   };
 }
 

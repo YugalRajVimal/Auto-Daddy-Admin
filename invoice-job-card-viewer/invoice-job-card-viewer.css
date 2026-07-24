@@ -26,6 +26,29 @@
   border: 1px solid #d6ebfb;
 }
 
+.invoice-viewer-panel-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid #d6ebfb;
+  padding: 0.625rem 0.75rem;
+  backdrop-filter: blur(6px);
+}
+
+@media (min-width: 640px) {
+  .invoice-viewer-panel-header {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 .invoice-viewer-panel-footer {
   position: sticky;
   bottom: 0;

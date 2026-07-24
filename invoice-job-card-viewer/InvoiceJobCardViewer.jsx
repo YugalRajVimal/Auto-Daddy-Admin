@@ -769,6 +769,7 @@ function InvoiceDocument({
  * @param {string} [props.defaultLogoUrl] — fallback business logo
  * @param {(id: string) => Promise<unknown>} [props.fetchJobCard] — custom API loader
  * @param {() => Promise<unknown>} [props.fetchBusinessProfile] — custom profile loader
+ * @param {React.ReactNode} [props.header] — sticky top chrome (e.g. Print / Close)
  * @param {React.ReactNode} [props.footer]
  * @param {boolean} [props.stickyFooter]
  * @param {string} [props.footerClassName]
@@ -779,6 +780,7 @@ export default function InvoiceJobCardViewer({
   jobCardId,
   onClose,
   variant = "invoice",
+  header = null,
   footer = null,
   stickyFooter = true,
   footerClassName = "",
@@ -854,6 +856,7 @@ export default function InvoiceJobCardViewer({
         aria-modal="true"
         aria-label={variant === "invoice" ? "Invoice" : "Job card"}
       >
+        {header ? <div className="invoice-viewer-panel-header">{header}</div> : null}
         {loading ? <InvoiceViewerSkeleton /> : null}
         {error ? <div className="invoice-viewer-state invoice-viewer-state-error">{error}</div> : null}
         {!loading && !error && job ? (

@@ -10,10 +10,11 @@ export type CarOwnerShopTypeScreenConfig = {
 };
 
 export const CAR_OWNER_SHOP_TYPE_SCREENS: Record<CarOwnerShopType, CarOwnerShopTypeScreenConfig> = {
+  // Keep `autoShops` as a route alias, but always hit the API with canonical `autoShop`.
   autoShops: {
-    shopType: "autoShops",
+    shopType: "autoShop",
     title: "Auto Shops",
-    href: "/(car-owner)/schedule-service?shopType=autoShops",
+    href: "/(car-owner)/schedule-service?shopType=autoShop",
   },
   autoShop: {
     shopType: "autoShop",
@@ -42,11 +43,19 @@ const SHOP_TYPE_ALIASES: Record<string, CarOwnerShopType[]> = {
   autoShop: ["autoShops", "autoShop"],
 };
 
+/** Canonical value accepted by GET /api/user/auto-shops?shopType= */
+export function carOwnerShopTypeApiValue(shopType: CarOwnerShopType | null | undefined): string | null {
+  if (!shopType) return null;
+  if (shopType === "autoShops" || shopType === "autoShop") return "autoShop";
+  return shopType;
+}
+
 export function parseCarOwnerShopTypeParam(raw: unknown): CarOwnerShopType | null {
   const value = typeof raw === "string" ? raw.trim() : "";
   if (!value) return null;
   if (value in CAR_OWNER_SHOP_TYPE_SCREENS) {
-    return value as CarOwnerShopType;
+    // Normalize legacy `autoShops` deep links to the canonical API value.
+    return value === "autoShops" ? "autoShop" : (value as CarOwnerShopType);
   }
   return null;
 }
@@ -58,16 +67,28 @@ export function carOwnerShopTypeScreenTitle(shopType: CarOwnerShopType | null): 
 
 export function carOwnerShopTypeMatches(
   shopShopType: string | null | undefined,
-  filterShopType: CarOwnerShopType | null
+  filterShopType: CarOwnerShopType | null,
+  shopShopTypes?: readonly string[] | null
 ): boolean {
   if (!filterShopType) return true;
-  const normalized = (shopShopType ?? "").trim();
-  if (!normalized) return false;
+
+  const candidates = [
+    ...(Array.isArray(shopShopTypes) ? shopShopTypes : []),
+    ...(shopShopType ? [shopShopType] : []),
+  ]
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  // Backend / admin default missing type to autoShop.
+  const types = candidates.length > 0 ? candidates : ["autoShop"];
   const aliases = SHOP_TYPE_ALIASES[filterShopType];
-  if (aliases) {
-    return aliases.includes(normalized as CarOwnerShopType);
-  }
-  return normalized === filterShopType;
+
+  return types.some((normalized) => {
+    if (aliases) {
+      return aliases.includes(normalized as CarOwnerShopType);
+    }
+    return normalized === filterShopType;
+  });
 }
 
 export function scheduleServiceListHref(shopType: CarOwnerShopType | null): string {

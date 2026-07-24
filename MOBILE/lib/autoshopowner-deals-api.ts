@@ -17,6 +17,8 @@ export type AutoshopDealFormFields = {
   offersEndOnDate?: string;
   dealImage?: UploadPart | null;
   serviceId?: string;
+  productName?: string;
+  subServiceName?: string;
   partName?: string;
   vehicleId?: string;
   vehicleName?: string;
@@ -67,6 +69,8 @@ function buildAutoshopDealFormData(fields: AutoshopDealFormFields) {
   const dealType = fields.dealType ?? "Service";
   if (dealType === "Service") {
     appendText(fd, "serviceId", fields.serviceId);
+    appendText(fd, "productName", fields.productName);
+    appendText(fd, "subServiceName", fields.subServiceName ?? fields.productName);
   } else {
     appendText(fd, "partName", fields.partName);
     appendText(fd, "vehicleId", fields.vehicleId);

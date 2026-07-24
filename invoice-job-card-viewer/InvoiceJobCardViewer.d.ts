@@ -11,6 +11,7 @@ export type InvoiceJobCardViewerProps = {
   fetchJobCard?: (id: string) => Promise<unknown>;
   fetchBusinessProfile?: () => Promise<unknown>;
   businessProfile?: unknown;
+  header?: ReactNode;
   footer?: ReactNode;
   stickyFooter?: boolean;
   footerClassName?: string;

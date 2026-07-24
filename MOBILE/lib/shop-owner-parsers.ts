@@ -167,17 +167,28 @@ function toDeal(raw: unknown): ShopDeal | null {
       : null;
   const selectedVehicleName =
     s(selectedVehicle?.vehicleName) ?? s(selectedVehicle?.name) ?? s(o.vehicleName);
-  const productName =
-    s(o.productName) ?? s(o.partName) ?? (service ? s(service.name) : undefined) ?? selectedVehicleName;
+  const subServiceName = s(o.subServiceName);
+  const dealType = s(o.dealType);
+  const partName = s(o.partName);
+  const isPartsLike =
+    (dealType?.toLowerCase().includes("part") ?? false) || Boolean(partName);
+  // Service deals: prefer sub-service name (not parent category like AUTOBODY).
+  const productName = isPartsLike
+    ? s(o.productName) ?? partName ?? selectedVehicleName
+    : s(o.productName) ??
+      subServiceName ??
+      s(o.description) ??
+      (service ? s(service.name) : undefined);
   return {
     _id: s(o._id),
     id,
-    dealType: s(o.dealType),
+    dealType,
     productName,
-    partName: s(o.partName),
+    partName,
     description: s(o.description),
     price: (o.price ?? o.originalPrice) as ShopDeal["price"],
     discountedPrice: o.discountedPrice as ShopDeal["discountedPrice"],
+    discountPercentage: (o.discountPercentage ?? o.percentageDiscount) as ShopDeal["discountPercentage"],
     dealEnabled: typeof o.dealEnabled === "boolean" ? o.dealEnabled : undefined,
     offersEndOnDate: s(o.offersEndOnDate) ?? s(o.offerEndsOnDate),
     createdAt: s(o.createdAt) ?? s(o.updatedAt),
@@ -199,11 +210,12 @@ function toDeal(raw: unknown): ShopDeal | null {
           : undefined),
     soldAt: s(o.soldAt) ?? s(o.completedAt),
     serviceId: s(o.servicesId) ?? s(o.serviceId),
+    subServiceName,
     vehicleId: s(o.vehicleId) ?? s(selectedVehicle?.id),
     service:
-      service && (s(service.id) || s(service.name) || s(service.desc))
+      service && (s(service.id) || s(service._id) || s(service.name) || s(service.desc))
         ? {
-            id: s(service.id),
+            id: s(service.id) ?? s(service._id),
             name: s(service.name),
             desc: s(service.desc),
           }
@@ -246,6 +258,39 @@ export function isPartsDeal(d: ShopDeal) {
   if (isSalvagesDeal(d)) return false;
   const t = (d.dealType ?? "").toLowerCase();
   return t.includes("part") || Boolean(d.partName);
+}
+
+/** Display value for list/board: percent for service, price for parts. */
+export function shopDealDiscountLabel(deal: ShopDeal, empty = "—"): string {
+  if (isPartsDeal(deal) || isSalvagesDeal(deal)) {
+    const discounted = Number(deal.discountedPrice);
+    if (!Number.isFinite(discounted) || discounted < 0) return empty;
+    return String(discounted);
+  }
+
+  const explicitPct = Number(deal.discountPercentage);
+  if (Number.isFinite(explicitPct) && explicitPct > 0) {
+    return `${explicitPct}%`;
+  }
+
+  const original = Number(deal.price);
+  const discounted = Number(deal.discountedPrice);
+  if (
+    Number.isFinite(original) &&
+    original > 0 &&
+    Number.isFinite(discounted) &&
+    discounted >= 0 &&
+    discounted < original
+  ) {
+    return `${Math.round((1 - discounted / original) * 100)}%`;
+  }
+
+  // Legacy service deals stored the percent in discountedPrice.
+  if (Number.isFinite(discounted) && discounted > 0 && discounted <= 100) {
+    return `${discounted}%`;
+  }
+
+  return empty;
 }
 
 export function parseMyServices(payload: unknown): ShopServiceCategory[] {

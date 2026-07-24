@@ -59,14 +59,22 @@ export function extractEstimateLines(job: Record<string, unknown>, hstRate: numb
       for (const subRaw of subs) {
         const sub = nested(subRaw);
         if (!sub) continue;
-        const unitCost = parseNum(sub.unitPrice ?? sub.price);
         const qty = parseNum(sub.qty ?? sub.unit ?? sub.labourDuration ?? 1) || 1;
         const labour = parseNum(sub.labourCost ?? sub.labourCharge);
-        const rawPrice = parseNum(sub.price);
-        const price = rawPrice > 0 ? rawPrice : unitCost * qty + labour;
-        const desc = [s(sub.name), s(sub.desc)].filter(Boolean).join(" — ") || "Service";
+        const unitCost = parseNum(sub.unitPrice ?? sub.unitCost ?? sub.price);
+        const before = parseNum(sub.amountBeforeDiscount);
+        const rawPrice = parseNum(sub.price ?? sub.amount);
+        const price =
+          before > 0
+            ? before
+            : rawPrice > 0
+              ? rawPrice
+              : unitCost * qty + labour;
+        const name = s(sub.name) || s(sub.subServiceName);
+        const desc = s(sub.desc);
+        const label = [name, desc && desc !== name ? desc : ""].filter(Boolean).join(" — ") || "Service";
         lines.push({
-          description: desc,
+          description: label,
           unitCost: unitCost > 0 ? unitCost : Math.max(0, (price - labour) / qty),
           qty,
           hstRate,
@@ -77,14 +85,20 @@ export function extractEstimateLines(job: Record<string, unknown>, hstRate: numb
     }
 
     const category = s(block.category);
+    const name = s(block.subServiceName) || s(block.name);
     const desc = s(block.desc) ?? category ?? "Service";
     const unitCost = parseNum(block.unitCost ?? block.unitPrice);
     const qty = parseNum(block.qty ?? 1) || 1;
     const amount = parseNum(block.amount);
-    const price = amount > 0 ? amount : unitCost * qty;
-    if (category || desc || unitCost > 0 || price > 0) {
+    const before = parseNum(block.amountBeforeDiscount);
+    const price = before > 0 ? before : amount > 0 ? amount : unitCost * qty;
+    const label =
+      name && desc && name !== desc
+        ? `${name} — ${desc}`
+        : name || (category && desc && category !== desc ? `${category} — ${desc}` : desc);
+    if (category || label || unitCost > 0 || price > 0) {
       lines.push({
-        description: category && desc && category !== desc ? `${category} — ${desc}` : desc,
+        description: label || "Service",
         unitCost: unitCost > 0 ? unitCost : price / qty,
         qty,
         hstRate,
@@ -105,6 +119,51 @@ export function extractEstimateLines(job: Record<string, unknown>, hstRate: numb
   }
 
   return lines;
+}
+
+/** Deal discount on a single service / sub-service record. */
+function serviceRecordDiscount(rec: Record<string, unknown>): number {
+  const pct = parseNum(rec.discountPercentage);
+  if (pct <= 0) return 0;
+  const qty = parseNum(rec.qty ?? rec.unit ?? 1) || 1;
+  const unitCost = parseNum(rec.unitCost ?? rec.unitPrice ?? rec.price);
+  const before = parseNum(rec.amountBeforeDiscount);
+  const base = before > 0 ? before : unitCost * qty;
+  if (base <= 0) return 0;
+  return (base * pct) / 100;
+}
+
+/** Sum of deal discounts on job services, or job-level discount fields if present. */
+export function extractEstimateDiscount(job: Record<string, unknown>): number {
+  const payable = nested(job.payableAmounts);
+  const fromPayable =
+    parseNum(payable?.discount) ||
+    parseNum(payable?.discountAmount) ||
+    parseNum(payable?.totalDiscount);
+  const fromJob =
+    parseNum(job.discount) ||
+    parseNum(job.discountAmount) ||
+    parseNum(job.totalDiscount);
+  if (fromPayable > 0) return fromPayable;
+  if (fromJob > 0) return fromJob;
+
+  let sum = 0;
+  const services = job.services;
+  if (!Array.isArray(services)) return 0;
+  for (const svc of services) {
+    const block = nested(svc);
+    if (!block) continue;
+    const subs = block.subServices ?? block.selectedSubServices;
+    if (Array.isArray(subs)) {
+      for (const subRaw of subs) {
+        const sub = nested(subRaw);
+        if (sub) sum += serviceRecordDiscount(sub);
+      }
+      continue;
+    }
+    sum += serviceRecordDiscount(block);
+  }
+  return sum;
 }
 
 export function formatEstimateMoney(
@@ -349,6 +408,8 @@ export function estimateTotals(
 ) {
   const includeHst = options?.includeHst !== false;
   const subtotal = lines.reduce((sum, line) => sum + line.price, 0);
+  const discount = extractEstimateDiscount(job);
+  const taxable = Math.max(0, subtotal - discount);
   const payable = nested(job.payableAmounts);
   const gstAmount = parseNum(payable?.gstAmount);
   const roundOff = parseNum(payable?.roundOff);
@@ -356,10 +417,10 @@ export function estimateTotals(
     ? gstAmount > 0
       ? gstAmount
       : hstRate > 0
-        ? (subtotal * hstRate) / 100
+        ? (taxable * hstRate) / 100
         : 0
     : 0;
-  const computedTotal = subtotal + hst + roundOff;
+  const computedTotal = taxable + hst + roundOff;
   const apiTotal = includeHst
     ? parseNum(job.totalPayableAmount) ||
       parseNum(job.totalAmount) ||
@@ -376,7 +437,7 @@ export function estimateTotals(
       : computedTotal > 0
         ? computedTotal
         : apiTotal;
-  return { subtotal, hst, roundOff, total };
+  return { subtotal, discount, hst, roundOff, total };
 }
 
 export function currencyLabelFromCode(countryCode: string | null | undefined): string {

@@ -1,6 +1,9 @@
+import { useCallback, useState } from "react";
 import { Outlet, useLocation } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
+import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
+import { StickyFaqsButton } from "../../components/owner/OwnerFaqsButton";
 import ShopBusinessProfileCard from "../../components/shop/ShopBusinessProfileCard";
 import ShopHeroCardToolbar from "../../components/shop/ShopHeroCardToolbar";
 import ShopPrimaryNav from "../../components/shop/ShopPrimaryNav";
@@ -24,10 +27,23 @@ import {
   DEFAULT_SHOP_PAGE_CHROME,
   useShopPageChromeContext,
 } from "../../context/ShopPageChromeContext";
+import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 
 export default function ShopPageLayout() {
   const location = useLocation();
   const { chrome } = useShopPageChromeContext();
+  const { faqsHeading, faqsDescription } = useShopOwnerPortal();
+  const [localFaqsOpen, setLocalFaqsOpen] = useState(false);
+
+  const faqsOpen = chrome.faqsOpen === true || localFaqsOpen;
+  const openFaqs = useCallback(() => {
+    if (chrome.onFaqsOpen) chrome.onFaqsOpen();
+    else setLocalFaqsOpen(true);
+  }, [chrome.onFaqsOpen]);
+  const closeFaqs = useCallback(() => {
+    if (chrome.onFaqsClose) chrome.onFaqsClose();
+    setLocalFaqsOpen(false);
+  }, [chrome.onFaqsClose]);
 
   const metaTitle = chrome.metaTitle ?? DEFAULT_SHOP_PAGE_CHROME.metaTitle!;
   const metaDescription = chrome.metaDescription ?? DEFAULT_SHOP_PAGE_CHROME.metaDescription!;
@@ -129,6 +145,14 @@ export default function ShopPageLayout() {
           {pageContent}
         </div>
       </div>
+
+      <StickyFaqsButton onClick={openFaqs} />
+      <OwnerFaqsDialog
+        open={faqsOpen}
+        onClose={closeFaqs}
+        heading={chrome.faqsHeading ?? faqsHeading}
+        description={chrome.faqsDescription ?? faqsDescription}
+      />
     </PortalPageContent>
   );
 }

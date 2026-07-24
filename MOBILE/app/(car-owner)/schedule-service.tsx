@@ -6,9 +6,11 @@ import { useAuth } from "@/context/auth-provider";
 import { parseServiceCatalogResponse } from "@/hooks/use-auto-shop-services-catalog";
 import { useCarOwnerAutoShops } from "@/hooks/use-car-owner-auto-shops";
 import { useCarOwnerFavoriteShops } from "@/hooks/use-car-owner-favorite-shops";
+import { useCarOwnerCustomerRequests } from "@/hooks/use-car-owner-customer-requests";
 import { getJson, putJson } from "@/lib/api";
+import { formatCustomerRequestDate } from "@/lib/car-owner-approvals";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
-import { formatEndTimeForOpenPill, isCarOwnerShopOpenToday } from "@/lib/car-owner-auto-shops";
+import { isCarOwnerShopOpenToday } from "@/lib/car-owner-auto-shops";
 import {
   carOwnerShopTypeScreenTitle,
   parseCarOwnerShopTypeParam,
@@ -77,16 +79,9 @@ const AutoShopCard = memo(function AutoShopCard({
   onToggleFavorite,
   shopTypeFilter,
 }: AutoShopCardProps) {
-  const openToday = isCarOwnerShopOpenToday(shop);
-  const openUntilText = formatEndTimeForOpenPill(shop.openHoursText || shop.timing);
-  const openPillText = openToday
-    ?
-    // openUntilText
-    // ? `Open ${openUntilText}`
-    "Open"
-    // : openUntilText
-    // ? `Closed ${openUntilText}`
-    : "Closed";
+  const openNow = isCarOwnerShopOpenToday(shop);
+  const openPillText = openNow ? "Shop is Open" : "Closed";
+  const todayHoursText = shop.todayHoursText?.trim() || "";
 
   const onViewShop = useCallback(() => {
     router.push({
@@ -128,10 +123,17 @@ const AutoShopCard = memo(function AutoShopCard({
               <Text style={styles.shopName} numberOfLines={2}>
                 {shop.name}
               </Text>
-              <View style={[styles.openPill, openToday ? styles.openPillOpen : styles.openPillClosed]}>
-                <Text style={styles.openPillText} numberOfLines={1}>
-                  {openPillText}
-                </Text>
+              <View style={styles.statusBlock}>
+                <View style={[styles.openPill, openNow ? styles.openPillOpen : styles.openPillClosed]}>
+                  <Text style={styles.openPillText} numberOfLines={1}>
+                    {openPillText}
+                  </Text>
+                </View>
+                {todayHoursText ? (
+                  <Text style={styles.todayHoursText} numberOfLines={1}>
+                    {todayHoursText}
+                  </Text>
+                ) : null}
               </View>
             </View>
             <Pressable
@@ -157,11 +159,6 @@ const AutoShopCard = memo(function AutoShopCard({
             </Pressable>
           </View>
         </View>
-
-        {/* <View style={styles.expandToggle}>
-          <Text style={styles.expandToggleText}>Show more</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.successDark} />
-        </View> */}
       </Pressable>
     </View>
   );
@@ -600,8 +597,18 @@ export default function CarOwnerScheduleService() {
 
   const { shops, loading, error, refresh } = useCarOwnerAutoShops(shopFilters);
   const { favoriteIds, isFavorite, toggleFavorite, refresh: refreshFavorites } = useCarOwnerFavoriteShops();
-  const [listTab, setListTab] = useState<ShopsListTab>("favorites");
-  const [browsingAllWithoutFilters, setBrowsingAllWithoutFilters] = useState(false);
+  const {
+    items: customerRequests,
+    loading: requestsLoading,
+    error: requestsError,
+    actingId,
+    refresh: refreshRequests,
+    approve: approveRequest,
+    reject: rejectRequest,
+  } = useCarOwnerCustomerRequests();
+  const [listTab, setListTab] = useState<ShopsListTab>(shopTypeFilter ? "all" : "favorites");
+  const [mainSection, setMainSection] = useState<"shops" | "approvals">("shops");
+  const [browsingAllWithoutFilters, setBrowsingAllWithoutFilters] = useState(() => Boolean(shopTypeFilter));
   const [refreshing, setRefreshing] = useState(false);
 
   const loadFilterOptions = useCallback(async () => {
@@ -692,11 +699,17 @@ export default function CarOwnerScheduleService() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([refresh(), refreshFavorites(), loadMyCity(), loadFilterOptions()]);
+      await Promise.all([
+        refresh(),
+        refreshFavorites(),
+        refreshRequests(),
+        loadMyCity(),
+        loadFilterOptions(),
+      ]);
     } finally {
       setRefreshing(false);
     }
-  }, [loadFilterOptions, loadMyCity, refresh, refreshFavorites]);
+  }, [loadFilterOptions, loadMyCity, refresh, refreshFavorites, refreshRequests]);
 
   const handleToggleFavorite = useCallback(
     async (shopId: string) => {
@@ -758,7 +771,7 @@ export default function CarOwnerScheduleService() {
   }, []);
 
   const headerTabsAndFilters = useMemo(() => {
-    if (!showShopListChrome) return undefined;
+    if (mainSection !== "shops" || !showShopListChrome) return undefined;
     return (
       <HeaderTabsAndFilters
         myCityName={myCityName}
@@ -782,6 +795,7 @@ export default function CarOwnerScheduleService() {
     favoriteIds.size,
     hasActiveFilters,
     listTab,
+    mainSection,
     myCityName,
     openCityPicker,
     selectAll,
@@ -791,6 +805,22 @@ export default function CarOwnerScheduleService() {
     showShopListChrome,
   ]);
 
+  const onApproveRequest = useCallback(
+    async (businessId: string) => {
+      const result = await approveRequest(businessId);
+      showToast(result.message, { type: result.ok ? "success" : "error" });
+    },
+    [approveRequest, showToast]
+  );
+
+  const onRejectRequest = useCallback(
+    async (businessId: string) => {
+      const result = await rejectRequest(businessId);
+      showToast(result.message, { type: result.ok ? "success" : "error" });
+    },
+    [rejectRequest, showToast]
+  );
+
   return (
     <CarOwnerStackScreenFrame
       title={screenTitle}
@@ -798,19 +828,116 @@ export default function CarOwnerScheduleService() {
       onRefresh={handleRefresh}
       refreshing={refreshing}
     >
-      <ShopsList
-        loading={loading}
-        error={error}
-        shops={shops}
-        listTab={listTab}
-        favoriteIds={favoriteIds}
-        isFavorite={isFavorite}
-        onToggleFavorite={handleToggleFavorite}
-        onSelectAllTab={selectAll}
-        hasActiveFilters={hasActiveFilters}
-        shopTypeFilter={shopTypeFilter}
-        emptyTitle={emptyTitle}
-      />
+      <View style={styles.sectionTabs}>
+        {([
+          { id: "shops" as const, label: "Shops" },
+          {
+            id: "approvals" as const,
+            label: customerRequests.length > 0 ? `Approvals (${customerRequests.length})` : "Approvals",
+          },
+        ]).map((tab) => {
+          const active = mainSection === tab.id;
+          return (
+            <Pressable
+              key={tab.id}
+              onPress={() => setMainSection(tab.id)}
+              style={[styles.sectionTabBtn, active && styles.sectionTabBtnActive]}
+            >
+              <Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {mainSection === "shops" ? (
+        <ShopsList
+          loading={loading}
+          error={error}
+          shops={shops}
+          listTab={listTab}
+          favoriteIds={favoriteIds}
+          isFavorite={isFavorite}
+          onToggleFavorite={handleToggleFavorite}
+          onSelectAllTab={selectAll}
+          hasActiveFilters={hasActiveFilters}
+          shopTypeFilter={shopTypeFilter}
+          emptyTitle={emptyTitle}
+        />
+      ) : requestsLoading && customerRequests.length === 0 ? (
+        <View style={styles.centerBlock}>
+          <ActivityIndicator size="small" color={colors.successDark} />
+          <Text style={styles.emptySubtitle}>Loading approvals…</Text>
+        </View>
+      ) : requestsError ? (
+        <View style={styles.centerBlock}>
+          <Text style={styles.errorText}>{requestsError}</Text>
+          <Pressable style={styles.resetBtn} onPress={() => void refreshRequests()}>
+            <Text style={styles.resetBtnText}>Try again</Text>
+          </Pressable>
+        </View>
+      ) : customerRequests.length === 0 ? (
+        <View style={styles.centerBlock}>
+          <Ionicons name="checkmark-done-outline" size={40} color={colors.textLight} />
+          <Text style={styles.emptyTitle}>No pending approvals</Text>
+          <Text style={styles.emptySubtitle}>
+            Shops that ask to add you as a customer will show up here.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.approvalsList}>
+          {customerRequests.map((req) => {
+            const busy = actingId === req.businessId;
+            return (
+              <View key={req.businessId} style={styles.approvalCard}>
+                <View style={styles.approvalCardTop}>
+                  <View style={styles.approvalLogo}>
+                    {req.businessLogo ? (
+                      <Image
+                        source={{ uri: req.businessLogo }}
+                        style={styles.approvalLogoImage}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <Ionicons name="storefront-outline" size={22} color={colors.successDark} />
+                    )}
+                  </View>
+                  <View style={styles.approvalCopy}>
+                    <Text style={styles.approvalName}>{req.businessName}</Text>
+                    <Text style={styles.approvalMeta}>
+                      {[req.city, formatCustomerRequestDate(req.addedAt)].filter(Boolean).join(" · ")}
+                    </Text>
+                    {req.pendingEdit?.name || req.pendingEdit?.email ? (
+                      <Text style={styles.approvalMeta}>
+                        Requested as {[req.pendingEdit?.name, req.pendingEdit?.email]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+                <View style={styles.approvalActions}>
+                  <Pressable
+                    disabled={busy}
+                    onPress={() => void onApproveRequest(req.businessId)}
+                    style={[styles.approvalApproveBtn, busy && styles.filterModalBtnPressed]}
+                  >
+                    <Text style={styles.approvalActionText}>Approve</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={busy}
+                    onPress={() => void onRejectRequest(req.businessId)}
+                    style={[styles.approvalRejectBtn, busy && styles.filterModalBtnPressed]}
+                  >
+                    <Text style={styles.approvalActionText}>Reject</Text>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       <FilterPickerModal
         visible={serviceFilterOpen}
@@ -870,6 +997,69 @@ const cardChrome = Platform.select({
 });
 
 const styles = StyleSheet.create({
+  sectionTabs: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  sectionTabBtn: {
+    flex: 1,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: "rgba(22,101,52,0.16)",
+  },
+  sectionTabBtnActive: {
+    backgroundColor: colors.successDark,
+    borderColor: colors.successDark,
+  },
+  sectionTabText: {
+    fontSize: fontSizes.sm,
+    fontWeight: "800",
+    color: colors.successDark,
+  },
+  sectionTabTextActive: { color: colors.white },
+  approvalsList: { gap: spacing.md, paddingBottom: spacing.xl },
+  approvalCard: {
+    backgroundColor: colors.white,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: "rgba(22,101,52,0.12)",
+    gap: spacing.sm,
+  },
+  approvalCardTop: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
+  approvalLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(22,101,52,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  approvalLogoImage: { width: 44, height: 44 },
+  approvalCopy: { flex: 1, minWidth: 0, gap: 2 },
+  approvalName: { fontSize: fontSizes.md, fontWeight: "900", color: colors.text },
+  approvalMeta: { fontSize: fontSizes.xs, fontWeight: "700", color: colors.textMuted },
+  approvalActions: { flexDirection: "row", gap: spacing.sm },
+  approvalApproveBtn: {
+    flex: 1,
+    backgroundColor: colors.successDark,
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+  },
+  approvalRejectBtn: {
+    flex: 1,
+    backgroundColor: "#991B1B",
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+  },
+  approvalActionText: { color: colors.white, fontWeight: "800", fontSize: fontSizes.sm },
   screenIntro: {
     ...typography.bodyMuted,
     marginBottom: spacing.md,
@@ -1262,22 +1452,31 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     letterSpacing: -0.3,
   },
+  statusBlock: {
+    marginTop: 4,
+    gap: 4,
+    alignItems: "flex-start",
+  },
   openPill: {
-    alignSelf: "stretch",
-    paddingVertical: 8,
-    paddingHorizontal: spacing.xl,
+    alignSelf: "flex-start",
+    paddingVertical: 4,
+    paddingHorizontal: spacing.md,
     borderRadius: radii.round,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 2,
   },
   openPillOpen: { backgroundColor: colors.successDark },
-  openPillClosed: { backgroundColor: "rgba(148,163,184,0.35)" },
+  openPillClosed: { backgroundColor: "rgba(148,163,184,0.85)" },
   openPillText: {
-    fontSize: fontSizes.sm,
+    fontSize: 11,
     fontWeight: "800",
     color: colors.white,
     letterSpacing: 0.2,
+  },
+  todayHoursText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: colors.textMuted,
   },
   favBtn: {
     width: 34,

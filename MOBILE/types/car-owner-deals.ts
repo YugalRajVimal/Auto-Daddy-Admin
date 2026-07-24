@@ -34,6 +34,7 @@ export type CarOwnerDealBase = {
   _id: string;
   description: string;
   discountedPrice: number;
+  originalPrice?: number;
   offerEndsOnDate: string;
   createdBy: CarOwnerDealCreatedBy;
   imagePath: string | null;
@@ -50,7 +51,7 @@ export type CarOwnerServiceDeal = CarOwnerDealBase & {
 };
 
 export type CarOwnerPartsDeal = CarOwnerDealBase & {
-  dealType: "parts" | "Parts";
+  dealType: "parts" | "Parts" | "Salvages" | "salvage" | "Salvage";
   partName: string;
   selectedVehicle: CarOwnerDealSelectedVehicle;
   serviceId?: never;
@@ -58,8 +59,37 @@ export type CarOwnerPartsDeal = CarOwnerDealBase & {
 
 export type CarOwnerDeal = CarOwnerServiceDeal | CarOwnerPartsDeal;
 
-export type CarOwnerDealsResponse = {
-  success: boolean;
-  deals: CarOwnerDeal[];
+export type CarOwnerDealBucket = {
+  city: CarOwnerDeal[];
+  others: CarOwnerDeal[];
 };
 
+export type CarOwnerDealsGrouped = {
+  Service?: CarOwnerDealBucket | { city?: unknown; others?: unknown };
+  Parts?: CarOwnerDealBucket | { city?: unknown; others?: unknown };
+  Salvages?: CarOwnerDealBucket | { city?: unknown; others?: unknown };
+  service?: CarOwnerDealBucket | { city?: unknown; others?: unknown };
+  parts?: CarOwnerDealBucket | { city?: unknown; others?: unknown };
+  salvages?: CarOwnerDealBucket | { city?: unknown; others?: unknown };
+};
+
+export type CarOwnerDealsApiFilters = {
+  makes: string[];
+  models: string[];
+};
+
+export type CarOwnerDealsResponse = {
+  success: boolean;
+  deals: CarOwnerDealsGrouped | CarOwnerDeal[] | unknown;
+  filters?: {
+    makes?: string[];
+    models?: string[];
+  };
+};
+
+export type NormalizedCarOwnerDeals = {
+  Service: CarOwnerDealBucket;
+  Parts: CarOwnerDealBucket;
+  filters: CarOwnerDealsApiFilters;
+  all: CarOwnerDeal[];
+};

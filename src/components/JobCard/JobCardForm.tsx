@@ -39,11 +39,16 @@ import {
 } from "../../lib/shopOwnerJobCardsApi";
 import {
   fetchAutoshopJobCardPrefix,
+  fetchAutoshopJobCards,
   findAutoshopServiceDealForSub,
   parseAutoshopJobCardPrefix,
   type AutoshopPageDetailsServiceDeal,
 } from "../../lib/autoshopownerJobCardsApi";
-import { pickJobCardNoForApi } from "../../lib/shopOwnerJobCards";
+import {
+  parseJobCardsFromPagePayload,
+  pickJobCardNoForApi,
+  type JobCardListRow,
+} from "../../lib/shopOwnerJobCards";
 
 const formCellInputClass = shopCompactInputClass;
 
@@ -86,6 +91,7 @@ const DEFAULT_JOB_CARD_TERMS =
 const JOB_CARD_FOOTER_LINK_CLASS = "text-sm font-medium text-blue-600 underline hover:text-blue-700";
 const PHONE_COMBO_ACTIVE_ITEM_CLASS = "bg-[#f5cce8] font-semibold text-ad-purple";
 const MIN_PHONE_MATCH_DIGITS = 3;
+const RECENT_JOB_CARD_CUSTOMER_LIMIT = 8;
 
 const META_LABEL_CLASS = "text-sm font-bold text-gray-900";
 const META_LABEL_CELL_CLASS = `${META_LABEL_CLASS} w-[8.5rem] shrink-0 text-left`;
@@ -554,6 +560,50 @@ function filterCustomersByPhone(
     });
 }
 
+function pickCustomerIdFromJobCardRaw(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "";
+  const o = raw as Record<string, unknown>;
+  const nested = o.customerId ?? o.customer ?? o.carOwner ?? o.owner;
+  if (typeof nested === "string" && nested.trim()) return nested.trim();
+  if (nested && typeof nested === "object") {
+    const id = (nested as { _id?: unknown; id?: unknown })._id ?? (nested as { id?: unknown }).id;
+    if (typeof id === "string" && id.trim()) return id.trim();
+  }
+  if (typeof o.customerId === "string" && o.customerId.trim()) return o.customerId.trim();
+  return "";
+}
+
+/** Unique customers from newest job cards first (matched against shop customer list). */
+function recentCustomersFromJobCards(
+  cards: JobCardListRow[],
+  customers: JobCardFormCustomer[],
+  limit = RECENT_JOB_CARD_CUSTOMER_LIMIT,
+): JobCardFormCustomer[] {
+  const byId = new Map(customers.map((c) => [c._id, c]));
+  const byPhone = new Map<string, JobCardFormCustomer>();
+  for (const customer of customers) {
+    const phone = phoneDigits(customer.phone);
+    if (phone.length >= 7 && !byPhone.has(phone)) byPhone.set(phone, customer);
+  }
+
+  const ordered = [...cards].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  const out: JobCardFormCustomer[] = [];
+  const seen = new Set<string>();
+
+  for (const card of ordered) {
+    const id = pickCustomerIdFromJobCardRaw(card.raw);
+    let customer = id ? byId.get(id) : undefined;
+    if (!customer && card.phone) {
+      customer = byPhone.get(phoneDigits(card.phone));
+    }
+    if (!customer || seen.has(customer._id)) continue;
+    seen.add(customer._id);
+    out.push(customer);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 type JobCardFormProps = {
   active: boolean;
   mode?: "add" | "edit";
@@ -591,6 +641,7 @@ export default function JobCardForm({
   const [displayJobNo, setDisplayJobNo] = useState("");
   const [serviceDate, setServiceDate] = useState(todayIsoDate);
   const [myCustomers, setMyCustomers] = useState<JobCardFormCustomer[]>([]);
+  const [recentCustomers, setRecentCustomers] = useState<JobCardFormCustomer[]>([]);
   const [myServices, setMyServices] = useState<ServiceCategory[]>([]);
   const [serviceDeals, setServiceDeals] = useState<AutoshopPageDetailsServiceDeal[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -624,6 +675,19 @@ export default function JobCardForm({
     if (formMode === "edit") return [];
     return filterCustomersByPhone(myCustomers, customerPhone);
   }, [myCustomers, customerPhone, formMode]);
+
+  const showingRecentCustomers =
+    formMode === "add" && customerPhone.trim().length < MIN_PHONE_MATCH_DIGITS;
+
+  const suggestionCustomers = useMemo(() => {
+    if (formMode !== "add") return [];
+    const digits = customerPhone.trim();
+    if (digits.length >= MIN_PHONE_MATCH_DIGITS) {
+      return matchingCustomers;
+    }
+    if (!digits) return recentCustomers;
+    return recentCustomers.filter((customer) => phoneDigits(customer.phone).includes(digits));
+  }, [formMode, customerPhone, matchingCustomers, recentCustomers]);
 
   const formSelectedVehicle = useMemo(() => {
     if (!form.vehicleId || !formSelectedCustomer) return null;
@@ -781,7 +845,7 @@ export default function JobCardForm({
     const digits = phoneDigits(raw);
     setCustomerPhone(digits);
     applyCustomerPhoneLookup(digits);
-    setPhoneLookupOpen(digits.length >= MIN_PHONE_MATCH_DIGITS);
+    setPhoneLookupOpen(true);
     setPhoneActiveIndex(0);
   }
 
@@ -842,14 +906,27 @@ export default function JobCardForm({
 
     void (async () => {
       try {
-        const [data, prefixRes] = await Promise.all([
+        const [data, prefixRes, recentJobCardsRes] = await Promise.all([
           fetchJobCardFormData(token),
           fetchAutoshopJobCardPrefix(token),
+          modeProp === "add"
+            ? fetchAutoshopJobCards(token).catch(() => null)
+            : Promise.resolve(null),
         ]);
         if (cancelled) return;
         setMyCustomers(data.myCustomers);
         setMyServices(data.myServices);
         setServiceDeals(data.serviceDeals ?? []);
+
+        if (modeProp === "add") {
+          const recentCards =
+            recentJobCardsRes && recentJobCardsRes.ok
+              ? parseJobCardsFromPagePayload(recentJobCardsRes.data)
+              : [];
+          setRecentCustomers(recentCustomersFromJobCards(recentCards, data.myCustomers));
+        } else {
+          setRecentCustomers([]);
+        }
 
         const prefixFromApi = prefixRes.ok ? parseAutoshopJobCardPrefix(prefixRes.data) : "";
         const prefix =
@@ -1218,7 +1295,7 @@ export default function JobCardForm({
                       value={formatPhoneDisplay(customerPhone)}
                       onChange={(e) => handleCustomerPhoneChange(e.target.value)}
                       onFocus={() => {
-                        if (customerPhone.length >= MIN_PHONE_MATCH_DIGITS) {
+                        if (formMode === "add") {
                           setPhoneLookupOpen(true);
                         }
                       }}
@@ -1226,22 +1303,22 @@ export default function JobCardForm({
                         if (
                           !phoneLookupOpen &&
                           (e.key === "ArrowDown" || e.key === "ArrowUp") &&
-                          matchingCustomers.length > 0
+                          suggestionCustomers.length > 0
                         ) {
                           setPhoneLookupOpen(true);
                           return;
                         }
-                        if (!phoneLookupOpen || matchingCustomers.length === 0) return;
+                        if (!phoneLookupOpen || suggestionCustomers.length === 0) return;
                         if (e.key === "ArrowDown") {
                           e.preventDefault();
                           setPhoneActiveIndex((index) =>
-                            Math.min(matchingCustomers.length - 1, index + 1),
+                            Math.min(suggestionCustomers.length - 1, index + 1),
                           );
                         } else if (e.key === "ArrowUp") {
                           e.preventDefault();
                           setPhoneActiveIndex((index) => Math.max(0, index - 1));
                         } else if (e.key === "Enter") {
-                          const hit = matchingCustomers[phoneActiveIndex];
+                          const hit = suggestionCustomers[phoneActiveIndex];
                           if (hit) {
                             e.preventDefault();
                             selectCustomer(hit);
@@ -1251,19 +1328,24 @@ export default function JobCardForm({
                       placeholder="705 991 3785"
                       aria-label="Customer phone number"
                       role="combobox"
-                      aria-expanded={phoneLookupOpen && matchingCustomers.length > 0}
+                      aria-expanded={phoneLookupOpen && suggestionCustomers.length > 0}
                       aria-controls="job-card-customer-phone-listbox"
                       aria-autocomplete="list"
                       className={`${META_VALUE_CLASS} w-full`}
                     />
 
-                    {phoneLookupOpen && matchingCustomers.length > 0 && formMode === "add" ? (
+                    {phoneLookupOpen && suggestionCustomers.length > 0 && formMode === "add" ? (
                       <div
                         id="job-card-customer-phone-listbox"
                         role="listbox"
                         className="absolute left-0 right-0 z-50 mt-0.5 max-h-52 overflow-y-auto rounded border border-gray-400 bg-white shadow-lg"
                       >
-                        {matchingCustomers.map((customer, index) => {
+                        {showingRecentCustomers ? (
+                          <div className="border-b border-gray-200 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                            Recent customers
+                          </div>
+                        ) : null}
+                        {suggestionCustomers.map((customer, index) => {
                           const active = index === phoneActiveIndex;
                           const plate = customer.myVehicles?.[0]?.licensePlateNo
                             ?? customer.myVehicles?.[0]?.regNo;
@@ -1313,7 +1395,8 @@ export default function JobCardForm({
                       </div>
                     </>
                   ) : customerPhone.length > 0 &&
-                    customerPhone.length < MIN_PHONE_MATCH_DIGITS ? (
+                    customerPhone.length < MIN_PHONE_MATCH_DIGITS &&
+                    suggestionCustomers.length === 0 ? (
                     <>
                       <span aria-hidden />
                       <p className="text-xs text-gray-600">
@@ -1326,6 +1409,13 @@ export default function JobCardForm({
                     <>
                       <span aria-hidden />
                       <p className="text-xs text-gray-600">No matching customers.</p>
+                    </>
+                  ) : !customerPhone && recentCustomers.length === 0 && formMode === "add" ? (
+                    <>
+                      <span aria-hidden />
+                      <p className="text-xs text-gray-600">
+                        Focus this field for recent customers, or type a phone number to search.
+                      </p>
                     </>
                   ) : null}
 

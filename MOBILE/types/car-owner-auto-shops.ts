@@ -14,6 +14,14 @@ export type CarOwnerAutoShopListItem = {
   openDaysText: string;
   /** Closed weekdays for UI (second line); empty if none. */
   closedScheduleText: string;
+  /** Today's hours label, e.g. "9.00 Am - 6.00 Pm" or "Closed today". */
+  todayHoursText: string;
+  /** True when today's currentWeekTimings row (or weekday schedule) is closed. */
+  isClosedToday: boolean;
+  /** Today's open time from API (`HH:mm`), null when closed or not provided. */
+  todayOpen: string | null;
+  /** Today's close time from API (`HH:mm`), null when closed or not provided. */
+  todayClose: string | null;
   /** Top-level service names (e.g. "Car Wash"). */
   mainServices: string[];
   /** Top-level services with ids for connect / scheduling actions. */
@@ -32,6 +40,8 @@ export type CarOwnerAutoShopListItem = {
   closedWeekdays: string[];
   /** True when the current car-owner has favorited this shop (overlaid from /api/user/favorite-auto-shops). */
   isFavorite: boolean;
-  /** Backend shop category (tyreShop, carWash, towTruck, autoShop, …). */
+  /** Backend primary shop category (first of shopTypes). */
   shopType: string;
+  /** All shop categories from API (`shopType` may be a string or array). */
+  shopTypes: string[];
 };

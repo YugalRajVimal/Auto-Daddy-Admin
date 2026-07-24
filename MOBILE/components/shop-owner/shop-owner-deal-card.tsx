@@ -3,13 +3,22 @@ import { cardFontSizes, colors, fontSizes, radii, spacing } from "@/constants/au
 import { useAuth } from "@/context/auth-provider";
 import { formatCurrencyAmount } from "@/lib/currency";
 import { dealCardImageAspectRatio } from "@/lib/deal-card-image";
+import { isDealSold } from "@/lib/shop-deal-sales";
+import {
+  isPartsDeal,
+  isSalvagesDeal,
+  shopDealDiscountLabel,
+} from "@/lib/shop-owner-parsers";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
+import type { MyCustomer } from "@/types/auto-shop-owner-endpoints";
 import type { ShopDeal } from "@/types/auto-shop-owner-endpoints";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -22,33 +31,36 @@ function safeDateLabel(iso: string | undefined): string {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-function dealKindLabel(dealType: string | undefined): "Service" | "Parts" {
-  const v = (dealType ?? "").trim().toLowerCase();
-  return v === "parts" ? "Parts" : "Service";
-}
-
-function dealModeOf(d: ShopDeal): "Service" | "Parts" {
+function dealModeOf(d: ShopDeal): "Service" | "Parts" | "Salvages" {
+  if (isSalvagesDeal(d)) return "Salvages";
+  if (isPartsDeal(d)) return "Parts";
   const kind = (d.dealType ?? "").trim().toLowerCase();
   if (kind === "parts") return "Parts";
-  if (kind === "service") return "Service";
   if (d.partName || d.selectedVehicle?.vehicleName || d.selectedVehicle?.name) return "Parts";
   return "Service";
 }
 
 function dealTitle(d: ShopDeal): string {
   const kind = dealModeOf(d);
-  if (kind === "Parts") {
+  if (kind === "Parts" || kind === "Salvages") {
     return d.partName?.trim() || d.productName?.trim() || "Parts deal";
   }
-  return d.service?.name?.trim() || d.productName?.trim() || "Service deal";
+  return (
+    d.subServiceName?.trim() ||
+    d.productName?.trim() ||
+    d.description?.trim() ||
+    d.service?.name?.trim() ||
+    "Service deal"
+  );
 }
 
 function dealSubtitle(d: ShopDeal): string | null {
   const kind = dealModeOf(d);
-  if (kind === "Parts" && d.selectedVehicle) {
+  if ((kind === "Parts" || kind === "Salvages") && d.selectedVehicle) {
     const parts = [
       d.selectedVehicle.name ?? d.selectedVehicle.vehicleName,
       d.selectedVehicle.model,
+      d.selectedVehicle.year,
     ].filter(Boolean);
     if (parts.length) return parts.join(" · ");
   }
@@ -67,32 +79,20 @@ function dealVehicleMakeLabel(vehicle: ShopDeal["selectedVehicle"]): string {
 
 function dealCollapsedLabels(d: ShopDeal): { primary: string; secondary: string } {
   const kind = dealModeOf(d);
-  if (kind === "Parts") {
+  if (kind === "Parts" || kind === "Salvages") {
     const vehicle = dealVehicleMakeLabel(d.selectedVehicle);
     const part = d.partName?.trim() || d.productName?.trim() || "Parts deal";
     return { primary: vehicle, secondary: part };
   }
-  const service = d.service?.name?.trim() || d.productName?.trim() || "Service deal";
+  const service =
+    d.subServiceName?.trim() || d.service?.name?.trim() || d.productName?.trim() || "Service deal";
   const desc = d.description?.trim();
   return { primary: service, secondary: desc ?? "" };
 }
 
-function dealLeftTag(d: ShopDeal): string {
-  return dealKindLabel(d.dealType);
-}
-
-function isDealActive(d: ShopDeal): boolean {
-  const ends = Date.parse(d.offersEndOnDate ?? "");
-  return !Number.isFinite(ends) || ends >= Date.now();
-}
-
-function dealRightTag(d: ShopDeal, active: boolean): string {
-  if (!active) return "Ended";
-  if (d.offersEndOnDate) {
-    const label = safeDateLabel(d.offersEndOnDate);
-    return label ? `Ends ${label}` : "Active";
-  }
-  return d.dealEnabled === false ? "Disabled" : "Active";
+function dealStatusLabel(d: ShopDeal): string {
+  if (isDealSold(d)) return "Sold";
+  return d.dealEnabled === false ? "Non-Active" : "Active";
 }
 
 function dealImageUri(d: ShopDeal): string | null {
@@ -100,11 +100,15 @@ function dealImageUri(d: ShopDeal): string | null {
   return normalizeMediaUrl(raw);
 }
 
-function CornerRibbon({ label, active }: { label: string; active: boolean }) {
+function CornerRibbon({ label, tone }: { label: string; tone: "active" | "ended" | "sold" }) {
+  const foldStyle =
+    tone === "sold" ? styles.ribbonFoldSold : tone === "active" ? styles.ribbonFoldActive : styles.ribbonFoldEnded;
+  const ribbonStyle =
+    tone === "sold" ? styles.ribbonSold : tone === "active" ? styles.ribbonActive : styles.ribbonEnded;
   return (
     <View style={styles.ribbonWrap} pointerEvents="none">
-      <View style={[styles.ribbonFold, active ? styles.ribbonFoldActive : styles.ribbonFoldEnded]} />
-      <View style={[styles.ribbon, active ? styles.ribbonActive : styles.ribbonEnded]}>
+      <View style={[styles.ribbonFold, foldStyle]} />
+      <View style={[styles.ribbon, ribbonStyle]}>
         <Text style={styles.ribbonText}>{label}</Text>
       </View>
     </View>
@@ -134,25 +138,67 @@ export function ShopOwnerDealCard({
   expanded,
   onToggleExpanded,
   deleting,
+  deactivating,
+  selling,
+  showSell,
+  customers,
+  soldDraftCustomerId,
+  onSoldDraftChange,
+  onSell,
   onEdit,
   onDelete,
+  onDeactivate,
 }: {
   deal: ShopDeal;
   expanded: boolean;
   onToggleExpanded: () => void;
   deleting?: boolean;
+  deactivating?: boolean;
+  selling?: boolean;
+  showSell?: boolean;
+  customers?: MyCustomer[];
+  soldDraftCustomerId?: string;
+  onSoldDraftChange?: (customerId: string) => void;
+  onSell?: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onDeactivate?: () => void;
 }) {
   const { meta } = useAuth();
+  const [customerListOpen, setCustomerListOpen] = useState(false);
   const kind = dealModeOf(d);
   const imageUri = dealImageUri(d);
   const description = d.description?.trim();
-  const active = isDealActive(d);
+  const sold = isDealSold(d);
+  const status = dealStatusLabel(d);
   const subtitle = dealSubtitle(d);
   const collapsedLabels = dealCollapsedLabels(d);
-  const placeholderIcon = kind === "Parts" ? "settings-outline" : "construct-outline";
+  const placeholderIcon =
+    kind === "Salvages" ? "car-sport-outline" : kind === "Parts" ? "settings-outline" : "construct-outline";
   const imageAspect = dealCardImageAspectRatio();
+  const discountLabel = shopDealDiscountLabel(d);
+  const priceDisplay =
+    kind === "Service"
+      ? discountLabel
+      : formatCurrencyAmount(d.discountedPrice ?? d.price, meta?.countryCode, { fallback: discountLabel });
+  const ribbonTone = sold ? "sold" : status === "Active" ? "active" : "ended";
+  const canSell = Boolean(showSell && !sold && soldDraftCustomerId && !selling);
+
+  const customerOptions = useMemo(() => {
+    const rows: { id: string; label: string }[] = [];
+    for (const customer of customers ?? []) {
+      const cid = (customer.carOwnerId ?? customer.id ?? customer._id ?? "").trim();
+      if (!cid) continue;
+      rows.push({
+        id: cid,
+        label: customer.name?.trim() || customer.phone?.trim() || "Customer",
+      });
+    }
+    return rows;
+  }, [customers]);
+
+  const selectedCustomerLabel =
+    customerOptions.find((c) => c.id === soldDraftCustomerId)?.label || "None";
 
   if (!expanded) {
     return (
@@ -174,6 +220,10 @@ export function ShopOwnerDealCard({
                 {collapsedLabels.secondary}
               </Text>
             ) : null}
+            <Text style={styles.collapsedStatus} numberOfLines={1}>
+              {status}
+              {sold && d.soldToCustomerName ? ` · ${d.soldToCustomerName}` : ""}
+            </Text>
           </Pressable>
           <Pressable
             onPress={onToggleExpanded}
@@ -220,7 +270,7 @@ export function ShopOwnerDealCard({
       </View>
 
       <View style={styles.cardImageSection}>
-        <CornerRibbon label={active ? "Active" : "Ended"} active={active} />
+        <CornerRibbon label={status} tone={ribbonTone} />
         {imageUri ? (
           <View style={[styles.cardImageFrame, { aspectRatio: imageAspect }]}>
             <Image source={{ uri: imageUri }} style={styles.cardImage} contentFit="cover" transition={180} />
@@ -243,10 +293,11 @@ export function ShopOwnerDealCard({
                 {subtitle}
               </Text>
             ) : null}
+            {d.offersEndOnDate ? (
+              <Text style={styles.cardMeta}>Ends {safeDateLabel(d.offersEndOnDate)}</Text>
+            ) : null}
           </View>
-          <Text style={styles.cardPrice}>
-            {formatCurrencyAmount(d.discountedPrice ?? d.price, meta?.countryCode, { fallback: "—" })}
-          </Text>
+          <Text style={styles.cardPrice}>{priceDisplay}</Text>
         </View>
 
         <View style={styles.descBox}>
@@ -261,42 +312,167 @@ export function ShopOwnerDealCard({
 
         <View style={styles.tagRow}>
           <View style={styles.tagBox}>
-            <Text style={styles.tagBoxText}>{dealLeftTag(d)}</Text>
+            <Text style={styles.tagBoxText}>{kind}</Text>
           </View>
           <View style={styles.tagBox}>
-            <Text style={styles.tagBoxText}>{dealRightTag(d, active)}</Text>
+            <Text style={styles.tagBoxText}>{status}</Text>
           </View>
         </View>
 
-        <View style={styles.actionRow}>
-          <Pressable
-            onPress={onEdit}
-            style={({ pressed }) => [styles.editBtn, pressed && styles.actionBtnPressed]}
-            android_ripple={{ color: "rgba(37,99,235,0.12)" }}
-          >
-            <Ionicons name="pencil-outline" size={17} color={colors.primary} />
-            <Text style={styles.editBtnText}>Edit</Text>
-          </Pressable>
-          <Pressable
-            onPress={onDelete}
-            disabled={deleting}
-            style={({ pressed }) => [
-              styles.deleteBtn,
-              deleting && styles.deleteBtnDisabled,
-              pressed && !deleting && styles.actionBtnPressed,
-            ]}
-            android_ripple={{ color: "rgba(239,68,68,0.12)" }}
-          >
-            {deleting ? (
-              <ActivityIndicator color={colors.danger} size="small" />
+        {showSell ? (
+          <View style={styles.sellBlock}>
+            <Text style={styles.sellLabel}>Sold to</Text>
+            {sold ? (
+              <Text style={styles.soldToText}>{d.soldToCustomerName?.trim() || "—"}</Text>
             ) : (
               <>
-                <Ionicons name="trash-outline" size={17} color={colors.danger} />
-                <Text style={styles.deleteBtnText}>Delete</Text>
+                <View style={styles.soldToRow}>
+                  <View style={styles.customerListWrap}>
+                    <Pressable
+                      style={styles.customerListBox}
+                      onPress={() => setCustomerListOpen((open) => !open)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Select sold-to customer"
+                    >
+                      <Text
+                        style={[
+                          styles.customerListValue,
+                          !soldDraftCustomerId && styles.customerListPlaceholder,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {selectedCustomerLabel}
+                      </Text>
+                      <Ionicons
+                        name={customerListOpen ? "chevron-up" : "chevron-down"}
+                        size={18}
+                        color={colors.textMuted}
+                      />
+                    </Pressable>
+                    {customerListOpen ? (
+                      <View style={styles.customerListDropdown}>
+                        <ScrollView
+                          nestedScrollEnabled
+                          keyboardShouldPersistTaps="handled"
+                          style={styles.customerListScroll}
+                        >
+                          <Pressable
+                            style={[
+                              styles.customerListItem,
+                              !soldDraftCustomerId && styles.customerListItemActive,
+                            ]}
+                            onPress={() => {
+                              onSoldDraftChange?.("");
+                              setCustomerListOpen(false);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.customerListItemText,
+                                !soldDraftCustomerId && styles.customerListItemTextActive,
+                              ]}
+                            >
+                              None
+                            </Text>
+                          </Pressable>
+                          {customerOptions.map((customer) => {
+                            const active = soldDraftCustomerId === customer.id;
+                            return (
+                              <Pressable
+                                key={customer.id}
+                                style={[
+                                  styles.customerListItem,
+                                  active && styles.customerListItemActive,
+                                ]}
+                                onPress={() => {
+                                  onSoldDraftChange?.(customer.id);
+                                  setCustomerListOpen(false);
+                                }}
+                              >
+                                <Text
+                                  style={[
+                                    styles.customerListItemText,
+                                    active && styles.customerListItemTextActive,
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {customer.label}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Pressable
+                    onPress={onSell}
+                    disabled={!canSell}
+                    style={[styles.sellBtn, !canSell && styles.sellBtnDisabled]}
+                  >
+                    {selling ? (
+                      <ActivityIndicator color={colors.white} size="small" />
+                    ) : (
+                      <Text style={styles.sellBtnText}>Sell</Text>
+                    )}
+                  </Pressable>
+                </View>
               </>
             )}
-          </Pressable>
-        </View>
+          </View>
+        ) : null}
+
+        {!sold ? (
+          <View style={styles.actionRow}>
+            <Pressable
+              onPress={onEdit}
+              style={({ pressed }) => [styles.editBtn, pressed && styles.actionBtnPressed]}
+              android_ripple={{ color: "rgba(37,99,235,0.12)" }}
+            >
+              <Ionicons name="pencil-outline" size={17} color={colors.primary} />
+              <Text style={styles.editBtnText}>Edit</Text>
+            </Pressable>
+            {onDeactivate && d.dealEnabled !== false ? (
+              <Pressable
+                onPress={onDeactivate}
+                disabled={deactivating}
+                style={({ pressed }) => [
+                  styles.deactivateBtn,
+                  deactivating && styles.deleteBtnDisabled,
+                  pressed && !deactivating && styles.actionBtnPressed,
+                ]}
+              >
+                {deactivating ? (
+                  <ActivityIndicator color={colors.textMuted} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="pause-circle-outline" size={17} color={colors.textMuted} />
+                    <Text style={styles.deactivateBtnText}>Non-Active</Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={onDelete}
+              disabled={deleting}
+              style={({ pressed }) => [
+                styles.deleteBtn,
+                deleting && styles.deleteBtnDisabled,
+                pressed && !deleting && styles.actionBtnPressed,
+              ]}
+              android_ripple={{ color: "rgba(239,68,68,0.12)" }}
+            >
+              {deleting ? (
+                <ActivityIndicator color={colors.danger} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                  <Text style={styles.deleteBtnText}>Delete</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </SurfaceCard>
   );
@@ -355,6 +531,12 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     lineHeight: 18,
   },
+  collapsedStatus: {
+    marginTop: 2,
+    fontSize: cardFontSizes.sm,
+    fontWeight: "700",
+    color: colors.primary,
+  },
   collapsedChevBtn: {
     width: 40,
     height: 40,
@@ -411,6 +593,7 @@ const styles = StyleSheet.create({
   },
   ribbonFoldActive: { backgroundColor: colors.primaryDark },
   ribbonFoldEnded: { backgroundColor: colors.textMuted },
+  ribbonFoldSold: { backgroundColor: "#1B7A3D" },
   ribbon: {
     position: "absolute",
     top: 14,
@@ -422,6 +605,7 @@ const styles = StyleSheet.create({
   },
   ribbonActive: { backgroundColor: colors.primary },
   ribbonEnded: { backgroundColor: colors.textLight },
+  ribbonSold: { backgroundColor: "#2E9B57" },
   ribbonText: {
     fontSize: cardFontSizes.sm,
     fontWeight: "900",
@@ -452,6 +636,11 @@ const styles = StyleSheet.create({
     fontSize: cardFontSizes.md,
     fontWeight: "600",
     color: colors.textMuted,
+  },
+  cardMeta: {
+    fontSize: cardFontSizes.sm,
+    fontWeight: "600",
+    color: colors.textLight,
   },
   cardPrice: {
     fontSize: fontSizes.lg,
@@ -504,9 +693,102 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: "center",
   },
-  actionRow: { flexDirection: "row", gap: spacing.sm },
-  editBtn: {
+  sellBlock: {
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  sellLabel: {
+    fontSize: cardFontSizes.sm,
+    fontWeight: "800",
+    color: colors.textMuted,
+  },
+  soldToText: {
+    fontSize: fontSizes.md,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  soldToRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  customerListWrap: {
     flex: 1,
+    minWidth: 0,
+    zIndex: 4,
+  },
+  customerListBox: {
+    minHeight: 40,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgAlt,
+    paddingHorizontal: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  customerListValue: {
+    flex: 1,
+    fontSize: fontSizes.sm,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  customerListPlaceholder: {
+    color: colors.textLight,
+  },
+  customerListDropdown: {
+    marginTop: 4,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    overflow: "hidden",
+  },
+  customerListScroll: {
+    maxHeight: 180,
+  },
+  customerListItem: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  customerListItemActive: {
+    backgroundColor: colors.primaryMutedBg,
+  },
+  customerListItemText: {
+    fontSize: fontSizes.sm,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  customerListItemTextActive: {
+    color: colors.primary,
+    fontWeight: "800",
+  },
+  sellBtn: {
+    minHeight: 40,
+    minWidth: 72,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: "#2E9B57",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sellBtnDisabled: { opacity: 0.55 },
+  sellBtnText: {
+    color: colors.white,
+    fontSize: cardFontSizes.md,
+    fontWeight: "900",
+  },
+  actionRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
+  editBtn: {
+    flexGrow: 1,
+    flexBasis: "30%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -523,8 +805,28 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: colors.primary,
   },
+  deactivateBtn: {
+    flexGrow: 1,
+    flexBasis: "30%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: radii.round,
+    backgroundColor: "#F1F4FA",
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 44,
+  },
+  deactivateBtnText: {
+    fontSize: cardFontSizes.md,
+    fontWeight: "900",
+    color: colors.textMuted,
+  },
   deleteBtn: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: "30%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

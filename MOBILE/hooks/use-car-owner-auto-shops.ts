@@ -1,7 +1,11 @@
 import { useAuth } from "@/context/auth-provider";
 import { getJson } from "@/lib/api";
 import { normalizeCarOwnerAutoShopsPayload } from "@/lib/car-owner-auto-shops";
-import { carOwnerShopTypeMatches, type CarOwnerShopType } from "@/lib/car-owner-shop-types";
+import {
+  carOwnerShopTypeApiValue,
+  carOwnerShopTypeMatches,
+  type CarOwnerShopType,
+} from "@/lib/car-owner-shop-types";
 import type { CarOwnerAutoShopListItem } from "@/types/car-owner-auto-shops";
 import { useCallback, useEffect, useState } from "react";
 
@@ -10,7 +14,7 @@ export type CarOwnerAutoShopsFilters = {
   serviceIds: readonly string[];
   /** Car company ids (comma-separated in query). */
   carCompanyIds: readonly string[];
-  /** Filter by backend `shopType` (tyreShop, carWash, towTruck, autoShops, …). */
+  /** Filter by backend `shopType` (tyreShop, carWash, towTruck, autoShop, …). */
   shopType?: CarOwnerShopType | null;
 };
 
@@ -24,8 +28,9 @@ function autoShopsPath(filters: CarOwnerAutoShopsFilters): string {
   if (companies.length > 0) {
     usp.set("carCompanies", companies.join(","));
   }
-  if (filters.shopType) {
-    usp.set("shopType", filters.shopType);
+  const apiShopType = carOwnerShopTypeApiValue(filters.shopType);
+  if (apiShopType) {
+    usp.set("shopType", apiShopType);
   }
   const qs = usp.toString();
   return qs ? `/api/user/auto-shops?${qs}` : "/api/user/auto-shops";
@@ -71,7 +76,9 @@ export function useCarOwnerAutoShops(filters: CarOwnerAutoShopsFilters) {
     const shopTypeFilter = filters.shopType ?? null;
     setShops(
       shopTypeFilter
-        ? rows.filter((shop) => carOwnerShopTypeMatches(shop.shopType, shopTypeFilter))
+        ? rows.filter((shop) =>
+            carOwnerShopTypeMatches(shop.shopType, shopTypeFilter, shop.shopTypes)
+          )
         : rows
     );
     setLoading(false);

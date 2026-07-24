@@ -6,7 +6,13 @@ import { customerKey } from "@/hooks/use-my-customers";
 import { useOncePress } from "@/hooks/use-once-press";
 import { formatCurrencyAmount, getCurrencySign } from "@/lib/currency";
 import {
+  findAutoshopServiceDealForSub,
+  type AutoshopPageDetailsServiceDeal,
+} from "@/lib/autoshopowner-job-cards-api";
+import { extractEstimateDiscount } from "@/lib/shop-job-card-estimate";
+import {
   fetchJobCardFormData,
+  normalizeJobCardServiceBlocks,
   saveJobCard,
   type JobCardFormCustomer,
 } from "@/lib/shop-owner-job-cards-api";
@@ -74,6 +80,7 @@ type ApiJobCardSubService = {
   desc?: string;
   price?: number | string;
   unitPrice?: number | string;
+  unitCost?: number | string;
   qty?: string | number;
   unit?: string | number;
   labourCost?: number | string;
@@ -82,22 +89,42 @@ type ApiJobCardSubService = {
   dueOdometerReading?: string | number;
   odoOut?: string | number;
   odoOutReading?: string | number;
+  amountBeforeDiscount?: number | string;
+  discountPercentage?: number | string;
+  dealId?: string;
 };
 
 type ApiJobCard = {
   _id?: string;
   customerId?: { _id?: string; name?: string; email?: string; phone?: string };
-  vehicleId?: { _id?: string; licensePlateNo?: string; make?: { name?: string; model?: string } };
+  vehicleId?: {
+    _id?: string;
+    licensePlateNo?: string;
+    make?: { name?: string; model?: string };
+    vehicleName?: string;
+    model?: string;
+    odometerReading?: string | number;
+  };
   odometerReading?: number | string;
   odoIn?: number | string;
   dueOdometerReading?: number | string;
+  odoOut?: number | string;
   otherCharges?: number | string;
   labourCharge?: number | string;
   labourDuration?: string | number;
   discount?: string | number;
   terms?: string;
   additionalNotes?: string;
-  services?: Array<{ service?: string; subServices?: ApiJobCardSubService[] }>;
+  services?: Array<
+    | { service?: string; serviceId?: string; subServices?: ApiJobCardSubService[] }
+    | (ApiJobCardSubService & {
+        service?: string;
+        serviceId?: string;
+        category?: string;
+        subServiceName?: string;
+        amount?: number | string;
+      })
+  >;
 };
 
 function displayPhone(c: MyCustomer) {
@@ -354,8 +381,33 @@ function buildLabourTechnicalRemarks(
   return parts.length ? `Labour: ${parts.join("; ")}` : "";
 }
 
+function findCatalogSubIndex(
+  cat: ServiceCategoryLike,
+  ss: Record<string, unknown>,
+): number {
+  const subName = String(ss.name ?? ss.subServiceName ?? "").trim();
+  const desc = String(ss.desc ?? "").trim();
+  if (subName) {
+    const byName = cat.subServices.findIndex((s) => s.name === subName);
+    if (byName >= 0) return byName;
+  }
+  if (desc) {
+    const byDesc = cat.subServices.findIndex(
+      (s) => (s.desc ?? "").trim() === desc || s.name.trim() === desc,
+    );
+    if (byDesc >= 0) return byDesc;
+  }
+  if (cat.subServices.length === 1) return 0;
+  const unitPrice = parseAmount(String(ss.unitPrice ?? ss.unitCost ?? ss.price ?? ""));
+  if (unitPrice > 0) {
+    const byPrice = cat.subServices.findIndex((s) => (s.price ?? 0) === unitPrice);
+    if (byPrice >= 0) return byPrice;
+  }
+  return -1;
+}
+
 function apiServiceBlocksToLines(
-  blocks: ApiJobCard["services"],
+  blocks: unknown[] | ApiJobCard["services"],
   categories: ServiceCategoryLike[],
   dueOdometerReading?: string
 ): ServiceLine[] {
@@ -363,7 +415,9 @@ function apiServiceBlocksToLines(
   let n = 0;
   const dueFallback = String(dueOdometerReading ?? "").replace(/\D/g, "");
   for (const block of blocks || []) {
-    const catId = String(block.service || "").trim();
+    if (!block || typeof block !== "object") continue;
+    const b = block as { service?: string; subServices?: Array<Record<string, unknown>> };
+    const catId = String(b.service || "").trim();
     if (!catId) {
       continue;
     }
@@ -371,12 +425,8 @@ function apiServiceBlocksToLines(
     if (!cat) {
       continue;
     }
-    for (const ss of block.subServices || []) {
-      const subName = String(ss.name || "").trim();
-      if (!subName) {
-        continue;
-      }
-      const subIdx = cat.subServices.findIndex((s) => s.name === subName);
+    for (const ss of b.subServices || []) {
+      const subIdx = findCatalogSubIndex(cat, ss);
       if (subIdx < 0) {
         continue;
       }
@@ -384,10 +434,18 @@ function apiServiceBlocksToLines(
       const qtyStr = String(ss.qty ?? ss.unit ?? "1");
       const qty = parseAmount(qtyStr) || 1;
       const labour = parseAmount(String(ss.labourCost ?? ss.labourCharge ?? "0"));
-      const savedTotal = parseAmount(String(ss.price ?? ""));
-      let unitPriceStr = ss.unitPrice != null ? String(ss.unitPrice) : "";
-      if (!unitPriceStr && savedTotal > 0 && qty > 0) {
-        unitPriceStr = String((savedTotal - labour) / qty);
+      const savedTotal = parseAmount(String(ss.price ?? ss.amount ?? ""));
+      const beforeDiscount = parseAmount(String(ss.amountBeforeDiscount ?? ""));
+      let unitPriceStr =
+        ss.unitPrice != null
+          ? String(ss.unitPrice)
+          : ss.unitCost != null
+            ? String(ss.unitCost)
+            : "";
+      if (!unitPriceStr && beforeDiscount > 0 && qty > 0) {
+        unitPriceStr = String(beforeDiscount / qty);
+      } else if (!unitPriceStr && savedTotal > 0 && qty > 0) {
+        unitPriceStr = String(Math.max(0, (savedTotal - labour) / qty));
       } else if (!unitPriceStr) {
         unitPriceStr = String(catalogSub?.price ?? 0);
       }
@@ -403,8 +461,14 @@ function apiServiceBlocksToLines(
       lines.push({
         id: `line-${n}`,
         subKey: subServiceKey(catId, subIdx),
-        desc: ss.desc ?? "",
-        labourCostStr: String(labour),
+        desc: String(ss.desc ?? catalogSub?.desc ?? ""),
+        labourCostStr: String(
+          labour > 0
+            ? labour
+            : typeof catalogSub?.labourCost === "number"
+              ? catalogSub.labourCost
+              : 0,
+        ),
         odoOutStr: needsOdo ? odoOutStr : "",
         ...draft,
         priceStr: priceStrFromLine(draft),
@@ -414,7 +478,11 @@ function apiServiceBlocksToLines(
   return lines;
 }
 
-function serviceLinesToBlocks(lines: ServiceLine[], categories: ServiceCategoryLike[]) {
+function serviceLinesToBlocks(
+  lines: ServiceLine[],
+  categories: ServiceCategoryLike[],
+  serviceDeals: AutoshopPageDetailsServiceDeal[] = [],
+) {
   const map = new Map<string, Array<Record<string, unknown>>>();
   for (const line of lines) {
     if (!line.subKey) {
@@ -434,6 +502,7 @@ function serviceLinesToBlocks(lines: ServiceLine[], categories: ServiceCategoryL
     const unitPrice = parseAmount(line.unitPriceStr);
     const amount = calcLineAmount(line);
     const labourCost = parseAmount(line.labourCostStr);
+    const qtyNum = parseAmount(line.qtyStr) || 1;
     const entry: Record<string, unknown> = {
       name: sub.name,
       desc: String(line.desc || "").trim(),
@@ -452,10 +521,37 @@ function serviceLinesToBlocks(lines: ServiceLine[], categories: ServiceCategoryL
         entry.odoOutReading = odoOutReading;
       }
     }
+    const deal = findAutoshopServiceDealForSub(serviceDeals, parsed.catId, sub.name);
+    if (deal) {
+      const discountPercentage = Number(deal.discountPercentage);
+      if (Number.isFinite(discountPercentage) && discountPercentage > 0) {
+        entry.discountPercentage = discountPercentage;
+        entry.amountBeforeDiscount = unitPrice * qtyNum;
+        entry.dealId = deal._id;
+      }
+    }
     bucket.push(entry);
     map.set(parsed.catId, bucket);
   }
   return [...map.entries()].map(([service, subServices]) => ({ service, subServices }));
+}
+
+function lineDealDiscount(
+  line: ServiceLine,
+  categories: ServiceCategoryLike[],
+  serviceDeals: AutoshopPageDetailsServiceDeal[],
+): number {
+  if (!line.subKey) return 0;
+  const parsed = parseSubServiceKey(line.subKey);
+  if (!parsed) return 0;
+  const cat = categories.find((c) => c.id === parsed.catId);
+  const sub = cat?.subServices?.[parsed.subIdx];
+  if (!sub?.name) return 0;
+  const deal = findAutoshopServiceDealForSub(serviceDeals, parsed.catId, sub.name);
+  if (!deal) return 0;
+  const pct = Number(deal.discountPercentage);
+  if (!Number.isFinite(pct) || pct <= 0) return 0;
+  return (calcLineAmount(line) * pct) / 100;
 }
 
 function formatJobCardDate(d = new Date()): string {
@@ -479,6 +575,7 @@ export default function NewJobCardPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [customers, setCustomers] = useState<MyCustomer[]>([]);
   const [categories, setCategories] = useState<ServiceCategoryLike[]>([]);
+  const [serviceDeals, setServiceDeals] = useState<AutoshopPageDetailsServiceDeal[]>([]);
   const [displayJobNo, setDisplayJobNo] = useState("");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -605,6 +702,7 @@ export default function NewJobCardPage() {
 
           const parsedCustomers = formData.myCustomers.map(mapPageDetailsCustomer);
           setCustomers(parsedCustomers);
+          setServiceDeals(formData.serviceDeals ?? []);
           setCategories(
             formData.myServices.map((c) => ({
               id: c.id,
@@ -645,11 +743,21 @@ export default function NewJobCardPage() {
                 setEditingJobCardNo(jobNo);
                 setDisplayJobNo(String(jobNo));
               }
-              const customerId = raw.customerId?._id?.trim();
-              const vehicleId = raw.vehicleId?._id?.trim();
+              const customerId =
+                typeof raw.customerId === "object"
+                  ? raw.customerId?._id?.trim()
+                  : typeof (raw as { customerId?: string }).customerId === "string"
+                    ? String((raw as { customerId?: string }).customerId).trim()
+                    : undefined;
+              const vehicleId =
+                typeof raw.vehicleId === "object"
+                  ? raw.vehicleId?._id?.trim()
+                  : typeof (raw as { vehicleId?: string }).vehicleId === "string"
+                    ? String((raw as { vehicleId?: string }).vehicleId).trim()
+                    : undefined;
               const matchedCustomer =
                 parsedCustomers.find((c) => customerId && customerKey(c) === customerId) ??
-                (raw.customerId
+                (raw.customerId && typeof raw.customerId === "object"
                   ? ({
                     _id: raw.customerId._id,
                     name: raw.customerId.name,
@@ -663,18 +771,22 @@ export default function NewJobCardPage() {
               }
               const matchedVehicle =
                 (matchedCustomer?.vehicles ?? []).find((v) => vehicleId && vehicleApiId(v) === vehicleId) ??
-                (raw.vehicleId
+                (raw.vehicleId && typeof raw.vehicleId === "object"
                   ? ({
                     _id: raw.vehicleId._id,
                     licensePlateNo: raw.vehicleId.licensePlateNo,
-                    vehicleName: raw.vehicleId.make?.name,
-                    model: raw.vehicleId.make?.model,
+                    vehicleName: raw.vehicleId.vehicleName || raw.vehicleId.make?.name,
+                    model: raw.vehicleId.model || raw.vehicleId.make?.model,
+                    odometerReading:
+                      raw.vehicleId.odometerReading != null
+                        ? String(raw.vehicleId.odometerReading)
+                        : undefined,
                   } as CustomerVehicle)
                   : null);
               if (matchedVehicle) {
                 setSelectedVehicle(matchedVehicle);
               }
-              setOdomCurrent(String(raw.odometerReading ?? raw.odoIn ?? "0"));
+              setOdomCurrent(String(raw.odometerReading ?? raw.odoIn ?? matchedVehicle?.odometerReading ?? "0"));
               setDiscount(String(raw.otherCharges ?? raw.discount ?? ""));
               setLabourCharge(String(raw.labourCharge ?? ""));
               setTermsNotes(extractTermsNotes(raw));
@@ -716,15 +828,15 @@ export default function NewJobCardPage() {
       return;
     }
     try {
-      const raw = JSON.parse(decodeURIComponent(params.jobCard)) as ApiJobCard;
-      const dueOdo = String(raw.dueOdometerReading ?? "");
-      let lines = apiServiceBlocksToLines(
-        raw.services,
-        categoriesWithSubs.length > 0 ? categoriesWithSubs : allCategoriesWithSubs,
-        dueOdo
-      );
+      const raw = JSON.parse(decodeURIComponent(params.jobCard)) as ApiJobCard &
+        Record<string, unknown>;
+      const dueOdo = String(raw.dueOdometerReading ?? raw.odoOut ?? "");
+      const normalizedBlocks = normalizeJobCardServiceBlocks(raw as Record<string, unknown>);
+      const catsForMatch =
+        categoriesWithSubs.length > 0 ? categoriesWithSubs : allCategoriesWithSubs;
+      let lines = apiServiceBlocksToLines(normalizedBlocks, catsForMatch, dueOdo);
       if (lines.length === 0 && categoriesWithSubs.length > 0) {
-        lines = apiServiceBlocksToLines(raw.services, allCategoriesWithSubs, dueOdo);
+        lines = apiServiceBlocksToLines(normalizedBlocks, allCategoriesWithSubs, dueOdo);
       }
       setServiceLines(
         (lines.length > 0 ? lines : [emptyServiceLine(mkLineId())]).map((line) => ({
@@ -732,9 +844,23 @@ export default function NewJobCardPage() {
           id: mkLineId(),
         }))
       );
-      setDiscount(String(raw.otherCharges ?? raw.discount ?? ""));
-      setLabourCharge(String(raw.labourCharge ?? ""));
+      const labourFromJob = String(raw.labourCharge ?? "").trim();
+      if (labourFromJob && parseAmount(labourFromJob) > 0) {
+        setLabourCharge(labourFromJob);
+      } else {
+        const fromLines = lines.reduce((sum, line) => sum + parseAmount(line.labourCostStr), 0);
+        if (fromLines > 0) setLabourCharge(String(fromLines));
+      }
+      const savedDealDiscount = extractEstimateDiscount(raw as Record<string, unknown>);
+      setDiscount(
+        savedDealDiscount > 0
+          ? String(savedDealDiscount)
+          : String(raw.otherCharges ?? raw.discount ?? ""),
+      );
       setTermsNotes(extractTermsNotes(raw));
+      if (String(raw.odometerReading ?? raw.odoIn ?? "").trim()) {
+        setOdomCurrent(String(raw.odometerReading ?? raw.odoIn ?? "0"));
+      }
     } catch {
       // ignore malformed payload
     }
@@ -764,6 +890,14 @@ export default function NewJobCardPage() {
     return sum;
   }, [activeLines]);
 
+  const dealDiscountTotal = useMemo(() => {
+    let sum = 0;
+    for (const line of activeLines) {
+      sum += lineDealDiscount(line, categoriesWithSubs, serviceDeals);
+    }
+    return sum;
+  }, [activeLines, categoriesWithSubs, serviceDeals]);
+
   const labourFromLines = useMemo(() => {
     let sum = 0;
     for (const line of activeLines) {
@@ -782,7 +916,8 @@ export default function NewJobCardPage() {
   }, [labourFromLines]);
 
   const labourAmount = parseAmount(labourCharge);
-  const discountAmount = parseAmount(discount);
+  const manualDiscountAmount = dealDiscountTotal > 0 ? 0 : parseAmount(discount);
+  const discountAmount = dealDiscountTotal > 0 ? dealDiscountTotal : manualDiscountAmount;
   const grandTotal = partsSubTotal + labourAmount - discountAmount;
 
   const optionByKey = useMemo(() => {
@@ -916,7 +1051,7 @@ export default function NewJobCardPage() {
       return;
     }
 
-    const blocks = serviceLinesToBlocks(serviceLines, categoriesWithSubs);
+    const blocks = serviceLinesToBlocks(serviceLines, categoriesWithSubs, serviceDeals);
 
     if (!hasShopServices) {
       promptSelectServicesFromProfile();
@@ -944,7 +1079,11 @@ export default function NewJobCardPage() {
       return;
     }
 
-    const tech = buildLabourTechnicalRemarks(labourAmount, discount, meta?.countryCode);
+    const tech = buildLabourTechnicalRemarks(
+      labourAmount,
+      dealDiscountTotal > 0 ? String(dealDiscountTotal) : discount,
+      meta?.countryCode
+    );
 
     setSubmitting(true);
     try {
@@ -978,7 +1117,7 @@ export default function NewJobCardPage() {
             labourCharge: labourCharge.trim() || "0",
             labourDuration: "0",
             technicalRemarks: tech,
-            discount,
+            discount: dealDiscountTotal > 0 ? String(dealDiscountTotal) : discount,
             additionalNotes: termsNotes.trim(),
           },
           vehiclePhotoFiles: [],
@@ -1397,17 +1536,27 @@ export default function NewJobCardPage() {
               </View>
               <View style={styles.totalsRow}>
                 <Text style={styles.amountRowLabel}>Discount</Text>
-                <View style={styles.labourInputWrap}>
-                  <Text style={styles.labourCurrencySign}>{getCurrencySign(meta?.countryCode)}</Text>
-                  <TextInput
-                    style={styles.labourInput}
-                    keyboardType="decimal-pad"
-                    value={discount}
-                    onChangeText={(t) => setDiscount(t.replace(/[^0-9.]/g, ""))}
-                    placeholder="0"
-                    placeholderTextColor={colors.textLight}
-                  />
-                </View>
+                {dealDiscountTotal > 0 ? (
+                  <Text style={styles.dealDiscountValue}>
+                    −
+                    {formatCurrencyAmount(dealDiscountTotal, meta?.countryCode, {
+                      fallback: "—",
+                      signSpacing: true,
+                    })}
+                  </Text>
+                ) : (
+                  <View style={styles.labourInputWrap}>
+                    <Text style={styles.labourCurrencySign}>{getCurrencySign(meta?.countryCode)}</Text>
+                    <TextInput
+                      style={styles.labourInput}
+                      keyboardType="decimal-pad"
+                      value={discount}
+                      onChangeText={(t) => setDiscount(t.replace(/[^0-9.]/g, ""))}
+                      placeholder="0"
+                      placeholderTextColor={colors.textLight}
+                    />
+                  </View>
+                )}
               </View>
               <View style={styles.grandTotalRow}>
                 <Text style={styles.grandTotalLabel}>Total</Text>
@@ -1784,6 +1933,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   totalsValue: { fontSize: fontSizes.md, fontWeight: "800", color: colors.text },
+  dealDiscountValue: {
+    fontSize: fontSizes.md,
+    fontWeight: "800",
+    color: "#047857",
+  },
   labourInputWrap: {
     flexDirection: "row",
     alignItems: "center",

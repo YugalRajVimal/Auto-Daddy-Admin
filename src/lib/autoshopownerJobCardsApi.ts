@@ -40,6 +40,8 @@ export type AutoshopJobCardServiceInput = {
   serviceId: string;
   category: string;
   desc?: string;
+  /** Catalog sub-service name — needed to rematch deals/lines on edit. */
+  subServiceName?: string;
   unitCost: number;
   qty: number;
   odoOutReading?: number;

@@ -1,11 +1,9 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { FiChevronLeft, FiFileText } from "react-icons/fi";
 import { toast } from "react-toastify";
-import {
-  InvoiceViewerDialog,
-  JobCardViewerDialog,
-} from "../../../../invoice-job-card-viewer/InvoiceJobCardViewer.jsx";
 import { Skeleton } from "../../../components/common/Skeleton";
+import OwnerInvoiceEstimateDialog from "../../../components/owner/OwnerInvoiceEstimateDialog";
+import OwnerJobCardViewerDialog from "../../../components/owner/OwnerJobCardViewerDialog";
 import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
@@ -25,8 +23,6 @@ import {
 } from "../../../components/owner/ownerVehicleFormUtils";
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
-
-type ViewerKind = "invoice" | "jobcard";
 
 function formatInvoiceDate(iso: string): string {
   const d = new Date(iso);
@@ -92,14 +88,14 @@ export default function OwnerInvoicesPage() {
   const [view, setView] = useState<"list" | "payment">("list");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const selected = useMemo(() => selectedSetFromArray(selectedIds), [selectedIds]);
-  const [viewerKind, setViewerKind] = useState<ViewerKind | null>(null);
-  const [selectedJobCardId, setSelectedJobCardId] = useState<string | null>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<CarOwnerInvoiceRow | null>(null);
+  const [jobCardViewerId, setJobCardViewerId] = useState<string | null>(null);
 
   const resetSidebar = useCallback(() => {
     setView("list");
     setSelectedIds([]);
-    setViewerKind(null);
-    setSelectedJobCardId(null);
+    setPreviewInvoice(null);
+    setJobCardViewerId(null);
   }, []);
 
   useOwnerNavReset(resetSidebar);
@@ -122,18 +118,21 @@ export default function OwnerInvoicesPage() {
   );
 
   const openInvoicePreview = (row: CarOwnerInvoiceRow) => {
-    setSelectedJobCardId(row.id);
-    setViewerKind("invoice");
+    setJobCardViewerId(null);
+    setPreviewInvoice(row);
   };
 
   const openJobCardPreview = (row: CarOwnerInvoiceRow) => {
-    setSelectedJobCardId(row.id);
-    setViewerKind("jobcard");
+    setPreviewInvoice(null);
+    setJobCardViewerId(row.id);
   };
 
-  const closeViewer = () => {
-    setViewerKind(null);
-    setSelectedJobCardId(null);
+  const closeInvoicePreview = () => {
+    setPreviewInvoice(null);
+  };
+
+  const closeJobCardViewer = () => {
+    setJobCardViewerId(null);
   };
 
   const paymentRow = useMemo(() => {
@@ -390,18 +389,19 @@ export default function OwnerInvoicesPage() {
         )}
       </div>
 
-      <InvoiceViewerDialog
-        open={viewerKind === "invoice"}
-        onClose={closeViewer}
-        jobCardId={selectedJobCardId ?? undefined}
-        fetchJobCard={fetchJobCardForViewer}
-        countryCode={countryCode}
-        apiBaseUrl={API_BASE_URL}
+      <OwnerInvoiceEstimateDialog
+        open={previewInvoice != null}
+        onClose={closeInvoicePreview}
+        jobCardId={previewInvoice?.id}
+        token={token}
+        cachedJobCard={previewInvoice ? findJobCardById(previewInvoice.id) : null}
+        invoiceNoHint={previewInvoice ? invoiceNoDisplay(previewInvoice) : null}
+        callingCode={countryCode}
       />
-      <JobCardViewerDialog
-        open={viewerKind === "jobcard"}
-        onClose={closeViewer}
-        jobCardId={selectedJobCardId ?? undefined}
+      <OwnerJobCardViewerDialog
+        open={jobCardViewerId != null}
+        onClose={closeJobCardViewer}
+        jobCardId={jobCardViewerId ?? undefined}
         fetchJobCard={fetchJobCardForViewer}
         countryCode={countryCode}
         apiBaseUrl={API_BASE_URL}

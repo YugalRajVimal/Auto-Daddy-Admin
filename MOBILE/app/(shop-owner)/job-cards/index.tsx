@@ -22,6 +22,7 @@ import {
   type JobCardListRow,
 } from "@/lib/shop-owner-job-cards";
 import { formatCurrencyAmount } from "@/lib/currency";
+import { extractEstimateDiscount } from "@/lib/shop-job-card-estimate";
 import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -174,41 +175,94 @@ function formatServiceAmount(price: unknown, countryCode: string | null | undefi
   });
 }
 
-type ServiceLine = { name: string; desc: string; price: string };
+type ServiceLine = { name: string; desc: string; price: number };
+
+function parseMoney(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = parseFloat(v.replace(/[^0-9.-]/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function lineAmountFromServiceRecord(rec: Record<string, unknown>): number {
+  const qty = parseMoney(rec.qty ?? rec.unit ?? 1) || 1;
+  const unit = parseMoney(rec.unitCost ?? rec.unitPrice);
+  const amount = parseMoney(rec.amount);
+  const before = parseMoney(rec.amountBeforeDiscount);
+  if (before > 0) return before;
+  if (amount > 0) return amount;
+  if (unit > 0) return unit * qty;
+  const price = parseMoney(rec.price);
+  // `price` on nested subs may already be unit×qty (+ labour). Prefer unit×qty when possible.
+  if (unit > 0) return unit * qty;
+  return price > 0 ? price : 0;
+}
 
 function extractServiceLines(raw: Record<string, unknown> | null, summary?: string): ServiceLine[] {
   if (!raw) {
     const sum = (summary ?? "").trim();
-    return sum ? [{ name: sum, desc: "—", price: "0" }] : [];
+    return sum ? [{ name: sum, desc: "—", price: 0 }] : [];
   }
   const servicesArr = Array.isArray(raw.services) ? (raw.services as unknown[]) : [];
   const lines: ServiceLine[] = [];
   for (const svc of servicesArr) {
     const svcObj = obj(svc);
-    const subs = Array.isArray(svcObj?.subServices) ? (svcObj.subServices as unknown[]) : [];
-    for (const sub of subs) {
-      const subObj = obj(sub);
-      lines.push({
-        name: s(subObj?.name) || "—",
-        desc: s(subObj?.desc) || "—",
-        price: s(subObj?.price) || "0",
-      });
+    if (!svcObj) continue;
+    const subs = Array.isArray(svcObj.subServices)
+      ? (svcObj.subServices as unknown[])
+      : Array.isArray(svcObj.selectedSubServices)
+        ? (svcObj.selectedSubServices as unknown[])
+        : null;
+
+    if (subs) {
+      for (const sub of subs) {
+        const subObj = obj(sub);
+        if (!subObj) continue;
+        const name =
+          s(subObj.name) || s(subObj.subServiceName) || s(subObj.desc) || "Service";
+        const desc = s(subObj.desc);
+        lines.push({
+          name,
+          desc: desc && desc !== name ? desc : "—",
+          price: lineAmountFromServiceRecord(subObj),
+        });
+      }
+      continue;
     }
+
+    // Flat API shape: { serviceId, category, desc, unitCost, qty, amount, ... }
+    const name =
+      s(svcObj.subServiceName) ||
+      s(svcObj.name) ||
+      s(svcObj.desc) ||
+      s(svcObj.category) ||
+      "Service";
+    const desc = s(svcObj.desc);
+    const category = s(svcObj.category);
+    lines.push({
+      name,
+      desc:
+        desc && desc !== name
+          ? desc
+          : category && category !== name
+            ? category
+            : "—",
+      price: lineAmountFromServiceRecord(svcObj),
+    });
   }
   if (lines.length === 0) {
     const sum = (summary ?? s(raw.servicesSummary) ?? s(raw.serviceSummary) ?? "").trim();
     if (sum) {
-      lines.push({ name: sum, desc: "—", price: "0" });
+      lines.push({ name: sum, desc: "—", price: 0 });
     }
   }
   return lines;
 }
 
 function sumServiceLines(lines: ServiceLine[]): number {
-  return lines.reduce((acc, line) => {
-    const n = parseFloat(String(line.price).replace(/[^0-9.-]/g, ""));
-    return acc + (Number.isFinite(n) ? n : 0);
-  }, 0);
+  return lines.reduce((acc, line) => acc + (Number.isFinite(line.price) ? line.price : 0), 0);
 }
 
 type LabourDetails = { hours: number | null; charge: number | null };
@@ -386,41 +440,93 @@ function JobCardExpandedPanel({
   const customer =
     getNested(raw, "customerId") ?? getNested(raw, "customer") ?? getNested(raw, "carOwner");
   const vehicle = getNested(raw, "vehicleId") ?? getNested(raw, "vehicle");
-  const vehicleMake = getNested(vehicle, "make");
-  const customerName = s(customer?.name) || row.customerName?.trim() || "—";
-  const phone = displayPhone(s(customer?.phone) || row.phone);
-  const city = pickCustomerCity(raw);
+  const makeRaw = vehicle?.make ?? vehicle?.vehicleMake;
+  const vehicleMake =
+    getNested(vehicle, "make") ??
+    getNested(vehicle, "vehicleMake") ??
+    (typeof makeRaw === "string" && makeRaw.trim() ? { name: makeRaw.trim() } : null);
+  const customerName =
+    s(customer?.name) ||
+    s((raw as Record<string, unknown> | null)?.customerName) ||
+    row.customerName?.trim() ||
+    "—";
+  const phone = displayPhone(
+    s(customer?.phone) || s((raw as Record<string, unknown> | null)?.phone) || row.phone,
+  );
+  const city = pickCustomerCity(raw) || s((raw as Record<string, unknown> | null)?.city);
   const plate =
-    s(vehicle?.licensePlateNo ?? vehicle?.licensePlate) || row.vehiclePlate?.trim() || "—";
+    s(vehicle?.licensePlateNo ?? vehicle?.licensePlate ?? vehicle?.regNo) ||
+    s((raw as Record<string, unknown> | null)?.licensePlateNo) ||
+    row.vehiclePlate?.trim() ||
+    "—";
+  const makeModelFromObj = [s(vehicleMake?.name), s(vehicleMake?.model)].filter(Boolean).join(" ");
   const model =
-    s(vehicle?.vehicleName ?? vehicle?.model ?? vehicleMake?.name) ||
+    makeModelFromObj ||
+    s(vehicle?.vehicleName) ||
+    s(vehicle?.brand) ||
+    s(vehicle?.model) ||
     row.vehicleMakeModel?.trim() ||
     "—";
-  const odoIn = s((raw as Record<string, unknown> | null)?.odometerReading) || row.odometerCurrent || "—";
-  const odoOut = s((raw as Record<string, unknown> | null)?.dueOdometerReading) || row.odometerDue || "—";
+  const odoIn =
+    s((raw as Record<string, unknown> | null)?.odometerReading) ||
+    s((raw as Record<string, unknown> | null)?.odoIn) ||
+    row.odometerCurrent ||
+    s(vehicle?.odometerReading) ||
+    "—";
+  const odoOutFromServices = (() => {
+    const services = Array.isArray((raw as Record<string, unknown> | null)?.services)
+      ? ((raw as Record<string, unknown>).services as unknown[])
+      : [];
+    let max = 0;
+    let any = false;
+    for (const item of services) {
+      const block = obj(item);
+      if (!block) continue;
+      const n = num(block.odoOutReading ?? block.dueOdometerReading ?? block.odoOut);
+      if (n != null && n > 0) {
+        any = true;
+        if (n > max) max = n;
+      }
+      const subs = Array.isArray(block.subServices) ? (block.subServices as unknown[]) : [];
+      for (const sub of subs) {
+        const so = obj(sub);
+        const sn = num(so?.odoOutReading ?? so?.dueOdometerReading ?? so?.odoOut);
+        if (sn != null && sn > 0) {
+          any = true;
+          if (sn > max) max = sn;
+        }
+      }
+    }
+    return any ? String(max) : "";
+  })();
+  const odoOut =
+    s((raw as Record<string, unknown> | null)?.dueOdometerReading) ||
+    s((raw as Record<string, unknown> | null)?.odoOut) ||
+    odoOutFromServices ||
+    row.odometerDue ||
+    "—";
   const serviceLines = extractServiceLines(raw, row.servicesSummary);
   const lineSum = sumServiceLines(serviceLines);
   const labour = extractLabour(raw);
   const labourCharge = labour.charge ?? 0;
   const labourHours = labour.hours;
-  const subTotal =
-    lineSum > 0
-      ? lineSum
-      : (() => {
-        const t = row.total;
-        if (typeof t === "number" && Number.isFinite(t)) {
-          return t;
-        }
-        const n = parseFloat(String(t ?? "").replace(/[^0-9.-]/g, ""));
-        return Number.isFinite(n) ? n : 0;
-      })();
+  const subTotal = lineSum > 0 ? lineSum : 0;
+  const discountAmount =
+    raw && typeof raw === "object" ? extractEstimateDiscount(raw as Record<string, unknown>) : 0;
+  const computedTotal = Math.max(0, subTotal + labourCharge - discountAmount);
   const rowTotal = (() => {
     const t = row.total;
     if (typeof t === "number" && Number.isFinite(t)) return t;
     const n = parseFloat(String(t ?? "").replace(/[^0-9.-]/g, ""));
     return Number.isFinite(n) ? n : 0;
   })();
-  const grandTotal = rowTotal > 0 ? rowTotal : subTotal + labourCharge;
+  // Prefer computed total when we have line items and/or a deal discount; API totals often omit discount.
+  const grandTotal =
+    (subTotal > 0 || discountAmount > 0) && computedTotal > 0
+      ? computedTotal
+      : rowTotal > 0
+        ? rowTotal
+        : computedTotal;
   const statuses = collectDisplayStatuses(row, raw);
   const primaryStatus = statuses[0];
   const otherStatuses = statuses.slice(1);
@@ -541,6 +647,16 @@ function JobCardExpandedPanel({
           </Text>
           <View style={styles.receiptTotalDots} />
           <Text style={styles.receiptTotalValue}>{formatServiceAmount(labourCharge, meta?.countryCode)}</Text>
+        </View>
+      ) : null}
+
+      {discountAmount > 0 ? (
+        <View style={styles.receiptTotalRow}>
+          <Text style={styles.receiptTotalLabel}>Discount</Text>
+          <View style={styles.receiptTotalDots} />
+          <Text style={[styles.receiptTotalValue, styles.receiptDiscountValue]}>
+            −{formatServiceAmount(discountAmount, meta?.countryCode)}
+          </Text>
         </View>
       ) : null}
 
@@ -1280,7 +1396,9 @@ export default function JobCardsPage() {
                   onBack={closeJobCardViewer}
                   onEdit={() => openJobCardEditorFromPreview?.(jobCardViewer.row!)}
                   onActionPreviewChange={(preview) =>
-                    setJobCardViewer((prev) => ({ ...prev, actionPreview: preview }))
+                    setJobCardViewer((prev) =>
+                      prev.actionPreview === preview ? prev : { ...prev, actionPreview: preview },
+                    )
                   }
                   onConverted={() => {
                     setExpandedId(null);
@@ -1786,6 +1904,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: colors.primary,
     lineHeight: 18,
+  },
+  receiptDiscountValue: {
+    color: "#047857",
   },
   receiptStatusRow: {
     flexDirection: "row",

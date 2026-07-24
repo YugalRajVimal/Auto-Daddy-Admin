@@ -1,34 +1,45 @@
 import type { MyShopServiceCategory } from "@/hooks/use-my-shop-services";
 
-export type ShopServiceDealOption = { label: string; value: string };
+export type ShopServiceDealOption = {
+  label: string;
+  value: string;
+  /** Parent or sub-service id sent as `serviceId` to the deals API. */
+  serviceId: string;
+  /** Sub-service display name sent as `productName` / `subServiceName`. */
+  subName: string;
+};
 
-/** Options for service deals: sub-services when present, otherwise the shop category from Profile. */
+/** Options for service deals — mirrors web ShopDealFormDialog (sub-services first). */
 export function buildShopServiceDealOptions(
   categories: Pick<MyShopServiceCategory, "id" | "name" | "subServices">[]
 ): ShopServiceDealOption[] {
   const opts: ShopServiceDealOption[] = [];
   for (const cat of categories) {
     const catId = cat.id?.trim() ?? "";
-    if (!catId) {
-      continue;
-    }
+    if (!catId) continue;
     const catLabel = cat.name?.trim() || "Service";
-    const subsWithId = cat.subServices
-      .map((sub) => ({ sub, id: sub.id?.trim() ?? "" }))
-      .filter((x) => x.id);
-
-    if (subsWithId.length > 0) {
-      for (const { sub, id } of subsWithId) {
-        const subLabel = sub.name?.trim() || "Service";
-        opts.push({
-          value: id,
-          label: cat.name?.trim() ? `${catLabel} — ${subLabel}` : subLabel,
-        });
-      }
-      continue;
+    const subs = cat.subServices ?? [];
+    let added = 0;
+    subs.forEach((sub, index) => {
+      const subLabel = sub.name?.trim();
+      if (!subLabel) return;
+      const subId = sub.id?.trim() ?? "";
+      opts.push({
+        value: subId || `${catId}::${index}`,
+        serviceId: subId || catId,
+        label: cat.name?.trim() ? `${catLabel} — ${subLabel}` : subLabel,
+        subName: subLabel,
+      });
+      added += 1;
+    });
+    if (added === 0) {
+      opts.push({
+        value: catId,
+        serviceId: catId,
+        label: catLabel,
+        subName: catLabel,
+      });
     }
-
-    opts.push({ value: catId, label: catLabel });
   }
   return opts;
 }

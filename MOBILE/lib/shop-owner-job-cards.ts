@@ -16,6 +16,8 @@ export type JobCardListRow = {
   invoiceNumber?: string;
   vehiclePlate?: string;
   vehicleMakeModel?: string;
+  /** Vehicle mongo id when API sends `vehicleId` as a string (not populated). */
+  vehicleId?: string;
   servicesSummary?: string;
   odometerCurrent?: string;
   odometerDue?: string;
@@ -206,23 +208,21 @@ function joinServiceNames(raw: unknown): string | undefined {
     if (!o) {
       continue;
     }
-    const flatDesc = s(o.desc) ?? s(o.category);
-    if (flatDesc) {
-      parts.push(flatDesc);
-      continue;
-    }
-    const name = s(o.name) ?? s(o.serviceName);
     const subs = o.subServices ?? o.selectedSubServices;
     if (Array.isArray(subs) && subs.length > 0) {
       for (const sub of subs) {
         const so = nestedObj(sub);
-        const sn = so ? s(so.name) : undefined;
+        const sn = so ? s(so.name) ?? s(so.subServiceName) ?? s(so.desc) : undefined;
         if (sn) {
           parts.push(sn);
         }
       }
-    } else if (name) {
-      parts.push(name);
+      continue;
+    }
+    const flatName =
+      s(o.subServiceName) ?? s(o.name) ?? s(o.desc) ?? s(o.category) ?? s(o.serviceName);
+    if (flatName) {
+      parts.push(flatName);
     }
   }
   return parts.length ? parts.join(", ") : undefined;
@@ -247,7 +247,12 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     nestedObj(o.vehicleId) ??
     nestedObj(o.myVehicle) ??
     nestedObj(o.car);
-  const make = vehicle ? nestedObj(vehicle.make) ?? nestedObj(vehicle.vehicleMake) : null;
+  const makeRaw = vehicle?.make ?? vehicle?.vehicleMake;
+  const make =
+    nestedObj(makeRaw) ??
+    (typeof makeRaw === "string" && makeRaw.trim()
+      ? { name: makeRaw.trim() }
+      : null);
   const customerName =
     s(o.customerName) ??
     s(o.ownerName) ??
@@ -266,14 +271,18 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
   const vehiclePlate =
     s(o.licensePlateNo) ??
     s(o.registration) ??
-    (vehicle ? s(vehicle.licensePlateNo) ?? s(vehicle.registration) : undefined);
+    (vehicle
+      ? s(vehicle.licensePlateNo) ?? s(vehicle.regNo) ?? s(vehicle.registration)
+      : undefined);
   const modelPart =
-    (vehicle ? s(vehicle.vehicleName) ?? s(vehicle.model) : undefined) ??
+    (vehicle ? s(vehicle.vehicleName) ?? s(vehicle.brand) ?? s(vehicle.model) : undefined) ??
     (make ? s(make.name) : undefined);
-  const model2 = make ? s(make.model) : undefined;
+  const model2 = make ? s(make.model) : vehicle ? s(vehicle.model) : undefined;
   const vehicleMakeModel =
     s(o.vehicleMakeModel) ??
-    (modelPart && model2 ? `${modelPart} ${model2}`.trim() : modelPart ?? model2);
+    (modelPart && model2 && modelPart.toLowerCase() !== model2.toLowerCase()
+      ? `${modelPart} ${model2}`.trim()
+      : modelPart ?? model2);
   const phone = pickCustomerPhone(o, customer);
   const phoneCountryCode =
     s(o.customerCountryCode) ??
@@ -281,9 +290,52 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     (customer ? s(customer.countryCode) : undefined);
   const odometerCurrent =
     s(o.odometerReading) ??
+    s(o.odoIn) ??
     s(o.currentOdometerReading) ??
     (vehicle ? s(vehicle.odometerReading) : undefined);
-  const odometerDue = s(o.dueOdometerReading) ?? s(o.dueAtOdometer);
+  const odometerDue =
+    s(o.dueOdometerReading) ??
+    s(o.odoOut) ??
+    s(o.dueAtOdometer) ??
+    (() => {
+      // Fall back to max odo-out on flat/nested service lines.
+      const services = o.services;
+      if (!Array.isArray(services)) return undefined;
+      let max = 0;
+      let any = false;
+      for (const item of services) {
+        const block = nestedObj(item);
+        if (!block) continue;
+        const subs = block.subServices ?? block.selectedSubServices;
+        if (Array.isArray(subs)) {
+          for (const sub of subs) {
+            const so = nestedObj(sub);
+            const n = Number(
+              String(so?.odoOutReading ?? so?.dueOdometerReading ?? so?.odoOut ?? "").replace(
+                /[^0-9.-]/g,
+                "",
+              ),
+            );
+            if (Number.isFinite(n) && n > 0) {
+              any = true;
+              if (n > max) max = n;
+            }
+          }
+          continue;
+        }
+        const n = Number(
+          String(block.odoOutReading ?? block.dueOdometerReading ?? block.odoOut ?? "").replace(
+            /[^0-9.-]/g,
+            "",
+          ),
+        );
+        if (Number.isFinite(n) && n > 0) {
+          any = true;
+          if (n > max) max = n;
+        }
+      }
+      return any ? String(max) : undefined;
+    })();
   const date =
     s(o.serviceDate) ??
     s(o.jobDate) ??
@@ -300,6 +352,9 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     typeof totalRaw === "number" || typeof totalRaw === "string" ? totalRaw : undefined;
   const servicesSummary = joinServiceNames(o.services) ?? s(o.servicesSummary) ?? s(o.serviceSummary);
   const issueDescription = s(o.issueDescription);
+  const vehicleId =
+    (typeof o.vehicleId === "string" ? s(o.vehicleId) : undefined) ??
+    (vehicle ? s(vehicle._id) ?? s(vehicle.id) : undefined);
 
   return {
     id,
@@ -310,6 +365,7 @@ function toRow(raw: unknown, listBucket?: JobCardListBucket): JobCardListRow | n
     invoiceNumber,
     vehiclePlate,
     vehicleMakeModel,
+    vehicleId,
     servicesSummary,
     odometerCurrent,
     odometerDue,
@@ -576,4 +632,70 @@ export function mergeJobCardListRows(...lists: JobCardListRow[][]): JobCardListR
     }
   }
   return [...byId.values()];
+}
+
+export type JobCardVehicleRef = {
+  _id?: string;
+  licensePlateNo?: string;
+  regNo?: string;
+  vehicleName?: string;
+  model?: string;
+  brand?: string;
+  make?: { name?: string; model?: string } | string;
+};
+
+function normalizePlateKey(plate: string | undefined): string {
+  return (plate ?? "").replace(/\s+/g, "").toLowerCase();
+}
+
+function vehicleMakeModelLabel(v: JobCardVehicleRef): string {
+  const makeObj = v.make && typeof v.make === "object" ? v.make : null;
+  const makeName =
+    (makeObj?.name ?? "").trim() ||
+    (typeof v.make === "string" ? v.make.trim() : "") ||
+    (v.vehicleName ?? "").trim() ||
+    (v.brand ?? "").trim();
+  const modelName = (makeObj?.model ?? "").trim() || (v.model ?? "").trim();
+  if (makeName && modelName && makeName.toLowerCase() !== modelName.toLowerCase()) {
+    return `${makeName} ${modelName}`.trim();
+  }
+  return makeName || modelName;
+}
+
+/**
+ * Job-card list APIs often return `vehicleId` as a bare id (no populated make/model).
+ * Build a lookup from page-details `myCustomers[].myVehicles`.
+ */
+export function buildJobCardVehicleLookup(
+  customers: Array<{ myVehicles?: JobCardVehicleRef[] | null }>,
+): { byId: Map<string, string>; byPlate: Map<string, string> } {
+  const byId = new Map<string, string>();
+  const byPlate = new Map<string, string>();
+  for (const customer of customers) {
+    for (const vehicle of customer.myVehicles ?? []) {
+      const label = vehicleMakeModelLabel(vehicle);
+      if (!label) continue;
+      const id = (vehicle._id ?? "").trim();
+      if (id) byId.set(id, label);
+      const plate = normalizePlateKey(vehicle.licensePlateNo ?? vehicle.regNo);
+      if (plate) byPlate.set(plate, label);
+    }
+  }
+  return { byId, byPlate };
+}
+
+/** Fill `vehicleMakeModel` from customer vehicles when the list payload omitted it. */
+export function enrichJobCardsWithVehicleMakeModel(
+  rows: JobCardListRow[],
+  lookup: { byId: Map<string, string>; byPlate: Map<string, string> },
+): JobCardListRow[] {
+  if (lookup.byId.size === 0 && lookup.byPlate.size === 0) return rows;
+  return rows.map((row) => {
+    if (row.vehicleMakeModel?.trim()) return row;
+    const fromId = row.vehicleId ? lookup.byId.get(row.vehicleId) : undefined;
+    if (fromId) return { ...row, vehicleMakeModel: fromId };
+    const fromPlate = lookup.byPlate.get(normalizePlateKey(row.vehiclePlate));
+    if (fromPlate) return { ...row, vehicleMakeModel: fromPlate };
+    return row;
+  });
 }

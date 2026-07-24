@@ -116,10 +116,143 @@ function scheduleFromLegacyFields(
   return schedule;
 }
 
-/** Resolve editable schedule from a business profile, preferring `perDayOpenHours`. */
+/**
+ * List APIs return `currentWeekTimings` (Mon–Sun with date, open/close, isClosed).
+ * Prefer that over weekly defaults so date overrides are reflected.
+ */
+function parseCurrentWeekTimings(raw: unknown): PerDayOpenHourEntry[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const entries: PerDayOpenHourEntry[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const day = typeof row.day === "string" ? normalizeWeekdayName(row.day) : null;
+    if (!day) continue;
+    const isClosed = Boolean(row.isClosed ?? row.closed);
+    const open =
+      typeof row.open === "string" && row.open.trim() ? row.open.trim() : DEFAULT_START;
+    const close =
+      typeof row.close === "string" && row.close.trim() ? row.close.trim() : DEFAULT_END;
+    entries.push({ day, open, close, isClosed });
+  }
+  return entries.length > 0 ? entries : null;
+}
+
+export function formatLocalDateISO(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Today's row from `currentWeekTimings` (by date, then weekday). */
+export function pickCurrentWeekTimingForToday(
+  businessProfile: Record<string, unknown> | null | undefined,
+  now = new Date()
+): { day: WeekDay; isClosed: boolean; open: string | null; close: string | null } | null {
+  if (!businessProfile || typeof businessProfile !== "object") return null;
+  const raw = businessProfile.currentWeekTimings ?? businessProfile.currentWeekHours;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+
+  const todayISO = formatLocalDateISO(now);
+  const todayDay = WEEK_DAYS[(now.getDay() + 6) % 7]!;
+
+  let match: Record<string, unknown> | null = null;
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.date === "string" && row.date.trim() === todayISO) {
+      match = row;
+      break;
+    }
+  }
+  if (!match) {
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const day = typeof row.day === "string" ? normalizeWeekdayName(row.day) : null;
+      if (day === todayDay) {
+        match = row;
+        break;
+      }
+    }
+  }
+  if (!match) return null;
+
+  const day =
+    (typeof match.day === "string" ? normalizeWeekdayName(match.day) : null) ?? todayDay;
+  const isClosed = Boolean(match.isClosed ?? match.closed);
+  const open =
+    typeof match.open === "string" && match.open.trim() ? match.open.trim() : null;
+  const close =
+    typeof match.close === "string" && match.close.trim() ? match.close.trim() : null;
+  return { day, isClosed, open, close };
+}
+
+/** True when `now` is within [open, close] on a 24h clock (same-day windows). */
+export function isNowWithinOpenClose(open: string, close: string, now = new Date()): boolean {
+  const toMinutes = (hhmm: string): number | null => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+    if (!m) return null;
+    const h = Number(m[1]);
+    const min = Number(m[2]);
+    if (!Number.isFinite(h) || !Number.isFinite(min) || h > 23 || min > 59) return null;
+    return h * 60 + min;
+  };
+  const start = toMinutes(open);
+  const end = toMinutes(close);
+  if (start == null || end == null) return true;
+  const current = now.getHours() * 60 + now.getMinutes();
+  if (end <= start) {
+    // Overnight window (e.g. 22:00–06:00)
+    return current >= start || current <= end;
+  }
+  return current >= start && current <= end;
+}
+
+export function formatOpenHoursTimeDisplay(time24: string): string {
+  const [hStr, mStr = "0"] = time24.split(":");
+  const hour = Number(hStr);
+  const minute = Number(mStr);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return time24;
+
+  const mm = String(minute).padStart(2, "0");
+  let hour12: number;
+  let ampm: "Am" | "Pm";
+
+  if (hour === 0) {
+    hour12 = 12;
+    ampm = "Am";
+  } else if (hour === 12) {
+    hour12 = 12;
+    ampm = "Pm";
+  } else if (hour > 12) {
+    hour12 = hour - 12;
+    ampm = "Pm";
+  } else {
+    hour12 = hour;
+    ampm = "Am";
+  }
+
+  return `${hour12}.${mm} ${ampm}`;
+}
+
+export function formatOpenHoursRangeDisplay(start: string, end: string): string {
+  return `${formatOpenHoursTimeDisplay(start)} - ${formatOpenHoursTimeDisplay(end)}`;
+}
+
+/** Resolve editable schedule from a business profile, preferring `currentWeekTimings`. */
 export function resolvePerDaySchedule(businessProfile: Record<string, unknown> | null | undefined): PerDaySchedule {
   if (!businessProfile || typeof businessProfile !== "object") {
     return createDefaultPerDaySchedule();
+  }
+
+  // Car-owner list payload: date-aware week (includes override open/close).
+  const currentWeek = parseCurrentWeekTimings(
+    businessProfile.currentWeekTimings ?? businessProfile.currentWeekHours
+  );
+  if (currentWeek?.length) {
+    return scheduleFromPerDayEntries(currentWeek);
   }
 
   const perDay = parsePerDayOpenHoursArray(businessProfile.perDayOpenHours);

@@ -1,9 +1,15 @@
 import {
+  fetchAutoshopJobCardPageDetails,
   fetchAutoshopJobCards,
   fetchAutoshopPendingApprovalJobCards,
+  parseAutoshopJobCardPageDetails,
   type AutoshopJobCardStatus,
 } from "@/lib/autoshopowner-job-cards-api";
-import { parseJobCardsFromPagePayload } from "@/lib/shop-owner-job-cards";
+import {
+  buildJobCardVehicleLookup,
+  enrichJobCardsWithVehicleMakeModel,
+  parseJobCardsFromPagePayload,
+} from "@/lib/shop-owner-job-cards";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 export type JobCardListSection = "all" | "approvals" | "invoice" | "paid";
@@ -27,6 +33,9 @@ export function useJobCardPage(
   search?: string
 ) {
   const [payload, setPayload] = useState<unknown>(null);
+  const [vehicleLookup, setVehicleLookup] = useState(() =>
+    buildJobCardVehicleLookup([]),
+  );
   const [loading, setLoading] = useState(false);
   const searchTrimmed = (search ?? "").trim();
   const apiSearch = usesJobCardApiSearch(section) ? searchTrimmed : "";
@@ -37,19 +46,27 @@ export function useJobCardPage(
     }
     setLoading(true);
     try {
-      const res =
+      const [listRes, pageDetailsRes] = await Promise.all([
         section === "approvals"
-          ? await fetchAutoshopPendingApprovalJobCards(token)
-          : await fetchAutoshopJobCards(token, {
+          ? fetchAutoshopPendingApprovalJobCards(token)
+          : fetchAutoshopJobCards(token, {
               status: statusForSection(section),
               search: apiSearch || undefined,
-            });
-      if (!res.ok) {
+            }),
+        fetchAutoshopJobCardPageDetails(token),
+      ]);
+
+      if (!listRes.ok) {
         showToast("Could not load job card overview.", { type: "error" });
         setPayload(null);
         return;
       }
-      setPayload(res.data);
+      setPayload(listRes.data);
+
+      if (pageDetailsRes.ok) {
+        const parsed = parseAutoshopJobCardPageDetails(pageDetailsRes.data);
+        setVehicleLookup(buildJobCardVehicleLookup(parsed?.myCustomers ?? []));
+      }
     } catch {
       showToast("Network error.", { type: "error" });
       setPayload(null);
@@ -69,7 +86,10 @@ export function useJobCardPage(
     void load();
   }, [load]);
 
-  const cards = useMemo(() => parseJobCardsFromPagePayload(payload), [payload]);
+  const cards = useMemo(() => {
+    const rows = parseJobCardsFromPagePayload(payload);
+    return enrichJobCardsWithVehicleMakeModel(rows, vehicleLookup);
+  }, [payload, vehicleLookup]);
 
   return { payload, loading, load, cards };
 }

@@ -1,4 +1,5 @@
 import {
+  apiMessageFromEnvelope,
   createAutoshopDeal,
   deleteAutoshopDeal,
   fetchAutoshopMyDeals,
@@ -10,7 +11,7 @@ import type { UploadPart } from "@/lib/upload-part";
 import type { ShopDeal } from "@/types/auto-shop-owner-endpoints";
 import { useCallback, useState } from "react";
 
-/** Mobile form fields (legacy UI) mapped onto new autoshop deals API. */
+/** @deprecated Prefer AutoshopDealFormFields — kept for callers that still pass URI helpers. */
 export type DealFormFields = AutoshopDealFormFields & {
   productName?: string;
   price?: string;
@@ -19,26 +20,29 @@ export type DealFormFields = AutoshopDealFormFields & {
   dealImageFileName?: string | null;
 };
 
-function toAutoshopFields(params: DealFormFields): AutoshopDealFormFields {
+function toAutoshopFields(params: DealFormFields | AutoshopDealFormFields): AutoshopDealFormFields {
+  const legacy = params as DealFormFields;
   const dealImage: UploadPart | null | undefined =
     params.dealImage ??
-    (params.dealImageUri
+    (legacy.dealImageUri
       ? {
-          uri: params.dealImageUri,
-          name: params.dealImageFileName ?? "deal.jpg",
-          type: params.dealImageMimeType ?? "image/jpeg",
+          uri: legacy.dealImageUri,
+          name: legacy.dealImageFileName ?? "deal.jpg",
+          type: legacy.dealImageMimeType ?? "image/jpeg",
         }
       : null);
 
   return {
     dealType: params.dealType,
     description: params.description,
-    originalPrice: params.originalPrice ?? params.price,
+    originalPrice: params.originalPrice ?? legacy.price,
     discountedPrice: params.discountedPrice,
     offersEndOnDate: params.offersEndOnDate,
     dealImage,
     serviceId: params.serviceId,
-    partName: params.partName ?? params.productName,
+    productName: params.productName,
+    subServiceName: params.subServiceName ?? params.productName,
+    partName: params.partName ?? (params.dealType === "Service" ? undefined : params.productName),
     vehicleId: params.vehicleId,
     vehicleName: params.vehicleName,
     vehicleModel: params.vehicleModel,
@@ -115,16 +119,13 @@ export function useMyDeals(
   );
 
   const createDeal = useCallback(
-    async (params: DealFormFields) => {
+    async (params: DealFormFields | AutoshopDealFormFields) => {
       if (!token) {
         return false;
       }
       try {
         const res = await createAutoshopDeal(token, toAutoshopFields(params));
-        const msg =
-          res.data && typeof res.data === "object" && "message" in res.data
-            ? String((res.data as { message?: string }).message ?? "")
-            : "";
+        const msg = apiMessageFromEnvelope(res.data);
         if (!res.ok) {
           showToast(msg || "Could not create deal.", { type: "error" });
           return false;
@@ -141,16 +142,13 @@ export function useMyDeals(
   );
 
   const saveDeal = useCallback(
-    async (id: string, params: DealFormFields) => {
+    async (id: string, params: DealFormFields | AutoshopDealFormFields) => {
       if (!token) {
         return false;
       }
       try {
         const res = await updateAutoshopDeal(token, id, toAutoshopFields(params));
-        const msg =
-          res.data && typeof res.data === "object" && "message" in res.data
-            ? String((res.data as { message?: string }).message ?? "")
-            : "";
+        const msg = apiMessageFromEnvelope(res.data);
         if (!res.ok) {
           showToast(msg || "Could not update deal.", { type: "error" });
           return false;

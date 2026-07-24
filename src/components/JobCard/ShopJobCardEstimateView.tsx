@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiArrowLeft, FiEdit2, FiPrinter } from "react-icons/fi";
 import { toast } from "react-toastify";
 import useAuth from "../../auth/useAuth";
@@ -66,6 +66,7 @@ function EstimateMetaRow({ label, value }: { label: string; value: string }) {
 
 function EstimateTotalsFooter({
   subtotal,
+  discount,
   hst,
   roundOff,
   total,
@@ -75,6 +76,7 @@ function EstimateTotalsFooter({
   theme,
 }: {
   subtotal: string;
+  discount?: string;
   hst: string;
   roundOff?: string;
   total: string;
@@ -101,6 +103,14 @@ function EstimateTotalsFooter({
         </td>
         <td className={`${valueClass} pt-3`}>{subtotal}</td>
       </tr>
+      {discount ? (
+        <tr>
+          <td colSpan={labelColSpan} className={labelClass}>
+            Discount :
+          </td>
+          <td className={`${valueClass} text-emerald-700`}>−{discount}</td>
+        </tr>
+      ) : null}
       {showHst ? (
         <tr>
           <td colSpan={labelColSpan} className={labelClass}>
@@ -181,14 +191,16 @@ export default function ShopJobCardEstimateView({
   const [actionPreview, setActionPreview] = useState<JobCardActionPreview | null>(
     initialActionPreview,
   );
+  const onActionPreviewChangeRef = useRef(onActionPreviewChange);
+  onActionPreviewChangeRef.current = onActionPreviewChange;
 
   useEffect(() => {
-    setActionPreview(initialActionPreview);
+    setActionPreview((prev) => (prev === initialActionPreview ? prev : initialActionPreview));
   }, [initialActionPreview, jobCardId]);
 
   useEffect(() => {
-    onActionPreviewChange?.(actionPreview);
-  }, [actionPreview, onActionPreviewChange]);
+    onActionPreviewChangeRef.current?.(actionPreview);
+  }, [actionPreview]);
 
   useEffect(() => {
     if (!token) {
@@ -277,7 +289,7 @@ export default function ShopJobCardEstimateView({
     () =>
       job
         ? estimateTotals(lines, effectiveHstRate, job, { includeHst: showHst })
-        : { subtotal: 0, hst: 0, roundOff: 0, total: 0 },
+        : { subtotal: 0, discount: 0, hst: 0, roundOff: 0, total: 0 },
     [job, lines, effectiveHstRate, showHst],
   );
 
@@ -621,6 +633,11 @@ export default function ShopJobCardEstimateView({
             </tbody>
             <EstimateTotalsFooter
               subtotal={formatEstimateMoney(totals.subtotal, callingCode)}
+              discount={
+                totals.discount > 0
+                  ? formatEstimateMoney(totals.discount, callingCode)
+                  : undefined
+              }
               hst={formatEstimateMoney(totals.hst, callingCode)}
               roundOff={
                 totals.roundOff !== 0
