@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
@@ -24,6 +26,11 @@ import { printAdminTable } from "../../../utils/adminPrintTable";
 import { DUMMY_INVOICE_TEMPLATES, resolveTemplateSlug } from "../../../components/shop/ShopDocumentTemplatePanel";
 import { InvoiceTemplatePreview } from "../../../components/shop/invoice-templates/InvoiceTemplatePreview";
 import { DEFAULT_INVOICE_PREVIEW } from "../../../components/shop/invoice-templates/sampleInvoiceData";
+import { FormFieldError, toastValidationSummary } from "../../../lib/validation/formUi";
+import {
+  invoiceTemplateContentSchema,
+  type InvoiceTemplateContentValues,
+} from "../../../lib/validation/schemas/cms";
 
 const USER_TYPE_OPTIONS = [
   { value: "mechanic-shop", label: "Auto Shop" },
@@ -240,12 +247,20 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [date, setDate] = useState("");
-  const [userType, setUserType] = useState("mechanic-shop");
-  const [label, setLabel] = useState("");
   const [templateSlug, setTemplateSlug] = useState(DUMMY_INVOICE_TEMPLATES[0]?.id ?? "");
   const [attachImage, setAttachImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors: fieldErrors },
+  } = useForm<InvoiceTemplateContentValues>({
+    resolver: zodResolver(invoiceTemplateContentSchema),
+    mode: "onSubmit",
+    defaultValues: { date: "", userType: "mechanic-shop", templateName: "" },
+  });
 
   // For preview popover: control which ID is hovered
   const [hoveredPreviewId, setHoveredPreviewId] = useState<string | null>(null);
@@ -323,9 +338,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   };
 
   const resetForm = () => {
-    setDate(""); // API will require explicit date
-    setUserType("mechanic-shop");
-    setLabel("");
+    reset({ date: "", userType: "mechanic-shop", templateName: "" }); // API will require explicit date
     setTemplateSlug(DUMMY_INVOICE_TEMPLATES[0]?.id ?? "");
     setAttachImage(false);
     setImageFile(null);
@@ -333,9 +346,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   };
 
   const openEdit = (row: TemplateRow) => {
-    setDate(row.date);
-    setUserType(row.userType);
-    setLabel(row.notes);
+    reset({ date: row.date, userType: row.userType, templateName: row.notes });
     setTemplateSlug(resolveTemplateSlug(DUMMY_INVOICE_TEMPLATES, row.templateSlug));
     setAttachImage(row.hasClip);
     setImageFile(null);
@@ -371,7 +382,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
   };
 
   // No real upload in sample/demo
-  const handleSave = async () => {
+  const onValidSave = async (values: InvoiceTemplateContentValues) => {
     try {
       if (editingId == null) {
         // In demo: just add a fake row
@@ -380,9 +391,9 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
           ...prev,
           {
             id: newId,
-            date,
-            userType,
-            notes: label,
+            date: values.date,
+            userType: values.userType,
+            notes: values.templateName,
             usedBy: 0,
             hasClip: attachImage,
             templateSlug,
@@ -399,9 +410,9 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
             tpl.id === editingId
               ? {
                   ...tpl,
-                  date,
-                  userType,
-                  notes: label,
+                  date: values.date,
+                  userType: values.userType,
+                  notes: values.templateName,
                   hasClip: attachImage,
                   templateSlug,
                 }
@@ -416,6 +427,12 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
       adminNotify.error(e.message || "Error saving template");
     }
   };
+
+  const onInvalidSave = (formErrors: typeof fieldErrors) => {
+    toastValidationSummary(adminNotify.error, formErrors);
+  };
+
+  const handleSave = () => void handleSubmit(onValidSave, onInvalidSave)();
 
   const handleToolbarPrint = () => {
     printAdminTable({
@@ -490,15 +507,14 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
               <CompactField label="Date" required className={compactFixedFieldWidth}>
                 <input
                   type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  {...register("date")}
                   className={compactInputClass}
                 />
+                <FormFieldError message={fieldErrors.date?.message} />
               </CompactField>
               <CompactField label="User Type" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
                 <select
-                  value={userType}
-                  onChange={(e) => setUserType(e.target.value)}
+                  {...register("userType")}
                   className={compactInputClass}
                 >
                   {USER_TYPE_OPTIONS.map((option) => (
@@ -511,11 +527,11 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
               <CompactField label="Template Name" required className="min-w-[200px] flex-1">
                 <input
                   type="text"
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
+                  {...register("templateName")}
                   placeholder="Invoice Template - 1"
                   className={compactInputClass}
                 />
+                <FormFieldError message={fieldErrors.templateName?.message} />
               </CompactField>
               <CompactField label="Design" required className="w-[180px] shrink-0 flex-none sm:w-[220px]">
                 <select

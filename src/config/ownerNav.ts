@@ -12,11 +12,10 @@ export const ownerPrimaryNav: NavItem[] = [
     path: "/owner",
     subItems: [
       { name: "Dashboard", path: "/owner" },
-      { name: "FAQs", path: "/owner/faqs" },
       { name: "Privacy", path: "/owner/privacy" },
       { name: "Features", path: "/owner/features" },
     ],
-    matchPaths: ["/owner", "/owner/faqs", "/owner/privacy", "/owner/features"],
+    matchPaths: ["/owner", "/owner/privacy", "/owner/features"],
   },
   {
     name: "Profile",

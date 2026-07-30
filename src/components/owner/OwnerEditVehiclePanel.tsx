@@ -4,10 +4,11 @@ import { toast } from "react-toastify";
 import { getJson, putJson } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
 import type { CarOwnerVehicle } from "../../lib/carOwnerVehicles";
+import { FormFieldError, fieldErrorClass } from "../../lib/validation/formUi";
+import { ownerVehicleSchema } from "../../lib/validation/schemas/vehicle";
 import {
   type CarCompaniesResponse,
   type CarCompanyCatalogItem,
-  isValidVehicleYear,
   ownerVehicleFieldClass,
   ownerVehicleLabelClass,
   ownerVehicleReadOnlyFieldClass,
@@ -16,6 +17,16 @@ import {
   trimVehicleApiMessage,
   type VehicleApiEnvelope,
 } from "./ownerVehicleFormUtils";
+
+/** Maps ownerVehicleSchema field names to this form's UI field names. */
+const SCHEMA_TO_UI_FIELD: Record<string, string> = {
+  company: "name",
+  model: "model",
+  year: "year",
+  licensePlate: "licensePlateNo",
+  vin: "vinNo",
+  odometer: "odometerReading",
+};
 
 function vehicleToFormState(vehicle: CarOwnerVehicle) {
   return {
@@ -64,6 +75,7 @@ export default function OwnerEditVehiclePanel({
   const [year, setYear] = useState("");
   const [odometerReading, setOdometerReading] = useState("");
   const [dueOdometerReading, setDueOdometerReading] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const resetFromVehicle = (v: CarOwnerVehicle) => {
     const next = vehicleToFormState(v);
@@ -129,6 +141,7 @@ export default function OwnerEditVehiclePanel({
   const handleCancelEdit = () => {
     if (submitting) return;
     resetFromVehicle(vehicle);
+    setErrors({});
     setEditing(false);
     onBack?.();
   };
@@ -147,18 +160,26 @@ export default function OwnerEditVehiclePanel({
     const nextOdometer = odometerReading.trim();
     const nextDueOdometer = dueOdometerReading.trim();
 
-    if (!nextPlate || !nextName || !nextModel || !nextYear) {
-      toast.error("Plate, make, model, and year are required.");
+    const result = ownerVehicleSchema.safeParse({
+      company: nextName,
+      model: nextModel,
+      year: nextYear,
+      licensePlate: nextPlate,
+      vin: nextVin,
+      odometer: nextOdometer,
+    });
+    if (!result.success) {
+      const nextErrors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const schemaKey = String(issue.path[0] ?? "");
+        const uiKey = SCHEMA_TO_UI_FIELD[schemaKey] ?? schemaKey;
+        if (!nextErrors[uiKey]) nextErrors[uiKey] = issue.message;
+      }
+      setErrors(nextErrors);
+      toast.error("Please fix the highlighted fields.");
       return;
     }
-    if (nextVin && nextVin.length !== 17) {
-      toast.error("VIN must be exactly 17 characters.");
-      return;
-    }
-    if (!isValidVehicleYear(nextYear)) {
-      toast.error("Enter a valid vehicle year.");
-      return;
-    }
+    setErrors({});
 
     setSubmitting(true);
     try {
@@ -239,8 +260,9 @@ export default function OwnerEditVehiclePanel({
                 disabled={fieldsDisabled}
                 autoComplete="off"
                 placeholder="ABC 1234"
-                className={fieldClass}
+                className={fieldErrorClass(!!errors.licensePlateNo, fieldClass)}
               />
+              <FormFieldError message={errors.licensePlateNo} />
             </label>
             <label className="block">
               <span className={ownerVehicleLabelClass}>
@@ -259,8 +281,9 @@ export default function OwnerEditVehiclePanel({
                 disabled={fieldsDisabled}
                 autoComplete="off"
                 placeholder="17-character VIN"
-                className={`${fieldClass} font-mono tracking-wide`}
+                className={fieldErrorClass(!!errors.vinNo, `${fieldClass} font-mono tracking-wide`)}
               />
+              <FormFieldError message={errors.vinNo} />
             </label>
           </div>
         </section>
@@ -278,7 +301,7 @@ export default function OwnerEditVehiclePanel({
                   setYear("");
                 }}
                 disabled={fieldsDisabled || companiesLoading}
-                className={selectClass}
+                className={fieldErrorClass(!!errors.name, selectClass)}
               >
                 <option value="">{companiesLoading ? "Loading…" : "Select make"}</option>
                 {companies.map((c) => (
@@ -290,6 +313,7 @@ export default function OwnerEditVehiclePanel({
                   <option value={name}>{name}</option>
                 ) : null}
               </select>
+              <FormFieldError message={errors.name} />
             </label>
 
             <label className="block">
@@ -301,7 +325,7 @@ export default function OwnerEditVehiclePanel({
                   setYear("");
                 }}
                 disabled={fieldsDisabled || !name}
-                className={selectClass}
+                className={fieldErrorClass(!!errors.model, selectClass)}
               >
                 <option value="">Select model</option>
                 {modelOptions.map((m) => (
@@ -313,6 +337,7 @@ export default function OwnerEditVehiclePanel({
                   <option value={model}>{model}</option>
                 ) : null}
               </select>
+              <FormFieldError message={errors.model} />
             </label>
 
             <label className="block">
@@ -321,7 +346,7 @@ export default function OwnerEditVehiclePanel({
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
                 disabled={fieldsDisabled || !model}
-                className={selectClass}
+                className={fieldErrorClass(!!errors.year, selectClass)}
               >
                 <option value="">Select year</option>
                 {yearOptions.map((y) => (
@@ -331,6 +356,7 @@ export default function OwnerEditVehiclePanel({
                 ))}
                 {year && !yearOptions.includes(year) ? <option value={year}>{year}</option> : null}
               </select>
+              <FormFieldError message={errors.year} />
             </label>
           </div>
         </section>

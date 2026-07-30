@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { motion } from "framer-motion";
+import { FiUser } from "react-icons/fi";
 import { ADMIN_PANEL_THEAD_ROW_CLASS, adminPanelRowClass } from "../admin/adminPanelTableStyles";
 import {
   businessName,
@@ -479,10 +480,12 @@ export function OwnerAutoShopsTable({ shops, onRowClick }: OwnerAutoShopsTablePr
                 >
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>
                     <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-200 bg-white">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-200 bg-white text-gray-400">
                         {logoUri ? (
                           <img src={logoUri} alt="" className="h-full w-full object-cover" />
-                        ) : null}
+                        ) : (
+                          <FiUser size={16} strokeWidth={1.5} aria-hidden />
+                        )}
                       </div>
                       <span className="font-semibold text-gray-900">{shop.name}</span>
                     </div>
@@ -713,10 +716,12 @@ export function OwnerCustomerRequestsTable({
                 <tr key={row.businessId} className={index % 2 === 0 ? "bg-white/90" : "bg-slate-50/80"}>
                   <td className={OWNER_TABLE_BODY_TD_CLASS}>
                     <div className="flex items-center gap-2">
-                      <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                      <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-400">
                         {row.businessLogo ? (
                           <img src={row.businessLogo} alt="" className="h-full w-full object-cover" />
-                        ) : null}
+                        ) : (
+                          <FiUser size={16} strokeWidth={1.5} aria-hidden />
+                        )}
                       </div>
                       <span className="font-semibold text-slate-900">{row.businessName}</span>
                     </div>

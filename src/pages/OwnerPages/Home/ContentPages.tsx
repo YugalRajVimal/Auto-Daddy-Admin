@@ -1,14 +1,12 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { FiChevronDown, FiHelpCircle, FiLock, FiStar } from "react-icons/fi";
+import { useMemo, type ReactNode } from "react";
+import { FiLock, FiStar } from "react-icons/fi";
 import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
 import {
-  useCarOwnerFaqs,
   useCarOwnerPrivacy,
   useCarOwnerProductFeatures,
   type CarOwnerContentBlock,
 } from "../../../hooks/useOwnerPortal";
 import { Skeleton } from "../../../components/common/Skeleton";
-import type { DummyFaqItem } from "../../../lib/dummyOwnerHomeProfile";
 
 const FEATURE_ACCENTS = [
   { soft: "bg-sky-50", tint: "text-sky-700", ring: "ring-sky-100", blob: "bg-sky-100" },
@@ -18,8 +16,6 @@ const FEATURE_ACCENTS = [
   { soft: "bg-indigo-50", tint: "text-indigo-700", ring: "ring-indigo-100", blob: "bg-indigo-100" },
   { soft: "bg-teal-50", tint: "text-teal-700", ring: "ring-teal-100", blob: "bg-teal-100" },
 ] as const;
-
-type FaqItem = DummyFaqItem;
 
 function PageIntro({
   eyebrow,
@@ -52,48 +48,6 @@ function EmptyState({ message }: { message: string }) {
   return (
     <div className="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-4 py-10 text-center text-sm text-slate-500">
       {message}
-    </div>
-  );
-}
-
-function FaqAccordion({ items }: { items: FaqItem[] }) {
-  const [openIndex, setOpenIndex] = useState(0);
-
-  return (
-    <div className="space-y-3">
-      {items.map((item, index) => {
-        const open = openIndex === index;
-        return (
-          <div
-            key={`${item.question}-${index}`}
-            className={`overflow-hidden rounded-2xl border border-white/80 bg-white/95 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 transition ${
-              open ? "ring-sky-200" : "ring-black/5 hover:ring-sky-100"
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => setOpenIndex(open ? -1 : index)}
-              className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
-            >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
-                <FiHelpCircle size={16} />
-              </span>
-              <span className="min-w-0 flex-1 text-sm font-semibold text-slate-900 md:text-base">
-                {item.question}
-              </span>
-              <FiChevronDown
-                className={`shrink-0 text-slate-400 transition ${open ? "rotate-180 text-sky-600" : ""}`}
-                size={18}
-              />
-            </button>
-            {open ? (
-              <div className="border-t border-slate-100 px-4 py-3 pl-[3.75rem] text-sm leading-relaxed text-slate-600">
-                {item.answer}
-              </div>
-            ) : null}
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -183,31 +137,6 @@ function LoadingBlock() {
   );
 }
 
-export function OwnerFaqsPage() {
-  const { loading, faqsHeading, items } = useCarOwnerFaqs("carowner");
-
-  return (
-    <OwnerPageShell pageHeading="" metaTitle="FAQs | AutoDaddy" metaDescription="FAQs for car owners" noPanel>
-      <div className="space-y-4">
-        <PageIntro
-          eyebrow="Help center"
-          title={faqsHeading || "FAQs"}
-          subtitle="Quick answers about your garage, shops, and paperwork."
-          icon={<FiHelpCircle size={20} className="text-sky-700" />}
-          accentClass="bg-sky-50 text-sky-700"
-        />
-        {loading ? (
-          <LoadingBlock />
-        ) : items.length > 0 ? (
-          <FaqAccordion items={items} />
-        ) : (
-          <EmptyState message="No FAQs available yet." />
-        )}
-      </div>
-    </OwnerPageShell>
-  );
-}
-
 export function OwnerPrivacyPage() {
   const { loading, privacyHeading, privacyDescription } = useCarOwnerPrivacy({
     country: "canada",
@@ -275,5 +204,3 @@ export function OwnerFeaturesPage() {
     </OwnerPageShell>
   );
 }
-
-export default OwnerFaqsPage;

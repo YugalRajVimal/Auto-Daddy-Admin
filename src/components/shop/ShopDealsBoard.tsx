@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
+import { formatDisplayDate } from "../../pages/AdminPages/Accounts/accountData";
 import { formatPhoneDisplay } from "../../lib/phoneFormat";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
+import { isDealSold } from "../../lib/shopDealSales";
 import { dealId, shopDealDiscountLabel as formatShopDealDiscount } from "../../lib/shopOwnerParsers";
 import type { ShopDeal } from "../../types/shopOwner";
 
@@ -62,8 +64,13 @@ function dealVehicleRowLabel(deal: ShopDeal): string {
   return name || year || "—";
 }
 
-function dealAttachmentUrl(deal: ShopDeal): string | null {
-  return normalizeMediaUrl(deal.dealImage ?? deal.productImage);
+function dealAttachmentUrls(deal: ShopDeal): string[] {
+  const fromList = (deal.dealImages ?? [])
+    .map((url) => normalizeMediaUrl(url))
+    .filter((url): url is string => Boolean(url));
+  if (fromList.length > 0) return fromList.slice(0, 2);
+  const single = normalizeMediaUrl(deal.dealImage ?? deal.productImage);
+  return single ? [single] : [];
 }
 
 function formatOfferBannerDate(iso?: string): string {
@@ -109,26 +116,64 @@ function groupDeals(deals: ShopDeal[], section: DealSectionId): DealGroup[] {
   return Array.from(groups.values());
 }
 
-function dealDetailRows(section: DealSectionId) {
-  if (section === "salvage") {
-    return [
-      { label: "Installation", value: "YES" },
-      { label: "Stock", value: "YES" },
-      { label: "Condition", value: "Salvage" },
-    ];
-  }
-  if (section === "service") {
-    return [
-      { label: "Booking", value: "YES" },
-      { label: "Available", value: "YES" },
-      { label: "Type", value: "Service" },
-    ];
-  }
-  return [
-    { label: "Installation", value: "YES" },
-    { label: "Stock", value: "YES" },
-    { label: "Condition", value: "New" },
+function formatDealDate(iso?: string): string {
+  if (!iso?.trim()) return "—";
+  return formatDisplayDate(iso.trim());
+}
+
+function dealVehicleLabel(deal: ShopDeal): string {
+  const vehicle = deal.selectedVehicle;
+  if (!vehicle) return "—";
+  const name = vehicle.vehicleName?.trim() || vehicle.name?.trim();
+  const model = vehicle.model?.trim();
+  if (name && model) return `${name}-${model}`;
+  return name || model || "—";
+}
+
+function dealVehicleYear(deal: ShopDeal): string {
+  return deal.selectedVehicle?.year?.trim() || "—";
+}
+
+function dealStatusLabel(deal: ShopDeal): string {
+  if (isDealSold(deal)) return "Sold";
+  return deal.dealEnabled === false ? "Non-Active" : "Active";
+}
+
+function dealSoldToLabel(deal: ShopDeal): string {
+  return deal.soldToCustomerName?.trim() || "—";
+}
+
+function dealPreviewRows(
+  deal: ShopDeal,
+  section: DealSectionId,
+  closingDateLabel = "Closing Date",
+): Array<{ label: string; value: string }> {
+  const isService = section === "service";
+  const rows: Array<{ label: string; value: string }> = [
+    { label: "Opening Date", value: formatDealDate(deal.createdAt) },
+    { label: closingDateLabel, value: formatDealDate(deal.offersEndOnDate) },
+    { label: isService ? "Subservice" : "Part Name", value: shopDealTitle(deal) },
   ];
+  if (!isService) {
+    rows.push(
+      { label: "Vehicle", value: dealVehicleLabel(deal) },
+      { label: "Year", value: dealVehicleYear(deal) },
+    );
+  }
+  rows.push(
+    {
+      label: isService ? "Discount (%)" : "Discounted Price",
+      value: shopDealDiscountLabel(deal) || "—",
+    },
+    { label: "Status", value: dealStatusLabel(deal) },
+  );
+  if (!isService) {
+    rows.push({ label: "Sold To", value: dealSoldToLabel(deal) });
+  }
+  if (deal.description?.trim()) {
+    rows.push({ label: "Description", value: deal.description.trim() });
+  }
+  return rows;
 }
 
 function ShopDealsBoardCard({
@@ -138,6 +183,7 @@ function ShopDealsBoardCard({
   businessPhone,
   website,
   selectedIds,
+  closingDateLabel,
   onToggleRow,
   onEdit,
 }: {
@@ -147,6 +193,7 @@ function ShopDealsBoardCard({
   businessPhone: string;
   website?: string;
   selectedIds: Set<string>;
+  closingDateLabel: string;
   onToggleRow: (id: string) => void;
   onEdit: (deal: ShopDeal) => void;
 }) {
@@ -156,7 +203,6 @@ function ShopDealsBoardCard({
       ? website
       : `https://${website}`
     : undefined;
-  const detailRows = dealDetailRows(section);
   const showVehicleColumn = section !== "service";
 
   return (
@@ -186,7 +232,9 @@ function ShopDealsBoardCard({
       <div>
         {group.deals.map((deal) => {
           const id = dealId(deal);
-          const imageUrl = dealAttachmentUrl(deal);
+          const imageUrls = dealAttachmentUrls(deal);
+          const previewRows = dealPreviewRows(deal, section, closingDateLabel);
+          const discount = shopDealDiscountLabel(deal);
           return (
             <div
               key={id}
@@ -198,7 +246,7 @@ function ShopDealsBoardCard({
                     type="checkbox"
                     checked={selectedIds.has(id)}
                     onChange={() => onToggleRow(id)}
-                    aria-label={`Select ${dealVehicleRowLabel(deal)}`}
+                    aria-label={`Select ${shopDealTitle(deal)}`}
                     className={BOARD_CHECKBOX_CLASS}
                   />
                 </label>
@@ -207,15 +255,28 @@ function ShopDealsBoardCard({
                   onClick={() => onEdit(deal)}
                   className="mx-auto block w-full max-w-[124px] text-center"
                 >
-                  <span className="mx-auto flex h-24 w-24 items-center justify-center overflow-hidden border border-gray-400 bg-white p-2">
-                    {imageUrl ? (
-                      <img src={imageUrl} alt="" className="max-h-full max-w-full object-contain" />
-                    ) : (
-                      <span className="text-xs font-semibold text-gray-400">No image</span>
-                    )}
-                  </span>
+                  {imageUrls.length > 1 ? (
+                    <span className="mx-auto grid w-full max-w-[124px] grid-cols-2 gap-1">
+                      {imageUrls.map((url) => (
+                        <span
+                          key={url}
+                          className="flex aspect-square items-center justify-center overflow-hidden border border-gray-400 bg-white p-1"
+                        >
+                          <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="mx-auto flex h-24 w-24 items-center justify-center overflow-hidden border border-gray-400 bg-white p-2">
+                      {imageUrls[0] ? (
+                        <img src={imageUrls[0]} alt="" className="max-h-full max-w-full object-contain" />
+                      ) : (
+                        <span className="text-xs font-semibold text-gray-400">No image</span>
+                      )}
+                    </span>
+                  )}
                   <span className="mt-1 block text-xs font-bold uppercase text-gray-800">
-                    {showVehicleColumn ? dealVehicleRowLabel(deal) : deal.productName?.trim() || group.title}
+                    {showVehicleColumn ? dealVehicleRowLabel(deal) : shopDealTitle(deal)}
                   </span>
                 </button>
               </div>
@@ -225,11 +286,18 @@ function ShopDealsBoardCard({
                 onClick={() => onEdit(deal)}
                 className="min-w-0 text-left"
               >
-                <p className="text-lg font-bold text-[#008000] sm:text-xl">{dealDiscountHeading(deal)}</p>
+                <p className="text-lg font-bold text-[#008000] sm:text-xl">
+                  {discount
+                    ? section === "service"
+                      ? `Overall ${discount} discount`
+                      : `Discounted price ${discount}`
+                    : dealDiscountHeading(deal)}
+                </p>
                 <ul className="mt-2 space-y-1 text-sm text-gray-900">
-                  {detailRows.map((row) => (
+                  {previewRows.map((row) => (
                     <li key={row.label}>
-                      {row.label} : <span className="font-semibold text-red-600">{row.value}</span>
+                      {row.label} :{" "}
+                      <span className="font-semibold text-red-600">{row.value}</span>
                     </li>
                   ))}
                 </ul>
@@ -283,6 +351,7 @@ export default function ShopDealsBoard({
   businessName,
   businessPhone,
   website,
+  closingDateLabel = "Closing Date",
   onToggleRow,
   onEdit,
 }: {
@@ -293,6 +362,7 @@ export default function ShopDealsBoard({
   businessName: string;
   businessPhone: string;
   website?: string;
+  closingDateLabel?: string;
   onToggleRow: (id: string) => void;
   onEdit: (deal: ShopDeal) => void;
 }) {
@@ -318,6 +388,7 @@ export default function ShopDealsBoard({
               businessPhone={businessPhone}
               website={website}
               selectedIds={selectedIds}
+              closingDateLabel={closingDateLabel}
               onToggleRow={onToggleRow}
               onEdit={onEdit}
             />

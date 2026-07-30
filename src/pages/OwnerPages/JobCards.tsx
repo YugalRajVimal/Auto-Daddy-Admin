@@ -3,19 +3,37 @@ import OwnerPageShell, {
   OwnerPageSearchInput,
 } from "../../components/owner/OwnerPageShell";
 import { OwnerJobCardsTable } from "../../components/owner/OwnerPanelTables";
+import {
+  ownerVehicleLabelClass,
+  ownerVehicleSelectClass,
+} from "../../components/owner/ownerVehicleFormUtils";
 import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
+import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import {
   businessName,
   jobCardLicensePlate,
   jobChipLabel,
   serviceTypeLabel,
 } from "../../lib/carOwnerJobCards";
+import {
+  vehicleSidebarLabel,
+  type CarOwnerVehicle,
+} from "../../lib/carOwnerVehicles";
 
 const PAGE_SIZE = 10;
 
+function vehicleOptionLabel(vehicle: CarOwnerVehicle, index: number): string {
+  const plate = vehicle.licensePlateNo?.trim().toUpperCase();
+  if (plate) return plate;
+  const make = vehicleSidebarLabel(vehicle);
+  return make || `Vehicle ${index + 1}`;
+}
+
 export default function OwnerJobCardsPage() {
   const countryCode = "+1";
-  const { items, loading, error, refresh } = useCarOwnerJobCards(null);
+  const { vehicles } = useCarOwnerVehicles();
+  const [vehicleFilter, setVehicleFilter] = useState("");
+  const { items, loading, error, refresh } = useCarOwnerJobCards(vehicleFilter || null);
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -46,7 +64,7 @@ export default function OwnerJobCardsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, vehicleFilter]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -73,41 +91,68 @@ export default function OwnerJobCardsPage() {
             Try again
           </button>
         </div>
-      ) : filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-gray-600">
-          {search.trim() ? "No job cards match your search." : "No job cards yet."}
-        </p>
       ) : (
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-end justify-end gap-2">
+            {vehicles.length > 0 ? (
+              <div className="min-w-[11rem] sm:min-w-[14rem]">
+                <label className={ownerVehicleLabelClass} htmlFor="owner-job-cards-vehicle-filter">
+                  Vehicle
+                </label>
+                <select
+                  id="owner-job-cards-vehicle-filter"
+                  value={vehicleFilter}
+                  onChange={(e) => setVehicleFilter(e.target.value)}
+                  aria-label="Filter by vehicle"
+                  className={ownerVehicleSelectClass}
+                >
+                  <option value="">All vehicles</option>
+                  {vehicles.map((vehicle, index) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicleOptionLabel(vehicle, index)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <OwnerPageSearchInput value={search} onChange={setSearch} placeholder="Search job cards…" />
           </div>
-          <OwnerJobCardsTable rows={pageRows} countryCode={countryCode} />
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between gap-2 border-t border-gray-200 pt-3 text-xs text-gray-800">
-              <span>
-                Page {page} of {totalPages} ({filtered.length} total)
-              </span>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="rounded border border-gray-300 bg-white px-2 py-1 font-semibold text-ad-purple disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="rounded border border-gray-300 bg-white px-2 py-1 font-semibold text-ad-purple disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          ) : null}
+          {filtered.length === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-600">
+              {search.trim() || vehicleFilter
+                ? "No job cards match your filters."
+                : "No job cards yet."}
+            </p>
+          ) : (
+            <>
+              <OwnerJobCardsTable rows={pageRows} countryCode={countryCode} />
+              {totalPages > 1 ? (
+                <div className="flex items-center justify-between gap-2 border-t border-gray-200 pt-3 text-xs text-gray-800">
+                  <span>
+                    Page {page} of {totalPages} ({filtered.length} total)
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className="rounded border border-gray-300 bg-white px-2 py-1 font-semibold text-ad-purple disabled:opacity-40"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      disabled={page >= totalPages}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      className="rounded border border-gray-300 bg-white px-2 py-1 font-semibold text-ad-purple disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       )}
     </OwnerPageShell>

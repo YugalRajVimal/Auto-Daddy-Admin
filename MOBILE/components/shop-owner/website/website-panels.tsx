@@ -22,6 +22,7 @@ import {
   DOMAIN_STATUS_OPTIONS,
   FALLBACK_PLANS,
   YEARLY_FEATURES,
+  BIWEEKLY_FEATURES,
   daysUntilExpiry,
   formatDisplayDate,
   type DomainForm,
@@ -673,10 +674,7 @@ export function SubscriptionPanel({
           <Text style={styles.planCardHeaderText}>{biweekly.title}</Text>
         </View>
         <View style={styles.planCardBody}>
-          <Text style={styles.biweeklyDesc}>
-            {biweekly.description || "26 -Void cheques of CAD 15"}
-            <Text style={styles.featureNote}> (for 26 Bi-weekly)</Text>
-          </Text>
+          <PlanFeatureList items={BIWEEKLY_FEATURES} />
         </View>
         <Pressable
           onPress={() => onViewInvoice("biweekly")}

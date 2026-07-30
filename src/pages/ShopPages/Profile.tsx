@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { toast } from "react-toastify";
 import DashboardPanelCard from "../../components/COMP";
 import { ThoughtOfTheDayCard } from "../../components/portal/ThoughtOfTheDayCard";
@@ -194,6 +194,7 @@ function AddNewLink({ to }: { to: string }) {
 
 export default function ShopProfilePage() {
   const { token } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     user,
     business,
@@ -207,7 +208,12 @@ export default function ShopProfilePage() {
     updatingActive,
     setBusinessActive,
   } = useShopOwnerPortal();
-  const [activeId, setActiveId] = useState("personal");
+  const sectionParam = searchParams.get("section");
+  const initialSection =
+    sectionParam && PROFILE_SECTIONS.some((s) => s.id === sectionParam)
+      ? sectionParam
+      : "personal";
+  const [activeId, setActiveId] = useState(initialSection);
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [carCompanies, setCarCompanies] = useState<ShopCarCompany[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set());
@@ -234,6 +240,24 @@ export default function ShopProfilePage() {
   const [numbering, setNumbering] = useState(readStoredNumbering);
   const [manageInvoicesOpen, setManageInvoicesOpen] = useState(false);
   const [invoicePrefixLoading, setInvoicePrefixLoading] = useState(false);
+
+  useEffect(() => {
+    if (!sectionParam) return;
+    if (!PROFILE_SECTIONS.some((s) => s.id === sectionParam)) return;
+    setActiveId(sectionParam);
+  }, [sectionParam]);
+
+  const handleSidebarSelect = (id: string) => {
+    setActiveId(id);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("section", id);
+        return next;
+      },
+      { replace: true }
+    );
+  };
 
   useEffect(() => {
     const invoiceSlug = resolveTemplateSlug(
@@ -834,7 +858,7 @@ console.log(res.data)
         sidebarVariant="nav"
         sidebarItems={PROFILE_SECTIONS}
         activeSidebarId={activeId}
-        onSidebarSelect={setActiveId}
+        onSidebarSelect={handleSidebarSelect}
         sidebarFooter={sidebarFooter}
         headerAction={headerAction}
         heroBackgroundImage={false}

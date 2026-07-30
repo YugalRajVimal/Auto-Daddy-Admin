@@ -5,7 +5,6 @@ import ShopPanelLayout from "../../layout/Shop/ShopPanelLayout";
 import ShopPageLayout from "../../layout/Shop/ShopPageLayout";
 import OwnerHomePage from "../../pages/OwnerPages/Home/Home";
 import {
-  OwnerFaqsPage,
   OwnerFeaturesPage,
   OwnerPrivacyPage,
 } from "../../pages/OwnerPages/Home/ContentPages";
@@ -43,7 +42,7 @@ export const ownerRoutes = (
   <Route element={<OwnerPanelLayout />}>
     <Route element={<OwnerPageLayout />}>
       <Route index path="/owner" element={<OwnerHomePage />} />
-      <Route path="/owner/faqs" element={<OwnerFaqsPage />} />
+      <Route path="/owner/faqs" element={<Navigate to="/owner" replace />} />
       <Route path="/owner/privacy" element={<OwnerPrivacyPage />} />
       <Route path="/owner/features" element={<OwnerFeaturesPage />} />
       <Route path="/owner/profile" element={<OwnerProfilePage />} />

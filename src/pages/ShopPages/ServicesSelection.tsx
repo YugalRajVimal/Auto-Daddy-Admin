@@ -7,6 +7,8 @@ import { useAuth } from "../../auth";
 import { apiMessage, fetchServiceCatalog, updateServiceWeWorkWith } from "../../lib/shopOwnerMutations";
 import { useShopServices } from "../../hooks/useShopServices";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
+import { FormFieldError } from "../../lib/validation/formUi";
+import { servicesSelectionSchema } from "../../lib/validation/schemas/catalog";
 
 type CatalogItem = { id: string; name: string };
 
@@ -35,6 +37,7 @@ export default function ShopServicesSelectionPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [faqsOpen, setFaqsOpen] = useState(false);
+  const [selectionError, setSelectionError] = useState<string | undefined>();
 
   useEffect(() => {
     if (!token) return;
@@ -49,6 +52,7 @@ export default function ShopServicesSelectionPage() {
   }, [categories]);
 
   const toggle = (id: string) => {
+    setSelectionError(undefined);
     setSelected((prev) => {
       const copy = new Set(prev);
       if (copy.has(id)) copy.delete(id);
@@ -59,9 +63,16 @@ export default function ShopServicesSelectionPage() {
 
   const handleSave = async () => {
     if (!token) return;
+    const parsed = servicesSelectionSchema.safeParse({ serviceIds: [...selected] });
+    if (!parsed.success) {
+      const msg = parsed.error.issues[0]?.message ?? "Select at least one service.";
+      setSelectionError(msg);
+      toast.error(msg);
+      return;
+    }
     setSaving(true);
     try {
-      const res = await updateServiceWeWorkWith(token, [...selected]);
+      const res = await updateServiceWeWorkWith(token, parsed.data.serviceIds);
       if (!res.ok) {
         toast.error(apiMessage(res.data) || "Could not save.");
         return;
@@ -94,6 +105,7 @@ export default function ShopServicesSelectionPage() {
           <ShopLoadingPanel variant="checkbox-row" count={8} />
         ) : (
           <ShopListPanel>
+          <FormFieldError message={selectionError} />
           {catalog.map((item) => (
             <label key={item.id} className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-4 py-3">
               <span className="text-sm font-semibold text-gray-900">{item.name}</span>
@@ -101,11 +113,11 @@ export default function ShopServicesSelectionPage() {
                 type="checkbox"
                 checked={selected.has(item.id)}
                 onChange={() => toggle(item.id)}
-                className="h-4 w-4 accent-ad-purple"
+                className="size-4 accent-ad-purple"
               />
             </label>
           ))}
-        </ShopListPanel>
+          </ShopListPanel>
         )}
       </ShopPageContentShell>
     </ShopPageShell>

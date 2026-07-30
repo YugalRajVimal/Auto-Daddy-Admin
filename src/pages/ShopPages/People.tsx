@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useState, type HTMLAttributes } from "
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { getJson } from "../../api/mobileAuth";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../lib/validation/formUi";
+import { shopPeopleSchema, type ShopPeopleValues } from "../../lib/validation/schemas/identity";
 import {
   CompactField,
   CompactFormPanel,
@@ -925,17 +929,26 @@ function AddNewCustomerForm({
 }) {
   const { token } = useAuth();
   const countryCode = "+1";
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [city, setCity] = useState(defaultCity);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    getValues,
+    formState: { errors },
+  } = useForm<ShopPeopleValues>({
+    resolver: zodResolver(shopPeopleSchema),
+    mode: "onSubmit",
+    defaultValues: { name: "", phone: "", email: "", city: defaultCity },
+  });
+
   useEffect(() => {
-    if (defaultCity) setCity((prev) => prev || defaultCity);
-  }, [defaultCity]);
+    if (defaultCity && !getValues("city")) setValue("city", defaultCity);
+  }, [defaultCity, getValues, setValue]);
 
   useEffect(() => {
     if (!token) return;
@@ -953,6 +966,8 @@ function AddNewCustomerForm({
     };
   }, [token]);
 
+  const city = watch("city");
+  const phone = watch("phone");
   const citySelectOptions = useMemo(() => {
     const names = new Set(cityOptions);
     if (defaultCity.trim()) names.add(defaultCity.trim());
@@ -960,36 +975,28 @@ function AddNewCustomerForm({
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [cityOptions, city, defaultCity]);
 
-  const handleSave = async () => {
+  const onValid = async (values: ShopPeopleValues) => {
     if (!token) return;
-    if (!name.trim()) {
-      setError("Name is required.");
-      return;
-    }
-    if (phoneDigits(phone).length !== 10) {
-      setError("Phone must be 10 digits.");
-      return;
-    }
-    if (!city.trim()) {
-      setError("City is required.");
-      return;
-    }
-
     setSubmitting(true);
     setError(null);
     try {
       const res = await onboardCarOwner(token, {
-        name: name.trim(),
-        email: email.trim(),
+        name: values.name.trim(),
+        email: (values.email ?? "").trim(),
         countryCode,
-        phone: phoneDigits(phone),
+        phone: values.phone,
         pincode: "",
         address: "",
-        city: city.trim(),
+        city: values.city.trim(),
         role: "carowner",
         vehicles: [],
       });
-      logPeopleApi("POST", "/api/autoshopowner/customer/onboard", { name, email, phone, city }, res);
+      logPeopleApi(
+        "POST",
+        "/api/autoshopowner/customer/onboard",
+        { name: values.name, email: values.email, phone: values.phone, city: values.city },
+        res,
+      );
       if (!res.ok) {
         setError(apiMessage(res.data) || "Could not add customer.");
         return;
@@ -1005,6 +1012,13 @@ function AddNewCustomerForm({
     }
   };
 
+  const onInvalid = (formErrors: typeof errors) => {
+    toastValidationSummary(toast.error, formErrors);
+  };
+
+  const nameField = register("name");
+  const phoneField = register("phone");
+
   return (
     <CompactFormPanel
       className={shopProfileFormPanelClass}
@@ -1014,7 +1028,7 @@ function AddNewCustomerForm({
           message="You are adding a new customer"
           saving={submitting}
           saveLabel="Save"
-          onSave={() => void handleSave()}
+          onSave={() => void handleSubmit(onValid, onInvalid)()}
           onCancel={onCancel}
         />
       }
@@ -1023,23 +1037,30 @@ function AddNewCustomerForm({
       <CompactFormRow className="items-end">
         <CompactField label="Name" required className={compactFixedFieldWidth}>
           <input
-            className={shopCompactInputClass}
-            value={name}
-            onChange={(e) => setName(e.target.value.slice(0, 20))}
+            className={fieldErrorClass(!!errors.name, shopCompactInputClass)}
+            {...nameField}
+            onChange={(e) => {
+              e.target.value = e.target.value.slice(0, 20);
+              void nameField.onChange(e);
+            }}
           />
+          <FormFieldError message={errors.name?.message} />
         </CompactField>
         <CompactField label="Phone" required className={compactFixedFieldWidth}>
           <input
-            className={shopCompactInputClass}
+            className={fieldErrorClass(!!errors.phone, shopCompactInputClass)}
             value={formatPhoneDisplay(phone)}
-            onChange={(e) => setPhone(phoneDigits(e.target.value))}
+            onChange={(e) => setValue("phone", phoneDigits(e.target.value), { shouldValidate: false })}
+            onBlur={phoneField.onBlur}
+            name={phoneField.name}
+            ref={phoneField.ref}
           />
+          <FormFieldError message={errors.phone?.message} />
         </CompactField>
         <CompactField label="City" required className={compactFixedFieldWidth}>
           <select
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            className={shopCompactInputClass}
+            className={fieldErrorClass(!!errors.city, shopCompactInputClass)}
+            {...register("city")}
           >
             <option value="">Select city</option>
             {citySelectOptions.map((cityName) => (
@@ -1048,14 +1069,15 @@ function AddNewCustomerForm({
               </option>
             ))}
           </select>
+          <FormFieldError message={errors.city?.message} />
         </CompactField>
         <CompactField label="Email" className={compactFixedFieldWidth}>
           <input
-            className={shopCompactInputClass}
+            className={fieldErrorClass(!!errors.email, shopCompactInputClass)}
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            {...register("email")}
           />
+          <FormFieldError message={errors.email?.message} />
         </CompactField>
       </CompactFormRow>
     </CompactFormPanel>
@@ -1078,20 +1100,36 @@ function EditCustomerForm({
   const { token } = useAuth();
   const countryCode = "+1";
   const id = customerId(customer);
-  const [name, setName] = useState(customer.name ?? "");
-  const [phone, setPhone] = useState(phoneDigits(customer.phone ?? ""));
-  const [email, setEmail] = useState(customer.email ?? "");
-  const [city, setCity] = useState(customer.city?.trim() || defaultCity);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm<ShopPeopleValues>({
+    resolver: zodResolver(shopPeopleSchema),
+    mode: "onSubmit",
+    defaultValues: {
+      name: customer.name ?? "",
+      phone: phoneDigits(customer.phone ?? ""),
+      email: customer.email ?? "",
+      city: customer.city?.trim() || defaultCity,
+    },
+  });
+
   useEffect(() => {
-    setName(customer.name ?? "");
-    setPhone(phoneDigits(customer.phone ?? ""));
-    setEmail(customer.email ?? "");
-    setCity(customer.city?.trim() || defaultCity);
-  }, [customer, defaultCity]);
+    reset({
+      name: customer.name ?? "",
+      phone: phoneDigits(customer.phone ?? ""),
+      email: customer.email ?? "",
+      city: customer.city?.trim() || defaultCity,
+    });
+  }, [customer, defaultCity, reset]);
 
   useEffect(() => {
     if (!token) return;
@@ -1109,6 +1147,8 @@ function EditCustomerForm({
     };
   }, [token]);
 
+  const city = watch("city");
+  const phone = watch("phone");
   const citySelectOptions = useMemo(() => {
     const names = new Set(cityOptions);
     if (defaultCity.trim()) names.add(defaultCity.trim());
@@ -1116,21 +1156,9 @@ function EditCustomerForm({
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [cityOptions, city, defaultCity]);
 
-  const handleSave = async () => {
+  const onValid = async (values: ShopPeopleValues) => {
     if (!token || !id) {
       setError("Missing customer id.");
-      return;
-    }
-    if (!name.trim()) {
-      setError("Name is required.");
-      return;
-    }
-    if (phoneDigits(phone).length !== 10) {
-      setError("Phone must be 10 digits.");
-      return;
-    }
-    if (!city.trim()) {
-      setError("City is required.");
       return;
     }
 
@@ -1138,14 +1166,18 @@ function EditCustomerForm({
     setError(null);
     try {
       const isOnboarded = (customer.status ?? "").toLowerCase() === "onboarded";
+      const name = values.name.trim();
+      const email = (values.email ?? "").trim();
+      const cityValue = values.city.trim();
+      const phoneValue = values.phone;
 
       if (addToListAfterSave) {
         const addRes = await addCarOwnerToMyCustomers(token, id, {
-          name: name.trim(),
-          email: email.trim(),
-          city: city.trim(),
+          name,
+          email,
+          city: cityValue,
         });
-        logPeopleApi("POST", "/api/autoshopowner/customer/add", { customerId: id, edits: { name, email, city } }, addRes);
+        logPeopleApi("POST", "/api/autoshopowner/customer/add", { customerId: id, edits: { name, email, city: cityValue } }, addRes);
         if (!addRes.ok) {
           setError(apiMessage(addRes.data) || "Could not add customer to your list.");
           return;
@@ -1159,15 +1191,15 @@ function EditCustomerForm({
 
       if (isOnboarded) {
         const res = await editOnboardedCustomer(token, id, {
-          name: name.trim(),
-          phone: phoneDigits(phone),
-          email: email.trim(),
-          city: city.trim(),
+          name,
+          phone: phoneValue,
+          email,
+          city: cityValue,
         });
         logPeopleApi(
           "PUT",
           `/api/autoshopowner/customer/onboarded/${encodeURIComponent(id)}`,
-          { name, phone, email, city },
+          { name, phone: phoneValue, email, city: cityValue },
           res,
         );
         if (!res.ok) {
@@ -1180,13 +1212,13 @@ function EditCustomerForm({
 
       const res = await updateMyCustomer(token, {
         carOwnerId: id,
-        name: name.trim(),
-        email: email.trim(),
+        name,
+        email,
         countryCode,
-        phone: phoneDigits(phone),
+        phone: phoneValue,
         pincode: customer.pincode?.trim() ?? "",
         address: customer.address?.trim() ?? "",
-        city: city.trim(),
+        city: cityValue,
         vehicles: mapCustomerVehiclesForUpdate(customer),
       });
       logPeopleApi("PUT", "/api/auto-shop-owner/my-customers", { carOwnerId: id }, res);
@@ -1203,6 +1235,13 @@ function EditCustomerForm({
     }
   };
 
+  const onInvalid = (formErrors: typeof errors) => {
+    toastValidationSummary(toast.error, formErrors);
+  };
+
+  const nameField = register("name");
+  const phoneField = register("phone");
+
   return (
     <CompactFormPanel
       className={shopProfileFormPanelClass}
@@ -1217,7 +1256,7 @@ function EditCustomerForm({
           saving={submitting}
           saveLabel={addToListAfterSave ? "+ Add" : "Update"}
           savingLabel={addToListAfterSave ? "Adding…" : "Updating…"}
-          onSave={() => void handleSave()}
+          onSave={() => void handleSubmit(onValid, onInvalid)()}
           onCancel={onCancel}
         />
       }
@@ -1226,23 +1265,30 @@ function EditCustomerForm({
       <CompactFormRow className="items-end">
         <CompactField label="Name" required className={compactFixedFieldWidth}>
           <input
-            className={shopCompactInputClass}
-            value={name}
-            onChange={(e) => setName(e.target.value.slice(0, 20))}
+            className={fieldErrorClass(!!errors.name, shopCompactInputClass)}
+            {...nameField}
+            onChange={(e) => {
+              e.target.value = e.target.value.slice(0, 20);
+              void nameField.onChange(e);
+            }}
           />
+          <FormFieldError message={errors.name?.message} />
         </CompactField>
         <CompactField label="Phone" required className={compactFixedFieldWidth}>
           <input
-            className={shopCompactInputClass}
+            className={fieldErrorClass(!!errors.phone, shopCompactInputClass)}
             value={formatPhoneDisplay(phone)}
-            onChange={(e) => setPhone(phoneDigits(e.target.value))}
+            onChange={(e) => setValue("phone", phoneDigits(e.target.value), { shouldValidate: false })}
+            onBlur={phoneField.onBlur}
+            name={phoneField.name}
+            ref={phoneField.ref}
           />
+          <FormFieldError message={errors.phone?.message} />
         </CompactField>
         <CompactField label="City" required className={compactFixedFieldWidth}>
           <select
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            className={shopCompactInputClass}
+            className={fieldErrorClass(!!errors.city, shopCompactInputClass)}
+            {...register("city")}
           >
             <option value="">Select city</option>
             {citySelectOptions.map((cityName) => (
@@ -1251,14 +1297,15 @@ function EditCustomerForm({
               </option>
             ))}
           </select>
+          <FormFieldError message={errors.city?.message} />
         </CompactField>
         <CompactField label="Email" className={compactFixedFieldWidth}>
           <input
-            className={shopCompactInputClass}
+            className={fieldErrorClass(!!errors.email, shopCompactInputClass)}
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            {...register("email")}
           />
+          <FormFieldError message={errors.email?.message} />
         </CompactField>
       </CompactFormRow>
     </CompactFormPanel>

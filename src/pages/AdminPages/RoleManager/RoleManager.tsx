@@ -1,11 +1,15 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AdminPage  from "../../../components/admin/AdminPage";
 import { PermissionMatrix } from "../../../components/admin/PermissionMatrix";
 import { adminNotify } from "../../../utils/adminNotify";
 import { CompactField, CompactFormFooter, CompactFormPanel, compactInputClass } from "../../../components/admin/ContentPanel";
 import { ONBOARDABLE_ROLES,roleLabel, type Permissions, type StaffRole } from "../../../config/permissionModules";
+import { roleManagerSchema, type RoleManagerValues } from "../../../lib/validation/schemas/catalog";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../../lib/validation/formUi";
 
 interface RoleDoc {
   _id: string;
@@ -23,10 +27,18 @@ const RoleManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editingRole, setEditingRole] = useState<RoleDoc | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState("");
-  const [type, setType] = useState<StaffRole | "">("");
   const [permissions, setPermissions] = useState<Permissions>({} as Permissions);
   const [saving, setSaving] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors: formErrors },
+  } = useForm<RoleManagerValues>({
+    resolver: zodResolver(roleManagerSchema),
+    defaultValues: { name: "", type: "" },
+  });
 
   const fetchRoles = useCallback(async () => {
     setLoading(true);
@@ -44,41 +56,40 @@ const RoleManagement: React.FC = () => {
 
   // const openCreate = () => {
   //   setEditingRole(null);
-  //   setName("");
-  //   setType("");
+  //   reset({ name: "", type: "" });
   //   setPermissions({} as Permissions);
   //   setShowForm(true);
   // };
 
   const openEdit = (r: RoleDoc) => {
     setEditingRole(r);
-    setName(r.name);
-    setType(r.type);
+    reset({ name: r.name, type: r.type });
     setPermissions(r.permissions);
     setShowForm(true);
   };
 
-  const save = async () => {
-    if (!name.trim()) return adminNotify.error("Name is required.");
-    if (!editingRole && !type) return adminNotify.error("Type is required.");
-    setSaving(true);
-    try {
-      if (editingRole) {
-        await axios.put(`${API}/api/admin/roles/${editingRole._id}`, { name: name.trim() }, { headers: getTokenHeaders() });
-        await axios.patch(`${API}/api/admin/roles/${editingRole._id}/permissions`, { permissions }, { headers: getTokenHeaders() });
-        adminNotify.success("Role updated. Every staff user with this role is updated immediately.");
-      } else {
-        await axios.post(`${API}/api/admin/roles`, { name: name.trim(), type, permissions }, { headers: getTokenHeaders() });
-        adminNotify.success("Role created.");
+  const save = handleSubmit(
+    async (values) => {
+      setSaving(true);
+      try {
+        if (editingRole) {
+          await axios.put(`${API}/api/admin/roles/${editingRole._id}`, { name: values.name }, { headers: getTokenHeaders() });
+          await axios.patch(`${API}/api/admin/roles/${editingRole._id}/permissions`, { permissions }, { headers: getTokenHeaders() });
+          adminNotify.success("Role updated. Every staff user with this role is updated immediately.");
+        } else {
+          await axios.post(`${API}/api/admin/roles`, { name: values.name, type: values.type, permissions }, { headers: getTokenHeaders() });
+          adminNotify.success("Role created.");
+        }
+        setShowForm(false);
+        fetchRoles();
+      } catch (e: any) {
+        adminNotify.error(e?.response?.data?.message || "Failed to save role");
+      } finally {
+        setSaving(false);
       }
-      setShowForm(false);
-      fetchRoles();
-    } catch (e: any) {
-      adminNotify.error(e?.response?.data?.message || "Failed to save role");
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+    (errs) => toastValidationSummary(adminNotify.error, errs as never)
+  );
 
   const remove = async (r: RoleDoc) => {
     if (!window.confirm(`Delete role "${r.name}"? Staff still assigned to it must be reassigned first.`)) return;
@@ -110,16 +121,26 @@ const RoleManagement: React.FC = () => {
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-4">
               <CompactField label="Role Name" required>
-                <input value={name} onChange={(e) => setName(e.target.value)} className={compactInputClass} placeholder="e.g. Regional Sub Admin" />
+                <input
+                  {...register("name")}
+                  className={fieldErrorClass(Boolean(formErrors.name), compactInputClass)}
+                  placeholder="e.g. Regional Sub Admin"
+                />
+                <FormFieldError message={formErrors.name?.message} />
               </CompactField>
               <CompactField label="Type" required>
-                <select value={type} onChange={(e) => setType(e.target.value as StaffRole)} className={compactInputClass} disabled={!!editingRole}>
+                <select
+                  {...register("type")}
+                  className={fieldErrorClass(Boolean(formErrors.type), compactInputClass)}
+                  disabled={!!editingRole}
+                >
                   <option value="">Select type</option>
                   {ONBOARDABLE_ROLES.map((r: { value: string; label: string }) => (
                     <option key={r.value} value={r.value}>{r.label}</option>
                   ))}
              
                 </select>
+                <FormFieldError message={formErrors.type?.message} />
                 {editingRole && <p className="mt-1 text-[11px] text-gray-500">Type cannot change after creation — staff are assigned by type.</p>}
               </CompactField>
             </div>

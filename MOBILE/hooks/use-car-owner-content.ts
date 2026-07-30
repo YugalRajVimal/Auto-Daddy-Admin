@@ -1,17 +1,18 @@
 import { useAuth } from "@/context/auth-provider";
 import {
   fetchCarOwnerFaqs,
-  fetchCarOwnerPrivacy,
-  fetchCarOwnerProductFeatures,
+  filterFaqsByPageSlug,
   parseCarOwnerFaqItems,
   parseCarOwnerPrivacy,
   parseCarOwnerProductFeatures,
+  fetchCarOwnerPrivacy,
+  fetchCarOwnerProductFeatures,
   type CarOwnerFaqItem,
 } from "@/lib/car-owner-home-api";
 import type { CarOwnerContentBlock } from "@/types/car-owner-dashboard";
 import { useCallback, useEffect, useState } from "react";
 
-export function useCarOwnerFaqs(role = "carowner") {
+export function usePortalFaqs(role = "car_owner", pageSlug?: string) {
   const { token } = useAuth();
   const [items, setItems] = useState<CarOwnerFaqItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,15 +34,24 @@ export function useCarOwnerFaqs(role = "carowner") {
       setLoading(false);
       return;
     }
-    setItems(parseCarOwnerFaqItems(res.data));
+    const parsed = parseCarOwnerFaqItems(res.data);
+    setItems(filterFaqsByPageSlug(parsed, pageSlug));
     setLoading(false);
-  }, [role, token]);
+  }, [pageSlug, role, token]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   return { items, loading, error, refresh: load };
+}
+
+export function useCarOwnerFaqs(pageSlug?: string) {
+  return usePortalFaqs("car_owner", pageSlug);
+}
+
+export function useShopOwnerFaqs(pageSlug?: string) {
+  return usePortalFaqs("shop_owner", pageSlug);
 }
 
 export function useCarOwnerPrivacyDoc(type: "privacy" | "disclaimer" = "privacy") {

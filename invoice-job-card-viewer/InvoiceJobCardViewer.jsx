@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   formatCurrencyAmount,
@@ -528,9 +528,58 @@ function InvoiceDocument({
       s(job?.technicalRemarks)
     : s(job?.additionalNotes) || s(job?.terms);
   const jobDate = formatInvoiceDate(job?.createdAt ?? job?.date);
+  const stageRef = useRef(null);
+  const sheetRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  const [sheetHeight, setSheetHeight] = useState((297 * 96) / 25.4);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    const sheet = sheetRef.current;
+    if (!stage || !sheet) return;
+    const A4_W = (210 * 96) / 25.4;
+    const A4_H = (297 * 96) / 25.4;
+    const PAD = 24;
+
+    const update = () => {
+      const availableW = Math.max(0, stage.clientWidth - PAD);
+      const availableH = Math.max(0, stage.clientHeight - PAD);
+      const contentH = Math.max(sheet.scrollHeight, A4_H);
+      const scaleW = availableW > 0 ? availableW / A4_W : 1;
+      const scaleH = availableH > A4_H * 0.35 ? availableH / contentH : scaleW;
+      setScale(Math.max(0.35, Math.min(scaleW, scaleH)));
+      setSheetHeight(contentH);
+    };
+
+    update();
+    const ro = new ResizeObserver(() => requestAnimationFrame(update));
+    ro.observe(stage);
+    ro.observe(sheet);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [job, variant]);
 
   return (
-    <div className="invoice-viewer-document">
+    <div className="invoice-viewer-a4-stage" ref={stageRef}>
+      <div
+        style={{
+          width: ((210 * 96) / 25.4) * scale,
+          height: sheetHeight * scale,
+          marginInline: "auto",
+          flexShrink: 0,
+        }}
+      >
+        <div
+          className="invoice-viewer-document"
+          ref={sheetRef}
+          style={{
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
+        >
       <HeaderWave />
 
       {s(job?.paymentStatus) ? (
@@ -750,6 +799,8 @@ function InvoiceDocument({
       ) : null}
 
       <FooterWaves />
+        </div>
+      </div>
     </div>
   );
 }
@@ -857,19 +908,21 @@ export default function InvoiceJobCardViewer({
         aria-label={variant === "invoice" ? "Invoice" : "Job card"}
       >
         {header ? <div className="invoice-viewer-panel-header">{header}</div> : null}
-        {loading ? <InvoiceViewerSkeleton /> : null}
-        {error ? <div className="invoice-viewer-state invoice-viewer-state-error">{error}</div> : null}
-        {!loading && !error && job ? (
-          <InvoiceDocument
-            job={job}
-            business={business}
-            variant={variant}
-            actionsSlot={actions}
-            countryCode={countryCode}
-            apiBaseUrl={apiBaseUrl}
-            defaultLogoUrl={defaultLogoUrl}
-          />
-        ) : null}
+        <div className="invoice-viewer-panel-body">
+          {loading ? <InvoiceViewerSkeleton /> : null}
+          {error ? <div className="invoice-viewer-state invoice-viewer-state-error">{error}</div> : null}
+          {!loading && !error && job ? (
+            <InvoiceDocument
+              job={job}
+              business={business}
+              variant={variant}
+              actionsSlot={actions}
+              countryCode={countryCode}
+              apiBaseUrl={apiBaseUrl}
+              defaultLogoUrl={defaultLogoUrl}
+            />
+          ) : null}
+        </div>
         {footer ? (
           <div
             className={`invoice-viewer-panel-footer${

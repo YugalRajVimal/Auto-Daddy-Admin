@@ -33,6 +33,8 @@ import {
   formatDomainApiError,
   parseDomainDetailsResponse,
 } from "../../lib/shopOwnerDomainApi";
+import { FormFieldError, fieldErrorClass } from "../../lib/validation/formUi";
+import { shopDomainBlockSchema } from "../../lib/validation/schemas/domain";
 import {
   fetchWebsiteTemplates,
   parseWebsiteTemplatesResponse,
@@ -81,6 +83,14 @@ const YEARLY_FEATURES: { label: string; note: string }[] = [
   { label: "Mobile App", note: "For You and Customers" },
 ];
 
+const BIWEEKLY_FEATURES: { label: string; note: string }[] = [
+  { label: "Website", note: "for 14 days" },
+  { label: "Free Software", note: "for 14 days" },
+  { label: "Job Cards", note: "Unlimited" },
+  { label: "Deals Marketplace", note: "Service deals" },
+  { label: "Mobile App", note: "For You and Customers" },
+];
+
 const FALLBACK_PLANS: Record<SubscriptionPlanId, SubscriptionPlan> = {
   yearly: {
     id: "yearly",
@@ -96,19 +106,28 @@ const FALLBACK_PLANS: Record<SubscriptionPlanId, SubscriptionPlan> = {
   biweekly: {
     id: "biweekly",
     title: "$ 15 Bi-weekly plan",
-    amount: 390,
+    amount: 15,
     days: 14,
-    hst: 51,
-    description: "26 -Void cheques of CAD 15",
+    hst: 2,
+    features: BIWEEKLY_FEATURES,
     invoiceRows: [
       {
         service: "Bi-weekly plan",
-        description: "26 void cheques of CAD 15 for 26 bi-weekly periods",
-        amount: 390,
+        description: "Website subscription for 14 days (CAD 15)",
+        amount: 15,
       },
     ],
   },
 };
+
+/** Prefer local biweekly features so API can't show yearly "365 days" notes. */
+function resolvePlanFeatures(
+  planId: SubscriptionPlanId,
+  features: { label: string; note: string }[] | undefined,
+): { label: string; note: string }[] {
+  if (planId === "biweekly") return BIWEEKLY_FEATURES;
+  return features?.length ? features : YEARLY_FEATURES;
+}
 
 const websiteFormSaveButtonClass =
   "inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:opacity-60";
@@ -198,31 +217,6 @@ function minExpiryDateInput(): string {
   return toDateInputValue(d);
 }
 
-function isValidDomainUrl(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed) return false;
-  try {
-    const parsed = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
-    const host = parsed.hostname;
-    if (!host || !host.includes(".")) return false;
-    return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i.test(
-      host,
-    );
-  } catch {
-    return false;
-  }
-}
-
-function isValidFutureExpiryDate(expiryDate: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) return false;
-  const end = new Date(`${expiryDate}T00:00:00`);
-  if (Number.isNaN(end.getTime())) return false;
-  // Reject invalid calendar dates (e.g. 2026-02-31 → rolls to March).
-  if (toDateInputValue(end) !== expiryDate) return false;
-  const min = new Date(`${minExpiryDateInput()}T00:00:00`);
-  return end.getTime() >= min.getTime();
-}
-
 function daysUntilExpiry(expiryDate: string): number | null {
   if (!expiryDate) return null;
   const end = new Date(`${expiryDate}T00:00:00`);
@@ -296,6 +290,7 @@ function DomainPanel({
   saving,
   loading,
   readOnly = false,
+  errors = {},
 }: {
   form: DomainForm;
   onChange: (next: DomainForm) => void;
@@ -305,6 +300,7 @@ function DomainPanel({
   saving?: boolean;
   loading?: boolean;
   readOnly?: boolean;
+  errors?: Record<string, string>;
 }) {
   if (loading) {
     return (
@@ -351,8 +347,9 @@ function DomainPanel({
             inputMode="url"
             autoComplete="url"
             readOnly={readOnly}
-            className={inputClass}
+            className={fieldErrorClass(!!errors.domain, inputClass)}
           />
+          <FormFieldError message={errors.domain} />
         </CompactField>
         <CompactField label="Expiry Date" className={compactFixedFieldWidth}>
           <input
@@ -362,8 +359,9 @@ function DomainPanel({
             onChange={(e) => onChange({ ...form, expiryDate: e.target.value })}
             readOnly={readOnly}
             disabled={readOnly}
-            className={inputClass}
+            className={fieldErrorClass(!!errors.expiryDate, inputClass)}
           />
+          <FormFieldError message={errors.expiryDate} />
         </CompactField>
         <CompactField label="Provider" className={compactFixedFieldWidth}>
           <input
@@ -964,10 +962,7 @@ function SubscriptionPanel({
           title={biweekly.title}
           onViewInvoice={() => onViewInvoice("biweekly")}
         >
-          <p className="text-sm font-semibold text-gray-900">
-            {biweekly.description || "26 -Void cheques of CAD 15"}
-            <span className="ml-1 text-xs font-medium text-blue-600">(for 26 Bi-weekly)</span>
-          </p>
+          <PlanFeatureList items={resolvePlanFeatures("biweekly", biweekly.features)} />
         </SubscriptionPlanCard>
       </div>
     </div>
@@ -1109,6 +1104,7 @@ export default function ShopMyWebsitePage() {
   const [savedDomainForm, setSavedDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
   const [domainLoading, setDomainLoading] = useState(false);
   const [domainSaving, setDomainSaving] = useState(false);
+  const [domainErrors, setDomainErrors] = useState<Record<string, string>>({});
   const [templates, setTemplates] = useState<WebsiteTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
@@ -1228,10 +1224,16 @@ export default function ShopMyWebsitePage() {
             next[plan.id] = {
               ...FALLBACK_PLANS[plan.id],
               ...plan,
-              features: plan.features?.length ? plan.features : FALLBACK_PLANS[plan.id].features,
-              invoiceRows: plan.invoiceRows?.length
-                ? plan.invoiceRows
-                : FALLBACK_PLANS[plan.id].invoiceRows,
+              // Bi-weekly is a 14-day period; ignore API values that copy yearly (365).
+              days: plan.id === "biweekly" ? 14 : plan.days,
+              description: plan.id === "biweekly" ? undefined : plan.description,
+              features: resolvePlanFeatures(plan.id, plan.features),
+              invoiceRows:
+                plan.id === "biweekly"
+                  ? FALLBACK_PLANS.biweekly.invoiceRows
+                  : plan.invoiceRows?.length
+                    ? plan.invoiceRows
+                    : FALLBACK_PLANS[plan.id].invoiceRows,
             };
           }
           setSubscriptionPlans(next);
@@ -1241,12 +1243,13 @@ export default function ShopMyWebsitePage() {
       if (statusRes.ok) {
         setSubscriptionStatus(parseSubscriptionStatus(statusRes.data));
       }
+      await refresh();
     } catch {
       // Keep fallbacks; toast only when user is on subscription tab via refresh.
     } finally {
       setSubscriptionLoading(false);
     }
-  }, [token]);
+  }, [refresh, token]);
 
   useEffect(() => {
     if (token && (activeSection === "subscription" || activeSection === "overview")) {
@@ -1288,22 +1291,24 @@ export default function ShopMyWebsitePage() {
   }, [business, profile?.name, user]);
 
   const handleDomainSaveAndNext = async () => {
-    if (!domainForm.domainName.trim()) {
-      toast.error("Please enter the domain name.");
+    const result = shopDomainBlockSchema.safeParse({
+      domain: domainForm.domainName,
+      url: domainForm.domainName,
+      expiryDate: domainForm.expiryDate,
+    });
+    if (!result.success) {
+      const nextErrors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const key = String(issue.path[0] ?? "form");
+        // "url" issues describe the same Domain Name field as "domain" — surface under one field.
+        const uiKey = key === "url" ? "domain" : key;
+        if (!nextErrors[uiKey]) nextErrors[uiKey] = issue.message;
+      }
+      setDomainErrors(nextErrors);
+      toast.error("Please fix the highlighted fields.");
       return;
     }
-    if (!isValidDomainUrl(domainForm.domainName)) {
-      toast.error("Please enter a valid domain URL (e.g. https://auto27.ca).");
-      return;
-    }
-    if (!domainForm.expiryDate.trim()) {
-      toast.error("Please select the domain expiry date.");
-      return;
-    }
-    if (!isValidFutureExpiryDate(domainForm.expiryDate)) {
-      toast.error("Please select a valid expiry date in the future.");
-      return;
-    }
+    setDomainErrors({});
     if (!token) {
       toast.error("Please sign in to continue.");
       return;
@@ -1342,6 +1347,7 @@ export default function ShopMyWebsitePage() {
 
   const handleDomainReset = () => {
     setDomainForm(savedDomainForm);
+    setDomainErrors({});
   };
 
   const hasExistingDomain = Boolean(savedDomainForm.domainName.trim());
@@ -1567,6 +1573,7 @@ export default function ShopMyWebsitePage() {
             saving={domainSaving}
             loading={domainLoading}
             readOnly={hasExistingDomain}
+            errors={domainErrors}
           />
         );
       case "templates":

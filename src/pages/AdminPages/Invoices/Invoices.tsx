@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import AdminPage, { adminPageTitleClass } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import {
@@ -28,6 +29,23 @@ import InvoiceViewModal from "./InvoiceViewModal";
 // import { PaidStampToggle } from "./PaidStampToggle";
 
 import { fetchInvoiceSettings, updateInvoiceSettings } from "./api/invoicingApi";
+import { money, optionalMoney, requiredDate, requiredTrimmed } from "../../../lib/validation/primitives";
+import { FormFieldError, fieldErrorClass, VALIDATION_SUMMARY } from "../../../lib/validation/formUi";
+
+const invoiceCoreSchema = z.object({
+  clientRefId: requiredTrimmed("Client"),
+  date: requiredDate("Date of issue"),
+});
+
+const invoiceLineValidationSchema = z.object({
+  unitPrice: money,
+  units: z
+    .string()
+    .trim()
+    .min(1, "Units are required.")
+    .refine((v) => Number.isFinite(Number(v)) && Number(v) > 0, "Units must be greater than 0."),
+  gstPercent: optionalMoney,
+});
 
 type InvoiceStatus = "Draft" | "Sent" | "Paid" | "Overdue";
 
@@ -144,8 +162,11 @@ export default function InvoicesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyInvoiceForm());
-  const [attempted, setAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [formErrors, setFormErrors] = useState<{ clientRefId?: string; date?: string; lineItems?: string }>({});
+  const [lineErrors, setLineErrors] = useState<
+    Record<string, { unitPrice?: string; units?: string; gstPercent?: string }>
+  >({});
   const [sendingPreviewInvoice, setSendingPreviewInvoice] = useState(false);
 
   // Reference data for pickers
@@ -252,7 +273,8 @@ export default function InvoicesPage() {
   const resetForm = () => {
     setForm(emptyInvoiceForm());
     setEditingId(null);
-    setAttempted(false);
+    setFormErrors({});
+    setLineErrors({});
   };
 
   const openAdd = async () => {
@@ -267,7 +289,8 @@ export default function InvoicesPage() {
   const openEdit = async (row: InvoiceRow) => {
     await loadReferenceData();
     setEditingId(row._id);
-    setAttempted(false);
+    setFormErrors({});
+    setLineErrors({});
     setForm({
       invoiceNo: row.invoiceNumber,
       date: row.dateOfIssue.slice(0, 10),
@@ -360,16 +383,55 @@ export default function InvoicesPage() {
   const draftTotal = draftSubtotal + draftGst + draftRoundOff;
 
   const saveInvoice = async (status: InvoiceStatus) => {
-    setAttempted(true);
-    if (!form.clientRefId) {
-      adminNotify.error("Please select a client for this invoice.");
+    const coreResult = invoiceCoreSchema.safeParse({ clientRefId: form.clientRefId, date: form.date });
+    const pickedLines = form.lineItems.filter((l) => l.itemRefId);
+
+    const nextFormErrors: { clientRefId?: string; date?: string; lineItems?: string } = {};
+    if (!coreResult.success) {
+      for (const issue of coreResult.error.issues) {
+        const key = issue.path[0];
+        if (key === "clientRefId" || key === "date") nextFormErrors[key] = issue.message;
+      }
+    }
+    if (pickedLines.length === 0) {
+      nextFormErrors.lineItems = "Add at least one line item with a selected item.";
+    }
+
+    const nextLineErrors: Record<string, { unitPrice?: string; units?: string; gstPercent?: string }> = {};
+    for (const line of pickedLines) {
+      const lineResult = invoiceLineValidationSchema.safeParse({
+        unitPrice: line.unitPrice,
+        units: line.units,
+        gstPercent: line.gstPercent,
+      });
+      if (!lineResult.success) {
+        const lineFieldErrors: { unitPrice?: string; units?: string; gstPercent?: string } = {};
+        for (const issue of lineResult.error.issues) {
+          const key = issue.path[0];
+          if (key === "unitPrice" || key === "units" || key === "gstPercent") lineFieldErrors[key] = issue.message;
+        }
+        nextLineErrors[line.id] = lineFieldErrors;
+      }
+    }
+
+    setFormErrors(nextFormErrors);
+    setLineErrors(nextLineErrors);
+
+    if (Object.keys(nextFormErrors).length > 0 || Object.keys(nextLineErrors).length > 0) {
+      const firstLineError = Object.values(nextLineErrors)[0];
+      adminNotify.error(
+        nextFormErrors.clientRefId ||
+          nextFormErrors.date ||
+          nextFormErrors.lineItems ||
+          firstLineError?.unitPrice ||
+          firstLineError?.units ||
+          firstLineError?.gstPercent ||
+          VALIDATION_SUMMARY,
+      );
       return;
     }
+
     const lineItems = draftApiLineItems();
-    if (lineItems.length === 0) {
-      adminNotify.error("Add at least one line item with a selected item.");
-      return;
-    }
     const finalStatus: InvoiceStatus = form.status === "Paid" ? "Paid" : status;
 
     const payload = {
@@ -633,8 +695,11 @@ export default function InvoicesPage() {
                   <div className="relative">
                     <select
                       value={form.clientRefId}
-                      onChange={(e) => setForm((f) => ({ ...f, clientRefId: e.target.value }))}
-                      className={compactInputClass}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, clientRefId: e.target.value }));
+                        setFormErrors((prev) => ({ ...prev, clientRefId: undefined }));
+                      }}
+                      className={fieldErrorClass(Boolean(formErrors.clientRefId), compactInputClass)}
                     >
                       <option value="">Select client</option>
                       {autoShopOwners.map((owner) => (
@@ -643,11 +708,7 @@ export default function InvoicesPage() {
                         </option>
                       ))}
                     </select>
-                    {attempted && !form.clientRefId && (
-                      <div className="absolute left-0 top-full z-10 mt-2 w-64 rounded border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-gray-700 shadow">
-                        Please select a client for this invoice.
-                      </div>
-                    )}
+                    <FormFieldError message={formErrors.clientRefId} />
                   </div>
                 </CompactField>
                 <CompactField label="Client Remark">
@@ -682,9 +743,13 @@ export default function InvoicesPage() {
                   <input
                     type="date"
                     value={form.date}
-                    onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                    className={compactInputClass}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, date: e.target.value }));
+                      setFormErrors((prev) => ({ ...prev, date: undefined }));
+                    }}
+                    className={fieldErrorClass(Boolean(formErrors.date), compactInputClass)}
                   />
+                  <FormFieldError message={formErrors.date} />
                 </CompactField>
                 <CompactField label="PO Number">
                   <input
@@ -768,34 +833,55 @@ export default function InvoicesPage() {
                           <input
                             type="number"
                             value={line.unitPrice}
-                            onChange={(e) => updateLine(line.id, { unitPrice: e.target.value })}
-                            className={`${compactInputClass} w-full text-right`}
+                            onChange={(e) => {
+                              updateLine(line.id, { unitPrice: e.target.value });
+                              setLineErrors((prev) => ({ ...prev, [line.id]: { ...prev[line.id], unitPrice: undefined } }));
+                            }}
+                            className={fieldErrorClass(
+                              Boolean(lineErrors[line.id]?.unitPrice),
+                              `${compactInputClass} w-full text-right`,
+                            )}
                             min="0"
                             step="0.01"
                             placeholder="0.00"
                           />
+                          <FormFieldError message={lineErrors[line.id]?.unitPrice} />
                         </td>
                         <td className="border-t border-gray-200 px-2 py-2 text-right align-middle">
                           <input
                             type="number"
                             value={line.units}
-                            onChange={(e) => updateLine(line.id, { units: e.target.value })}
-                            className={`${compactInputClass} w-full text-right`}
+                            onChange={(e) => {
+                              updateLine(line.id, { units: e.target.value });
+                              setLineErrors((prev) => ({ ...prev, [line.id]: { ...prev[line.id], units: undefined } }));
+                            }}
+                            className={fieldErrorClass(
+                              Boolean(lineErrors[line.id]?.units),
+                              `${compactInputClass} w-full text-right`,
+                            )}
                             min="0"
                             step="1"
                             placeholder="0"
                           />
+                          <FormFieldError message={lineErrors[line.id]?.units} />
                         </td>
                         <td className="border-t border-gray-200 px-2 py-2 text-right align-middle">
                           <input
                             type="number"
                             value={line.gstPercent}
-                            onChange={(e) => updateLine(line.id, { gstPercent: e.target.value })}
-                            className={`${compactInputClass} w-full text-right`}
+                            onChange={(e) => {
+                              updateLine(line.id, { gstPercent: e.target.value });
+                              setLineErrors((prev) => ({ ...prev, [line.id]: { ...prev[line.id], gstPercent: undefined } }));
+                            }}
+                            className={fieldErrorClass(
+                              Boolean(lineErrors[line.id]?.gstPercent),
+                              `${compactInputClass} w-full text-right`,
+                            )}
                             min="0"
                             step="0.1"
                             placeholder="0"
                           />
+                          <FormFieldError message={lineErrors[line.id]?.gstPercent} />
                         </td>
                         <td className="border-t border-gray-200 px-4 py-2 text-right align-middle tabular-nums bg-gray-50 font-semibold">
                           {fmtMoney(lineAmount(Number(line.unitPrice) || 0, Number(line.units) || 0))}
@@ -826,6 +912,7 @@ export default function InvoicesPage() {
             >
               + Add Line
             </button>
+            <FormFieldError message={formErrors.lineItems} />
 
             <div className="mt-6 mr-8 flex justify-end">
               <div className="w-full max-w-sm rounded border border-gray-300">

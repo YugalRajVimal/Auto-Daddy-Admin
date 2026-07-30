@@ -22,6 +22,7 @@ export type PostAuthRoute =
   | "/(shop-owner)/profile"
   | "/(car-owner)/(tabs)/home"
   | "/(car-owner)/profile"
+  | "/(car-owner)/onboarding"
   | "/(associate)/(tabs)/home";
 
 export { isAssociateRole } from "./associate-roles";
@@ -71,17 +72,16 @@ export function getPostAuthRoute(
   const role = (meta.role ?? "").toLowerCase();
 
   if (role === "autoshopowner") {
-    // Match web shop portal: incomplete business profile does not block the app.
-    // Owners edit it anytime under Profile. Still force personal profile when known incomplete.
-    // On cold start meta flags can be null briefly; don't trap users in profile screens.
-    if (meta.isProfileComplete === false) {
-      return "/(shop-owner)/profile";
-    }
+    // Match web shop portal: incomplete personal/business profile does not block the app.
+    // Owners edit profiles anytime under Profile; always land on the dashboard after auth.
     return "/(shop-owner)/(tabs)/home";
   }
 
-  // car-owner shell (explicit)
+  // car-owner shell — match web OwnerPanelLayout: incomplete profile → onboarding.
   if (role === "carowner" || role === "car-owner" || role === "car_owner") {
+    if (meta.isProfileComplete === false) {
+      return "/(car-owner)/onboarding";
+    }
     return "/(car-owner)/(tabs)/home";
   }
 

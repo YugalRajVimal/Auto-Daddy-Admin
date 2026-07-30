@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   FiCalendar,
   FiChevronLeft,
@@ -15,6 +17,12 @@ import {
   ownerVehicleSelectClass,
 } from "../../../components/owner/ownerVehicleFormUtils";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
+import { FormFieldError, toastValidationSummary } from "../../../lib/validation/formUi";
+import {
+  diaryNoteSchema,
+  type DiaryNoteFormInput,
+  type DiaryNoteValues,
+} from "../../../lib/validation/schemas/cms";
 
 type DiaryNote = {
   id: string;
@@ -25,15 +33,6 @@ type DiaryNote = {
   urgent: boolean;
   completed: boolean;
   attachmentName?: string;
-};
-
-type NoteFormState = {
-  date: string;
-  time: string;
-  title: string;
-  description: string;
-  urgent: boolean;
-  attachmentName: string;
 };
 
 type ModalMode = "create" | "edit" | null;
@@ -125,6 +124,19 @@ function addDays(iso: string, delta: number) {
   return toIsoDate(d);
 }
 
+function todayIso() {
+  return toIsoDate(new Date());
+}
+
+/** True when `iso` is strictly before today (local calendar day). */
+function isPastIsoDate(iso: string) {
+  const d = parseIsoDate(iso);
+  d.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d.getTime() < today.getTime();
+}
+
 function monthLabel(year: number, monthIndex: number) {
   return new Date(year, monthIndex, 1).toLocaleString("en-US", {
     month: "long",
@@ -153,7 +165,7 @@ function buildCalendarCells(year: number, monthIndex: number) {
   return cells;
 }
 
-function emptyForm(dateIso: string): NoteFormState {
+function emptyForm(dateIso: string): DiaryNoteValues {
   return {
     date: formatDisplayDate(dateIso),
     time: "",
@@ -164,7 +176,7 @@ function emptyForm(dateIso: string): NoteFormState {
   };
 }
 
-function formFromNote(note: DiaryNote): NoteFormState {
+function formFromNote(note: DiaryNote): DiaryNoteValues {
   return {
     date: formatDisplayDate(note.date),
     time: note.time,
@@ -177,29 +189,42 @@ function formFromNote(note: DiaryNote): NoteFormState {
 
 export default function OwnerDigitalDiaryPage() {
   const [notes, setNotes] = useState<DiaryNote[]>(INITIAL_NOTES);
-  const [selectedDate, setSelectedDate] = useState("2026-07-12");
+  const [selectedDate, setSelectedDate] = useState(todayIso);
   const [calendarMonth, setCalendarMonth] = useState(() => {
-    const d = parseIsoDate("2026-07-12");
+    const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
   });
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<NoteFormState>(() => emptyForm("2026-07-12"));
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignDateValue, setAssignDateValue] = useState("");
 
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const reset = () => {
-    setSelectedDate("2026-07-12");
-    setCalendarMonth({ year: 2026, month: 6 });
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    reset: resetNoteForm,
+    formState: { errors: fieldErrors },
+  } = useForm<DiaryNoteFormInput, unknown, DiaryNoteValues>({
+    resolver: zodResolver(diaryNoteSchema),
+    mode: "onSubmit",
+    defaultValues: emptyForm(todayIso()),
+  });
+
+  const resetPage = () => {
+    const today = todayIso();
+    const d = new Date();
+    setSelectedDate(today);
+    setCalendarMonth({ year: d.getFullYear(), month: d.getMonth() });
     setOpenMenuId(null);
     setModalMode(null);
     setEditingId(null);
     setAssigningId(null);
   };
-  useOwnerNavReset(reset);
+  useOwnerNavReset(resetPage);
 
   useEffect(() => {
     if (!openMenuId) return;
@@ -241,15 +266,19 @@ export default function OwnerDigitalDiaryPage() {
   );
 
   const openCreate = () => {
+    if (isPastIsoDate(selectedDate)) {
+      toast.error("Notes cannot be added for previous dates.");
+      return;
+    }
     setEditingId(null);
-    setForm(emptyForm(selectedDate));
+    resetNoteForm(emptyForm(selectedDate));
     setModalMode("create");
     setOpenMenuId(null);
   };
 
   const openEdit = (note: DiaryNote) => {
     setEditingId(note.id);
-    setForm(formFromNote(note));
+    resetNoteForm(formFromNote(note));
     setModalMode("edit");
     setOpenMenuId(null);
   };
@@ -279,15 +308,17 @@ export default function OwnerDigitalDiaryPage() {
     });
   };
 
-  const handleSave = (e: FormEvent) => {
-    e.preventDefault();
-    const iso = parseDisplayDate(form.date);
-    if (!iso) {
-      toast.error("Enter a valid date as DD/MM/YYYY.");
-      return;
-    }
-    if (!form.title.trim()) {
-      toast.error("Title is required.");
+  const onValidSave = (values: DiaryNoteValues) => {
+    const iso = parseDisplayDate(values.date);
+    if (!iso) return;
+
+    // New notes (and date moves) must be today or later; existing past notes can still be edited in place.
+    const dateChangedOnEdit =
+      modalMode === "edit" && editingId
+        ? notes.find((n) => n.id === editingId)?.date !== iso
+        : false;
+    if ((modalMode === "create" || dateChangedOnEdit) && isPastIsoDate(iso)) {
+      toast.error("Notes cannot be added for previous dates.");
       return;
     }
 
@@ -297,12 +328,12 @@ export default function OwnerDigitalDiaryPage() {
           n.id === editingId
             ? {
                 ...n,
-                title: form.title.trim(),
-                description: form.description.trim(),
+                title: values.title.trim(),
+                description: (values.description ?? "").trim(),
                 date: iso,
-                time: form.time,
-                urgent: form.urgent,
-                attachmentName: form.attachmentName || undefined,
+                time: values.time ?? "",
+                urgent: values.urgent ?? false,
+                attachmentName: values.attachmentName || undefined,
               }
             : n,
         ),
@@ -312,13 +343,13 @@ export default function OwnerDigitalDiaryPage() {
     } else {
       const newNote: DiaryNote = {
         id: `note-${Date.now()}`,
-        title: form.title.trim(),
-        description: form.description.trim(),
+        title: values.title.trim(),
+        description: (values.description ?? "").trim(),
         date: iso,
-        time: form.time,
-        urgent: form.urgent,
+        time: values.time ?? "",
+        urgent: values.urgent ?? false,
         completed: false,
-        attachmentName: form.attachmentName || undefined,
+        attachmentName: values.attachmentName || undefined,
       };
       setNotes((prev) => [...prev, newNote]);
       setSelectedDate(iso);
@@ -326,6 +357,12 @@ export default function OwnerDigitalDiaryPage() {
     }
     closeModal();
   };
+
+  const onInvalidSave = (formErrors: typeof fieldErrors) => {
+    toastValidationSummary(toast.error, formErrors);
+  };
+
+  const handleSave = handleSubmit(onValidSave, onInvalidSave);
 
   const markComplete = (id: string) => {
     setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, completed: true } : n)));
@@ -347,6 +384,10 @@ export default function OwnerDigitalDiaryPage() {
 
   const applyAssignDate = () => {
     if (!assigningId || !assignDateValue) return;
+    if (isPastIsoDate(assignDateValue)) {
+      toast.error("Notes cannot be assigned to previous dates.");
+      return;
+    }
     setNotes((prev) =>
       prev.map((n) => (n.id === assigningId ? { ...n, date: assignDateValue } : n)),
     );
@@ -375,7 +416,13 @@ export default function OwnerDigitalDiaryPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-ad-purple to-ad-purple-dark px-4 py-2 text-sm font-semibold text-white shadow-[0_6px_14px_rgba(155,48,141,0.28)] transition hover:brightness-105"
+            disabled={isPastIsoDate(selectedDate)}
+            title={
+              isPastIsoDate(selectedDate)
+                ? "Notes cannot be added for previous dates"
+                : undefined
+            }
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-ad-purple to-ad-purple-dark px-4 py-2 text-sm font-semibold text-white shadow-[0_6px_14px_rgba(155,48,141,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:brightness-100"
           >
             <FiPlus size={15} aria-hidden />
             New Note
@@ -411,7 +458,9 @@ export default function OwnerDigitalDiaryPage() {
                     <FiCalendar size={22} aria-hidden />
                   </span>
                   <p className="text-sm text-slate-600">
-                    No notes for this date. Click New Note to add one.
+                    {isPastIsoDate(selectedDate)
+                      ? "No notes for this date. Notes cannot be added for previous dates."
+                      : "No notes for this date. Click New Note to add one."}
                   </p>
                 </div>
               ) : (
@@ -566,6 +615,7 @@ export default function OwnerDigitalDiaryPage() {
               />
               <form
                 onSubmit={handleSave}
+                noValidate
                 className="relative z-10 w-full max-w-[520px] overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] ring-1 ring-black/5"
               >
                 <div className="border-b border-slate-100 px-6 py-4">
@@ -586,24 +636,22 @@ export default function OwnerDigitalDiaryPage() {
                       <div className="relative">
                         <input
                           type="text"
-                          value={form.date}
-                          onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                          {...register("date")}
                           placeholder="DD/MM/YYYY"
                           className={`${ownerVehicleFieldClass} pr-9`}
-                          required
                         />
                         <FiCalendar
                           className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-slate-400"
                           size={15}
                         />
                       </div>
+                      <FormFieldError message={fieldErrors.date?.message} />
                     </label>
 
                     <label className="block">
                       <span className={ownerVehicleLabelClass}>Time</span>
                       <select
-                        value={form.time}
-                        onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+                        {...register("time")}
                         className={ownerVehicleSelectClass}
                       >
                         {TIME_OPTIONS.map((t) => (
@@ -621,18 +669,16 @@ export default function OwnerDigitalDiaryPage() {
                     </span>
                     <input
                       type="text"
-                      value={form.title}
-                      onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                      {...register("title")}
                       className={ownerVehicleFieldClass}
-                      required
                     />
+                    <FormFieldError message={fieldErrors.title?.message} />
                   </label>
 
                   <label className="block">
                     <span className={ownerVehicleLabelClass}>Description</span>
                     <textarea
-                      value={form.description}
-                      onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                      {...register("description")}
                       rows={4}
                       className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                     />
@@ -642,8 +688,7 @@ export default function OwnerDigitalDiaryPage() {
                     <label className="inline-flex cursor-pointer items-center gap-2 pb-1 text-sm">
                       <input
                         type="checkbox"
-                        checked={form.urgent}
-                        onChange={(e) => setForm((f) => ({ ...f, urgent: e.target.checked }))}
+                        {...register("urgent")}
                         className="h-4 w-4 accent-rose-600"
                       />
                       <span className="font-semibold text-rose-600">Mark Urgent</span>
@@ -654,10 +699,7 @@ export default function OwnerDigitalDiaryPage() {
                       <input
                         type="file"
                         onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            attachmentName: e.target.files?.[0]?.name ?? "",
-                          }))
+                          setValue("attachmentName", e.target.files?.[0]?.name ?? "")
                         }
                         className="block w-full text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700"
                       />
@@ -711,6 +753,7 @@ export default function OwnerDigitalDiaryPage() {
                     <input
                       type="date"
                       value={assignDateValue}
+                      min={todayIso()}
                       onChange={(e) => setAssignDateValue(e.target.value)}
                       className={ownerVehicleFieldClass}
                     />

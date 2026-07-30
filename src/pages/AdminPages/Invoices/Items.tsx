@@ -1,11 +1,16 @@
 
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import AdminPage, { adminPageTitleClass } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { CompactField, CompactFormFooter, CompactFormPanel, compactInputClass } from "../../../components/admin/ContentPanel";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { bulkUpdateItems, createItem, fetchItems, ItemView, updateItem } from "./api/invoicingApi";
+import { money, optionalMoney, requiredTrimmed } from "../../../lib/validation/primitives";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../../lib/validation/formUi";
 
 // Remove ItemType and HSN code from data model, and openingStock as well.
 type ItemRow = {
@@ -21,14 +26,16 @@ type ItemRow = {
   view: ItemView;
 };
 
-type ItemFormDraft = {
-  itemName: string;
-  description: string;
-  unitCost: string;
-  quantity: string;
-  unitType: string;
-  gstPercent: string;
-};
+const itemFormSchema = z.object({
+  itemName: requiredTrimmed("Item name"),
+  description: z.string().optional().default(""),
+  unitCost: money,
+  quantity: optionalMoney,
+  unitType: z.string().optional().default(""),
+  gstPercent: optionalMoney,
+});
+
+type ItemFormDraft = z.input<typeof itemFormSchema>;
 
 const QUANTITY_UNIT_OPTIONS = ["Unit", "Days"];
 
@@ -104,11 +111,20 @@ export default function ItemsPage() {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyItemForm());
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [existingImage, setExistingImage] = useState<string>("");
-  const [attempted, setAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ItemFormDraft>({
+    resolver: zodResolver(itemFormSchema),
+    mode: "onSubmit",
+    defaultValues: emptyItemForm(),
+  });
 
   const totalPages = Math.max(1, Math.ceil(total / entriesPerPage));
 
@@ -155,11 +171,10 @@ export default function ItemsPage() {
   };
 
   const resetForm = () => {
-    setForm(emptyItemForm());
+    reset(emptyItemForm());
     setImageFile(null);
     setExistingImage("");
     setEditingId(null);
-    setAttempted(false);
   };
 
   const openAdd = () => {
@@ -169,10 +184,9 @@ export default function ItemsPage() {
 
   const openEdit = (row: ItemRow) => {
     setEditingId(row._id);
-    setAttempted(false);
     setImageFile(null);
     setExistingImage(row.image || "");
-    setForm({
+    reset({
       itemName: row.itemName,
       description: row.description,
       unitCost: row.unitCost != null ? String(row.unitCost) : "",
@@ -188,35 +202,36 @@ export default function ItemsPage() {
     setShowForm(false);
   };
 
-  const saveItem = async () => {
-    setAttempted(true);
-    if (!form.itemName.trim()) {
-      adminNotify.error("Item name is required.");
-      return;
-    }
-    if (!form.unitCost.trim()) {
-      adminNotify.error("Unit cost is required.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const payload = { ...form };
-      if (editingId) {
-        await updateItem(editingId, payload, imageFile);
-        adminNotify.success("Item updated.");
-      } else {
-        await createItem(payload, imageFile);
-        adminNotify.success("Item saved.");
+  const saveItem = handleSubmit(
+    async (values) => {
+      setSaving(true);
+      try {
+        const payload = {
+          itemName: values.itemName,
+          description: values.description ?? "",
+          unitCost: values.unitCost,
+          quantity: values.quantity ?? "",
+          unitType: values.unitType ?? "",
+          gstPercent: values.gstPercent ?? "",
+        };
+        if (editingId) {
+          await updateItem(editingId, payload, imageFile);
+          adminNotify.success("Item updated.");
+        } else {
+          await createItem(payload, imageFile);
+          adminNotify.success("Item saved.");
+        }
+        resetForm();
+        setShowForm(false);
+        loadItems();
+      } catch (err: any) {
+        adminNotify.error(err.message || "Failed to save item.");
+      } finally {
+        setSaving(false);
       }
-      resetForm();
-      setShowForm(false);
-      loadItems();
-    } catch (err: any) {
-      adminNotify.error(err.message || "Failed to save item.");
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+    (formErrors) => toastValidationSummary(adminNotify.error, formErrors as never),
+  );
 
   const runBulk = async (action: "archive" | "delete" | "restore", successMsg: string) => {
     if (selected.size === 0) return;
@@ -290,13 +305,10 @@ export default function ItemsPage() {
                 <CompactField label="Item Name" required className="sm:col-span-1">
                   <input
                     type="text"
-                    value={form.itemName}
-                    onChange={(e) => setForm((f) => ({ ...f, itemName: e.target.value }))}
-                    className={compactInputClass}
+                    className={fieldErrorClass(Boolean(errors.itemName), compactInputClass)}
+                    {...register("itemName")}
                   />
-                  {attempted && !form.itemName.trim() && (
-                    <p className="mt-1 text-xs text-red-600">Item name is required.</p>
-                  )}
+                  <FormFieldError message={errors.itemName?.message} />
                 </CompactField>
                 <CompactField
                   label={'Description "shown on invoice / estimate"'}
@@ -304,9 +316,8 @@ export default function ItemsPage() {
                 >
                   <input
                     type="text"
-                    value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                     className={compactInputClass}
+                    {...register("description")}
                   />
                 </CompactField>
               </div>
@@ -316,25 +327,20 @@ export default function ItemsPage() {
                 <CompactField label="Unit Cost (Sale)" required>
                   <input
                     type="number"
-                    value={form.unitCost}
-                    onChange={(e) => setForm((f) => ({ ...f, unitCost: e.target.value }))}
                     placeholder="Without GST"
-                    className={compactInputClass}
+                    className={fieldErrorClass(Boolean(errors.unitCost), compactInputClass)}
+                    {...register("unitCost")}
                   />
+                  <FormFieldError message={errors.unitCost?.message} />
                 </CompactField>
                 <CompactField label="Quantity (Sale)">
                   <div className="flex gap-1.5">
                     <input
                       type="number"
-                      value={form.quantity}
-                      onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
-                      className={compactInputClass}
+                      className={fieldErrorClass(Boolean(errors.quantity), compactInputClass)}
+                      {...register("quantity")}
                     />
-                    <select
-                      value={form.unitType}
-                      onChange={(e) => setForm((f) => ({ ...f, unitType: e.target.value }))}
-                      className={compactInputClass}
-                    >
+                    <select className={compactInputClass} {...register("unitType")}>
                       <option value="">Select</option>
                       {QUANTITY_UNIT_OPTIONS.map((opt) => (
                         <option key={opt} value={opt}>
@@ -343,14 +349,15 @@ export default function ItemsPage() {
                       ))}
                     </select>
                   </div>
+                  <FormFieldError message={errors.quantity?.message} />
                 </CompactField>
                 <CompactField label="GST(%)">
                   <input
                     type="number"
-                    value={form.gstPercent}
-                    onChange={(e) => setForm((f) => ({ ...f, gstPercent: e.target.value }))}
-                    className={compactInputClass}
+                    className={fieldErrorClass(Boolean(errors.gstPercent), compactInputClass)}
+                    {...register("gstPercent")}
                   />
+                  <FormFieldError message={errors.gstPercent?.message} />
                 </CompactField>
               </div>
 

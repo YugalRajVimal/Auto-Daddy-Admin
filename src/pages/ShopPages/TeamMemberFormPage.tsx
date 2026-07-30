@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "react-toastify";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AttachImageCheckbox from "../../components/admin/AttachImageCheckbox";
 import {
   CompactField,
@@ -13,6 +15,8 @@ import { useAuth } from "../../auth";
 import { apiMessage, createTeamMember, fetchTeamMembers, updateTeamMember } from "../../lib/shopOwnerMutations";
 import { formatPhoneDisplay, phoneDigits } from "../../lib/phoneFormat";
 import { ShopFormPage } from "../../components/shop/forms/ShopFormPage";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../lib/validation/formUi";
+import { teamMemberSchema, type TeamMemberValues } from "../../lib/validation/schemas/identity";
 
 function parseMembers(payload: unknown) {
   if (!payload || typeof payload !== "object") return [];
@@ -31,15 +35,24 @@ export default function ShopTeamMemberFormPage() {
   const navigate = useNavigate();
   const { token } = useAuth();
   const isEdit = Boolean(id);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [designation, setDesignation] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [attachPhoto, setAttachPhoto] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [loading, setLoading] = useState(isEdit);
   const [submitting, setSubmitting] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm<TeamMemberValues>({
+    resolver: zodResolver(teamMemberSchema),
+    mode: "onSubmit",
+    defaultValues: { name: "", email: "", phone: "", designation: "" },
+  });
 
   useEffect(() => {
     if (!token || !id) return;
@@ -49,29 +62,27 @@ export default function ShopTeamMemberFormPage() {
         (m) => String((m as { _id?: string; id?: string })._id ?? (m as { id?: string }).id) === id
       ) as Record<string, unknown> | undefined;
       if (member) {
-        setName(String(member.name ?? ""));
-        setEmail(String(member.email ?? ""));
-        setPhone(phoneDigits(String(member.phone ?? "")));
-        setDesignation(String(member.designation ?? ""));
+        reset({
+          name: String(member.name ?? ""),
+          email: String(member.email ?? ""),
+          phone: phoneDigits(String(member.phone ?? "")),
+          designation: String(member.designation ?? ""),
+        });
         setIsActive(member.isActive !== false);
       }
       setLoading(false);
     });
-  }, [id, token]);
+  }, [id, token, reset]);
 
-  const handleSave = async () => {
+  const onValid = async (values: TeamMemberValues) => {
     if (!token) return;
-    if (!name.trim() || phoneDigits(phone).length !== 10 || !designation.trim()) {
-      toast.error("Name, phone, and designation are required.");
-      return;
-    }
     setSubmitting(true);
     try {
       const payload = {
-        name: name.trim(),
-        email: email.trim(),
-        phone: phoneDigits(phone),
-        designation: designation.trim(),
+        name: values.name.trim(),
+        email: (values.email ?? "").trim(),
+        phone: values.phone,
+        designation: values.designation.trim(),
         isActive,
         teamMemberPhoto: attachPhoto ? photo : null,
       };
@@ -88,6 +99,13 @@ export default function ShopTeamMemberFormPage() {
       setSubmitting(false);
     }
   };
+
+  const onInvalid = (formErrors: typeof errors) => {
+    toastValidationSummary(toast.error, formErrors);
+  };
+
+  const phoneField = register("phone");
+  const phone = watch("phone");
 
   if (loading) {
     return (
@@ -112,25 +130,48 @@ export default function ShopTeamMemberFormPage() {
             actionLabel={
               submitting ? (isEdit ? "Updating…" : "Saving…") : isEdit ? "Update" : "Save"
             }
-            onSave={() => void handleSave()}
+            onSave={() => void handleSubmit(onValid, onInvalid)()}
             onCancel={() => navigate("/shop/team")}
           />
         }
       >
         <CompactFormRow>
           <CompactField label="Name" required>
-            <input className={shopCompactInputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={20} />
+            <input
+              className={fieldErrorClass(!!errors.name, shopCompactInputClass)}
+              {...register("name")}
+              maxLength={20}
+            />
+            <FormFieldError message={errors.name?.message} />
           </CompactField>
           <CompactField label="Designation" required>
-            <input className={shopCompactInputClass} value={designation} onChange={(e) => setDesignation(e.target.value)} maxLength={30} />
+            <input
+              className={fieldErrorClass(!!errors.designation, shopCompactInputClass)}
+              {...register("designation")}
+              maxLength={30}
+            />
+            <FormFieldError message={errors.designation?.message} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="Phone" required>
-            <input className={shopCompactInputClass} value={formatPhoneDisplay(phone)} onChange={(e) => setPhone(phoneDigits(e.target.value))} />
+            <input
+              className={fieldErrorClass(!!errors.phone, shopCompactInputClass)}
+              value={formatPhoneDisplay(phone)}
+              onChange={(e) => setValue("phone", phoneDigits(e.target.value), { shouldValidate: false })}
+              onBlur={phoneField.onBlur}
+              name={phoneField.name}
+              ref={phoneField.ref}
+            />
+            <FormFieldError message={errors.phone?.message} />
           </CompactField>
           <CompactField label="Email">
-            <input className={shopCompactInputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input
+              className={fieldErrorClass(!!errors.email, shopCompactInputClass)}
+              type="email"
+              {...register("email")}
+            />
+            <FormFieldError message={errors.email?.message} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow className="items-start">

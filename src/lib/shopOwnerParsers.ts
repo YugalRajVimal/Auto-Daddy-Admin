@@ -155,6 +155,30 @@ function extractDeals(payload: unknown): unknown[] {
   return [];
 }
 
+function collectDealImageUrls(o: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const add = (value: unknown) => {
+    if (typeof value === "string") {
+      const t = value.trim();
+      if (t && !out.includes(t)) out.push(t);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) add(item);
+      return;
+    }
+    if (value && typeof value === "object") {
+      const rec = value as Record<string, unknown>;
+      add(rec.url ?? rec.path ?? rec.image ?? rec.dealImage);
+    }
+  };
+  add(o.dealImages);
+  add(o.dealImage);
+  add(o.productImage);
+  add(o.images);
+  return out.slice(0, 2);
+}
+
 function toDeal(raw: unknown): ShopDeal | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -238,6 +262,10 @@ function toDeal(raw: unknown): ShopDeal | null {
         : undefined,
     dealImage: s(o.dealImage),
     productImage: s(o.productImage),
+    dealImages: (() => {
+      const urls = collectDealImageUrls(o);
+      return urls.length > 0 ? urls : undefined;
+    })(),
   };
 }
 

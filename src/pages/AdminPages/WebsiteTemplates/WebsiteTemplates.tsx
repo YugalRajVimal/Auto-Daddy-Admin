@@ -19,6 +19,16 @@ import AdminSearchCard, {
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { FormFieldError, fieldErrorClass, zodIssuesToFieldErrorMap } from "../../../lib/validation/formUi";
+import { websiteTemplateSchema } from "../../../lib/validation/schemas/domain";
+
+/** websiteTemplateSchema field -> this form's local state/error-map key. */
+const SCHEMA_TO_UI_FIELD: Record<string, string> = {
+  name: "templateName",
+  url: "url",
+  date: "date",
+  shopType: "shopType",
+};
 
 const SHOP_TYPE_OPTIONS = [
   { value: "mechanic-shop", label: "Auto Shop", apiValue: "mechanic-shop" },
@@ -154,6 +164,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     "tow-truck": false,
   });
   const [loading, setLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const resetTableControls = () => {
     setPage(1);
@@ -251,6 +262,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     setShopType("mechanic-shop");
     setUrl("");
     setTemplateName("");
+    setFormErrors({});
   };
 
   const openSearchCard = () => {
@@ -279,12 +291,30 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   };
 
   const handleSave = async () => {
+    const result = websiteTemplateSchema.safeParse({
+      name: templateName,
+      url,
+      date,
+      shopType,
+    });
+    if (!result.success) {
+      const map = zodIssuesToFieldErrorMap(result.error);
+      const nextErrors: Record<string, string> = {};
+      for (const [schemaKey, message] of Object.entries(map)) {
+        nextErrors[SCHEMA_TO_UI_FIELD[schemaKey] ?? schemaKey] = message;
+      }
+      setFormErrors(nextErrors);
+      adminNotify.error("Please fix the highlighted fields.");
+      return;
+    }
+    setFormErrors({});
+
     try {
       await createTemplate({
-        templateName,
-        url,
-        date,
-        shopType: shopType,
+        templateName: result.data.name,
+        url: result.data.url,
+        date: result.data.date,
+        shopType: result.data.shopType,
       });
       adminNotify.success("Saved successfully.");
       fetchAndSetTemplates();
@@ -390,22 +420,24 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
                   placeholder="Classic Garage"
-                  className={compactInputClass}
+                  className={fieldErrorClass(!!formErrors.templateName, compactInputClass)}
                 />
+                <FormFieldError message={formErrors.templateName} />
               </CompactField>
               <CompactField label="Date" required className={compactFixedFieldWidth}>
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(!!formErrors.date, compactInputClass)}
                 />
+                <FormFieldError message={formErrors.date} />
               </CompactField>
               <CompactField label="Shop Type" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
                 <select
                   value={shopType}
                   onChange={(e) => setShopType(e.target.value)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(!!formErrors.shopType, compactInputClass)}
                 >
                   {SHOP_TYPE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -413,6 +445,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                     </option>
                   ))}
                 </select>
+                <FormFieldError message={formErrors.shopType} />
               </CompactField>
               <CompactField label="URL" required className="min-w-[200px] flex-1">
                 <input
@@ -420,8 +453,9 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://example.com/my-template"
-                  className={compactInputClass}
+                  className={fieldErrorClass(!!formErrors.url, compactInputClass)}
                 />
+                <FormFieldError message={formErrors.url} />
               </CompactField>
             </CompactFormRow>
           </CompactFormPanel>

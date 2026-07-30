@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
@@ -20,6 +22,8 @@ import AdminSearchCard, {
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { FormFieldError, toastValidationSummary } from "../../../lib/validation/formUi";
+import { privacySchema, type PrivacyValues } from "../../../lib/validation/schemas/cms";
 
 // ---- React Date Picker import and CSS ----
 import DatePicker from "react-datepicker";
@@ -184,8 +188,20 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   // Change: use Date object for date state for the form, default to today
   const [date, setDate] = useState<Date>(() => new Date());
   const [type, setType] = useState(TYPE_OPTIONS[0]);
-  const [description, setDescription] = useState("");
   const [refresh, setRefresh] = useState(0);
+
+  const {
+    watch,
+    setValue,
+    handleSubmit,
+    reset,
+    formState: { errors: fieldErrors },
+  } = useForm<PrivacyValues>({
+    resolver: zodResolver(privacySchema),
+    mode: "onSubmit",
+    defaultValues: { description: "" },
+  });
+  const description = watch("description");
 
   const resetTableControls = () => {
     setPage(1);
@@ -252,7 +268,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   const resetForm = () => {
     setDate(new Date());
     setType(TYPE_OPTIONS[0]);
-    setDescription("");
+    reset({ description: "" });
     setEditingId(null);
   };
 
@@ -266,7 +282,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   const openEdit = (row: PrivacyRow) => {
     setDate(row.date ? parseDateSafe(row.date) || new Date() : new Date());
     setType(row.type);
-    setDescription(row.description);
+    reset({ description: row.description });
     setEditingId(row.id);
     setShowSearchCard(false);
     setShowForm(true);
@@ -299,11 +315,11 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   };
 
   // --- Changed: handleSave uses new date state (as Date object)
-  const handleSave = async () => {
+  const onValidSave = async (values: PrivacyValues) => {
     try {
       if (editingId) {
         // Only updating description for now (UI only supports this for existing entries)
-        await updateEntry(editingId, { description });
+        await updateEntry(editingId, { description: values.description });
         adminNotify.success("Updated successfully.");
       } else {
         // Parse type to backend value: e.g. "Privacy - Web" -> "privacy"
@@ -312,7 +328,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
           date: toDateString(date) || new Date().toISOString().slice(0, 10),
           country: "Canada",
           type: backendType,
-          description,
+          description: values.description,
         });
         adminNotify.success("Saved successfully.");
       }
@@ -323,6 +339,12 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
       adminNotify.error(e.message || "Failed to save");
     }
   };
+
+  const onInvalidSave = (formErrors: typeof fieldErrors) => {
+    toastValidationSummary(adminNotify.error, formErrors);
+  };
+
+  const handleSave = () => void handleSubmit(onValidSave, onInvalidSave)();
 
   const handleDelete = async () => {
     // multi-delete supported by UI
@@ -436,9 +458,10 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
               <CompactField label="Description" required className="min-w-[200px] flex-1">
                 <CompactAutoGrowTextarea
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => setValue("description", e.target.value, { shouldValidate: false })}
                   placeholder="Description"
                 />
+                <FormFieldError message={fieldErrors.description?.message} />
               </CompactField>
             </CompactFormRow>
           </CompactFormPanel>

@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { FiMapPin, FiTag } from "react-icons/fi";
 import { useLocation } from "react-router";
 import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerDealFilters from "../../../components/owner/OwnerDealFilters";
 import OwnerDealRow from "../../../components/owner/OwnerDealRow";
 import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import { useOwnerShopCityFilter } from "../../../context/OwnerShopCityFilterContext";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerDeals } from "../../../hooks/useCarOwnerDeals";
 import { useCarOwnerVehicles } from "../../../hooks/useCarOwnerVehicles";
@@ -119,7 +120,25 @@ export default function OwnerDealsPage() {
   const countryCode = "+1";
   const location = useLocation();
   const category = dealCategoryFromPath(location.pathname);
+  const {
+    filterCityName,
+    setFilterCityName,
+    clearFilterCity,
+    resetFilterCityToProfile,
+  } = useOwnerShopCityFilter();
   const [listFilters, setListFilters] = useState<DealListFilters>(EMPTY_DEAL_LIST_FILTERS);
+
+  /** Keep deal filter city in sync with shared header city filter. */
+  useEffect(() => {
+    setListFilters((prev) =>
+      prev.city === filterCityName ? prev : { ...prev, city: filterCityName },
+    );
+  }, [filterCityName]);
+
+  const filtersForPanel = useMemo(
+    () => ({ ...listFilters, city: filterCityName }),
+    [listFilters, filterCityName],
+  );
 
   const { grouped, apiFilters, loading, error, refresh } = useCarOwnerDeals({
     make: listFilters.make,
@@ -127,9 +146,19 @@ export default function OwnerDealsPage() {
   });
   const { vehicles } = useCarOwnerVehicles();
 
+  const handleFiltersChange = useCallback(
+    (next: DealListFilters) => {
+      setListFilters(next);
+      if (next.city.trim()) setFilterCityName(next.city);
+      else clearFilterCity();
+    },
+    [setFilterCityName, clearFilterCity],
+  );
+
   const resetSidebar = useCallback(() => {
     setListFilters(EMPTY_DEAL_LIST_FILTERS);
-  }, []);
+    resetFilterCityToProfile();
+  }, [resetFilterCityToProfile]);
 
   useOwnerNavReset(resetSidebar);
 
@@ -141,8 +170,8 @@ export default function OwnerDealsPage() {
   );
 
   const cityOnlyFilters = useMemo(
-    () => ({ make: "", model: "", city: listFilters.city }),
-    [listFilters.city]
+    () => ({ make: "", model: "", city: filterCityName }),
+    [filterCityName]
   );
 
   const filteredCity = useMemo(
@@ -183,8 +212,8 @@ export default function OwnerDealsPage() {
           <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/90 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] ring-1 ring-black/5 sm:p-4">
             <OwnerDealFilters
               deals={categoryDeals}
-              filters={listFilters}
-              onChange={setListFilters}
+              filters={filtersForPanel}
+              onChange={handleFiltersChange}
               apiFilters={apiFilters}
             />
           </div>
@@ -211,7 +240,9 @@ export default function OwnerDealsPage() {
           <EmptyState>
             {categoryDeals.length === 0
               ? "No deals in this category right now."
-              : "No deals match the selected filters."}
+              : filterCityName.trim()
+                ? `No deals match the selected filters in ${filterCityName.trim()}.`
+                : "No deals match the selected filters."}
           </EmptyState>
         ) : (
           <div className="flex flex-col gap-5">

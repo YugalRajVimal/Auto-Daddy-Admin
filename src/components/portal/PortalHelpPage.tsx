@@ -7,6 +7,7 @@ import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import ShopSupportPanel from "../shop/ShopSupportPanel";
 import ShopTicketRow, { type ShopTicket } from "../shop/ShopTicketRow";
 import { useWebVoiceRecorder } from "../../hooks/useWebVoiceRecorder";
+import { helpTicketSchema } from "../../lib/validation/schemas/cms";
 
 type HelpSection = "ticket-raised" | "resolved";
 
@@ -113,13 +114,17 @@ export default function PortalHelpPage({
   }, [reset]);
 
   const handleSave = async () => {
-    const service = services.find((s) => s.id === resolvedServiceId);
-    if (!service) {
-      toast.error("Please choose a subject.");
+    const parsed = helpTicketSchema.safeParse({
+      serviceId: resolvedServiceId,
+      hasRecording: hasRecording ? true : false,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Please complete the ticket form.");
       return;
     }
-    if (!audioBlob) {
-      toast.error("Please record your message before saving.");
+    const service = services.find((s) => s.id === parsed.data.serviceId);
+    if (!service || !audioBlob) {
+      toast.error("Please complete the ticket form.");
       return;
     }
 

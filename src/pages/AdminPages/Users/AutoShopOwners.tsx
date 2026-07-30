@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { authHeaders } from "../../../api/client";
@@ -19,6 +21,12 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 import { getPostLoginRedirect, useAuth } from "../../../auth";
+import { FormFieldError } from "../../../lib/validation/formUi";
+import {
+  autoShopOwnerPageSchema,
+  type AutoShopOwnerPageFormInput,
+  type AutoShopOwnerPageValues,
+} from "../../../lib/validation/schemas/identity";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TeamMemberType = { _id: string; name: string; email?: string; phone?: string; designation?: string; photo?: string };
@@ -184,9 +192,6 @@ const BaseModal: React.FC<{
     </div>
   );
 };
-
-// ─── ADD / EDIT MODAL ────────────────────────────────────────────────────────
-function isEmail(e: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()); }
 
 // ─── CUSTOMERS MODAL ──────────────────────────────────────────────────────────
 const CustomersModal: React.FC<{ owner: AutoShopOwnerType; onClose: () => void }> = ({ owner, onClose }) => (
@@ -399,7 +404,6 @@ function printOwnersTable(owners: AutoShopOwnerType[], visibleCols: string[], ti
 }
 
 // ─── STYLE CONSTANTS ──────────────────────────────────────────────────────────
-const fieldErrorClass = "mt-0.5 text-[11px] font-semibold text-red-700";
 type ProvinceCityOption = { name: string; status?: string };
 type ProvinceWithCities = { cities?: ProvinceCityOption[] };
 const tdClass = "border border-gray-300 px-3 py-2 text-center text-sm text-gray-700";
@@ -414,17 +418,34 @@ const AutoShopAddEditForm: React.FC<{
   onSaved: () => void;
 }> = ({ owner, onCancel, onSaved }) => {
   const isEdit = !!owner;
-  const [Name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [city, setCity] = useState("");
-  const [address, setAddress] = useState("");
-  const [zipCode, setZipCode] = useState("");
+  const {
+    watch,
+    setValue,
+    setError,
+    clearErrors,
+    formState: { errors: fieldErrors },
+  } = useForm<AutoShopOwnerPageFormInput>({
+    resolver: zodResolver(autoShopOwnerPageSchema),
+    mode: "onSubmit",
+    defaultValues: { name: "", phone: "", email: "", city: "", address: "", zipCode: "", shopType: ["autoShop"] },
+  });
+  const Name = watch("name");
+  const email = watch("email") ?? "";
+  const phone = watch("phone");
+  const city = watch("city") ?? "";
+  const address = watch("address") ?? "";
+  const zipCode = watch("zipCode");
+  const setName = (v: string) => setValue("name", v);
+  const setEmail = (v: string) => setValue("email", v);
+  const setPhone = (v: string) => setValue("phone", v);
+  const setCity = (v: string) => setValue("city", v);
+  const setAddress = (v: string) => setValue("address", v);
+  const setZipCode = (v: string) => setValue("zipCode", v);
+
   const [joiningDate, setJoiningDate] = useState("");
   const [shopType, setShopType] = useState<ShopType[]>(["autoShop"]);
   const [shopTypeOpen, setShopTypeOpen] = useState(false);
   const shopTypeRef = useRef<HTMLDivElement>(null);
-  const [attempted, setAttempted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
@@ -476,7 +497,6 @@ const AutoShopAddEditForm: React.FC<{
   }, [cityOptions, city]);
 
   useEffect(() => {
-    setAttempted(false);
     setApiError(null);
     if (isEdit && owner) {
       setName(owner.businessProfile?.businessName || owner.name || "");
@@ -500,15 +520,30 @@ const AutoShopAddEditForm: React.FC<{
   }, [isEdit, owner]);
 
   function validate(): string | null {
-    if (!Name.trim()) return "Owner name is required.";
-    if (email.trim() && !isEmail(email)) return "Enter a valid email.";
-    if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
-    if (!shopType || shopType.length === 0) return "Shop type required.";
-    return null;
+    clearErrors();
+    const result = autoShopOwnerPageSchema.safeParse({
+      name: Name,
+      email,
+      phone,
+      city,
+      address,
+      zipCode,
+      shopType,
+    });
+    if (result.success) return null;
+    const flat = result.error.flatten().fieldErrors;
+    let firstMessage: string | null = null;
+    (Object.keys(flat) as Array<keyof AutoShopOwnerPageValues>).forEach((key) => {
+      const message = flat[key]?.[0];
+      if (message) {
+        setError(key, { message });
+        firstMessage ??= message;
+      }
+    });
+    return firstMessage;
   }
 
   async function handleSave() {
-    setAttempted(true);
     const err = validate();
     if (err) {
       setApiError(err);
@@ -599,9 +634,7 @@ const AutoShopAddEditForm: React.FC<{
             className={compactInputClass}
             placeholder="xxx xxx xxxx"
           />
-          {attempted && phone.replace(/\D/g, "").length !== 10 && (
-            <p className={fieldErrorClass}>Must be 10 digits (format: xxx xxx xxxx)</p>
-          )}
+          <FormFieldError message={fieldErrors.phone?.message} />
         </CompactField>
         <CompactField label="Business Name" required>
           <input
@@ -610,7 +643,7 @@ const AutoShopAddEditForm: React.FC<{
             onChange={(e) => setName(e.target.value.slice(0, 60))}
             className={compactInputClass}
           />
-          {attempted && !Name.trim() && <p className={fieldErrorClass}>Required</p>}
+          <FormFieldError message={fieldErrors.name?.message} />
         </CompactField>
         <CompactField label="Shop Type" required>
           <div ref={shopTypeRef} className="relative min-w-0 w-full">
@@ -656,6 +689,7 @@ const AutoShopAddEditForm: React.FC<{
               </div>
             ) : null}
           </div>
+          <FormFieldError message={fieldErrors.shopType?.message} />
         </CompactField>
       </CompactFormRow>
       <CompactFormRow columns={4} className="items-start">
@@ -694,22 +728,7 @@ const AutoShopAddEditForm: React.FC<{
             className={compactInputClass}
             placeholder="e.g. K1A0B1"
           />
-          {attempted && !zipCode.trim() && (
-            <p className={fieldErrorClass}>Required</p>
-          )}
-
-          {attempted && zipCode.trim() && (() => {
-            // Canada: ANA NAN (A-Z 1-9 A-Z 1-9 A-Z 1-9), spaces optional, case-insensitive
-            const caPattern = /^[A-Z]\d[A-Z][ ]?\d[A-Z]\d$/i;
-            if (!caPattern.test(zipCode)) {
-              return (
-                <p className={fieldErrorClass}>
-                  Enter a valid Canadian Postal Code (e.g. K1A0B1)
-                </p>
-              );
-            }
-            return null;
-          })()}
+          <FormFieldError message={fieldErrors.zipCode?.message} />
         </CompactField>
   
         <CompactField label="Email">
@@ -720,9 +739,7 @@ const AutoShopAddEditForm: React.FC<{
             placeholder="name@example.com"
             className={compactInputClass}
           />
-          {attempted && email.trim() && !isEmail(email) && (
-            <p className={fieldErrorClass}>Enter a valid email</p>
-          )}
+          <FormFieldError message={fieldErrors.email?.message} />
         </CompactField>
       </CompactFormRow>
     </CompactFormPanel>

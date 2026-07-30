@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import {
   dealCityOptions,
-  dealFiltersUseVehicleCascade,
   dealMakeOptions,
   dealModelOptions,
   type DealListFilters,
@@ -39,15 +38,13 @@ export default function OwnerDealFilters({
     return [];
   }, [apiFilters?.models, deals, filters.make]);
 
-  const cityOptions = useMemo(
-    () => dealCityOptions(deals, filters.make, filters.model),
-    [deals, filters.make, filters.model]
-  );
-  const useVehicleCascade = useMemo(
-    () => Boolean(apiFilters?.makes?.length) || dealFiltersUseVehicleCascade(deals),
-    [apiFilters?.makes, deals]
-  );
-  const cityDisabled = useVehicleCascade ? !filters.make || !filters.model : false;
+  const cityOptions = useMemo(() => {
+    const options = dealCityOptions(deals, filters.make, filters.model);
+    const selected = filters.city.trim();
+    if (!selected) return options;
+    if (options.some((c) => c.toLowerCase() === selected.toLowerCase())) return options;
+    return [selected, ...options].sort((a, b) => a.localeCompare(b));
+  }, [deals, filters.make, filters.model, filters.city]);
 
   const hasActiveFilter = Boolean(filters.make || filters.model || filters.city);
 
@@ -76,7 +73,7 @@ export default function OwnerDealFilters({
           aria-label="Make"
           onChange={(e) => {
             const make = e.target.value;
-            onChange({ make, model: "", city: "" });
+            onChange({ make, model: "", city: filters.city });
           }}
           className={selectClass}
         >
@@ -94,7 +91,7 @@ export default function OwnerDealFilters({
           disabled={!filters.make}
           onChange={(e) => {
             const model = e.target.value;
-            onChange({ ...filters, model, city: "" });
+            onChange({ ...filters, model });
           }}
           className={`${selectClass} disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400`}
         >
@@ -109,17 +106,10 @@ export default function OwnerDealFilters({
         <select
           value={filters.city}
           aria-label="City"
-          disabled={cityDisabled}
           onChange={(e) => onChange({ ...filters, city: e.target.value })}
-          className={`${selectClass} disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400`}
+          className={selectClass}
         >
-          <option value="">
-            {useVehicleCascade
-              ? filters.make && filters.model
-                ? "All cities"
-                : "City"
-              : "All cities"}
-          </option>
+          <option value="">All cities</option>
           {cityOptions.map((city) => (
             <option key={city} value={city}>
               {city}

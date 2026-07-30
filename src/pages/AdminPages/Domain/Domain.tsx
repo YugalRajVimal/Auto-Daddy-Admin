@@ -23,6 +23,8 @@ import {
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { FormFieldError, fieldErrorClass } from "../../../lib/validation/formUi";
+import { domainSchema } from "../../../lib/validation/schemas/domain";
 
 interface BusinessProfile {
   _id: string;
@@ -289,6 +291,7 @@ export default function Domain() {
   const [formMode, setFormMode] = useState<"CREATE" | "EDIT" | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // --- REWRITE START: SEARCH/FILTER STATE FOR BACKEND ---
   const [search, setSearch] = useState(""); // For "live search here" input
@@ -454,6 +457,7 @@ export default function Domain() {
     setEditId(null);
     setActiveOwner(null);
     setActiveCarOwner(null);
+    setFormErrors({});
   };
 
   // --- 7. Row Actions: Open add/view/edit forms ---
@@ -667,19 +671,32 @@ export default function Domain() {
       return;
     }
 
-    if (
-      !form.userName ||
-      !userTypeApi ||
-      !form.domain ||
-      !form.expiry ||
-      !form.provider ||
-      !form.dns
-    ) {
+    const result = domainSchema.pick({ domain: true, url: true, expiryDate: true }).safeParse({
+      domain: form.domain,
+      url: form.domain,
+      expiryDate: form.expiry,
+    });
+    const nextErrors: Record<string, string> = {};
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const key = String(issue.path[0] ?? "form");
+        // "url" issues describe the same Domain field as "domain" — surface under one field.
+        const uiKey = key === "url" ? "domain" : key === "expiryDate" ? "expiry" : key;
+        if (!nextErrors[uiKey]) nextErrors[uiKey] = issue.message;
+      }
+    }
+    if (!form.userName) nextErrors.userName = "User Name is required.";
+    if (!form.provider) nextErrors.provider = "Provider is required.";
+    if (!form.dns) nextErrors.dns = "DNS is required.";
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFormErrors(nextErrors);
       const msg = "All required fields must be filled.";
       setDomainsError(msg);
       adminNotify.error(msg);
       return;
     }
+    setFormErrors({});
 
     setSaving(true);
     setDomainsError(null);
@@ -1172,7 +1189,7 @@ export default function Domain() {
                   setActiveOwner(null);
                 }
               }}
-              className={compactInputClass}
+              className={fieldErrorClass(!!formErrors.userName, compactInputClass)}
             >
               <option value="">Select User</option>
               {userNameOptions.map((name) => (
@@ -1181,6 +1198,7 @@ export default function Domain() {
                 </option>
               ))}
             </select>
+            <FormFieldError message={formErrors.userName} />
           </CompactField>
           <CompactField label="Domain" required className="w-full min-w-0">
             <input
@@ -1189,8 +1207,9 @@ export default function Domain() {
               value={form.domain}
               onChange={handleFormChange}
               placeholder="example.com"
-              className={compactInputClass}
+              className={fieldErrorClass(!!formErrors.domain, compactInputClass)}
             />
+            <FormFieldError message={formErrors.domain} />
           </CompactField>
           <CompactField
             label="Domain Type"
@@ -1241,15 +1260,16 @@ export default function Domain() {
               name="expiry"
               value={form.expiry}
               onChange={handleFormChange}
-              className={compactInputClass}
+              className={fieldErrorClass(!!formErrors.expiry, compactInputClass)}
             />
+            <FormFieldError message={formErrors.expiry} />
           </CompactField>
           <CompactField label="Provider" required className="w-full min-w-0">
             <select
               name="provider"
               value={form.provider}
               onChange={handleFormChange}
-              className={compactInputClass}
+              className={fieldErrorClass(!!formErrors.provider, compactInputClass)}
             >
               <option value="">Select Provider</option>
               {PROVIDER_OPTIONS.map((option) => (
@@ -1258,6 +1278,7 @@ export default function Domain() {
                 </option>
               ))}
             </select>
+            <FormFieldError message={formErrors.provider} />
           </CompactField>
           <CompactField label="DNS" required className="w-full min-w-0">
             <CompactAutoGrowTextarea
@@ -1266,6 +1287,7 @@ export default function Domain() {
               onChange={handleFormChange}
               placeholder="A record, CNAME, nameservers, etc."
             />
+            <FormFieldError message={formErrors.dns} />
           </CompactField>
         </CompactFormRow>
       </CompactFormPanel>

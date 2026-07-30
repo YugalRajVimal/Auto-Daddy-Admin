@@ -1,7 +1,7 @@
 import { AppSplash } from "@/components/reusables";
 import { useAuth } from "@/context/auth-provider";
 import { getPostAuthRoute } from "@/lib/auth";
-import { Redirect, Slot } from "expo-router";
+import { Redirect, Slot, useSegments } from "expo-router";
 
 function isCarOwnerRole(role: string | null | undefined): boolean {
   const r = (role ?? "").toLowerCase().replace(/[-_\s]/g, "");
@@ -10,6 +10,8 @@ function isCarOwnerRole(role: string | null | undefined): boolean {
 
 export default function CarOwnerLayout() {
   const { isBootstrapping, isAuthenticated, meta } = useAuth();
+  const segments = useSegments();
+  const onOnboarding = segments.includes("onboarding");
 
   if (isBootstrapping) {
     return <AppSplash />;
@@ -35,6 +37,14 @@ export default function CarOwnerLayout() {
     );
   }
 
+  // Match web OwnerPanelLayout: force first-time profile setup when known incomplete.
+  if (meta?.isProfileComplete === false && !onOnboarding) {
+    return <Redirect href="/(car-owner)/onboarding" />;
+  }
+
+  if (meta?.isProfileComplete === true && onOnboarding) {
+    return <Redirect href="/(car-owner)/(tabs)/home" />;
+  }
+
   return <Slot />;
 }
-

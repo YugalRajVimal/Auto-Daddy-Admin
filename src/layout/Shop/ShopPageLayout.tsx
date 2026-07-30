@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
@@ -22,18 +22,31 @@ import {
   shopPortalTopPaddingClass,
 } from "../../components/shop/shopLayoutStyles";
 import ShopSidebar from "../../components/shop/ShopSidebar";
+import ShopSubscriptionInteractionLock from "../../components/shop/ShopSubscriptionInteractionLock";
 import { shopPrimaryNav } from "../../config/shopNav";
 import {
   DEFAULT_SHOP_PAGE_CHROME,
   useShopPageChromeContext,
 } from "../../context/ShopPageChromeContext";
+import { useShopSubscriptionGate } from "../../context/ShopSubscriptionGateContext";
+import { useShopOwnerFaqs } from "../../hooks/useOwnerPortal";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
+import { shopFaqPageSlugFromPath } from "../../lib/shopFaqPageSlug";
+import { isShopPathAllowedWithoutSubscription } from "../../lib/shopSubscriptionAccess";
 
 export default function ShopPageLayout() {
   const location = useLocation();
   const { chrome } = useShopPageChromeContext();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
+  const pageSlug = useMemo(
+    () => shopFaqPageSlugFromPath(location.pathname),
+    [location.pathname],
+  );
+  const { items, loading } = useShopOwnerFaqs(pageSlug);
+  const { subscriptionLocked } = useShopSubscriptionGate();
   const [localFaqsOpen, setLocalFaqsOpen] = useState(false);
+  const lockInteractions =
+    subscriptionLocked && !isShopPathAllowedWithoutSubscription(location.pathname);
 
   const faqsOpen = chrome.faqsOpen === true || localFaqsOpen;
   const openFaqs = useCallback(() => {
@@ -137,13 +150,19 @@ export default function ShopPageLayout() {
           className={`order-2 lg:order-1 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:justify-self-stretch lg:self-center ${shopNavRowNavClass}`}
         />
 
-        <div className="order-3 min-h-0 lg:order-2 lg:col-start-1 lg:row-start-2 lg:self-start">
+        <ShopSubscriptionInteractionLock
+          active={lockInteractions}
+          className="order-3 min-h-0 lg:order-2 lg:col-start-1 lg:row-start-2 lg:self-start"
+        >
           {sidebarCell}
-        </div>
+        </ShopSubscriptionInteractionLock>
 
-        <div className="order-4 flex min-h-0 min-w-0 flex-col overflow-hidden lg:order-3 lg:col-start-2 lg:row-start-2">
+        <ShopSubscriptionInteractionLock
+          active={lockInteractions}
+          className="order-4 flex min-h-0 min-w-0 flex-col overflow-hidden lg:order-3 lg:col-start-2 lg:row-start-2"
+        >
           {pageContent}
-        </div>
+        </ShopSubscriptionInteractionLock>
       </div>
 
       <StickyFaqsButton onClick={openFaqs} />
@@ -152,6 +171,8 @@ export default function ShopPageLayout() {
         onClose={closeFaqs}
         heading={chrome.faqsHeading ?? faqsHeading}
         description={chrome.faqsDescription ?? faqsDescription}
+        items={items}
+        loading={loading}
       />
     </PortalPageContent>
   );

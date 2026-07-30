@@ -1,3 +1,5 @@
+import ShopCompleteProfileDialog from "../../components/shop/ShopCompleteProfileDialog";
+import ShopSubscriptionRequiredDialog from "../../components/shop/ShopSubscriptionRequiredDialog";
 import ShopPortalShell from "../../components/shop/ShopPortalShell";
 import { RequirePortal } from "../../auth/guards/RequirePortal";
 import { shopPrimaryNav } from "../../config/shopNav";
@@ -6,20 +8,66 @@ import {
   ShopOwnerDataProvider,
   ShopOwnerPrefetcher,
 } from "../../context/ShopOwnerDataProvider";
+import {
+  ShopSubscriptionGateProvider,
+  useShopSubscriptionGate,
+} from "../../context/ShopSubscriptionGateContext";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
-import { useEffect, useState } from "react";
+import {
+  resolveBusinessProfileIncomplete,
+  resolvePersonalProfileIncomplete,
+  resolveShopProfileIncompleteKind,
+} from "../../lib/shopProfileCompleteness";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { getPostLoginRedirect, useAuth } from "../../auth";
 
+const PROFILE_DISMISS_KEY = "autodaddy.shop.complete-profile-dismissed";
+
+function ShopSubscriptionPrompt() {
+  const navigate = useNavigate();
+  const { subscribePromptOpen, closeSubscribePrompt } = useShopSubscriptionGate();
+
+  return (
+    <ShopSubscriptionRequiredDialog
+      open={subscribePromptOpen}
+      onSubscribe={() => {
+        closeSubscribePrompt();
+        navigate("/shop/my-website");
+      }}
+      onLater={closeSubscribePrompt}
+    />
+  );
+}
+
 function ShopLayoutContent() {
-  const { displayName, city, daysLeft, business, businessNameLoaded, profileIcon } =
-    useShopOwnerPortal();
+  const {
+    displayName,
+    city,
+    daysLeft,
+    business,
+    businessNameLoaded,
+    profileIcon,
+    user,
+    hasActiveSubscription,
+    subscriptionGateReady,
+  } = useShopOwnerPortal();
   const profilePhotoSrc = normalizeMediaUrl(profileIcon ?? null);
-  const location = city || business?.city?.trim();
-  const { login } = useAuth();
+  const locationLabel = city || business?.city?.trim();
+  const { login, session } = useAuth();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   // State to track back-to-admin-token
   const [backToAdminToken, setBackToAdminToken] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(PROFILE_DISMISS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     const token = localStorage.getItem("back-to-admin-token");
@@ -50,8 +98,67 @@ function ShopLayoutContent() {
     }
   };
 
+  const incompleteKind = useMemo(() => {
+    const personalIncomplete = resolvePersonalProfileIncomplete(
+      session?.meta,
+      user,
+      user?.city ?? business?.city,
+      businessNameLoaded
+    );
+    const businessIncomplete = resolveBusinessProfileIncomplete(
+      session?.meta,
+      business,
+      user?.pincode ?? business?.pincode,
+      businessNameLoaded
+    );
+    return resolveShopProfileIncompleteKind(personalIncomplete, businessIncomplete);
+  }, [
+    session?.meta,
+    user,
+    business,
+    businessNameLoaded,
+  ]);
+
+  const profileCompletenessKnown = businessNameLoaded || (
+    session?.meta?.isProfileComplete != null &&
+    session?.meta?.isAutoShopBusinessProfileComplete != null
+  );
+
+  const onProfilePage = pathname.startsWith("/shop/profile");
+  const showCompleteProfileDialog =
+    Boolean(incompleteKind) && !onProfilePage && !dismissed;
+
+  const subscriptionLocked =
+    subscriptionGateReady && !hasActiveSubscription;
+
+  const handleCompleteProfile = () => {
+    const section =
+      incompleteKind === "business" ? "business" : "personal";
+    navigate(`/shop/profile?section=${section}`);
+  };
+
+  const handleLater = () => {
+    try {
+      sessionStorage.setItem(PROFILE_DISMISS_KEY, "1");
+    } catch {
+      // ignore quota / private mode
+    }
+    setDismissed(true);
+  };
+
+  // Clear dismiss once we know the profile is complete so a future incomplete state can prompt again.
+  useEffect(() => {
+    if (!profileCompletenessKnown || incompleteKind) return;
+    try {
+      sessionStorage.removeItem(PROFILE_DISMISS_KEY);
+    } catch {
+      // ignore
+    }
+    setDismissed(false);
+  }, [incompleteKind, profileCompletenessKnown]);
+
   return (
-    <>
+    <ShopSubscriptionGateProvider subscriptionLocked={subscriptionLocked}>
       {backToAdminToken && (
         <div
           className="flex items-center justify-between px-4 py-2 text-sm z-50 border border-yellow-300 text-yellow-900 bg-yellow-100 whitespace-nowrap"
@@ -92,11 +199,22 @@ function ShopLayoutContent() {
         brandLogo={{ src: profilePhotoSrc, placeholderLabel: "Profile photo" }}
         businessName={displayName}
         businessNameLoading={!businessNameLoaded}
-        city={location}
-        subscriptionDaysLeft={daysLeft ?? null}
+        city={locationLabel}
+        subscriptionDaysLeft={hasActiveSubscription ? (daysLeft ?? null) : null}
         helpPath="/shop/help"
       />
-    </>
+
+      {incompleteKind ? (
+        <ShopCompleteProfileDialog
+          open={showCompleteProfileDialog}
+          kind={incompleteKind}
+          onComplete={handleCompleteProfile}
+          onLater={handleLater}
+        />
+      ) : null}
+
+      <ShopSubscriptionPrompt />
+    </ShopSubscriptionGateProvider>
   );
 }
 

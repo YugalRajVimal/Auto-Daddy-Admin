@@ -20,6 +20,13 @@ import AdminSearchCard, {
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { carBrandSchema } from "../../../lib/validation/schemas/catalog";
+import {
+  FormFieldError,
+  fieldErrorClass,
+  VALIDATION_SUMMARY,
+  zodIssuesToFieldErrorMap,
+} from "../../../lib/validation/formUi";
 
 // Helper to get token and provide correct header for admin token (no Bearer)
 const getAdminAuthHeaders = () => {
@@ -284,6 +291,7 @@ function ComboSelectWithEditor({
   multi = false,
   multiValue = [],
   onToggleValue,
+  error,
 }: {
   label: string;
   required?: boolean;
@@ -296,6 +304,7 @@ function ComboSelectWithEditor({
   multi?: boolean;
   multiValue?: string[];
   onToggleValue?: (value: string) => void;
+  error?: string;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -335,9 +344,12 @@ function ComboSelectWithEditor({
           type="button"
           disabled={disabled}
           onClick={() => setOpen((prev) => !prev)}
-          className={`${compactInputClass} flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:bg-gray-100 ${
-            (multi ? multiValue.length > 0 : !!value) ? "text-gray-900" : "text-gray-500"
-          }`}
+          className={fieldErrorClass(
+            Boolean(error),
+            `${compactInputClass} flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:bg-gray-100 ${
+              (multi ? multiValue.length > 0 : !!value) ? "text-gray-900" : "text-gray-500"
+            }`
+          )}
         >
           <span className="truncate">{displayValue}</span>
           <span className="ml-2 shrink-0 text-[10px] text-gray-500">{open ? "▲" : "▼"}</span>
@@ -417,6 +429,7 @@ function ComboSelectWithEditor({
           </div>
         )}
       </div>
+      <FormFieldError message={error} />
     </CompactField>
   );
 }
@@ -607,6 +620,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
 
   const [editingCompany, setEditingCompany] = useState<CarCompany | null>(null);
   const [make, setMake] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [modelRows, setModelRows] = useState<ModelFormRow[]>([{ ...EMPTY_MODEL }]);
   const [brandLogoFile, setBrandLogoFile] = useState<File | null>(null);
   const [brandLogoPreviewUrl, setBrandLogoPreviewUrl] = useState<string | null>(null);
@@ -722,6 +736,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     setAttachBrandLogo(false);
     setEditingCompany(null);
     setError("");
+    setFormErrors({});
     setMakesPopupOpen(false);
     setSessionMakeNames([]);
     setSelectedModelNames([]);
@@ -747,6 +762,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
       .filter(Boolean);
     setSelectedModelNames(allModelNames);
     setError("");
+    setFormErrors({});
   };
 
   const resetFormForNewMake = (makeName: string) => {
@@ -759,6 +775,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     setAttachBrandLogo(false);
     setSelectedModelNames([]);
     setError("");
+    setFormErrors({});
   };
 
   const openAdd = () => {
@@ -1005,12 +1022,14 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   };
 
   const validateForm = () => {
-    if (!make.trim()) {
-      const msg = "Make is required.";
-      setError(msg);
-      adminNotify.error(msg);
+    const parsed = carBrandSchema.safeParse({ name: make });
+    if (!parsed.success) {
+      const fieldErrors = zodIssuesToFieldErrorMap(parsed.error);
+      setFormErrors(fieldErrors);
+      adminNotify.error(parsed.error.issues[0]?.message ?? VALIDATION_SUMMARY);
       return false;
     }
+    setFormErrors({});
     const processed = getProcessedModels();
     if (processed.length === 0) {
       const msg = "Add at least one model.";
@@ -1246,8 +1265,17 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
                 value={make}
                 placeholder="Select make"
                 options={allMakeOptions}
-                onChange={handleMakeChange}
+                onChange={(v) => {
+                  handleMakeChange(v);
+                  setFormErrors((prev) => {
+                    if (!("name" in prev)) return prev;
+                    const next = { ...prev };
+                    delete next.name;
+                    return next;
+                  });
+                }}
                 onEditAddNew={openMakesPopup}
+                error={formErrors.name}
               />
               <InlineModelSelector
                 label="Model"

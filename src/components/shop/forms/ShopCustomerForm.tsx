@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "react-toastify";
+import { useFieldArray, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AttachImageCheckbox from "../../admin/AttachImageCheckbox";
 import {
   CompactField,
@@ -13,6 +15,12 @@ import OwnerCityPicker from "../../owner/OwnerCityPicker";
 import { getJson } from "../../../api/mobileAuth";
 import { useAuth } from "../../../auth";
 import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../../lib/validation/formUi";
+import {
+  shopCustomerSchema,
+  type ShopCustomerFormInput,
+  type ShopCustomerValues,
+} from "../../../lib/validation/schemas/identity";
 import {
   addCarOwnerToMyCustomers,
   apiMessage,
@@ -28,24 +36,9 @@ type CarCompanyCatalogItem = {
   models: Array<{ modelName: string; years: Array<string | number> }>;
 };
 
-const currentYear = new Date().getFullYear();
+type VehicleUiExtra = { vehicleImage?: File | null; attachVehiclePhoto?: boolean };
 
-function isValidEmail(v: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-}
-
-function isValidYear(v: string) {
-  const y = Number(v);
-  return /^\d{4}$/.test(v) && y >= 1900 && y <= currentYear + 1;
-}
-
-type VehicleDraft = CustomerVehiclePayload & {
-  vehicleImage?: File | null;
-  attachVehiclePhoto?: boolean;
-  isNew?: boolean;
-};
-
-function emptyVehicle(): VehicleDraft {
+function emptyVehicle(): ShopCustomerFormInput["vehicles"][number] {
   return {
     licensePlateNo: "",
     vinNo: "",
@@ -72,30 +65,48 @@ export default function ShopCustomerForm({
   const { token } = useAuth();
   const countryCode = "+1";
 
-  const [name, setName] = useState(customer?.name ?? "");
-  const [email, setEmail] = useState(customer?.email ?? "");
-  const [phone, setPhone] = useState(phoneDigits(customer?.phone ?? ""));
-  const [pincode, setPincode] = useState(customer?.pincode ?? "");
-  const [address, setAddress] = useState(customer?.address ?? "");
-  const [city, setCity] = useState(customer?.city ?? "");
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const [attachProfilePhoto, setAttachProfilePhoto] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
-  const [vehicles, setVehicles] = useState<VehicleDraft[]>(
-    customer?.vehicles?.length
-      ? customer.vehicles.map((v) => ({
-          vId: v.vId ?? v._id,
-          licensePlateNo: v.licensePlateNo ?? "",
-          vinNo: v.vinNo ?? "",
-          vehicleName: v.vehicleName ?? "",
-          model: v.model ?? "",
-          year: v.year ?? "",
-          odometerReading: v.odometerReading ?? "",
-        }))
-      : [emptyVehicle()]
-  );
+  const [vehicleUiExtras, setVehicleUiExtras] = useState<Record<number, VehicleUiExtra>>({});
   const [companies, setCompanies] = useState<CarCompanyCatalogItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<ShopCustomerFormInput, unknown, ShopCustomerValues>({
+    resolver: zodResolver(shopCustomerSchema),
+    mode: "onSubmit",
+    defaultValues: {
+      name: customer?.name ?? "",
+      email: customer?.email ?? "",
+      phone: phoneDigits(customer?.phone ?? ""),
+      pincode: customer?.pincode ?? "",
+      address: customer?.address ?? "",
+      city: customer?.city ?? "",
+      vehicles: customer?.vehicles?.length
+        ? customer.vehicles.map((v) => ({
+            vId: v.vId ?? v._id,
+            licensePlateNo: v.licensePlateNo ?? "",
+            vinNo: v.vinNo ?? "",
+            vehicleName: v.vehicleName ?? "",
+            model: v.model ?? "",
+            year: v.year ?? "",
+            odometerReading: v.odometerReading ?? "",
+          }))
+        : [emptyVehicle()],
+    },
+  });
+
+  const { fields: vehicleFields, append: appendVehicle } = useFieldArray({
+    control,
+    name: "vehicles",
+  });
 
   useEffect(() => {
     if (!token) return;
@@ -104,8 +115,8 @@ export default function ShopCustomerForm({
     });
   }, [token]);
 
-  const updateVehicle = (index: number, patch: Partial<VehicleDraft>) => {
-    setVehicles((prev) => prev.map((v, i) => (i === index ? { ...v, ...patch } : v)));
+  const patchVehicleExtra = (index: number, patch: Partial<VehicleUiExtra>) => {
+    setVehicleUiExtras((prev) => ({ ...prev, [index]: { ...prev[index], ...patch } }));
   };
 
   const modelOptions = (vehicleName: string) => {
@@ -118,31 +129,14 @@ export default function ShopCustomerForm({
     return (m?.years ?? []).map(String);
   };
 
-  const validate = (): string | null => {
-    if (!name.trim()) return "Name is required.";
-    if (!email.trim() || !isValidEmail(email)) return "Valid email is required.";
-    if (phoneDigits(phone).length !== 10) return "Phone must be 10 digits.";
-    if (!pincode.trim()) return "Postal code is required.";
-    for (const v of vehicles) {
-      if (!v.licensePlateNo.trim() || !v.vehicleName.trim() || !v.model.trim() || !v.year.trim()) {
-        return "Each vehicle needs plate, make, model, and year.";
-      }
-      if (!isValidYear(v.year)) return "Enter a valid vehicle year.";
-      if (v.vinNo && v.vinNo.length !== 17) return "VIN must be exactly 17 characters when provided.";
-    }
-    return null;
-  };
+  const phone = watch("phone");
+  const city = watch("city");
 
-  const handleSubmit = async () => {
+  const onValid = async (values: ShopCustomerValues) => {
     if (!token) return;
-    const err = validate();
-    if (err) {
-      toast.error(err);
-      return;
-    }
     setSubmitting(true);
     try {
-      const vehiclePayloads: CustomerVehiclePayload[] = vehicles.map((v) => ({
+      const vehiclePayloads: CustomerVehiclePayload[] = values.vehicles.map((v) => ({
         ...(v.vId && !v.isNew ? { vId: v.vId } : {}),
         licensePlateNo: v.licensePlateNo.trim().slice(0, 14),
         vinNo: v.vinNo?.trim() || undefined,
@@ -154,20 +148,22 @@ export default function ShopCustomerForm({
 
       const uploads = {
         profilePhoto: attachProfilePhoto ? profilePhoto : null,
-        vehicleImages: vehicles.map((v) => (v.attachVehiclePhoto ? v.vehicleImage ?? null : null)),
+        vehicleImages: values.vehicles.map((_, index) =>
+          vehicleUiExtras[index]?.attachVehiclePhoto ? vehicleUiExtras[index]?.vehicleImage ?? null : null,
+        ),
       };
 
       if (mode === "add") {
         const res = await onboardCarOwner(
           token,
           {
-            name: name.trim(),
-            email: email.trim(),
+            name: values.name.trim(),
+            email: values.email.trim(),
             countryCode,
-            phone: phoneDigits(phone),
-            pincode: pincode.trim(),
-            address: address.trim(),
-            city: city.trim(),
+            phone: values.phone,
+            pincode: values.pincode.trim(),
+            address: values.address.trim(),
+            city: values.city.trim(),
             role: "carowner",
             vehicles: vehiclePayloads,
           },
@@ -196,13 +192,13 @@ export default function ShopCustomerForm({
           token,
           {
             carOwnerId,
-            name: name.trim(),
-            email: email.trim(),
+            name: values.name.trim(),
+            email: values.email.trim(),
             countryCode,
-            phone: phoneDigits(phone),
-            pincode: pincode.trim(),
-            address: address.trim(),
-            city: city.trim(),
+            phone: values.phone,
+            pincode: values.pincode.trim(),
+            address: values.address.trim(),
+            city: values.city.trim(),
             vehicles: vehiclePayloads,
           },
           uploads
@@ -219,7 +215,15 @@ export default function ShopCustomerForm({
     }
   };
 
+  const onInvalid = (formErrors: typeof errors) => {
+    toastValidationSummary(toast.error, formErrors);
+  };
+
+  const nameField = register("name");
+  const phoneField = register("phone");
+
   const title = mode === "add" ? "Add Customer" : "Edit Customer";
+  const vehicleErrors = errors.vehicles;
 
   return (
     <ShopFormPage title={title} metaTitle={`${title} | AutoDaddy`} backTo={backTo}>
@@ -236,25 +240,47 @@ export default function ShopCustomerForm({
                   ? "Update"
                   : "Save"
             }
-            onSave={() => void handleSubmit()}
+            onSave={() => void handleSubmit(onValid, onInvalid)()}
             onCancel={() => navigate(backTo)}
           />
         }
       >
         <CompactFormRow>
           <CompactField label="Full Name" required>
-            <input className={shopCompactInputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={20} />
+            <input
+              className={fieldErrorClass(!!errors.name, shopCompactInputClass)}
+              {...nameField}
+              maxLength={20}
+            />
+            <FormFieldError message={errors.name?.message} />
           </CompactField>
           <CompactField label="Email" required>
-            <input className={shopCompactInputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input
+              className={fieldErrorClass(!!errors.email, shopCompactInputClass)}
+              type="email"
+              {...register("email")}
+            />
+            <FormFieldError message={errors.email?.message} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="Phone" required>
-            <input className={shopCompactInputClass} value={formatPhoneDisplay(phone)} onChange={(e) => setPhone(phoneDigits(e.target.value))} />
+            <input
+              className={fieldErrorClass(!!errors.phone, shopCompactInputClass)}
+              value={formatPhoneDisplay(phone)}
+              onChange={(e) => setValue("phone", phoneDigits(e.target.value), { shouldValidate: false })}
+              onBlur={phoneField.onBlur}
+              name={phoneField.name}
+              ref={phoneField.ref}
+            />
+            <FormFieldError message={errors.phone?.message} />
           </CompactField>
           <CompactField label="Postal Code" required>
-            <input className={shopCompactInputClass} value={pincode} onChange={(e) => setPincode(e.target.value)} />
+            <input
+              className={fieldErrorClass(!!errors.pincode, shopCompactInputClass)}
+              {...register("pincode")}
+            />
+            <FormFieldError message={errors.pincode?.message} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
@@ -267,7 +293,7 @@ export default function ShopCustomerForm({
             </div>
           </CompactField>
           <CompactField label="Address">
-            <input className={shopCompactInputClass} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={50} />
+            <input className={shopCompactInputClass} {...register("address")} maxLength={50} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow className="items-start">
@@ -286,100 +312,117 @@ export default function ShopCustomerForm({
             <button
               type="button"
               className="text-xs font-semibold text-ad-purple hover:underline"
-              onClick={() => setVehicles((v) => [...v, emptyVehicle()])}
+              onClick={() => appendVehicle(emptyVehicle())}
             >
               + Add vehicle
             </button>
           </div>
-          {vehicles.map((v, index) => (
-            <div key={index} className="space-y-3 rounded border border-gray-300 bg-white p-3">
-              <CompactFormRow>
-                <CompactField label="License Plate" required>
-                  <input
-                    className={shopCompactInputClass}
-                    value={v.licensePlateNo}
-                    onChange={(e) => updateVehicle(index, { licensePlateNo: e.target.value })}
-                    maxLength={14}
+          {typeof vehicleErrors?.message === "string" ? (
+            <FormFieldError message={vehicleErrors.message} />
+          ) : null}
+          {vehicleFields.map((field, index) => {
+            const vVehicleName = watch(`vehicles.${index}.vehicleName`);
+            const vModel = watch(`vehicles.${index}.model`);
+            const rowErrors = vehicleErrors?.[index];
+            const extra = vehicleUiExtras[index];
+            return (
+              <div key={field.id} className="space-y-3 rounded border border-gray-300 bg-white p-3">
+                <CompactFormRow>
+                  <CompactField label="License Plate" required>
+                    <input
+                      className={fieldErrorClass(!!rowErrors?.licensePlateNo, shopCompactInputClass)}
+                      {...register(`vehicles.${index}.licensePlateNo`)}
+                      maxLength={14}
+                    />
+                    <FormFieldError message={rowErrors?.licensePlateNo?.message} />
+                  </CompactField>
+                  <CompactField label="VIN">
+                    <input
+                      className={fieldErrorClass(!!rowErrors?.vinNo, shopCompactInputClass)}
+                      {...register(`vehicles.${index}.vinNo`)}
+                      maxLength={17}
+                    />
+                    <FormFieldError message={rowErrors?.vinNo?.message} />
+                  </CompactField>
+                </CompactFormRow>
+                <CompactFormRow>
+                  <CompactField label="Make" required>
+                    <select
+                      className={fieldErrorClass(!!rowErrors?.vehicleName, shopCompactInputClass)}
+                      {...register(`vehicles.${index}.vehicleName`)}
+                      onChange={(e) => {
+                        setValue(`vehicles.${index}.vehicleName`, e.target.value);
+                        setValue(`vehicles.${index}.model`, "");
+                        setValue(`vehicles.${index}.year`, "");
+                      }}
+                    >
+                      <option value="">Select make</option>
+                      {companies.map((c) => (
+                        <option key={c.companyName} value={c.companyName}>
+                          {c.companyName}
+                        </option>
+                      ))}
+                    </select>
+                    <FormFieldError message={rowErrors?.vehicleName?.message} />
+                  </CompactField>
+                  <CompactField label="Model" required>
+                    <select
+                      className={fieldErrorClass(!!rowErrors?.model, shopCompactInputClass)}
+                      {...register(`vehicles.${index}.model`)}
+                      onChange={(e) => {
+                        setValue(`vehicles.${index}.model`, e.target.value);
+                        setValue(`vehicles.${index}.year`, "");
+                      }}
+                    >
+                      <option value="">Select model</option>
+                      {modelOptions(vVehicleName).map((m) => (
+                        <option key={m.modelName} value={m.modelName}>
+                          {m.modelName}
+                        </option>
+                      ))}
+                    </select>
+                    <FormFieldError message={rowErrors?.model?.message} />
+                  </CompactField>
+                  <CompactField label="Year" required>
+                    <select
+                      className={fieldErrorClass(!!rowErrors?.year, shopCompactInputClass)}
+                      {...register(`vehicles.${index}.year`)}
+                    >
+                      <option value="">Year</option>
+                      {yearOptions(vVehicleName, vModel).map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                    <FormFieldError message={rowErrors?.year?.message} />
+                  </CompactField>
+                </CompactFormRow>
+                <CompactFormRow>
+                  <CompactField label="Odometer">
+                    <input
+                      className={shopCompactInputClass}
+                      {...register(`vehicles.${index}.odometerReading`)}
+                    />
+                  </CompactField>
+                </CompactFormRow>
+                <CompactFormRow className="items-start">
+                  <AttachImageCheckbox
+                    label="Attach Image"
+                    checked={Boolean(extra?.attachVehiclePhoto)}
+                    onCheckedChange={(checked) =>
+                      patchVehicleExtra(index, {
+                        attachVehiclePhoto: checked,
+                        ...(checked ? {} : { vehicleImage: null }),
+                      })
+                    }
+                    file={extra?.vehicleImage ?? null}
+                    onFileChange={(file) => patchVehicleExtra(index, { vehicleImage: file, attachVehiclePhoto: true })}
                   />
-                </CompactField>
-                <CompactField label="VIN">
-                  <input
-                    className={shopCompactInputClass}
-                    value={v.vinNo ?? ""}
-                    onChange={(e) => updateVehicle(index, { vinNo: e.target.value })}
-                    maxLength={17}
-                  />
-                </CompactField>
-              </CompactFormRow>
-              <CompactFormRow>
-                <CompactField label="Make" required>
-                  <select
-                    className={shopCompactInputClass}
-                    value={v.vehicleName}
-                    onChange={(e) => updateVehicle(index, { vehicleName: e.target.value, model: "", year: "" })}
-                  >
-                    <option value="">Select make</option>
-                    {companies.map((c) => (
-                      <option key={c.companyName} value={c.companyName}>
-                        {c.companyName}
-                      </option>
-                    ))}
-                  </select>
-                </CompactField>
-                <CompactField label="Model" required>
-                  <select
-                    className={shopCompactInputClass}
-                    value={v.model}
-                    onChange={(e) => updateVehicle(index, { model: e.target.value, year: "" })}
-                  >
-                    <option value="">Select model</option>
-                    {modelOptions(v.vehicleName).map((m) => (
-                      <option key={m.modelName} value={m.modelName}>
-                        {m.modelName}
-                      </option>
-                    ))}
-                  </select>
-                </CompactField>
-                <CompactField label="Year" required>
-                  <select
-                    className={shopCompactInputClass}
-                    value={v.year}
-                    onChange={(e) => updateVehicle(index, { year: e.target.value })}
-                  >
-                    <option value="">Year</option>
-                    {yearOptions(v.vehicleName, v.model).map((y) => (
-                      <option key={y} value={y}>
-                        {y}
-                      </option>
-                    ))}
-                  </select>
-                </CompactField>
-              </CompactFormRow>
-              <CompactFormRow>
-                <CompactField label="Odometer">
-                  <input
-                    className={shopCompactInputClass}
-                    value={v.odometerReading ?? ""}
-                    onChange={(e) => updateVehicle(index, { odometerReading: e.target.value })}
-                  />
-                </CompactField>
-              </CompactFormRow>
-              <CompactFormRow className="items-start">
-                <AttachImageCheckbox
-                  label="Attach Image"
-                  checked={Boolean(v.attachVehiclePhoto)}
-                  onCheckedChange={(checked) =>
-                    updateVehicle(index, {
-                      attachVehiclePhoto: checked,
-                      ...(checked ? {} : { vehicleImage: null }),
-                    })
-                  }
-                  file={v.vehicleImage ?? null}
-                  onFileChange={(file) => updateVehicle(index, { vehicleImage: file, attachVehiclePhoto: true })}
-                />
-              </CompactFormRow>
-            </div>
-          ))}
+                </CompactFormRow>
+              </div>
+            );
+          })}
         </div>
       </CompactFormPanel>
 
@@ -389,7 +432,7 @@ export default function ShopCustomerForm({
         token={token}
         selectedId={null}
         onSelect={(c) => {
-          setCity(c.name);
+          setValue("city", c.name);
           setCityPickerOpen(false);
         }}
       />

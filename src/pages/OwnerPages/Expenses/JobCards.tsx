@@ -3,25 +3,32 @@ import { useNavigate } from "react-router";
 import { FiCheck, FiClipboard, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
-import OwnerJobCardViewerDialog from "../../../components/owner/OwnerJobCardViewerDialog";
+import OwnerInvoiceEstimateView from "../../../components/owner/OwnerInvoiceEstimateView";
 import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import {
+  ownerVehicleLabelClass,
+  ownerVehicleSelectClass,
+} from "../../../components/owner/ownerVehicleFormUtils";
 import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerJobCardApprovals } from "../../../hooks/useCarOwnerJobCardApprovals";
 import { useCarOwnerJobCards } from "../../../hooks/useCarOwnerJobCards";
+import { useCarOwnerVehicles } from "../../../hooks/useCarOwnerVehicles";
 import {
   businessName,
   carOwnerJobCardStatusLabel,
-  fetchCarOwnerJobCardById,
   formatBusinessPhone,
   formatJobCardDate,
   isCarOwnerJobCardPendingApproval,
   jobChipLabel,
-  resolveCarOwnerJobCardForViewer,
   resolveJobCardNo,
   resolveJobCardTotal,
 } from "../../../lib/carOwnerJobCards";
 import { formatCurrencyAmount } from "../../../lib/currency";
+import {
+  vehicleSidebarLabel,
+  type CarOwnerVehicle,
+} from "../../../lib/carOwnerVehicles";
 import {
   OWNER_PANEL_TABLE,
   OWNER_TABLE_BODY_TD_CLASS,
@@ -30,9 +37,12 @@ import {
 } from "../../../components/owner/ownerPanelTableStyles";
 import type { CarOwnerJobCard } from "../../../types/carOwnerJobCards";
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
-
-type ViewerKind = "jobcard";
+function vehicleOptionLabel(vehicle: CarOwnerVehicle, index: number): string {
+  const plate = vehicle.licensePlateNo?.trim().toUpperCase();
+  if (plate) return plate;
+  const make = vehicleSidebarLabel(vehicle);
+  return make || `Vehicle ${index + 1}`;
+}
 
 function selectedSetFromArray(ids: string[]): Set<string> {
   return new Set(ids);
@@ -96,14 +106,20 @@ function ToolbarButton({
 export default function OwnerExpensesJobCardsPage() {
   const countryCode = "+1";
   const { token } = useAuth();
-  const { items, loading, error, refresh } = useCarOwnerJobCards();
+  const { vehicles } = useCarOwnerVehicles();
+  const [vehicleFilter, setVehicleFilter] = useState("");
+  const { items, loading, error, refresh } = useCarOwnerJobCards(vehicleFilter || null);
   const { acting, approveMany, rejectMany } = useCarOwnerJobCardApprovals();
   const navigate = useNavigate();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const selected = useMemo(() => selectedSetFromArray(selectedIds), [selectedIds]);
-  const [viewerKind, setViewerKind] = useState<ViewerKind | null>(null);
-  const [selectedJobCardId, setSelectedJobCardId] = useState<string | null>(null);
+  const [detailJobCardId, setDetailJobCardId] = useState<string | null>(null);
+
+  const detailJobCard = useMemo(
+    () => (detailJobCardId ? items.find((jc) => jc._id === detailJobCardId) ?? null : null),
+    [items, detailJobCardId],
+  );
 
   const pendingSelectedIds = useMemo(
     () =>
@@ -118,36 +134,17 @@ export default function OwnerExpensesJobCardsPage() {
 
   const reset = useCallback(() => {
     setSelectedIds([]);
-    setViewerKind(null);
-    setSelectedJobCardId(null);
+    setDetailJobCardId(null);
+    setVehicleFilter("");
   }, []);
   useOwnerNavReset(reset);
 
-  const fetchJobCardForViewer = useCallback(
-    async (id: string) => {
-      if (!token) {
-        throw new Error("Please log in again.");
-      }
-      const res = await fetchCarOwnerJobCardById(token, id);
-      if (res.ok && res.data) {
-        const resolved = resolveCarOwnerJobCardForViewer(res.data);
-        if (resolved) return resolved;
-      }
-      const cached = items.find((jc) => jc._id === id);
-      if (cached) return cached;
-      throw new Error("Could not load job card.");
-    },
-    [token, items],
-  );
-
   const openJobCardPreview = (jc: CarOwnerJobCard) => {
-    setSelectedJobCardId(jc._id);
-    setViewerKind("jobcard");
+    setDetailJobCardId(jc._id);
   };
 
-  const closeViewer = () => {
-    setViewerKind(null);
-    setSelectedJobCardId(null);
+  const closeDetail = () => {
+    setDetailJobCardId(null);
   };
 
   const handleApprove = async () => {
@@ -182,165 +179,212 @@ export default function OwnerExpensesJobCardsPage() {
       noPanel
     >
       <div className="flex flex-col gap-4">
-        <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
-          <div className="space-y-1">
-            <p className="text-sm text-slate-500">Review and approve shop job cards</p>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">Job Cards</h1>
-          </div>
-          {!loading && !error && items.length > 0 ? (
-            <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
-              {items.length} job card{items.length === 1 ? "" : "s"}
-            </p>
-          ) : null}
-        </header>
-
-        {loading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-12 w-full rounded-2xl" />
-            <Skeleton className="h-64 w-full rounded-2xl" />
-          </div>
-        ) : error ? (
-          <EmptyState>
-            <span className="mb-3 block font-semibold text-slate-800">{error}</span>
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="rounded-xl bg-ad-purple px-4 py-2 text-sm font-semibold text-white shadow-sm"
-            >
-              Try again
-            </button>
-          </EmptyState>
-        ) : items.length === 0 ? (
-          <EmptyState>No job cards yet.</EmptyState>
+        {detailJobCardId ? (
+          <OwnerInvoiceEstimateView
+            key={detailJobCardId}
+            jobCardId={detailJobCardId}
+            token={token}
+            cachedJobCard={detailJobCard}
+            jobNoHint={detailJobCard ? resolveJobCardNo(detailJobCard) : null}
+            callingCode={countryCode}
+            documentKind="jobcard"
+            onBack={closeDetail}
+          />
         ) : (
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-2">
-                {showPendingActions ? (
-                  <>
-                    <ToolbarButton
-                      variant="success"
-                      disabled={acting}
-                      onClick={() => void handleApprove()}
-                    >
-                      <FiCheck size={13} aria-hidden />
-                      Approve
-                    </ToolbarButton>
-                    <ToolbarButton
-                      variant="danger"
-                      disabled={acting}
-                      onClick={() => void handleDiscard()}
-                    >
-                      <FiX size={13} aria-hidden />
-                      Discard
-                    </ToolbarButton>
-                  </>
-                ) : null}
+          <>
+            <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
+              <div className="space-y-1">
+                <p className="text-sm text-slate-500">Review and approve shop job cards</p>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+                  Job Cards
+                </h1>
               </div>
+              {!loading && !error && items.length > 0 ? (
+                <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
+                  {items.length} job card{items.length === 1 ? "" : "s"}
+                </p>
+              ) : null}
+            </header>
 
-              <button
-                type="button"
-                onClick={() => navigate("/owner/expenses/invoices")}
-                className="inline-flex items-center gap-1 rounded-xl bg-white/80 px-3 py-1.5 text-sm font-semibold text-slate-600 ring-1 ring-black/5 transition hover:bg-white"
-              >
-                View invoices
-              </button>
-            </div>
-
-            <div className={OWNER_TABLE_SURFACE_CLASS}>
-              <div className="overflow-x-auto">
-                <table className={OWNER_PANEL_TABLE.table}>
-                  <thead>
-                    <tr className="bg-gradient-to-r from-ad-purple to-ad-purple-dark text-white">
-                      <th className={`${OWNER_TABLE_HEAD_TH_CLASS} w-10`}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.length > 0 && selectedIds.length === items.length}
-                          onChange={(e) => {
-                            if (e.target.checked) setSelectedIds(items.map((jc) => jc._id));
-                            else setSelectedIds([]);
-                          }}
-                          aria-label="Select all"
-                        />
-                      </th>
-                      <th className={OWNER_TABLE_HEAD_TH_CLASS}>Job No.</th>
-                      <th className={OWNER_TABLE_HEAD_TH_CLASS}>Date</th>
-                      <th className={OWNER_TABLE_HEAD_TH_CLASS}>Auto Shop</th>
-                      <th className={OWNER_TABLE_HEAD_TH_CLASS}>Phone</th>
-                      <th className={OWNER_TABLE_HEAD_TH_CLASS}>Amount</th>
-                      <th className={OWNER_TABLE_HEAD_TH_CLASS}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((jc, index) => {
-                      const isChecked = selected.has(jc._id);
-                      const phone = formatBusinessPhone(jc.business) || "—";
-                      const amount = formatCurrencyAmount(resolveJobCardTotal(jc), countryCode);
-                      const status = carOwnerJobCardStatusLabel(jc);
-                      const jobNo = resolveJobCardNo(jc);
-                      return (
-                        <tr
-                          key={jc._id}
-                          className={index % 2 === 0 ? "bg-white/90" : "bg-slate-50/80"}
+            {loading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full rounded-2xl" />
+                <Skeleton className="h-64 w-full rounded-2xl" />
+              </div>
+            ) : error ? (
+              <EmptyState>
+                <span className="mb-3 block font-semibold text-slate-800">{error}</span>
+                <button
+                  type="button"
+                  onClick={() => void refresh()}
+                  className="rounded-xl bg-ad-purple px-4 py-2 text-sm font-semibold text-white shadow-sm"
+                >
+                  Try again
+                </button>
+              </EmptyState>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div className="flex flex-wrap gap-2">
+                    {showPendingActions ? (
+                      <>
+                        <ToolbarButton
+                          variant="success"
+                          disabled={acting}
+                          onClick={() => void handleApprove()}
                         >
-                          <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                setSelectedIds((cur) => {
-                                  const next = new Set(cur);
-                                  if (e.target.checked) next.add(jc._id);
-                                  else next.delete(jc._id);
-                                  return Array.from(next);
-                                });
-                              }}
-                              aria-label={`Select ${jobChipLabel(jc)}`}
-                            />
-                          </td>
-                          <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                            <button
-                              type="button"
-                              className="font-semibold text-sky-700 hover:underline"
-                              onClick={() => openJobCardPreview(jc)}
-                            >
-                              {jobNo ? `J # ${jobNo}` : "—"}
-                            </button>
-                          </td>
-                          <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                            {formatJobCardDate(jc.createdAt || jc.date || "")}
-                          </td>
-                          <td className={OWNER_TABLE_BODY_TD_CLASS}>{businessName(jc.business)}</td>
-                          <td className={OWNER_TABLE_BODY_TD_CLASS}>{phone}</td>
-                          <td className={`${OWNER_TABLE_BODY_TD_CLASS} font-semibold text-slate-900`}>
-                            {amount}
-                          </td>
-                          <td className={OWNER_TABLE_BODY_TD_CLASS}>
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${statusPillClass(status)}`}
-                            >
-                              {status}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          <FiCheck size={13} aria-hidden />
+                          Approve
+                        </ToolbarButton>
+                        <ToolbarButton
+                          variant="danger"
+                          disabled={acting}
+                          onClick={() => void handleDiscard()}
+                        >
+                          <FiX size={13} aria-hidden />
+                          Discard
+                        </ToolbarButton>
+                      </>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-wrap items-end gap-3">
+                    {vehicles.length > 0 ? (
+                      <div className="min-w-[11rem] sm:min-w-[14rem]">
+                        <label className={ownerVehicleLabelClass} htmlFor="job-cards-vehicle-filter">
+                          Vehicle
+                        </label>
+                        <select
+                          id="job-cards-vehicle-filter"
+                          value={vehicleFilter}
+                          onChange={(e) => {
+                            setVehicleFilter(e.target.value);
+                            setSelectedIds([]);
+                          }}
+                          aria-label="Filter by vehicle"
+                          className={ownerVehicleSelectClass}
+                        >
+                          <option value="">All vehicles</option>
+                          {vehicles.map((vehicle, index) => (
+                            <option key={vehicle.id} value={vehicle.id}>
+                              {vehicleOptionLabel(vehicle, index)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => navigate("/owner/expenses/invoices")}
+                      className="inline-flex h-10 items-center gap-1 rounded-xl bg-white/80 px-3 py-1.5 text-sm font-semibold text-slate-600 ring-1 ring-black/5 transition hover:bg-white"
+                    >
+                      View invoices
+                    </button>
+                  </div>
+                </div>
+
+                {items.length === 0 ? (
+                  <EmptyState>
+                    {vehicleFilter ? "No job cards for this vehicle." : "No job cards yet."}
+                  </EmptyState>
+                ) : (
+                  <div className={OWNER_TABLE_SURFACE_CLASS}>
+                    <div className="overflow-x-auto">
+                      <table className={OWNER_PANEL_TABLE.table}>
+                        <thead>
+                          <tr className="bg-gradient-to-r from-ad-purple to-ad-purple-dark text-white">
+                            <th className={`${OWNER_TABLE_HEAD_TH_CLASS} w-10`}>
+                              <input
+                                type="checkbox"
+                                checked={
+                                  selectedIds.length > 0 && selectedIds.length === items.length
+                                }
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedIds(items.map((jc) => jc._id));
+                                  else setSelectedIds([]);
+                                }}
+                                aria-label="Select all"
+                              />
+                            </th>
+                            <th className={OWNER_TABLE_HEAD_TH_CLASS}>Job No.</th>
+                            <th className={OWNER_TABLE_HEAD_TH_CLASS}>Date</th>
+                            <th className={OWNER_TABLE_HEAD_TH_CLASS}>Auto Shop</th>
+                            <th className={OWNER_TABLE_HEAD_TH_CLASS}>Phone</th>
+                            <th className={OWNER_TABLE_HEAD_TH_CLASS}>Amount</th>
+                            <th className={OWNER_TABLE_HEAD_TH_CLASS}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.map((jc, index) => {
+                            const isChecked = selected.has(jc._id);
+                            const phone = formatBusinessPhone(jc.business) || "—";
+                            const amount = formatCurrencyAmount(
+                              resolveJobCardTotal(jc),
+                              countryCode,
+                            );
+                            const status = carOwnerJobCardStatusLabel(jc);
+                            const jobNo = resolveJobCardNo(jc);
+                            return (
+                              <tr
+                                key={jc._id}
+                                className={index % 2 === 0 ? "bg-white/90" : "bg-slate-50/80"}
+                              >
+                                <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      setSelectedIds((cur) => {
+                                        const next = new Set(cur);
+                                        if (e.target.checked) next.add(jc._id);
+                                        else next.delete(jc._id);
+                                        return Array.from(next);
+                                      });
+                                    }}
+                                    aria-label={`Select ${jobChipLabel(jc)}`}
+                                  />
+                                </td>
+                                <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                                  <button
+                                    type="button"
+                                    className="font-semibold text-sky-700 hover:underline"
+                                    onClick={() => openJobCardPreview(jc)}
+                                  >
+                                    {jobNo ? `J # ${jobNo}` : "—"}
+                                  </button>
+                                </td>
+                                <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                                  {formatJobCardDate(jc.createdAt || jc.date || "")}
+                                </td>
+                                <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                                  {businessName(jc.business)}
+                                </td>
+                                <td className={OWNER_TABLE_BODY_TD_CLASS}>{phone}</td>
+                                <td
+                                  className={`${OWNER_TABLE_BODY_TD_CLASS} font-semibold text-slate-900`}
+                                >
+                                  {amount}
+                                </td>
+                                <td className={OWNER_TABLE_BODY_TD_CLASS}>
+                                  <span
+                                    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${statusPillClass(status)}`}
+                                  >
+                                    {status}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </div>
-
-      <OwnerJobCardViewerDialog
-        open={viewerKind === "jobcard"}
-        onClose={closeViewer}
-        jobCardId={selectedJobCardId ?? undefined}
-        fetchJobCard={fetchJobCardForViewer}
-        countryCode={countryCode}
-        apiBaseUrl={API_BASE_URL}
-      />
     </OwnerPageShell>
   );
 }

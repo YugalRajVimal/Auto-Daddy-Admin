@@ -116,13 +116,15 @@ function normalizePlan(raw: unknown): SubscriptionPlan | null {
 
   const amount =
     asNumber(o.amount ?? o.price ?? o.total ?? o.baseAmount) ??
-    (id === "yearly" ? 365 : 390);
+    (id === "yearly" ? 365 : 15);
+  // Bi-weekly period is always 14 days (API sometimes returns yearly 365 by mistake).
   const days =
-    asNumber(o.days ?? o.durationDays ?? o.periodDays ?? o.validityDays) ??
-    (id === "yearly" ? 365 : 14);
+    id === "biweekly"
+      ? 14
+      : (asNumber(o.days ?? o.durationDays ?? o.periodDays ?? o.validityDays) ?? 365);
   const hst =
     asNumber(o.hst ?? o.hstAmount ?? o.tax ?? o.taxAmount) ??
-    (id === "yearly" ? 49 : 51);
+    (id === "yearly" ? 49 : 2);
 
   const title =
     asString(o.title ?? o.name ?? o.label) ||
@@ -186,13 +188,16 @@ export function parseSubscriptionStatus(payload: unknown): SubscriptionStatus | 
     data.paymentStatus ?? data.status ?? data.subscriptionStatus,
   );
   const daysLeft = asNumber(data.daysLeft ?? data.daysRemaining ?? data.remainingDays);
+  /** Days remaining is the source of truth: > 0 means subscribed. */
   const active =
-    typeof data.active === "boolean"
-      ? data.active
-      : typeof data.isActive === "boolean"
-        ? data.isActive
-        : isSubscriptionPaymentPaid(paymentStatus) ||
-          ["active", "subscribed"].includes(paymentStatus.toLowerCase());
+    typeof daysLeft === "number"
+      ? daysLeft > 0
+      : typeof data.active === "boolean"
+        ? data.active
+        : typeof data.isActive === "boolean"
+          ? data.isActive
+          : isSubscriptionPaymentPaid(paymentStatus) ||
+            ["active", "subscribed"].includes(paymentStatus.toLowerCase());
 
   const planLabel =
     asString(data.planLabel ?? data.planName ?? data.currentPlan ?? data.label) ||

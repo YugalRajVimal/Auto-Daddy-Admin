@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "react-toastify";
 import AttachImageCheckbox from "../../components/admin/AttachImageCheckbox";
@@ -14,15 +17,28 @@ import { fetchJobCardFormData, fetchJobCardByIdForForm, resolveJobCardFromApiRes
 import { useShopServices } from "../../hooks/useShopServices";
 import type { MyCustomer } from "../../types/shopOwner";
 import { ShopFormPage } from "../../components/shop/forms/ShopFormPage";
+import { jobCardPageSchema } from "../../lib/validation/schemas/jobCard";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../lib/validation/formUi";
 
-type ServiceLine = {
-  catId: string;
-  subIdx: number;
-  name: string;
-  qty: string;
-  unitPrice: string;
-  labour: string;
-};
+const serviceLineSchema = z.object({
+  catId: z.string(),
+  subIdx: z.number(),
+  name: z.string(),
+  qty: z.string(),
+  unitPrice: z.string(),
+  labour: z.string(),
+});
+
+const jobCardPageFormSchema = jobCardPageSchema.extend({
+  services: z.array(serviceLineSchema).min(1, "Add at least one service."),
+  odomIn: z.string().optional().default(""),
+  odomOut: z.string().optional().default(""),
+  discount: z.string().optional().default(""),
+});
+
+type ServiceLine = z.input<typeof serviceLineSchema>;
+
+type JobCardPageFormValues = z.input<typeof jobCardPageFormSchema>;
 
 type JobCardEditRaw = Record<string, unknown>;
 
@@ -108,18 +124,38 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
   const { categories } = useShopServices();
   const [customers, setCustomers] = useState<MyCustomer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [customerId, setCustomerId] = useState("");
-  const [vehicleIdVal, setVehicleIdVal] = useState("");
-  const [odomIn, setOdomIn] = useState("");
-  const [odomOut, setOdomOut] = useState("");
-  const [discount, setDiscount] = useState("");
-  const [lines, setLines] = useState<ServiceLine[]>([]);
   const [attachVehiclePhotos, setAttachVehiclePhotos] = useState(false);
   const [vehiclePhotoFile, setVehiclePhotoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [editingJobCardId, setEditingJobCardId] = useState<string | null>(null);
 
   const isEdit = Boolean(editingJobCardId);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm<JobCardPageFormValues>({
+    resolver: zodResolver(jobCardPageFormSchema),
+    mode: "onSubmit",
+    defaultValues: {
+      customerId: "",
+      vehicleId: "",
+      services: [],
+      odomIn: "",
+      odomOut: "",
+      discount: "",
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({ control, name: "services" });
+
+  const customerId = watch("customerId");
+  const watchedLines = watch("services");
 
   useEffect(() => {
     if (!token) return;
@@ -156,12 +192,15 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
     const services = normalizeJobCardServiceBlocks(editRaw);
     const h = hydrateFromRaw({ ...editRaw, services }, categories);
     if (h.editingId) setEditingJobCardId(h.editingId);
-    setCustomerId(h.customerId);
-    setVehicleIdVal(h.vehicleIdVal);
-    setOdomIn(h.odomIn);
-    setOdomOut(h.odomOut);
-    setDiscount(h.discount);
-    if (h.lines.length > 0) setLines(h.lines);
+    reset({
+      customerId: h.customerId,
+      vehicleId: h.vehicleIdVal,
+      services: h.lines.length > 0 ? h.lines : [],
+      odomIn: h.odomIn,
+      odomOut: h.odomOut,
+      discount: h.discount,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editRaw, categories]);
 
   const selectedCustomer = customers.find((c) => (c.carOwnerId ?? c.id ?? c._id) === customerId);
@@ -186,28 +225,25 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
   const addLine = (key: string) => {
     const opt = subOptions.find((o) => o.key === key);
     if (!opt) return;
-    if (lines.some((l) => l.catId === opt.catId && l.subIdx === opt.subIdx)) return;
-    setLines((prev) => [
-      ...prev,
-      {
-        catId: opt.catId,
-        subIdx: opt.subIdx,
-        name: opt.label,
-        qty: "1",
-        unitPrice: String(opt.price),
-        labour: "0",
-      },
-    ]);
+    if (watchedLines.some((l) => l.catId === opt.catId && l.subIdx === opt.subIdx)) return;
+    append({
+      catId: opt.catId,
+      subIdx: opt.subIdx,
+      name: opt.label,
+      qty: "1",
+      unitPrice: String(opt.price),
+      labour: "0",
+    });
   };
 
-  const labourTotal = lines.reduce((sum, l) => {
+  const labourTotal = watchedLines.reduce((sum, l) => {
     const qty = Number(l.qty) || 0;
     const unit = Number(l.unitPrice) || 0;
     const labour = Number(l.labour) || 0;
     return sum + qty * unit + labour;
   }, 0);
 
-  const buildServicesJson = () => {
+  const buildServicesJson = (lines: ServiceLine[]) => {
     const map = new Map<string, Array<Record<string, unknown>>>();
     for (const line of lines) {
       const cat = categories.find((c) => c.id === line.catId);
@@ -230,39 +266,31 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
       });
       map.set(line.catId, bucket);
     }
-    return JSON.stringify([...map.entries()].map(([service, subServices]) => ({ service, subServices })));
+    return [...map.entries()].map(([service, subServices]) => ({ service, subServices }));
   };
 
-  const handleSubmit = async () => {
+  const onValidSubmit = async (values: JobCardPageFormValues) => {
     if (!token) return;
-    if (!customerId || !vehicleIdVal) {
-      toast.error("Select a customer and vehicle.");
-      return;
-    }
-    if (lines.length === 0) {
-      toast.error("Add at least one service.");
-      return;
-    }
     setSubmitting(true);
     try {
-      const services = JSON.parse(buildServicesJson()) as unknown[];
+      const services = buildServicesJson(values.services);
       await saveJobCard(
         token,
         {
           jobCardId: editingJobCardId ?? undefined,
           sendForApproval: !isEdit,
           form: {
-            customerId,
-            vehicleId: vehicleIdVal,
-            odometerReading: odomIn || "0",
-            dueOdometerReading: odomOut || "0",
+            customerId: values.customerId,
+            vehicleId: values.vehicleId,
+            odometerReading: values.odomIn || "0",
+            dueOdometerReading: values.odomOut || "0",
             issueDescription: "Walk-in / scheduled service",
             serviceType: "Repair",
             priorityLevel: "Normal",
             services,
             labourCharge: String(labourTotal),
-            labourDuration: discount || "0",
-            technicalRemarks: discount ? `Discount: ${discount}` : "",
+            labourDuration: values.discount || "0",
+            technicalRemarks: values.discount ? `Discount: ${values.discount}` : "",
           },
           vehiclePhotoFiles: attachVehiclePhotos && vehiclePhotoFile ? [vehiclePhotoFile] : [],
         },
@@ -276,6 +304,12 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
       setSubmitting(false);
     }
   };
+
+  const onInvalidSubmit = () => {
+    toastValidationSummary(toast.error, errors as never);
+  };
+
+  const submitForm = handleSubmit(onValidSubmit, onInvalidSubmit);
 
   const title = isEdit ? "Edit Job Card" : "New Job Card";
 
@@ -296,7 +330,7 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
         footer={
           <CompactFormFooter
             actionLabel={submitting ? (isEdit ? "Updating…" : "Saving…") : isEdit ? "Update" : "Save"}
-            onSave={() => void handleSubmit()}
+            onSave={() => void submitForm()}
             onCancel={() => navigate("/shop/job-cards")}
           />
         }
@@ -304,13 +338,11 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
         <CompactFormRow>
           <CompactField label="Customer" required>
             <select
-              className={shopCompactInputClass}
-              value={customerId}
-              onChange={(e) => {
-                setCustomerId(e.target.value);
-                setVehicleIdVal("");
-              }}
+              className={fieldErrorClass(Boolean(errors.customerId), shopCompactInputClass)}
               disabled={isEdit}
+              {...register("customerId", {
+                onChange: () => setValue("vehicleId", ""),
+              })}
             >
               <option value="">Select customer</option>
               {customers.map((c) => {
@@ -322,13 +354,13 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
                 );
               })}
             </select>
+            <FormFieldError message={errors.customerId?.message} />
           </CompactField>
           <CompactField label="Vehicle" required>
             <select
-              className={shopCompactInputClass}
-              value={vehicleIdVal}
-              onChange={(e) => setVehicleIdVal(e.target.value)}
+              className={fieldErrorClass(Boolean(errors.vehicleId), shopCompactInputClass)}
               disabled={isEdit}
+              {...register("vehicleId")}
             >
               <option value="">Select vehicle</option>
               {vehicles.map((v) => {
@@ -340,17 +372,18 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
                 );
               })}
             </select>
+            <FormFieldError message={errors.vehicleId?.message} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="ODO IN">
-            <input className={shopCompactInputClass} value={odomIn} onChange={(e) => setOdomIn(e.target.value)} />
+            <input className={shopCompactInputClass} {...register("odomIn")} />
           </CompactField>
           <CompactField label="ODO OUT">
-            <input className={shopCompactInputClass} value={odomOut} onChange={(e) => setOdomOut(e.target.value)} />
+            <input className={shopCompactInputClass} {...register("odomOut")} />
           </CompactField>
           <CompactField label="Discount">
-            <input className={shopCompactInputClass} value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            <input className={shopCompactInputClass} {...register("discount")} />
           </CompactField>
         </CompactFormRow>
 
@@ -372,41 +405,35 @@ function JobCardForm({ editRaw }: { editRaw?: JobCardEditRaw | null }) {
               ))}
             </select>
           </CompactField>
+          <FormFieldError message={errors.services?.message ?? errors.services?.root?.message} />
           <div className="mt-3 space-y-2">
-            {lines.map((line, i) => (
+            {fields.map((field, i) => (
               <div
-                key={`${line.catId}-${line.subIdx}`}
+                key={field.id}
                 className="grid gap-2 rounded border border-gray-300 bg-white p-2 sm:grid-cols-5"
               >
-                <p className="text-xs font-semibold text-ad-purple sm:col-span-5">{line.name}</p>
+                <p className="text-xs font-semibold text-ad-purple sm:col-span-5">
+                  {watchedLines[i]?.name}
+                </p>
                 <input
                   className={shopCompactInputClass}
                   placeholder="Qty"
-                  value={line.qty}
-                  onChange={(e) =>
-                    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, qty: e.target.value } : l)))
-                  }
+                  {...register(`services.${i}.qty` as const)}
                 />
                 <input
                   className={shopCompactInputClass}
                   placeholder="Unit price"
-                  value={line.unitPrice}
-                  onChange={(e) =>
-                    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, unitPrice: e.target.value } : l)))
-                  }
+                  {...register(`services.${i}.unitPrice` as const)}
                 />
                 <input
                   className={shopCompactInputClass}
                   placeholder="Labour"
-                  value={line.labour}
-                  onChange={(e) =>
-                    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, labour: e.target.value } : l)))
-                  }
+                  {...register(`services.${i}.labour` as const)}
                 />
                 <button
                   type="button"
                   className="text-xs text-red-600"
-                  onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))}
+                  onClick={() => remove(i)}
                 >
                   Remove
                 </button>

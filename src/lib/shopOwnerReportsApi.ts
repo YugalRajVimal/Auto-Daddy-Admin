@@ -1,8 +1,11 @@
 import {
   fetchAutoshopGstReports,
   fetchAutoshopIncomeReport,
+  fetchAutoshopJobCardPrefix,
+  parseAutoshopJobCardPrefix,
   apiMessageFromEnvelope,
 } from "./autoshopownerJobCardsApi";
+import { composePrefixedJobCardNo } from "../components/JobCard/shopJobCardEstimate";
 import { fetchBanks, fetchExpenses } from "./shopOwnerAccountsApi";
 import { normalizeMediaUrl } from "./normalizeMediaUrl";
 import type { BankRow, GstLedgerRow, LedgerRow } from "../pages/AdminPages/Accounts/accountData";
@@ -59,13 +62,24 @@ function isoDateOnly(value: unknown): string {
   return parsed.toISOString().slice(0, 10);
 }
 
-function mapJobCardToLedgerRow(item: JobCardReportItem): ShopReportLedgerRow {
+function formatJobCardRef(jobCardNo: number | string | undefined, prefix?: string): string {
+  if (jobCardNo == null || String(jobCardNo).trim() === "") return "";
+  const prefixed = composePrefixedJobCardNo(prefix, jobCardNo);
+  if (prefixed) return prefixed;
+  return String(jobCardNo).trim();
+}
+
+function mapJobCardToLedgerRow(
+  item: JobCardReportItem,
+  jobCardPrefix?: string,
+): ShopReportLedgerRow {
   const services = Array.isArray(item.services) ? item.services : [];
   const first = services[0];
   const categoryLabel = String(first?.category ?? "Service Revenue").trim() || "Service Revenue";
   const subcategoryLabel = String(first?.desc ?? "Repairs").trim() || "Repairs";
   const plate = String(item.licensePlateNo ?? "").trim();
   const jobNo = item.jobCardNo != null ? String(item.jobCardNo) : "";
+  const jobRef = formatJobCardRef(item.jobCardNo, jobCardPrefix);
   const serviceNotes = services
     .map((s) => String(s.desc ?? s.category ?? "").trim())
     .filter(Boolean)
@@ -78,11 +92,9 @@ function mapJobCardToLedgerRow(item: JobCardReportItem): ShopReportLedgerRow {
     amount: Number(item.totalAmount ?? 0) || 0,
     category: slugifyLabel(categoryLabel) || "service-revenue",
     subcategory: slugifyLabel(subcategoryLabel) || "repairs",
-    notes: [plate && `Plate ${plate}`, jobNo && `JC#${jobNo}`, serviceNotes]
-      .filter(Boolean)
-      .join(" · "),
+    notes: [plate && `Plate ${plate}`, jobRef, serviceNotes].filter(Boolean).join(" · "),
     gst: true,
-    billNumber: jobNo || null,
+    billNumber: jobRef || null,
     byCheque: false,
     hasReceipt: false,
     bank: item.bankName ? String(item.bankName) : undefined,
@@ -143,20 +155,35 @@ function failMessage(payload: unknown, fallback: string) {
   return apiMessageFromEnvelope(payload) || fallback;
 }
 
+async function loadShopJobCardPrefix(token: string): Promise<string> {
+  try {
+    const res = await fetchAutoshopJobCardPrefix(token);
+    if (!res.ok) return "";
+    return parseAutoshopJobCardPrefix(res.data);
+  } catch {
+    return "";
+  }
+}
+
 export async function loadShopIncomeReport(
   token: string,
   fromDate: string,
   toDate: string,
 ): Promise<{ rows: ShopReportLedgerRow[]; totalIncome: number }> {
-  const res = await fetchAutoshopIncomeReport(token, {
-    startDate: fromDate || undefined,
-    endDate: toDate || undefined,
-  });
+  const [res, jobCardPrefix] = await Promise.all([
+    fetchAutoshopIncomeReport(token, {
+      startDate: fromDate || undefined,
+      endDate: toDate || undefined,
+    }),
+    loadShopJobCardPrefix(token),
+  ]);
   if (!res.ok) {
     throw new Error(failMessage(res.data, "Failed to load income report"));
   }
   const root = asRecord(res.data);
-  const rows = parseJobCardList(res.data).map(mapJobCardToLedgerRow);
+  const rows = parseJobCardList(res.data).map((item) =>
+    mapJobCardToLedgerRow(item, jobCardPrefix),
+  );
   const totalIncome =
     typeof root?.totalIncome === "number" && Number.isFinite(root.totalIncome)
       ? root.totalIncome
@@ -169,12 +196,13 @@ export async function loadShopGstReport(
   fromDate: string,
   toDate: string,
 ): Promise<ShopReportGstRow[]> {
-  const [gstRes, expensesRes] = await Promise.all([
+  const [gstRes, expensesRes, jobCardPrefix] = await Promise.all([
     fetchAutoshopGstReports(token, {
       startDate: fromDate || undefined,
       endDate: toDate || undefined,
     }),
     fetchExpenses(token),
+    loadShopJobCardPrefix(token),
   ]);
 
   if (!gstRes.ok) {
@@ -182,7 +210,7 @@ export async function loadShopGstReport(
   }
 
   const incomeRows: ShopReportGstRow[] = parseJobCardList(gstRes.data).map((item) => ({
-    ...mapJobCardToLedgerRow(item),
+    ...mapJobCardToLedgerRow(item, jobCardPrefix),
     ledgerType: "income" as const,
   }));
 

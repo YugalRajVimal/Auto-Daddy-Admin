@@ -198,29 +198,23 @@ function dealsMatchingSelection(selectedIds: Set<string>, deals: ShopDeal[]): Sh
 
 function DealsToolbar({
   showDelete,
-  showDeactivate,
   hasSelection,
   canDelete,
-  canDeactivate,
   canEdit,
   canAddNew,
   bulkBusy,
   onDelete,
-  onDeactivate,
   onEdit,
   onPrint,
   onAddNew,
 }: {
   showDelete: boolean;
-  showDeactivate: boolean;
   hasSelection: boolean;
   canDelete: boolean;
-  canDeactivate: boolean;
   canEdit: boolean;
   canAddNew: boolean;
   bulkBusy: boolean;
   onDelete: () => void;
-  onDeactivate: () => void;
   onEdit: () => void;
   onPrint: () => void;
   onAddNew: () => void;
@@ -248,16 +242,6 @@ function DealsToolbar({
                 className={DEAL_TOOLBAR_GRAY_BUTTON_CLASS}
               >
                 Delete
-              </button>
-            ) : null}
-            {showDeactivate ? (
-              <button
-                type="button"
-                onClick={onDeactivate}
-                disabled={!canDeactivate || bulkBusy}
-                className={DEAL_TOOLBAR_GRAY_BUTTON_CLASS}
-              >
-                Non-Active
               </button>
             ) : null}
             <button
@@ -310,6 +294,7 @@ function DealsListTable({
   const showSoldTo = section !== "service";
   const nameHeader = section === "service" ? "Subservice" : "Part Name";
   const discountHeader = section === "service" ? "Discount (%)" : "Discounted Price";
+  const closingDateHeader = isCompleted ? "Purchasing Date" : "Closing Date";
   const pageRowIds = deals.map((deal) => dealId(deal));
   const allPageSelected = deals.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
   const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
@@ -337,7 +322,7 @@ function DealsListTable({
               />
             </th>
             <th className={SHOP_TABLE_HEAD_TH_CLASS}>Opening Date</th>
-            <th className={SHOP_TABLE_HEAD_TH_CLASS}>Closing Date</th>
+            <th className={SHOP_TABLE_HEAD_TH_CLASS}>{closingDateHeader}</th>
             <th className={SHOP_TABLE_HEAD_TH_CLASS}>{nameHeader}</th>
             {showVehicleColumns ? (
               <>
@@ -501,11 +486,6 @@ export default function ShopDealsPage() {
 
   const hasBulkSelection = selectedDeals.length > 0;
   const canBulkDelete = hasBulkSelection && !bulkBusy;
-  const canBulkDeactivate =
-    activeId !== "completed" &&
-    hasBulkSelection &&
-    !bulkBusy &&
-    selectedDeals.some((deal) => deal.dealEnabled !== false);
   const canPrint = hasBulkSelection;
   const canAddNew = activeId !== "completed";
   const canEditSelected =
@@ -673,43 +653,13 @@ export default function ShopDealsPage() {
     }
   };
 
-  const handleBulkDeactivate = async () => {
-    if (!canBulkDeactivate || !token) return;
-    const rows = selectedDeals.filter((deal) => deal.dealEnabled !== false);
-    const count = rows.length;
-    if (count === 0) {
-      toast.info("Selected deals are already non-active.");
-      return;
-    }
-    if (!window.confirm(`Mark ${count} selected deal${count === 1 ? "" : "s"} as non-active?`)) return;
-
-    setBulkBusy(true);
-    let failed = 0;
-    try {
-      for (const deal of rows) {
-        const id = dealId(deal);
-        const res = await updateAutoshopDeal(token, id, dealToFormFields(deal, { dealEnabled: "false" }));
-        if (!res.ok) failed += 1;
-      }
-      await refresh();
-      setSelectedDealIds(new Set());
-      if (failed > 0) {
-        toast.error(`Non-active update failed for ${failed} deal${failed === 1 ? "" : "s"}.`);
-      } else {
-        toast.success(`Marked ${count} deal${count === 1 ? "" : "s"} as non-active.`);
-      }
-    } finally {
-      setBulkBusy(false);
-    }
-  };
-
   const handlePrint = () => {
     if (!canPrint) return;
     const showVehicleColumns = activeId !== "service";
     const showSoldTo = activeId !== "service";
     const headers = [
       "Opening Date",
-      "Closing Date",
+      activeId === "completed" ? "Purchasing Date" : "Closing Date",
       activeId === "service" ? "Subservice" : "Part Name",
       ...(showVehicleColumns ? ["Vehicle", "Year"] : []),
       activeId === "service" ? "Discount (%)" : "Discounted Price",
@@ -795,6 +745,7 @@ export default function ShopDealsPage() {
                   businessName={businessName}
                   businessPhone={businessPhone}
                   website={website}
+                  closingDateLabel={activeId === "completed" ? "Purchasing Date" : "Closing Date"}
                   onToggleRow={toggleDealSelection}
                   onEdit={openEdit}
                 />
@@ -808,15 +759,12 @@ export default function ShopDealsPage() {
             <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
               <DealsToolbar
                 showDelete={activeId !== "completed"}
-                showDeactivate={activeId !== "completed"}
                 hasSelection={hasBulkSelection}
                 canDelete={canBulkDelete}
-                canDeactivate={canBulkDeactivate}
                 canEdit={canEditSelected}
                 canAddNew={canAddNew}
                 bulkBusy={bulkBusy}
                 onDelete={() => void handleBulkDelete()}
-                onDeactivate={() => void handleBulkDeactivate()}
                 onEdit={openEditSelected}
                 onPrint={handlePrint}
                 onAddNew={openCreate}

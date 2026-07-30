@@ -1,3 +1,5 @@
+import { ownerProfileEditSchema } from "./validation/schemas/identity";
+
 export type CarOwnerUserProfile = {
   name?: string;
   email?: string;
@@ -113,30 +115,15 @@ export function validateProfileEdit(raw: {
   address: string;
   pincode: string;
 }): { valid: boolean; errors: ProfileFieldErrors } {
+  const parsed = ownerProfileEditSchema.safeParse(raw);
+  if (parsed.success) return { valid: true, errors: {} };
+
   const errors: ProfileFieldErrors = {};
-  const name = raw.name.trim();
-
-  if (!name) errors.name = "Name is required.";
-  else if (name.length > PROFILE_NAME_MAX_LENGTH) {
-    errors.name = `Use at most ${PROFILE_NAME_MAX_LENGTH} characters.`;
+  for (const issue of parsed.error.issues) {
+    const key = issue.path[0];
+    if (key === "name" || key === "email" || key === "phone" || key === "address" || key === "pincode") {
+      if (!errors[key]) errors[key] = issue.message;
+    }
   }
-
-  const email = raw.email.trim();
-  if (email && !isValidEmail(email)) errors.email = "Enter a valid email address.";
-
-  const phoneDigits = digitsOnly(raw.phone);
-  if (phoneDigits.length > 0 && phoneDigits.length !== 10) {
-    errors.phone = "Phone must be exactly 10 digits.";
-  }
-
-  const address = raw.address.trim();
-  if (address.length > PROFILE_ADDRESS_MAX_LENGTH) {
-    errors.address = `Use at most ${PROFILE_ADDRESS_MAX_LENGTH} characters.`;
-  }
-
-  if (hasCanadianPostalCodeValidationError(raw.pincode)) {
-    errors.pincode = "Enter a valid Canadian postal code (e.g. A1A 1A1).";
-  }
-
-  return { valid: Object.keys(errors).length === 0, errors };
+  return { valid: false, errors };
 }

@@ -3,8 +3,13 @@ import { FiArrowLeft, FiPrinter } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Skeleton } from "../common/Skeleton";
 import {
+  JobCardDocumentHeaderWave,
+  JobCardDocumentWaves,
+} from "../JobCard/JobCardDocumentWaves";
+import {
   buildBusinessBlock,
   buildCustomerBlock,
+  buildVehicleBlock,
   currencyLabelFromCode,
   estimateTotals,
   extractEstimateLines,
@@ -14,9 +19,14 @@ import {
   pickInvoiceNoFromRecord,
   pickJobNoFromRecord,
 } from "../JobCard/shopJobCardEstimate";
-import { resolveInvoiceTheme } from "../shop/invoice-templates/invoiceTheme";
+import {
+  JOB_CARD_PREVIEW_THEME,
+  resolveInvoiceTheme,
+  type InvoiceThemeTokens,
+} from "../shop/invoice-templates/invoiceTheme";
 import { fetchCarOwnerJobCardById, resolveCarOwnerJobCardForViewer } from "../../lib/carOwnerJobCards";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
+import A4DocumentSheet from "../common/A4DocumentSheet";
 import { printDomElement } from "../../utils/printDomElement";
 import type { CarOwnerJobCard, CarOwnerJobCardBusiness } from "../../types/carOwnerJobCards";
 import type { ShopProfileBusiness } from "../../types/shopOwner";
@@ -26,6 +36,8 @@ const OUTLINE_BTN_CLASS =
 
 /** Match Wallet invoice preview (magenta / modern template). */
 const OWNER_INVOICE_THEME = resolveInvoiceTheme("modern-invoice-v2");
+
+export type OwnerEstimateDocumentKind = "invoice" | "jobcard";
 
 function nested(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v)
@@ -79,7 +91,9 @@ function EstimateTotalsFooter({
   roundOff,
   total,
   totalLabel,
+  showHst,
   labelColSpan,
+  theme,
 }: {
   subtotal: string;
   discount?: string;
@@ -87,15 +101,17 @@ function EstimateTotalsFooter({
   roundOff?: string;
   total: string;
   totalLabel: string;
+  showHst: boolean;
   labelColSpan: number;
+  theme: InvoiceThemeTokens;
 }) {
   const labelClass =
     "border-0 bg-transparent px-2 py-1 text-right text-sm font-semibold text-gray-800";
   const valueClass =
     "border-0 bg-transparent px-2 py-1 text-right text-sm font-semibold tabular-nums text-gray-800";
   const totalStyle = {
-    backgroundColor: OWNER_INVOICE_THEME.accent,
-    color: OWNER_INVOICE_THEME.accentText,
+    backgroundColor: theme.accent,
+    color: theme.accentText,
   };
   const totalCellClass = "border-0 px-2 py-2 text-xs font-bold leading-none";
 
@@ -115,12 +131,14 @@ function EstimateTotalsFooter({
           <td className={`${valueClass} text-emerald-700`}>−{discount}</td>
         </tr>
       ) : null}
-      <tr>
-        <td colSpan={labelColSpan} className={labelClass}>
-          HST :
-        </td>
-        <td className={valueClass}>{hst}</td>
-      </tr>
+      {showHst ? (
+        <tr>
+          <td colSpan={labelColSpan} className={labelClass}>
+            HST :
+          </td>
+          <td className={valueClass}>{hst}</td>
+        </tr>
+      ) : null}
       {roundOff ? (
         <tr>
           <td colSpan={labelColSpan} className={labelClass}>
@@ -147,7 +165,10 @@ export type OwnerInvoiceEstimateViewProps = {
   /** Cached list card used while detail loads / as fallback. */
   cachedJobCard?: CarOwnerJobCard | null;
   invoiceNoHint?: string | null;
+  jobNoHint?: string | null;
   callingCode?: string;
+  /** Invoice (magenta) or job card (blue waves) — matches shop A4 layout. */
+  documentKind?: OwnerEstimateDocumentKind;
   onBack?: () => void;
   /** Hide Back/Print toolbar (e.g. when the dialog chrome already has actions). */
   hideToolbar?: boolean;
@@ -158,10 +179,21 @@ export default function OwnerInvoiceEstimateView({
   token,
   cachedJobCard = null,
   invoiceNoHint = null,
+  jobNoHint = null,
   callingCode = "+1",
+  documentKind = "invoice",
   onBack,
   hideToolbar = false,
 }: OwnerInvoiceEstimateViewProps) {
+  const isInvoiceDocument = documentKind === "invoice";
+  const showHst = isInvoiceDocument;
+  const theme = isInvoiceDocument ? OWNER_INVOICE_THEME : JOB_CARD_PREVIEW_THEME;
+  const documentHeading = isInvoiceDocument ? "Invoice" : "Job Card";
+  const documentNoLabel = isInvoiceDocument ? "Invoice No. :" : "Job Card No. :";
+  const printRootId = isInvoiceDocument
+    ? "owner-invoice-estimate-print"
+    : "owner-job-card-estimate-print";
+
   const [job, setJob] = useState<Record<string, unknown> | null>(
     cachedJobCard ? ({ ...cachedJobCard } as Record<string, unknown>) : null,
   );
@@ -201,19 +233,25 @@ export default function OwnerInvoiceEstimateView({
         setLoading(false);
         return;
       }
-      setError("Could not load invoice.");
+      setError(isInvoiceDocument ? "Could not load invoice." : "Could not load job card.");
       setJob(null);
     } catch (err) {
       if (cachedJobCard && cachedJobCard._id === jobCardId) {
         setJob({ ...cachedJobCard } as Record<string, unknown>);
       } else {
-        setError(err instanceof Error ? err.message : "Could not load invoice.");
+        setError(
+          err instanceof Error
+            ? err.message
+            : isInvoiceDocument
+              ? "Could not load invoice."
+              : "Could not load job card.",
+        );
         setJob(null);
       }
     } finally {
       setLoading(false);
     }
-  }, [token, jobCardId, cachedJobCard]);
+  }, [token, jobCardId, cachedJobCard, isInvoiceDocument]);
 
   useEffect(() => {
     void load();
@@ -224,40 +262,55 @@ export default function OwnerInvoiceEstimateView({
     [job, cachedJobCard],
   );
   const hstRate = job ? parseHstRate(job, business) : 13;
+  const effectiveHstRate = showHst ? hstRate : 0;
   const lines = useMemo(
-    () => (job ? extractEstimateLines(job, hstRate) : []),
-    [job, hstRate],
+    () => (job ? extractEstimateLines(job, effectiveHstRate) : []),
+    [job, effectiveHstRate],
   );
   const totals = useMemo(
     () =>
       job
-        ? estimateTotals(lines, hstRate, job, { includeHst: true })
+        ? estimateTotals(lines, effectiveHstRate, job, { includeHst: showHst })
         : { subtotal: 0, discount: 0, hst: 0, roundOff: 0, total: 0 },
-    [job, lines, hstRate],
+    [job, lines, effectiveHstRate, showHst],
   );
 
   const docNo = useMemo(() => {
-    const fromJob = pickInvoiceNoFromRecord(job);
-    if (fromJob) return fromJob;
-    const hint = invoiceNoHint?.trim();
+    if (isInvoiceDocument) {
+      const fromJob = pickInvoiceNoFromRecord(job);
+      if (fromJob) return fromJob;
+      const hint = invoiceNoHint?.trim();
+      if (hint && hint !== "—") return hint;
+      return pickJobNoFromRecord(job) || "—";
+    }
+    const hint = jobNoHint?.trim();
     if (hint && hint !== "—") return hint;
     return pickJobNoFromRecord(job) || "—";
-  }, [job, invoiceNoHint]);
+  }, [job, invoiceNoHint, jobNoHint, isInvoiceDocument]);
 
   const currencyLabel = currencyLabelFromCode(callingCode);
   const businessBlock = buildBusinessBlock(business);
   const customerBlock = job ? buildCustomerBlock(job) : { name: "—", company: "", address: "" };
+  const vehicleBlock = job
+    ? buildVehicleBlock(job)
+    : { plate: "", name: "", vin: "", cin: "", odometer: "" };
+  const hasVehicleDetails = Boolean(
+    vehicleBlock.plate ||
+      vehicleBlock.name ||
+      vehicleBlock.vin ||
+      vehicleBlock.cin ||
+      vehicleBlock.odometer,
+  );
   const logoUrl = normalizeMediaUrl(business?.businessLogo);
   const hstNumber = pickBusinessHstNumber(business, job) || "—";
-  const theme = OWNER_INVOICE_THEME;
 
   const handlePrint = () => {
-    const node = document.getElementById("owner-invoice-estimate-print");
+    const node = document.getElementById(printRootId);
     if (!(node instanceof HTMLElement)) {
       toast.error("Nothing to print.");
       return;
     }
-    printDomElement(node, "Invoice");
+    printDomElement(node, documentHeading);
   };
 
   if (loading && !job) {
@@ -288,7 +341,9 @@ export default function OwnerInvoiceEstimateView({
           </div>
         ) : null}
         <div className="rounded-2xl border border-rose-100 bg-rose-50/80 px-4 py-8 text-center text-sm text-rose-800">
-          <p className="font-semibold">{error ?? "Could not load invoice."}</p>
+          <p className="font-semibold">
+            {error ?? (isInvoiceDocument ? "Could not load invoice." : "Could not load job card.")}
+          </p>
           <button
             type="button"
             onClick={() => void load()}
@@ -302,7 +357,11 @@ export default function OwnerInvoiceEstimateView({
   }
 
   return (
-    <div className="space-y-3 print:space-y-0">
+    <div
+      className={`flex min-h-0 flex-1 flex-col gap-3 print:block print:space-y-0 ${
+        hideToolbar ? "h-full" : ""
+      }`}
+    >
       {!hideToolbar ? (
         <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
           {onBack ? (
@@ -320,137 +379,186 @@ export default function OwnerInvoiceEstimateView({
         </div>
       ) : null}
 
-      <div
-        id="owner-invoice-estimate-print"
-        className="relative overflow-hidden rounded border bg-white p-4 shadow-sm sm:p-6 print:border-0 print:p-0 print:shadow-none"
-        style={{ borderColor: theme.border }}
+      <A4DocumentSheet
+        id={printRootId}
+        className="overflow-hidden p-[14mm] print:p-[12mm]"
+        stageClassName={
+          hideToolbar ? "min-h-[calc(94vh-3.5rem)]" : "min-h-[calc(100vh-11rem)]"
+        }
       >
-        <div className="mb-4 h-1.5 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6" style={{ backgroundColor: theme.accent }} />
-
-        <div className="relative z-10 mb-4 flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            {logoUrl ? (
-              <img src={logoUrl} alt="" className="h-12 max-w-[8rem] object-contain" />
-            ) : (
-              <div
-                className="flex h-12 w-12 items-center justify-center rounded text-xs font-bold"
-                style={{ backgroundColor: theme.accent, color: theme.accentText }}
-              >
-                AD
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold" style={{ color: theme.title }}>
-                {businessBlock.name}
-              </p>
+        {isInvoiceDocument ? (
+          <div className="mb-5 h-2 -mx-[14mm] -mt-[14mm]" style={{ backgroundColor: theme.accent }} />
+        ) : (
+          <>
+            <div className="pointer-events-none absolute inset-x-0 top-0">
+              <JobCardDocumentHeaderWave />
             </div>
-          </div>
-          <h2
-            className="shrink-0 text-2xl font-bold uppercase tracking-wide"
-            style={{ color: theme.title }}
-          >
-            Invoice
-          </h2>
-        </div>
+            <div className="mb-2 h-16 shrink-0 sm:h-20" aria-hidden />
+          </>
+        )}
 
-        <div className="relative z-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="space-y-4 text-sm text-gray-800">
-            <div>
-              {businessBlock.address ? <p>{businessBlock.address}</p> : null}
-              {businessBlock.phone ? <p>{businessBlock.phone}</p> : null}
-            </div>
-            <div>
-              <p className="font-bold text-gray-900">To</p>
-              <p className="font-semibold">{customerBlock.name}</p>
-              {customerBlock.company ? <p>{customerBlock.company}</p> : null}
-              {customerBlock.address ? <p>{customerBlock.address}</p> : null}
-            </div>
-          </div>
-
-          <div className="text-sm lg:ml-auto lg:justify-self-end">
-            <div className="w-full min-w-[18rem] max-w-[20rem] space-y-1">
-              <EstimateMetaRow label="Invoice No. :" value={docNo} />
-              <EstimateMetaRow
-                label="Date :"
-                value={formatEstimateDate(job.date ?? job.serviceDate ?? job.jobDate ?? job.createdAt)}
-              />
-              <EstimateMetaRow label="HST No. :" value={hstNumber} />
-            </div>
-          </div>
-        </div>
-
-        <div className="relative z-10 mt-5 overflow-x-auto">
-          <table className="w-full min-w-[36rem] border-collapse text-sm">
-            <thead>
-              <tr
-                className="text-left text-xs font-bold"
-                style={{ backgroundColor: theme.accent, color: theme.accentText }}
-              >
-                <th className="border border-gray-300 px-2 py-2">S. No.</th>
-                <th className="border border-gray-300 px-2 py-2">Description</th>
-                <th className="border border-gray-300 px-2 py-2 text-right">Unit Cost</th>
-                <th className="border border-gray-300 px-2 py-2 text-center">Qty</th>
-                <th className="border border-gray-300 px-2 py-2 text-right">HST</th>
-                <th className="border border-gray-300 px-2 py-2 text-right">Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="border border-gray-300 px-2 py-4 text-center text-gray-500">
-                    No line items
-                  </td>
-                </tr>
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-14 max-w-[9rem] object-contain" />
               ) : (
-                lines.map((line, index) => (
-                  <tr
-                    key={`${line.description}-${index}`}
-                    style={index % 2 === 1 ? { backgroundColor: theme.stripe } : undefined}
-                  >
-                    <td className="border border-gray-300 px-2 py-2 align-top">{index + 1}.</td>
-                    <td className="border border-gray-300 px-2 py-2 align-top">{line.description}</td>
-                    <td className="border border-gray-300 px-2 py-2 text-right align-top tabular-nums">
-                      {formatEstimateMoney(line.unitCost, callingCode)}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-2 text-center align-top tabular-nums">
-                      {line.qty}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-2 text-right align-top tabular-nums">
-                      {line.hstRate > 0 ? `${line.hstRate}%` : "—"}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-2 text-right align-top tabular-nums">
-                      {formatEstimateMoney(line.price, callingCode)}
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded text-sm font-bold"
+                  style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                >
+                  AD
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-base font-bold" style={{ color: theme.title }}>
+                  {businessBlock.name}
+                </p>
+              </div>
+            </div>
+            <h2
+              className="shrink-0 text-3xl font-bold uppercase tracking-wide"
+              style={{ color: theme.title }}
+            >
+              {documentHeading}
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-8">
+            <div className="space-y-4 text-[13px] leading-relaxed text-gray-800">
+              <div>
+                {businessBlock.address ? <p>{businessBlock.address}</p> : null}
+                {businessBlock.phone ? <p>{businessBlock.phone}</p> : null}
+              </div>
+              <div>
+                <p className="font-bold text-gray-900">To</p>
+                <p className="font-semibold">{customerBlock.name}</p>
+                {customerBlock.company ? <p>{customerBlock.company}</p> : null}
+                {customerBlock.address ? <p>{customerBlock.address}</p> : null}
+              </div>
+              {hasVehicleDetails ? (
+                <div>
+                  <p className="font-bold text-gray-900">Vehicle</p>
+                  <p className="font-semibold tracking-wide">
+                    {vehicleBlock.plate || "—"}
+                  </p>
+                  {vehicleBlock.name ? <p>{vehicleBlock.name}</p> : null}
+                  {vehicleBlock.vin ? <p>VIN: {vehicleBlock.vin}</p> : null}
+                  {vehicleBlock.cin ? <p>CIN: {vehicleBlock.cin}</p> : null}
+                  {vehicleBlock.odometer ? <p>{vehicleBlock.odometer}</p> : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="ml-auto justify-self-end text-[13px]">
+              <div className="w-full min-w-[16rem] space-y-1.5">
+                <EstimateMetaRow label={documentNoLabel} value={docNo} />
+                <EstimateMetaRow
+                  label="Date :"
+                  value={formatEstimateDate(
+                    job.date ?? job.serviceDate ?? job.jobDate ?? job.createdAt,
+                  )}
+                />
+                {showHst ? <EstimateMetaRow label="HST No. :" value={hstNumber} /> : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex-1">
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr
+                  className="text-left text-xs font-bold"
+                  style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                >
+                  <th className="border border-gray-300 px-2.5 py-2.5">S. No.</th>
+                  <th className="border border-gray-300 px-2.5 py-2.5">Description</th>
+                  <th className="border border-gray-300 px-2.5 py-2.5 text-right">Unit Cost</th>
+                  <th className="border border-gray-300 px-2.5 py-2.5 text-center">Qty</th>
+                  {showHst ? (
+                    <th className="border border-gray-300 px-2.5 py-2.5 text-right">HST</th>
+                  ) : null}
+                  <th className="border border-gray-300 px-2.5 py-2.5 text-right">Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={showHst ? 6 : 5}
+                      className="border border-gray-300 px-2.5 py-6 text-center text-gray-500"
+                    >
+                      No line items
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-            <EstimateTotalsFooter
-              subtotal={formatEstimateMoney(totals.subtotal, callingCode)}
-              discount={
-                totals.discount > 0
-                  ? formatEstimateMoney(totals.discount, callingCode)
-                  : undefined
-              }
-              hst={formatEstimateMoney(totals.hst, callingCode)}
-              roundOff={
-                totals.roundOff !== 0
-                  ? formatEstimateMoney(totals.roundOff, callingCode)
-                  : undefined
-              }
-              total={formatEstimateMoney(totals.total, callingCode)}
-              totalLabel={`Total (${currencyLabel}) :`}
-              labelColSpan={5}
-            />
-          </table>
+                ) : (
+                  lines.map((line, index) => (
+                    <tr
+                      key={`${line.description}-${index}`}
+                      style={index % 2 === 1 ? { backgroundColor: theme.stripe } : undefined}
+                    >
+                      <td className="border border-gray-300 px-2.5 py-2.5 align-top">
+                        {index + 1}.
+                      </td>
+                      <td className="border border-gray-300 px-2.5 py-2.5 align-top">
+                        {line.description}
+                      </td>
+                      <td className="border border-gray-300 px-2.5 py-2.5 text-right align-top tabular-nums">
+                        {formatEstimateMoney(line.unitCost, callingCode)}
+                      </td>
+                      <td className="border border-gray-300 px-2.5 py-2.5 text-center align-top tabular-nums">
+                        {line.qty}
+                      </td>
+                      {showHst ? (
+                        <td className="border border-gray-300 px-2.5 py-2.5 text-right align-top tabular-nums">
+                          {line.hstRate > 0 ? `${line.hstRate}%` : "—"}
+                        </td>
+                      ) : null}
+                      <td className="border border-gray-300 px-2.5 py-2.5 text-right align-top tabular-nums">
+                        {formatEstimateMoney(line.price, callingCode)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              <EstimateTotalsFooter
+                subtotal={formatEstimateMoney(totals.subtotal, callingCode)}
+                discount={
+                  totals.discount > 0
+                    ? formatEstimateMoney(totals.discount, callingCode)
+                    : undefined
+                }
+                hst={formatEstimateMoney(totals.hst, callingCode)}
+                roundOff={
+                  totals.roundOff !== 0
+                    ? formatEstimateMoney(totals.roundOff, callingCode)
+                    : undefined
+                }
+                total={formatEstimateMoney(totals.total, callingCode)}
+                totalLabel={`Total (${currencyLabel}) :`}
+                showHst={showHst}
+                labelColSpan={showHst ? 5 : 4}
+                theme={theme}
+              />
+            </table>
+          </div>
+
+          <p className="relative z-10 mt-auto pt-8 text-right text-[10px] text-gray-500">
+            This estimate was sent using AutoDaddy
+          </p>
         </div>
 
-        <p className="relative z-10 mt-6 text-right text-[10px] text-gray-500 print:mt-4">
-          This estimate was sent using AutoDaddy
-        </p>
-
-        <div className="mt-4 h-1.5 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6" style={{ backgroundColor: theme.accent }} />
-      </div>
+        {isInvoiceDocument ? (
+          <div className="mt-5 h-2 -mx-[14mm] -mb-[14mm]" style={{ backgroundColor: theme.accent }} />
+        ) : (
+          <>
+            <div className="mt-auto h-[7.5rem] shrink-0 sm:h-[9rem]" aria-hidden />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0">
+              <JobCardDocumentWaves />
+            </div>
+          </>
+        )}
+      </A4DocumentSheet>
     </div>
   );
 }

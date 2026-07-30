@@ -1,6 +1,9 @@
 
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
@@ -41,6 +44,20 @@ import {
   fetchExpenseCategories,
   removeExpenseCategory,
 } from "./accountsAPI";
+import { bankAccountSchema } from "../../../lib/validation/schemas/money";
+import {
+  moneyPositive,
+  optionalMoney,
+  requiredDate,
+  requiredTrimmed,
+} from "../../../lib/validation/primitives";
+import {
+  FormFieldError,
+  fieldErrorClass,
+  VALIDATION_SUMMARY,
+  toastValidationSummary,
+  zodIssuesToFieldErrorMap,
+} from "../../../lib/validation/formUi";
  
 function buildLedgerSearchFields(variant: "expenses" | "income"): AdminSearchField[] {
   const fields: AdminSearchField[] = [
@@ -375,14 +392,30 @@ function VendorComboField({
 // BankName, tracked client-side, since the API has no separate field.
 // ---------------------------------------------------------------------------
  
+const newBankFormSchema = bankAccountSchema;
+type NewBankFormValues = z.input<typeof newBankFormSchema>;
+
+function emptyNewBankForm(): NewBankFormValues {
+  return { label: "", balance: "", bankName: "", accountNumber: "", email: "" };
+}
+
 function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: AccountsPageProps) {
   const [banks, setBanks] = useState<BankRow[]>([]);
   const [draft, setDraft] = useState<BankRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(initialShowForm);
-  const [bankWalletName, setBankWalletName] = useState("");
-  const [openingBalance, setOpeningBalance] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const {
+    register: registerNewBank,
+    handleSubmit: handleNewBankFormSubmit,
+    reset: resetNewBankFormValues,
+    formState: { errors: newBankErrors },
+  } = useForm<NewBankFormValues>({
+    resolver: zodResolver(newBankFormSchema),
+    mode: "onSubmit",
+    defaultValues: emptyNewBankForm(),
+  });
  
   // "Assign to Invoice" isn't a separate field on the API — it's just
   // "which bank's BankName is picked". We keep that selection client-side
@@ -427,47 +460,45 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
   };
  
   const resetNewBankForm = () => {
-    setBankWalletName("");
-    setOpeningBalance("");
+    resetNewBankFormValues(emptyNewBankForm());
   };
- 
+
   const handleNewBankCancel = () => {
     resetNewBankForm();
     setShowForm(false);
   };
- 
-  const handleNewBankSave = async () => {
-    const label = bankWalletName.trim();
-    if (!label) {
-      adminNotify.error("Bank / wallet name is required.");
-      return;
-    }
-    const parsedBalance = Number.parseFloat(openingBalance);
-    const openingBalanceValue = Number.isFinite(parsedBalance) ? parsedBalance : 0;
- 
-    setSaving(true);
-    try {
-      await apiJson<any>("/accounts/banks", {
-        method: "POST",
-        body: JSON.stringify({
-          BankName: label.toUpperCase(),
-          status: "active",
-          openingBalance: openingBalanceValue,
-          AccountName: "",
-          AccountNumber: "",
-          Interac: "",
-        }),
-      });
-      adminNotify.success("Bank account added.");
-      resetNewBankForm();
-      setShowForm(false);
-      await loadBanks();
-    } catch (err) {
-      adminNotify.error(err instanceof Error ? err.message : "Failed to add bank account.");
-    } finally {
-      setSaving(false);
-    }
-  };
+
+  const handleNewBankSave = handleNewBankFormSubmit(
+    async (values) => {
+      const label = values.label.trim();
+      const parsedBalance = Number(values.balance);
+      const openingBalanceValue = Number.isFinite(parsedBalance) ? parsedBalance : 0;
+
+      setSaving(true);
+      try {
+        await apiJson<any>("/accounts/banks", {
+          method: "POST",
+          body: JSON.stringify({
+            BankName: label.toUpperCase(),
+            status: "active",
+            openingBalance: openingBalanceValue,
+            AccountName: "",
+            AccountNumber: "",
+            Interac: "",
+          }),
+        });
+        adminNotify.success("Bank account added.");
+        resetNewBankForm();
+        setShowForm(false);
+        await loadBanks();
+      } catch (err) {
+        adminNotify.error(err instanceof Error ? err.message : "Failed to add bank account.");
+      } finally {
+        setSaving(false);
+      }
+    },
+    (formErrors) => toastValidationSummary(adminNotify.error, formErrors as never),
+  );
  
   const handleTableUpdate = async () => {
     const changedRows = draft.filter((row) => {
@@ -530,7 +561,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
               <CompactFormFooter
                 message="You are creating a 'Bank / Wallet'"
                 messageCenter
-                onSave={saving ? undefined : handleNewBankSave}
+                onSave={saving ? undefined : () => void handleNewBankSave()}
                 onCancel={saving ? undefined : handleNewBankCancel}
                 actionLabel={saving ? "Saving..." : undefined}
               />
@@ -541,19 +572,19 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
               <CompactField label="Bank / Wallet Name" required className={compactFixedFieldWidth}>
                 <input
                   type="text"
-                  value={bankWalletName}
-                  onChange={(e) => setBankWalletName(e.target.value)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(newBankErrors.label), compactInputClass)}
+                  {...registerNewBank("label")}
                 />
+                <FormFieldError message={newBankErrors.label?.message} />
               </CompactField>
               <CompactField label="Opening Balance" className={compactFixedFieldWidth}>
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={openingBalance}
-                  onChange={(e) => setOpeningBalance(e.target.value)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(newBankErrors.balance), compactInputClass)}
+                  {...registerNewBank("balance")}
                 />
+                <FormFieldError message={newBankErrors.balance?.message} />
               </CompactField>
             </CompactFormRow>
           </CompactFormPanel>
@@ -732,6 +763,7 @@ function LedgerPage({
   const [rows, setRows] = useState<(ExpenseRow | IncomeRow)[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const ledgerSearchFields = useMemo(() => buildLedgerSearchFields(variant), [variant]);
@@ -761,7 +793,53 @@ function LedgerPage({
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [attachAttachment, setAttachAttachment] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
- 
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    setFormErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const ledgerFormSchema = useMemo(
+    () =>
+      z
+        .object({
+          amount: moneyPositive,
+          date: requiredDate("Date"),
+          vendor: requiredTrimmed(vendorLabel),
+          paymentMode: z.string().optional().default(""),
+          bank: z.string().optional().default(""),
+          category: requiredTrimmed("Category"),
+          subcategory: z.string().optional().default(""),
+          byCheque: z.boolean().optional().default(false),
+          chequeAccount: z.string().optional().default(""),
+          gstAmount: optionalMoney,
+        })
+        .superRefine((data, ctx) => {
+          if (isIncome && !data.paymentMode.trim()) {
+            ctx.addIssue({ code: "custom", message: "Payment Mode is required.", path: ["paymentMode"] });
+          }
+          if (isExpense && !data.subcategory.trim()) {
+            ctx.addIssue({ code: "custom", message: "Subcategory is required.", path: ["subcategory"] });
+          }
+          if (isExpense && data.byCheque && !data.chequeAccount.trim()) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Account is required when paying by cheque.",
+              path: ["chequeAccount"],
+            });
+          }
+          if (isIncome && data.paymentMode.trim() === "Bank Transfer" && !data.bank.trim()) {
+            ctx.addIssue({ code: "custom", message: "Bank is required for Bank Transfer.", path: ["bank"] });
+          }
+        }),
+    [isExpense, isIncome, vendorLabel],
+  );
+
   const resetTableControls = () => {
     setPage(1);
     setSelected(new Set());
@@ -1182,7 +1260,7 @@ function LedgerPage({
     setReceiptFile(null);
     setAttachAttachment(false);
     setAttachmentFile(null);
- 
+    setFormErrors({});
   };
  
   const openAdd = () => {
@@ -1253,43 +1331,34 @@ function LedgerPage({
   };
  
   const handleSave = async () => {
-    const parsedAmount = Number.parseFloat(amount);
-    const normalizedVendor = vendor.trim();
-    const normalizedPaymentMode = paymentMode.trim();
- 
-    if (!amount.trim() || !Number.isFinite(parsedAmount)) {
-      adminNotify.error("Amount is required.");
+    if (savingRef.current) return;
+
+    const parsed = ledgerFormSchema.safeParse({
+      amount,
+      date,
+      vendor,
+      paymentMode,
+      bank,
+      category,
+      subcategory,
+      byCheque,
+      chequeAccount,
+      gstAmount,
+    });
+
+    if (!parsed.success) {
+      const fieldErrors = zodIssuesToFieldErrorMap(parsed.error);
+      setFormErrors(fieldErrors);
+      adminNotify.error(parsed.error.issues[0]?.message ?? VALIDATION_SUMMARY);
       return;
     }
-    if (!date) {
-      adminNotify.error("Date is required.");
-      return;
-    }
-    if (!normalizedVendor) {
-      adminNotify.error(`${vendorLabel} is required.`);
-      return;
-    }
-    if (isIncome && !normalizedPaymentMode) {
-      adminNotify.error("Payment Mode is required.");
-      return;
-    }
-    if (!category) {
-      adminNotify.error("Category is required.");
-      return;
-    }
-    if (isExpense && !subcategory) {
-      adminNotify.error("Subcategory is required.");
-      return;
-    }
-    if (isExpense && byCheque && !chequeAccount) {
-      adminNotify.error("Account is required when paying by cheque.");
-      return;
-    }
-    if (isIncome && normalizedPaymentMode === "Bank Transfer" && !bank) {
-      adminNotify.error("Bank is required for Bank Transfer.");
-      return;
-    }
- 
+    setFormErrors({});
+
+    const values = parsed.data;
+    const parsedAmount = Number(values.amount);
+    const normalizedVendor = values.vendor;
+    const normalizedPaymentMode = values.paymentMode;
+
     const combinedCategory = encodeCategory(selectedCategoryLabel, selectedSubcategoryLabel);
  
     const formData = new FormData();
@@ -1311,6 +1380,7 @@ function LedgerPage({
       if (attachAttachment && attachmentFile) formData.set("incomeImage", attachmentFile);
     }
  
+    savingRef.current = true;
     setSaving(true);
     try {
       if (editingId != null) {
@@ -1325,6 +1395,7 @@ function LedgerPage({
     } catch (err) {
       adminNotify.error(err instanceof Error ? err.message : "Failed to save entry.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -1419,9 +1490,18 @@ function LedgerPage({
           <CompactFormPanel
             footer={
               <CompactFormFooter
-                actionLabel={editingId != null ? "Update" : "Save"}
-                onSave={saving ? undefined : handleSave}
-                onCancel={handleCancel}
+                actionLabel={
+                  saving
+                    ? editingId != null
+                      ? "Updating…"
+                      : "Saving…"
+                    : editingId != null
+                      ? "Update"
+                      : "Save"
+                }
+                onSave={() => void handleSave()}
+                onCancel={saving ? undefined : handleCancel}
+                disabled={saving}
               />
             }
       
@@ -1437,9 +1517,13 @@ function LedgerPage({
                     type="text"
                     inputMode="decimal"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className={compactInputClass}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      clearFieldError("amount");
+                    }}
+                    className={fieldErrorClass(Boolean(formErrors.amount), compactInputClass)}
                   />
+                  <FormFieldError message={formErrors.amount} />
                 </CompactField>
                 {isExpense ? (
                   <div className="mt-3">
@@ -1478,9 +1562,13 @@ function LedgerPage({
                   <input
                     type="date"
                     value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className={compactInputClass}
+                    onChange={(e) => {
+                      setDate(e.target.value);
+                      clearFieldError("date");
+                    }}
+                    className={fieldErrorClass(Boolean(formErrors.date), compactInputClass)}
                   />
+                  <FormFieldError message={formErrors.date} />
                 </CompactField>
                 {isExpense ? (
                   <div className="mt-3">
@@ -1512,8 +1600,11 @@ function LedgerPage({
                 <CompactField label="Payment Mode" required className={compactFixedFieldWidth}>
                   <select
                     value={paymentMode}
-                    onChange={(e) => setPaymentMode(e.target.value)}
-                    className={compactInputClass}
+                    onChange={(e) => {
+                      setPaymentMode(e.target.value);
+                      clearFieldError("paymentMode");
+                    }}
+                    className={fieldErrorClass(Boolean(formErrors.paymentMode), compactInputClass)}
                   >
                     <option value="">Select</option>
                     {INCOME_PAYMENT_MODE_OPTIONS.map((opt) => (
@@ -1522,6 +1613,7 @@ function LedgerPage({
                       </option>
                     ))}
                   </select>
+                  <FormFieldError message={formErrors.paymentMode} />
                 </CompactField>
               ) : null}
               {isIncome ? (
@@ -1530,7 +1622,14 @@ function LedgerPage({
                   required={paymentMode === "Bank Transfer"}
                   className={compactFixedFieldWidth}
                 >
-                  <select value={bank} onChange={(e) => setBank(e.target.value)} className={compactInputClass}>
+                  <select
+                    value={bank}
+                    onChange={(e) => {
+                      setBank(e.target.value);
+                      clearFieldError("bank");
+                    }}
+                    className={fieldErrorClass(Boolean(formErrors.bank), compactInputClass)}
+                  >
                     <option value="">Select account</option>
                     {bankOptions.map((opt) => (
                       <option key={opt} value={opt}>
@@ -1538,6 +1637,7 @@ function LedgerPage({
                       </option>
                     ))}
                   </select>
+                  <FormFieldError message={formErrors.bank} />
                 </CompactField>
               ) : null}
               <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
@@ -1545,10 +1645,14 @@ function LedgerPage({
                   label={vendorLabel}
                   required
                   value={vendor}
-                  onChange={setVendor}
+                  onChange={(v) => {
+                    setVendor(v);
+                    clearFieldError("vendor");
+                  }}
                   options={vendorOptions}
                   className="w-full flex-none"
                 />
+                <FormFieldError message={formErrors.vendor} />
                 {isExpense ? (
                   <div className="mt-3">
                     <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
@@ -1567,8 +1671,11 @@ function LedgerPage({
                     {byCheque ? (
                       <select
                         value={chequeAccount}
-                        onChange={(e) => setChequeAccount(e.target.value)}
-                        className={compactInputClass}
+                        onChange={(e) => {
+                          setChequeAccount(e.target.value);
+                          clearFieldError("chequeAccount");
+                        }}
+                        className={fieldErrorClass(Boolean(formErrors.chequeAccount), compactInputClass)}
                       >
                         <option value="">Select account</option>
                         {chequeAccountOptions.map((opt) => (
@@ -1578,32 +1685,45 @@ function LedgerPage({
                         ))}
                       </select>
                     ) : null}
+                    <FormFieldError message={formErrors.chequeAccount} />
                   </div>
                 ) : null}
               </div>
-              <ComboSelectWithEditor
-                label="Category"
-                required
-                value={selectedCategoryLabel}
-                placeholder={isExpense && categoriesLoading ? "Loading categories…" : "Select category"}
-                options={categoryLabels}
-                disabled={isExpense && categoriesLoading}
-                onChange={handleCategoryChange}
-                onEditAddNew={openCategoriesPopup}
-                className={isIncome ? "w-[120px] shrink-0 flex-none sm:w-[140px]" : "min-w-[160px] flex-1"}
-              />
-              {isExpense ? (
+              <div className={isIncome ? "w-[120px] shrink-0 flex-none sm:w-[140px]" : "min-w-[160px] flex-1"}>
                 <ComboSelectWithEditor
-                  label="Subcategory"
+                  label="Category"
                   required
-                  value={selectedSubcategoryLabel}
-                  placeholder="Select or type a subcategory"
-                  options={subcategoryLabels}
-                  disabled={!category}
-                  onChange={handleSubcategoryChange}
-                  onEditAddNew={openSubcategoriesPopup}
-                  className="min-w-[160px] flex-1"
+                  value={selectedCategoryLabel}
+                  placeholder={isExpense && categoriesLoading ? "Loading categories…" : "Select category"}
+                  options={categoryLabels}
+                  disabled={isExpense && categoriesLoading}
+                  onChange={(v) => {
+                    handleCategoryChange(v);
+                    clearFieldError("category");
+                  }}
+                  onEditAddNew={openCategoriesPopup}
+                  className="w-full"
                 />
+                <FormFieldError message={formErrors.category} />
+              </div>
+              {isExpense ? (
+                <div className="min-w-[160px] flex-1">
+                  <ComboSelectWithEditor
+                    label="Subcategory"
+                    required
+                    value={selectedSubcategoryLabel}
+                    placeholder="Select or type a subcategory"
+                    options={subcategoryLabels}
+                    disabled={!category}
+                    onChange={(v) => {
+                      handleSubcategoryChange(v);
+                      clearFieldError("subcategory");
+                    }}
+                    onEditAddNew={openSubcategoriesPopup}
+                    className="w-full"
+                  />
+                  <FormFieldError message={formErrors.subcategory} />
+                </div>
               ) : null}
               {isExpense ? (
                 <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>

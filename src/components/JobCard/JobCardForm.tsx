@@ -49,6 +49,8 @@ import {
   pickJobCardNoForApi,
   type JobCardListRow,
 } from "../../lib/shopOwnerJobCards";
+import { jobCardFormSchema } from "../../lib/validation/schemas/jobCard";
+import { FormFieldError, fieldErrorClass, VALIDATION_SUMMARY } from "../../lib/validation/formUi";
 
 const formCellInputClass = shopCompactInputClass;
 
@@ -70,12 +72,13 @@ const DEFAULT_FORM = {
 const JOB_CARD_TABLE = adminPanelTableClasses(true);
 const JOB_CARD_TABLE_HEAD_TH_CLASS = `${JOB_CARD_TABLE.th} h-9 py-0 align-middle`;
 const JOB_CARD_TABLE_BODY_TD_CLASS = `${JOB_CARD_TABLE.td} h-9 py-0 align-middle`;
-const JOB_CARD_CATEGORY_COL_CLASS = "w-[30%]";
-const JOB_CARD_DESCRIPTION_NO_ODO_COL_CLASS = "w-[45%]";
-const JOB_CARD_DESCRIPTION_WITH_ODO_COL_CLASS = "w-[35%]";
+const JOB_CARD_CATEGORY_COL_CLASS = "w-[28%]";
+const JOB_CARD_DESCRIPTION_NO_ODO_COL_CLASS = "w-[37%]";
+const JOB_CARD_DESCRIPTION_WITH_ODO_COL_CLASS = "w-[27%]";
 const JOB_CARD_ODO_COL_CLASS = "w-[10%]";
 const JOB_CARD_UNIT_COST_COL_CLASS = "w-[10%]";
 const JOB_CARD_QTY_COL_CLASS = "w-[5%]";
+const JOB_CARD_LABOUR_COL_CLASS = "w-[10%]";
 const JOB_CARD_AMOUNT_COL_CLASS = "w-[10%] text-right";
 const JOB_CARD_TOTALS_CARD_WIDTH_CLASS = "w-full min-w-[15rem] lg:w-[18rem]";
 const JOB_CARD_NUM_INPUT_CLASS = `${formCellInputClass} w-full min-w-0 px-1`;
@@ -636,6 +639,12 @@ export default function JobCardForm({
   const [formLoading, setFormLoading] = useState(false);
   const [editPrefillLoading, setEditPrefillLoading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    customerId?: string;
+    vehicleId?: string;
+    services?: string;
+    odoOut?: string;
+  }>({});
   const [form, setForm] = useState({ ...DEFAULT_FORM });
   const [editId, setEditId] = useState<string | null>(null);
   const [displayJobNo, setDisplayJobNo] = useState("");
@@ -800,6 +809,7 @@ export default function JobCardForm({
     setPhoneActiveIndex(0);
     setEditPrefillLoading(false);
     setSaveError(null);
+    setFieldErrors({});
     lineIdRef.current = 1;
     setServiceLines([emptyTableLine(mkLineId())]);
     setVehiclePhotoFiles([]);
@@ -1090,34 +1100,58 @@ export default function JobCardForm({
       vehicleCategories.length > 0 ? vehicleCategories : allCategories;
     const linesToSave = collectLinesForSave(serviceLines);
     const services = serviceLinesToBlocks(linesToSave, categories, serviceDeals);
-    if (!form.customerId) {
-      setSaveError(
-        customerPhone.length === 10
-          ? "No customer found for this phone number."
-          : "Enter the customer's 10-digit phone number.",
-      );
-      setFormLoading(false);
-      return;
+    const dueOdometerReading = resolveDueOdometerReading(linesToSave, categories);
+
+    const parseResult = jobCardFormSchema.safeParse({
+      customerId: form.customerId,
+      vehicleId: form.vehicleId,
+      odoIn: form.odometerReading,
+      odoOut: dueOdometerReading,
+      discount: form.discount,
+      services,
+    });
+
+    const nextFieldErrors: typeof fieldErrors = {};
+    if (!parseResult.success) {
+      for (const issue of parseResult.error.issues) {
+        const key = issue.path[0];
+        if (key === "customerId") {
+          nextFieldErrors.customerId =
+            customerPhone.length === 10
+              ? "No customer found for this phone number."
+              : "Enter the customer's 10-digit phone number.";
+        } else if (key === "vehicleId") {
+          nextFieldErrors.vehicleId = "Select a vehicle for this customer.";
+        } else if (key === "services") {
+          nextFieldErrors.services = "Add at least one line item with a service.";
+        } else if (key === "odoOut") {
+          nextFieldErrors.odoOut = issue.message;
+        }
+      }
     }
-    if (!form.vehicleId) {
-      setSaveError("Select a vehicle for this customer.");
-      setFormLoading(false);
-      return;
-    }
-    if (services.length === 0) {
-      setSaveError("Add at least one line item with a service.");
-      setFormLoading(false);
-      return;
-    }
+
     const missingOdoOut = linesToSave.some(
       (line) =>
         lineRequiresOdoOut(line, categories) && parseNumberFromText(line.odoOutStr) <= 0,
     );
     if (missingOdoOut) {
-      setSaveError("Enter odometer out reading for all services that require it.");
+      nextFieldErrors.odoOut = "Enter odometer out reading for all services that require it.";
+    }
+
+    setFieldErrors(nextFieldErrors);
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      const message =
+        nextFieldErrors.customerId ||
+        nextFieldErrors.vehicleId ||
+        nextFieldErrors.services ||
+        nextFieldErrors.odoOut ||
+        VALIDATION_SUMMARY;
+      setSaveError(message);
       setFormLoading(false);
       return;
     }
+    setSaveError(null);
     try {
       const tech = buildLabourTechnicalRemarks(
         form.labourCharge,
@@ -1133,7 +1167,7 @@ export default function JobCardForm({
         sendForApproval: formMode !== "edit",
         form: {
           ...form,
-          dueOdometerReading: resolveDueOdometerReading(linesToSave, categories),
+          dueOdometerReading,
           additionalNotes: termsNotes.trim(),
           services,
           labourCharge: form.labourCharge || "0",
@@ -1331,7 +1365,7 @@ export default function JobCardForm({
                       aria-expanded={phoneLookupOpen && suggestionCustomers.length > 0}
                       aria-controls="job-card-customer-phone-listbox"
                       aria-autocomplete="list"
-                      className={`${META_VALUE_CLASS} w-full`}
+                      className={fieldErrorClass(Boolean(fieldErrors.customerId), `${META_VALUE_CLASS} w-full`)}
                     />
 
                     {phoneLookupOpen && suggestionCustomers.length > 0 && formMode === "add" ? (
@@ -1417,6 +1451,11 @@ export default function JobCardForm({
                         Focus this field for recent customers, or type a phone number to search.
                       </p>
                     </>
+                  ) : fieldErrors.customerId ? (
+                    <>
+                      <span aria-hidden />
+                      <FormFieldError message={fieldErrors.customerId} />
+                    </>
                   ) : null}
 
                   {showVehiclePicker ? (
@@ -1438,7 +1477,7 @@ export default function JobCardForm({
                             setServiceLines([emptyTableLine(mkLineId())]);
                           }
                         }}
-                        className={META_VALUE_CLASS}
+                        className={fieldErrorClass(Boolean(fieldErrors.vehicleId), META_VALUE_CLASS)}
                         aria-label="Vehicle"
                       >
                         <option value="">Select vehicle</option>
@@ -1449,6 +1488,8 @@ export default function JobCardForm({
                           </option>
                         ))}
                       </select>
+                      <span aria-hidden />
+                      <FormFieldError message={fieldErrors.vehicleId} />
                     </>
                   ) : null}
                 </div>
@@ -1508,6 +1549,9 @@ export default function JobCardForm({
                       <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_QTY_COL_CLASS} text-center`}>
                         Qty
                       </th>
+                      <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_LABOUR_COL_CLASS} text-right`}>
+                        Labour
+                      </th>
                       <th className={`${JOB_CARD_TABLE_HEAD_TH_CLASS} ${JOB_CARD_AMOUNT_COL_CLASS} pr-2`}>
                         Amount
                       </th>
@@ -1517,7 +1561,7 @@ export default function JobCardForm({
                     {categoriesWithSubs.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={showOdoColumn ? 6 : 5}
+                          colSpan={showOdoColumn ? 7 : 6}
                           className={`${JOB_CARD_TABLE_BODY_TD_CLASS} py-4 text-center text-gray-600`}
                         >
                           {!form.vehicleId
@@ -1616,6 +1660,19 @@ export default function JobCardForm({
                                 className={JOB_CARD_QTY_INPUT_CLASS}
                               />
                             </td>
+                            <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} ${JOB_CARD_LABOUR_COL_CLASS} text-right`}>
+                              <input
+                                value={line.labourCostStr}
+                                disabled={formLoading || !line.subKey}
+                                onChange={(e) =>
+                                  updateServiceLine(line.id, { labourCostStr: e.target.value })
+                                }
+                                inputMode="decimal"
+                                placeholder="0"
+                                aria-label="Labour"
+                                className={`${JOB_CARD_NUM_INPUT_CLASS} text-right`}
+                              />
+                            </td>
                             <td className={`${JOB_CARD_TABLE_BODY_TD_CLASS} relative ${JOB_CARD_AMOUNT_COL_CLASS} pr-2`}>
                               <input
                                 readOnly
@@ -1651,6 +1708,8 @@ export default function JobCardForm({
                 <FiPlus size={13} aria-hidden />
                 Add Line
               </button>
+              <FormFieldError message={fieldErrors.services} />
+              <FormFieldError message={fieldErrors.odoOut} />
             </div>
 
             <div className="mt-4 flex justify-end border-t border-gray-300 pt-4">

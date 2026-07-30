@@ -9,6 +9,7 @@ import type {
 export type CarOwnerFaqItem = {
   question: string;
   answer: string;
+  pageSlug?: string;
 };
 
 function withQuery(path: string, query: Record<string, string | undefined>) {
@@ -55,9 +56,15 @@ export function fetchCarOwnerHome(authToken: string) {
   return getJson<CarOwnerDashboardApiResponse>("/api/carowner/home", { authToken });
 }
 
-/** GET /api/carowner/common/faq?role=carowner */
-export function fetchCarOwnerFaqs(authToken: string, role = "carowner") {
-  return getJson<unknown>(withQuery("/api/carowner/common/faq", { role }), { authToken });
+/** GET /api/carowner/common/faq?role=car_owner|shop_owner&pageSlug=… */
+export function fetchCarOwnerFaqs(
+  authToken: string,
+  role = "car_owner",
+  pageSlug?: string
+) {
+  return getJson<unknown>(withQuery("/api/carowner/common/faq", { role, pageSlug }), {
+    authToken,
+  });
 }
 
 /** GET /api/carowner/common/privacy-and-disclaimer */
@@ -96,12 +103,24 @@ export function parseCarOwnerFaqItems(payload: unknown): CarOwnerFaqItem[] {
     const question = asString(obj.question ?? obj.heading ?? obj.title);
     const answer = asString(obj.answer ?? obj.desc ?? obj.description ?? obj.body);
     if (!question && !answer) continue;
+    const pageSlug = asString(obj.pageSlug ?? obj.page_slug ?? obj.slug);
     out.push({
       question: question || "Question",
       answer: answer || "—",
+      ...(pageSlug ? { pageSlug } : {}),
     });
   }
   return out;
+}
+
+/** Keep only FAQs tagged for the current page/section. */
+export function filterFaqsByPageSlug(
+  items: CarOwnerFaqItem[],
+  pageSlug?: string
+): CarOwnerFaqItem[] {
+  if (!pageSlug?.trim()) return items;
+  const wanted = pageSlug.trim();
+  return items.filter((item) => item.pageSlug?.trim() === wanted);
 }
 
 export function parseCarOwnerPrivacy(payload: unknown): {

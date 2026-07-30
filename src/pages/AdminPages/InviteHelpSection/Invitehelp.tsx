@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "react-router";
 import { FiPaperclip, FiVolume2, FiLoader } from "react-icons/fi";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
@@ -26,6 +28,8 @@ import {
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { FormFieldError, toastValidationSummary } from "../../../lib/validation/formUi";
+import { inviteHelpSchema, type InviteHelpValues } from "../../../lib/validation/schemas/cms";
 
 const API_ROOT = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api/admin`
@@ -285,9 +289,19 @@ export default function Invitehelp({
   const [page, setPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
 
-  const [notifDate, setNotifDate] = useState("");
-  const [notifTitle, setNotifTitle] = useState("");
-  const [notifNote, setNotifNote] = useState("");
+  const {
+    register,
+    watch,
+    setValue,
+    handleSubmit,
+    reset,
+    formState: { errors: fieldErrors },
+  } = useForm<InviteHelpValues>({
+    resolver: zodResolver(inviteHelpSchema),
+    mode: "onSubmit",
+    defaultValues: { date: "", title: "", note: "" },
+  });
+  const notifNote = watch("note");
   const [attachImage, setAttachImage] = useState(false);
   const [notifImage, setNotifImage] = useState<File | null>(null);
   const [userType, setUserType] = useState<UserType>("carOwner");
@@ -540,9 +554,7 @@ export default function Invitehelp({
   };
 
   const resetForm = () => {
-    setNotifDate("");
-    setNotifTitle("");
-    setNotifNote("");
+    reset({ date: "", title: "", note: "" });
     setAttachImage(false);
     setNotifImage(null);
     setUserType("carOwner");
@@ -575,21 +587,15 @@ export default function Invitehelp({
     setShowForm(false);
   };
 
-  const handleSave = () => {
+  const onValidSave = (values: InviteHelpValues) => {
     if (section === "sent") {
-      if (!notifDate.trim() || !notifTitle.trim() || !notifNote.trim()) {
-        const msg = "Date, title, and note are required.";
-        setError(msg);
-        adminNotify.error(msg);
-        return;
-      }
       setError("");
       const userScope: UserScope = selectedUser ? "particular" : "all";
       const entry: SentNotification = {
         _id: `sent-${Date.now()}`,
-        date: notifDate.trim(),
-        title: notifTitle.trim(),
-        note: notifNote.trim(),
+        date: values.date.trim(),
+        title: values.title.trim(),
+        note: values.note.trim(),
         imageUrl: attachImage && notifImage ? URL.createObjectURL(notifImage) : null,
         userType,
         userScope,
@@ -601,6 +607,12 @@ export default function Invitehelp({
     resetForm();
     setShowForm(false);
   };
+
+  const onInvalidSave = (formErrors: typeof fieldErrors) => {
+    toastValidationSummary(adminNotify.error, formErrors);
+  };
+
+  const handleSave = () => void handleSubmit(onValidSave, onInvalidSave)();
 
   const handleStatusChange = async (id: string, status: "resolved" | "unresolved") => {
     setLoading(true);
@@ -636,10 +648,10 @@ export default function Invitehelp({
           <CompactField label="Date" required className={compactFixedFieldWidth}>
             <input
               type="date"
-              value={notifDate}
-              onChange={(e) => setNotifDate(e.target.value)}
+              {...register("date")}
               className={compactInputClass}
             />
+            <FormFieldError message={fieldErrors.date?.message} />
           </CompactField>
           <CompactField label="User Type" required className={compactFixedFieldWidth}>
             <select
@@ -675,16 +687,17 @@ export default function Invitehelp({
           <CompactField label="Title" required className={compactFixedFieldWidth}>
             <input
               type="text"
-              value={notifTitle}
-              onChange={(e) => setNotifTitle(e.target.value)}
+              {...register("title")}
               className={compactInputClass}
             />
+            <FormFieldError message={fieldErrors.title?.message} />
           </CompactField>
           <CompactField label="Note" required className="min-w-0 flex-1">
             <CompactAutoGrowTextarea
               value={notifNote}
-              onChange={(e) => setNotifNote(e.target.value)}
+              onChange={(e) => setValue("note", e.target.value, { shouldValidate: false })}
             />
+            <FormFieldError message={fieldErrors.note?.message} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow className="items-start justify-start">

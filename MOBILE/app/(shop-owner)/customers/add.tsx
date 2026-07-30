@@ -13,7 +13,6 @@ import {
   buildOnboardedVehicleBody,
   editOnboardedCustomer,
   onboardCustomer,
-  searchCustomers,
 } from "@/lib/autoshopowner-api";
 import {
   pickCustomerVehicleApiId,
@@ -112,68 +111,6 @@ async function pickImageFromLibrary(): Promise<PickedImage | null | "denied"> {
   return { uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName };
 }
 
-function pickId(obj: Record<string, unknown>): string | null {
-  const candidates = [obj.carOwnerId, obj._id, obj.id];
-  for (const value of candidates) {
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-  }
-  return null;
-}
-
-function extractCarOwnerIdFromPayload(payload: unknown): string | null {
-  if (!payload || typeof payload !== "object") {
-    return null;
-  }
-  const root = payload as Record<string, unknown>;
-  const direct = pickId(root);
-  if (direct) {
-    return direct;
-  }
-  const data = root.data;
-  if (data && typeof data === "object") {
-    const d = data as Record<string, unknown>;
-    const nestedDirect = pickId(d);
-    if (nestedDirect) {
-      return nestedDirect;
-    }
-    const nestedOwner = d.carOwner;
-    if (nestedOwner && typeof nestedOwner === "object") {
-      const ownerId = pickId(nestedOwner as Record<string, unknown>);
-      if (ownerId) {
-        return ownerId;
-      }
-    }
-  }
-  return null;
-}
-
-function extractList(payload: unknown): unknown[] {
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-  if (!payload || typeof payload !== "object") {
-    return [];
-  }
-  const root = payload as Record<string, unknown>;
-  const candidates = [root.data, root.customers, root.carOwners, root.results];
-  for (const c of candidates) {
-    if (Array.isArray(c)) {
-      return c;
-    }
-    if (c && typeof c === "object") {
-      const nested = c as Record<string, unknown>;
-      for (const key of ["customers", "carOwners", "results", "items", "rows", "list", "data"]) {
-        if (Array.isArray(nested[key])) {
-          return nested[key] as unknown[];
-        }
-      }
-    }
-  }
-  return [];
-}
-
 function Field({
   label,
   placeholder,
@@ -261,10 +198,12 @@ export default function AddCustomerPage() {
   const [profileImage, setProfileImage] = useState<PickedImage | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [attemptedSave, setAttemptedSave] = useState(false);
+  const isAddMode = mode === "add";
   const isProfileOnlyEdit = isEditMode && editVehicleListSlot === null && !isAppendingVehicle;
   const isVehicleOnlyForm =
     isEditMode && !isViewMode && (editVehicleListSlot !== null || isAppendingVehicle);
-  const showVehicleSection = !isProfileOnlyEdit;
+  /** Create matches web People: profile only. Vehicles are added later from the customer list. */
+  const showVehicleSection = isEditMode && !isProfileOnlyEdit;
   const carCompanyCatalog = useCarCompanyCatalog(token, showVehicleSection && !isViewMode);
 
   const resetForm = () => {
@@ -427,11 +366,12 @@ export default function AddCustomerPage() {
       return;
     }
     const pinDigits = normalizePostalCodeForStorage(pincode);
-    if (!vehicleOnlySave && pincode.trim() && !isValidCanadianPostalCode(pincode)) {
+    // Create (People): only name/phone/city/email — skip address/postal extras.
+    if (!isAddMode && !vehicleOnlySave && pincode.trim() && !isValidCanadianPostalCode(pincode)) {
       showToast(POSTAL_CODE_ERROR_MESSAGE, { type: "error" });
       return;
     }
-    if (!vehicleOnlySave && address.trim().length > 50) {
+    if (!isAddMode && !vehicleOnlySave && address.trim().length > 50) {
       showToast("Address must be at most 50 characters.", { type: "error" });
       return;
     }
@@ -441,12 +381,13 @@ export default function AddCustomerPage() {
       email: email.trim(),
       countryCode: defaultDialCallingCode(),
       phone: phoneDigits,
-      pincode: pinDigits,
-      address: address.trim().slice(0, 50),
+      pincode: isAddMode ? "" : pinDigits,
+      address: isAddMode ? "" : address.trim().slice(0, 50),
       ...optionalCityField(selectedCity?.name),
     };
     let filledVehicles: UpdateMyCustomerPayload["vehicles"] = [];
-    if (!isProfileOnlyEdit) {
+    // Create has no vehicles (web People onboard sends vehicles: []).
+    if (!isAddMode && !isProfileOnlyEdit) {
       const vehicleRows: FormVehicle[] =
         isEditMode && isAppendingVehicle
           ? [{ ...(vehicles[0] ?? emptyVehicle()), isNew: true }]
@@ -524,45 +465,6 @@ export default function AddCustomerPage() {
           phone: phoneDigits,
           city: selectedCity!.name.trim(),
         });
-        if (res.ok && filledVehicles.length > 0) {
-          const newId =
-            extractCarOwnerIdFromPayload(res.data) ??
-            (await (async () => {
-              const lookup = await searchCustomers(token, phoneDigits);
-              if (!lookup.ok) return null;
-              const list = extractList(lookup.data);
-              const match = list.find((item) => {
-                if (!item || typeof item !== "object") return false;
-                const o = item as Record<string, unknown>;
-                return typeof o.phone === "string" && o.phone.replace(/\D/g, "") === phoneDigits;
-              });
-              return match && typeof match === "object"
-                ? pickId(match as Record<string, unknown>)
-                : null;
-            })());
-          if (newId) {
-            for (const vehicle of filledVehicles) {
-              const carCompanyId = await resolveCarCompanyId(vehicle.vehicleName);
-              if (!carCompanyId) {
-                showToast("Please select a make from the list for each vehicle.", { type: "error" });
-                return;
-              }
-              await addVehicleToOnboardedCustomer(
-                token,
-                newId,
-                buildOnboardedVehicleBody({
-                  carCompanyId,
-                  make: vehicle.vehicleName,
-                  model: vehicle.model,
-                  year: vehicle.year,
-                  licensePlateNo: vehicle.licensePlateNo,
-                  vinNo: vehicle.vinNo,
-                  odometerReading: vehicle.odometerReading,
-                })
-              );
-            }
-          }
-        }
       }
       const msg =
         res.data && typeof res.data === "object" && "message" in res.data
@@ -700,31 +602,21 @@ export default function AddCustomerPage() {
           <>
             {!isVehicleOnlyForm ? (
               <>
-                <Text style={styles.sectionTitle}>Personal Information</Text>
+                <Text style={styles.sectionTitle}>
+                  {isAddMode ? "New Customer" : "Personal Information"}
+                </Text>
                 <View style={[styles.card, shadows.soft]}>
                   <Field
-                    label="Full Name *"
-                    placeholder="Enter full name"
+                    label="Name *"
+                    placeholder="Enter name"
                     icon="person-outline"
                     value={name}
                     onChangeText={(t) => setName(t.slice(0, 20))}
                     maxLength={20}
                     errorText={attemptedSave && !name.trim() ? "Name is required." : null}
                   />
-                  <Field
-                    label="Email Address"
-                    placeholder="Enter email address (optional)"
-                    icon="mail-outline"
-                    value={email}
-                    onChangeText={(t) => setEmail(t.slice(0, 80))}
-                    keyboardType="email-address"
-                    maxLength={80}
-                    errorText={
-                      email.trim() && !isValidEmail(email) ? "Enter a valid email address." : null
-                    }
-                  />
 
-                  <Text style={styles.fieldLabel}>Phone Number *</Text>
+                  <Text style={styles.fieldLabel}>Phone *</Text>
                   <View style={styles.phoneInput}>
                     <Ionicons name="call-outline" size={18} color="#70A8CF" />
                     <TextInput
@@ -741,20 +633,6 @@ export default function AddCustomerPage() {
                     <Text style={styles.errorText}>Phone number must be 10 digits.</Text>
                   ) : null}
 
-                  <Field
-                    label="Zip Code"
-                    placeholder="A1A 1A1 (optional)"
-                    icon="location-outline"
-                    value={pincode}
-                    onChangeText={(t) => setPincode(formatPincodeDisplay(t))}
-                    autoCapitalize="characters"
-                    maxLength={PINCODE_DISPLAY_MAX_LENGTH}
-                    errorText={
-                      attemptedSave && hasCanadianPostalCodeValidationError(pincode)
-                        ? POSTAL_CODE_ERROR_MESSAGE
-                        : null
-                    }
-                  />
                   <View style={styles.fieldWrap}>
                     <Text style={styles.fieldLabel}>City *</Text>
                     <Pressable
@@ -774,38 +652,72 @@ export default function AddCustomerPage() {
                       <Text style={styles.errorText}>City is required.</Text>
                     ) : null}
                   </View>
-                  <View style={styles.fieldWrap}>
-                    <Text style={styles.fieldLabel}>Role</Text>
-                    <View style={styles.inputWrap}>
-                      <Ionicons name="layers-outline" size={18} color="#70A8CF" />
-                      <Text style={styles.roleFixed}>carowner</Text>
-                    </View>
-                  </View>
+
                   <Field
-                    label="Address"
-                    placeholder="Enter full address"
-                    icon="home-outline"
-                    multiline
-                    value={address}
-                    onChangeText={(t) => setAddress(t.slice(0, 50))}
-                    maxLength={50}
-                    errorText={address.trim().length > 50 ? "Address must be at most 50 characters." : null}
+                    label="Email"
+                    placeholder="Enter email (optional)"
+                    icon="mail-outline"
+                    value={email}
+                    onChangeText={(t) => setEmail(t.slice(0, 80))}
+                    keyboardType="email-address"
+                    maxLength={80}
+                    errorText={
+                      email.trim() && !isValidEmail(email) ? "Enter a valid email address." : null
+                    }
                   />
-                  <AddVehicleImageButton
-                    title="Profile photo"
-                    image={profileImage}
-                    onPress={() => {
-                      void (async () => {
-                        const picked = await pickImageFromLibrary();
-                        if (picked === "denied") {
-                          showToast("Photo library permission is required.", { type: "error" });
-                          return;
+
+                  {!isAddMode ? (
+                    <>
+                      <Field
+                        label="Zip Code"
+                        placeholder="A1A 1A1 (optional)"
+                        icon="location-outline"
+                        value={pincode}
+                        onChangeText={(t) => setPincode(formatPincodeDisplay(t))}
+                        autoCapitalize="characters"
+                        maxLength={PINCODE_DISPLAY_MAX_LENGTH}
+                        errorText={
+                          attemptedSave && hasCanadianPostalCodeValidationError(pincode)
+                            ? POSTAL_CODE_ERROR_MESSAGE
+                            : null
                         }
-                        if (picked) setProfileImage(picked);
-                      })();
-                    }}
-                    onRemove={() => setProfileImage(null)}
-                  />
+                      />
+                      <View style={styles.fieldWrap}>
+                        <Text style={styles.fieldLabel}>Role</Text>
+                        <View style={styles.inputWrap}>
+                          <Ionicons name="layers-outline" size={18} color="#70A8CF" />
+                          <Text style={styles.roleFixed}>carowner</Text>
+                        </View>
+                      </View>
+                      <Field
+                        label="Address"
+                        placeholder="Enter full address"
+                        icon="home-outline"
+                        multiline
+                        value={address}
+                        onChangeText={(t) => setAddress(t.slice(0, 50))}
+                        maxLength={50}
+                        errorText={
+                          address.trim().length > 50 ? "Address must be at most 50 characters." : null
+                        }
+                      />
+                      <AddVehicleImageButton
+                        title="Profile photo"
+                        image={profileImage}
+                        onPress={() => {
+                          void (async () => {
+                            const picked = await pickImageFromLibrary();
+                            if (picked === "denied") {
+                              showToast("Photo library permission is required.", { type: "error" });
+                              return;
+                            }
+                            if (picked) setProfileImage(picked);
+                          })();
+                        }}
+                        onRemove={() => setProfileImage(null)}
+                      />
+                    </>
+                  ) : null}
                 </View>
               </>
             ) : null}

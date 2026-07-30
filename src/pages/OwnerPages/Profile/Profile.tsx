@@ -7,8 +7,8 @@ import { useAuth } from "../../../auth";
 import { useCarOwnerProfile } from "../../../hooks/useCarOwnerProfile";
 import { parseCitiesApiResponse, type UserCity } from "../../../lib/carOwnerCities";
 import { DUMMY_OWNER_PROFILE } from "../../../lib/dummyOwnerHomeProfile";
+import { FormFieldError, fieldErrorClass } from "../../../lib/validation/formUi";
 
-const fieldErrorClass = "mt-1 text-[11px] font-medium text-rose-600";
 const labelClass = "mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500";
 const inputClass =
   "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50 disabled:opacity-70";
@@ -99,13 +99,6 @@ export default function OwnerProfilePage() {
     editEmail || display.email || (usingDummy ? DUMMY_OWNER_PROFILE.email : "No email");
   const previewAddress =
     editAddress || display.address || (usingDummy ? DUMMY_OWNER_PROFILE.address : "No address");
-  const initials =
-    previewName
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase() ?? "")
-      .join("") || "?";
 
   return (
     <OwnerPageShell
@@ -151,8 +144,8 @@ export default function OwnerProfilePage() {
                       className="size-24 rounded-2xl object-cover ring-4 ring-white shadow-md"
                     />
                   ) : (
-                    <div className="flex size-24 items-center justify-center rounded-2xl bg-sky-100 text-2xl font-bold text-sky-800 ring-4 ring-white shadow-md">
-                      {initials}
+                    <div className="flex size-24 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 ring-4 ring-white shadow-md">
+                      <FiUser size={40} strokeWidth={1.5} aria-hidden />
                     </div>
                   )}
                   <button
@@ -219,9 +212,9 @@ export default function OwnerProfilePage() {
                     maxLength={profileNameMaxLength}
                     placeholder={usingDummy ? DUMMY_OWNER_PROFILE.name : "Your name"}
                     disabled={saving}
-                    className={inputClass}
+                    className={fieldErrorClass(!!fieldErrors.name, inputClass)}
                   />
-                  {fieldErrors.name ? <p className={fieldErrorClass}>{fieldErrors.name}</p> : null}
+                  <FormFieldError message={fieldErrors.name} />
                 </label>
 
                 <label className="block">
@@ -236,9 +229,9 @@ export default function OwnerProfilePage() {
                     placeholder={usingDummy ? DUMMY_OWNER_PROFILE.phone : "781 708 9765"}
                     maxLength={12}
                     disabled={saving}
-                    className={inputClass}
+                    className={fieldErrorClass(!!fieldErrors.phone, inputClass)}
                   />
-                  {fieldErrors.phone ? <p className={fieldErrorClass}>{fieldErrors.phone}</p> : null}
+                  <FormFieldError message={fieldErrors.phone} />
                 </label>
 
                 <label className="block">
@@ -252,9 +245,9 @@ export default function OwnerProfilePage() {
                     }}
                     placeholder={usingDummy ? DUMMY_OWNER_PROFILE.email : "you@example.com"}
                     disabled={saving}
-                    className={inputClass}
+                    className={fieldErrorClass(!!fieldErrors.email, inputClass)}
                   />
-                  {fieldErrors.email ? <p className={fieldErrorClass}>{fieldErrors.email}</p> : null}
+                  <FormFieldError message={fieldErrors.email} />
                 </label>
 
                 <label className="block">
@@ -291,11 +284,9 @@ export default function OwnerProfilePage() {
                     maxLength={profileAddressMaxLength}
                     placeholder={usingDummy ? DUMMY_OWNER_PROFILE.address : "Street address"}
                     disabled={saving}
-                    className={inputClass}
+                    className={fieldErrorClass(!!fieldErrors.address, inputClass)}
                   />
-                  {fieldErrors.address ? (
-                    <p className={fieldErrorClass}>{fieldErrors.address}</p>
-                  ) : null}
+                  <FormFieldError message={fieldErrors.address} />
                 </label>
 
                 <label className="block">
@@ -310,11 +301,9 @@ export default function OwnerProfilePage() {
                     maxLength={pincodeDisplayMaxLength}
                     placeholder={usingDummy ? DUMMY_OWNER_PROFILE.pincode : "A1A 1A1"}
                     disabled={saving}
-                    className={inputClass}
+                    className={fieldErrorClass(!!fieldErrors.pincode, inputClass)}
                   />
-                  {fieldErrors.pincode ? (
-                    <p className={fieldErrorClass}>{fieldErrors.pincode}</p>
-                  ) : null}
+                  <FormFieldError message={fieldErrors.pincode} />
                 </label>
               </div>
 

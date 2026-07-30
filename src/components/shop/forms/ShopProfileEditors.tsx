@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router";
-import { FiPaperclip, FiTrash2 } from "react-icons/fi";
+import { FiPaperclip, FiTrash2, FiUser } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson } from "../../../api/mobileAuth";
 import {
@@ -33,6 +33,8 @@ import {
 } from "../shopLayoutStyles";
 import { useAuth } from "../../../auth";
 import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
+import { FormFieldError, fieldErrorClass, zodIssuesToFieldErrorMap } from "../../../lib/validation/formUi";
+import { shopBusinessProfileSchema, shopPersonalProfileSchema } from "../../../lib/validation/schemas/deal";
 import {
   fetchOpenHours,
   updateBusinessProfile,
@@ -76,6 +78,10 @@ import { getCarBrandId, getCarBrandName } from "../../../lib/dummyCarBrands";
 import { getServiceId, getServiceName } from "../../../lib/dummyServices";
 import { parseCitiesApiResponse } from "../../../lib/carOwnerCities";
 import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
+import {
+  hasEstablishedBusinessProfile,
+  hasEstablishedPersonalProfile,
+} from "../../../lib/shopProfileCompleteness";
 import { shopSaveButtonClass } from "./ShopFormPage";
 import { ShopReveal } from "../ShopAnimated";
 import { ShopLoadingPanel } from "../ShopPanels";
@@ -166,35 +172,35 @@ function ProfileImageUploadField({
   return (
     <>
       <div className="flex flex-col items-start gap-2">
+        <p className="text-xs font-bold text-ad-green-dark">{label}</p>
         {hasImage ? (
-          <>
-            <p className="text-xs font-bold text-ad-green-dark">{label}</p>
-            <button
-              type="button"
-              onClick={() => setPreviewOpen(true)}
-              disabled={saving}
-              className="h-14 w-14 overflow-hidden rounded border border-gray-300 bg-gray-100 hover:opacity-90 disabled:opacity-60"
-              title={`View ${previewTitle}`}
-              aria-label={`View ${previewTitle}`}
-            >
-              <img src={imageUrl!} alt={label} className="h-full w-full object-cover" />
-            </button>
-            <button
-              type="button"
-              onClick={onChooseClick}
-              disabled={saving}
-              className="text-xs font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
-            >
-              Change image
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
-            />
-          </>
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            disabled={saving}
+            className="flex h-14 w-14 items-center justify-center overflow-hidden rounded border border-gray-300 bg-gray-100 hover:opacity-90 disabled:opacity-60"
+            title={`View ${previewTitle}`}
+            aria-label={`View ${previewTitle}`}
+          >
+            <img src={imageUrl!} alt={label} className="h-full w-full object-cover" />
+          </button>
+        ) : (
+          <div
+            className="flex h-14 w-14 items-center justify-center overflow-hidden rounded border border-gray-300 bg-gray-100 text-gray-400"
+            aria-label={`No ${previewTitle.toLowerCase()}`}
+          >
+            <FiUser size={28} strokeWidth={1.5} aria-hidden />
+          </div>
+        )}
+        {hasImage ? (
+          <button
+            type="button"
+            onClick={onChooseClick}
+            disabled={saving}
+            className="text-xs font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-60"
+          >
+            Change image
+          </button>
         ) : (
           <>
             <div className="inline-flex items-center gap-2">
@@ -207,7 +213,7 @@ function ProfileImageUploadField({
                 className="h-3.5 w-3.5 accent-ad-green"
               />
               <label htmlFor={id} className="text-xs font-bold text-ad-green-dark">
-                {label}
+                Add image
               </label>
             </div>
             {showUploadImage ? (
@@ -220,15 +226,15 @@ function ProfileImageUploadField({
                 Choose image
               </button>
             ) : null}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
-            />
           </>
         )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+        />
       </div>
       {imageUrl ? (
         <ProfileImagePreviewModal
@@ -256,27 +262,6 @@ function ProfileStatusFooter({
       </div>
       <div className="flex items-center gap-2">{actions}</div>
     </div>
-  );
-}
-
-function hasEstablishedPersonalProfile(user?: ShopProfileUser, city?: string): boolean {
-  const phone = phoneDigits(user?.phone ?? "");
-  return Boolean(
-    user?.name?.trim() &&
-      user?.email?.trim() &&
-      phone.length >= 10 &&
-      (city?.trim() || user?.city?.trim())
-  );
-}
-
-function hasEstablishedBusinessProfile(business?: ShopProfileBusiness, zipCode?: string): boolean {
-  const phone = phoneDigits(business?.businessPhone ?? "");
-  return Boolean(
-    business?.businessName?.trim() &&
-    business?.address?.trim() &&
-    business?.city?.trim() &&
-    phone.length >= 10 &&
-    (zipCode?.trim() || business?.email?.trim())
   );
 }
 
@@ -335,7 +320,7 @@ export function ShopPersonalProfileEditor({
   city?: string;
   onSaved: () => void;
 }) {
-  const { token, session } = useAuth();
+  const { token, session, login } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
@@ -347,6 +332,7 @@ export function ShopPersonalProfileEditor({
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedOnce, setSavedOnce] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; city?: string; email?: string }>({});
 
   const savedProfilePhotoUrl = useMemo(
     () => normalizeMediaUrl(user?.profilePhoto ?? null),
@@ -387,6 +373,7 @@ export function ShopPersonalProfileEditor({
     setSelectedCity(city ?? "");
     setShowUploadImage(false);
     setProfilePhoto(null);
+    setErrors({});
   };
 
   const reset = () => {
@@ -422,16 +409,18 @@ export function ShopPersonalProfileEditor({
 
   const handleUpdate = async () => {
     if (!token) return;
-    const trimmedName = name.trim();
-    const trimmedCity = selectedCity.trim();
-    if (!trimmedName) {
-      toast.error("Name is required.");
+    const result = shopPersonalProfileSchema.safeParse({
+      name,
+      city: selectedCity,
+      email,
+    });
+    if (!result.success) {
+      setErrors(zodIssuesToFieldErrorMap(result.error));
+      toast.error("Please fix the highlighted fields.");
       return;
     }
-    if (!trimmedCity) {
-      toast.error("City is required.");
-      return;
-    }
+    setErrors({});
+    const { name: trimmedName, city: trimmedCity } = result.data;
     setSaving(true);
     try {
       const res = await updatePersonalProfile(token, {
@@ -447,6 +436,15 @@ export function ShopPersonalProfileEditor({
 
       setProfilePhoto(null);
       if (!isUpdating) setSavedOnce(true);
+      if (session) {
+        login({
+          ...session,
+          meta: {
+            ...session.meta,
+            isProfileComplete: true,
+          },
+        });
+      }
       toast.success(apiMessage(res.data) || (isUpdating ? "Profile updated." : "Profile saved."));
       onSaved();
     } finally {
@@ -478,12 +476,13 @@ export function ShopPersonalProfileEditor({
         <CompactFormRow>
           <CompactField label="Name">
             <input
-              className={shopCompactInputClass}
+              className={fieldErrorClass(!!errors.name, shopCompactInputClass)}
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={saving}
               maxLength={60}
             />
+            <FormFieldError message={errors.name} />
           </CompactField>
           <CompactField label="Phone">
             <input
@@ -495,7 +494,7 @@ export function ShopPersonalProfileEditor({
           </CompactField>
           <CompactField label="City">
             <select
-              className={shopCompactInputClass}
+              className={fieldErrorClass(!!errors.city, shopCompactInputClass)}
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
               disabled={saving}
@@ -507,15 +506,17 @@ export function ShopPersonalProfileEditor({
                 </option>
               ))}
             </select>
+            <FormFieldError message={errors.city} />
           </CompactField>
           <CompactField label="Email">
             <input
               type="email"
-              className={shopCompactInputClass}
+              className={fieldErrorClass(!!errors.email, shopCompactInputClass)}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={saving}
             />
+            <FormFieldError message={errors.email} />
           </CompactField>
         </CompactFormRow>
 
@@ -556,7 +557,7 @@ export function ShopBusinessProfileEditor({
   shopTypes?: string[];
   onSaved: () => void;
 }) {
-  const { token, session } = useAuth();
+  const { token, session, login } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [businessName, setBusinessName] = useState(business?.businessName ?? "");
@@ -579,13 +580,7 @@ export function ShopBusinessProfileEditor({
   const [savedOnce, setSavedOnce] = useState(false);
 
   // Validation error states
-  const [errors, setErrors] = useState<{
-    businessPhone?: string;
-    zip?: string;
-    email?: string;
-    hst?: string;
-    tax?: string;
-  }>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const savedLogoUrl = useMemo(
     () => normalizeMediaUrl(business?.businessLogo ?? null),
@@ -746,113 +741,39 @@ export function ShopBusinessProfileEditor({
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [cityOptions, city]);
 
-  // --- VALIDATION HELPERS ---
-  function isValidUSZip(zip: string) {
-    // 12345 or 12345-6789
-    return /^\d{5}(-\d{4})?$/.test(zip);
-  }
-  function isValidCanadaPostalCode(zip: string) {
-    // K1A 0B1 or K1A-0B1 or K1A0B1, case insensitive
-    return /^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ -]?\d[ABCEGHJ-NPRSTV-Z]\d$/i.test(zip);
-  }
-  function isValidIndiaPincode(pin: string) {
-    return /^\d{6}$/.test(pin);
-  }
-  // function detectZipCountry(zip: string): "IN" | "US" | "CA" | "unknown" {
-  //   if (isValidIndiaPincode(zip)) return "IN";
-  //   if (isValidUSZip(zip)) return "US";
-  //   if (isValidCanadaPostalCode(zip)) return "CA";
-  //   return "unknown";
-  // }
-
-  function isValidEmail(email: string) {
-    // RFC 5322 Official Standard (relaxed)
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  }
-  function isValidPhone(phone: string) {
-    // US/Canada/India mobile and landline (basic: 10-15 digits)
-    return /^[0-9]{10,15}$/.test(phone);
-  }
-  function isValidTaxPercentage(tax: string) {
-    const value = Number(tax);
-    return !isNaN(value) && value >= 0 && value <= 50;
-  }
-
-  function isValidTaxId(taxId: string) {
-    return /^[A-Z0-9]{17}$/.test(taxId.replace(/\s/g, ""));
-  }
-
-  function validateAllFields() {
-    let fieldErrors: typeof errors = {};
-
-    // Business Phone
-    if (!businessPhone || !isValidPhone(businessPhone)) {
-      fieldErrors.businessPhone =
-        "Enter a valid phone number (10-15 digits, digits only).";
-    }
-
-    // Email
-    if (!email.trim() || !isValidEmail(email.trim())) {
-      fieldErrors.email = "Enter a valid email address.";
-    }
-
-    // Zip/Postal/Pin Code
-    if (!zip.trim()) {
-      fieldErrors.zip = "Enter a zip/postal/pincode.";
-    } else {
-      if (
-        !(
-          isValidUSZip(zip.trim()) ||
-          isValidCanadaPostalCode(zip.trim()) ||
-          isValidIndiaPincode(zip.trim())
-        )
-      ) {
-        fieldErrors.zip = "Enter a valid US zip, Canada postal code, or India PIN code.";
-      }
-    }
-
-    // TAX ID No
-    if (hst.trim()) {
-      if (!isValidTaxId(hst.trim())) {
-        fieldErrors.hst = "Enter a valid TAX ID No (17 uppercase alphanumeric characters).";
-      }
-    }
-
-    // Tax %
-    if (tax.trim()) {
-      if (!isValidTaxPercentage(tax.trim())) {
-        fieldErrors.tax = "Enter a valid tax percentage (0 - 50).";
-      }
-    }
-
-    setErrors(fieldErrors);
-    return Object.keys(fieldErrors).length === 0;
-  }
-
   const handleUpdate = async () => {
     if (!token) return;
-    if (shopTypes.length === 0) {
-      toast.error("Select at least one business type.");
-      return;
-    }
 
-    if (!validateAllFields()) {
+    const result = shopBusinessProfileSchema.safeParse({
+      businessName,
+      businessPhone,
+      city,
+      address,
+      zip,
+      email,
+      hst,
+      tax,
+      shopTypes,
+    });
+    if (!result.success) {
+      setErrors(zodIssuesToFieldErrorMap(result.error));
       toast.error("Please fix validation errors.");
       return;
     }
+    setErrors({});
 
     setSaving(true);
     try {
       const res = await updateBusinessProfile(token, {
-        businessName: businessName.trim(),
-        businessPhone: phoneDigits(businessPhone),
-        city: city.trim(),
-        businessAddress: address.trim(),
-        pincode: zip.trim(),
-        businessEmail: email.trim(),
-        businessHSTNumber: hst.trim().toUpperCase(),
-        gst: tax.trim() || "0",
-        shopTypes,
+        businessName: result.data.businessName,
+        businessPhone: phoneDigits(result.data.businessPhone),
+        city: result.data.city,
+        businessAddress: result.data.address,
+        pincode: result.data.zip,
+        businessEmail: result.data.email,
+        businessHSTNumber: result.data.hst.trim().toUpperCase(),
+        gst: result.data.tax.trim() || "0",
+        shopTypes: result.data.shopTypes,
         businessLogo: logo,
       });
       if (!res.ok) {
@@ -861,6 +782,15 @@ export function ShopBusinessProfileEditor({
       }
       setLogo(null);
       if (!isUpdating) setSavedOnce(true);
+      if (session) {
+        login({
+          ...session,
+          meta: {
+            ...session.meta,
+            isAutoShopBusinessProfileComplete: true,
+          },
+        });
+      }
       toast.success(isUpdating ? "Business profile updated." : "Business profile saved.");
       onSaved();
     } finally {
@@ -892,26 +822,25 @@ export function ShopBusinessProfileEditor({
         <CompactFormRow className={BUSINESS_PROFILE_FIELD_GRID}>
           <CompactField label="Business Name">
             <input
-              className={shopCompactInputClass}
+              className={fieldErrorClass(!!errors.businessName, shopCompactInputClass)}
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               disabled={saving}
             />
+            <FormFieldError message={errors.businessName} />
           </CompactField>
           <CompactField label="Business Phone" >
             <input
-              className={shopCompactInputClass + (errors.businessPhone ? " border-red-500" : "")}
+              className={fieldErrorClass(!!errors.businessPhone, shopCompactInputClass)}
               value={formatPhoneDisplay(businessPhone)}
               onChange={(e) => setBusinessPhone(phoneDigits(e.target.value))}
               disabled={saving}
             />
-            {errors.businessPhone && (
-              <div className="text-xs text-red-600">{errors.businessPhone}</div>
-            )}
+            <FormFieldError message={errors.businessPhone} />
           </CompactField>
           <CompactField label="City">
             <select
-              className={shopCompactInputClass}
+              className={fieldErrorClass(!!errors.city, shopCompactInputClass)}
               value={city}
               onChange={(e) => setCity(e.target.value)}
               disabled={saving}
@@ -923,31 +852,31 @@ export function ShopBusinessProfileEditor({
                 </option>
               ))}
             </select>
+            <FormFieldError message={errors.city} />
           </CompactField>
           <CompactField label="Address">
             <input
-              className={shopCompactInputClass}
+              className={fieldErrorClass(!!errors.address, shopCompactInputClass)}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               disabled={saving}
             />
+            <FormFieldError message={errors.address} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow className={BUSINESS_PROFILE_FIELD_GRID}>
           <CompactField label="Zip Code">
             <input
-              className={shopCompactInputClass + (errors.zip ? " border-red-500" : "")}
+              className={fieldErrorClass(!!errors.zip, shopCompactInputClass)}
               value={zip}
               onChange={(e) => setZip(e.target.value)}
               disabled={saving}
             />
-            {errors.zip && (
-              <div className="text-xs text-red-600">{errors.zip}</div>
-            )}
+            <FormFieldError message={errors.zip} />
           </CompactField>
           <CompactField label="TAX ID No">
             <input
-              className={shopCompactInputClass + (errors.hst ? " border-red-500" : "")}
+              className={fieldErrorClass(!!errors.hst, shopCompactInputClass)}
               value={hst}
               onChange={(e) =>
                 setHst(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 17))
@@ -955,32 +884,26 @@ export function ShopBusinessProfileEditor({
               maxLength={17}
               disabled={saving}
             />
-            {errors.hst && (
-              <div className="text-xs text-red-600">{errors.hst}</div>
-            )}
+            <FormFieldError message={errors.hst} />
           </CompactField>
           <CompactField label="Tax %">
             <input
-              className={shopCompactInputClass + (errors.tax ? " border-red-500" : "")}
+              className={fieldErrorClass(!!errors.tax, shopCompactInputClass)}
               value={tax}
               onChange={(e) => setTax(e.target.value)}
               disabled={saving}
             />
-            {errors.tax && (
-              <div className="text-xs text-red-600">{errors.tax}</div>
-            )}
+            <FormFieldError message={errors.tax} />
           </CompactField>
           <CompactField label="E mail">
             <input
               type="email"
-              className={shopCompactInputClass + (errors.email ? " border-red-500" : "")}
+              className={fieldErrorClass(!!errors.email, shopCompactInputClass)}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={saving}
             />
-            {errors.email && (
-              <div className="text-xs text-red-600">{errors.email}</div>
-            )}
+            <FormFieldError message={errors.email} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow className={`${BUSINESS_PROFILE_FIELD_GRID} items-start`}>
@@ -1044,6 +967,7 @@ export function ShopBusinessProfileEditor({
                 </div>
               ) : null}
             </div>
+            <FormFieldError message={errors.shopTypes} />
           </CompactField>
         </CompactFormRow>
       </div>

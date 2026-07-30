@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router";
 import { toast } from "react-toastify";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { getJson, putJson } from "../api/mobileAuth";
 import { useAuth } from "../auth";
 import {
@@ -10,9 +12,13 @@ import {
   CompactFormRow,
   compactInputClass,
 } from "../components/admin/ContentPanel";
+import { FormFieldError, toastValidationSummary } from "../lib/validation/formUi";
+import {
+  carOwnerOnboardingSchema,
+  type CarOwnerOnboardingValues,
+} from "../lib/validation/schemas/identity";
 import {
   formatPincodeDisplay,
-  isValidEmail,
   normalizePostalCodeForStorage,
   parseUserProfilePayload,
   PROFILE_ADDRESS_MAX_LENGTH,
@@ -33,12 +39,24 @@ export default function CarOwnerOnboardingPage() {
   const { token, role, session, login, logout, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  const [name, setName] = useState(session?.profile?.name ?? "");
-  const [email, setEmail] = useState(session?.profile?.email ?? "");
-  const [pincode, setPincode] = useState("");
-  const [address, setAddress] = useState("");
   const [saving, setSaving] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors: fieldErrors },
+  } = useForm<CarOwnerOnboardingValues>({
+    resolver: zodResolver(carOwnerOnboardingSchema),
+    mode: "onSubmit",
+    defaultValues: {
+      name: session?.profile?.name ?? "",
+      email: session?.profile?.email ?? "",
+      pincode: "",
+      address: "",
+    },
+  });
 
   useEffect(() => {
     if (!token || role !== "car_owner") {
@@ -59,10 +77,10 @@ export default function CarOwnerOnboardingPage() {
         const parsed = parseUserProfilePayload(res.data);
         if (!parsed) return;
 
-        if (parsed.name?.trim()) setName(parsed.name.trim());
-        if (parsed.email?.trim()) setEmail(parsed.email.trim());
-        if (parsed.pincode?.trim()) setPincode(formatPincodeDisplay(parsed.pincode));
-        if (parsed.address?.trim()) setAddress(parsed.address.trim());
+        if (parsed.name?.trim()) setValue("name", parsed.name.trim());
+        if (parsed.email?.trim()) setValue("email", parsed.email.trim());
+        if (parsed.pincode?.trim()) setValue("pincode", formatPincodeDisplay(parsed.pincode));
+        if (parsed.address?.trim()) setValue("address", parsed.address.trim());
       } finally {
         if (!cancelled) setProfileLoading(false);
       }
@@ -71,7 +89,7 @@ export default function CarOwnerOnboardingPage() {
     return () => {
       cancelled = true;
     };
-  }, [token, role, session?.meta?.isProfileComplete]);
+  }, [token, role, session?.meta?.isProfileComplete, setValue]);
 
   if (isLoading || profileLoading) {
     return (
@@ -89,22 +107,13 @@ export default function CarOwnerOnboardingPage() {
     return <Navigate to="/owner" replace />;
   }
 
-  const handleSubmit = async () => {
+  const onValidSubmit = async (values: CarOwnerOnboardingValues) => {
     if (!token || !session) return;
 
-    const nextName = name.trim().slice(0, PROFILE_NAME_MAX_LENGTH);
-    const nextEmail = email.trim();
-    const nextPincode = normalizePostalCodeForStorage(pincode);
-    const nextAddress = address.trim().slice(0, PROFILE_ADDRESS_MAX_LENGTH);
-
-    if (!nextName || !nextEmail || !nextPincode || !nextAddress) {
-      toast.error("Name, email, postal code, and address are required.");
-      return;
-    }
-    if (!isValidEmail(nextEmail)) {
-      toast.error("Enter a valid email address.");
-      return;
-    }
+    const nextName = values.name.trim().slice(0, PROFILE_NAME_MAX_LENGTH);
+    const nextEmail = values.email.trim();
+    const nextPincode = normalizePostalCodeForStorage(values.pincode);
+    const nextAddress = values.address.trim().slice(0, PROFILE_ADDRESS_MAX_LENGTH);
 
     setSaving(true);
     try {
@@ -147,6 +156,12 @@ export default function CarOwnerOnboardingPage() {
     }
   };
 
+  const onInvalidSubmit = (formErrors: typeof fieldErrors) => {
+    toastValidationSummary(toast.error, formErrors);
+  };
+
+  const submitForm = handleSubmit(onValidSubmit, onInvalidSubmit);
+
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center py-10">
       <h1 className="mb-2 text-center font-serif text-2xl font-bold text-gray-900">Complete your profile</h1>
@@ -160,7 +175,7 @@ export default function CarOwnerOnboardingPage() {
             message="First-time car owner setup"
             messageCenter
             actionLabel={saving ? "Saving…" : "Continue"}
-            onSave={() => void handleSubmit()}
+            onSave={() => void submitForm()}
             onCancel={() => logout(true)}
             cancelLabel="Sign out"
           />
@@ -170,46 +185,46 @@ export default function CarOwnerOnboardingPage() {
           <CompactField label="Full name">
             <input
               type="text"
-              value={name}
               maxLength={PROFILE_NAME_MAX_LENGTH}
-              onChange={(e) => setName(e.target.value)}
               disabled={saving}
               className={compactInputClass}
               autoComplete="name"
+              {...register("name")}
             />
+            <FormFieldError message={fieldErrors.name?.message} />
           </CompactField>
           <CompactField label="Email">
             <input
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               disabled={saving}
               className={compactInputClass}
               autoComplete="email"
+              {...register("email")}
             />
+            <FormFieldError message={fieldErrors.email?.message} />
           </CompactField>
         </CompactFormRow>
         <CompactFormRow>
           <CompactField label="Postal code">
             <input
               type="text"
-              value={pincode}
-              onChange={(e) => setPincode(e.target.value)}
               disabled={saving}
               className={compactInputClass}
               autoComplete="postal-code"
+              {...register("pincode")}
             />
+            <FormFieldError message={fieldErrors.pincode?.message} />
           </CompactField>
           <CompactField label="Address">
             <input
               type="text"
-              value={address}
               maxLength={PROFILE_ADDRESS_MAX_LENGTH}
-              onChange={(e) => setAddress(e.target.value)}
               disabled={saving}
               className={compactInputClass}
               autoComplete="street-address"
+              {...register("address")}
             />
+            <FormFieldError message={fieldErrors.address?.message} />
           </CompactField>
         </CompactFormRow>
       </CompactFormPanel>

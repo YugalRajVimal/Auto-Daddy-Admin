@@ -3,6 +3,7 @@ import { postJson, type ApiResponse } from "@/lib/api";
 export type AuthSessionVerifyResponse = {
   message?: string;
   error?: string;
+  phone?: string;
 };
 
 /** National digits only, matching OTP login payloads. */
@@ -31,6 +32,17 @@ export function isAuthSessionVerified(
     response.ok &&
     typeof message === "string" &&
     message.trim().toLowerCase() === "verified"
+  );
+}
+
+/** HTTP 428 from POST /api/auth/ — token is valid but profile setup is required. */
+export function isAuthSessionProfileIncomplete(
+  response: ApiResponse<AuthSessionVerifyResponse>
+): boolean {
+  if (response.status === 428) return true;
+  const message = (response.data?.message ?? "").toLowerCase();
+  return (
+    message.includes("profile is incomplete") || message.includes("complete your profile")
   );
 }
 

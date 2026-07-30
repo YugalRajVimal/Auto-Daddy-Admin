@@ -69,6 +69,8 @@ export type ShopDeal = {
   };
   dealImage?: string;
   productImage?: string;
+  /** Up to two deal images (parts/salvage). Prefer this when present. */
+  dealImages?: string[];
 };
 
 export type ShopOwnerNotification = {

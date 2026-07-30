@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import OtpInput from "../../components/form/input/OtpInput";
 import {
   buildSessionMeta,
@@ -11,6 +13,13 @@ import {
 import { useAuth, getPostLoginRedirect } from "../../auth";
 import type { UserRole } from "../../auth/types";
 import { formatPhoneDisplay, phoneDigits } from "../../lib/phoneFormat";
+import { FormFieldError } from "../../lib/validation/formUi";
+import {
+  signInRequestSchema,
+  signInOtpSchema,
+  type SignInRequestInput,
+  type SignInOtpValues,
+} from "../../lib/validation/schemas/identity";
 
 const ADMIN_ROLE = "admin" as const;
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
@@ -31,22 +40,43 @@ function formatCooldown(seconds: number) {
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
 
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
 export default function AdminSignInPage() {
   const navigate = useNavigate();
   const { login, isAuthenticated, isLoading, role } = useAuth();
   const [countryId, setCountryId] = useState("CA");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [loginWithEmail, setLoginWithEmail] = useState(false);
-  const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+
+  const requestSchema = useMemo(() => signInRequestSchema(loginWithEmail), [loginWithEmail]);
+  const {
+    handleSubmit: handleRequestSubmit,
+    watch: watchRequest,
+    setValue: setRequestValue,
+    reset: resetRequest,
+    formState: { errors: requestErrors },
+  } = useForm<SignInRequestInput>({
+    resolver: zodResolver(requestSchema),
+    mode: "onSubmit",
+    defaultValues: { email: "", phone: "" },
+  });
+  const email = watchRequest("email");
+  const phone = watchRequest("phone");
+
+  const {
+    handleSubmit: handleOtpSubmit,
+    setValue: setOtpValue,
+    watch: watchOtp,
+    reset: resetOtp,
+    formState: { errors: otpErrors },
+  } = useForm<SignInOtpValues>({
+    resolver: zodResolver(signInOtpSchema),
+    mode: "onSubmit",
+    defaultValues: { otp: "" },
+  });
+  const otp = watchOtp("otp");
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && role) {
@@ -63,18 +93,13 @@ export default function AdminSignInPage() {
   }, [otpSent, resendCooldown]);
 
   const countryCode = CALLING_CODES.find((c) => c.id === countryId)?.code ?? "+1";
-  const nationalPhoneDigits = phoneDigits(phone);
+  const nationalPhoneDigits = phoneDigits(phone ?? "");
 
   function getAdminAuthPayload() {
     if (loginWithEmail) {
-      return { email: email.trim().toLowerCase(), role: ADMIN_ROLE };
+      return { email: (email ?? "").trim().toLowerCase(), role: ADMIN_ROLE };
     }
     return { countryCode, phone: nationalPhoneDigits, role: ADMIN_ROLE };
-  }
-
-  function canRequestOtp() {
-    if (loginWithEmail) return isValidEmail(email);
-    return nationalPhoneDigits.length === 10;
   }
 
   async function handleSendOtp() {
@@ -92,7 +117,7 @@ export default function AdminSignInPage() {
           const isResend = otpSent;
           setOtpSent(true);
           setResendCooldown(RESEND_COOLDOWN_SEC);
-          if (isResend) setOtp("");
+          if (isResend) setOtpValue("otp", "");
           setStatus("OTP sent! Please check your email.");
         } else {
           setOtpSent(false);
@@ -106,7 +131,7 @@ export default function AdminSignInPage() {
         const isResend = otpSent;
         setOtpSent(true);
         setResendCooldown(RESEND_COOLDOWN_SEC);
-        if (isResend) setOtp("");
+        if (isResend) setOtpValue("otp", "");
         setStatus("OTP sent! Please check your phone.");
       } else {
         setOtpSent(false);
@@ -118,6 +143,14 @@ export default function AdminSignInPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function onInvalidRequest() {
+    // Inline field errors already rendered via FormFieldError.
+  }
+
+  function onInvalidOtp() {
+    // Inline field errors already rendered via FormFieldError.
   }
 
   async function handleResendOtp() {
@@ -178,7 +211,8 @@ export default function AdminSignInPage() {
     }
   }
 
-  async function handleVerifyOtp() {
+  async function handleVerifyOtp(values: SignInOtpValues) {
+    const otp = values.otp;
     setStatus(null);
     setLoading(true);
     try {
@@ -283,10 +317,7 @@ export default function AdminSignInPage() {
               {!otpSent ? (
                 <form
                   className="mx-auto w-full max-w-xs space-y-4"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!loading && canRequestOtp()) void handleSendOtp();
-                  }}
+                  onSubmit={handleRequestSubmit(handleSendOtp, onInvalidRequest)}
                 >
                   <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
                     <input
@@ -295,6 +326,7 @@ export default function AdminSignInPage() {
                       onChange={(e) => {
                         setLoginWithEmail(e.target.checked);
                         setStatus(null);
+                        resetRequest({ email: "", phone: "" });
                       }}
                       disabled={loading}
                       className="h-4 w-4 rounded border-gray-400 text-ad-green focus:ring-ad-green"
@@ -308,12 +340,13 @@ export default function AdminSignInPage() {
                       <input
                         type="email"
                         value={email}
+                        onChange={(e) => setRequestValue("email", e.target.value, { shouldValidate: false })}
                         autoComplete="email"
                         placeholder="Enter your email"
-                        onChange={(e) => setEmail(e.target.value)}
                         disabled={loading}
                         className="w-full rounded-md border border-gray-400 bg-white py-2 px-3 text-sm focus:border-ad-green focus:outline-none"
                       />
+                      <FormFieldError message={requestErrors.email?.message} />
                     </div>
                   ) : (
                     <div>
@@ -343,17 +376,18 @@ export default function AdminSignInPage() {
                           autoComplete="tel-national"
                           placeholder="781 708 9765"
                           maxLength={12}
-                          onChange={(e) => setPhone(formatPhoneDisplay(e.target.value))}
+                          onChange={(e) => setRequestValue("phone", formatPhoneDisplay(e.target.value), { shouldValidate: false })}
                           disabled={loading}
                           className="w-full rounded-r-md border border-gray-400 bg-white py-2 px-3 text-sm focus:border-ad-green focus:outline-none"
                         />
                       </div>
+                      <FormFieldError message={requestErrors.phone?.message} />
                     </div>
                   )}
 
                   <button
                     type="submit"
-                    disabled={loading || !canRequestOtp()}
+                    disabled={loading}
                     className="w-full rounded-md bg-ad-green py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-ad-green-dark disabled:opacity-60"
                   >
                     {loading ? "Sending..." : "Get OTP"}
@@ -362,16 +396,14 @@ export default function AdminSignInPage() {
               ) : (
                 <form
                   className="mx-auto w-full max-w-xs space-y-4"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!loading && otp.length === 6) void handleVerifyOtp();
-                  }}
+                  onSubmit={handleOtpSubmit(handleVerifyOtp, onInvalidOtp)}
                 >
                   <label className="block text-sm text-ad-green-dark">OTP</label>
-                  <OtpInput value={otp} onChange={setOtp} disabled={loading} autoFocus />
+                  <OtpInput value={otp} onChange={(v) => setOtpValue("otp", v, { shouldValidate: false })} disabled={loading} autoFocus />
+                  <FormFieldError message={otpErrors.otp?.message} />
                   <button
                     type="submit"
-                    disabled={loading || otp.length !== 6}
+                    disabled={loading}
                     className="w-full rounded-md bg-ad-green py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-ad-green-dark disabled:opacity-60"
                   >
                     {loading ? "Verifying..." : "Verify & Login"}
@@ -396,7 +428,7 @@ export default function AdminSignInPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setOtp("");
+                      resetOtp({ otp: "" });
                       setOtpSent(false);
                       setResendCooldown(0);
                       setStatus(null);

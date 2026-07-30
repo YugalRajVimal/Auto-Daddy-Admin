@@ -253,10 +253,20 @@ export default function WebsitePage() {
             next[plan.id] = {
               ...FALLBACK_PLANS[plan.id],
               ...plan,
-              features: plan.features?.length ? plan.features : FALLBACK_PLANS[plan.id].features,
-              invoiceRows: plan.invoiceRows?.length
-                ? plan.invoiceRows
-                : FALLBACK_PLANS[plan.id].invoiceRows,
+              days: plan.id === "biweekly" ? 14 : plan.days,
+              description: plan.id === "biweekly" ? undefined : plan.description,
+              features:
+                plan.id === "biweekly"
+                  ? FALLBACK_PLANS.biweekly.features
+                  : plan.features?.length
+                    ? plan.features
+                    : FALLBACK_PLANS[plan.id].features,
+              invoiceRows:
+                plan.id === "biweekly"
+                  ? FALLBACK_PLANS.biweekly.invoiceRows
+                  : plan.invoiceRows?.length
+                    ? plan.invoiceRows
+                    : FALLBACK_PLANS[plan.id].invoiceRows,
             };
           }
           setSubscriptionPlans(next);

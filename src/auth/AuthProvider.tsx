@@ -10,8 +10,8 @@ import type { Action, Permissions, Session, UserProfile, UserRole } from "./type
 import { getPortalForRole, getSignInPathForRole, getHomePathForRole } from "./roleRegistry";
 import { clearSession, readSession, writeSession } from "./tokenStorage";
 import {
+  isSessionProfileIncomplete,
   isSessionUnauthorized,
-  isSessionVerified,
   verifyMobileSession,
 } from "../api/mobileAuth";
 
@@ -243,12 +243,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         const res = await verifyMobileSession(current.token, countryCode, phone);
         if (!cancelled) {
-          if (isSessionVerified(res.data) || !isSessionUnauthorized(res.status, res.data)) {
-            setSession(current);
-          } else {
+          if (isSessionUnauthorized(res.status, res.data)) {
             clearSession();
-            localStorage.removeItem('permission');
+            localStorage.removeItem("permission");
             setSession(null);
+          } else if (isSessionProfileIncomplete(res.status, res.data)) {
+            // Token is valid; force incomplete flag so owner onboarding / shop dialog shows.
+            const next: Session = {
+              ...current,
+              meta: {
+                ...current.meta,
+                phone: current.meta?.phone ?? phone,
+                countryCode: current.meta?.countryCode ?? countryCode,
+                isProfileComplete: false,
+              },
+            };
+            writeSession(next);
+            setSession(next);
+          } else {
+            // Verified, or non-auth failure (network/etc.) — keep cached session.
+            setSession(current);
           }
           setIsLoading(false);
         }

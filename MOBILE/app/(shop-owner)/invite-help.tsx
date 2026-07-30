@@ -2,10 +2,12 @@ import { StackScreenFrame, SurfaceCard, useToast } from "@/components/reusables"
 import { colors, fontSizes, radii, spacing, typography } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
-import { fetchMyServices, submitEnquiry } from "@/lib/auto-shop-owner-api";
+import { submitEnquiry } from "@/lib/auto-shop-owner-api";
+import { fetchMyServices } from "@/lib/shop-owner-api";
+import { parseMyServices } from "@/lib/shop-owner-parsers";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,42 +22,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type ServiceOption = { id: string; name: string };
 
-function extractServices(payload: unknown): ServiceOption[] {
-  if (!payload || typeof payload !== "object") return [];
-  const root = payload as Record<string, unknown>;
-  const raw =
-    root.services ??
-    (root.data && typeof root.data === "object"
-      ? (root.data as Record<string, unknown>).services
-      : null);
-  if (!Array.isArray(raw)) return [];
-  const out: ServiceOption[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") continue;
-    const o = item as Record<string, unknown>;
-    const nested =
-      o.service && typeof o.service === "object"
-        ? (o.service as Record<string, unknown>)
-        : null;
-    const id =
-      typeof o.id === "string"
-        ? o.id
-        : typeof o._id === "string"
-          ? o._id
-          : typeof nested?.id === "string"
-            ? nested.id
-            : typeof nested?._id === "string"
-              ? nested._id
-              : "";
-    const name =
-      typeof o.name === "string"
-        ? o.name.trim()
-        : typeof nested?.name === "string"
-          ? nested.name.trim()
-          : "";
-    if (id && name) out.push({ id, name });
-  }
-  return out;
+function toServiceOptions(payload: unknown): ServiceOption[] {
+  return parseMyServices(payload)
+    .map((c) => ({ id: c.id, name: (c.name ?? "").trim() }))
+    .filter((s): s is ServiceOption => Boolean(s.id && s.name));
 }
 
 function LanguageBanner() {
@@ -159,12 +129,18 @@ export default function InviteHelpScreen() {
     setServicesLoading(true);
     try {
       const res = await fetchMyServices(token);
-      const list = extractServices(res.data);
+      if (!res.ok) {
+        setServices([]);
+        showToast("Could not load services.", { type: "error" });
+        return;
+      }
+      const list = toServiceOptions(res.data);
       setServices(list);
       if (!selectedService && list.length > 0) {
         setSelectedService(list[0]);
       }
     } catch {
+      setServices([]);
       showToast("Could not load services.", { type: "error" });
     } finally {
       setServicesLoading(false);

@@ -1083,6 +1083,13 @@ import {
   type LeadApiRow,
   type LeadApiStatus,
 } from "./leadsAPI";
+import { leadSchema } from "../../../lib/validation/schemas/identity";
+import {
+  FormFieldError,
+  VALIDATION_SUMMARY,
+  fieldErrorClass,
+  zodIssuesToFieldErrorMap,
+} from "../../../lib/validation/formUi";
 
 // UI-level status mirrors the backend enum exactly (lowercased for display).
 type LeadStatus = "pending" | "visited" | "completed";
@@ -1231,6 +1238,7 @@ export default function LeadsPage({
   const [removeExistingImage, setRemoveExistingImage] = useState(false);
   const [associates, setAssociates] = useState<AssociateApiRow[]>([]);
   const [associatesLoading, setAssociatesLoading] = useState(true);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const resetTableControls = () => {
     setPage(1);
@@ -1384,6 +1392,7 @@ export default function LeadsPage({
     if (editingObjectUrl) URL.revokeObjectURL(editingObjectUrl);
     setEditingObjectUrl(null);
     setRemoveExistingImage(false);
+    setFormErrors({});
   };
 
   const openAdd = () => {
@@ -1418,6 +1427,7 @@ export default function LeadsPage({
     setSentTo(row.sentToId || "");
     setStatus(row.status);
     setImageFile(null);
+    setFormErrors({});
     setShowSearchCard(false);
     setShowForm(true);
   };
@@ -1469,19 +1479,23 @@ export default function LeadsPage({
   };
 
   const handleSave = async () => {
-    if (!date.trim() || !name.trim() || !phone.trim() || !city.trim()) {
-      adminNotify.error("Please fill Date, Name, Phone, and City.");
+    const parsed = leadSchema.safeParse({ date, name, phone, city, email, website, notes });
+    if (!parsed.success) {
+      const fieldErrors = zodIssuesToFieldErrorMap(parsed.error);
+      setFormErrors(fieldErrors);
+      adminNotify.error(parsed.error.issues[0]?.message ?? VALIDATION_SUMMARY);
       return;
     }
+    setFormErrors({});
 
     const basePayload = {
-      date: date.trim(),
-      name: name.trim(),
-      phone: phone.trim(),
-      city: city.trim(),
-      email: email.trim() || undefined,
-      website: website.trim() || undefined,
-      notes: notes.trim() || undefined,
+      date: parsed.data.date,
+      name: parsed.data.name,
+      phone: parsed.data.phone,
+      city: parsed.data.city,
+      email: parsed.data.email.trim() || undefined,
+      website: parsed.data.website.trim() || undefined,
+      notes: parsed.data.notes.trim() || undefined,
       // sentTo is now the associate's ObjectId string (or null to clear).
       sentTo: sentTo || null,
     };
@@ -1760,27 +1774,34 @@ export default function LeadsPage({
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className={compactInputClass}
+                    className={fieldErrorClass(Boolean(formErrors.date), compactInputClass)}
                   />
+                  <FormFieldError message={formErrors.date} />
                 </CompactField>
                 <CompactField label="Name" required className="w-full min-w-0">
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className={compactInputClass}
+                    className={fieldErrorClass(Boolean(formErrors.name), compactInputClass)}
                   />
+                  <FormFieldError message={formErrors.name} />
                 </CompactField>
                 <CompactField label="Phone" required className="w-full min-w-0">
                   <input
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className={compactInputClass}
+                    className={fieldErrorClass(Boolean(formErrors.phone), compactInputClass)}
                   />
+                  <FormFieldError message={formErrors.phone} />
                 </CompactField>
                 <CompactField label="City" required className="w-full min-w-0">
-                  <select value={city} onChange={(e) => setCity(e.target.value)} className={compactInputClass}>
+                  <select
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className={fieldErrorClass(Boolean(formErrors.city), compactInputClass)}
+                  >
                     <option value="">Select city</option>
                     {citySelectOptions.map((cityName) => (
                       <option key={cityName} value={cityName}>
@@ -1788,6 +1809,7 @@ export default function LeadsPage({
                       </option>
                     ))}
                   </select>
+                  <FormFieldError message={formErrors.city} />
                 </CompactField>
               </CompactFormRow>
               <CompactFormRow className="w-full items-start" columns={4}>
@@ -1796,8 +1818,9 @@ export default function LeadsPage({
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className={compactInputClass}
+                    className={fieldErrorClass(Boolean(formErrors.email), compactInputClass)}
                   />
+                  <FormFieldError message={formErrors.email} />
                 </CompactField>
                 <CompactField label="Website" className="w-full min-w-0">
                   <input

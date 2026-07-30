@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import axios, { AxiosError } from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
@@ -19,6 +21,8 @@ import AdminSearchCard, {
 } from "../../../components/admin/AdminSearchCard";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { citySchema, type CitySchemaInput, type CitySchemaValues } from "../../../lib/validation/schemas/catalog";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../../lib/validation/formUi";
 
 const CITY_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "city", label: "City" },
@@ -89,9 +93,17 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingCity, setEditingCity] = useState<City | null>(null);
-  const [formName, setFormName] = useState("");
-  const [formStatus, setFormStatus] = useState<CityStatus>("Active");
-  const [formProvinceId, setFormProvinceId] = useState("");
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors: formErrors },
+  } = useForm<CitySchemaInput, unknown, CitySchemaValues>({
+    resolver: zodResolver(citySchema),
+    mode: "onSubmit",
+    defaultValues: { name: "", province: "", status: "Active" },
+  });
 
   const resetTableControls = () => {
     setPage(1);
@@ -186,9 +198,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
   };
 
   const resetForm = () => {
-    setFormName("");
-    setFormStatus("Active");
-    setFormProvinceId(selectedProvinceId);
+    reset({ name: "", province: selectedProvinceId, status: "Active" });
     setEditingCity(null);
     setError("");
   };
@@ -201,9 +211,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
 
   const openEdit = (city: CityRow) => {
     setEditingCity(city);
-    setFormName(city.name);
-    setFormStatus(city.status || "Active");
-    setFormProvinceId(city.provinceId);
+    reset({ name: city.name, province: city.provinceId, status: city.status || "Active" });
     setError("");
     setShowSearchCard(false);
     setShowForm(true);
@@ -235,55 +243,46 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     setShowForm(false);
   };
 
-  const handleSave = async () => {
-    if (!formName.trim()) {
-      const __adminMsg = "City name is required.";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-      return;
-    }
-    if (!formProvinceId) {
-      const __adminMsg = "Please select a province.";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-      return;
-    }
-    setActionLoading(true);
-    setError("");
-    setSuccessMsg("");
-    try {
-      if (editingCity) {
-        await axios.patch(
-          `${API_BASE}/admin/provinces/${formProvinceId}/cities/${encodeURIComponent(editingCity.name)}`,
-          { name: formName.trim(), status: formStatus },
-          getAdminAuthHeader()
-        );
-        adminNotify.success("City updated successfully.");
-        setSuccessMsg("City updated successfully.");
-      } else {
-        await axios.post(
-          `${API_BASE}/admin/provinces/${formProvinceId}/cities`,
-          {
-            name: formName.trim(),
-            status: formStatus,
-          },
-          getAdminAuthHeader()
-        );
-        adminNotify.success("City added successfully.");
-        setSuccessMsg("City added successfully.");
+  const handleSave = handleSubmit(
+    async (values) => {
+      setActionLoading(true);
+      setError("");
+      setSuccessMsg("");
+      try {
+        if (editingCity) {
+          await axios.patch(
+            `${API_BASE}/admin/provinces/${values.province}/cities/${encodeURIComponent(editingCity.name)}`,
+            { name: values.name, status: values.status },
+            getAdminAuthHeader()
+          );
+          adminNotify.success("City updated successfully.");
+          setSuccessMsg("City updated successfully.");
+        } else {
+          await axios.post(
+            `${API_BASE}/admin/provinces/${values.province}/cities`,
+            {
+              name: values.name,
+              status: values.status,
+            },
+            getAdminAuthHeader()
+          );
+          adminNotify.success("City added successfully.");
+          setSuccessMsg("City added successfully.");
+        }
+        resetForm();
+        setShowForm(false);
+        fetchProvinces();
+      } catch (err) {
+        const axErr = err as AxiosError<{ message?: string }>;
+        const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Error saving city";
+        setError(__adminMsg);
+        adminNotify.error(__adminMsg);
+      } finally {
+        setActionLoading(false);
       }
-      resetForm();
-      setShowForm(false);
-      fetchProvinces();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Error saving city";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    },
+    (errs) => toastValidationSummary(adminNotify.error, errs as never),
+  );
 
   const handleDelete = async (city: CityRow) => {
     if (!window.confirm(`Delete city "${city.name}"?`)) return;
@@ -388,7 +387,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
                     ? (editingCity ? "Updating..." : "Saving...")
                     : (editingCity ? "Update" : "Save")
                 }
-                onSave={handleSave}
+                onSave={() => void handleSave()}
                 onCancel={handleCancel}
               />
             }
@@ -401,9 +400,8 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
             <CompactFormRow className="items-start">
               <CompactField label="Province" required>
                 <select
-                  value={formProvinceId}
-                  onChange={(e) => setFormProvinceId(e.target.value)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(formErrors.province), compactInputClass)}
+                  {...register("province")}
                 >
                   <option value="">Select Province</option>
                   {provinces.map((p) => (
@@ -413,20 +411,20 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
                     </option>
                   ))}
                 </select>
+                <FormFieldError message={formErrors.province?.message} />
               </CompactField>
               <CompactField label="City" required>
                 <input
                   type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(formErrors.name), compactInputClass)}
+                  {...register("name")}
                 />
+                <FormFieldError message={formErrors.name?.message} />
               </CompactField>
               <CompactField label="Status" required>
                 <select
-                  value={formStatus}
-                  onChange={(e) => setFormStatus(e.target.value as CityStatus)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(formErrors.status), compactInputClass)}
+                  {...register("status")}
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>

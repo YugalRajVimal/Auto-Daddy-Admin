@@ -6,6 +6,8 @@ import { authHeaders } from "../../../api/client";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
+import { vehicleTypeSchema } from "../../../lib/validation/schemas/catalog";
+import { FormFieldError, VALIDATION_SUMMARY, zodIssuesToFieldErrorMap } from "../../../lib/validation/formUi";
 
 // Representation according to CarDetails.schema.js (companyName, models)
 interface CarModel {
@@ -43,6 +45,7 @@ const VehicleType: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [visibleCols, setVisibleCols] = useState(["companyName", "models"]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const companyNameInputRef = useRef<HTMLInputElement>(null);
 
   const resetTableControls = () => {
@@ -108,6 +111,7 @@ const VehicleType: React.FC = () => {
     setEditingCar(null);
     setCompanyName("");
     setModels([{ modelName: "", years: [] }]);
+    setFormErrors({});
     setShowModal(true);
     setTimeout(() => companyNameInputRef.current?.focus(), 150);
   };
@@ -123,12 +127,21 @@ const VehicleType: React.FC = () => {
         years: [...m.years],
       }))
     );
+    setFormErrors({});
     setShowModal(true);
     setTimeout(() => companyNameInputRef.current?.focus(), 150);
   };
 
   // Model/form helpers
-  const handleCompanyNameChange = (val: string) => setCompanyName(val);
+  const handleCompanyNameChange = (val: string) => {
+    setCompanyName(val);
+    setFormErrors((prev) => {
+      if (!("name" in prev)) return prev;
+      const next = { ...prev };
+      delete next.name;
+      return next;
+    });
+  };
 
   /**
    * For the "years" field,
@@ -202,15 +215,18 @@ const VehicleType: React.FC = () => {
     e.preventDefault();
     clearAlerts();
     const baseURL = import.meta.env.VITE_API_URL;
-    const trimmedCompany = companyName.trim();
     const token = getToken();
 
-    if (!trimmedCompany) {
-      const msg = "Company name is required.";
-      setError(msg);
-      adminNotify.error(msg);
+    const parsed = vehicleTypeSchema.safeParse({ name: companyName });
+    if (!parsed.success) {
+      const fieldErrors = zodIssuesToFieldErrorMap(parsed.error);
+      setFormErrors(fieldErrors);
+      adminNotify.error(parsed.error.issues[0]?.message ?? VALIDATION_SUMMARY);
       return;
     }
+    setFormErrors({});
+    const trimmedCompany = parsed.data.name;
+
     if (!validateModels()) {
       return;
     }
@@ -556,9 +572,12 @@ const VehicleType: React.FC = () => {
                   required
                   autoFocus
                   onChange={(e) => handleCompanyNameChange(e.target.value)}
-                  className="w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400"
+                  className={`w-full px-3 py-2 border rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition placeholder:text-gray-400 ${
+                    formErrors.name ? "border-red-500" : ""
+                  }`}
                   placeholder="Enter car company name"
                 />
+                <FormFieldError message={formErrors.name} />
               </div>
               <div className="mb-3">
                 <label className="block mb-1 font-semibold text-gray-700">

@@ -46,10 +46,14 @@ export function fetchCarOwnerHome(token: string) {
   return getJson<CarOwnerDashboardData>("/api/carowner/home", token);
 }
 
-/** GET /api/carowner/common/faq?role=carowner */
-export function fetchCarOwnerFaqs(token: string, role = "carowner") {
+/** GET /api/carowner/common/faq?role=car_owner|shop_owner&pageSlug=… */
+export function fetchCarOwnerFaqs(
+  token: string,
+  role = "car_owner",
+  pageSlug?: string,
+) {
   return getJson<unknown>(
-    withQuery("/api/carowner/common/faq", { role }),
+    withQuery("/api/carowner/common/faq", { role, pageSlug }),
     token,
   );
 }
@@ -90,12 +94,24 @@ export function parseCarOwnerFaqItems(payload: unknown): DummyFaqItem[] {
     const question = asString(obj.question ?? obj.heading ?? obj.title);
     const answer = asString(obj.answer ?? obj.desc ?? obj.description ?? obj.body);
     if (!question && !answer) continue;
+    const pageSlug = asString(obj.pageSlug ?? obj.page_slug ?? obj.slug);
     out.push({
       question: question || "Question",
       answer: answer || "—",
+      ...(pageSlug ? { pageSlug } : {}),
     });
   }
   return out;
+}
+
+/** Keep only FAQs tagged for the current page/section. */
+export function filterCarOwnerFaqsByPageSlug(
+  items: DummyFaqItem[],
+  pageSlug?: string,
+): DummyFaqItem[] {
+  if (!pageSlug?.trim()) return items;
+  const wanted = pageSlug.trim();
+  return items.filter((item) => item.pageSlug?.trim() === wanted);
 }
 
 export function parseCarOwnerPrivacy(payload: unknown): {

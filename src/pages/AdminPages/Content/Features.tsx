@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
@@ -22,6 +24,8 @@ import AdminSearchCard, {
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { FormFieldError, toastValidationSummary } from "../../../lib/validation/formUi";
+import { featureSchema, type FeatureValues } from "../../../lib/validation/schemas/cms";
 
 // --- Import React DatePicker related code
 import DatePicker from "react-datepicker";
@@ -125,11 +129,23 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   const [date, setDate] = useState<Date | null>(parseDateString("2026-06-16"));
 
   const [user, setUser] = useState("car-owner");
-  const [feature, setFeature] = useState(DEFAULT_FEATURE);
   const [attachImage, setAttachImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
+
+  const {
+    watch,
+    setValue,
+    handleSubmit,
+    reset,
+    formState: { errors: fieldErrors },
+  } = useForm<FeatureValues>({
+    resolver: zodResolver(featureSchema),
+    mode: "onSubmit",
+    defaultValues: { feature: DEFAULT_FEATURE },
+  });
+  const feature = watch("feature");
 
   const resetTableControls = () => {
     setPage(1);
@@ -232,7 +248,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   const resetForm = () => {
     setDate(parseDateString("2026-06-16"));
     setUser("car-owner");
-    setFeature(DEFAULT_FEATURE);
+    reset({ feature: DEFAULT_FEATURE });
     setAttachImage(false);
     setImageFile(null);
     setEditingId(null);
@@ -247,7 +263,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   const openEdit = (row: FeatureRow) => {
     setDate(parseDateString(row.date));
     setUser(row.user);
-    setFeature(row.feature);
+    reset({ feature: row.feature });
     setAttachImage(!!row.imageUrl);
     setImageFile(null);
     setEditingId(row.id);
@@ -282,14 +298,14 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
   };
 
   // Handle create & update
-  const handleSave = async () => {
+  const onValidSave = async (values: FeatureValues) => {
     try {
       setLoading(true);
       const formData = new FormData();
       formData.append("date", formatDateString(date));
       formData.append("country", "Canada");
       formData.append("role", user); // called "role" in API
-      formData.append("feature", feature);
+      formData.append("feature", values.feature);
 
       if (attachImage && imageFile) {
         formData.append("featureImage", imageFile);
@@ -329,6 +345,12 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       setLoading(false);
     }
   };
+
+  const onInvalidSave = (formErrors: typeof fieldErrors) => {
+    toastValidationSummary(adminNotify.error, formErrors);
+  };
+
+  const handleSave = () => void handleSubmit(onValidSave, onInvalidSave)();
 
   // Handle multi-delete
   const handleDelete = async () => {
@@ -460,9 +482,10 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
               <CompactField label="Feature" required className="min-w-[200px] flex-1">
                 <CompactAutoGrowTextarea
                   value={feature}
-                  onChange={(e) => setFeature(e.target.value)}
+                  onChange={(e) => setValue("feature", e.target.value, { shouldValidate: false })}
                   disabled={loading}
                 />
+                <FormFieldError message={fieldErrors.feature?.message} />
               </CompactField>
             </CompactFormRow>
             <CompactFormRow className="items-start justify-start">

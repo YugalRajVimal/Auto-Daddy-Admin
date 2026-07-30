@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import axios, { AxiosError } from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
@@ -19,6 +21,8 @@ import AdminSearchCard, {
 } from "../../../components/admin/AdminSearchCard";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { serviceSchema, type ServiceSchemaInput, type ServiceSchemaValues } from "../../../lib/validation/schemas/catalog";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../../lib/validation/formUi";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -108,10 +112,17 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
   const [filterShopType, setFilterShopType] = useState<"all" | ShopType>("all");
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [shopType, setShopType] = useState<ShopType>("autoShop");
-  const [status, setStatus] = useState<ServiceStatus>("Active");
-  const [odoOutRequired, setOdoOutRequired] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors: formErrors },
+  } = useForm<ServiceSchemaInput, unknown, ServiceSchemaValues>({
+    resolver: zodResolver(serviceSchema),
+    mode: "onSubmit",
+    defaultValues: { name: "", shopType: "autoShop", status: "Active", odoOutRequired: false },
+  });
 
   const resetTableControls = () => {
     setPage(1);
@@ -199,10 +210,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
   };
 
   const resetForm = () => {
-    setName("");
-    setShopType("autoShop");
-    setStatus("Active");
-    setOdoOutRequired(false);
+    reset({ name: "", shopType: "autoShop", status: "Active", odoOutRequired: false });
     setEditingId(null);
     setError("");
   };
@@ -214,10 +222,12 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
   };
 
   const openEdit = (service: Service) => {
-    setName(service.name);
-    setShopType(service.shopType);
-    setStatus(service.status || "Active");
-    setOdoOutRequired(Boolean(service.odoOutRequired));
+    reset({
+      name: service.name,
+      shopType: service.shopType,
+      status: service.status || "Active",
+      odoOutRequired: Boolean(service.odoOutRequired),
+    });
     setEditingId(service._id);
     setError("");
     setShowSearchCard(false);
@@ -250,47 +260,49 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     setShowForm(false);
   };
 
-  const handleSave = async () => {
-    if (!name.trim()) {
-      const __adminMsg = "Service name is required.";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-      return;
-    }
-    setActionLoading(true);
-    setError("");
-    setSuccessMsg("");
-    try {
-      const payload = { name: name.trim(), shopType, status, odoOutRequired };
-      if (editingId) {
-        await axios.put(
-          `${API_BASE}/admin/services/${editingId}`,
-          payload,
-          getAdminAuthConfig()
-        );
-        adminNotify.success("Service updated successfully.");
-        setSuccessMsg("Service updated successfully.");
-      } else {
-        await axios.post(
-          `${API_BASE}/admin/services`,
-          payload,
-          getAdminAuthConfig()
-        );
-        adminNotify.success("Service added successfully.");
-        setSuccessMsg("Service added successfully.");
+  const handleSave = handleSubmit(
+    async (values) => {
+      setActionLoading(true);
+      setError("");
+      setSuccessMsg("");
+      try {
+        const payload = {
+          name: values.name,
+          shopType: values.shopType as ShopType,
+          status: values.status,
+          odoOutRequired: values.odoOutRequired,
+        };
+        if (editingId) {
+          await axios.put(
+            `${API_BASE}/admin/services/${editingId}`,
+            payload,
+            getAdminAuthConfig()
+          );
+          adminNotify.success("Service updated successfully.");
+          setSuccessMsg("Service updated successfully.");
+        } else {
+          await axios.post(
+            `${API_BASE}/admin/services`,
+            payload,
+            getAdminAuthConfig()
+          );
+          adminNotify.success("Service added successfully.");
+          setSuccessMsg("Service added successfully.");
+        }
+        resetForm();
+        setShowForm(false);
+        fetchServices();
+      } catch (err) {
+        const axErr = err as AxiosError<{ message?: string; error?: string }>;
+        const __adminMsg = axErr?.response?.data?.message || axErr?.response?.data?.error || "Error saving service";
+        setError(__adminMsg);
+        adminNotify.error(__adminMsg);
+      } finally {
+        setActionLoading(false);
       }
-      resetForm();
-      setShowForm(false);
-      fetchServices();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string; error?: string }>;
-      const __adminMsg = axErr?.response?.data?.message || axErr?.response?.data?.error || "Error saving service";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    },
+    (errs) => toastValidationSummary(adminNotify.error, errs as never),
+  );
 
   const handleDelete = async (service: Service) => {
     if (!window.confirm(`Delete service "${service.name}"?`)) return;
@@ -405,7 +417,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                     ? (editingId ? "Updating..." : "Saving...")
                     : (editingId ? "Update" : "Save")
                 }
-                onSave={handleSave}
+                onSave={() => void handleSave()}
                 onCancel={handleCancel}
               />
             }
@@ -419,16 +431,15 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
               <CompactField label="Service Name" required>
                 <input
                   type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(formErrors.name), compactInputClass)}
+                  {...register("name")}
                 />
+                <FormFieldError message={formErrors.name?.message} />
               </CompactField>
               <CompactField label="Shop Type" required>
                 <select
-                  value={shopType}
-                  onChange={(e) => setShopType(e.target.value as ShopType)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(formErrors.shopType), compactInputClass)}
+                  {...register("shopType")}
                 >
                   {SHOP_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -436,12 +447,12 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                     </option>
                   ))}
                 </select>
+                <FormFieldError message={formErrors.shopType?.message} />
               </CompactField>
               <CompactField label="Status" required>
                 <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as ServiceStatus)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(formErrors.status), compactInputClass)}
+                  {...register("status")}
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
@@ -451,9 +462,8 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                 <label className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 text-sm text-gray-800">
                   <input
                     type="checkbox"
-                    checked={odoOutRequired}
-                    onChange={(e) => setOdoOutRequired(e.target.checked)}
                     className="h-3.5 w-3.5 accent-ad-green"
+                    {...register("odoOutRequired")}
                   />
                   Yes
                 </label>

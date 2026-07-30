@@ -1,11 +1,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import axios from "axios";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import Label from "../../form/Label";
 import Input from "../../form/input/InputField";
 import Button from "../../ui/button/Button";
 import Alert from "../../ui/alert/Alert";
+import { FormFieldError } from "../../../lib/validation/formUi";
+import {
+  signInEmailSchema,
+  signInOtpSchema,
+  type SignInEmailValues,
+  type SignInOtpValues,
+} from "../../../lib/validation/schemas/identity";
 
 interface AlertState {
   isEnable: boolean;
@@ -16,9 +25,31 @@ interface AlertState {
 
 export default function SignInForm() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState<string>("");
   const [isOTPFieldsVisible, setIsOTPFormVisible] = useState(false);
-  const [otp, setOTP] = useState<string>("");
+
+  const {
+    handleSubmit: handleEmailSubmit,
+    watch: watchEmail,
+    setValue: setEmailValue,
+    formState: { errors: emailErrors },
+  } = useForm<SignInEmailValues>({
+    resolver: zodResolver(signInEmailSchema),
+    mode: "onSubmit",
+    defaultValues: { email: "" },
+  });
+  const email = watchEmail("email");
+
+  const {
+    handleSubmit: handleOtpSubmit,
+    watch: watchOtp,
+    setValue: setOtpValue,
+    formState: { errors: otpErrors },
+  } = useForm<SignInOtpValues>({
+    resolver: zodResolver(signInOtpSchema),
+    mode: "onSubmit",
+    defaultValues: { otp: "" },
+  });
+  const otp = watchOtp("otp");
 
   const [alert, setAlert] = useState<AlertState>({
     isEnable: false,
@@ -37,21 +68,13 @@ export default function SignInForm() {
   };
 
   // Send OTP
-  const handleGetOTP = async () => {
+  const handleGetOTP = async (values: SignInEmailValues) => {
     clearAlert();
-    if (!email) {
-      return setAlert({
-        isEnable: true,
-        variant: "error",
-        title: "Validation Error",
-        message: "Please enter your email address.",
-      });
-    }
 
     try {
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL}/api/auth/signin`,
-        { email, role: "SubAdmin" }
+        { email: values.email, role: "SubAdmin" }
       );
 
       setAlert({
@@ -72,22 +95,13 @@ export default function SignInForm() {
   };
 
   // Verify OTP
-  const handleLogIn = async () => {
+  const handleLogIn = async (values: SignInOtpValues) => {
     clearAlert();
-
-    if (!email || !otp) {
-      return setAlert({
-        isEnable: true,
-        variant: "error",
-        title: "Validation Error",
-        message: "Please enter both email and OTP.",
-      });
-    }
 
     try {
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL}/api/auth/verify-account`,
-        { email, otp, role: "SubAdmin" }
+        { email, otp: values.otp, role: "SubAdmin" }
       );
 
       setAlert({
@@ -148,10 +162,11 @@ export default function SignInForm() {
                 name="email"
                 value={email}
                 onChange={(e) => {
-                  setEmail(e.target.value);
+                  setEmailValue("email", e.target.value, { shouldValidate: false });
                   clearAlert();
                 }}
               />
+              <FormFieldError message={emailErrors.email?.message} />
             </div>
 
             <div className={`${isOTPFieldsVisible ? "block" : "hidden"}`}>
@@ -164,19 +179,20 @@ export default function SignInForm() {
                 name="otp"
                 value={otp}
                 onChange={(e) => {
-                  setOTP(e.target.value);
+                  setOtpValue("otp", e.target.value, { shouldValidate: false });
                   clearAlert();
                 }}
               />
+              <FormFieldError message={otpErrors.otp?.message} />
             </div>
 
             <div>
               {isOTPFieldsVisible ? (
-                <Button onClick={handleLogIn} className="w-full" size="sm">
+                <Button onClick={handleOtpSubmit(handleLogIn)} className="w-full" size="sm">
                   Verify & Sign In
                 </Button>
               ) : (
-                <Button onClick={handleGetOTP} className="w-full" size="sm">
+                <Button onClick={handleEmailSubmit(handleGetOTP)} className="w-full" size="sm">
                   Get OTP
                 </Button>
               )}

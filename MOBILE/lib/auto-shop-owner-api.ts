@@ -533,7 +533,7 @@ export function updateBusinessActiveStatus(token: string, isBusinessActive: bool
   );
 }
 
-/** POST /api/auto-shop-owner/submit-enquiry — voice note + selected service. */
+/** POST /api/auto-shop-owner/invite-help-admin — voice note + selected service. */
 export function submitEnquiry(
   token: string,
   opts: { serviceId: string; serviceName: string; audioUri: string }
@@ -542,15 +542,18 @@ export function submitEnquiry(
   formData.append("serviceId", opts.serviceId);
   if (opts.serviceName) formData.append("serviceName", opts.serviceName);
   const isM4a = opts.audioUri.toLowerCase().endsWith(".m4a");
-  formData.append("voiceNote", {
+  // Backend expects field name `audio` (same as web invite-help-admin).
+  formData.append("audio", {
     uri: opts.audioUri,
     name: isM4a ? "enquiry.m4a" : "enquiry.3gp",
     type: isM4a ? "audio/m4a" : "audio/3gpp",
   } as unknown as Blob);
   if (__DEV__) {
-    logMultipartCurl("POST", `${autoShopOwnerBaseUrl()}/api/auto-shop-owner/submit-enquiry`, formData, token);
+    logMultipartCurl("POST", `${autoShopOwnerBaseUrl()}/api/auto-shop-owner/invite-help-admin`, formData, token);
   }
-  return postFormData<ApiEnvelope>("/api/auto-shop-owner/submit-enquiry", formData, { authToken: token });
+  return postFormData<ApiEnvelope>("/api/auto-shop-owner/invite-help-admin", formData, {
+    authToken: token,
+  });
 }
 
 /** GET /api/auto-shop-owner/main-car-companies */

@@ -1,13 +1,35 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "../../../icons";
 import Label from "../../form/Label";
 import Input from "../../form/input/InputField";
 import Checkbox from "../../form/input/Checkbox";
+import { FormFieldError } from "../../../lib/validation/formUi";
+import {
+  signUpEmailPasswordSchema,
+  type SignUpEmailPasswordValues,
+} from "../../../lib/validation/schemas/identity";
 
 export default function SubAdminSignUpForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
+  const {
+    watch,
+    setValue,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SignUpEmailPasswordValues>({
+    resolver: zodResolver(signUpEmailPasswordSchema),
+    mode: "onSubmit",
+    defaultValues: { email: "", password: "" },
+  });
+
+  const onSubmit = (values: SignUpEmailPasswordValues) => {
+    // No sign-up API is wired up for this template form yet.
+    console.log("Sign up submitted:", values.email);
+  };
   return (
     <div className="flex flex-col flex-1 w-full overflow-y-auto lg:w-1/2 no-scrollbar">
       <div className="w-full max-w-md mx-auto mb-5 sm:pt-10">
@@ -82,7 +104,7 @@ export default function SubAdminSignUpForm() {
                 </span>
               </div>
             </div>
-            <form>
+            <form onSubmit={handleSubmit(onSubmit)}>
               <div className="space-y-5">
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   {/* <!-- First Name --> */}
@@ -120,7 +142,10 @@ export default function SubAdminSignUpForm() {
                     id="email"
                     name="email"
                     placeholder="Enter your email"
+                    value={watch("email")}
+                    onChange={(e) => setValue("email", e.target.value, { shouldValidate: false })}
                   />
+                  <FormFieldError message={errors.email?.message} />
                 </div>
                 {/* <!-- Password --> */}
                 <div>
@@ -131,6 +156,8 @@ export default function SubAdminSignUpForm() {
                     <Input
                       placeholder="Enter your password"
                       type={showPassword ? "text" : "password"}
+                      value={watch("password")}
+                      onChange={(e) => setValue("password", e.target.value, { shouldValidate: false })}
                     />
                     <span
                       onClick={() => setShowPassword(!showPassword)}
@@ -143,6 +170,7 @@ export default function SubAdminSignUpForm() {
                       )}
                     </span>
                   </div>
+                  <FormFieldError message={errors.password?.message} />
                 </div>
                 {/* <!-- Checkbox --> */}
                 <div className="flex items-center gap-3">
@@ -164,7 +192,10 @@ export default function SubAdminSignUpForm() {
                 </div>
                 {/* <!-- Button --> */}
                 <div>
-                  <button className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600">
+                  <button
+                    type="submit"
+                    className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600"
+                  >
                     Sign Up
                   </button>
                 </div>

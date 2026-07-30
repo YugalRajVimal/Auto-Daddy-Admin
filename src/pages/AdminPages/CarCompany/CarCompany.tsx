@@ -8,6 +8,8 @@ import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
+import { carCompanySchema } from "../../../lib/validation/schemas/catalog";
+import { FormFieldError, VALIDATION_SUMMARY, zodIssuesToFieldErrorMap } from "../../../lib/validation/formUi";
 
 // --- Types ---
 interface CarModel { modelName: string; } // years REMOVED
@@ -36,6 +38,7 @@ const CarCompany: React.FC = () => {
   const [visibleCols, setVisibleCols] = useState(["companyName", "models", "brandLogo"]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [attachBrandLogo, setAttachBrandLogo] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const resetTableControls = () => {
@@ -86,6 +89,7 @@ const CarCompany: React.FC = () => {
     setEditingCompany(null);
     setForm({ ...EMPTY_FORM });
     setAttachBrandLogo(false);
+    setFormErrors({});
     setShowModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 150);
   };
@@ -102,6 +106,7 @@ const CarCompany: React.FC = () => {
       brandLogoPreviewUrl: company.brandLogo ? getBackendImageUrl(company.brandLogo) : null
     });
     setAttachBrandLogo(Boolean(company.brandLogo));
+    setFormErrors({});
     setShowModal(true);
     setTimeout(() => nameInputRef.current?.focus(), 150);
   };
@@ -136,8 +141,16 @@ const CarCompany: React.FC = () => {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearAlerts();
-    if (!form.companyName.trim() || !form.models.length || form.models.some((m) => !m.modelName.trim())) {
-      const msg = "Company name and model names are required.";
+    const parsed = carCompanySchema.safeParse({ name: form.companyName });
+    if (!parsed.success) {
+      const fieldErrors = zodIssuesToFieldErrorMap(parsed.error);
+      setFormErrors({ companyName: fieldErrors.name });
+      adminNotify.error(parsed.error.issues[0]?.message ?? VALIDATION_SUMMARY);
+      return;
+    }
+    setFormErrors({});
+    if (!form.models.length || form.models.some((m) => !m.modelName.trim())) {
+      const msg = "Model names are required.";
       setError(msg);
       adminNotify.error(msg);
       return;
@@ -145,7 +158,7 @@ const CarCompany: React.FC = () => {
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append("companyName", form.companyName.trim());
+      formData.append("companyName", parsed.data.name);
       formData.append(
         "models",
         JSON.stringify(form.models.map((m) => ({
@@ -327,9 +340,18 @@ const CarCompany: React.FC = () => {
                 <div style={{ marginBottom: 22 }}>
                   <label style={{ display: "block", fontWeight: 600, fontSize: 18, marginBottom: 7 }}>Company Name <span style={{ color: "#e73d3d" }}>*</span></label>
                   <input ref={nameInputRef} type="text" value={form.companyName} required autoFocus
-                    onChange={(e) => updateFormField("companyName", e.target.value)}
-                    style={{ width: "100%", border: "1px solid #d2d6de", borderRadius: 3, padding: "12px 13px", fontSize: 19, outline: "none", boxSizing: "border-box" }}
+                    onChange={(e) => {
+                      updateFormField("companyName", e.target.value);
+                      setFormErrors((prev) => {
+                        if (!("companyName" in prev)) return prev;
+                        const next = { ...prev };
+                        delete next.companyName;
+                        return next;
+                      });
+                    }}
+                    style={{ width: "100%", border: formErrors.companyName ? "1px solid #dc2626" : "1px solid #d2d6de", borderRadius: 3, padding: "12px 13px", fontSize: 19, outline: "none", boxSizing: "border-box" }}
                     placeholder="Enter company name" />
+                  <FormFieldError message={formErrors.companyName} />
                 </div>
 
                 {/* Brand Logo */}

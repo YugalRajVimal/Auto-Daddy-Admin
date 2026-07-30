@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FiUser } from "react-icons/fi";
 import { Skeleton } from "../common/Skeleton";
 
 type ShopBrandLogoProps = {
@@ -8,7 +9,7 @@ type ShopBrandLogoProps = {
 };
 
 const LOGO_BOX_CLASS =
-  "relative aspect-square size-16 shrink-0 overflow-hidden rounded border border-gray-200 bg-gray-100 sm:size-[72px] md:size-20";
+  "relative aspect-square size-16 shrink-0 overflow-hidden rounded border border-gray-200 bg-gray-100 text-gray-400 sm:size-[72px] md:size-20";
 
 export default function ShopBrandLogo({
   src,
@@ -19,7 +20,7 @@ export default function ShopBrandLogo({
   const [failed, setFailed] = useState(false);
   const trimmed = src?.trim() ?? "";
   const hasSrc = Boolean(trimmed) && !failed;
-  const showSkeleton = !hasSrc || !loaded;
+  const showSkeleton = hasSrc && !loaded;
 
   useEffect(() => {
     setLoaded(false);
@@ -29,21 +30,26 @@ export default function ShopBrandLogo({
   return (
     <div className={`${LOGO_BOX_CLASS} ${className}`} aria-label={alt}>
       {showSkeleton ? (
-        <Skeleton
-          className="absolute inset-0 rounded-none"
-          pulse={hasSrc && !loaded}
-        />
+        <Skeleton className="absolute inset-0 rounded-none" pulse />
       ) : null}
       {hasSrc ? (
         <img
           src={trimmed}
           alt={alt}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-150 ${loaded ? "opacity-100" : "opacity-0"
-            }`}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-150 ${
+            loaded ? "opacity-100" : "opacity-0"
+          }`}
           onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
         />
-      ) : null}
+      ) : (
+        <span
+          className="absolute inset-0 flex items-center justify-center text-current opacity-50"
+          aria-hidden
+        >
+          <FiUser className="h-[55%] w-[55%]" strokeWidth={1.5} />
+        </span>
+      )}
     </div>
   );
 }

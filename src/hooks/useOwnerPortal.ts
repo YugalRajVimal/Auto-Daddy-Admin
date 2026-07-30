@@ -6,6 +6,7 @@ import {
   fetchCarOwnerHome,
   fetchCarOwnerPrivacy,
   fetchCarOwnerProductFeatures,
+  filterCarOwnerFaqsByPageSlug,
   parseCarOwnerFaqItems,
   parseCarOwnerPrivacy,
   parseCarOwnerProductFeatures,
@@ -307,7 +308,8 @@ export function useCarOwnerDashboard() {
   };
 }
 
-export function useCarOwnerFaqs(role = "carowner") {
+/** Shared FAQ fetch for car_owner / shop_owner CMS roles + optional pageSlug. */
+export function usePortalFaqs(role = "car_owner", pageSlug?: string) {
   const { token } = useAuth();
   const [items, setItems] = useState<DummyFaqItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -324,7 +326,8 @@ export function useCarOwnerFaqs(role = "carowner") {
       try {
         const res = await fetchCarOwnerFaqs(token, role);
         if (cancelled) return;
-        setItems(res.ok ? parseCarOwnerFaqItems(res.data) : []);
+        const parsed = res.ok ? parseCarOwnerFaqItems(res.data) : [];
+        setItems(filterCarOwnerFaqsByPageSlug(parsed, pageSlug));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -332,9 +335,17 @@ export function useCarOwnerFaqs(role = "carowner") {
     return () => {
       cancelled = true;
     };
-  }, [role, token]);
+  }, [pageSlug, role, token]);
 
   return { items, loading, faqsHeading: "FAQs" };
+}
+
+export function useCarOwnerFaqs(pageSlug?: string) {
+  return usePortalFaqs("car_owner", pageSlug);
+}
+
+export function useShopOwnerFaqs(pageSlug?: string) {
+  return usePortalFaqs("shop_owner", pageSlug);
 }
 
 export function useCarOwnerPrivacy(query?: { country?: string; type?: string }) {

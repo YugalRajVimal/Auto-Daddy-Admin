@@ -39,6 +39,7 @@ export type VerifyOtpResponse = {
 export type AuthSessionVerifyResponse = {
   message?: string;
   error?: string;
+  phone?: string;
 };
 
 export async function postJson<T>(path: string, body: Record<string, unknown>, token?: string) {
@@ -233,4 +234,14 @@ export function isSessionUnauthorized(status: number, response: AuthSessionVerif
   if (status === 401 || status === 403) return true;
   const err = (response?.error ?? response?.message ?? "").toLowerCase();
   return err.includes("unauthorized");
+}
+
+/** HTTP 428 from POST /api/auth/ — token is valid but profile setup is required. */
+export function isSessionProfileIncomplete(
+  status: number,
+  response: AuthSessionVerifyResponse | null
+): boolean {
+  if (status === 428) return true;
+  const msg = (response?.message ?? "").toLowerCase();
+  return msg.includes("profile is incomplete") || msg.includes("complete your profile");
 }

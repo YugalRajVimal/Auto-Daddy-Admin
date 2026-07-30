@@ -21,6 +21,7 @@ import type { CarOwnerDashboardApiResponse } from "@/types/car-owner-dashboard";
 import { coalesceCarOwnerHomePayload, fetchCarOwnerHome } from "@/lib/car-owner-home-api";
 import { fetchAndMergeShopOwnerPortal } from "@/lib/shop-owner-portal-bootstrap";
 import {
+  isAuthSessionProfileIncomplete,
   isAuthSessionUnauthorized,
   isAuthSessionVerified,
   normalizeAuthSessionPhone,
@@ -83,6 +84,11 @@ type AuthContextType = {
    * includes fresher `userProfile` than what's currently stored.
    */
   syncCarOwnerProfileFromDashboard: (profile: CarOwnerDashboardApiResponse["userProfile"] | null | undefined) => Promise<void>;
+  /**
+   * Patch persisted session meta (e.g. mark profile complete after onboarding).
+   * Needed because GET /api/user/profile often omits isProfileComplete.
+   */
+  updateSessionMeta: (patch: Partial<AuthSessionMeta>) => Promise<void>;
   sendOtp: (phone: string, countryCode: string) => Promise<ApiResponse<OtpRequestResponse>>;
   verifyOtp: (
     phone: string,
@@ -144,7 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authToken: string,
       sessionMeta: AuthSessionMeta | null,
       onInvalidSession?: (message?: string) => void
-    ): Promise<"valid" | "invalid" | "skipped"> => {
+    ): Promise<"valid" | "invalid" | "skipped" | "profile_incomplete"> => {
       const phone = sessionMeta?.phone?.trim();
       const countryCode = sessionMeta?.countryCode?.trim();
       if (!phone || !countryCode) {
@@ -171,10 +177,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           return "invalid";
         }
+        if (isAuthSessionProfileIncomplete(response)) {
+          return "profile_incomplete";
+        }
         return "skipped";
       } catch {
         return "skipped";
       }
+    },
+    []
+  );
+
+  const markProfileIncomplete = useCallback(
+    async (authToken: string, sessionMeta: AuthSessionMeta | null): Promise<AuthSessionMeta> => {
+      const next: AuthSessionMeta = {
+        role: sessionMeta?.role ?? null,
+        name: sessionMeta?.name ?? null,
+        isProfileComplete: false,
+        isAutoShopBusinessProfileComplete:
+          sessionMeta?.isAutoShopBusinessProfileComplete ?? null,
+        profilePhoto: sessionMeta?.profilePhoto ?? null,
+        phone: sessionMeta?.phone ?? null,
+        countryCode: sessionMeta?.countryCode ?? null,
+      };
+      await saveAuthSession(authToken, next);
+      setMeta(next);
+      return next;
     },
     []
   );
@@ -324,6 +352,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [token]
   );
 
+  const updateSessionMeta = useCallback(async (patch: Partial<AuthSessionMeta>) => {
+    if (!token) return;
+
+    const current: AuthSessionMeta = metaRef.current ?? {
+      role: null,
+      name: null,
+      isProfileComplete: null,
+      isAutoShopBusinessProfileComplete: null,
+      profilePhoto: null,
+    };
+
+    const next: AuthSessionMeta = {
+      ...current,
+      ...patch,
+      role: patch.role !== undefined ? patch.role : current.role,
+      name: patch.name !== undefined ? patch.name : current.name,
+      isProfileComplete:
+        patch.isProfileComplete !== undefined ? patch.isProfileComplete : current.isProfileComplete,
+      isAutoShopBusinessProfileComplete:
+        patch.isAutoShopBusinessProfileComplete !== undefined
+          ? patch.isAutoShopBusinessProfileComplete
+          : current.isAutoShopBusinessProfileComplete,
+      profilePhoto: patch.profilePhoto !== undefined ? patch.profilePhoto : current.profilePhoto,
+      phone: patch.phone !== undefined ? patch.phone : current.phone,
+      countryCode: patch.countryCode !== undefined ? patch.countryCode : current.countryCode,
+    };
+
+    await saveAuthSession(token, next);
+    setMeta(next);
+    setSessionRevision((v) => v + 1);
+  }, [token]);
+
   const refreshSession = useCallback(async (options?: { onProgress?: (label: string) => void; onInvalidSession?: (message?: string) => void }) => {
     const session = await getAuthSession();
     if (!session.token) {
@@ -342,10 +402,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    let metaForRefresh = session.meta;
+    if (verifyResult === "profile_incomplete") {
+      metaForRefresh = await markProfileIncomplete(session.token, session.meta);
+    }
+
     setToken(session.token);
     try {
       const refreshedMeta = await withTimeout(
-        refreshMetaFromServer(session.token, session.meta, {
+        refreshMetaFromServer(session.token, metaForRefresh, {
           onProgress: options?.onProgress,
           onInvalidSession: options?.onInvalidSession,
         }),
@@ -359,9 +424,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await invalidateStoredSession();
         return;
       }
-      setMeta(session.meta);
+      setMeta(metaForRefresh);
     }
-  }, [checkStoredSessionWithAuthEndpoint, invalidateStoredSession, refreshMetaFromServer]);
+  }, [checkStoredSessionWithAuthEndpoint, invalidateStoredSession, markProfileIncomplete, refreshMetaFromServer]);
 
   useEffect(() => {
     let mounted = true;
@@ -440,9 +505,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
+        let metaForRefresh = session.meta;
+        if (verifyResult === "profile_incomplete") {
+          metaForRefresh = await markProfileIncomplete(session.token, session.meta);
+        }
+
         try {
           const refreshedMeta = await withTimeout(
-            refreshMetaFromServer(session.token, session.meta),
+            refreshMetaFromServer(session.token, metaForRefresh),
             6000
           );
           if (!mounted) {
@@ -459,7 +529,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
           }
           // Keep cached meta; don't block boot forever if network hangs.
-          setMeta((prev) => prev ?? session.meta);
+          setMeta((prev) => prev ?? metaForRefresh);
         } finally {
           // If we have a token but still don't know the role, the session is not usable.
           // Force a fresh login instead of routing the user into the wrong role group.
@@ -484,7 +554,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [checkStoredSessionWithAuthEndpoint, invalidateStoredSession, refreshMetaFromServer]);
+  }, [checkStoredSessionWithAuthEndpoint, invalidateStoredSession, markProfileIncomplete, refreshMetaFromServer]);
 
   useEffect(() => {
     const handleAppState = (nextState: AppStateStatus) => {
@@ -507,6 +577,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           );
           if (verifyResult === "invalid") {
             await invalidateStoredSession();
+          } else if (verifyResult === "profile_incomplete") {
+            await markProfileIncomplete(session.token, session.meta);
           }
         } finally {
           sessionVerifyInFlightRef.current = false;
@@ -516,7 +588,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const subscription = AppState.addEventListener("change", handleAppState);
     return () => subscription.remove();
-  }, [checkStoredSessionWithAuthEndpoint, invalidateStoredSession, isBootstrapping]);
+  }, [checkStoredSessionWithAuthEndpoint, invalidateStoredSession, isBootstrapping, markProfileIncomplete]);
 
   const sendOtp = useCallback(async (phone: string, countryCode: string) => {
     const [deviceId, fcmToken] = await Promise.all([getDeviceIdForApi(), getFcmTokenForApi()]);
@@ -618,6 +690,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isBootstrapping,
       sessionRevision,
       syncCarOwnerProfileFromDashboard,
+      updateSessionMeta,
       sendOtp,
       verifyOtp,
       logout,
@@ -634,6 +707,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionRevision,
       syncCarOwnerProfileFromDashboard,
       token,
+      updateSessionMeta,
       verifyOtp,
     ]
   );

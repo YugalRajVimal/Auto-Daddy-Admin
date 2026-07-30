@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
@@ -23,6 +25,12 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
+import { FormFieldError } from "../../../lib/validation/formUi";
+import {
+  staffUserFormSchema,
+  type StaffUserFormInput,
+  type StaffUserFormValues,
+} from "../../../lib/validation/schemas/identity";
 
 import {
   ONBOARDABLE_ROLES,
@@ -266,14 +274,21 @@ const StaffUserManagement: React.FC = () => {
   // Password intentionally NOT part of the create/edit form — staff users
   // are created with a server-generated password and the SuperAdmin sets
   // the real one via the "Reset Password" row action.
-  const [form, setForm] = useState({ name: "", email: "", phone: "" });
-
-  // `role` (role_admin/sub_admin/associates) is derived automatically from
-  // whichever Role doc (`roleId`) is picked — there is only ONE dropdown
-  // in the UI ("Role"), not two. `role` is kept in state purely so we can
-  // show helper text / gate whether it's editable.
-
-  const [roleId, setRoleId] = useState("");
+  // `role` field in the schema holds the selected Role doc id (`roleId`) —
+  // there is only ONE dropdown in the UI ("Role"), not two.
+  const {
+    register,
+    handleSubmit: submitStaffForm,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm<StaffUserFormInput, unknown, StaffUserFormValues>({
+    resolver: zodResolver(staffUserFormSchema),
+    mode: "onSubmit",
+    defaultValues: { name: "", email: "", phone: "", role: "" },
+  });
+  const phoneValue = watch("phone");
 
   const [isActive, setIsActive] = useState(true);
   const [formError, setFormError] = useState("");
@@ -337,9 +352,7 @@ const StaffUserManagement: React.FC = () => {
   };
 
   const resetFormFields = () => {
-    setForm({ name: "", email: "", phone: "" });
-
-    setRoleId("");
+    reset({ name: "", email: "", phone: "", role: "" });
     setIsActive(true);
   };
 
@@ -395,8 +408,7 @@ const StaffUserManagement: React.FC = () => {
 
   const openEdit = (s: StaffUser) => {
     setEditingStaff(s);
-    setForm({ name: s.name, email: s.email, phone: s.phone || "" });
-    setRoleId((s as any).roleRef?._id || "");
+    reset({ name: s.name, email: s.email, phone: s.phone || "", role: (s as any).roleRef?._id || "" });
     setIsActive(s.isActive);
     setFormError("");
     setShowForm(true);
@@ -430,31 +442,14 @@ const StaffUserManagement: React.FC = () => {
     setShowForm(false);
   };
 
-  // Single source of truth: picking a Role doc sets both roleId and the
-  // derived role "type" (role_admin/sub_admin/associates) together.
-  const handleAssignedRoleChange = (id: string) => {
-    setRoleId(id);
-
-  };
-
-  const saveForm = async () => {
+  const onValidStaffForm = async (values: StaffUserFormValues) => {
     setFormError("");
-    if (!form.name.trim()) return fail("Name is required.");
-    if (!form.email.trim()) return fail("Email is required.");
-    if (!roleId) return fail("Please select a role.");
-
-    function fail(msg: string) {
-      setFormError(msg);
-      adminNotify.error(msg);
-    }
-    if (formError) return;
-
     setFormLoading(true);
     try {
       if (editingStaff) {
         await axios.put(
           `${API}/api/admin/staff-users/${editingStaff._id}`,
-          { name: form.name.trim(), email: form.email.trim(), phone: form.phone, roleId },
+          { name: values.name.trim(), email: values.email.trim(), phone: values.phone, roleId: values.role },
           { headers: getTokenHeaders() }
         );
         if (editingStaff.isActive !== isActive) {
@@ -466,7 +461,7 @@ const StaffUserManagement: React.FC = () => {
         // from the row menu afterwards to set the real one.
         await axios.post(
           `${API}/api/admin/staff-users`,
-          { name: form.name.trim(), email: form.email.trim(), phone: form.phone, roleId },
+          { name: values.name.trim(), email: values.email.trim(), phone: values.phone, roleId: values.role },
           { headers: getTokenHeaders() }
         );
         showMsg("Staff user created successfully. Use 'Reset Password' to set their password.");
@@ -483,9 +478,15 @@ const StaffUserManagement: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const onInvalidStaffForm = () => {
+    adminNotify.error("Please fill all required fields correctly.");
+  };
+
+  const saveForm = () => void submitStaffForm(onValidStaffForm, onInvalidStaffForm)();
+
+  const onStaffFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    await saveForm();
+    saveForm();
   };
 
   const handleToggleStatus = async (s: StaffUser) => {
@@ -773,12 +774,11 @@ const StaffUserManagement: React.FC = () => {
                   {formError}
                 </div>
               )}
-              <form onSubmit={handleSubmit} autoComplete="off" className="flex flex-col gap-4">
+              <form onSubmit={onStaffFormSubmit} autoComplete="off" className="flex flex-col gap-4">
                 <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <CompactField label="Role" required className={compactFixedFieldWidth}>
                     <select
-                      value={roleId}
-                      onChange={(e) => handleAssignedRoleChange(e.target.value)}
+                      {...register("role")}
                       className={compactInputClass}
                       disabled={!!editingStaff}
                     >
@@ -789,6 +789,7 @@ const StaffUserManagement: React.FC = () => {
                         </option>
                       ))}
                     </select>
+                    <FormFieldError message={errors.role?.message} />
                     {editingStaff ? (
                       <p className="mt-1 text-[11px] text-gray-500">Role cannot be changed after creation.</p>
                     ) : roles.length === 0 ? (
@@ -801,44 +802,37 @@ const StaffUserManagement: React.FC = () => {
                   <CompactField label="Name" required>
                     <input
                       type="text"
-                      required
-                      value={form.name}
-                      onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                      {...register("name")}
+                      maxLength={40}
                       placeholder="John Doe"
                       className={compactInputClass}
                     />
+                    <FormFieldError message={errors.name?.message} />
                   </CompactField>
                   <CompactField label="Phone" className={compactFixedFieldWidth}>
                     <input
                       type="tel"
-                      value={form.phone}
+                      value={phoneValue}
                       onChange={(e) => {
                         // Only allow digits, spaces, and +
                         const raw = e.target.value.replace(/[^\d\s\+]/g, "");
-                        setForm((p) => ({ ...p, phone: raw }));
+                        setValue("phone", raw, { shouldValidate: false });
                       }}
                       placeholder="+1 234 567 8901"
                       className={compactInputClass}
                       maxLength={17}
-                      pattern="^(\+1\s?\d{3}[\s\-]?\d{3}[\s\-]?\d{4}|(\+91\s?|0)?[6-9]\d{9}|(\+1|1)?\s?\d{3}[\s\-]?\d{3}[\s\-]?\d{4})$"
-                      title="Enter a valid phone number. Canada/USA: +1 234 567 8901, India: +91 98765 43210"
                     />
-                    {form.phone && !/^(\+1\s?\d{3}[\s\-]?\d{3}[\s\-]?\d{4}|(\+91\s?|0)?[6-9]\d{9}|(\+1|1)?\s?\d{3}[\s\-]?\d{3}[\s\-]?\d{4})$/.test(form.phone) && (
-                      <p className="mt-1 text-xs text-red-600">
-                        Please enter a valid phone number. Canada/USA: +1 234 567 8901, India: +91 98765 43210
-                      </p>
-                    )}
+                    <FormFieldError message={errors.phone?.message} />
                   </CompactField>
 
                   <CompactField label="Email" required>
                     <input
                       type="email"
-                      required
-                      value={form.email}
-                      onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                      {...register("email")}
                       placeholder="john@example.com"
                       className={compactInputClass}
                     />
+                    <FormFieldError message={errors.email?.message} />
                   </CompactField>
 
                   <CompactField label="Status" className={compactFixedFieldWidth}>

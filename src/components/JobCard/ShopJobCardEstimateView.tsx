@@ -43,7 +43,9 @@ import {
   pickJobNoFromRecord,
 } from "./shopJobCardEstimate";
 import type { JobCardListRow } from "../../lib/shopOwnerJobCards";
+import A4DocumentSheet from "../common/A4DocumentSheet";
 import { printDomElement } from "../../utils/printDomElement";
+
 
 const OUTLINE_BTN_CLASS =
   "inline-flex items-center gap-1.5 rounded border border-gray-400 bg-white px-3 py-1.5 text-xs font-bold text-gray-800 hover:bg-gray-50 disabled:opacity-60";
@@ -424,7 +426,7 @@ export default function ShopJobCardEstimateView({
   }
 
   return (
-    <div className="space-y-3 print:space-y-0">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 print:block print:space-y-0">
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
         {onBack ? (
           <button type="button" onClick={onBack} className={OUTLINE_BTN_CLASS}>
@@ -508,166 +510,168 @@ export default function ShopJobCardEstimateView({
         </div>
       </div>
 
-      <div
+      <A4DocumentSheet
         id="shop-job-card-estimate-print"
-        className="relative overflow-hidden rounded border bg-white p-4 shadow-sm sm:p-6 print:border-0 print:p-0 print:shadow-none"
-        style={{ borderColor: theme.border }}
+        className="overflow-hidden p-[14mm] print:p-[12mm]"
+        stageClassName="min-h-[calc(100vh-11rem)]"
       >
         {isInvoiceDocument ? (
-          <div className="mb-4 h-1.5 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6" style={{ backgroundColor: theme.accent }} />
+          <div className="mb-5 h-2 -mx-[14mm] -mt-[14mm]" style={{ backgroundColor: theme.accent }} />
         ) : (
           <>
-            <div className="pointer-events-none absolute -inset-x-4 -top-4 sm:-inset-x-6 sm:-top-6">
+            <div className="pointer-events-none absolute inset-x-0 top-0">
               <JobCardDocumentHeaderWave />
             </div>
-            <div className="-mt-4 mb-2 h-16 shrink-0 sm:h-20" aria-hidden />
+            <div className="mb-2 h-16 shrink-0 sm:h-20" aria-hidden />
           </>
         )}
 
-        <div className="relative z-10 mb-4 flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            {logoUrl ? (
-              <img src={logoUrl} alt="" className="h-12 max-w-[8rem] object-contain" />
-            ) : (
-              <div
-                className="flex h-12 w-12 items-center justify-center rounded text-xs font-bold"
-                style={{ backgroundColor: theme.accent, color: theme.accentText }}
-              >
-                AD
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold" style={{ color: theme.title }}>
-                {businessBlock.name}
-              </p>
-            </div>
-          </div>
-          <h2
-            className="shrink-0 text-2xl font-bold uppercase tracking-wide"
-            style={{ color: theme.title }}
-          >
-            {documentHeading}
-          </h2>
-        </div>
-
-        <div className="relative z-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="space-y-4 text-sm text-gray-800">
-            <div>
-              {businessBlock.address ? <p>{businessBlock.address}</p> : null}
-              {businessBlock.phone ? <p>{businessBlock.phone}</p> : null}
-            </div>
-            <div>
-              <p className="font-bold text-gray-900">To</p>
-              <p className="font-semibold">{customerBlock.name}</p>
-              {customerBlock.company ? <p>{customerBlock.company}</p> : null}
-              {customerBlock.address ? <p>{customerBlock.address}</p> : null}
-            </div>
-          </div>
-
-          <div className="text-sm lg:ml-auto lg:justify-self-end">
-            <div className="w-full min-w-[18rem] max-w-[20rem] space-y-1">
-              <EstimateMetaRow label={documentNoLabel} value={docNo} />
-              <EstimateMetaRow
-                label="Date :"
-                value={formatEstimateDate(job.date ?? job.serviceDate ?? job.jobDate ?? job.createdAt)}
-              />
-              {showHst ? <EstimateMetaRow label="HST No. :" value={hstNumber} /> : null}
-            </div>
-          </div>
-        </div>
-
-        <div className="relative z-10 mt-5 overflow-x-auto">
-          <table className="w-full min-w-[36rem] border-collapse text-sm">
-            <thead>
-              <tr
-                className="text-left text-xs font-bold"
-                style={{ backgroundColor: theme.accent, color: theme.accentText }}
-              >
-                <th className="border border-gray-300 px-2 py-2">S. No.</th>
-                <th className="border border-gray-300 px-2 py-2">Description</th>
-                <th className="border border-gray-300 px-2 py-2 text-right">Unit Cost</th>
-                <th className="border border-gray-300 px-2 py-2 text-center">Qty</th>
-                {showHst ? (
-                  <th className="border border-gray-300 px-2 py-2 text-right">HST</th>
-                ) : null}
-                <th className="border border-gray-300 px-2 py-2 text-right">Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={showHst ? 6 : 5}
-                    className="border border-gray-300 px-2 py-4 text-center text-gray-500"
-                  >
-                    No line items
-                  </td>
-                </tr>
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-14 max-w-[9rem] object-contain" />
               ) : (
-                lines.map((line, index) => (
-                  <tr
-                    key={`${line.description}-${index}`}
-                    style={
-                      index % 2 === 1 ? { backgroundColor: theme.stripe } : undefined
-                    }
-                  >
-                    <td className="border border-gray-300 px-2 py-2 align-top">{index + 1}.</td>
-                    <td className="border border-gray-300 px-2 py-2 align-top">{line.description}</td>
-                    <td className="border border-gray-300 px-2 py-2 text-right align-top tabular-nums">
-                      {formatEstimateMoney(line.unitCost, callingCode)}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-2 text-center align-top tabular-nums">
-                      {line.qty}
-                    </td>
-                    {showHst ? (
-                      <td className="border border-gray-300 px-2 py-2 text-right align-top tabular-nums">
-                        {line.hstRate > 0 ? `${line.hstRate}%` : "—"}
-                      </td>
-                    ) : null}
-                    <td className="border border-gray-300 px-2 py-2 text-right align-top tabular-nums">
-                      {formatEstimateMoney(line.price, callingCode)}
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded text-sm font-bold"
+                  style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                >
+                  AD
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-base font-bold" style={{ color: theme.title }}>
+                  {businessBlock.name}
+                </p>
+              </div>
+            </div>
+            <h2
+              className="shrink-0 text-3xl font-bold uppercase tracking-wide"
+              style={{ color: theme.title }}
+            >
+              {documentHeading}
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-8">
+            <div className="space-y-4 text-[13px] leading-relaxed text-gray-800">
+              <div>
+                {businessBlock.address ? <p>{businessBlock.address}</p> : null}
+                {businessBlock.phone ? <p>{businessBlock.phone}</p> : null}
+              </div>
+              <div>
+                <p className="font-bold text-gray-900">To</p>
+                <p className="font-semibold">{customerBlock.name}</p>
+                {customerBlock.company ? <p>{customerBlock.company}</p> : null}
+                {customerBlock.address ? <p>{customerBlock.address}</p> : null}
+              </div>
+            </div>
+
+            <div className="ml-auto justify-self-end text-[13px]">
+              <div className="w-full min-w-[16rem] space-y-1.5">
+                <EstimateMetaRow label={documentNoLabel} value={docNo} />
+                <EstimateMetaRow
+                  label="Date :"
+                  value={formatEstimateDate(job.date ?? job.serviceDate ?? job.jobDate ?? job.createdAt)}
+                />
+                {showHst ? <EstimateMetaRow label="HST No. :" value={hstNumber} /> : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex-1">
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr
+                  className="text-left text-xs font-bold"
+                  style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                >
+                  <th className="border border-gray-300 px-2.5 py-2.5">S. No.</th>
+                  <th className="border border-gray-300 px-2.5 py-2.5">Description</th>
+                  <th className="border border-gray-300 px-2.5 py-2.5 text-right">Unit Cost</th>
+                  <th className="border border-gray-300 px-2.5 py-2.5 text-center">Qty</th>
+                  {showHst ? (
+                    <th className="border border-gray-300 px-2.5 py-2.5 text-right">HST</th>
+                  ) : null}
+                  <th className="border border-gray-300 px-2.5 py-2.5 text-right">Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={showHst ? 6 : 5}
+                      className="border border-gray-300 px-2.5 py-6 text-center text-gray-500"
+                    >
+                      No line items
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-            <EstimateTotalsFooter
-              subtotal={formatEstimateMoney(totals.subtotal, callingCode)}
-              discount={
-                totals.discount > 0
-                  ? formatEstimateMoney(totals.discount, callingCode)
-                  : undefined
-              }
-              hst={formatEstimateMoney(totals.hst, callingCode)}
-              roundOff={
-                totals.roundOff !== 0
-                  ? formatEstimateMoney(totals.roundOff, callingCode)
-                  : undefined
-              }
-              total={formatEstimateMoney(totals.total, callingCode)}
-              totalLabel={`Total (${currencyLabel}) :`}
-              showHst={showHst}
-              labelColSpan={showHst ? 5 : 4}
-              theme={theme}
-            />
-          </table>
+                ) : (
+                  lines.map((line, index) => (
+                    <tr
+                      key={`${line.description}-${index}`}
+                      style={
+                        index % 2 === 1 ? { backgroundColor: theme.stripe } : undefined
+                      }
+                    >
+                      <td className="border border-gray-300 px-2.5 py-2.5 align-top">{index + 1}.</td>
+                      <td className="border border-gray-300 px-2.5 py-2.5 align-top">{line.description}</td>
+                      <td className="border border-gray-300 px-2.5 py-2.5 text-right align-top tabular-nums">
+                        {formatEstimateMoney(line.unitCost, callingCode)}
+                      </td>
+                      <td className="border border-gray-300 px-2.5 py-2.5 text-center align-top tabular-nums">
+                        {line.qty}
+                      </td>
+                      {showHst ? (
+                        <td className="border border-gray-300 px-2.5 py-2.5 text-right align-top tabular-nums">
+                          {line.hstRate > 0 ? `${line.hstRate}%` : "—"}
+                        </td>
+                      ) : null}
+                      <td className="border border-gray-300 px-2.5 py-2.5 text-right align-top tabular-nums">
+                        {formatEstimateMoney(line.price, callingCode)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              <EstimateTotalsFooter
+                subtotal={formatEstimateMoney(totals.subtotal, callingCode)}
+                discount={
+                  totals.discount > 0
+                    ? formatEstimateMoney(totals.discount, callingCode)
+                    : undefined
+                }
+                hst={formatEstimateMoney(totals.hst, callingCode)}
+                roundOff={
+                  totals.roundOff !== 0
+                    ? formatEstimateMoney(totals.roundOff, callingCode)
+                    : undefined
+                }
+                total={formatEstimateMoney(totals.total, callingCode)}
+                totalLabel={`Total (${currencyLabel}) :`}
+                showHst={showHst}
+                labelColSpan={showHst ? 5 : 4}
+                theme={theme}
+              />
+            </table>
+          </div>
+
+          <p className="relative z-10 mt-auto pt-8 text-right text-[10px] text-gray-500">
+            {footerNote}
+          </p>
         </div>
 
-        <p className="relative z-10 mt-6 text-right text-[10px] text-gray-500 print:mt-4">
-          {footerNote}
-        </p>
-
         {isInvoiceDocument ? (
-          <div className="mt-4 h-1.5 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6" style={{ backgroundColor: theme.accent }} />
+          <div className="mt-5 h-2 -mx-[14mm] -mb-[14mm]" style={{ backgroundColor: theme.accent }} />
         ) : (
           <>
-            <div className="-mb-4 mt-6 h-[7.5rem] shrink-0 sm:h-[9rem]" aria-hidden />
-            <div className="pointer-events-none absolute -inset-x-4 -bottom-4 sm:-inset-x-6 sm:-bottom-6">
+            <div className="mt-auto h-[7.5rem] shrink-0 sm:h-[9rem]" aria-hidden />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0">
               <JobCardDocumentWaves />
             </div>
           </>
         )}
-      </div>
+      </A4DocumentSheet>
     </div>
   );
 }

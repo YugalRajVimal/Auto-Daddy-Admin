@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import { adminNotify } from "../../../utils/adminNotify";
@@ -24,6 +26,8 @@ import {
   compactInputClass,
 } from "../../../components/admin/ContentPanel";
 import { getPostLoginRedirect, useAuth } from "../../../auth";
+import { FormFieldError } from "../../../lib/validation/formUi";
+import { carOwnerPageSchema, type CarOwnerPageFormInput, type CarOwnerPageValues } from "../../../lib/validation/schemas/identity";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type BusinessProfileType = {
@@ -489,7 +493,6 @@ function emptyVehicle(): VehicleFormRow {
     vehicleImagePreview: "",
   };
 }
-function isValidEmail(e: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()); }
 const fieldErrorClass = "mt-0.5 text-[11px] font-semibold text-red-700";
 const carOwnerRowFieldWidth = compactFixedFieldWidth;
 const carOwnerAddressFieldWidth = "min-w-0 flex-1";
@@ -684,12 +687,32 @@ function VehicleRowForm({ v, i, attempted, carCatalog, onChange, onRemove, canRe
 
 const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () => void; onSaved: () => void }> = ({ owner, onCancel, onSaved }) => {
   const isEdit = !!owner;
-  const [name, setName] = useState(""); const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState(""); const [joiningDate, setJoiningDate] = useState("");
+  const {
+    watch,
+    setValue,
+    setError,
+    clearErrors,
+    formState: { errors: fieldErrors },
+  } = useForm<CarOwnerPageFormInput>({
+    resolver: zodResolver(carOwnerPageSchema),
+    mode: "onSubmit",
+    defaultValues: { name: "", phone: "", email: "", address: "", city: "", attachEmail: false },
+  });
+  const name = watch("name");
+  const email = watch("email") ?? "";
+  const phone = watch("phone");
+  const address = watch("address");
+  const city = watch("city") ?? "";
+  const attachEmail = watch("attachEmail") ?? false;
+  const setName = (v: string) => setValue("name", v);
+  const setEmail = (v: string) => setValue("email", v);
+  const setPhone = (v: string) => setValue("phone", v);
+  const setAddress = (v: string) => setValue("address", v);
+  const setCity = (v: string) => setValue("city", v);
+  const setAttachEmail = (v: boolean) => setValue("attachEmail", v);
+
+  const [joiningDate, setJoiningDate] = useState("");
   const [vehicles, setVehicles] = useState<VehicleFormRow[]>([emptyVehicle()]);
-  const [attachEmail, setAttachEmail] = useState(false);
   const [attachProfilePhoto, setAttachProfilePhoto] = useState(false);
   const [profileFile, setProfileFile] = useState<File | null>(null); const [profilePreview, setProfilePreview] = useState("");
   const [submitting, setSubmitting] = useState(false); const [attempted, setAttempted] = useState(false);
@@ -774,11 +797,19 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
   }, [isEdit, owner]);
 
   function validate(): string | null {
-    if (!name.trim()) return "Name is required.";
-    if (attachEmail && (!email.trim() || !isValidEmail(email))) return "Valid email required.";
-    if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
-    if (!address.trim()) return "Address is required.";
-    return null;
+    clearErrors();
+    const result = carOwnerPageSchema.safeParse({ name, email, phone, address, city, attachEmail });
+    if (result.success) return null;
+    const flat = result.error.flatten().fieldErrors;
+    let firstMessage: string | null = null;
+    (Object.keys(flat) as Array<keyof CarOwnerPageValues>).forEach((key) => {
+      const message = flat[key]?.[0];
+      if (message) {
+        setError(key, { message });
+        firstMessage ??= message;
+      }
+    });
+    return firstMessage;
   }
 
   async function handleSave() {
@@ -866,9 +897,7 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
             className={compactInputClass}
           />
-          {attempted && phone.replace(/\D/g, "").length !== 10 && (
-            <p className={fieldErrorClass}>Must be 10 digits</p>
-          )}
+          <FormFieldError message={fieldErrors.phone?.message} />
         </CompactField>
         <CompactField label="Full Name" required className={carOwnerRowFieldWidth}>
           <input
@@ -877,7 +906,7 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
             onChange={(e) => setName(e.target.value.slice(0, 20))}
             className={compactInputClass}
           />
-          {attempted && !name.trim() && <p className={fieldErrorClass}>Required</p>}
+          <FormFieldError message={fieldErrors.name?.message} />
         </CompactField>
         <CompactField label="City" className={carOwnerRowFieldWidth}>
           <select
@@ -899,7 +928,7 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
             onChange={(e) => setAddress(e.target.value.slice(0, 50))}
             placeholder="Max 50 chars"
           />
-          {attempted && !address.trim() && <p className={fieldErrorClass}>Required</p>}
+          <FormFieldError message={fieldErrors.address?.message} />
         </CompactField>
       </CompactFormRow>
       <CompactFormRow className="items-start justify-start gap-6">
@@ -949,9 +978,7 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
                 placeholder="name@example.com"
                 className={compactInputClass}
               />
-              {attempted && !isValidEmail(email) && (
-                <p className={fieldErrorClass}>Valid email required</p>
-              )}
+              <FormFieldError message={fieldErrors.email?.message} />
             </>
           ) : null}
         </div>

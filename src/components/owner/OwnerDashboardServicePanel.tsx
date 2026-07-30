@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiPlus } from "react-icons/fi";
+import { FiPlus, FiUser } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson, postJson } from "../../api/mobileAuth";
 import DashboardPanelCard from "../COMP";
@@ -115,8 +115,12 @@ function OwnerDashboardShopRow({
       className="flex w-full items-center gap-3 border-b border-[#b2e0a0]/60 bg-ad-green-light/50 px-3 py-3 text-left transition-colors hover:bg-ad-green-light/70 last:border-b-0"
       aria-label={`View ${shop.name}`}
     >
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-200 bg-white">
-        {logoUri ? <img src={logoUri} alt="" className="h-full w-full object-cover" /> : null}
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-200 bg-white text-gray-400">
+        {logoUri ? (
+          <img src={logoUri} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <FiUser size={24} strokeWidth={1.5} aria-hidden />
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-gray-900">{shop.name}</p>

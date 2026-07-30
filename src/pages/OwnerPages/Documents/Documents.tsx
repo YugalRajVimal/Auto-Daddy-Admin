@@ -1,4 +1,4 @@
-import { useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { FiFileText, FiImage, FiTruck, FiUpload } from "react-icons/fi";
 import { Navigate, useParams } from "react-router";
 import { toast } from "react-toastify";
@@ -155,6 +155,20 @@ export default function OwnerDocumentsPage() {
     useCarOwnerDocuments();
 
   const firstVehicleId = vehicles[0]?.id;
+  const vehicleIdsKey = vehicles.map((v) => v.id).join(",");
+  const prevVehicleIdsKey = useRef<string | null>(null);
+
+  // Keep document sections aligned when garage vehicles change (add/delete).
+  useEffect(() => {
+    if (vehiclesLoading) return;
+    if (prevVehicleIdsKey.current === null) {
+      prevVehicleIdsKey.current = vehicleIdsKey;
+      return;
+    }
+    if (prevVehicleIdsKey.current === vehicleIdsKey) return;
+    prevVehicleIdsKey.current = vehicleIdsKey;
+    void refresh();
+  }, [vehicleIdsKey, vehiclesLoading, refresh]);
 
   const visibleSections = useMemo(() => {
     if (!vehicleId) return sections;
@@ -175,6 +189,14 @@ export default function OwnerDocumentsPage() {
       toast.error(res.message ?? "Could not upload document.");
     }
   };
+
+  if (!vehiclesLoading && vehicleId && vehicles.length > 0 && !activeVehicle && firstVehicleId) {
+    return <Navigate to={`/owner/documents/${firstVehicleId}`} replace />;
+  }
+
+  if (!vehiclesLoading && vehicleId && vehicles.length === 0) {
+    return <Navigate to="/owner/documents" replace />;
+  }
 
   if (!vehiclesLoading && !vehicleId && firstVehicleId) {
     return <Navigate to={`/owner/documents/${firstVehicleId}`} replace />;

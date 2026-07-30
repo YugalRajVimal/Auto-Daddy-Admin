@@ -4,7 +4,6 @@ import { toast } from "react-toastify";
 import {
   CompactField,
   CompactFormPanel,
-  CompactFormRow,
 } from "../../admin/ContentPanel";
 import {
   shopCompactInputClass,
@@ -17,6 +16,8 @@ import { addSubServices, editSubService, fetchAdminServices } from "../../../lib
 import { parseServiceCatalog } from "../../../lib/dummyServices";
 import { apiMessage } from "../../../lib/shopOwnerMutations";
 import type { ShopServiceCategory } from "../../../types/shopOwner";
+import { FormFieldError, fieldErrorClass, zodIssuesToFieldErrorMap } from "../../../lib/validation/formUi";
+import { shopServiceSubSchema } from "../../../lib/validation/schemas/deal";
 
 type CatalogSub = ShopServiceCategory["subServices"][number];
 type QuantityType = NonNullable<CatalogSub["quantityType"]>;
@@ -131,8 +132,10 @@ export default function ShopServiceSubDialog({
   const [qty, setQty] = useState("1");
   const [quantityType, setQuantityType] = useState<QuantityType>("Unit");
   const [labourCost, setLabourCost] = useState("0");
+  const [tax, setTax] = useState("0");
   const [desc, setDesc] = useState("");
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [companies, setCompanies] = useState<CarCompanyCatalogItem[]>([]);
   const [catalogSubs, setCatalogSubs] = useState<SuggestionEntry[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -190,6 +193,7 @@ export default function ShopServiceSubDialog({
       setQty(String(sub.qty != null && sub.qty > 0 ? sub.qty : 1));
       setQuantityType(sub.quantityType === "Days" ? "Days" : "Unit");
       setLabourCost(sub.labourCost != null ? String(sub.labourCost) : "0");
+      setTax(sub.tax != null ? String(sub.tax) : "0");
     } else {
       setMake("");
       setModel("");
@@ -199,7 +203,9 @@ export default function ShopServiceSubDialog({
       setQty("1");
       setQuantityType("Unit");
       setLabourCost("0");
+      setTax("0");
     }
+    setErrors({});
     setShowSuggestions(false);
   }, [category, editIndex]);
 
@@ -331,30 +337,43 @@ export default function ShopServiceSubDialog({
     setQty(String(sub.qty != null && sub.qty > 0 ? sub.qty : 1));
     setQuantityType(sub.quantityType === "Days" ? "Days" : "Unit");
     setLabourCost(sub.labourCost != null ? String(sub.labourCost) : "0");
+    setTax(sub.tax != null ? String(sub.tax) : "0");
     setShowSuggestions(false);
   };
 
   const handleSave = async () => {
     if (!category) return;
-    if (!name.trim()) {
-      toast.error("Category name is required.");
-      return;
+
+    const result = shopServiceSubSchema.safeParse({ name, price, description: desc });
+    const fieldErrors: Record<string, string> = {};
+    if (!result.success) {
+      const map = zodIssuesToFieldErrorMap(result.error);
+      if (map.name) fieldErrors.name = map.name;
+      if (map.price) fieldErrors.price = map.price;
+      if (map.description) fieldErrors.desc = map.description;
     }
-    const priceNum = parseFloat(price);
-    if (!Number.isFinite(priceNum)) {
-      toast.error("Enter a valid unit cost.");
-      return;
-    }
+
     const qtyNum = parseFloat(qty);
     if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
-      toast.error("Enter a valid quantity.");
-      return;
+      fieldErrors.qty = "Enter a valid quantity.";
     }
     const labourCostNum = parseFloat(labourCost);
     if (!Number.isFinite(labourCostNum) || labourCostNum < 0) {
-      toast.error("Enter a valid labor cost.");
+      fieldErrors.labourCost = "Enter a valid labor cost.";
+    }
+    const taxNum = parseFloat(tax);
+    if (!Number.isFinite(taxNum) || taxNum < 0) {
+      fieldErrors.tax = "Enter a valid tax %.";
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors(fieldErrors);
+      toast.error("Please fix the highlighted fields.");
       return;
     }
+    setErrors({});
+
+    const priceNum = parseFloat(price);
     const nextSubs = [...category.subServices];
     const entry = {
       id: editIndex != null ? nextSubs[editIndex]?.id : undefined,
@@ -366,6 +385,7 @@ export default function ShopServiceSubDialog({
       qty: qtyNum,
       quantityType,
       labourCost: labourCostNum,
+      tax: taxNum,
     };
     if (editIndex != null) nextSubs[editIndex] = entry;
     else nextSubs.push(entry);
@@ -390,6 +410,7 @@ export default function ShopServiceSubDialog({
         quantity: qtyNum,
         quantityType,
         labourCost: labourCostNum,
+        tax: taxNum,
       };
       const res =
         editIndex != null
@@ -419,18 +440,20 @@ export default function ShopServiceSubDialog({
   const isEditing = editIndex != null;
   const saveLabel = isEditing ? "Update" : "Save";
   const savingLabel = isEditing ? "Updating…" : "Saving…";
+  const categoryTitle = category.name?.trim() || "Service";
 
   const footerMessage = isEditing
-    ? "You are editing a sub-service"
-    : "You are creating the Category of Service list";
+    ? "You are editing the Service"
+    : "You are creating the Service";
 
   return (
     <CompactFormPanel
-      className={shopProfileFormPanelClass}
+      className={`${shopProfileFormPanelClass} mx-auto w-full max-w-3xl`}
+      contentClassName="space-y-4 px-8 py-5 sm:px-10 sm:py-6 md:px-12"
       showBottomBorder={false}
       footer={
         <div
-          className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
+          className={`flex flex-wrap items-center justify-between gap-2 px-8 py-2.5 sm:px-10 md:px-12 ${shopProfileFormPanelFooterClass}`}
         >
           <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
             {footerMessage}
@@ -444,7 +467,7 @@ export default function ShopServiceSubDialog({
             >
               {saving ? savingLabel : saveLabel}
             </button>
-            <span className="text-xs text-gray-700">
+            <span className="text-xs text-blue-600">
               or{" "}
               <button
                 type="button"
@@ -459,8 +482,12 @@ export default function ShopServiceSubDialog({
         </div>
       }
     >
-      <CompactFormRow className="flex-nowrap items-end gap-x-3 overflow-x-auto">
-        <CompactField label="Make" className="w-[9rem] shrink-0">
+      <h3 className="font-serif text-lg font-bold text-ad-green-dark sm:text-xl">
+        {categoryTitle}
+      </h3>
+
+      <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+        <CompactField label="Make">
           <select
             className={shopCompactInputClass}
             value={make}
@@ -479,7 +506,7 @@ export default function ShopServiceSubDialog({
             ))}
           </select>
         </CompactField>
-        <CompactField label="Model" className="w-[9rem] shrink-0">
+        <CompactField label="Model">
           <select
             className={shopCompactInputClass}
             value={model}
@@ -497,11 +524,16 @@ export default function ShopServiceSubDialog({
             ))}
           </select>
         </CompactField>
-        <CompactField label="Name Category" required className="w-[10.5rem] shrink-0">
+      </div>
+
+      <div className="border-t border-ad-form-border" role="separator" />
+
+      <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+        <CompactField label="Name Service" required>
           <div ref={nameFieldRef} className="relative">
             <input
               ref={nameInputRef}
-              className={shopCompactInputClass}
+              className={fieldErrorClass(!!errors.name, shopCompactInputClass)}
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -554,34 +586,52 @@ export default function ShopServiceSubDialog({
                 )
               : null}
           </div>
+          <FormFieldError message={errors.name} />
         </CompactField>
-        <CompactField label="Description" className="min-w-[12rem] flex-1">
+      </div>
+
+      <CompactField label="Description">
+        <input
+          className={fieldErrorClass(!!errors.desc, shopCompactInputClass)}
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          disabled={saving}
+        />
+        <FormFieldError message={errors.desc} />
+      </CompactField>
+
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+        <CompactField label="Cost" required>
           <input
-            className={shopCompactInputClass}
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-            disabled={saving}
-          />
-        </CompactField>
-        <CompactField label="Unit Cost" required className="w-[4.5rem] shrink-0">
-          <input
-            className={shopCompactInputClass}
+            className={fieldErrorClass(!!errors.price, shopCompactInputClass)}
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             inputMode="decimal"
             disabled={saving}
           />
+          <FormFieldError message={errors.price} />
         </CompactField>
-        <CompactField label="Qty" className="w-[3.5rem] shrink-0">
+        <CompactField label="Quantity">
           <input
-            className={shopCompactInputClass}
+            className={fieldErrorClass(!!errors.qty, shopCompactInputClass)}
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             inputMode="numeric"
             disabled={saving}
           />
+          <FormFieldError message={errors.qty} />
         </CompactField>
-        <CompactField label="Qty Type" className="w-[5.5rem] shrink-0">
+        <CompactField label="Tax %">
+          <input
+            className={fieldErrorClass(!!errors.tax, shopCompactInputClass)}
+            value={tax}
+            onChange={(e) => setTax(e.target.value)}
+            inputMode="decimal"
+            disabled={saving}
+          />
+          <FormFieldError message={errors.tax} />
+        </CompactField>
+        <CompactField label="Qty Type">
           <select
             className={shopCompactInputClass}
             value={quantityType}
@@ -595,16 +645,17 @@ export default function ShopServiceSubDialog({
             ))}
           </select>
         </CompactField>
-        <CompactField label="Labor Cost" className="w-[5rem] shrink-0">
+        <CompactField label="Labor Cost">
           <input
-            className={shopCompactInputClass}
+            className={fieldErrorClass(!!errors.labourCost, shopCompactInputClass)}
             value={labourCost}
             onChange={(e) => setLabourCost(e.target.value)}
             inputMode="decimal"
             disabled={saving}
           />
+          <FormFieldError message={errors.labourCost} />
         </CompactField>
-      </CompactFormRow>
+      </div>
     </CompactFormPanel>
   );
 }

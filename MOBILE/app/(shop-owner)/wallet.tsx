@@ -1,7 +1,7 @@
+import { ShopJobCardEstimateView } from "@/components/job-cards";
 import {
   ChevronLabelBar,
   Fab,
-  LoadingProgress,
   ModalKeyboardRoot,
   StackScreenFrame,
   SurfaceCard,
@@ -27,6 +27,7 @@ import {
 } from "@/lib/expense-categories";
 import { localImageMultipartPart } from "@/lib/local-image-for-form";
 import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
+import { pickJobNoFromListRow } from "@/lib/shop-job-card-estimate";
 import {
   pickJobCardInvoiceNumber,
   pickJobCardNoForApi,
@@ -104,12 +105,6 @@ function dateToYmd(d: Date) {
 
 function normalizeVendorLabel(value: string) {
   return value.trim().replace(/\s+/g, " ");
-}
-
-function displayBillId(row: JobCardListRow): string {
-  const invoiceNo = pickJobCardInvoiceNumber(row);
-  if (invoiceNo) return invoiceNo;
-  return row.jobNo?.trim() || "—";
 }
 
 function matchesInvoiceSearch(row: JobCardListRow, query: string): boolean {
@@ -896,6 +891,10 @@ export default function WalletPage() {
     [dismissMenus]
   );
 
+  const closeInvoicePreview = useCallback(() => {
+    setPreviewRow(null);
+  }, []);
+
   const activeMenu = invoiceMenu ?? expenseMenu ?? bankMenu;
   const menuCardLayoutStyle = useMemo(() => {
     if (!activeMenu) return null;
@@ -1232,32 +1231,24 @@ export default function WalletPage() {
       <Modal
         visible={previewRow != null}
         transparent
-        animationType="slide"
-        onRequestClose={() => setPreviewRow(null)}
+        animationType="fade"
+        onRequestClose={closeInvoicePreview}
       >
-        <ModalKeyboardRoot onBackdropPress={() => setPreviewRow(null)} scrimColor="rgba(0,0,0,0.42)">
-          <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetTitleRow}>
-              <Text style={styles.sheetTitle}>Invoice Preview</Text>
-              <Pressable style={styles.sheetClose} onPress={() => setPreviewRow(null)}>
-                <Ionicons name="close" size={18} color="#D84D4D" />
-              </Pressable>
-            </View>
+        <View style={styles.viewerBackdrop}>
+          <Pressable style={styles.viewerBackdropPress} onPress={closeInvoicePreview} />
+          <View style={styles.viewerCard}>
             {previewRow ? (
-              <View style={styles.previewBody}>
-                <Text style={styles.previewBill}>{displayBillId(previewRow)}</Text>
-                <Text style={styles.previewName}>{previewRow.customerName?.trim() || "—"}</Text>
-                <Text style={styles.previewMeta}>{previewRow.phone?.trim() || "—"}</Text>
-                <Text style={styles.previewMeta}>{previewRow.vehiclePlate?.trim() || "—"}</Text>
-                <Text style={styles.previewAmount}>{formatAmount(previewRow.total)}</Text>
-                <Text style={styles.previewMeta}>
-                  {previewRow.date ? formatDisplayDate(previewRow.date) : "—"}
-                </Text>
-              </View>
+              <ShopJobCardEstimateView
+                key={previewRow.id}
+                jobCardId={previewRow.id}
+                listRow={previewRow}
+                jobNoHint={pickJobNoFromListRow(previewRow) ?? null}
+                showPaymentActions={false}
+                onBack={closeInvoicePreview}
+              />
             ) : null}
           </View>
-        </ModalKeyboardRoot>
+        </View>
       </Modal>
 
       <Modal
@@ -1835,11 +1826,27 @@ const styles = StyleSheet.create({
   },
   sheetFormScroll: { maxHeight: "100%" },
   sheetFormScrollContent: { paddingBottom: spacing.xxl, gap: 2 },
-  previewBody: { gap: 6, paddingBottom: spacing.lg },
-  previewBill: { fontSize: fontSizes.lg, fontWeight: "900", color: colors.primary },
-  previewName: { fontSize: fontSizes.md, fontWeight: "800", color: colors.text },
-  previewMeta: { fontSize: fontSizes.sm, color: colors.textMuted, fontWeight: "600" },
-  previewAmount: { fontSize: fontSizes.xl, fontWeight: "900", color: colors.text, marginTop: 8 },
+  viewerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.screenHorizontal,
+  },
+  viewerBackdropPress: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  viewerCard: {
+    width: "100%",
+    height: "86%",
+    minHeight: 260,
+    backgroundColor: colors.white,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+    ...shadows.card,
+  },
   fieldLabel: {
     marginTop: spacing.sm,
     marginBottom: 4,

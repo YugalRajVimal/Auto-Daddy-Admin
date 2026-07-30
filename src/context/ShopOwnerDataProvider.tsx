@@ -47,6 +47,11 @@ import {
   parseWebsiteTemplatesResponse,
   type WebsiteTemplate,
 } from "../lib/shopOwnerWebsiteApi";
+import {
+  fetchSubscriptionStatus,
+  parseSubscriptionStatus,
+  type SubscriptionStatus,
+} from "../lib/shopOwnerSubscriptionApi";
 import type { MyCustomer, ShopDeal, ShopProfileResponse, ShopServiceCategory } from "../types/shopOwner";
 
 const DEFAULT_PERIOD: MyCustomersPeriod = { timeFilter: "All", anchorDate: new Date() };
@@ -54,6 +59,7 @@ const DEFAULT_PERIOD: MyCustomersPeriod = { timeFilter: "All", anchorDate: new D
 export type ShopPortalCache = {
   dashboard: ShopDashboardData | null;
   profile: ShopProfileResponse | null;
+  subscription: SubscriptionStatus | null;
 };
 
 export type ShopWalletCache = {
@@ -112,7 +118,8 @@ async function fetchSectionData(
   try {
     switch (section) {
       case "portal": {
-        const [homeRes, personalRes, businessRes, legacyProfileRes, legacyTeamRes] = await Promise.all([
+        const [homeRes, personalRes, businessRes, legacyProfileRes, legacyTeamRes, subscriptionRes] =
+          await Promise.all([
           // NEW: Home (thought of the day + subscription days left)
           getJson<unknown>("/api/autoshopowner/home", token),
           // NEW: Profile slices
@@ -122,6 +129,7 @@ async function fetchSectionData(
           getJson<ShopProfileResponse>("/api/auto-shop-owner/profile", token),
           // LEGACY fallback: team members are not exposed in the new router yet
           getJson<unknown>("/api/auto-shop-owner/team-members", token),
+          fetchSubscriptionStatus(token),
         ]);
 
         const homeData =
@@ -239,10 +247,17 @@ async function fetchSectionData(
                   typeof homeData.daysLeftInSubscription === "number" ? homeData.daysLeftInSubscription : undefined,
               }
             : null;
+
+        const subscription =
+          subscriptionRes.ok && subscriptionRes.data != null
+            ? parseSubscriptionStatus(subscriptionRes.data)
+            : null;
+
         return {
           data: {
             dashboard: mergedDashboard,
             profile: mergedProfile,
+            subscription,
           },
           error: null,
         };

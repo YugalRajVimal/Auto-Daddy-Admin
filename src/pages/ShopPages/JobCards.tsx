@@ -705,7 +705,52 @@ export default function ShopJobCardsPage() {
     setView("form");
   };
 
-  const openNewJobCard = () => {
+  const openNewJobCard = async () => {
+    if (!token) {
+      toast.error("Sign in to create a job card.");
+      return;
+    }
+
+    try {
+      const [prefixRes, nextRes] = await Promise.all([
+        fetchAutoshopJobCardPrefix(token),
+        fetchAutoshopJobCardNextNumber(token),
+      ]);
+      const fromNext = nextRes.ok
+        ? parseAutoshopJobCardNextNumber(nextRes.data)
+        : { nextNumber: "", prefix: "" };
+      const prefix = (
+        (prefixRes.ok ? parseAutoshopJobCardPrefix(prefixRes.data) : "") ||
+        fromNext.prefix
+      ).trim();
+      const nextNumber = fromNext.nextNumber.trim();
+      const nextNumberValid =
+        nextNumber !== "" &&
+        Number.isInteger(Number.parseInt(nextNumber, 10)) &&
+        Number.parseInt(nextNumber, 10) >= 1;
+
+      if (!prefix || !nextNumberValid) {
+        const missing =
+          !prefix && !nextNumberValid
+            ? "job card prefix and number"
+            : !prefix
+              ? "job card prefix"
+              : "job card number";
+        toast.error(
+          `Set your ${missing} in Manage Estimates before creating a job card.`,
+        );
+        setManageEstimatesOpen(true);
+        return;
+      }
+
+      setJobCardPrefix(prefix);
+      setEstimateNumbering({ code: prefix, number: nextNumber });
+    } catch {
+      toast.error("Could not verify estimate numbering. Use Manage Estimates to set them.");
+      setManageEstimatesOpen(true);
+      return;
+    }
+
     setSection("my-list");
     setFormMode("add");
     setEditJobCardId(null);
@@ -883,7 +928,9 @@ export default function ShopJobCardsPage() {
                 ) : null
               }
               trailing={
-                section === "my-list" ? <AddNewButton onClick={openNewJobCard} /> : null
+                section === "my-list" ? (
+                  <AddNewButton onClick={() => void openNewJobCard()} />
+                ) : null
               }
             />
 

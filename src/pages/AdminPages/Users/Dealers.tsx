@@ -1073,6 +1073,9 @@
 
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
@@ -1092,6 +1095,8 @@ import {
 } from "../../../components/admin/ContentPanel";
 import { useAdminCityOptions, withSelectedCity } from "../../../hooks/useAdminCityOptions";
 import { adminNotify } from "../../../utils/adminNotify";
+import { FormFieldError } from "../../../lib/validation/formUi";
+import { dummyUserFormSchema, type DummyUserFormInput } from "../../../lib/validation/schemas/identity";
 import {
   createDealer,
   deleteDealer,
@@ -1255,21 +1260,6 @@ const CountModal: React.FC<{
   </BaseModal>
 );
 
-function isEmail(e: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
-}
-
-function isWebsiteUrl(url: string) {
-  const trimmed = url.trim();
-  if (!trimmed) return false;
-  try {
-    const parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
-    return !!parsed.hostname;
-  } catch {
-    return false;
-  }
-}
-
 function formatWebsiteUrl(url?: string) {
   if (!url?.trim()) return "-";
   return url.trim().replace(/^https?:\/\//i, "");
@@ -1342,6 +1332,8 @@ function matchesDummyUserSearchFilters(row: DummyUserRow, filters: AdminSearchVa
   });
 }
 
+type DummyUserFormFields = z.infer<ReturnType<typeof dummyUserFormSchema>>;
+
 const DummyUserAddEditForm: React.FC<{
   row?: DummyUserRow | null;
   config: DummyUserListConfig;
@@ -1352,55 +1344,65 @@ const DummyUserAddEditForm: React.FC<{
   const isEdit = !!row;
   const isWebMode = config.fieldMode === "web";
   const showAddress = !isWebMode || Boolean(config.showAddress);
-  // Removed all categoryOptions code
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [primaryLabel, setPrimaryLabel] = useState("");
-  const [region, setRegion] = useState("");
-  const [websiteUrl, setWebsiteUrl] = useState("");
+  const schema = useMemo(() => dummyUserFormSchema({ isWebMode, showAddress }), [isWebMode, showAddress]);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm<DummyUserFormInput, unknown, DummyUserFormFields>({
+    resolver: zodResolver(schema),
+    mode: "onSubmit",
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      address: "",
+      city: "",
+      primaryLabel: "",
+      region: "",
+      websiteUrl: "",
+    },
+  });
+  const city = watch("city") ?? "";
+  const phone = watch("phone");
   const [attachImage, setAttachImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  // const [ setImagePreviewUrl] = useState("");
-  const [attempted, setAttempted] = useState(false);
   const cityOptions = useAdminCityOptions();
   const citySelectOptions = withSelectedCity(cityOptions, city);
 
   useEffect(() => {
-    setAttempted(false);
     if (isEdit && row) {
-      setName(row.name);
-      setEmail(row.email);
-      setPhone(row.phone);
-      setAddress(row.address ?? "");
-      setCity(row.city);
-      setPrimaryLabel(row.primaryLabel);
-      setRegion(row.region ?? "");
-      setWebsiteUrl(row.websiteUrl ?? "");
+      reset({
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        address: row.address ?? "",
+        city: row.city,
+        primaryLabel: row.primaryLabel,
+        region: row.region ?? "",
+        websiteUrl: row.websiteUrl ?? "",
+      });
       setAttachImage(Boolean(row.imageUrl));
       setImageFile(null);
     } else {
-      setName("");
-      setEmail("");
-      setPhone("");
-      setAddress("");
-      setCity("");
-      setPrimaryLabel("");
-      setRegion("");
-      setWebsiteUrl("");
+      reset({
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+        city: "",
+        primaryLabel: "",
+        region: "",
+        websiteUrl: "",
+      });
       setAttachImage(false);
       setImageFile(null);
     }
-  }, [isEdit, row]);
-
-  const isValid =
-    name.trim() &&
-    isEmail(email) &&
-    phone.replace(/\D/g, "").length === 10 &&
-    primaryLabel.trim() &&
-    (isWebMode ? isWebsiteUrl(websiteUrl) : address.trim() && region.trim());
+  }, [isEdit, row, reset]);
 
   const handleImageFileChange = (file: File | null) => {
     if (!file) {
@@ -1416,27 +1418,23 @@ const DummyUserAddEditForm: React.FC<{
 
   };
 
-  const handleSave = () => {
-    setAttempted(true);
-    if (!isValid) {
-      adminNotify.error("Please fill all required fields.");
-      return;
-    }
-    const normalizedWebsiteUrl = websiteUrl.trim()
-      ? websiteUrl.trim().startsWith("http")
-        ? websiteUrl.trim()
-        : `https://${websiteUrl.trim()}`
+  const onValid = (values: DummyUserFormFields) => {
+    const websiteUrlTrimmed = (values.websiteUrl ?? "").trim();
+    const normalizedWebsiteUrl = websiteUrlTrimmed
+      ? websiteUrlTrimmed.startsWith("http")
+        ? websiteUrlTrimmed
+        : `https://${websiteUrlTrimmed}`
       : undefined;
 
     onSaved(
       {
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.replace(/\D/g, ""),
-        address: showAddress ? address.trim() : undefined,
-        city: city.trim() || "Toronto",
-        primaryLabel: primaryLabel.trim(),
-        region: isWebMode ? undefined : region.trim(),
+        name: values.name.trim(),
+        email: values.email.trim(),
+        phone: values.phone,
+        address: showAddress ? (values.address ?? "").trim() : undefined,
+        city: values.city?.trim() || "Toronto",
+        primaryLabel: values.primaryLabel.trim(),
+        region: isWebMode ? undefined : (values.region ?? "").trim(),
         websiteUrl: isWebMode ? normalizedWebsiteUrl : undefined,
         imageFile: isWebMode && attachImage ? imageFile : undefined,
         removeImage: isWebMode && !attachImage && isEdit && Boolean(row?.imageUrl),
@@ -1444,6 +1442,12 @@ const DummyUserAddEditForm: React.FC<{
       row?._id
     );
   };
+
+  const onInvalid = () => {
+    adminNotify.error("Please fill all required fields correctly.");
+  };
+
+  const phoneField = register("phone");
 
   const formMessage = isEdit ? `You are updating a '${config.title}'` : `You are creating a '${config.title}'`;
 
@@ -1454,31 +1458,38 @@ const DummyUserAddEditForm: React.FC<{
           message={formMessage}
           messageCenter
           actionLabel={saving ? "Saving…" : isEdit ? "Update" : "Save"}
-          onSave={saving ? () => {} : handleSave}
+          onSave={saving ? () => {} : () => void handleSubmit(onValid, onInvalid)()}
           onCancel={onCancel}
         />
       }
     >
       <div className="grid grid-cols-1 gap-x-4 gap-y-4 items-start sm:grid-cols-5">
         <CompactField label="Full Name" required className="min-w-0">
-          <input type="text" value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} className={compactInputClass} />
+          <input type="text" {...register("name")} maxLength={40} className={compactInputClass} />
+          <FormFieldError message={errors.name?.message} />
         </CompactField>
         <CompactField label="Email" required className="min-w-0">
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={compactInputClass} />
+          <input type="email" {...register("email")} className={compactInputClass} />
+          <FormFieldError message={errors.email?.message} />
         </CompactField>
         <CompactField label="Phone" required className="min-w-0">
           <input
             type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            onChange={(e) => setValue("phone", e.target.value.replace(/\D/g, "").slice(0, 10), { shouldValidate: false })}
+            onBlur={phoneField.onBlur}
+            name={phoneField.name}
+            ref={phoneField.ref}
             className={compactInputClass}
           />
+          <FormFieldError message={errors.phone?.message} />
         </CompactField>
         <CompactField label={config.primaryFieldLabel} required className="min-w-0">
-          <input type="text" value={primaryLabel} onChange={(e) => setPrimaryLabel(e.target.value)} className={compactInputClass} />
+          <input type="text" {...register("primaryLabel")} className={compactInputClass} />
+          <FormFieldError message={errors.primaryLabel?.message} />
         </CompactField>
         <CompactField label="City" className="min-w-0">
-          <select value={city} onChange={(e) => setCity(e.target.value)} className={compactInputClass}>
+          <select {...register("city")} className={compactInputClass}>
             <option value="">Select city</option>
             {citySelectOptions.map((cityName) => (
               <option key={cityName} value={cityName}>
@@ -1493,26 +1504,29 @@ const DummyUserAddEditForm: React.FC<{
           <CompactField label="Address" required={!isWebMode} className="min-w-0">
             <input
               type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value.slice(0, 200))}
+              {...register("address")}
+              maxLength={200}
               placeholder="Street / Area"
               className={compactInputClass}
             />
+            <FormFieldError message={errors.address?.message} />
           </CompactField>
         )}
         {isWebMode ? (
           <CompactField label={config.regionFieldLabel} required className="min-w-0">
             <input
               type="url"
-              value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value.slice(0, 120))}
+              {...register("websiteUrl")}
+              maxLength={120}
               placeholder="https://example.com"
               className={compactInputClass}
             />
+            <FormFieldError message={errors.websiteUrl?.message} />
           </CompactField>
         ) : (
           <CompactField label={config.regionFieldLabel} required className="min-w-0">
-            <input type="text" value={region} onChange={(e) => setRegion(e.target.value)} className={compactInputClass} />
+            <input type="text" {...register("region")} className={compactInputClass} />
+            <FormFieldError message={errors.region?.message} />
           </CompactField>
         )}
         {isWebMode && (
@@ -1531,7 +1545,6 @@ const DummyUserAddEditForm: React.FC<{
           />
         )}
       </div>
-      {attempted && !isValid && <p className="text-xs font-semibold text-red-700">Please fill all required fields correctly.</p>}
     </CompactFormPanel>
   );
 };

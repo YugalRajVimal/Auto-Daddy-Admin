@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { authHeaders } from "../../api/client";
 import { getJson } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
@@ -11,6 +13,12 @@ import {
   updateMyCustomer,
   type CustomerVehiclePayload,
 } from "../../lib/shopOwnerMutations";
+import { FormFieldError } from "../../lib/validation/formUi";
+import {
+  carOwnerAddEditFormSchema,
+  type CarOwnerAddEditFormInput,
+  type CarOwnerAddEditFormValues,
+} from "../../lib/validation/schemas/identity";
 import {
   CompactAutoGrowTextarea,
   CompactField,
@@ -95,10 +103,6 @@ function emptyVehicle(): VehicleFormRow {
     vehicleImageFile: null,
     vehicleImagePreview: "",
   };
-}
-
-function isValidEmail(e: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 }
 
 const fieldErrorClass = "mt-0.5 text-[11px] font-semibold text-red-700";
@@ -462,15 +466,43 @@ export default function CarOwnerAddEditForm({
   const isEdit = !!owner;
   const viewOnly = readOnly && isEdit;
   const profileLocked = vehiclesOnly && isEdit;
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [pincode, setPincode] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
+
+  const {
+    watch,
+    setValue,
+    setError,
+    clearErrors,
+    formState: { errors: fieldErrors },
+  } = useForm<CarOwnerAddEditFormInput>({
+    resolver: zodResolver(carOwnerAddEditFormSchema),
+    mode: "onSubmit",
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      pincode: "",
+      address: "",
+      city: "",
+      attachEmail: false,
+    },
+  });
+  const name = watch("name");
+  const email = watch("email") ?? "";
+  const phone = watch("phone");
+  const pincode = watch("pincode");
+  const address = watch("address") ?? "";
+  const city = watch("city") ?? "";
+  const attachEmail = watch("attachEmail") ?? false;
+  const setName = (v: string) => setValue("name", v);
+  const setEmail = (v: string) => setValue("email", v);
+  const setPhone = (v: string) => setValue("phone", v);
+  const setPincode = (v: string) => setValue("pincode", v);
+  const setAddress = (v: string) => setValue("address", v);
+  const setCity = (v: string) => setValue("city", v);
+  const setAttachEmail = (v: boolean) => setValue("attachEmail", v);
+
   const [vehicles, setVehicles] = useState<VehicleFormRow[]>([emptyVehicle()]);
   const [vehiclesBaseline, setVehiclesBaseline] = useState<VehicleFormRow[]>([]);
-  const [attachEmail, setAttachEmail] = useState(false);
   const [attachProfilePhoto, setAttachProfilePhoto] = useState(false);
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [profilePreview, setProfilePreview] = useState("");
@@ -698,6 +730,7 @@ export default function CarOwnerAddEditForm({
   const showCustomerHeader = profileLocked || (vehiclesByPhone && !!resolvedOwnerId);
 
   function validate(): string | null {
+    clearErrors();
     if (phoneOnlyMode) {
       if (phone.replace(/\D/g, "").length !== 10) return "Enter a 10-digit phone number.";
       if (fieldsUnlocked && !resolvedOwnerId) return "No customer found with this phone number.";
@@ -707,12 +740,27 @@ export default function CarOwnerAddEditForm({
       return "Enter a 10-digit phone number to search.";
     }
     if (!profileLocked && !showCustomerHeader) {
-      if (!name.trim()) return "Name is required.";
-      if (attachEmail && (!email.trim() || !isValidEmail(email))) {
-        return "Valid email required.";
+      const result = carOwnerAddEditFormSchema.safeParse({
+        name,
+        email,
+        phone,
+        pincode,
+        address,
+        city,
+        attachEmail,
+      });
+      if (!result.success) {
+        const flat = result.error.flatten().fieldErrors;
+        let firstMessage: string | null = null;
+        (Object.keys(flat) as Array<keyof CarOwnerAddEditFormValues>).forEach((key) => {
+          const message = flat[key]?.[0];
+          if (message) {
+            setError(key, { message });
+            firstMessage ??= message;
+          }
+        });
+        return firstMessage;
       }
-      if (phone.replace(/\D/g, "").length !== 10) return "Phone must be 10 digits.";
-      if (!pincode.trim()) return "Zip code required.";
     }
     if (appendVehicle) {
       const hasNew = vehicles.some((v) => v.licensePlateNo.trim() || v.vehicleName.trim());
@@ -946,9 +994,7 @@ export default function CarOwnerAddEditForm({
             readOnly={viewOnly}
             className={`${compactInputClass}${readOnlyFieldClass}`}
           />
-          {attempted && phone.replace(/\D/g, "").length !== 10 ? (
-            <p className={fieldErrorClass}>Must be 10 digits</p>
-          ) : null}
+          <FormFieldError message={fieldErrors.phone?.message} />
         </CompactField>
         <CompactField label="Full Name" required className={compactFixedFieldWidth}>
           <input
@@ -958,7 +1004,7 @@ export default function CarOwnerAddEditForm({
             readOnly={nonPhoneReadOnly}
             className={nonPhoneFieldClass}
           />
-          {attempted && !name.trim() ? <p className={fieldErrorClass}>Required</p> : null}
+          <FormFieldError message={fieldErrors.name?.message} />
         </CompactField>
         <CompactField label="City" className={compactFixedFieldWidth}>
           <select
@@ -984,7 +1030,7 @@ export default function CarOwnerAddEditForm({
             readOnly={nonPhoneReadOnly}
             className={nonPhoneFieldClass}
           />
-          {attempted && !pincode.trim() ? <p className={fieldErrorClass}>Required</p> : null}
+          <FormFieldError message={fieldErrors.pincode?.message} />
         </CompactField>
         <div className={`ml-auto min-w-0 ${carOwnerAddressFieldWidth}`}>
           <label className="mb-1 block text-xs font-bold text-ad-green-dark">Address</label>
@@ -1106,9 +1152,7 @@ export default function CarOwnerAddEditForm({
                 placeholder="name@example.com"
                 className={compactInputClass}
               />
-              {attempted && !isValidEmail(email) ? (
-                <p className={fieldErrorClass}>Valid email required</p>
-              ) : null}
+              <FormFieldError message={fieldErrors.email?.message} />
             </>
           ) : null}
         </div>

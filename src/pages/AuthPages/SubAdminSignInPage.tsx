@@ -1,26 +1,40 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { FiMail, FiLock } from "react-icons/fi";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth, getPostLoginRedirect } from "../../auth";
+import { FormFieldError } from "../../lib/validation/formUi";
+import {
+  emailPasswordSignInSchema,
+  type EmailPasswordSignInValues,
+} from "../../lib/validation/schemas/identity";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
 const LOGO = "/logo.png";
 
 export default function SubAdminSignInPage() {
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<EmailPasswordSignInValues>({
+    resolver: zodResolver(emailPasswordSignInSchema),
+    mode: "onSubmit",
+    defaultValues: { email: "", password: "" },
+  });
 
-  async function handleLogin() {
+  async function handleLogin(values: EmailPasswordSignInValues) {
     setStatus(null);
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/subadmin/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify({ email: values.email.trim().toLowerCase(), password: values.password }),
       });
       const data = await res.json();
       if (res.ok && data.token) {
@@ -76,40 +90,34 @@ export default function SubAdminSignInPage() {
             </div>
           )}
 
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!loading && email.trim() && password) void handleLogin();
-            }}
-          >
+          <form className="space-y-4" onSubmit={handleSubmit(handleLogin)}>
             <label className="block text-sm text-ad-green-dark">Email Address</label>
             <div className="relative">
               <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                {...register("email")}
                 placeholder="Enter your email"
                 disabled={loading}
                 className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 focus:border-ad-green focus:outline-none focus:ring-1 focus:ring-ad-green"
               />
             </div>
+            <FormFieldError message={errors.email?.message} />
             <label className="block text-sm text-ad-green-dark">Password</label>
             <div className="relative">
               <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                {...register("password")}
                 placeholder="Enter password"
                 disabled={loading}
                 className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 focus:border-ad-green focus:outline-none focus:ring-1 focus:ring-ad-green"
               />
             </div>
+            <FormFieldError message={errors.password?.message} />
             <button
               type="submit"
-              disabled={loading || !email.trim() || !password}
+              disabled={loading}
               className="w-full rounded-lg bg-ad-green py-3 text-sm font-bold uppercase tracking-wide text-white hover:bg-ad-green-dark disabled:opacity-60"
             >
               {loading ? "Signing in..." : "Sign In"}

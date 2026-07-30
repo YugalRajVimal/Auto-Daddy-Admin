@@ -3,6 +3,7 @@ import { RequirePortal } from "../../auth/guards/RequirePortal";
 import useAuth from "../../auth/useAuth";
 import { buildOwnerPrimaryNav, ownerHelpNav } from "../../config/ownerNav";
 import { OwnerPageChromeProvider } from "../../context/OwnerPageChromeContext";
+import { OwnerShopCityFilterProvider } from "../../context/OwnerShopCityFilterContext";
 import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import { useMemo, useState, useEffect } from "react";
@@ -128,7 +129,9 @@ export default function OwnerPanelLayout() {
   return (
     <RequirePortal portal="owner" signInPath="/" unauthorizedPath="/">
       <OwnerPageChromeProvider>
-        <OwnerLayoutContent />
+        <OwnerShopCityFilterProvider>
+          <OwnerLayoutContent />
+        </OwnerShopCityFilterProvider>
       </OwnerPageChromeProvider>
     </RequirePortal>
   );

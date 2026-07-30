@@ -1,4 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
@@ -21,8 +24,15 @@ import AdminSearchCard, {
 } from "../../../components/admin/AdminSearchCard";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { FormFieldError, toastValidationSummary } from "../../../lib/validation/formUi";
+import { thoughtOfDaySchema } from "../../../lib/validation/schemas/cms";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+
+/** Date is validated separately (see `dateError`); only subject/note run through zod here. */
+const thoughtFormSchema = thoughtOfDaySchema.omit({ date: true });
+type ThoughtFormInput = z.input<typeof thoughtFormSchema>;
+type ThoughtFormValues = z.infer<typeof thoughtFormSchema>;
 
 // Utility to get backend API endpoint
 const API_BASE = (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/admin/common` : "/api");
@@ -88,8 +98,19 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const [date, setDate] = useState<Date | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
 
-  const [title, setTitle] = useState("");
-  const [note, setNote] = useState("");
+  const {
+    watch,
+    setValue,
+    handleSubmit,
+    reset,
+    formState: { errors: fieldErrors },
+  } = useForm<ThoughtFormInput, unknown, ThoughtFormValues>({
+    resolver: zodResolver(thoughtFormSchema),
+    mode: "onSubmit",
+    defaultValues: { subject: "", note: "" },
+  });
+  const title = watch("subject");
+  const note = watch("note");
   const [attachImage, setAttachImage] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
@@ -206,8 +227,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const resetForm = () => {
     setDate(new Date());
     setDateError(null);
-    setTitle("");
-    setNote("");
+    reset({ subject: "", note: "" });
     setAttachImage(false);
     setImageFile(null);
     setEditingKey(null);
@@ -223,8 +243,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const openEdit = (row: NoteRow) => {
     setDate(row.date ? new Date(row.date) : null);
     setDateError(null);
-    setTitle(row.subject);
-    setNote(row.notes);
+    reset({ subject: row.subject, note: row.notes });
     setAttachImage(Boolean(row.imageUrl));
     setImageFile(null);
     setEditingKey(getRowKey(row));
@@ -268,7 +287,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   };
 
   // ----- ADD & EDIT (no filtering here) -----
-  const handleSave = async () => {
+  const onValidSave = async (values: ThoughtFormValues) => {
     setDateError(null);
     if (!date) {
       setDateError("Please select a date.");
@@ -282,8 +301,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     const formData = new FormData();
     formData.append("date", date.toISOString().slice(0, 10));
     formData.append("country", "Canada");
-    formData.append("subject", title);
-    if (note) formData.append("notes", note);
+    formData.append("subject", values.subject);
+    if (values.note) formData.append("notes", values.note);
     const existingLikes =
       editingKey != null ? findNoteByKey(editingKey)?.likes ?? 0 : 0;
     formData.append("likes", String(existingLikes));
@@ -322,6 +341,12 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     resetForm();
     setShowForm(false);
   };
+
+  const onInvalidSave = (formErrors: typeof fieldErrors) => {
+    toastValidationSummary(adminNotify.error, formErrors);
+  };
+
+  const handleSave = () => void handleSubmit(onValidSave, onInvalidSave)();
 
   // ----- DELETE (single and multi, but confirm all at once for multi) -----
   const handleDelete = async (row: NoteRow, skipConfirm = false) => {
@@ -461,16 +486,17 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 <input
                   type="text"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => setValue("subject", e.target.value, { shouldValidate: false })}
                   className={compactInputClass}
-                  required
                 />
+                <FormFieldError message={fieldErrors.subject?.message} />
               </CompactField>
               <CompactField label="Note" className="min-w-0 flex-1">
                 <CompactAutoGrowTextarea
                   value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  onChange={(e) => setValue("note", e.target.value, { shouldValidate: false })}
                 />
+                <FormFieldError message={fieldErrors.note?.message} />
               </CompactField>
             </CompactFormRow>
             <CompactFormRow className="items-start justify-start gap-4">

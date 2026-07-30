@@ -1,5 +1,12 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { FormFieldError } from "../lib/validation/formUi";
+import {
+  autoShopOwnerOnboardingSchema,
+  type AutoShopOwnerOnboardingValues,
+} from "../lib/validation/schemas/identity";
 
 /**
  * Onboarding and verification for autoshopowner.
@@ -21,34 +28,28 @@ const darkText = "text-gray-900";
 
 
 // Adapt InputField to all dark
-const InputField = ({
-  label,
-  name,
-  type = "text",
-  value,
-  onChange,
-  required = false,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & {
-  label: string;
-  name: string;
-  value: string;
-  onChange: React.ChangeEventHandler<HTMLInputElement>;
-  required?: boolean;
-}) => (
+const InputField = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement> & {
+    label: string;
+    name: string;
+    errorMessage?: string;
+  }
+>(({ label, name, type = "text", required = false, errorMessage, ...props }, ref) => (
   <div className="flex flex-col gap-1">
     <label className={`text-sm font-semibold ${darkText}`}>{label}</label>
     <input
+      ref={ref}
       name={name}
       type={type}
-      value={value}
-      onChange={onChange}
       required={required}
       className={`px-4 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-700 transition ${darkText} bg-white`}
       {...props}
     />
+    <FormFieldError message={errorMessage} />
   </div>
-);
+));
+InputField.displayName = "InputField";
 
 const Stepper = ({ step }: { step: number }) => (
   <div className="flex justify-center mb-8 gap-4">
@@ -89,37 +90,37 @@ const Stepper = ({ step }: { step: number }) => (
 
 const AutoShopOwnerOnboarding: React.FC = () => {
   const [step, setStep] = useState<"form" | "otp" | "verified" | "error">("form");
-  const [form, setForm] = useState({
-    phone: "",
-    email: "",
-    name: "",
-    pincode: "",
-    address: "",
-  });
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [submittedPhone, setSubmittedPhone] = useState("");
 
-  // Handle input change for form fields
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    formState: { errors: fieldErrors },
+  } = useForm<AutoShopOwnerOnboardingValues>({
+    resolver: zodResolver(autoShopOwnerOnboardingSchema),
+    mode: "onSubmit",
+    defaultValues: { phone: "", email: "", name: "", pincode: "", address: "" },
+  });
 
   // Submit the registration/profile form
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onValidFormSubmit = async (values: AutoShopOwnerOnboardingValues) => {
     setError("");
     setLoading(true);
 
     try {
       const res = await axios.post(
         `${API_BASE}/api/auth/autoshopowner/sign-up-log-in-complete-profile`,
-        { ...form, countryCode: DEFAULT_COUNTRY_CODE }
+        { ...values, countryCode: DEFAULT_COUNTRY_CODE }
       );
       setLoading(false);
       if (res.data && res.data.userId) {
+        setSubmittedPhone(values.phone);
         setStep("otp");
         setOtpSent(true);
       } else {
@@ -136,6 +137,8 @@ const AutoShopOwnerOnboarding: React.FC = () => {
     }
   };
 
+  const handleFormSubmit = handleSubmit(onValidFormSubmit);
+
   // Submit the OTP for verification
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,7 +147,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
     try {
       const res = await axios.post(`${API_BASE}/api/auth/verify-otp`, {
         countryCode: DEFAULT_COUNTRY_CODE,
-        phone: form.phone,
+        phone: submittedPhone,
         otp,
       });
       setLoading(false);
@@ -178,7 +181,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
     try {
       await axios.post(
         `${API_BASE}/api/auth/autoshopowner/sign-up-log-in-complete-profile`,
-        { ...form, countryCode: DEFAULT_COUNTRY_CODE }
+        { ...getValues(), countryCode: DEFAULT_COUNTRY_CODE }
       );
       setOtpSent(true);
       setResendLoading(false);
@@ -213,57 +216,47 @@ const AutoShopOwnerOnboarding: React.FC = () => {
             <form
               onSubmit={handleFormSubmit}
               autoComplete="off"
+              noValidate
               className="space-y-6"
             >
               <InputField
                 label="Phone"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
                 type="tel"
-                required
-                pattern="\d{5,15}"
                 placeholder="Phone number"
                 autoComplete="tel-local"
+                errorMessage={fieldErrors.phone?.message}
+                {...register("phone")}
               />
               <InputField
                 label="Full Name"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                required
                 autoComplete="name"
                 placeholder="Full Name"
+                errorMessage={fieldErrors.name?.message}
+                {...register("name")}
               />
               <InputField
                 label="Email"
-                name="email"
                 type="email"
-                value={form.email}
-                onChange={handleChange}
-                required
                 autoComplete="email"
                 placeholder="your@email.com"
+                errorMessage={fieldErrors.email?.message}
+                {...register("email")}
               />
               <div className="flex gap-4">
                 <div className="w-1/2">
                   <InputField
                     label="Pincode"
-                    name="pincode"
-                    value={form.pincode}
-                    onChange={handleChange}
-                    required
                     placeholder="Postal Code"
+                    errorMessage={fieldErrors.pincode?.message}
+                    {...register("pincode")}
                   />
                 </div>
                 <div className="flex-1">
                   <InputField
                     label="Address"
-                    name="address"
-                    value={form.address}
-                    onChange={handleChange}
-                    required
                     placeholder="Shop Address"
+                    errorMessage={fieldErrors.address?.message}
+                    {...register("address")}
                   />
                 </div>
               </div>
@@ -315,7 +308,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
                 </svg>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">Verify Your Account</h2>
                 <p className="text-gray-900 text-sm mb-2">
-                  We sent a 6-digit OTP to <span className="font-semibold">{DEFAULT_COUNTRY_CODE} {form.phone}</span>
+                  We sent a 6-digit OTP to <span className="font-semibold">{DEFAULT_COUNTRY_CODE} {submittedPhone}</span>
                 </p>
                 {otpSent && (
                   <span className="text-xs text-green-900 mb-1">OTP sent!</span>

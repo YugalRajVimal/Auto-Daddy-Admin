@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { adminNotify } from "../../../utils/adminNotify";
 import AdminPage from "../../../components/admin/AdminPage";
 import { AdminDataTable, tableCell } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
+import { taskSchema, type TaskSchemaInput, type TaskSchemaValues } from "../../../lib/validation/schemas/catalog";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../../lib/validation/formUi";
 
 const API_BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api/admin/tasks`
@@ -35,9 +39,16 @@ const Tasks: React.FC = () => {
   const [pagination, setPagination] = useState<Pagination | null>(null);
 
   const [showAdd, setShowAdd] = useState<boolean>(false);
-  const [addName, setAddName] = useState<string>("");
-  const [addDescription, setAddDescription] = useState<string>("");
-  const [addLink, setAddLink] = useState<string>("");
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors: addFormErrors },
+  } = useForm<TaskSchemaInput, unknown, TaskSchemaValues>({
+    resolver: zodResolver(taskSchema),
+    defaultValues: { name: "", description: "", link: "" },
+  });
 
   const [bulkTasksInput, setBulkTasksInput] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -89,39 +100,39 @@ const Tasks: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, isDeletedView]);
 
-  const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      const body = {
-        name: addName.trim(),
-        description: addDescription.trim(),
-        link: addLink.trim(),
-      };
-      const res = await fetch(API_BASE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to add task");
-      adminNotify.success("Task added.");
-      setShowAdd(false);
-      setAddName("");
-      setAddDescription("");
-      setAddLink("");
-      fetchTasks(1);
-      setPage(1);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Could not add task";
-      setError(message);
-      adminNotify.error(message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const handleAddTask = handleSubmit(
+    async (values) => {
+      setSubmitting(true);
+      setError(null);
+      try {
+        const body = {
+          name: values.name,
+          description: values.description.trim(),
+          link: values.link.trim(),
+        };
+        const res = await fetch(API_BASE, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to add task");
+        adminNotify.success("Task added.");
+        setShowAdd(false);
+        reset({ name: "", description: "", link: "" });
+        fetchTasks(1);
+        setPage(1);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Could not add task";
+        setError(message);
+        adminNotify.error(message);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    (errs) => toastValidationSummary(adminNotify.error, errs as never)
+  );
 
   const handleBulkAddTasks = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -365,31 +376,35 @@ const Tasks: React.FC = () => {
           >
             <h2 className="font-medium mb-1 text-slate-700">Add New Task</h2>
             <div className="flex flex-col gap-2">
-              <input
-                className="border rounded px-3 py-1"
-                type="text"
-                placeholder="Task Name"
-                value={addName}
-                disabled={submitting}
-                required
-                onChange={(e) => setAddName(e.target.value)}
-              />
-              <input
-                className="border rounded px-3 py-1"
-                type="url"
-                placeholder="Task Link (must start with http/https)"
-                value={addLink}
-                required
-                disabled={submitting}
-                onChange={(e) => setAddLink(e.target.value)}
-              />
-              <textarea
-                className="border rounded w-full h-12 px-3 py-1"
-                placeholder="Task Description (optional)"
-                value={addDescription}
-                disabled={submitting}
-                onChange={(e) => setAddDescription(e.target.value)}
-              />
+              <div>
+                <input
+                  className={fieldErrorClass(Boolean(addFormErrors.name), "border rounded px-3 py-1 w-full")}
+                  type="text"
+                  placeholder="Task Name"
+                  disabled={submitting}
+                  {...register("name")}
+                />
+                <FormFieldError message={addFormErrors.name?.message} />
+              </div>
+              <div>
+                <input
+                  className={fieldErrorClass(Boolean(addFormErrors.link), "border rounded px-3 py-1 w-full")}
+                  type="text"
+                  placeholder="Task Link (must start with http/https)"
+                  disabled={submitting}
+                  {...register("link")}
+                />
+                <FormFieldError message={addFormErrors.link?.message} />
+              </div>
+              <div>
+                <textarea
+                  className={fieldErrorClass(Boolean(addFormErrors.description), "border rounded w-full h-12 px-3 py-1")}
+                  placeholder="Task Description (optional)"
+                  disabled={submitting}
+                  {...register("description")}
+                />
+                <FormFieldError message={addFormErrors.description?.message} />
+              </div>
               <button
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm mt-2"
                 type="submit"

@@ -17,6 +17,7 @@ import {
   isEligibleForInvoiceConversion,
   isJobCardApproved,
   isJobCardEditable,
+  jobCardStatusLabel,
   pickJobCardInvoiceNumber,
   pickJobCardNoForApi,
   type JobCardListRow,
@@ -46,7 +47,7 @@ import {
 const JOB_CARD_SECTIONS: { id: JobCardListSection; label: string }[] = [
   { id: "all", label: "My Job Cards" },
   { id: "approvals", label: "Approvals" },
-  { id: "invoice", label: "Converted" },
+  { id: "invoice", label: "Converted to Invoice" },
   { id: "paid", label: "Paid Jobs" },
 ];
 
@@ -327,44 +328,27 @@ function pickCustomerCity(raw: Record<string, unknown> | null): string {
   return s(customer?.city) || s(customer?.address) || "";
 }
 
-function collectDisplayStatuses(row: JobCardListRow, raw: Record<string, unknown> | null): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const add = (v: string | undefined) => {
-    const t = (v ?? "").trim();
-    if (!t) {
-      return;
-    }
-    const key = t.toLowerCase();
-    if (seen.has(key)) {
-      return;
-    }
-    seen.add(key);
-    out.push(t);
-  };
+type StatusPalette = { bg: string; border: string; text: string };
 
-  if (raw) {
-    for (const key of ["statuses", "statusList", "statusHistory", "workflowStatuses", "jobStatuses"]) {
-      const arr = raw[key];
-      if (!Array.isArray(arr)) {
-        continue;
-      }
-      for (const item of arr) {
-        if (typeof item === "string") {
-          add(item);
-        } else if (item && typeof item === "object") {
-          const o = item as Record<string, unknown>;
-          add(s(o.status) ?? s(o.label) ?? s(o.name) ?? s(o.value));
-        }
-      }
-    }
+/** Web parity colors for `jobCardStatusLabel` / `jobCardStatusClass`. */
+function statusPaletteForLabel(label: string): StatusPalette {
+  const norm = label.trim().toLowerCase();
+  if (norm.includes("converted to invoice") || (norm.includes("invoice") && !norm.includes("unpaid"))) {
+    return { bg: "#F3E8FF", border: "#C084FC", text: "#7E22CE" };
   }
-
-  // For shop-owner job cards we only want to display the workflow/job status here.
-  // Payment-related labels (Paid/Pending/Unpaid) are shown elsewhere in the UI.
-  add(s(raw?.status) ?? s(raw?.jobStatus) ?? row.status);
-
-  return out;
+  if (norm.includes("cash paid") || norm.includes("paid by cash")) {
+    return { bg: "#DCFCE7", border: "#86EFAC", text: "#15803D" };
+  }
+  if (norm.includes("approved") || norm.includes("accepted")) {
+    return { bg: "#DCFCE7", border: "#86EFAC", text: "#15803D" };
+  }
+  if (norm.includes("reject")) {
+    return { bg: "#FEE2E2", border: "#FCA5A5", text: "#DC2626" };
+  }
+  if (norm.includes("pending")) {
+    return { bg: "#DBEAFE", border: "#93C5FD", text: "#1D4ED8" };
+  }
+  return { bg: "#F3F4F6", border: "#D1D5DB", text: "#374151" };
 }
 
 function matchesJobCardSearch(row: JobCardListRow, query: string): boolean {
@@ -418,13 +402,10 @@ function getNested(o: Record<string, unknown> | null, key: string): Record<strin
   return obj(v);
 }
 
-type StatusPalette = { bg: string; border: string; text: string };
-
 type JobCardExpandedPanelProps = {
   row: JobCardListRow;
   detailRaw: Record<string, unknown> | null;
   loading: boolean;
-  getStatusPalette: (label: string) => StatusPalette;
   onOpenOptionsMenu: () => void;
 };
 
@@ -432,7 +413,6 @@ function JobCardExpandedPanel({
   row,
   detailRaw,
   loading,
-  getStatusPalette,
   onOpenOptionsMenu,
 }: JobCardExpandedPanelProps) {
   const { meta } = useAuth();
@@ -527,10 +507,11 @@ function JobCardExpandedPanel({
       : rowTotal > 0
         ? rowTotal
         : computedTotal;
-  const statuses = collectDisplayStatuses(row, raw);
-  const primaryStatus = statuses[0];
-  const otherStatuses = statuses.slice(1);
-  const primaryPalette = primaryStatus ? getStatusPalette(primaryStatus) : null;
+  // Same status resolution as web JobCards (`jobCardStatusLabel` / approvedByCustomer).
+  // Prefer list-row fields so approval flags aren’t dropped when detail omits them.
+  const statusLabel = jobCardStatusLabel(row);
+  const statusPalette =
+    statusLabel && statusLabel !== "—" ? statusPaletteForLabel(statusLabel) : null;
   const notes = extractNotes(raw);
 
   return (
@@ -685,24 +666,18 @@ function JobCardExpandedPanel({
       <View style={styles.receiptRule} />
       <View style={styles.receiptStatusRow}>
         <View style={styles.receiptStatusBlock}>
-          {primaryStatus && primaryPalette ? (
+          {statusPalette ? (
             <View
               style={[
                 styles.receiptStatusPrimary,
-                { backgroundColor: primaryPalette.bg, borderColor: primaryPalette.border },
+                { backgroundColor: statusPalette.bg, borderColor: statusPalette.border },
               ]}
             >
-              <Text style={[styles.receiptStatusPrimaryText, { color: primaryPalette.text }]}>
-                {primaryStatus}
+              <Text style={[styles.receiptStatusPrimaryText, { color: statusPalette.text }]}>
+                {statusLabel}
               </Text>
             </View>
           ) : null}
-          {otherStatuses.map((label) => (
-            <Text key={label} style={styles.receiptStatusAlt}>
-              <Text style={styles.receiptStatusOr}>or </Text>
-              {label}
-            </Text>
-          ))}
         </View>
         <Pressable style={styles.optionsBtn} hitSlop={8} onPress={onOpenOptionsMenu}>
           <Ionicons name="ellipsis-vertical" size={18} color={colors.primary} />
@@ -905,53 +880,6 @@ export default function JobCardsPage() {
       },
     });
   });
-
-  const getStatusPalette = useCallback((label: string, active?: boolean) => {
-    const norm = label.trim().toLowerCase();
-    const a = active === true;
-    if (norm === "new") {
-      return a
-        ? { bg: "#CFF3D6", border: "#22C55E", text: "#0F5132" }
-        : { bg: "#ECF9EF", border: "#BFE8C8", text: "#2F6B3E" };
-    }
-    if (norm === "previous") {
-      return a
-        ? { bg: "#D7E8FF", border: "#2E6BE6", text: "#1E3A8A" }
-        : { bg: "#EEF5FF", border: "#C7DBFF", text: "#264A9E" };
-    }
-    if (norm === "pending") {
-      return a
-        ? { bg: "#FFE9B6", border: "#F59E0B", text: "#92400E" }
-        : { bg: "#FFF5E1", border: "#FED7AA", text: "#9A5B11" };
-    }
-    if (norm === "approved") {
-      return a
-        ? { bg: "#CFF3D6", border: "#22C55E", text: "#0F5132" }
-        : { bg: "#ECF9EF", border: "#BFE8C8", text: "#2F6B3E" };
-    }
-    if (norm === "complete" || norm === "completed") {
-      return a
-        ? { bg: "#D7E8FF", border: "#2563EB", text: "#1E3A8A" }
-        : { bg: colors.primaryMutedBg, border: colors.border, text: colors.primary };
-    }
-    if (norm.includes("approval") || norm.includes("sent")) {
-      return a
-        ? { bg: "#CFF3D6", border: colors.success, text: colors.successDark }
-        : { bg: colors.successMuted, border: "#BBF7D0", text: colors.successDark };
-    }
-    if (norm === "rejected" || norm === "autorejected" || norm === "auto rejected") {
-      return a
-        ? { bg: "#FFD1D1", border: "#EF4444", text: "#7F1D1D" }
-        : { bg: "#FFEAEA", border: "#FBC2C2", text: "#8A1E1E" };
-    }
-    if (norm === "paid") {
-      return { bg: "#D1FAE5", border: "#10B981", text: "#065F46" };
-    }
-    if (norm === "unpaid") {
-      return { bg: "#FEE2E2", border: "#F87171", text: "#991B1B" };
-    }
-    return { bg: "#FFF3CD", border: "#FDE68A", text: "#856404" };
-  }, []);
 
   const resendJobCard = useCallback(
     async (row: JobCardListRow) => {
@@ -1202,6 +1130,9 @@ export default function JobCardsPage() {
               const plate = row.vehiclePlate?.trim() || "—";
               const model = row.vehicleMakeModel?.trim() || "—";
               const invoiceNo = section === "invoice" ? pickJobCardInvoiceNumber(row) : "";
+              const statusLabel = jobCardStatusLabel(row);
+              const statusPalette =
+                statusLabel && statusLabel !== "—" ? statusPaletteForLabel(statusLabel) : null;
               const detailRaw =
                 expandedDetail?.id === row.id
                   ? pickJobCardFromPayload(expandedDetail.payload) ?? obj(row.raw)
@@ -1234,10 +1165,30 @@ export default function JobCardsPage() {
                           <Text style={styles.customerName} numberOfLines={1}>
                             {row.customerName?.trim() || "Customer"}
                           </Text>
-                          <View style={styles.phonePill}>
-                            <Text style={styles.phoneText} numberOfLines={1}>
-                              {displayPhone(row.phone)}
-                            </Text>
+                          <View style={styles.phoneStatusRow}>
+                            <View style={styles.phonePill}>
+                              <Text style={styles.phoneText} numberOfLines={1}>
+                                {displayPhone(row.phone)}
+                              </Text>
+                            </View>
+                            {statusPalette ? (
+                              <View
+                                style={[
+                                  styles.statusPill,
+                                  {
+                                    backgroundColor: statusPalette.bg,
+                                    borderColor: statusPalette.border,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[styles.statusPillText, { color: statusPalette.text }]}
+                                  numberOfLines={1}
+                                >
+                                  {statusLabel}
+                                </Text>
+                              </View>
+                            ) : null}
                           </View>
                         </Pressable>
                         <Pressable style={styles.chevronBtn} onPress={toggleExpand} hitSlop={8}>
@@ -1266,7 +1217,6 @@ export default function JobCardsPage() {
                       row={row}
                       detailRaw={detailRaw}
                       loading={detailLoading}
-                      getStatusPalette={getStatusPalette}
                       onOpenOptionsMenu={() => setMenuRow(row)}
                     />
                   ) : null}
@@ -1615,11 +1565,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
+  phoneStatusRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: spacing.xs,
+    maxWidth: "100%",
+  },
   phoneText: {
     fontSize: cardFontSizes.sm,
     fontWeight: "700",
     color: colors.primary,
   },
+  statusPill: {
+    borderWidth: 1,
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 2,
+    borderRadius: radii.md,
+    maxWidth: "100%",
+  },
+  statusPillText: { fontSize: cardFontSizes.tiny, fontWeight: "800" },
   chevronBtn: {
     width: 30,
     height: 30,
@@ -1944,17 +1909,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 18,
   },
-  receiptStatusAlt: {
-    fontSize: cardFontSizes.xs,
-    fontWeight: "600",
-    color: colors.textMuted,
-    textAlign: "center",
-    lineHeight: 16,
-  },
-  receiptStatusOr: {
-    color: colors.textLight,
-    fontWeight: "500",
-  },
   footerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1974,13 +1928,6 @@ const styles = StyleSheet.create({
     marginLeft: "auto",
   },
   footerDate: { fontSize: cardFontSizes.xs, color: colors.textMuted },
-  statusPill: {
-    borderWidth: 1,
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 1,
-    borderRadius: radii.md,
-  },
-  statusPillText: { fontSize: cardFontSizes.tiny, fontWeight: "800" },
   footerTotal: { fontSize: cardFontSizes.md, fontWeight: "800", color: colors.primary },
   optionsModalRoot: {
     flex: 1,

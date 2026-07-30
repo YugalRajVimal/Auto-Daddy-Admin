@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
-import { FiBell, FiUser } from "react-icons/fi";
+import { FiBell, FiEdit2 } from "react-icons/fi";
 import useAuth from "../../auth/useAuth";
 import { getActivePrimaryItem, type NavItem, type NavSubItem } from "../../config/adminNav";
+import { useOwnerShopCityFilter } from "../../context/OwnerShopCityFilterContext";
 import { useCarOwnerNotifications } from "../../hooks/useCarOwnerNotifications";
 import ShopBrandLogo from "../shop/ShopBrandLogo";
 import { shopPortalHorizPaddingClass } from "../shop/shopLayoutStyles";
@@ -64,9 +65,18 @@ export default function OwnerPortalShell({
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { items } = useCarOwnerNotifications();
+  const { filterCityName, openCityPicker } = useOwnerShopCityFilter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navReset = (location.state as { navReset?: number } | null | undefined)?.navReset ?? 0;
   const contentKey = `${location.pathname}-${navReset}`;
+  const onCityFilterPages =
+    location.pathname === "/owner/auto-shops" ||
+    location.pathname.startsWith("/owner/auto-shops/") ||
+    location.pathname === "/owner/deals" ||
+    location.pathname.startsWith("/owner/deals/");
+  const headerCity = onCityFilterPages
+    ? filterCityName.trim() || "All cities"
+    : city?.trim() || "";
 
   const activePrimary = getActivePrimaryItem(location.pathname, primaryNav, homePath);
   const onHelpNav = helpPath != null && isPathActive(location.pathname, helpPath, homePath);
@@ -123,16 +133,12 @@ export default function OwnerPortalShell({
   const headerStackGapClass = "gap-2";
   const loginAsDisplay = loginAs?.trim() || displayName;
 
-  const headerAvatar = headerAvatarSrc?.trim() ? (
+  const headerAvatar = (
     <ShopBrandLogo
       src={headerAvatarSrc}
       alt="Profile photo"
-      className="!size-9 !rounded-xl !border-white/80 !shadow-md ring-2 ring-ad-purple/10 sm:!size-10"
+      className="!size-9 !rounded-xl !border-white/80 !bg-white/70 !shadow-md text-ad-purple/50 ring-2 ring-ad-purple/10 backdrop-blur-sm sm:!size-10"
     />
-  ) : (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/80 bg-white/70 text-ad-purple/50 shadow-md ring-2 ring-ad-purple/10 backdrop-blur-sm sm:size-10">
-      <FiUser size={20} strokeWidth={1.75} aria-hidden />
-    </span>
   );
 
   useEffect(() => {
@@ -175,17 +181,44 @@ export default function OwnerPortalShell({
               >
                 {displayName}
               </Link>
-              {city ? (
+              {headerCity ? (
                 <>
                   <span className="mx-1.5 font-normal text-ad-purple/25" aria-hidden>
                     ·
                   </span>
-                  <Link
-                    to={profilePath}
-                    className="font-medium text-ad-blue-dark/80 underline decoration-ad-blue-dark/20 underline-offset-4 transition-colors hover:text-ad-blue-dark hover:decoration-ad-blue-dark/50"
+                  {onCityFilterPages ? (
+                    <button
+                      type="button"
+                      onClick={openCityPicker}
+                      aria-label="Change city filter"
+                      className="inline-flex items-center gap-1.5 font-medium text-ad-blue-dark/80 underline decoration-ad-blue-dark/20 underline-offset-4 transition-colors hover:text-ad-blue-dark hover:decoration-ad-blue-dark/50"
+                    >
+                      <span>{headerCity}</span>
+                      <FiEdit2 size={13} className="shrink-0 no-underline" aria-hidden />
+                    </button>
+                  ) : (
+                    <Link
+                      to={profilePath}
+                      className="font-medium text-ad-blue-dark/80 underline decoration-ad-blue-dark/20 underline-offset-4 transition-colors hover:text-ad-blue-dark hover:decoration-ad-blue-dark/50"
+                    >
+                      {headerCity}
+                    </Link>
+                  )}
+                </>
+              ) : onCityFilterPages ? (
+                <>
+                  <span className="mx-1.5 font-normal text-ad-purple/25" aria-hidden>
+                    ·
+                  </span>
+                  <button
+                    type="button"
+                    onClick={openCityPicker}
+                    aria-label="Select city filter"
+                    className="inline-flex items-center gap-1.5 font-medium text-ad-blue-dark/80 underline decoration-ad-blue-dark/20 underline-offset-4 transition-colors hover:text-ad-blue-dark hover:decoration-ad-blue-dark/50"
                   >
-                    {city}
-                  </Link>
+                    <span>Select city</span>
+                    <FiEdit2 size={13} className="shrink-0" aria-hidden />
+                  </button>
                 </>
               ) : null}
             </p>

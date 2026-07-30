@@ -233,6 +233,7 @@ export function CompactFormFooter({
   actionLabel = "Save",
   cancelLabel = "Cancel",
   actionType = "button",
+  disabled = false,
   message,
   messageCenter = false,
 }: {
@@ -241,6 +242,7 @@ export function CompactFormFooter({
   actionLabel?: string;
   cancelLabel?: string;
   actionType?: "button" | "submit";
+  disabled?: boolean;
   message?: ReactNode;
   messageCenter?: boolean;
 }) {
@@ -250,13 +252,15 @@ export function CompactFormFooter({
     </>
   );
   const footerMessage = message ?? defaultMessage;
+  const saveDisabled = disabled || !onSave;
 
   const actions = (
     <div className="flex items-center gap-2">
       <button
         type={actionType}
         onClick={onSave}
-        className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95"
+        disabled={saveDisabled}
+        className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95 disabled:pointer-events-none disabled:opacity-50"
       >
         {actionLabel}
         <span aria-hidden className="text-base leading-none">

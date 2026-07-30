@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { FiCalendar, FiHeart, FiMapPin, FiPhone, FiTag } from "react-icons/fi";
+import { FiCalendar, FiHeart, FiMapPin, FiPhone, FiTag, FiUser } from "react-icons/fi";
 import {
   dealDiscountPercent,
   dealKindLabel,
@@ -203,8 +203,8 @@ export default function OwnerDealRow({
                 className="size-10 shrink-0 rounded-xl border border-slate-200/80 object-cover"
               />
             ) : (
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50 text-sm font-bold text-slate-500">
-                {shopName.charAt(0).toUpperCase()}
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50 text-slate-400">
+                <FiUser size={20} strokeWidth={1.5} aria-hidden />
               </div>
             )}
             <div className="min-w-0 space-y-0.5">

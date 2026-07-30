@@ -76,7 +76,7 @@ function printWithIframe(html: string): void {
   iframe.setAttribute("aria-hidden", "true");
   // Non-zero size — 0×0 iframes often print a blank page in Chromium.
   iframe.style.cssText =
-    "position:fixed;left:0;top:0;width:816px;height:1056px;border:0;opacity:0;pointer-events:none;z-index:-1";
+    "position:fixed;left:0;top:0;width:794px;height:1123px;border:0;opacity:0;pointer-events:none;z-index:-1";
   document.body.appendChild(iframe);
 
   const frameWindow = iframe.contentWindow;
@@ -129,7 +129,7 @@ export function printDomElement(element: HTMLElement, title = "Print"): void {
 ${css}
   </style>
   <style>
-    @page { margin: 12mm; size: auto; }
+    @page { size: A4; margin: 0; }
     html, body {
       margin: 0 !important;
       padding: 0 !important;
@@ -143,18 +143,36 @@ ${css}
       print-color-adjust: exact !important;
       color-adjust: exact !important;
     }
+    .a4-document-stage,
+    .a4-document-scaler,
+    .invoice-viewer-a4-stage {
+      display: contents !important;
+      background: transparent !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      overflow: visible !important;
+      width: auto !important;
+      height: auto !important;
+      transform: none !important;
+    }
     #shop-job-card-estimate-print,
+    #owner-invoice-estimate-print,
+    .invoice-viewer-document,
+    .a4-document-sheet,
     [data-print-root] {
       position: static !important;
       inset: auto !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      margin: 0 !important;
+      width: 210mm !important;
+      max-width: 210mm !important;
+      min-height: 297mm !important;
+      margin: 0 auto !important;
       border: none !important;
       border-radius: 0 !important;
       box-shadow: none !important;
       overflow: hidden !important;
       background: #fff !important;
+      transform: none !important;
+      transform-origin: top left !important;
     }
   </style>
 </head>

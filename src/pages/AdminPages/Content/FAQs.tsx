@@ -4,6 +4,8 @@
 import { useState, useEffect, useCallback } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
@@ -25,6 +27,8 @@ import AdminSearchCard, {
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
+import { FormFieldError, toastValidationSummary } from "../../../lib/validation/formUi";
+import { faqSchema, type FaqFormInput, type FaqValues } from "../../../lib/validation/schemas/cms";
 
 const API_BASE = (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/admin/common` : "/api");
 
@@ -173,11 +177,23 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   const [editingId, setEditingId] = useState<FaqRow["id"] | null>(null);
   const [date, setDate] = useState("2026-06-16");
   const [user, setUser] = useState("car-owner");
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState(DEFAULT_ANSWER);
   const [pageSlug, setPageSlug] = useState(DEFAULT_PAGE_SLUG);
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const {
+    watch,
+    setValue,
+    handleSubmit,
+    reset,
+    formState: { errors: fieldErrors },
+  } = useForm<FaqFormInput, unknown, FaqValues>({
+    resolver: zodResolver(faqSchema),
+    mode: "onSubmit",
+    defaultValues: { question: "", answer: DEFAULT_ANSWER, status: "" },
+  });
+  const question = watch("question");
+  const answer = watch("answer");
 
   const resetTableControls = () => {
     setPage(1);
@@ -265,8 +281,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   const resetForm = () => {
     setDate("2026-06-16");
     setUser("car-owner");
-    setQuestion("");
-    setAnswer(DEFAULT_ANSWER);
+    reset({ question: "", answer: DEFAULT_ANSWER, status: "" });
     setPageSlug(DEFAULT_PAGE_SLUG);
     setEditingId(null);
   };
@@ -280,8 +295,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
   const openEdit = (row: FaqRow) => {
     setDate(row.date);
     setUser(USER_OPTIONS.find((o) => o.apiValue === row.role)?.value ?? row.role);
-    setQuestion(row.question);
-    setAnswer(row.answer);
+    reset({ question: row.question, answer: row.answer, status: "" });
     setPageSlug(row.pageSlug ?? DEFAULT_PAGE_SLUG);
     setEditingId(row.id);
     setShowSearchCard(false);
@@ -319,14 +333,14 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
     (opt) => opt.user === user
   );
 
-  const handleSave = async () => {
+  const onValidSave = async (values: FaqValues) => {
     // The backend expects role, date, question, answer, pageSlug
     const roleForApi = USER_OPTIONS.find((o) => o.value === user)?.apiValue || "car_owner";
     const payload: any = {
       role: roleForApi,
       date,
-      question,
-      answer,
+      question: values.question,
+      answer: values.answer,
       pageSlug: pageSlug,
     };
 
@@ -351,7 +365,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ answer, pageSlug }), // NOTE: update pageSlug as well if your backend supports it
+          body: JSON.stringify({ answer: values.answer, pageSlug }), // NOTE: update pageSlug as well if your backend supports it
         });
         if (!res.ok) throw new Error("Failed to update.");
         adminNotify.success("Updated successfully.");
@@ -363,6 +377,12 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
       adminNotify.error(err?.message || "Failed to save FAQ.");
     }
   };
+
+  const onInvalidSave = (formErrors: typeof fieldErrors) => {
+    toastValidationSummary(adminNotify.error, formErrors);
+  };
+
+  const handleSave = () => void handleSubmit(onValidSave, onInvalidSave)();
 
   // Deletes selected rows, sequentially (unchanged)
   const handleDelete = async () => {
@@ -528,15 +548,17 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
               <CompactField label="Question" required className="min-w-[200px] flex-1">
                 <CompactAutoGrowTextarea
                   value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
+                  onChange={(e) => setValue("question", e.target.value, { shouldValidate: false })}
                   placeholder="Question ?"
                 />
+                <FormFieldError message={fieldErrors.question?.message} />
               </CompactField>
               <CompactField label="Answer" required className="min-w-[200px] flex-1">
                 <CompactAutoGrowTextarea
                   value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
+                  onChange={(e) => setValue("answer", e.target.value, { shouldValidate: false })}
                 />
+                <FormFieldError message={fieldErrors.answer?.message} />
               </CompactField>
             </CompactFormRow>
           </CompactFormPanel>

@@ -7,49 +7,53 @@ import Input from "../../form/input/InputField";
 import Button from "../../ui/button/Button";
 
 import { useNavigate } from "react-router";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { FormFieldError } from "../../../lib/validation/formUi";
+import {
+  signInEmailSchema,
+  signInOtpSchema,
+  type SignInEmailValues,
+  type SignInOtpValues,
+} from "../../../lib/validation/schemas/identity";
 
 export default function SignInForm() {
   // const [isChecked, setIsChecked] = useState(false);
 
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState();
   const [isOTPFieldsVisible, setIsOTPFormVisible] = useState(false);
-  const [otp, setOTP] = useState();
+
+  const {
+    handleSubmit: handleEmailSubmit,
+    watch: watchEmail,
+    setValue: setEmailValue,
+    formState: { errors: emailErrors },
+  } = useForm<SignInEmailValues>({
+    resolver: zodResolver(signInEmailSchema),
+    mode: "onSubmit",
+    defaultValues: { email: "" },
+  });
+  const email = watchEmail("email");
+
+  const {
+    handleSubmit: handleOtpSubmit,
+    watch: watchOtp,
+    setValue: setOtpValue,
+    formState: { errors: otpErrors },
+  } = useForm<SignInOtpValues>({
+    resolver: zodResolver(signInOtpSchema),
+    mode: "onSubmit",
+    defaultValues: { otp: "" },
+  });
+  const otp = watchOtp("otp");
 
   const handleGetOTP = async () => {
-    // Check if email is provided
-    if (!email) {
-      alert("Please enter your email address.");
-      return;
-    }
-
-    // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      alert("Please enter a valid email address.");
-      return;
-    }
-
     //send OTP using API Endpoint
-
     setIsOTPFormVisible(true);
   };
 
   const handleLogIn = async () => {
-    // If OTP fields are visible, it means we're in the second step of login (OTP verification)
-
-    if (!email || !otp) {
-      alert("Please enter both email and OTP.");
-      return;
-    }
-
-    // Basic OTP validation (e.g., 6 digits)
-    if (!/^\d{6}$/.test(otp)) {
-      alert("Please enter a valid 6-digit OTP.");
-      return;
-    }
-
     // Simulate API call for OTP verification
     try {
       // Replace with actual API call to verify OTP
@@ -161,8 +165,9 @@ export default function SignInForm() {
                     placeholder="info@gmail.com"
                     name="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value as any)}
+                    onChange={(e) => setEmailValue("email", e.target.value, { shouldValidate: false })}
                   />
+                  <FormFieldError message={emailErrors.email?.message} />
                 </div>
                 <div className={`${isOTPFieldsVisible ? "block" : "hidden"}`}>
                   <Label>
@@ -175,9 +180,10 @@ export default function SignInForm() {
                       placeholder="Enter OTP"
                       name="otp"
                       value={otp}
-                      onChange={(e) => setOTP(e.target.value as any)}
+                      onChange={(e) => setOtpValue("otp", e.target.value, { shouldValidate: false })}
                     />
                   </div>
+                  <FormFieldError message={otpErrors.otp?.message} />
                 </div>
                 {/* <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -201,7 +207,7 @@ export default function SignInForm() {
                         OTP sent to your email!
                       </p>
                       <Button
-                        onClick={handleLogIn}
+                        onClick={handleOtpSubmit(handleLogIn)}
                         className="w-full"
                         size="sm"
                       >
@@ -209,7 +215,7 @@ export default function SignInForm() {
                       </Button>
                     </>
                   ) : (
-                    <Button onClick={handleGetOTP} className="w-full" size="sm">
+                    <Button onClick={handleEmailSubmit(handleGetOTP)} className="w-full" size="sm">
                       Get OTP
                     </Button>
                   )}

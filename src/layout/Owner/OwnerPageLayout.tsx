@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { Outlet } from "react-router";
+import { useCallback, useMemo, useState } from "react";
+import { Outlet, useLocation } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
@@ -10,10 +10,16 @@ import {
 } from "../../context/OwnerPageChromeContext";
 import { ownerPortalContentPadClass } from "../../components/owner/ownerLayoutStyles";
 import { useCarOwnerFaqs } from "../../hooks/useOwnerPortal";
+import { ownerFaqPageSlugFromPath } from "../../lib/ownerFaqPageSlug";
 
 export default function OwnerPageLayout() {
   const { chrome } = useOwnerPageChromeContext();
-  const { items, loading, faqsHeading } = useCarOwnerFaqs("carowner");
+  const location = useLocation();
+  const pageSlug = useMemo(
+    () => ownerFaqPageSlugFromPath(location.pathname),
+    [location.pathname],
+  );
+  const { items, loading, faqsHeading } = useCarOwnerFaqs(pageSlug);
   const [faqsOpen, setFaqsOpen] = useState(false);
 
   const openFaqs = useCallback(() => setFaqsOpen(true), []);

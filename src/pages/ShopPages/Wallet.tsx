@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TextareaHTMLAttributes } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { motion } from "framer-motion";
 import AttachImageCheckbox from "../../components/admin/AttachImageCheckbox";
 import ClipImageHover from "../../components/admin/ClipImageHover";
@@ -66,6 +69,34 @@ import {
   type CategoryOption,
 } from "../AdminPages/Accounts/ledgerCategories";
 import useAuth from "../../auth/useAuth";
+import { walletEntrySchema, bankAccountSchema } from "../../lib/validation/schemas/money";
+import { optionalMoney, requiredTrimmed } from "../../lib/validation/primitives";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../lib/validation/formUi";
+
+const shopExpenseFormSchema = walletEntrySchema
+  .extend({
+    subcategory: requiredTrimmed("Subcategory"),
+    gstAmount: optionalMoney,
+    hasBillNumber: z.boolean().optional().default(false),
+    billNumber: z.string().optional().default(""),
+    byCheque: z.boolean().optional().default(false),
+    chequeAccount: z.string().optional().default(""),
+  })
+  .superRefine((data, ctx) => {
+    if (data.hasBillNumber && !data.billNumber?.trim()) {
+      ctx.addIssue({ code: "custom", message: "Bill number is required.", path: ["billNumber"] });
+    }
+    if (data.byCheque && !data.chequeAccount) {
+      ctx.addIssue({ code: "custom", message: "Select an account for cheque payment.", path: ["chequeAccount"] });
+    }
+  });
+type ShopExpenseFormValues = z.input<typeof shopExpenseFormSchema>;
+
+const shopBankFormSchema = bankAccountSchema.extend({
+  accountName: z.string().optional().default(""),
+  assignToInvoice: z.boolean().optional().default(false),
+});
+type ShopBankFormValues = z.input<typeof shopBankFormSchema>;
 
 const PAGE_SIZE = 10;
 const WALLET_SEARCH_INPUT_ID = "shop-wallet-search";
@@ -437,6 +468,8 @@ function WalletExpenseForm({
   onOpenSubcategoriesPopup,
   onSave,
   onCancel,
+  saving = false,
+  errors = {},
 }: {
   mode: "add" | "edit";
   amount: string;
@@ -475,6 +508,16 @@ function WalletExpenseForm({
   onOpenSubcategoriesPopup: () => void;
   onSave: () => void;
   onCancel: () => void;
+  saving?: boolean;
+  errors?: {
+    amount?: string;
+    date?: string;
+    vendor?: string;
+    category?: string;
+    subcategory?: string;
+    billNumber?: string;
+    chequeAccount?: string;
+  };
 }) {
   const isEdit = mode === "edit";
 
@@ -494,16 +537,18 @@ function WalletExpenseForm({
             <button
               type="button"
               onClick={onSave}
-              className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95"
+              disabled={saving}
+              className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:pointer-events-none disabled:opacity-50"
             >
-              {isEdit ? "Update" : "Save"}
+              {saving ? (isEdit ? "Updating…" : "Saving…") : isEdit ? "Update" : "Save"}
             </button>
             <span className="text-xs text-gray-700">
               or{" "}
               <button
                 type="button"
                 onClick={onCancel}
-                className="font-medium text-blue-600 underline hover:text-blue-700"
+                disabled={saving}
+                className="font-medium text-blue-600 underline hover:text-blue-700 disabled:pointer-events-none disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -519,50 +564,61 @@ function WalletExpenseForm({
             inputMode="decimal"
             value={amount}
             onChange={(e) => onAmountChange(e.target.value)}
-            className={shopCompactInputClass}
+            className={fieldErrorClass(Boolean(errors.amount), shopCompactInputClass)}
           />
+          <FormFieldError message={errors.amount} />
         </CompactField>
         <CompactField label="Date" required className="min-w-0 flex-1">
           <input
             type="date"
             value={date}
             onChange={(e) => onDateChange(e.target.value)}
-            className={shopCompactInputClass}
+            className={fieldErrorClass(Boolean(errors.date), shopCompactInputClass)}
           />
+          <FormFieldError message={errors.date} />
         </CompactField>
-        <ShopVendorComboField
-          label="Vendor"
-          required
-          value={vendor}
-          onChange={onVendorChange}
-          options={vendorOptions}
-          className="min-w-0 flex-1"
-        />
-        <ComboSelectWithEditor
-          label="Category"
-          required
-          value={selectedCategoryLabel}
-          placeholder="Select category"
-          options={categoryLabels}
-          onChange={onCategoryChange}
-          className="min-w-0 flex-1"
-          inputClassName={shopCompactInputClass}
-          activeItemClassName={SHOP_COMBO_ACTIVE_ITEM_CLASS}
-        />
-        <ComboSelectWithEditor
-          label="Subcategory"
-          required
-          value={selectedSubcategoryLabel}
-          placeholder="Select subcategory"
-          options={subcategoryLabels}
-          disabled={!category}
-          onChange={onSubcategoryChange}
-          onEditAddNew={onOpenSubcategoriesPopup}
-          className="min-w-0 flex-1"
-          inputClassName={shopCompactInputClass}
-          editButtonClassName={SHOP_COMBO_EDIT_BUTTON_CLASS}
-          activeItemClassName={SHOP_COMBO_ACTIVE_ITEM_CLASS}
-        />
+        <div className="min-w-0 flex-1">
+          <ShopVendorComboField
+            label="Vendor"
+            required
+            value={vendor}
+            onChange={onVendorChange}
+            options={vendorOptions}
+            className="w-full"
+          />
+          <FormFieldError message={errors.vendor} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <ComboSelectWithEditor
+            label="Category"
+            required
+            value={selectedCategoryLabel}
+            placeholder="Select category"
+            options={categoryLabels}
+            onChange={onCategoryChange}
+            className="w-full"
+            inputClassName={shopCompactInputClass}
+            activeItemClassName={SHOP_COMBO_ACTIVE_ITEM_CLASS}
+          />
+          <FormFieldError message={errors.category} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <ComboSelectWithEditor
+            label="Subcategory"
+            required
+            value={selectedSubcategoryLabel}
+            placeholder="Select subcategory"
+            options={subcategoryLabels}
+            disabled={!category}
+            onChange={onSubcategoryChange}
+            onEditAddNew={onOpenSubcategoriesPopup}
+            className="w-full"
+            inputClassName={shopCompactInputClass}
+            editButtonClassName={SHOP_COMBO_EDIT_BUTTON_CLASS}
+            activeItemClassName={SHOP_COMBO_ACTIVE_ITEM_CLASS}
+          />
+          <FormFieldError message={errors.subcategory} />
+        </div>
       </CompactFormRow>
       <CompactFormRow className="flex-nowrap items-start gap-x-3 overflow-x-auto">
         <CompactField label="Notes" className="min-w-0 flex-1">
@@ -596,9 +652,10 @@ function WalletExpenseForm({
               type="text"
               value={billNumber}
               onChange={(e) => onBillNumberChange(e.target.value)}
-              className={shopCompactInputClass}
+              className={fieldErrorClass(Boolean(errors.billNumber), shopCompactInputClass)}
             />
           ) : null}
+          <FormFieldError message={errors.billNumber} />
         </div>
         <div className="min-w-0 flex-1">
           <label className={SHOP_FORM_CHECKBOX_LABEL_CLASS}>
@@ -618,7 +675,7 @@ function WalletExpenseForm({
             <select
               value={chequeAccount}
               onChange={(e) => onChequeAccountChange(e.target.value)}
-              className={shopCompactInputClass}
+              className={fieldErrorClass(Boolean(errors.chequeAccount), shopCompactInputClass)}
             >
               <option value="">Select account</option>
               {chequeAccountOptions.map((opt) => (
@@ -628,6 +685,7 @@ function WalletExpenseForm({
               ))}
             </select>
           ) : null}
+          <FormFieldError message={errors.chequeAccount} />
         </div>
         <div className="min-w-0 flex-1">
           <label className={SHOP_FORM_CHECKBOX_LABEL_CLASS}>
@@ -673,6 +731,7 @@ function WalletBankForm({
   onAssignToInvoiceChange,
   onSave,
   onCancel,
+  errors = {},
 }: {
   mode: "add" | "edit";
   label: string;
@@ -687,8 +746,10 @@ function WalletBankForm({
   onAssignToInvoiceChange: (value: boolean) => void;
   onSave: () => void;
   onCancel: () => void;
+  errors?: { label?: string; balance?: string };
 }) {
   const isEdit = mode === "edit";
+  const fieldErrors = errors;
 
   return (
     <CompactFormPanel
@@ -724,15 +785,16 @@ function WalletBankForm({
         </div>
       }
     >
-      <CompactFormRow className="flex-nowrap items-end gap-x-3 overflow-x-auto">
+      <CompactFormRow className="flex-nowrap items-start gap-x-3 overflow-x-auto">
         <CompactField label="Bank / Wallet Label" required className="min-w-[11rem] flex-1">
           <input
             type="text"
             value={label}
             onChange={(e) => onLabelChange(e.target.value)}
             placeholder="e.g. Business Chequing"
-            className={shopCompactInputClass}
+            className={fieldErrorClass(Boolean(fieldErrors.label), shopCompactInputClass)}
           />
+          <FormFieldError message={fieldErrors.label} />
         </CompactField>
         <CompactField label="Account Name" className="min-w-[11rem] flex-1">
           <input
@@ -759,8 +821,9 @@ function WalletBankForm({
             value={balance}
             onChange={(e) => onBalanceChange(e.target.value)}
             placeholder="0.00"
-            className={shopCompactInputClass}
+            className={fieldErrorClass(Boolean(fieldErrors.balance), shopCompactInputClass)}
           />
+          <FormFieldError message={fieldErrors.balance} />
         </CompactField>
         <CompactField label="Invoice" className="w-[9.5rem] shrink-0">
           <label className="flex h-[30px] cursor-pointer items-center gap-2 text-sm font-semibold text-gray-800">
@@ -1142,18 +1205,60 @@ export default function ShopWalletPage() {
   const effectiveExpenseCategories = expenseCategories.length > 0 ? expenseCategories : EXPENSE_CATEGORIES;
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
-  const [expenseAmount, setExpenseAmount] = useState("");
-  const [expenseDate, setExpenseDate] = useState<string>(todayYMD());
-  const [expenseVendor, setExpenseVendor] = useState("");
-  const [expenseCategory, setExpenseCategory] = useState("");
-  const [expenseSubcategory, setExpenseSubcategory] = useState("");
-  const [expenseNotes, setExpenseNotes] = useState("");
+  const [savingExpense, setSavingExpense] = useState(false);
+  const savingExpenseRef = useRef(false);
+
+  const expenseForm = useForm<ShopExpenseFormValues>({
+    resolver: zodResolver(shopExpenseFormSchema),
+    mode: "onSubmit",
+    defaultValues: {
+      amount: "",
+      date: todayYMD(),
+      vendor: "",
+      category: "",
+      subcategory: "",
+      note: "",
+      paymentMode: "",
+      gstAmount: "",
+      hasBillNumber: false,
+      billNumber: "",
+      byCheque: false,
+      chequeAccount: "",
+    },
+  });
+  const {
+    watch: watchExpenseField,
+    setValue: setExpenseFieldValue,
+    reset: resetExpenseFieldValues,
+    handleSubmit: handleExpenseFormSubmit,
+    formState: { errors: expenseFormErrors },
+  } = expenseForm;
+
+  const expenseAmount = watchExpenseField("amount");
+  const expenseDate = watchExpenseField("date");
+  const expenseVendor = watchExpenseField("vendor");
+  const expenseCategory = watchExpenseField("category");
+  const expenseSubcategory = watchExpenseField("subcategory");
+  const expenseNotes = watchExpenseField("note") ?? "";
+  const expenseGstAmount = watchExpenseField("gstAmount");
+  const expenseHasBillNumber = watchExpenseField("hasBillNumber") ?? false;
+  const expenseBillNumber = watchExpenseField("billNumber") ?? "";
+  const expenseByCheque = watchExpenseField("byCheque") ?? false;
+  const expenseChequeAccount = watchExpenseField("chequeAccount") ?? "";
   const [expenseGst, setExpenseGst] = useState(false);
-  const [expenseGstAmount, setExpenseGstAmount] = useState("");
-  const [expenseHasBillNumber, setExpenseHasBillNumber] = useState(false);
-  const [expenseBillNumber, setExpenseBillNumber] = useState("");
-  const [expenseByCheque, setExpenseByCheque] = useState(false);
-  const [expenseChequeAccount, setExpenseChequeAccount] = useState("");
+
+  const setExpenseAmount = (v: string) => setExpenseFieldValue("amount", v);
+  const setExpenseDate = (v: string) => setExpenseFieldValue("date", v);
+  const setExpenseVendor = (v: string) => setExpenseFieldValue("vendor", v);
+  const setExpenseCategory = (v: string) => setExpenseFieldValue("category", v);
+  const setExpenseSubcategory = (v: string) => setExpenseFieldValue("subcategory", v);
+  const setExpenseNotes = (v: string) => setExpenseFieldValue("note", v);
+  const setExpenseGstAmount = (v: string) => setExpenseFieldValue("gstAmount", v);
+  const setExpenseHasBillNumber = (v: boolean) => setExpenseFieldValue("hasBillNumber", v);
+  const setExpenseBillNumber = (v: string) => setExpenseFieldValue("billNumber", v);
+  const setExpenseByCheque = (v: boolean) => setExpenseFieldValue("byCheque", v);
+  const setExpenseChequeAccount = (v: string) => setExpenseFieldValue("chequeAccount", v);
+
   const [expenseAttachReceipt, setExpenseAttachReceipt] = useState(false);
   const [expenseReceiptFile, setExpenseReceiptFile] = useState<File | null>(null);
   const [subcategoriesPopupOpen, setSubcategoriesPopupOpen] = useState(false);
@@ -1162,11 +1267,39 @@ export default function ShopWalletPage() {
   const [banks, setBanks] = useState<ShopWalletBankRow[]>(() => [...DUMMY_SHOP_BANKS]);
   const [showBankForm, setShowBankForm] = useState(false);
   const [editingBankId, setEditingBankId] = useState<string | null>(null);
-  const [bankLabel, setBankLabel] = useState("");
-  const [bankAccountName, setBankAccountName] = useState("");
-  const [bankAccountNumber, setBankAccountNumber] = useState("");
-  const [bankBalance, setBankBalance] = useState("");
-  const [bankAssignToInvoice, setBankAssignToInvoice] = useState(false);
+
+  const bankForm = useForm<ShopBankFormValues>({
+    resolver: zodResolver(shopBankFormSchema),
+    mode: "onSubmit",
+    defaultValues: {
+      label: "",
+      accountName: "",
+      accountNumber: "",
+      balance: "",
+      assignToInvoice: false,
+      bankName: "",
+      email: "",
+    },
+  });
+  const {
+    watch: watchBankField,
+    setValue: setBankFieldValue,
+    reset: resetBankFieldValues,
+    handleSubmit: handleBankFormSubmit,
+    formState: { errors: bankFormErrors },
+  } = bankForm;
+
+  const bankLabel = watchBankField("label");
+  const bankAccountName = watchBankField("accountName") ?? "";
+  const bankAccountNumber = watchBankField("accountNumber") ?? "";
+  const bankBalance = watchBankField("balance");
+  const bankAssignToInvoice = watchBankField("assignToInvoice") ?? false;
+
+  const setBankLabel = (v: string) => setBankFieldValue("label", v);
+  const setBankAccountName = (v: string) => setBankFieldValue("accountName", v);
+  const setBankAccountNumber = (v: string) => setBankFieldValue("accountNumber", v);
+  const setBankBalance = (v: string) => setBankFieldValue("balance", v);
+  const setBankAssignToInvoice = (v: boolean) => setBankFieldValue("assignToInvoice", v);
   const [previewInvoice, setPreviewInvoice] = useState<JobCardListRow | null>(null);
   const { refreshSection } = useShopOwnerData();
   const {
@@ -1339,21 +1472,24 @@ export default function ShopWalletPage() {
 
   const resetExpenseForm = useCallback(() => {
     setEditingExpenseId(null);
-    setExpenseAmount("");
-    setExpenseDate(todayYMD());
-    setExpenseVendor("");
-    setExpenseCategory("");
-    setExpenseSubcategory("");
-    setExpenseNotes("");
+    resetExpenseFieldValues({
+      amount: "",
+      date: todayYMD(),
+      vendor: "",
+      category: "",
+      subcategory: "",
+      note: "",
+      paymentMode: "",
+      gstAmount: "",
+      hasBillNumber: false,
+      billNumber: "",
+      byCheque: false,
+      chequeAccount: "",
+    });
     setExpenseGst(false);
-    setExpenseGstAmount("");
-    setExpenseHasBillNumber(false);
-    setExpenseBillNumber("");
-    setExpenseByCheque(false);
-    setExpenseChequeAccount("");
     setExpenseAttachReceipt(false);
     setExpenseReceiptFile(null);
-  }, []);
+  }, [resetExpenseFieldValues]);
 
   const handleExpenseCategoryChange = useCallback(
     (nextCategoryLabel: string) => {
@@ -1459,20 +1595,25 @@ export default function ShopWalletPage() {
     const cat = effectiveExpenseCategories.find((c) => c.value === nextCategory);
     const nextSubcategory = resolveSubcategoryValue(cat, row.subcategory);
     setEditingExpenseId(row.id);
-    setExpenseAmount(String(row.amount));
-    setExpenseDate(row.date);
-    setExpenseVendor(row.vendor);
-    setExpenseCategory(nextCategory);
-    setExpenseSubcategory(nextSubcategory);
-    setExpenseNotes(row.notes);
+    resetExpenseFieldValues({
+      amount: String(row.amount),
+      date: row.date,
+      vendor: row.vendor,
+      category: nextCategory,
+      subcategory: nextSubcategory,
+      note: row.notes,
+      paymentMode: "",
+      gstAmount: "",
+      hasBillNumber: Boolean(row.billNumber),
+      billNumber: row.billNumber ?? "",
+      byCheque: row.byCheque,
+      chequeAccount: "",
+    });
     setExpenseGst(row.gst);
-    setExpenseHasBillNumber(Boolean(row.billNumber));
-    setExpenseBillNumber(row.billNumber ?? "");
-    setExpenseByCheque(row.byCheque);
     setExpenseAttachReceipt(row.hasReceipt);
     setExpenseReceiptFile(null);
     setShowExpenseForm(true);
-  }, [effectiveExpenseCategories]);
+  }, [effectiveExpenseCategories, resetExpenseFieldValues]);
 
   const closeExpenseForm = useCallback(() => {
     resetExpenseForm();
@@ -1481,13 +1622,17 @@ export default function ShopWalletPage() {
 
   const openAddBankForm = useCallback(() => {
     setEditingBankId(null);
-    setBankLabel("");
-    setBankAccountName("");
-    setBankAccountNumber("");
-    setBankBalance("");
-    setBankAssignToInvoice(banks.length === 0);
+    resetBankFieldValues({
+      label: "",
+      accountName: "",
+      accountNumber: "",
+      balance: "",
+      assignToInvoice: banks.length === 0,
+      bankName: "",
+      email: "",
+    });
     setShowBankForm(true);
-  }, [banks.length]);
+  }, [banks.length, resetBankFieldValues]);
 
   const openEditBankForm = useCallback(() => {
     const row = banks.find((bank) => selectedRowIds.has(bank.id));
@@ -1496,197 +1641,188 @@ export default function ShopWalletPage() {
       return;
     }
     setEditingBankId(row.id);
-    setBankLabel(row.label);
-    setBankAccountName(row.accountName === "—" ? "" : row.accountName);
-    setBankAccountNumber(row.accountNumber === "—" ? "" : row.accountNumber);
-    setBankBalance(String(row.balance));
-    setBankAssignToInvoice(row.assignToInvoice);
+    resetBankFieldValues({
+      label: row.label,
+      accountName: row.accountName === "—" ? "" : row.accountName,
+      accountNumber: row.accountNumber === "—" ? "" : row.accountNumber,
+      balance: String(row.balance),
+      assignToInvoice: row.assignToInvoice,
+      bankName: "",
+      email: "",
+    });
     setShowBankForm(true);
-  }, [banks, selectedRowIds]);
+  }, [banks, selectedRowIds, resetBankFieldValues]);
 
   const closeBankForm = useCallback(() => {
     setShowBankForm(false);
     setEditingBankId(null);
   }, []);
 
-  const handleSaveBank = () => {
-    const trimmedLabel = bankLabel.trim();
-    if (!trimmedLabel) {
-      toast.error("Enter a bank or wallet label.");
-      return;
-    }
-    const balance = Number(bankBalance);
-    if (!Number.isFinite(balance)) {
-      toast.error("Enter a valid balance.");
-      return;
-    }
+  const handleSaveBank = handleBankFormSubmit(
+    (values) => {
+      const trimmedLabel = values.label.trim();
+      const balance = Number(values.balance);
+      const accountName = values.accountName ?? "";
+      const accountNumber = values.accountNumber ?? "";
+      const assignToInvoice = Boolean(values.assignToInvoice);
 
-    const saveLocal = () => {
-      const bankId = editingBankId ?? `bank-${Date.now()}`;
-      const nextRow: ShopWalletBankRow = {
-        id: bankId,
-        label: trimmedLabel.toUpperCase(),
-        accountName: bankAccountName.trim() || "—",
-        accountNumber: bankAccountNumber.trim() || "—",
-        balance,
-        assignToInvoice: bankAssignToInvoice,
-      };
-      setBanks((prev) => {
-        const updated = editingBankId
-          ? prev.map((row) => (row.id === editingBankId ? nextRow : row))
-          : [nextRow, ...prev];
-        if (!nextRow.assignToInvoice) return updated;
-        return updated.map((row) => ({
-          ...row,
-          assignToInvoice: row.id === bankId,
-        }));
-      });
-      setPage(1);
-      setSelectedRowIds(new Set());
-      toast.success(editingBankId ? "Bank account updated." : "Bank account added.");
-      closeBankForm();
-    };
-
-    if (USE_DUMMY_SHOP_WALLET || !token) {
-      saveLocal();
-      return;
-    }
-
-    void (async () => {
-      try {
-        if (editingBankId) {
-          const res = await updateBank(token, editingBankId, {
-            bankName: trimmedLabel,
-            openingBalance: balance,
-            totalBalance: balance,
-            accountName: bankAccountName.trim() || undefined,
-            accountNumber: bankAccountNumber.trim() || undefined,
-            assignToInvoice: bankAssignToInvoice,
-          });
-          if (!res.ok) return toast.error("Could not update bank.");
-        } else {
-          const res = await createBank(token, {
-            bankName: trimmedLabel,
-            openingBalance: balance,
-            accountName: bankAccountName.trim() || undefined,
-            accountNumber: bankAccountNumber.trim() || undefined,
-            assignToInvoice: bankAssignToInvoice,
-          });
-          if (!res.ok) return toast.error("Could not add bank.");
-        }
-        await loadAccounts();
-        closeBankForm();
-        toast.success(editingBankId ? "Bank account updated." : "Bank account added.");
-      } catch {
-        toast.error("Network error.");
-      }
-    })();
-  };
-
-  const handleSaveExpense = () => {
-    const trimmedVendor = expenseVendor.trim();
-    const parsedAmount = Number.parseFloat(expenseAmount);
-    const parsedGst = Number.parseFloat(expenseGstAmount);
-
-    if (!expenseAmount.trim() || !Number.isFinite(parsedAmount)) {
-      toast.error("Amount is required.");
-      return;
-    }
-    if (!expenseDate) {
-      toast.error("Date is required.");
-      return;
-    }
-    if (!trimmedVendor) {
-      toast.error("Vendor is required.");
-      return;
-    }
-    if (!expenseCategory) {
-      toast.error("Category is required.");
-      return;
-    }
-    if (!expenseSubcategory) {
-      toast.error("Subcategory is required.");
-      return;
-    }
-
-    const existingExpense = editingExpenseId
-      ? expenses.find((row) => row.id === editingExpenseId)
-      : undefined;
-    const nextAttachmentUrl = expenseAttachReceipt
-      ? expenseReceiptFile
-        ? URL.createObjectURL(expenseReceiptFile)
-        : existingExpense?.attachmentUrl ?? null
-      : null;
-
-    const payload: Omit<ShopWalletExpenseRow, "id"> = {
-      date: expenseDate,
-      vendor: trimmedVendor,
-      amount: parsedAmount || 0,
-      category: expenseCategory,
-      subcategory: expenseSubcategory,
-      notes: expenseNotes,
-      gst: expenseGst,
-      billNumber: expenseHasBillNumber && expenseBillNumber.trim() ? expenseBillNumber.trim() : null,
-      byCheque: expenseByCheque,
-      hasReceipt: expenseAttachReceipt,
-      attachmentUrl: nextAttachmentUrl,
-    };
-
-    const saveLocal = () => {
-      if (editingExpenseId) {
-        setExpenses((prev) =>
-          prev.map((row) => (row.id === editingExpenseId ? { ...row, ...payload } : row)),
-        );
-        toast.success("Expense updated.");
-      } else {
-        setExpenses((prev) => [
-          {
-            id: `exp-${Date.now()}`,
-            ...payload,
-          },
-          ...prev,
-        ]);
-        toast.success("Expense added.");
-      }
-      setPage(1);
-      closeExpenseForm();
-    };
-
-    if (USE_DUMMY_SHOP_WALLET || !token) {
-      saveLocal();
-      return;
-    }
-
-    void (async () => {
-      try {
-        const body = {
-          date: expenseDate,
-          vendor: trimmedVendor,
-          amount: parsedAmount,
-          category: expenseCategory,
-          subCategory: expenseSubcategory,
-          notes: expenseNotes,
-          // Backend schema expects Number (e.g. 13), not boolean.
-          gst: expenseGst ? (Number.isFinite(parsedGst) ? parsedGst : 0) : 0,
-          billNumber: expenseHasBillNumber && expenseBillNumber.trim() ? expenseBillNumber.trim() : undefined,
-          account: expenseByCheque ? expenseChequeAccount : undefined,
-          expenseImage: expenseAttachReceipt ? expenseReceiptFile : null,
+      const saveLocal = () => {
+        const bankId = editingBankId ?? `bank-${Date.now()}`;
+        const nextRow: ShopWalletBankRow = {
+          id: bankId,
+          label: trimmedLabel.toUpperCase(),
+          accountName: accountName.trim() || "—",
+          accountNumber: accountNumber.trim() || "—",
+          balance,
+          assignToInvoice,
         };
-        if (editingExpenseId) {
-          const res = await updateExpense(token, editingExpenseId, body);
-          if (!res.ok) return toast.error("Could not update expense.");
-        } else {
-          const res = await createExpense(token, body);
-          if (!res.ok) return toast.error("Could not add expense.");
-        }
-        await loadAccounts();
-        closeExpenseForm();
-        toast.success(editingExpenseId ? "Expense updated." : "Expense added.");
-      } catch {
-        toast.error("Network error.");
+        setBanks((prev) => {
+          const updated = editingBankId
+            ? prev.map((row) => (row.id === editingBankId ? nextRow : row))
+            : [nextRow, ...prev];
+          if (!nextRow.assignToInvoice) return updated;
+          return updated.map((row) => ({
+            ...row,
+            assignToInvoice: row.id === bankId,
+          }));
+        });
+        setPage(1);
+        setSelectedRowIds(new Set());
+        toast.success(editingBankId ? "Bank account updated." : "Bank account added.");
+        closeBankForm();
+      };
+
+      if (USE_DUMMY_SHOP_WALLET || !token) {
+        saveLocal();
+        return;
       }
-    })();
-  };
+
+      void (async () => {
+        try {
+          if (editingBankId) {
+            const res = await updateBank(token, editingBankId, {
+              bankName: trimmedLabel,
+              openingBalance: balance,
+              totalBalance: balance,
+              accountName: accountName.trim() || undefined,
+              accountNumber: accountNumber.trim() || undefined,
+              assignToInvoice,
+            });
+            if (!res.ok) return toast.error("Could not update bank.");
+          } else {
+            const res = await createBank(token, {
+              bankName: trimmedLabel,
+              openingBalance: balance,
+              accountName: accountName.trim() || undefined,
+              accountNumber: accountNumber.trim() || undefined,
+              assignToInvoice,
+            });
+            if (!res.ok) return toast.error("Could not add bank.");
+          }
+          await loadAccounts();
+          closeBankForm();
+          toast.success(editingBankId ? "Bank account updated." : "Bank account added.");
+        } catch {
+          toast.error("Network error.");
+        }
+      })();
+    },
+    (formErrors) => toastValidationSummary(toast.error, formErrors as never),
+  );
+
+  const handleSaveExpense = handleExpenseFormSubmit(
+    (values) => {
+      if (savingExpenseRef.current) return;
+
+      const trimmedVendor = values.vendor.trim();
+      const parsedAmount = Number.parseFloat(values.amount);
+      const parsedGst = Number.parseFloat(values.gstAmount ?? "");
+
+      const existingExpense = editingExpenseId
+        ? expenses.find((row) => row.id === editingExpenseId)
+        : undefined;
+      const nextAttachmentUrl = expenseAttachReceipt
+        ? expenseReceiptFile
+          ? URL.createObjectURL(expenseReceiptFile)
+          : existingExpense?.attachmentUrl ?? null
+        : null;
+
+      const payload: Omit<ShopWalletExpenseRow, "id"> = {
+        date: values.date,
+        vendor: trimmedVendor,
+        amount: parsedAmount || 0,
+        category: values.category,
+        subcategory: values.subcategory,
+        notes: values.note ?? "",
+        gst: expenseGst,
+        billNumber: values.hasBillNumber && values.billNumber?.trim() ? values.billNumber.trim() : null,
+        byCheque: Boolean(values.byCheque),
+        hasReceipt: expenseAttachReceipt,
+        attachmentUrl: nextAttachmentUrl,
+      };
+
+      const saveLocal = () => {
+        if (editingExpenseId) {
+          setExpenses((prev) =>
+            prev.map((row) => (row.id === editingExpenseId ? { ...row, ...payload } : row)),
+          );
+          toast.success("Expense updated.");
+        } else {
+          setExpenses((prev) => [
+            {
+              id: `exp-${Date.now()}`,
+              ...payload,
+            },
+            ...prev,
+          ]);
+          toast.success("Expense added.");
+        }
+        setPage(1);
+        closeExpenseForm();
+      };
+
+      if (USE_DUMMY_SHOP_WALLET || !token) {
+        saveLocal();
+        return;
+      }
+
+      savingExpenseRef.current = true;
+      setSavingExpense(true);
+      void (async () => {
+        try {
+          const body = {
+            date: values.date,
+            vendor: trimmedVendor,
+            amount: parsedAmount,
+            category: values.category,
+            subCategory: values.subcategory,
+            notes: values.note ?? "",
+            // Backend schema expects Number (e.g. 13), not boolean.
+            gst: expenseGst ? (Number.isFinite(parsedGst) ? parsedGst : 0) : 0,
+            billNumber: values.hasBillNumber && values.billNumber?.trim() ? values.billNumber.trim() : undefined,
+            account: values.byCheque ? values.chequeAccount : undefined,
+            expenseImage: expenseAttachReceipt ? expenseReceiptFile : null,
+          };
+          if (editingExpenseId) {
+            const res = await updateExpense(token, editingExpenseId, body);
+            if (!res.ok) return toast.error("Could not update expense.");
+          } else {
+            const res = await createExpense(token, body);
+            if (!res.ok) return toast.error("Could not add expense.");
+          }
+          await loadAccounts();
+          closeExpenseForm();
+          toast.success(editingExpenseId ? "Expense updated." : "Expense added.");
+        } catch {
+          toast.error("Network error.");
+        } finally {
+          savingExpenseRef.current = false;
+          setSavingExpense(false);
+        }
+      })();
+    },
+    (formErrors) => toastValidationSummary(toast.error, formErrors as never),
+  );
 
   useEffect(() => {
     void loadAccounts();
@@ -2030,8 +2166,18 @@ export default function ShopWalletPage() {
             onAttachReceiptChange={setExpenseAttachReceipt}
             onReceiptFileChange={setExpenseReceiptFile}
             onOpenSubcategoriesPopup={openSubcategoriesPopup}
-            onSave={handleSaveExpense}
+            onSave={() => void handleSaveExpense()}
             onCancel={closeExpenseForm}
+            saving={savingExpense}
+            errors={{
+              amount: expenseFormErrors.amount?.message,
+              date: expenseFormErrors.date?.message,
+              vendor: expenseFormErrors.vendor?.message,
+              category: expenseFormErrors.category?.message,
+              subcategory: expenseFormErrors.subcategory?.message,
+              billNumber: expenseFormErrors.billNumber?.message,
+              chequeAccount: expenseFormErrors.chequeAccount?.message,
+            }}
           />
           {subcategoriesPopupOpen ? (
             <ListEditorPopup
@@ -2059,8 +2205,12 @@ export default function ShopWalletPage() {
             onAccountNumberChange={setBankAccountNumber}
             onBalanceChange={setBankBalance}
             onAssignToInvoiceChange={setBankAssignToInvoice}
-            onSave={handleSaveBank}
+            onSave={() => void handleSaveBank()}
             onCancel={closeBankForm}
+            errors={{
+              label: bankFormErrors.label?.message,
+              balance: bankFormErrors.balance?.message,
+            }}
           />
         </ShopReveal>
 

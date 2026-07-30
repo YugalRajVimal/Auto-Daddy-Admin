@@ -11,6 +11,8 @@ import {
   remainingKmNumber,
 } from "../../lib/carOwnerOdometer";
 import type { CarOwnerVehicle } from "../../lib/carOwnerVehicles";
+import { fieldErrorClass } from "../../lib/validation/formUi";
+import { odometerUpdateSchema } from "../../lib/validation/schemas/vehicle";
 import OwnerOdometerVehiclePicker from "./OwnerOdometerVehiclePicker";
 import { Skeleton } from "../common/Skeleton";
 import { shopMainContentFillClass } from "../shop/shopLayoutStyles";
@@ -77,22 +79,28 @@ function OdometerVehicleForm({
   const statusText = formatOdometerStatus(remainingNum);
   const serviceByDisplay = serviceBy?.trim() || "";
 
-  const canSave =
-    !saving &&
-    parsed != null &&
-    Number.isFinite(parsed) &&
-    parsed >= 0 &&
-    (currentNum == null || parsed !== currentNum);
-  const validationError =
+  const zodResult = odometerUpdateSchema.safeParse({ reading: value });
+  const lowerThanCurrentError =
     parsed != null && currentNum != null && parsed < currentNum
       ? "New reading should not be lower than the current value."
       : null;
+  const validationError = !zodResult.success
+    ? (zodResult.error.issues[0]?.message ?? null)
+    : lowerThanCurrentError;
+
+  const canSave =
+    !saving && zodResult.success && !lowerThanCurrentError && (currentNum == null || parsed !== currentNum);
 
   const handleSave = async () => {
-    if (!token || parsed == null) {
+    if (!token) {
       toast.error("Please log in again.");
       return;
     }
+    if (!zodResult.success) {
+      toast.error(zodResult.error.issues[0]?.message ?? "Enter a valid odometer reading.");
+      return;
+    }
+    if (parsed == null) return;
 
     setSaving(true);
     try {
@@ -147,7 +155,7 @@ function OdometerVehicleForm({
               value={value}
               onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, ""))}
               disabled={saving}
-              className={compactInputClass}
+              className={fieldErrorClass(!!validationError, compactInputClass)}
             />
           </div>
 

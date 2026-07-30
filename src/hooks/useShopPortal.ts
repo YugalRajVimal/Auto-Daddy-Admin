@@ -3,6 +3,10 @@ import { useAuth } from "../auth";
 import { extractThoughtOfTheDay, type ThoughtOfTheDayView } from "../lib/extractThought";
 import { updateBusinessActiveStatus } from "../lib/shopOwnerApi";
 import { useShopOwnerData } from "../context/ShopOwnerDataProvider";
+import {
+  resolveHasActiveSubscription,
+  resolveSubscriptionDaysLeft,
+} from "../lib/shopSubscriptionAccess";
 import type { DashboardIncomeOverview } from "../types/shopOwner";
 
 export type ShopContentBlock = {
@@ -68,7 +72,16 @@ export function useShopOwnerPortal() {
   const businessNameLoaded = portal.loaded;
 
   const city = business?.city?.trim() || "";
-  const daysLeft = dashboard?.subscriptionDaysLeftCount;
+  const subscription = portal.data?.subscription ?? null;
+  /** Prefer status API daysLeft; fall back to home `daysLeftInSubscription`. */
+  const apiDaysLeft =
+    typeof subscription?.daysLeft === "number"
+      ? subscription.daysLeft
+      : dashboard?.subscriptionDaysLeftCount;
+  const daysLeft = resolveSubscriptionDaysLeft(apiDaysLeft);
+  /** Active when daysLeft > 0 (or DEV simulate flag). */
+  const hasActiveSubscription = resolveHasActiveSubscription(apiDaysLeft);
+  const subscriptionGateReady = portal.loaded;
   const thoughtOfTheDay =
     extractThoughtOfTheDay(dashboard?.thoughtOfTheDay) ?? DEFAULT_THOUGHT;
   const faqsHeading = dashboard?.FAQs?.heading?.trim() || "FAQs";
@@ -108,6 +121,9 @@ export function useShopOwnerPortal() {
     displayName,
     city,
     daysLeft,
+    subscription,
+    hasActiveSubscription,
+    subscriptionGateReady,
     thoughtOfTheDay,
     businessPhone: business?.businessPhone || dashboard?.businessContactNo || "",
     faqsHeading,

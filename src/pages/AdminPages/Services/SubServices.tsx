@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import axios, { AxiosError } from "axios";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
@@ -20,6 +22,8 @@ import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import type { ShopType, Service } from "./Services";
+import { subServiceSchema, type SubServiceValues } from "../../../lib/validation/schemas/catalog";
+import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../../lib/validation/formUi";
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -180,9 +184,17 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingRow, setEditingRow] = useState<SubServiceRow | null>(null);
-  const [formName, setFormName] = useState("");
-  const [formStatus, setFormStatus] = useState<SubServiceStatus>("active");
-  const [formServiceId, setFormServiceId] = useState("");
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors: formErrors },
+  } = useForm<SubServiceValues>({
+    resolver: zodResolver(subServiceSchema),
+    mode: "onSubmit",
+    defaultValues: { serviceId: "", name: "", status: "active" },
+  });
 
   const searchFields = buildSubServiceSearchFields(services);
 
@@ -291,9 +303,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   };
 
   const resetForm = () => {
-    setFormName("");
-    setFormStatus("active");
-    setFormServiceId("");
+    reset({ serviceId: "", name: "", status: "active" });
     setEditingRow(null);
     setError("");
   };
@@ -305,9 +315,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   };
 
   const openEdit = (row: SubServiceRow) => {
-    setFormName(row.name);
-    setFormStatus(row.status || "active");
-    setFormServiceId(row.categoryId);
+    reset({ serviceId: row.categoryId, name: row.name, status: row.status || "active" });
     setEditingRow(row);
     setError("");
     setShowSearchCard(false);
@@ -340,72 +348,63 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     setShowForm(false);
   };
 
-  const handleSave = async () => {
-    if (!formName.trim()) {
-      const __adminMsg = "Sub service name is required.";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-      return;
-    }
-    if (!formServiceId) {
-      const __adminMsg = "Please select a service.";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-      return;
-    }
-    setActionLoading(true);
-    setError("");
-    setSuccessMsg("");
-    try {
-      const parent = services.find((s) => s._id === formServiceId);
-      if (!parent) {
-        const __adminMsg = "Selected service not found.";
+  const handleSave = handleSubmit(
+    async (values) => {
+      setActionLoading(true);
+      setError("");
+      setSuccessMsg("");
+      try {
+        const parent = services.find((s) => s._id === values.serviceId);
+        if (!parent) {
+          const __adminMsg = "Selected service not found.";
+          setError(__adminMsg);
+          adminNotify.error(__adminMsg);
+          return;
+        }
+        const existing: SubService[] = (parent.subServices || []).map((s) =>
+          mapApiSubService(s as Record<string, unknown>)
+        );
+        let updated: SubService[];
+        if (editingRow) {
+          updated = existing.map((s) =>
+            s.name === editingRow.name
+              ? {
+                  ...s,
+                  name: values.name,
+                  status: values.status as SubServiceStatus,
+                  createdBy: editingRow.createdBy || s.createdBy || "admin",
+                  shopkeeperName: editingRow.shopkeeperName || s.shopkeeperName,
+                  phone: editingRow.phone || s.phone,
+                }
+              : s
+          );
+        } else {
+          updated = [
+            ...existing,
+            { name: values.name, status: values.status as SubServiceStatus, createdBy: "admin" },
+          ];
+        }
+        await axios.put(
+          `${API_BASE}/admin/services/${values.serviceId}`,
+          { subServices: updated },
+          { headers: getAuthHeaders() }
+        );
+        adminNotify.success(editingRow ? "Sub service updated." : "Sub service added.");
+        setSuccessMsg(editingRow ? "Sub service updated." : "Sub service added.");
+        resetForm();
+        setShowForm(false);
+        fetchServices();
+      } catch (err) {
+        const axErr = err as AxiosError<{ message?: string }>;
+        const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Error saving sub service";
         setError(__adminMsg);
         adminNotify.error(__adminMsg);
-        return;
+      } finally {
+        setActionLoading(false);
       }
-      const existing: SubService[] = (parent.subServices || []).map((s) =>
-        mapApiSubService(s as Record<string, unknown>)
-      );
-      let updated: SubService[];
-      if (editingRow) {
-        updated = existing.map((s) =>
-          s.name === editingRow.name
-            ? {
-                ...s,
-                name: formName.trim(),
-                status: formStatus,
-                createdBy: editingRow.createdBy || s.createdBy || "admin",
-                shopkeeperName: editingRow.shopkeeperName || s.shopkeeperName,
-                phone: editingRow.phone || s.phone,
-              }
-            : s
-        );
-      } else {
-        updated = [
-          ...existing,
-          { name: formName.trim(), status: formStatus, createdBy: "admin" },
-        ];
-      }
-      await axios.put(
-        `${API_BASE}/admin/services/${formServiceId}`,
-        { subServices: updated },
-        { headers: getAuthHeaders() }
-      );
-      adminNotify.success(editingRow ? "Sub service updated." : "Sub service added.");
-      setSuccessMsg(editingRow ? "Sub service updated." : "Sub service added.");
-      resetForm();
-      setShowForm(false);
-      fetchServices();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Error saving sub service";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    },
+    (errs) => toastValidationSummary(adminNotify.error, errs as never),
+  );
 
   const handleDelete = async (row: SubServiceRow) => {
     if (!window.confirm(`Delete sub service "${row.name}"?`)) return;
@@ -546,7 +545,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                     ? (editingRow ? "Updating..." : "Saving...")
                     : (editingRow ? "Update" : "Save")
                 }
-                onSave={handleSave}
+                onSave={() => void handleSave()}
                 onCancel={handleCancel}
               />
             }
@@ -559,9 +558,8 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
             <CompactFormRow className="items-start">
               <CompactField label="Service" required>
                 <select
-                  value={formServiceId}
-                  onChange={(e) => setFormServiceId(e.target.value)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(formErrors.serviceId), compactInputClass)}
+                  {...register("serviceId")}
                 >
                   <option value="">Select Service</option>
                   {services.map((s) => (
@@ -570,20 +568,20 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                     </option>
                   ))}
                 </select>
+                <FormFieldError message={formErrors.serviceId?.message} />
               </CompactField>
               <CompactField label="Sub Service Name" required>
                 <input
                   type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(formErrors.name), compactInputClass)}
+                  {...register("name")}
                 />
+                <FormFieldError message={formErrors.name?.message} />
               </CompactField>
               <CompactField label="Status" required>
                 <select
-                  value={formStatus}
-                  onChange={(e) => setFormStatus(e.target.value as SubServiceStatus)}
-                  className={compactInputClass}
+                  className={fieldErrorClass(Boolean(formErrors.status), compactInputClass)}
+                  {...register("status")}
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>

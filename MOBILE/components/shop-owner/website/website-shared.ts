@@ -37,6 +37,14 @@ export const YEARLY_FEATURES: { label: string; note: string }[] = [
   { label: "Mobile App", note: "For You and Customers" },
 ];
 
+export const BIWEEKLY_FEATURES: { label: string; note: string }[] = [
+  { label: "Website", note: "for 14 days" },
+  { label: "Free Software", note: "for 14 days" },
+  { label: "Job Cards", note: "Unlimited" },
+  { label: "Deals Marketplace", note: "Service deals" },
+  { label: "Mobile App", note: "For You and Customers" },
+];
+
 export const FALLBACK_PLANS: Record<SubscriptionPlanId, SubscriptionPlan> = {
   yearly: {
     id: "yearly",
@@ -52,15 +60,15 @@ export const FALLBACK_PLANS: Record<SubscriptionPlanId, SubscriptionPlan> = {
   biweekly: {
     id: "biweekly",
     title: "$ 15 Bi-weekly plan",
-    amount: 390,
+    amount: 15,
     days: 14,
-    hst: 51,
-    description: "26 -Void cheques of CAD 15",
+    hst: 2,
+    features: BIWEEKLY_FEATURES,
     invoiceRows: [
       {
         service: "Bi-weekly plan",
-        description: "26 void cheques of CAD 15 for 26 bi-weekly periods",
-        amount: 390,
+        description: "Website subscription for 14 days (CAD 15)",
+        amount: 15,
       },
     ],
   },

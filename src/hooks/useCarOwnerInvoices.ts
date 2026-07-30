@@ -81,11 +81,18 @@ function toInvoiceRow(jc: CarOwnerJobCard): CarOwnerInvoiceRow {
 
 export type InvoiceTab = "paid" | "unpaid";
 
-export function useCarOwnerInvoices() {
+function jobCardsPath(vehicleId?: string | null): string {
+  const id = vehicleId?.trim();
+  if (!id) return "/api/user/job-cards";
+  return `/api/user/job-cards?vehicleId=${encodeURIComponent(id)}`;
+}
+
+export function useCarOwnerInvoices(vehicleId?: string | null) {
   const { token } = useAuth();
   const [items, setItems] = useState<CarOwnerJobCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const vehicleFilter = vehicleId?.trim() || null;
 
   const load = useCallback(async () => {
     if (!token) {
@@ -98,7 +105,7 @@ export function useCarOwnerInvoices() {
     setLoading(true);
     setError(null);
 
-    const res = await getJson<CarOwnerJobCardsResponse>("/api/user/job-cards", token);
+    const res = await getJson<CarOwnerJobCardsResponse>(jobCardsPath(vehicleFilter), token);
     if (!res.ok || !res.data?.success) {
       setItems([]);
       setLoading(false);
@@ -112,7 +119,7 @@ export function useCarOwnerInvoices() {
     setItems(next);
     setLoading(false);
     setError(null);
-  }, [token]);
+  }, [token, vehicleFilter]);
 
   useEffect(() => {
     void load();

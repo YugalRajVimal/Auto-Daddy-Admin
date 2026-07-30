@@ -3,16 +3,27 @@ import { FiPlus, FiTruck, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson, postFormData } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
+import { FormFieldError, fieldErrorClass } from "../../lib/validation/formUi";
+import { ownerVehicleRequireVinSchema } from "../../lib/validation/schemas/vehicle";
 import {
   type CarCompaniesResponse,
   type CarCompanyCatalogItem,
-  isValidVehicleYear,
   ownerVehicleFieldClass,
   ownerVehicleLabelClass,
   ownerVehicleSelectClass,
   trimVehicleApiMessage,
   type VehicleApiEnvelope,
 } from "./ownerVehicleFormUtils";
+
+/** Maps ownerVehicleRequireVinSchema field names to this form's UI field names. */
+const SCHEMA_TO_UI_FIELD: Record<string, string> = {
+  company: "name",
+  model: "model",
+  year: "year",
+  licensePlate: "licensePlateNo",
+  vin: "vinNo",
+  odometer: "odometerReading",
+};
 
 type OwnerAddVehicleFormProps = {
   onCancel: () => void;
@@ -32,6 +43,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [odometerReading, setOdometerReading] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!token) return;
@@ -75,6 +87,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
     setModel("");
     setYear("");
     setOdometerReading("");
+    setErrors({});
   };
 
   const handleCancel = () => {
@@ -96,18 +109,26 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
     const nextYear = year.trim();
     const nextOdometer = odometerReading.trim();
 
-    if (!nextPlate || !nextName || !nextModel || !nextYear) {
-      toast.error("Plate, make, model, and year are required.");
+    const result = ownerVehicleRequireVinSchema.safeParse({
+      company: nextName,
+      model: nextModel,
+      year: nextYear,
+      licensePlate: nextPlate,
+      vin: nextVin,
+      odometer: nextOdometer,
+    });
+    if (!result.success) {
+      const nextErrors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const schemaKey = String(issue.path[0] ?? "");
+        const uiKey = SCHEMA_TO_UI_FIELD[schemaKey] ?? schemaKey;
+        if (!nextErrors[uiKey]) nextErrors[uiKey] = issue.message;
+      }
+      setErrors(nextErrors);
+      toast.error("Please fix the highlighted fields.");
       return;
     }
-    if (!nextVin || nextVin.length !== 17) {
-      toast.error("VIN is required and must be exactly 17 characters.");
-      return;
-    }
-    if (!isValidVehicleYear(nextYear)) {
-      toast.error("Enter a valid vehicle year.");
-      return;
-    }
+    setErrors({});
 
     setSubmitting(true);
     try {
@@ -177,8 +198,9 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                 autoComplete="off"
                 placeholder="ABC 1234"
                 disabled={submitting}
-                className={ownerVehicleFieldClass}
+                className={fieldErrorClass(!!errors.licensePlateNo, ownerVehicleFieldClass)}
               />
+              <FormFieldError message={errors.licensePlateNo} />
             </label>
             <label className="block">
               <span className={ownerVehicleLabelClass}>
@@ -195,8 +217,9 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                 autoComplete="off"
                 placeholder="17-character VIN"
                 disabled={submitting}
-                className={`${ownerVehicleFieldClass} font-mono tracking-wide`}
+                className={fieldErrorClass(!!errors.vinNo, `${ownerVehicleFieldClass} font-mono tracking-wide`)}
               />
+              <FormFieldError message={errors.vinNo} />
             </label>
           </div>
         </section>
@@ -214,7 +237,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                   setYear("");
                 }}
                 disabled={companiesLoading || submitting}
-                className={ownerVehicleSelectClass}
+                className={fieldErrorClass(!!errors.name, ownerVehicleSelectClass)}
               >
                 <option value="">{companiesLoading ? "Loading…" : "Select make"}</option>
                 {companies.map((c) => (
@@ -223,6 +246,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                   </option>
                 ))}
               </select>
+              <FormFieldError message={errors.name} />
             </label>
 
             <label className="block">
@@ -234,7 +258,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                   setYear("");
                 }}
                 disabled={!name || submitting}
-                className={ownerVehicleSelectClass}
+                className={fieldErrorClass(!!errors.model, ownerVehicleSelectClass)}
               >
                 <option value="">Select model</option>
                 {modelOptions.map((m) => (
@@ -243,6 +267,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                   </option>
                 ))}
               </select>
+              <FormFieldError message={errors.model} />
             </label>
 
             <label className="block">
@@ -251,7 +276,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
                 disabled={!model || submitting}
-                className={ownerVehicleSelectClass}
+                className={fieldErrorClass(!!errors.year, ownerVehicleSelectClass)}
               >
                 <option value="">Select year</option>
                 {yearOptions.map((y) => (
@@ -260,6 +285,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                   </option>
                 ))}
               </select>
+              <FormFieldError message={errors.year} />
             </label>
 
             <label className="block">
@@ -271,8 +297,9 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
                 inputMode="numeric"
                 placeholder="e.g. 18450"
                 disabled={submitting}
-                className={ownerVehicleFieldClass}
+                className={fieldErrorClass(!!errors.odometerReading, ownerVehicleFieldClass)}
               />
+              <FormFieldError message={errors.odometerReading} />
             </label>
           </div>
         </section>

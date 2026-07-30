@@ -1,7 +1,7 @@
 import type { CarOwnerContentBlock } from "../hooks/useOwnerPortal";
 import type { CarOwnerVehicle } from "./carOwnerVehicles";
 
-export type DummyFaqItem = { question: string; answer: string };
+export type DummyFaqItem = { question: string; answer: string; pageSlug?: string };
 
 export const DUMMY_OWNER_FAQS: DummyFaqItem[] = [
   {

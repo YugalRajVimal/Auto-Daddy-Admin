@@ -61,6 +61,7 @@ export default function OwnerInvoiceEstimateDialog({
         className="invoice-viewer-panel"
         style={{
           borderColor: "#f5c6d6",
+          background: "#cfcfcf",
           boxShadow: "0 18px 48px rgba(216, 27, 96, 0.14), 0 4px 16px rgba(0, 0, 0, 0.08)",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -68,7 +69,7 @@ export default function OwnerInvoiceEstimateDialog({
         aria-modal="true"
         aria-label="Invoice"
       >
-        <div className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-[#f5c6d6] bg-white/95 px-3 py-2.5 backdrop-blur-sm sm:px-4">
+        <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-2 border-b border-[#f5c6d6] bg-white/95 px-3 py-2.5 backdrop-blur-sm sm:px-4">
           <p className="text-sm font-bold text-[#d81b60]">Invoice Preview</p>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={handlePrint} className={TOOLBAR_BTN_CLASS}>
@@ -86,7 +87,7 @@ export default function OwnerInvoiceEstimateDialog({
             </button>
           </div>
         </div>
-        <div className="p-3 sm:p-4">
+        <div className="min-h-0 flex-1 overflow-hidden">
           <OwnerInvoiceEstimateView
             key={jobCardId}
             jobCardId={jobCardId}

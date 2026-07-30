@@ -24,6 +24,7 @@ import {
   ownerVehicleLabelClass,
   ownerVehicleSelectClass,
 } from "../../../components/owner/ownerVehicleFormUtils";
+import { useOwnerShopCityFilter } from "../../../context/OwnerShopCityFilterContext";
 import { useCarOwnerAutoShops } from "../../../hooks/useCarOwnerAutoShops";
 import { useCarOwnerCustomerRequests } from "../../../hooks/useCarOwnerCustomerRequests";
 import { useCarOwnerFavoriteShops } from "../../../hooks/useCarOwnerFavoriteShops";
@@ -135,6 +136,12 @@ function shopOffersSubService(
 
 export default function OwnerAutoShopsPage() {
   const location = useLocation();
+  const {
+    filterCityName,
+    setFilterCityName,
+    clearFilterCity,
+    resetFilterCityToProfile,
+  } = useOwnerShopCityFilter();
   const section: AutoShopsSection =
     location.pathname.includes("/approvals") ? "approvals" : "auto-shops";
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
@@ -143,7 +150,15 @@ export default function OwnerAutoShopsPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [listFilters, setListFilters] = useState<OwnerShopListFilters>(EMPTY_SHOP_LIST_FILTERS);
   const deferredSearch = useDeferredValue(listFilters.search.trim());
-  const filtersActive = shopFiltersAreActive(listFilters);
+
+  /** Keep filter panel city in sync with header city filter (shared context). */
+  useEffect(() => {
+    setListFilters((prev) =>
+      prev.city === filterCityName ? prev : { ...prev, city: filterCityName },
+    );
+  }, [filterCityName]);
+
+  const filtersActive = shopFiltersAreActive({ ...listFilters, city: filterCityName });
 
   const { all: sidebarCatalog, loading: servicesLoading } = useCarOwnerServiceSidebar();
 
@@ -201,12 +216,21 @@ export default function OwnerAutoShopsPage() {
     [listFilters.serviceValue, catalog],
   );
 
-  const cityOptions = useMemo(
-    () => uniqueSortedCities(shopsWithFavorites),
-    [shopsWithFavorites],
+  const cityOptions = useMemo(() => {
+    const fromShops = uniqueSortedCities(shopsWithFavorites);
+    const selected = filterCityName.trim();
+    if (!selected) return fromShops;
+    if (fromShops.some((c) => c.toLowerCase() === selected.toLowerCase())) return fromShops;
+    return [selected, ...fromShops].sort((a, b) => a.localeCompare(b));
+  }, [shopsWithFavorites, filterCityName]);
+
+  const filtersForPanel = useMemo(
+    () => ({ ...listFilters, city: filterCityName }),
+    [listFilters, filterCityName],
   );
 
   const filteredShops = useMemo(() => {
+    const cityNeedle = filterCityName.trim().toLowerCase();
     return shopsWithFavorites.filter((shop) => {
       if (!matchesShopSearch(shop, listFilters.search)) return false;
 
@@ -234,8 +258,8 @@ export default function OwnerAutoShopsPage() {
         }
       }
 
-      if (listFilters.city) {
-        if (shop.city.trim().toLowerCase() !== listFilters.city.trim().toLowerCase()) {
+      if (cityNeedle) {
+        if (shop.city.trim().toLowerCase() !== cityNeedle) {
           return false;
         }
       }
@@ -250,7 +274,7 @@ export default function OwnerAutoShopsPage() {
 
       return true;
     });
-  }, [shopsWithFavorites, listFilters, serviceSelection]);
+  }, [shopsWithFavorites, listFilters, serviceSelection, filterCityName]);
 
   const expandedShop =
     filteredShops.find((s) => s.id === expandedShopId) ??
@@ -272,17 +296,29 @@ export default function OwnerAutoShopsPage() {
     setExpandedShopId(null);
   }, []);
 
-  const handleFiltersChange = useCallback((next: OwnerShopListFilters) => {
-    setListFilters(next);
+  const handleFiltersChange = useCallback(
+    (next: OwnerShopListFilters) => {
+      setListFilters(next);
+      setExpandedShopId(null);
+      if (next.city.trim()) setFilterCityName(next.city);
+      else clearFilterCity();
+    },
+    [setFilterCityName, clearFilterCity],
+  );
+
+  const clearAllFilters = useCallback(() => {
+    setListFilters(EMPTY_SHOP_LIST_FILTERS);
+    clearFilterCity();
     setExpandedShopId(null);
-  }, []);
+  }, [clearFilterCity]);
 
   const resetPage = useCallback(() => {
     setSelectedVehicleId(vehicles[0]?.id ?? null);
     setExpandedShopId(null);
     setFiltersOpen(false);
     setListFilters(EMPTY_SHOP_LIST_FILTERS);
-  }, [vehicles]);
+    resetFilterCityToProfile();
+  }, [vehicles, resetFilterCityToProfile]);
 
   useOwnerSidebarDefault(!vehiclesLoading && vehicles.length > 0, resetPage);
   useOwnerNavReset(resetPage);
@@ -453,7 +489,7 @@ export default function OwnerAutoShopsPage() {
             {showShopList && filtersOpen ? (
               <div id="auto-shops-filters">
                 <OwnerShopFilters
-                  filters={listFilters}
+                  filters={filtersForPanel}
                   onChange={handleFiltersChange}
                   catalog={catalog}
                   cityOptions={cityOptions}
@@ -505,10 +541,14 @@ export default function OwnerAutoShopsPage() {
               <EmptyState>No auto repair shops found in your area yet.</EmptyState>
             ) : filteredShops.length === 0 ? (
               <EmptyState>
-                <p className="mb-3">No shops match the selected filters.</p>
+                <p className="mb-3">
+                  {filterCityName.trim()
+                    ? `No shops match the selected filters in ${filterCityName.trim()}.`
+                    : "No shops match the selected filters."}
+                </p>
                 <button
                   type="button"
-                  onClick={() => handleFiltersChange(EMPTY_SHOP_LIST_FILTERS)}
+                  onClick={clearAllFilters}
                   className="rounded-xl bg-ad-purple px-4 py-2 text-sm font-semibold text-white shadow-sm"
                 >
                   Clear filters
