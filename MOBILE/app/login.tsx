@@ -1,6 +1,5 @@
 import { DialCountrySelector } from "@/components/reusables/forms/dial-country-selector";
 import { NetworkStatusStrip, Screen, useToast } from "@/components/reusables";
-import { associateColors } from "@/constants/associate-theme";
 import {
   colors,
   fontSizes,
@@ -48,7 +47,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const OTP_LENGTH = 6;
 
 export default function LoginPage() {
-  const { sendOtp, verifyOtp, refreshSession, enterDevAssociateSession } = useAuth();
+  const { sendOtp, verifyOtp, refreshSession } = useAuth();
   const { showToast } = useToast();
   const { isOffline } = useNetworkConnectivity();
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -67,15 +66,6 @@ export default function LoginPage() {
   const keyboardOpen = keyboardBottom > 0;
 
   const dialOption = useMemo(() => getDialCountryOption(dialCountryId), [dialCountryId]);
-
-  const handleEnterAsAssociate = useOncePress(async () => {
-    try {
-      await enterDevAssociateSession();
-      router.replace("/(associate)/(tabs)/home");
-    } catch {
-      showToast("Could not start associate preview.", { type: "error" });
-    }
-  });
 
   const handlePhoneChange = useCallback((next: string) => {
     setPhoneNumber(nationalPhoneDisplayFromKeystrokes(next));
@@ -456,15 +446,9 @@ export default function LoginPage() {
           <Text style={styles.backText}>Back to number entry</Text>
         </Pressable>
       ) : (
-        <>
-          <Pressable style={styles.devAssociateBtn} onPress={() => void handleEnterAsAssociate?.()}>
-            <Ionicons name="briefcase-outline" size={18} color={associateColors.primaryDark} />
-            <Text style={styles.devAssociateLabel}>Enter as Business Associate (preview)</Text>
-          </Pressable>
-          <Text style={styles.termsText}>
-            By continuing, you agree to our Terms and Privacy Policy
-          </Text>
-        </>
+        <Text style={styles.termsText}>
+          By continuing, you agree to our Terms and Privacy Policy
+        </Text>
       )}
     </Screen>
   );
@@ -597,27 +581,8 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     textAlign: "center",
   },
-  devAssociateBtn: {
-    marginTop: spacing.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    alignSelf: "center",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: radii.round,
-    borderWidth: 1,
-    borderColor: associateColors.tabBarBorder,
-    backgroundColor: associateColors.primaryMutedBg,
-  },
-  devAssociateLabel: {
-    color: associateColors.primaryDark,
-    fontSize: fontSizes.md,
-    fontWeight: "700",
-  },
   termsText: {
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
     color: colors.textMuted,
     fontSize: fontSizes.sm,
     textAlign: "center",
