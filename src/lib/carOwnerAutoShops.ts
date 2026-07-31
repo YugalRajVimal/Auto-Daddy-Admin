@@ -404,13 +404,16 @@ export function canonicalWeekdayToday(): string {
 }
 
 /**
- * Open now / open today from `currentWeekTimings` when present; otherwise weekday lists.
+ * Open now from `currentWeekTimings` when present; otherwise weekday lists.
  * When today's open/close times are known, also requires the current clock time to fall in range.
+ * `isBusinessActive === false` always counts as closed.
  */
 export function isCarOwnerShopOpenToday(
   shop: CarOwnerAutoShopListItem,
   now = new Date(),
 ): boolean {
+  if (shop.isBusinessActive === false) return false;
+
   if (typeof shop.isClosedToday === "boolean") {
     if (shop.isClosedToday) return false;
     if (shop.todayOpen && shop.todayClose) {
@@ -550,10 +553,19 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
     : todayEntry?.enabled
       ? todayEntry.end
       : null;
+  const businessActiveRaw = raw.isBusinessActive ?? raw.idBusinessActive ?? raw.businessActive;
+  const isBusinessActive =
+    businessActiveRaw === false ||
+    businessActiveRaw === 0 ||
+    businessActiveRaw === "false" ||
+    businessActiveRaw === "0"
+      ? false
+      : true;
   const todayHoursText = (() => {
+    if (!isBusinessActive) return "Closed today";
     if (isClosedToday) return "Closed today";
     if (todayOpen && todayClose) return formatOpenHoursRangeDisplay(todayOpen, todayClose);
-    // API marked the day open without open/close — don't invent hours.
+    // API marked the day open without open/close — don't invent hours in the label.
     if (todayFromApi) return "Hours not listed";
     if (todayEntry?.enabled) return formatOpenHoursRangeDisplay(todayEntry.start, todayEntry.end);
     return pickString(schedule.openHoursText) || "Hours not listed";
@@ -612,9 +624,10 @@ export function normalizeCarOwnerAutoShop(raw: Record<string, unknown>): CarOwne
     openDaysText: schedule.openDaysText,
     closedScheduleText: schedule.closedScheduleText,
     todayHoursText,
-    isClosedToday,
-    todayOpen,
-    todayClose,
+    isClosedToday: !isBusinessActive || isClosedToday,
+    todayOpen: !isBusinessActive || isClosedToday ? null : todayOpen,
+    todayClose: !isBusinessActive || isClosedToday ? null : todayClose,
+    isBusinessActive,
     mainServices: services.mainServices,
     mainServiceItems: services.mainServiceItems,
     subServices: services.subServices,

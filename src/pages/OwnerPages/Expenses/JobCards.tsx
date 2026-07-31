@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { FiCheck, FiClipboard, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
@@ -19,6 +19,7 @@ import {
   carOwnerJobCardStatusLabel,
   formatBusinessPhone,
   formatJobCardDate,
+  formatOwnerJobCardNo,
   isCarOwnerJobCardPendingApproval,
   jobChipLabel,
   resolveJobCardNo,
@@ -107,7 +108,22 @@ export default function OwnerExpensesJobCardsPage() {
   const countryCode = "+1";
   const { token } = useAuth();
   const { vehicles } = useCarOwnerVehicles();
-  const [vehicleFilter, setVehicleFilter] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const vehicleFilter = searchParams.get("vehicleId")?.trim() || "";
+  const setVehicleFilter = useCallback(
+    (vehicleId: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (vehicleId) next.set("vehicleId", vehicleId);
+          else next.delete("vehicleId");
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const { items, loading, error, refresh } = useCarOwnerJobCards(vehicleFilter || null);
   const { acting, approveMany, rejectMany } = useCarOwnerJobCardApprovals();
   const navigate = useNavigate();
@@ -136,7 +152,7 @@ export default function OwnerExpensesJobCardsPage() {
     setSelectedIds([]);
     setDetailJobCardId(null);
     setVehicleFilter("");
-  }, []);
+  }, [setVehicleFilter]);
   useOwnerNavReset(reset);
 
   const openJobCardPreview = (jc: CarOwnerJobCard) => {
@@ -275,7 +291,13 @@ export default function OwnerExpensesJobCardsPage() {
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => navigate("/owner/expenses/invoices")}
+                      onClick={() =>
+                        navigate(
+                          vehicleFilter
+                            ? `/owner/expenses/invoices?vehicleId=${encodeURIComponent(vehicleFilter)}`
+                            : "/owner/expenses/invoices",
+                        )
+                      }
                       className="inline-flex h-10 items-center gap-1 rounded-xl bg-white/80 px-3 py-1.5 text-sm font-semibold text-slate-600 ring-1 ring-black/5 transition hover:bg-white"
                     >
                       View invoices
@@ -350,7 +372,7 @@ export default function OwnerExpensesJobCardsPage() {
                                     className="font-semibold text-sky-700 hover:underline"
                                     onClick={() => openJobCardPreview(jc)}
                                   >
-                                    {jobNo ? `J # ${jobNo}` : "—"}
+                                    {formatOwnerJobCardNo(jobNo)}
                                   </button>
                                 </td>
                                 <td className={OWNER_TABLE_BODY_TD_CLASS}>

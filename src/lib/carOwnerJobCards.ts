@@ -1,4 +1,9 @@
 import { getJson } from "../api/mobileAuth";
+import {
+  composePrefixedJobCardNo,
+  formatJobCardDocumentNo,
+  isPrefixedJobCardDisplayNo,
+} from "../components/JobCard/shopJobCardEstimate";
 import { digitsOnly, formatNationalPhoneDisplay } from "./carOwnerProfile";
 import type { CarOwnerJobCard } from "../types/carOwnerJobCards";
 
@@ -47,13 +52,32 @@ function jobCardServiceName(service: NonNullable<CarOwnerJobCard["services"]>[nu
 
 export function resolveJobCardNo(jc: CarOwnerJobCard | Record<string, unknown>): string {
   const o = jc as Record<string, unknown>;
-  return (
+  const prefix = asString(o.jobCardPrefix) || asString(o.prefix);
+  const numericNo =
+    (typeof o.jobCardNo === "number" && Number.isFinite(o.jobCardNo) ? o.jobCardNo : null) ??
+    (typeof o.jobCardNumber === "number" && Number.isFinite(o.jobCardNumber)
+      ? o.jobCardNumber
+      : null) ??
+    (asString(o.jobCardNo) || asString(o.jobCardNumber) || null);
+
+  const composed = composePrefixedJobCardNo(prefix, numericNo);
+  if (composed) return composed;
+
+  const raw =
     asString(o.jobNo) ||
     asString(o.jobCardNo) ||
     asString(o.jobCardNumber) ||
     asString(o.jobNumber) ||
-    ""
-  );
+    "";
+  if (isPrefixedJobCardDisplayNo(raw)) return raw;
+  return raw;
+}
+
+/** Owner UI label for a resolved job card number (e.g. "ABC-4" or "J # 4"). */
+export function formatOwnerJobCardNo(jobNo: string | null | undefined): string {
+  const raw = (jobNo ?? "").trim();
+  if (!raw || raw === "—") return "—";
+  return formatJobCardDocumentNo(raw) || raw;
 }
 
 export function resolveJobCardTotal(jc: CarOwnerJobCard | Record<string, unknown>): number {
@@ -99,7 +123,8 @@ export function serviceTypeLabel(jc: CarOwnerJobCard): string {
 export function jobChipLabel(jc: CarOwnerJobCard): string {
   const jobNo = resolveJobCardNo(jc);
   if (!jobNo) return "Job";
-  return jobNo.toLowerCase().startsWith("job") ? jobNo : `Job # ${jobNo}`;
+  if (isPrefixedJobCardDisplayNo(jobNo) || jobNo.toLowerCase().startsWith("job")) return jobNo;
+  return `Job # ${jobNo}`;
 }
 
 export function jobCardLicensePlate(jc: CarOwnerJobCard): string {
@@ -191,6 +216,7 @@ export function canonicalizeCarOwnerJobCard(raw: unknown): CarOwnerJobCard | nul
   const paymentStatus =
     paymentFromApi ||
     (invoicePaid || status.toLowerCase().replace(/\s+/g, "") === "cashpaid" ? "Paid" : "Unpaid");
+  const jobCardPrefix = asString(obj.jobCardPrefix) || asString(obj.prefix) || undefined;
 
   const vehicleRaw = obj.vehicleId ?? obj.vehicle;
   const vehicle =
@@ -202,7 +228,9 @@ export function canonicalizeCarOwnerJobCard(raw: unknown): CarOwnerJobCard | nul
     ...(obj as unknown as CarOwnerJobCard),
     _id: id,
     jobNo,
-    jobCardNo: (obj.jobCardNo as CarOwnerJobCard["jobCardNo"]) ?? (jobNo || undefined),
+    jobCardPrefix,
+    jobCardNo: (obj.jobCardNo as CarOwnerJobCard["jobCardNo"]) ?? (obj.jobCardNumber as CarOwnerJobCard["jobCardNo"]) ?? undefined,
+    jobCardNumber: (obj.jobCardNumber as CarOwnerJobCard["jobCardNumber"]) ?? undefined,
     totalPayableAmount: total,
     totalAmount: asFiniteNumber(obj.totalAmount) ?? total,
     invoiceId: invoiceNo || null,

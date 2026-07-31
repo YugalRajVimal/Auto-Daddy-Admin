@@ -195,8 +195,9 @@ export default function OwnerDashboardServicePanel({
 
   const handleToggleFavorite = useCallback(
     async (shopId: string) => {
+      const shop = shopsWithFavorites.find((s) => s.id === shopId);
       setFavoriteBusyId(shopId);
-      const result = await toggleFavorite(shopId);
+      const result = await toggleFavorite(shopId, shop?.isFavorite);
       setFavoriteBusyId(null);
       if (!result.ok) {
         toast.error(result.error ?? "Could not update favorite.");
@@ -204,7 +205,7 @@ export default function OwnerDashboardServicePanel({
       }
       toast.success(result.isFavorite ? "Added to favorites." : "Removed from favorites.");
     },
-    [toggleFavorite]
+    [toggleFavorite, shopsWithFavorites]
   );
 
   useEffect(() => {

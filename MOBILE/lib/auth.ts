@@ -20,6 +20,7 @@ export const AUTH_DASHBOARD_DETAILS_KEY = "autoShopDashboardDetails";
 export type PostAuthRoute =
   | "/(shop-owner)/(tabs)/home"
   | "/(shop-owner)/profile"
+  | "/(shop-owner)/businessprofile"
   | "/(car-owner)/(tabs)/home"
   | "/(car-owner)/profile"
   | "/(car-owner)/onboarding"
@@ -72,8 +73,10 @@ export function getPostAuthRoute(
   const role = (meta.role ?? "").toLowerCase();
 
   if (role === "autoshopowner") {
-    // Match web shop portal: incomplete personal/business profile does not block the app.
-    // Owners edit profiles anytime under Profile; always land on the dashboard after auth.
+    // Only business profile completion gates shop owners (personal is optional).
+    if (meta.isAutoShopBusinessProfileComplete === false) {
+      return "/(shop-owner)/businessprofile";
+    }
     return "/(shop-owner)/(tabs)/home";
   }
 

@@ -52,9 +52,14 @@ export type BusinessProfileFields = {
   businessEmail?: string;
   shopTypes?: string[]; // sent as JSON string (matches curl examples)
   businessLogo?: File | null;
+  /** First-time / mobile complete-business-profile fields */
+  lat?: string | number;
+  lng?: string | number;
+  perDayOpenHours?: string;
+  serviceWeWorkWith?: string[];
 };
 
-export function updateBusinessProfile(token: string, fields: BusinessProfileFields) {
+function buildBusinessProfileFormData(fields: BusinessProfileFields): FormData {
   const fd = new FormData();
   const append = (k: string, v: unknown) => {
     if (v == null) return;
@@ -71,11 +76,36 @@ export function updateBusinessProfile(token: string, fields: BusinessProfileFiel
   append("businessHSTNumber", fields.businessHSTNumber);
   append("gst", fields.gst);
   append("businessEmail", fields.businessEmail);
+  append("lat", fields.lat);
+  append("lng", fields.lng);
+  if (fields.perDayOpenHours != null && fields.perDayOpenHours.trim()) {
+    fd.append("perDayOpenHours", fields.perDayOpenHours.trim());
+  }
   if (Array.isArray(fields.shopTypes)) {
     fd.append("shopTypes", JSON.stringify(fields.shopTypes));
   }
+  if (Array.isArray(fields.serviceWeWorkWith)) {
+    fd.append("serviceWeWorkWith", JSON.stringify(fields.serviceWeWorkWith));
+  }
   if (fields.businessLogo) fd.append("businessLogo", fields.businessLogo);
-  return putFormAutoshopowner<ApiEnvelope>("/api/autoshopowner/profile/business", fd, token);
+  return fd;
+}
+
+export function updateBusinessProfile(token: string, fields: BusinessProfileFields) {
+  return putFormAutoshopowner<ApiEnvelope>(
+    "/api/autoshopowner/profile/business",
+    buildBusinessProfileFormData(fields),
+    token,
+  );
+}
+
+/** PUT /api/auto-shop-owner/complete-business-profile — first-time shop business setup. */
+export function completeBusinessProfile(token: string, fields: BusinessProfileFields) {
+  return putFormAutoshopowner<ApiEnvelope>(
+    "/api/auto-shop-owner/complete-business-profile",
+    buildBusinessProfileFormData(fields),
+    token,
+  );
 }
 
 export type TemplateSlugsFields = {

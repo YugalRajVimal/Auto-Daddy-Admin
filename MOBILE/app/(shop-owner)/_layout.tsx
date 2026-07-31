@@ -1,10 +1,17 @@
 import { AppSplash } from "@/components/reusables";
 import { useAuth } from "@/context/auth-provider";
 import { getPostAuthRoute } from "@/lib/auth";
-import { Redirect, Slot } from "expo-router";
+import { Redirect, Slot, useSegments } from "expo-router";
+
+function isShopOwnerRole(role: string | null | undefined): boolean {
+  const r = (role ?? "").toLowerCase().replace(/[-_\s]/g, "");
+  return r === "autoshopowner";
+}
 
 export default function ShopOwnerLayout() {
   const { isBootstrapping, isAuthenticated, meta } = useAuth();
+  const segments = useSegments();
+  const onBusinessSetup = segments.includes("businessprofile");
 
   if (isBootstrapping) {
     return <AppSplash />;
@@ -22,7 +29,7 @@ export default function ShopOwnerLayout() {
 
   // If the user's role doesn't match this route group, bounce them to the right home.
   const normalizedRole = (meta?.role ?? "").toLowerCase().replace(/[-_\s]/g, "");
-  if (normalizedRole && normalizedRole !== "autoshopowner") {
+  if (normalizedRole && !isShopOwnerRole(meta.role)) {
     return (
       <Redirect
         href={getPostAuthRoute({
@@ -34,7 +41,11 @@ export default function ShopOwnerLayout() {
     );
   }
 
+  // Only business profile completion gates shop owners (personal is optional).
+  if (meta?.isAutoShopBusinessProfileComplete === false && !onBusinessSetup) {
+    return <Redirect href="/(shop-owner)/businessprofile" />;
+  }
+
   // Allow nested screens (tabs + stacks) to render.
   return <Slot />;
 }
-

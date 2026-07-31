@@ -134,9 +134,41 @@ function scheduleFromLegacyFields(
   return schedule;
 }
 
+/** Coerce API `isClosed` / `closed` (boolean, 0/1, "true"/"false"). */
+export function coerceTimingClosedFlag(value: unknown): boolean | null {
+  if (value === true || value === 1 || value === "1") return true;
+  if (value === false || value === 0 || value === "0") return false;
+  if (typeof value === "string") {
+    const t = value.trim().toLowerCase();
+    if (t === "true" || t === "yes" || t === "closed") return true;
+    if (t === "false" || t === "no" || t === "open") return false;
+  }
+  return null;
+}
+
+function timingRowIsClosed(row: Record<string, unknown>): boolean {
+  const flagged = coerceTimingClosedFlag(row.isClosed ?? row.closed);
+  if (flagged != null) return flagged;
+  // No flag: treat as open only when both open and close are present.
+  const hasOpen = typeof row.open === "string" && Boolean(row.open.trim());
+  const hasClose = typeof row.close === "string" && Boolean(row.close.trim());
+  return !(hasOpen && hasClose);
+}
+
+function timingRowOpenClose(row: Record<string, unknown>): { open: string | null; close: string | null } {
+  const open =
+    typeof row.open === "string" && row.open.trim() ? row.open.trim() : null;
+  const close =
+    typeof row.close === "string" && row.close.trim() ? row.close.trim() : null;
+  return { open, close };
+}
+
 /**
  * List APIs return `currentWeekTimings` (Mon–Sun with date, open/close, isClosed).
  * Prefer that over weekly defaults so date overrides are reflected.
+ *
+ * Open rows may omit open/close (e.g. override "Reopened by owner") — use defaults
+ * so the day still counts as open with normal hours.
  */
 function parseCurrentWeekTimings(raw: unknown): PerDayOpenHourEntry[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null;
@@ -149,12 +181,14 @@ function parseCurrentWeekTimings(raw: unknown): PerDayOpenHourEntry[] | null {
         ? normalizeWeekdayName(row.day)
         : null;
     if (!day) continue;
-    const isClosed = Boolean(row.isClosed ?? row.closed);
-    const open =
-      typeof row.open === "string" && row.open.trim() ? row.open.trim() : DEFAULT_START;
-    const close =
-      typeof row.close === "string" && row.close.trim() ? row.close.trim() : DEFAULT_END;
-    entries.push({ day, open, close, isClosed });
+    const isClosed = timingRowIsClosed(row);
+    const { open, close } = timingRowOpenClose(row);
+    entries.push({
+      day,
+      open: open ?? DEFAULT_START,
+      close: close ?? DEFAULT_END,
+      isClosed,
+    });
   }
   return entries.length > 0 ? entries : null;
 }
@@ -233,11 +267,13 @@ export function pickCurrentWeekTimingForToday(
 
   const day =
     (typeof match.day === "string" ? normalizeWeekdayName(match.day) : null) ?? todayDay;
-  const isClosed = Boolean(match.isClosed ?? match.closed);
-  const open =
-    typeof match.open === "string" && match.open.trim() ? match.open.trim() : null;
-  const close =
-    typeof match.close === "string" && match.close.trim() ? match.close.trim() : null;
+  const isClosed = timingRowIsClosed(match);
+  let { open, close } = timingRowOpenClose(match);
+  // Open today but times omitted (common on "Reopened by owner" overrides) → default window.
+  if (!isClosed && (!open || !close)) {
+    open = open ?? DEFAULT_START;
+    close = close ?? DEFAULT_END;
+  }
   return { day, isClosed, open, close };
 }
 
@@ -698,4 +734,19 @@ export function perDayOpenHoursFromSchedule(schedule: PerDaySchedule): PerDayOpe
 
 export function serializePerDayOpenHoursForApi(schedule: PerDaySchedule): string {
   return JSON.stringify(perDayOpenHoursFromSchedule(schedule));
+}
+
+/** Match MOBILE `validatePerDaySchedule` — used by shop onboarding. */
+export function validatePerDaySchedule(schedule: PerDaySchedule): string | null {
+  const enabledDays = WEEK_DAYS.filter((day) => schedule[day]?.enabled);
+  if (enabledDays.length === 0) {
+    return "Please enable at least one open day.";
+  }
+  for (const day of enabledDays) {
+    const { start, end } = schedule[day];
+    if (end <= start) {
+      return `${day}: end time must be after start time.`;
+    }
+  }
+  return null;
 }

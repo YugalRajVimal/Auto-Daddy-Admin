@@ -535,7 +535,9 @@ export default function OwnerVehiclesPage() {
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => navigate("/owner/expenses/job-cards")}
+                        onClick={() =>
+                          navigate(`/owner/expenses/job-cards?vehicleId=${encodeURIComponent(v.id)}`)
+                        }
                         className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100 transition hover:bg-indigo-100"
                       >
                         <FiClipboard size={13} /> Job cards
@@ -549,7 +551,9 @@ export default function OwnerVehiclesPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => navigate("/owner/expenses/invoices")}
+                        onClick={() =>
+                          navigate(`/owner/expenses/invoices?vehicleId=${encodeURIComponent(v.id)}`)
+                        }
                         className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 ring-1 ring-amber-100 transition hover:bg-amber-100"
                       >
                         <FiFileText size={13} /> Invoices

@@ -67,3 +67,30 @@ export function resolveShopProfileIncompleteKind(
   if (businessIncomplete) return "business";
   return null;
 }
+
+/** Forced completion target — standalone business setup page. */
+export function shopProfileCompletionPath(_kind?: ShopProfileIncompleteKind): string {
+  return "/shop/onboarding";
+}
+
+/**
+ * Shop portal gate from verify-otp flags.
+ * Only `isAutoShopBusinessProfileComplete` blocks entry; personal `isProfileComplete` is ignored.
+ */
+export function resolveShopIncompleteKindFromAuthFlags(flags: {
+  isProfileComplete?: boolean | null;
+  isAutoShopBusinessProfileComplete?: boolean | null;
+}): ShopProfileIncompleteKind | null {
+  if (flags.isAutoShopBusinessProfileComplete === false) return "business";
+  return null;
+}
+
+/** True when shop owner must finish business setup before using the portal. */
+export function resolveShopNeedsBusinessOnboarding(
+  meta: SessionMeta | null | undefined,
+  business: ShopProfileBusiness | null | undefined,
+  zipCode: string | null | undefined,
+  portalLoaded: boolean
+): boolean {
+  return resolveBusinessProfileIncomplete(meta, business, zipCode, portalLoaded) === true;
+}

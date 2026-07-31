@@ -13,6 +13,10 @@ import {
 import { useAuth, getPostLoginRedirect } from "../../auth";
 import type { UserRole } from "../../auth/types";
 import { formatPhoneDisplay, phoneDigits } from "../../lib/phoneFormat";
+import {
+  resolveShopIncompleteKindFromAuthFlags,
+  shopProfileCompletionPath,
+} from "../../lib/shopProfileCompleteness";
 import { FormFieldError } from "../../lib/validation/formUi";
 import {
   signInRequestSchema,
@@ -257,10 +261,15 @@ export default function AdminSignInPage() {
       await enrichMobileProfile(data.token, userRole, data, nationalPhoneDigits, countryCode);
       setStatus("Login successful!");
       setTimeout(() => {
-        const redirect =
-          userRole === "car_owner" && data.isProfileComplete === false
-            ? "/owner/onboarding"
-            : getPostLoginRedirect(userRole);
+        let redirect = getPostLoginRedirect(userRole);
+        if (userRole === "car_owner" && data.isProfileComplete === false) {
+          redirect = "/owner/onboarding";
+        } else if (userRole === "auto_shop_owner") {
+          const shopIncomplete = resolveShopIncompleteKindFromAuthFlags(data);
+          if (shopIncomplete) {
+            redirect = shopProfileCompletionPath(shopIncomplete);
+          }
+        }
         navigate(redirect, { replace: true });
       }, 800);
     } catch {

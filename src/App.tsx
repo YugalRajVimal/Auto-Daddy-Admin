@@ -20,6 +20,7 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import AdminSignInPage from "./pages/AuthPages/AdminSignInPage";
 import AutoShopOwnerOnboarding from "./pages/AutoShopOwnerOnboarding";
 import CarOwnerOnboardingPage from "./pages/CarOwnerOnboarding";
+import ShopOwnerOnboardingPage from "./pages/ShopOwnerOnboarding";
 import { adminRoutes } from "./portals/admin/routes";
 import { ownerRoutes, shopRoutes } from "./portals/owner/routes";
 
@@ -55,6 +56,7 @@ export default function App() {
 
             <Route path="/auto-shop-owner/onboarding" element={<AutoShopOwnerOnboarding />} />
             <Route path="/owner/onboarding" element={<CarOwnerOnboardingPage />} />
+            <Route path="/shop/onboarding" element={<ShopOwnerOnboardingPage />} />
 
             {/* Template / demo routes */}
             <Route path="/calendar" element={<Calendar />} />

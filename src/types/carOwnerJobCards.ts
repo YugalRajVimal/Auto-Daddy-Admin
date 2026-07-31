@@ -117,8 +117,12 @@ export type CarOwnerJobCard = {
   /** Backend often leaves status "pending" after customer approval; trust this flag. */
   approvedByCustomer?: boolean;
   jobNo: string;
+  /** Shop job card prefix from API (e.g. "ABC"). */
+  jobCardPrefix?: string;
   /** Numeric job card number from API. */
   jobCardNo?: number | string;
+  /** Alternate numeric job card number from API. */
+  jobCardNumber?: number | string;
   invoiceNumber?: string;
   /** Invoice id from API (e.g. INV-4). */
   invoiceId?: string | null;

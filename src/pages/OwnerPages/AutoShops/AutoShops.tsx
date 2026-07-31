@@ -186,7 +186,11 @@ export default function OwnerAutoShopsPage() {
   );
 
   const { shops, loading, error, refresh } = useCarOwnerAutoShops(shopFilters);
-  const { isFavorite, toggleFavorite } = useCarOwnerFavoriteShops();
+  const {
+    isFavorite,
+    toggleFavorite,
+    loading: favoritesLoading,
+  } = useCarOwnerFavoriteShops();
   const {
     items: customerRequests,
     loading: requestsLoading,
@@ -201,9 +205,13 @@ export default function OwnerAutoShopsPage() {
     () =>
       shops.map((shop) => ({
         ...shop,
-        isFavorite: isFavorite(shop.id) || shop.isFavorite,
+        // Favorites hook is source of truth after load. Do not OR with shop.isFavorite —
+        // the list payload stays stale after unfavorite and would keep the heart filled.
+        isFavorite: favoritesLoading
+          ? shop.isFavorite || isFavorite(shop.id)
+          : isFavorite(shop.id),
       })),
-    [shops, isFavorite],
+    [shops, isFavorite, favoritesLoading],
   );
 
   const catalog = useMemo(
@@ -357,8 +365,9 @@ export default function OwnerAutoShopsPage() {
   };
 
   const handleToggleFavorite = async (shopId: string) => {
+    const shop = shopsWithFavorites.find((s) => s.id === shopId);
     setFavoriteBusyId(shopId);
-    const result = await toggleFavorite(shopId);
+    const result = await toggleFavorite(shopId, shop?.isFavorite);
     setFavoriteBusyId(null);
     if (!result.ok) {
       toast.error(result.error ?? "Could not update favorite.");

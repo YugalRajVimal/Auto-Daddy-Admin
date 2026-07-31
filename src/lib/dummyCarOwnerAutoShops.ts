@@ -27,6 +27,7 @@ function makeShop(
     isClosedToday: false,
     todayOpen: "09:00",
     todayClose: "18:00",
+    isBusinessActive: true,
     mainServices: serviceItems.map((s) => s.name),
     mainServiceItems: serviceItems,
     subServices: [],

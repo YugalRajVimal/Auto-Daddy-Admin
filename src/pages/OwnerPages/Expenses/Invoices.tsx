@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { FiChevronLeft, FiFileText } from "react-icons/fi";
+import { useSearchParams } from "react-router";
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerInvoiceEstimateView from "../../../components/owner/OwnerInvoiceEstimateView";
@@ -8,7 +9,7 @@ import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "../../../hooks/useCarOwnerInvoices";
 import { useCarOwnerVehicles } from "../../../hooks/useCarOwnerVehicles";
-import { resolveJobCardNo } from "../../../lib/carOwnerJobCards";
+import { formatOwnerJobCardNo, resolveJobCardNo } from "../../../lib/carOwnerJobCards";
 import { formatCurrencyAmount } from "../../../lib/currency";
 import {
   vehicleSidebarLabel,
@@ -69,9 +70,7 @@ function invoiceNoDisplay(row: CarOwnerInvoiceRow): string {
 }
 
 function jobNoDisplay(row: CarOwnerInvoiceRow): string {
-  const no = row.jobNo?.trim();
-  if (!no || no === "—") return "—";
-  return `J # ${no.replace(/^J\s*#\s*/i, "")}`;
+  return formatOwnerJobCardNo(row.jobNo);
 }
 
 function selectedSetFromArray(ids: string[]): Set<string> {
@@ -93,7 +92,22 @@ export default function OwnerInvoicesPage() {
   const countryCode = "+1";
   const { token } = useAuth();
   const { vehicles } = useCarOwnerVehicles();
-  const [vehicleFilter, setVehicleFilter] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const vehicleFilter = searchParams.get("vehicleId")?.trim() || "";
+  const setVehicleFilter = useCallback(
+    (vehicleId: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (vehicleId) next.set("vehicleId", vehicleId);
+          else next.delete("vehicleId");
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const { loading, error, refresh, invoiceRows, findJobCardById } = useCarOwnerInvoices(
     vehicleFilter || null,
   );
@@ -110,7 +124,7 @@ export default function OwnerInvoicesPage() {
     setPreviewInvoice(null);
     setJobCardViewerId(null);
     setVehicleFilter("");
-  }, []);
+  }, [setVehicleFilter]);
 
   useOwnerNavReset(resetSidebar);
 

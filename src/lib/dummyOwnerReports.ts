@@ -145,6 +145,7 @@ export const DUMMY_REPORT_SHOPS: CarOwnerAutoShopListItem[] = [
     isClosedToday: false,
     todayOpen: "09:00",
     todayClose: "18:00",
+    isBusinessActive: true,
     mainServices: ["Oil Change", "Brake Service"],
     mainServiceItems: [
       { id: "svc-1", name: "Oil Change" },
@@ -183,6 +184,7 @@ export const DUMMY_REPORT_SHOPS: CarOwnerAutoShopListItem[] = [
     isClosedToday: false,
     todayOpen: "08:00",
     todayClose: "19:00",
+    isBusinessActive: true,
     mainServices: ["Tire Service", "Brake Service"],
     mainServiceItems: [
       { id: "svc-3", name: "Tire Service" },
@@ -221,6 +223,7 @@ export const DUMMY_REPORT_SHOPS: CarOwnerAutoShopListItem[] = [
     isClosedToday: false,
     todayOpen: "08:30",
     todayClose: "17:30",
+    isBusinessActive: true,
     mainServices: ["General Repair", "Inspection"],
     mainServiceItems: [
       { id: "svc-4", name: "General Repair" },

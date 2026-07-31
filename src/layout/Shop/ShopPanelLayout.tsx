@@ -1,4 +1,3 @@
-import ShopCompleteProfileDialog from "../../components/shop/ShopCompleteProfileDialog";
 import ShopSubscriptionRequiredDialog from "../../components/shop/ShopSubscriptionRequiredDialog";
 import ShopPortalShell from "../../components/shop/ShopPortalShell";
 import { RequirePortal } from "../../auth/guards/RequirePortal";
@@ -15,15 +14,12 @@ import {
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import {
-  resolveBusinessProfileIncomplete,
-  resolvePersonalProfileIncomplete,
-  resolveShopProfileIncompleteKind,
+  resolveShopNeedsBusinessOnboarding,
+  shopProfileCompletionPath,
 } from "../../lib/shopProfileCompleteness";
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { Navigate, useNavigate } from "react-router";
 import { getPostLoginRedirect, useAuth } from "../../auth";
-
-const PROFILE_DISMISS_KEY = "autodaddy.shop.complete-profile-dismissed";
 
 function ShopSubscriptionPrompt() {
   const navigate = useNavigate();
@@ -56,18 +52,9 @@ function ShopLayoutContent() {
   const profilePhotoSrc = normalizeMediaUrl(profileIcon ?? null);
   const locationLabel = city || business?.city?.trim();
   const { login, session } = useAuth();
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
 
   // State to track back-to-admin-token
   const [backToAdminToken, setBackToAdminToken] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState(() => {
-    try {
-      return sessionStorage.getItem(PROFILE_DISMISS_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
 
   useEffect(() => {
     const token = localStorage.getItem("back-to-admin-token");
@@ -98,64 +85,24 @@ function ShopLayoutContent() {
     }
   };
 
-  const incompleteKind = useMemo(() => {
-    const personalIncomplete = resolvePersonalProfileIncomplete(
-      session?.meta,
-      user,
-      user?.city ?? business?.city,
-      businessNameLoaded
-    );
-    const businessIncomplete = resolveBusinessProfileIncomplete(
-      session?.meta,
-      business,
-      user?.pincode ?? business?.pincode,
-      businessNameLoaded
-    );
-    return resolveShopProfileIncompleteKind(personalIncomplete, businessIncomplete);
-  }, [
-    session?.meta,
-    user,
-    business,
-    businessNameLoaded,
-  ]);
-
-  const profileCompletenessKnown = businessNameLoaded || (
-    session?.meta?.isProfileComplete != null &&
-    session?.meta?.isAutoShopBusinessProfileComplete != null
+  // Only business profile completion gates the shop portal (personal is optional).
+  const needsBusinessOnboarding = useMemo(
+    () =>
+      resolveShopNeedsBusinessOnboarding(
+        session?.meta,
+        business,
+        user?.pincode ?? business?.pincode,
+        businessNameLoaded
+      ),
+    [session?.meta, business, user?.pincode, businessNameLoaded]
   );
 
-  const onProfilePage = pathname.startsWith("/shop/profile");
-  const showCompleteProfileDialog =
-    Boolean(incompleteKind) && !onProfilePage && !dismissed;
+  if (needsBusinessOnboarding) {
+    return <Navigate to={shopProfileCompletionPath("business")} replace />;
+  }
 
   const subscriptionLocked =
     subscriptionGateReady && !hasActiveSubscription;
-
-  const handleCompleteProfile = () => {
-    const section =
-      incompleteKind === "business" ? "business" : "personal";
-    navigate(`/shop/profile?section=${section}`);
-  };
-
-  const handleLater = () => {
-    try {
-      sessionStorage.setItem(PROFILE_DISMISS_KEY, "1");
-    } catch {
-      // ignore quota / private mode
-    }
-    setDismissed(true);
-  };
-
-  // Clear dismiss once we know the profile is complete so a future incomplete state can prompt again.
-  useEffect(() => {
-    if (!profileCompletenessKnown || incompleteKind) return;
-    try {
-      sessionStorage.removeItem(PROFILE_DISMISS_KEY);
-    } catch {
-      // ignore
-    }
-    setDismissed(false);
-  }, [incompleteKind, profileCompletenessKnown]);
 
   return (
     <ShopSubscriptionGateProvider subscriptionLocked={subscriptionLocked}>
@@ -203,15 +150,6 @@ function ShopLayoutContent() {
         subscriptionDaysLeft={hasActiveSubscription ? (daysLeft ?? null) : null}
         helpPath="/shop/help"
       />
-
-      {incompleteKind ? (
-        <ShopCompleteProfileDialog
-          open={showCompleteProfileDialog}
-          kind={incompleteKind}
-          onComplete={handleCompleteProfile}
-          onLater={handleLater}
-        />
-      ) : null}
 
       <ShopSubscriptionPrompt />
     </ShopSubscriptionGateProvider>

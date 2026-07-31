@@ -24,7 +24,7 @@ import {
   resolveInvoiceTheme,
   type InvoiceThemeTokens,
 } from "../shop/invoice-templates/invoiceTheme";
-import { fetchCarOwnerJobCardById, resolveCarOwnerJobCardForViewer } from "../../lib/carOwnerJobCards";
+import { fetchCarOwnerJobCardById, resolveCarOwnerJobCardForViewer, resolveJobCardNo } from "../../lib/carOwnerJobCards";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import A4DocumentSheet from "../common/A4DocumentSheet";
 import { printDomElement } from "../../utils/printDomElement";
@@ -285,6 +285,10 @@ export default function OwnerInvoiceEstimateView({
     }
     const hint = jobNoHint?.trim();
     if (hint && hint !== "—") return hint;
+    if (job) {
+      const resolved = resolveJobCardNo(job);
+      if (resolved) return resolved;
+    }
     return pickJobNoFromRecord(job) || "—";
   }, [job, invoiceNoHint, jobNoHint, isInvoiceDocument]);
 
