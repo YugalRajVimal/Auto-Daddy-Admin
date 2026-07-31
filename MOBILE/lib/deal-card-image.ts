@@ -39,3 +39,28 @@ export async function pickDealImageFromLibrary(): Promise<PickedDealImage | null
     fileName: asset.fileName ?? null,
   };
 }
+
+/**
+ * Pick up to `max` deal images. Multi-select disables in-picker crop (Expo limitation),
+ * so images are taken as-is at quality 0.85.
+ */
+export async function pickDealImagesFromLibrary(
+  max = 2
+): Promise<PickedDealImage[]> {
+  const limit = Math.max(1, Math.min(2, max));
+  const res = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    allowsMultipleSelection: true,
+    selectionLimit: limit,
+    quality: 0.85,
+  });
+  if (res.canceled || !res.assets?.length) return [];
+  return res.assets
+    .filter((a) => Boolean(a.uri))
+    .slice(0, limit)
+    .map((asset) => ({
+      uri: asset.uri,
+      mimeType: asset.mimeType ?? null,
+      fileName: asset.fileName ?? null,
+    }));
+}

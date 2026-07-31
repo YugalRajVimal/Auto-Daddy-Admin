@@ -1,5 +1,6 @@
 import type { CarOwnerJobCard } from "@/types/car-owner-job-cards";
 import { getJson } from "@/lib/api";
+import { composePrefixedJobCardNo } from "@/lib/shop-job-card-estimate";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -24,13 +25,15 @@ function asFiniteNumber(value: unknown): number | null {
 
 export function resolveJobCardNo(jc: CarOwnerJobCard | Record<string, unknown>): string {
   const o = jc as Record<string, unknown>;
-  return (
+  const prefix = asString(o.jobCardPrefix) || asString(o.prefix);
+  const numericNo =
     asString(o.jobNo) ||
     asString(o.jobCardNo) ||
     asString(o.jobCardNumber) ||
     asString(o.jobNumber) ||
-    ""
-  );
+    "";
+  const composed = composePrefixedJobCardNo(prefix, numericNo);
+  return composed || numericNo;
 }
 
 export function resolveJobCardTotal(jc: CarOwnerJobCard | Record<string, unknown>): number {

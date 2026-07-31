@@ -16,6 +16,8 @@ export type AutoshopDealFormFields = {
   discountedPrice?: string;
   offersEndOnDate?: string;
   dealImage?: UploadPart | null;
+  /** Additional deal images. First image may also be set via `dealImage`. Max 2 total. */
+  dealImages?: UploadPart[];
   serviceId?: string;
   productName?: string;
   subServiceName?: string;
@@ -37,24 +39,39 @@ function appendText(fd: FormData, key: string, value: unknown) {
   if (s) fd.append(key, s);
 }
 
+/** API expects offer end dates as `YYYY-MM-DD`. */
 export function formatAutoshopDealOfferEndDate(value: string | Date) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) {
     const trimmed = String(value).trim();
-    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
-      return `${trimmed.slice(0, 10)}T00:00:00.000Z`;
-    }
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
     return trimmed;
   }
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}T00:00:00.000Z`;
+  return `${y}-${m}-${day}`;
+}
+
+function collectDealImageParts(fields: AutoshopDealFormFields): UploadPart[] {
+  const out: UploadPart[] = [];
+  if (fields.dealImage) out.push(fields.dealImage);
+  for (const part of fields.dealImages ?? []) {
+    if (part && !out.includes(part)) out.push(part);
+  }
+  return out.slice(0, 2);
+}
+
+function appendDealImages(fd: FormData, fields: AutoshopDealFormFields) {
+  // Omit entirely when no new files — edit keeps existing images.
+  for (const image of collectDealImageParts(fields)) {
+    appendUploadPart(fd, "dealImage", image);
+  }
 }
 
 function buildAutoshopDealFormData(fields: AutoshopDealFormFields) {
   const fd = new FormData();
-  appendUploadPart(fd, "dealImage", fields.dealImage);
+  appendDealImages(fd, fields);
   if (fields.dealType) fd.append("dealType", fields.dealType);
   appendText(fd, "description", fields.description);
   appendText(fd, "originalPrice", fields.originalPrice);

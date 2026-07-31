@@ -28,6 +28,7 @@ import {
 import { localImageMultipartPart } from "@/lib/local-image-for-form";
 import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
 import { pickJobNoFromListRow } from "@/lib/shop-job-card-estimate";
+import { firstZodError, walletEntrySchema } from "@/lib/validation-zod";
 import {
   pickJobCardInvoiceNumber,
   pickJobCardNoForApi,
@@ -657,24 +658,20 @@ export default function WalletPage() {
     const parsedAmount = Number.parseFloat(expenseAmount);
     const parsedGst = Number.parseFloat(expenseGstAmount);
 
-    if (!expenseAmount.trim() || !Number.isFinite(parsedAmount)) {
+    const parsed = walletEntrySchema.safeParse({
+      amount: expenseAmount.trim(),
+      date: expenseDate.trim(),
+      vendor: trimmedVendor,
+      category: expenseCategory ?? "",
+      subcategory: expenseSubcategory ?? "",
+      note: expenseNotes ?? "",
+    });
+    if (!parsed.success) {
+      showToast(firstZodError(parsed.error), { type: "error" });
+      return;
+    }
+    if (!Number.isFinite(parsedAmount)) {
       showToast("Amount is required.", { type: "error" });
-      return;
-    }
-    if (!expenseDate) {
-      showToast("Date is required.", { type: "error" });
-      return;
-    }
-    if (!trimmedVendor) {
-      showToast("Vendor is required.", { type: "error" });
-      return;
-    }
-    if (!expenseCategory) {
-      showToast("Category is required.", { type: "error" });
-      return;
-    }
-    if (!expenseSubcategory) {
-      showToast("Subcategory is required.", { type: "error" });
       return;
     }
     if (!token) {

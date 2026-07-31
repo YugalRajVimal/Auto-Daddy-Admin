@@ -131,6 +131,8 @@ export function updateTemplateSlugs(token: string, fields: TemplateSlugsFields) 
 export type InvoicePrefixEntry = {
   prefix: string;
   year: number | null;
+  /** Next invoice sequence from the API (`invoiceCounter`). */
+  invoiceCounter: number | null;
 };
 
 /** GET /api/autoshopowner/invoice-prefix — current year, or `?year=` for a specific year. */
@@ -176,8 +178,36 @@ function readPrefixString(obj: Record<string, unknown>): string {
   return typeof raw === "string" ? raw.trim() : raw != null ? String(raw).trim() : "";
 }
 
+function readInvoiceCounter(obj: Record<string, unknown>): number | null {
+  const raw =
+    obj.invoiceCounter ??
+    obj.invoice_counter ??
+    obj.nextNumber ??
+    obj.nextInvoiceNumber ??
+    obj.counter;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return Math.trunc(raw);
+  if (typeof raw === "string" && raw.trim()) {
+    const digits = raw.replace(/[^\d]/g, "");
+    if (!digits) return null;
+    const n = Number(digits);
+    return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
+  }
+  return null;
+}
+
+/** Display id as `{prefix}-{invoiceCounter}` (e.g. "ABC-6"). */
+export function formatNextInvoiceNo(prefix: string, invoiceCounter: number | null | undefined): string {
+  const p = prefix.trim().replace(/-+$/, "");
+  if (!p || invoiceCounter == null || !Number.isFinite(invoiceCounter) || invoiceCounter <= 0) {
+    return p;
+  }
+  return `${p}-${Math.trunc(invoiceCounter)}`;
+}
+
 export function parseInvoicePrefix(payload: unknown): InvoicePrefixEntry {
-  if (!payload || typeof payload !== "object") return { prefix: "", year: null };
+  if (!payload || typeof payload !== "object") {
+    return { prefix: "", year: null, invoiceCounter: null };
+  }
   const root = payload as Record<string, unknown>;
   const data =
     root.data && typeof root.data === "object" && !Array.isArray(root.data)
@@ -186,6 +216,7 @@ export function parseInvoicePrefix(payload: unknown): InvoicePrefixEntry {
   return {
     prefix: readPrefixString(data) || readPrefixString(root),
     year: readPrefixYear(data) ?? readPrefixYear(root),
+    invoiceCounter: readInvoiceCounter(data) ?? readInvoiceCounter(root),
   };
 }
 
@@ -204,7 +235,11 @@ export function parseInvoicePrefixHistory(payload: unknown): InvoicePrefixEntry[
       const obj = item as Record<string, unknown>;
       const prefix = readPrefixString(obj);
       if (!prefix) return null;
-      return { prefix, year: readPrefixYear(obj) };
+      return {
+        prefix,
+        year: readPrefixYear(obj),
+        invoiceCounter: readInvoiceCounter(obj),
+      };
     })
     .filter((entry): entry is InvoicePrefixEntry => entry != null);
 }

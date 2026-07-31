@@ -63,3 +63,19 @@ export function isValidYear(input: string) {
   const current = new Date().getFullYear();
   return y >= 1900 && y <= current + 1;
 }
+
+/** Zod form schemas (wallet / deals / job cards / vehicle). */
+export {
+  walletEntrySchema,
+  bankAccountSchema,
+  serviceDealSchema,
+  partsDealSchema,
+  dealFormSchema,
+  jobCardFormSchema,
+  vehicleFormSchema,
+  firstZodError,
+  moneyPositive,
+  money,
+  futureDate,
+  percent1to100,
+} from "./validation-zod";

@@ -1,5 +1,6 @@
 import { AppSplash } from "@/components/reusables";
 import { useAuth } from "@/context/auth-provider";
+import { OwnerShopCityFilterProvider } from "@/context/owner-shop-city-filter-context";
 import { getPostAuthRoute } from "@/lib/auth";
 import { Redirect, Slot, useSegments } from "expo-router";
 
@@ -46,5 +47,9 @@ export default function CarOwnerLayout() {
     return <Redirect href="/(car-owner)/(tabs)/home" />;
   }
 
-  return <Slot />;
+  return (
+    <OwnerShopCityFilterProvider>
+      <Slot />
+    </OwnerShopCityFilterProvider>
+  );
 }

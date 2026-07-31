@@ -10,6 +10,8 @@ export type CarCompanyCatalogItem = {
   _id?: string;
   id?: string;
   companyName: string;
+  brandLogo?: string | null;
+  logoUrl?: string | null;
   models: CarCompanyCatalogModel[];
 };
 
@@ -38,7 +40,15 @@ export function useCarCompanyCatalog(authToken: string | null, enabled = true) {
           return;
         }
         const next = Array.isArray(res.data?.data) ? res.data.data : [];
-        setCompanies(next.filter((c) => Boolean(c.companyName?.trim())));
+        setCompanies(
+          next
+            .filter((c) => Boolean(c.companyName?.trim()))
+            .map((c) => ({
+              ...c,
+              brandLogo: typeof c.brandLogo === "string" ? c.brandLogo : null,
+              logoUrl: typeof c.logoUrl === "string" ? c.logoUrl : null,
+            }))
+        );
       } catch {
         if (!cancelled) {
           setCompanies([]);

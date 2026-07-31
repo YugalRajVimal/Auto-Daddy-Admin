@@ -1,13 +1,21 @@
 import { QuickActionTile, SectionHeader, SurfaceCard } from "@/components/reusables";
 import { colors, radii, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
+import { useShopSubscriptionGateOptional } from "@/context/shop-subscription-gate-context";
 import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
 export function QuickActions() {
   const { meta } = useAuth();
+  const gate = useShopSubscriptionGateOptional();
   const role = (meta?.role ?? "").toLowerCase();
-  const base = role === "carowner" || role === "car-owner" || role === "car_owner" ? "/(car-owner)" : "/(shop-owner)";
+  const isCarOwner = role === "carowner" || role === "car-owner" || role === "car_owner";
+  const base = isCarOwner ? "/(car-owner)" : "/(shop-owner)";
+
+  const go = (run: () => void) => {
+    if (!isCarOwner && gate && !gate.requireSubscription()) return;
+    run();
+  };
 
   return (
     <SurfaceCard shadow="card" style={styles.card}>
@@ -19,7 +27,7 @@ export function QuickActions() {
               width="100%"
               icon="document-text"
               label="Job Card"
-              onPress={() => router.push(`${base}/job-cards?qa=1` as any)}
+              onPress={() => go(() => router.push(`${base}/job-cards?qa=1` as any))}
               iconBackground={colors.iconBlueTint}
               iconColor={colors.primary}
             />
@@ -29,7 +37,7 @@ export function QuickActions() {
               width="100%"
               icon="people"
               label="My Customers"
-              onPress={() => router.push(`${base}/customers?qa=1` as any)}
+              onPress={() => go(() => router.push(`${base}/customers?qa=1` as any))}
               iconBackground={colors.successMuted}
               iconColor={colors.success}
             />
@@ -42,7 +50,7 @@ export function QuickActions() {
               width="100%"
               icon="wallet"
               label="Wallet"
-              onPress={() => router.push(`${base}/wallet?qa=1` as any)}
+              onPress={() => go(() => router.push(`${base}/wallet?qa=1` as any))}
               iconBackground={colors.warningMuted}
               iconColor={colors.warning}
             />
@@ -53,10 +61,12 @@ export function QuickActions() {
               icon="flash"
               label="My Services"
               onPress={() =>
-                router.push({
-                  pathname: `${base}/services`,
-                  params: { qa: "1", backTo: `${base}/(tabs)/home` },
-                } as any)
+                go(() =>
+                  router.push({
+                    pathname: `${base}/services`,
+                    params: { qa: "1", backTo: `${base}/(tabs)/home` },
+                  } as any)
+                )
               }
               iconBackground={colors.pillPurple}
               iconColor={colors.purple}

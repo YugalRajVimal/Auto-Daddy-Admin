@@ -52,8 +52,9 @@ export function ManageInvoicesModal({ visible, authToken, onClose }: Props) {
           showToast("Could not load invoice prefix.", { type: "error" });
           return;
         }
-        const { prefix } = parseInvoicePrefix(res.data);
+        const { prefix, invoiceCounter } = parseInvoicePrefix(res.data);
         setCode(prefix);
+        if (invoiceCounter != null) setNumber(String(invoiceCounter));
       })
       .catch(() => {
         if (!cancelled) showToast("Could not load invoice prefix.", { type: "error" });

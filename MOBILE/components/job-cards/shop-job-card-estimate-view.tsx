@@ -2,6 +2,11 @@ import { LoadingProgress, useToast } from "@/components/reusables";
 import { colors, fontSizes, radii, shadows, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import {
+  fetchInvoicePrefix,
+  formatNextInvoiceNo,
+  parseInvoicePrefix,
+} from "@/lib/autoshopowner-api";
+import {
   apiMessageFromEnvelope,
   fetchAutoshopJobCardPrefix,
   parseAutoshopJobCardPrefix,
@@ -25,6 +30,7 @@ import {
 import {
   buildBusinessBlock,
   buildCustomerBlock,
+  buildVehicleBlock,
   currencyLabelFromCode,
   deriveJobCardPrefixFromDisplayId,
   estimateDocumentNo,
@@ -102,6 +108,7 @@ export function ShopJobCardEstimateView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jobCardPrefix, setJobCardPrefix] = useState("");
+  const [nextInvoiceNo, setNextInvoiceNo] = useState("");
   const [business, setBusiness] = useState<ShopProfileBusiness | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionPreview, setActionPreview] = useState<JobCardActionPreview | null>(
@@ -169,6 +176,29 @@ export function ShopJobCardEstimateView({
     };
   }, [token]);
 
+  const invoicePreview = actionPreview === "invoice";
+
+  useEffect(() => {
+    if (!token || !invoicePreview) {
+      setNextInvoiceNo("");
+      return;
+    }
+    let cancelled = false;
+    void fetchInvoicePrefix(token)
+      .then((res) => {
+        if (cancelled || !res.ok) return;
+        const { prefix, invoiceCounter } = parseInvoicePrefix(res.data);
+        const formatted = formatNextInvoiceNo(prefix, invoiceCounter);
+        if (formatted) setNextInvoiceNo(formatted);
+      })
+      .catch(() => {
+        /* display falls back */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, invoicePreview]);
+
   const load = useCallback(async () => {
     if (!jobCardId) return;
     setLoading(true);
@@ -214,7 +244,6 @@ export function ShopJobCardEstimateView({
     void load();
   }, [load]);
 
-  const invoicePreview = actionPreview === "invoice";
   const cashPreview = actionPreview === "cash";
   const alreadyInvoiced = job ? jobCardShowsInvoiceHst(job) : false;
   const isInvoiceDocument = invoicePreview || showPaymentActions === false;
@@ -252,13 +281,23 @@ export function ShopJobCardEstimateView({
       const invoiceNo =
         pickInvoiceNoFromRecord(job) || (listRow ? pickJobCardInvoiceNumber(listRow) : "");
       if (invoiceNo) return invoiceNo;
+      if (nextInvoiceNo.trim()) return nextInvoiceNo.trim();
     }
     return estimateDocumentNo(job ?? {}, jobNoHint, listRow, resolvedPrefix);
-  }, [job, jobNoHint, listRow, resolvedPrefix, showInvoiceDocumentNo]);
+  }, [job, jobNoHint, listRow, nextInvoiceNo, resolvedPrefix, showInvoiceDocumentNo]);
 
   const currencyLabel = currencyLabelFromCode(countryCode);
   const businessBlock = buildBusinessBlock(business);
   const customerBlock = job ? buildCustomerBlock(job) : { name: "—", company: "", address: "" };
+  const vehicleBlock = job
+    ? buildVehicleBlock(job)
+    : { plate: "", name: "", vin: "", cin: "", odometer: "" };
+  const hasVehicleBlock =
+    Boolean(vehicleBlock.plate) ||
+    Boolean(vehicleBlock.name) ||
+    Boolean(vehicleBlock.vin) ||
+    Boolean(vehicleBlock.cin) ||
+    Boolean(vehicleBlock.odometer);
   const logoUrl = normalizeMediaUrl(business?.businessLogo ?? null);
   const hstNumber = pickBusinessHstNumber(business, job) || "—";
   const documentNoLabel = showInvoiceDocumentNo ? "Invoice No. :" : "Job Card No. :";
@@ -508,6 +547,27 @@ export function ShopJobCardEstimateView({
             </View>
           </View>
 
+          {hasVehicleBlock ? (
+            <View style={styles.vehicleBlock}>
+              <Text style={styles.toLabel}>Vehicle</Text>
+              {vehicleBlock.plate ? (
+                <Text style={styles.toName}>{vehicleBlock.plate}</Text>
+              ) : null}
+              {vehicleBlock.name ? (
+                <Text style={styles.docBodyText}>{vehicleBlock.name}</Text>
+              ) : null}
+              {vehicleBlock.vin ? (
+                <Text style={styles.docBodyText}>VIN: {vehicleBlock.vin}</Text>
+              ) : null}
+              {vehicleBlock.cin ? (
+                <Text style={styles.docBodyText}>CIN: {vehicleBlock.cin}</Text>
+              ) : null}
+              {vehicleBlock.odometer ? (
+                <Text style={styles.docBodyText}>{vehicleBlock.odometer}</Text>
+              ) : null}
+            </View>
+          ) : null}
+
           <View style={styles.table}>
             <View style={[styles.tableHead, { backgroundColor: theme.accent }]}>
               <Text style={[styles.th, styles.colSno, { color: theme.accentText }]}>S. No.</Text>
@@ -718,6 +778,7 @@ const styles = StyleSheet.create({
   docMetaRight: { gap: 4 },
   docBodyText: { fontSize: fontSizes.sm, fontWeight: "600", color: colors.text, lineHeight: 18 },
   toBlock: { marginTop: spacing.sm, gap: 2 },
+  vehicleBlock: { marginTop: spacing.md, marginBottom: spacing.sm, gap: 2 },
   toLabel: { fontSize: fontSizes.sm, fontWeight: "900", color: colors.text },
   toName: { fontSize: fontSizes.sm, fontWeight: "800", color: colors.text },
   metaRow: { flexDirection: "row", gap: spacing.sm, alignItems: "baseline" },

@@ -35,6 +35,25 @@ export function createDefaultPerDaySchedule(): PerDaySchedule {
   }, {} as PerDaySchedule);
 }
 
+/** When true, ignore API and use a fixed demo schedule. */
+export const USE_DUMMY_SHOP_OPEN_HOURS = false;
+
+export function createDummyPerDaySchedule(): PerDaySchedule {
+  const schedule = createDefaultPerDaySchedule();
+  for (const day of ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] as WeekDay[]) {
+    schedule[day] = { enabled: true, start: "09:00", end: "20:00" };
+  }
+  schedule.Saturday = { enabled: true, start: "09:00", end: "18:00" };
+  return schedule;
+}
+
+export function resolveShopOpenHoursSchedule(perDayOpenHours?: string | null): PerDaySchedule {
+  if (USE_DUMMY_SHOP_OPEN_HOURS) {
+    return createDummyPerDaySchedule();
+  }
+  return resolvePerDaySchedule(perDayOpenHours ? { perDayOpenHours } : null);
+}
+
 function splitLegacyOpenHours(openHours: string | null | undefined) {
   const fallback = { start: "08:00", end: "20:00" };
   if (!openHours || !openHours.includes("-")) {
@@ -53,7 +72,6 @@ function normalizeWeekdayName(day: string): WeekDay | null {
   return match ?? null;
 }
 
-/** Parse API `perDayOpenHours` or legacy JSON `openHours` arrays. */
 export function parsePerDayOpenHoursArray(raw: unknown): PerDayOpenHourEntry[] | null {
   if (Array.isArray(raw)) {
     return raw
@@ -116,9 +134,41 @@ function scheduleFromLegacyFields(
   return schedule;
 }
 
+/** Coerce API `isClosed` / `closed` (boolean, 0/1, "true"/"false"). */
+export function coerceTimingClosedFlag(value: unknown): boolean | null {
+  if (value === true || value === 1 || value === "1") return true;
+  if (value === false || value === 0 || value === "0") return false;
+  if (typeof value === "string") {
+    const t = value.trim().toLowerCase();
+    if (t === "true" || t === "yes" || t === "closed") return true;
+    if (t === "false" || t === "no" || t === "open") return false;
+  }
+  return null;
+}
+
+function timingRowIsClosed(row: Record<string, unknown>): boolean {
+  const flagged = coerceTimingClosedFlag(row.isClosed ?? row.closed);
+  if (flagged != null) return flagged;
+  // No flag: treat as open only when both open and close are present.
+  const hasOpen = typeof row.open === "string" && Boolean(row.open.trim());
+  const hasClose = typeof row.close === "string" && Boolean(row.close.trim());
+  return !(hasOpen && hasClose);
+}
+
+function timingRowOpenClose(row: Record<string, unknown>): { open: string | null; close: string | null } {
+  const open =
+    typeof row.open === "string" && row.open.trim() ? row.open.trim() : null;
+  const close =
+    typeof row.close === "string" && row.close.trim() ? row.close.trim() : null;
+  return { open, close };
+}
+
 /**
  * List APIs return `currentWeekTimings` (Mon–Sun with date, open/close, isClosed).
  * Prefer that over weekly defaults so date overrides are reflected.
+ *
+ * Open rows may omit open/close (e.g. override "Reopened by owner") — use defaults
+ * so the day still counts as open with normal hours.
  */
 function parseCurrentWeekTimings(raw: unknown): PerDayOpenHourEntry[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null;
@@ -126,29 +176,65 @@ function parseCurrentWeekTimings(raw: unknown): PerDayOpenHourEntry[] | null {
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
-    const day = typeof row.day === "string" ? normalizeWeekdayName(row.day) : null;
+    const day =
+      typeof row.day === "string"
+        ? normalizeWeekdayName(row.day)
+        : null;
     if (!day) continue;
-    const isClosed = Boolean(row.isClosed ?? row.closed);
-    const open =
-      typeof row.open === "string" && row.open.trim() ? row.open.trim() : DEFAULT_START;
-    const close =
-      typeof row.close === "string" && row.close.trim() ? row.close.trim() : DEFAULT_END;
-    entries.push({ day, open, close, isClosed });
+    const isClosed = timingRowIsClosed(row);
+    const { open, close } = timingRowOpenClose(row);
+    entries.push({
+      day,
+      open: open ?? DEFAULT_START,
+      close: close ?? DEFAULT_END,
+      isClosed,
+    });
   }
   return entries.length > 0 ? entries : null;
 }
 
-export function formatLocalDateISO(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+export function resolvePerDaySchedule(businessProfile: Record<string, unknown> | null | undefined): PerDaySchedule {
+  if (!businessProfile || typeof businessProfile !== "object") {
+    return createDefaultPerDaySchedule();
+  }
+
+  // Car-owner list payload: date-aware week (includes override open/close).
+  const currentWeek = parseCurrentWeekTimings(
+    businessProfile.currentWeekTimings ?? businessProfile.currentWeekHours,
+  );
+  if (currentWeek?.length) {
+    return scheduleFromPerDayEntries(currentWeek);
+  }
+
+  const perDay = parsePerDayOpenHoursArray(businessProfile.perDayOpenHours);
+  if (perDay?.length) {
+    return scheduleFromPerDayEntries(perDay);
+  }
+
+  const openHoursArray = parsePerDayOpenHoursArray(businessProfile.openHours);
+  if (openHoursArray?.length) {
+    return scheduleFromPerDayEntries(
+      openHoursArray.map((entry) => ({
+        ...entry,
+        isClosed: entry.isClosed ?? false,
+      }))
+    );
+  }
+
+  const openDays = Array.isArray(businessProfile.openDays)
+    ? businessProfile.openDays.filter((d): d is string => typeof d === "string")
+    : [];
+  if (typeof businessProfile.openHours === "string" && openDays.length > 0) {
+    return scheduleFromLegacyFields(businessProfile.openHours, openDays);
+  }
+
+  return createDefaultPerDaySchedule();
 }
 
 /** Today's row from `currentWeekTimings` (by date, then weekday). */
 export function pickCurrentWeekTimingForToday(
   businessProfile: Record<string, unknown> | null | undefined,
-  now = new Date()
+  now = new Date(),
 ): { day: WeekDay; isClosed: boolean; open: string | null; close: string | null } | null {
   if (!businessProfile || typeof businessProfile !== "object") return null;
   const raw = businessProfile.currentWeekTimings ?? businessProfile.currentWeekHours;
@@ -181,11 +267,13 @@ export function pickCurrentWeekTimingForToday(
 
   const day =
     (typeof match.day === "string" ? normalizeWeekdayName(match.day) : null) ?? todayDay;
-  const isClosed = Boolean(match.isClosed ?? match.closed);
-  const open =
-    typeof match.open === "string" && match.open.trim() ? match.open.trim() : null;
-  const close =
-    typeof match.close === "string" && match.close.trim() ? match.close.trim() : null;
+  const isClosed = timingRowIsClosed(match);
+  let { open, close } = timingRowOpenClose(match);
+  // Open today but times omitted (common on "Reopened by owner" overrides) → default window.
+  if (!isClosed && (!open || !close)) {
+    open = open ?? DEFAULT_START;
+    close = close ?? DEFAULT_END;
+  }
   return { day, isClosed, open, close };
 }
 
@@ -208,6 +296,10 @@ export function isNowWithinOpenClose(open: string, close: string, now = new Date
     return current >= start || current <= end;
   }
   return current >= start && current <= end;
+}
+
+export function shortDayLabel(day: WeekDay) {
+  return day.slice(0, 3);
 }
 
 export function formatOpenHoursTimeDisplay(time24: string): string {
@@ -237,81 +329,357 @@ export function formatOpenHoursTimeDisplay(time24: string): string {
   return `${hour12}.${mm} ${ampm}`;
 }
 
-export function formatOpenHoursRangeDisplay(start: string, end: string): string {
-  return `${formatOpenHoursTimeDisplay(start)} - ${formatOpenHoursTimeDisplay(end)}`;
+/** Table column time (e.g. `9.00`). */
+export function formatOpenHoursTimeTable(time24: string): string {
+  const [hStr, mStr = "0"] = time24.split(":");
+  const hour = Number(hStr);
+  const minute = Number(mStr);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return time24;
+
+  const mm = String(minute).padStart(2, "0");
+  let hour12 = hour % 12;
+  if (hour12 === 0) hour12 = 12;
+  return `${hour12}.${mm}`;
 }
 
-/** Resolve editable schedule from a business profile, preferring `currentWeekTimings`. */
-export function resolvePerDaySchedule(businessProfile: Record<string, unknown> | null | undefined): PerDaySchedule {
-  if (!businessProfile || typeof businessProfile !== "object") {
-    return createDefaultPerDaySchedule();
-  }
-
-  // Car-owner list payload: date-aware week (includes override open/close).
-  const currentWeek = parseCurrentWeekTimings(
-    businessProfile.currentWeekTimings ?? businessProfile.currentWeekHours
-  );
-  if (currentWeek?.length) {
-    return scheduleFromPerDayEntries(currentWeek);
-  }
-
-  const perDay = parsePerDayOpenHoursArray(businessProfile.perDayOpenHours);
-  if (perDay?.length) {
-    return scheduleFromPerDayEntries(perDay);
-  }
-
-  const openHoursArray = parsePerDayOpenHoursArray(businessProfile.openHours);
-  if (openHoursArray?.length) {
-    return scheduleFromPerDayEntries(
-      openHoursArray.map((entry) => ({
-        ...entry,
-        isClosed: entry.isClosed ?? false,
-      }))
-    );
-  }
-
-  const openDays = Array.isArray(businessProfile.openDays)
-    ? businessProfile.openDays.filter((d): d is string => typeof d === "string")
-    : [];
-  if (typeof businessProfile.openHours === "string" && openDays.length > 0) {
-    return scheduleFromLegacyFields(businessProfile.openHours, openDays);
-  }
-
-  return createDefaultPerDaySchedule();
+export function formatLocalDateISO(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-export function perDayOpenHoursFromSchedule(schedule: PerDaySchedule): PerDayOpenHourEntry[] {
-  return WEEK_DAYS.map((day) => ({
-    day,
-    open: schedule[day].start,
-    close: schedule[day].end,
-    isClosed: !schedule[day].enabled,
-  }));
+/** Next calendar date for a weekday, formatted `YYYY-MM-DD`. */
+export function nextWeekdayDateISO(day: WeekDay): string {
+  const targetIndex = WEEK_DAYS.indexOf(day);
+  const today = new Date();
+  const todayIndex = (today.getDay() + 6) % 7;
+  let diff = targetIndex - todayIndex;
+  if (diff < 0) diff += 7;
+  const next = new Date(today);
+  next.setDate(today.getDate() + diff);
+  return formatLocalDateISO(next);
 }
 
-export function serializePerDayOpenHoursForApi(schedule: PerDaySchedule): string {
-  return JSON.stringify(perDayOpenHoursFromSchedule(schedule));
+export type ShopOpenHoursHistoryRow = {
+  dateISO: string;
+  day: WeekDay;
+  enabled: boolean;
+  start: string;
+  end: string;
+  /** True when this date has a one-off special override. */
+  isSpecial?: boolean;
+  reason?: string;
+};
+
+export type SpecialOpenHourOverride = {
+  dateISO: string;
+  enabled: boolean;
+  start: string;
+  end: string;
+  reason?: string;
+};
+
+export type CurrentWeekOpenHoursRow = {
+  day: WeekDay;
+  dateISO: string;
+  entry: DayScheduleEntry;
+};
+
+export function weekDayFromDateISO(dateISO: string): WeekDay {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0, 0);
+  return WEEK_DAYS[(date.getDay() + 6) % 7];
 }
 
-export function validatePerDaySchedule(schedule: PerDaySchedule): string | null {
-  const enabledDays = WEEK_DAYS.filter((day) => schedule[day]?.enabled);
-  if (enabledDays.length === 0) {
-    return "Please enable at least one open day.";
+export function addDaysISO(dateISO: string, days: number): string {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return formatLocalDateISO(date);
+}
+
+export function sortOpenHoursHistoryDesc(
+  rows: ShopOpenHoursHistoryRow[]
+): ShopOpenHoursHistoryRow[] {
+  return [...rows].sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+}
+
+/**
+ * Table order: next 7 days (today+7 … today+1), then today, then past history.
+ */
+export function sortOpenHoursTableRows(
+  rows: ShopOpenHoursHistoryRow[],
+  todayISO = formatLocalDateISO(new Date())
+): ShopOpenHoursHistoryRow[] {
+  const upcoming: ShopOpenHoursHistoryRow[] = [];
+  const todayRows: ShopOpenHoursHistoryRow[] = [];
+  const history: ShopOpenHoursHistoryRow[] = [];
+
+  for (const row of rows) {
+    if (row.dateISO > todayISO) upcoming.push(row);
+    else if (row.dateISO === todayISO) todayRows.push(row);
+    else history.push(row);
   }
-  for (const day of enabledDays) {
-    const { start, end } = schedule[day];
-    if (end <= start) {
-      return `${day}: end time must be after start time.`;
-    }
+
+  upcoming.sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+  history.sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+  return [...upcoming, ...todayRows, ...history];
+}
+
+function pickArray(...candidates: unknown[]): unknown[] | null {
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c;
   }
   return null;
 }
 
-function shortDayLabel(day: WeekDay) {
-  return day.slice(0, 3);
+function unwrapOpenHoursPayload(payload: unknown): Record<string, unknown> {
+  if (!payload || typeof payload !== "object") return {};
+  const root = payload as Record<string, unknown>;
+  const data = root.data;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    return data as Record<string, unknown>;
+  }
+  return root;
 }
 
-/** Human-readable summary for profile display. */
+/** Normalize API date values (`YYYY-MM-DD` or ISO datetime) to local calendar `YYYY-MM-DD`. */
+export function normalizeOpenHoursDateISO(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const text = raw.trim();
+  if (!text) return null;
+  // Prefer the calendar date from the string when present (avoids UTC shift on midnight Z).
+  const ymd = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (ymd) return ymd[1];
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return formatLocalDateISO(parsed);
+}
+
+/** Parse special date overrides from GET open-hours response. */
+export function parseSpecialOpenHours(payload: unknown): SpecialOpenHourOverride[] {
+  const root = unwrapOpenHoursPayload(payload);
+  const arr =
+    pickArray(
+      root.specialDayOverrides,
+      root.specialOpenHours,
+      root.specialHours,
+      root.specials,
+      root.overrides,
+      root.specialOpenHour,
+      Array.isArray(root.data) ? root.data : null
+    ) ?? [];
+
+  const out: SpecialOpenHourOverride[] = [];
+  for (const item of arr) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const dateISO = normalizeOpenHoursDateISO(obj.date ?? obj.dateISO ?? obj.specialDate);
+    if (!dateISO) continue;
+    const isClosed = Boolean(obj.isClosed ?? obj.closed);
+    const open =
+      typeof obj.open === "string"
+        ? obj.open
+        : typeof obj.start === "string"
+          ? obj.start
+          : DEFAULT_START;
+    const close =
+      typeof obj.close === "string"
+        ? obj.close
+        : typeof obj.end === "string"
+          ? obj.end
+          : DEFAULT_END;
+    const reason = typeof obj.reason === "string" ? obj.reason : undefined;
+    out.push({
+      dateISO,
+      enabled: !isClosed,
+      start: open || DEFAULT_START,
+      end: close || DEFAULT_END,
+      reason,
+    });
+  }
+  return out;
+}
+
+/** True when the open-hours payload includes an explicit weekly schedule array. */
+export function hasWeeklyScheduleInPayload(payload: unknown): boolean {
+  const root = unwrapOpenHoursPayload(payload);
+  const arr =
+    root.weeklySchedule ??
+    root.perDayOpenHours ??
+    root.weeklyOpenHours ??
+    root.weekly ??
+    root.schedule;
+  return Array.isArray(arr) && arr.length > 0;
+}
+
+/** Parse weekly schedule from GET open-hours (or business profile) payload. */
+export function parseWeeklyOpenHoursFromPayload(payload: unknown): PerDaySchedule {
+  const root = unwrapOpenHoursPayload(payload);
+  const fromPerDay = parsePerDayOpenHoursArray(
+    root.weeklySchedule ??
+      root.perDayOpenHours ??
+      root.weeklyOpenHours ??
+      root.weekly ??
+      root.schedule
+  );
+  if (fromPerDay?.length) return scheduleFromPerDayEntries(fromPerDay);
+  return resolvePerDaySchedule(root);
+}
+
+/** Parse optional effectiveSchedule array from a date-range GET response. */
+export function parseEffectiveOpenHoursSchedule(
+  payload: unknown
+): ShopOpenHoursHistoryRow[] | null {
+  const root = unwrapOpenHoursPayload(payload);
+  const arr = root.effectiveSchedule;
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+
+  const rows: ShopOpenHoursHistoryRow[] = [];
+  for (const item of arr) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const dateISO = normalizeOpenHoursDateISO(obj.date ?? obj.dateISO);
+    if (!dateISO) continue;
+    const day =
+      typeof obj.day === "string"
+        ? normalizeWeekdayName(obj.day) ?? weekDayFromDateISO(dateISO)
+        : weekDayFromDateISO(dateISO);
+    const isClosed = Boolean(obj.isClosed ?? obj.closed);
+    const open =
+      typeof obj.open === "string"
+        ? obj.open
+        : typeof obj.start === "string"
+          ? obj.start
+          : DEFAULT_START;
+    const close =
+      typeof obj.close === "string"
+        ? obj.close
+        : typeof obj.end === "string"
+          ? obj.end
+          : DEFAULT_END;
+    rows.push({
+      dateISO,
+      day,
+      enabled: !isClosed,
+      start: open || DEFAULT_START,
+      end: close || DEFAULT_END,
+      isSpecial: Boolean(obj.isSpecial ?? obj.isOverride),
+      reason: typeof obj.reason === "string" ? obj.reason : undefined,
+    });
+  }
+  return rows.length > 0 ? rows : null;
+}
+
+export function effectiveHoursForDate(
+  dateISO: string,
+  schedule: PerDaySchedule,
+  specialsByDate: Map<string, SpecialOpenHourOverride>
+): ShopOpenHoursHistoryRow {
+  const day = weekDayFromDateISO(dateISO);
+  const special = specialsByDate.get(dateISO);
+  if (special) {
+    return {
+      dateISO,
+      day,
+      enabled: special.enabled,
+      start: special.start,
+      end: special.end,
+      isSpecial: true,
+      reason: special.reason,
+    };
+  }
+  const entry = schedule[day];
+  return {
+    dateISO,
+    day,
+    enabled: entry.enabled,
+    start: entry.start,
+    end: entry.end,
+    isSpecial: false,
+  };
+}
+
+/**
+ * Build table rows: next 7 days (today+7 … today+1) above today,
+ * then history below today from past special overrides only.
+ * Weekly default changes must not rewrite older dates — history never
+ * synthesizes past days from the current weekly schedule.
+ */
+export function buildOpenHoursTableRows(
+  schedule: PerDaySchedule,
+  specials: SpecialOpenHourOverride[],
+  now = new Date()
+): ShopOpenHoursHistoryRow[] {
+  const todayISO = formatLocalDateISO(now);
+  const specialsByDate = new Map(specials.map((s) => [s.dateISO, s]));
+  const upcoming: ShopOpenHoursHistoryRow[] = [];
+  const seen = new Set<string>();
+
+  // Next 7 days above today (weekly defaults + specials)
+  for (let offset = 7; offset >= 1; offset--) {
+    const dateISO = addDaysISO(todayISO, offset);
+    upcoming.push(effectiveHoursForDate(dateISO, schedule, specialsByDate));
+    seen.add(dateISO);
+  }
+
+  const todayRow = effectiveHoursForDate(todayISO, schedule, specialsByDate);
+  seen.add(todayISO);
+
+  // History: past special overrides only (weekly updates never rewrite these)
+  const history = specials
+    .filter((s) => s.dateISO < todayISO && !seen.has(s.dateISO))
+    .sort((a, b) => b.dateISO.localeCompare(a.dateISO))
+    .map((s) => effectiveHoursForDate(s.dateISO, schedule, specialsByDate));
+
+  return [...upcoming, todayRow, ...history];
+}
+
+/**
+ * Current week (Mon–Sun) open/closed rows with calendar dates,
+ * sorted descending so the week's last date (Sunday) is first.
+ */
+export function currentWeekOpenHoursRows(
+  schedule: PerDaySchedule,
+  now = new Date()
+): CurrentWeekOpenHoursRow[] {
+  const todayIndex = (now.getDay() + 6) % 7; // Mon=0 … Sun=6
+  const monday = new Date(now);
+  monday.setHours(12, 0, 0, 0);
+  monday.setDate(now.getDate() - todayIndex);
+
+  const rows = WEEK_DAYS.map((day, i) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    return {
+      day,
+      dateISO: formatLocalDateISO(date),
+      entry: schedule[day],
+    };
+  });
+
+  return rows.reverse();
+}
+
+/** Demo open/closed history for the current week (newest date first). */
+export function createDummyShopOpenHoursHistory(
+  now = new Date()
+): ShopOpenHoursHistoryRow[] {
+  const schedule = createDummyPerDaySchedule();
+  return currentWeekOpenHoursRows(schedule, now).map(({ day, dateISO, entry }) => ({
+    dateISO,
+    day,
+    enabled: entry.enabled,
+    start: entry.start,
+    end: entry.end,
+  }));
+}
+
+export function formatOpenHoursRangeDisplay(start: string, end: string): string {
+  return `${formatOpenHoursTimeDisplay(start)} - ${formatOpenHoursTimeDisplay(end)}`;
+}
+
 export function formatPerDayScheduleDisplay(schedule: PerDaySchedule): string {
   const enabled = WEEK_DAYS.filter((day) => schedule[day]?.enabled);
   if (enabled.length === 0) {
@@ -342,16 +710,9 @@ export function formatPerDayScheduleDisplay(schedule: PerDaySchedule): string {
         days.length === 1
           ? shortDayLabel(days[0])
           : `${shortDayLabel(days[0])}–${shortDayLabel(days[days.length - 1])}`;
-      return `${dayLabel} ${start}–${end}`;
+      return `${dayLabel} ${formatOpenHoursRangeDisplay(start, end)}`;
     })
     .join("; ");
-}
-
-export function formatPerDayOpenHoursDisplay(entries: PerDayOpenHourEntry[] | null | undefined): string {
-  if (!entries?.length) {
-    return "Not provided";
-  }
-  return formatPerDayScheduleDisplay(scheduleFromPerDayEntries(entries));
 }
 
 export function enabledWeekdaysFromSchedule(schedule: PerDaySchedule): WeekDay[] {
@@ -360,4 +721,32 @@ export function enabledWeekdaysFromSchedule(schedule: PerDaySchedule): WeekDay[]
 
 export function closedWeekdaysFromSchedule(schedule: PerDaySchedule): WeekDay[] {
   return WEEK_DAYS.filter((day) => !schedule[day]?.enabled);
+}
+
+export function perDayOpenHoursFromSchedule(schedule: PerDaySchedule): PerDayOpenHourEntry[] {
+  return WEEK_DAYS.map((day) => ({
+    day,
+    open: schedule[day].start,
+    close: schedule[day].end,
+    isClosed: !schedule[day].enabled,
+  }));
+}
+
+export function serializePerDayOpenHoursForApi(schedule: PerDaySchedule): string {
+  return JSON.stringify(perDayOpenHoursFromSchedule(schedule));
+}
+
+/** Match MOBILE `validatePerDaySchedule` — used by shop onboarding. */
+export function validatePerDaySchedule(schedule: PerDaySchedule): string | null {
+  const enabledDays = WEEK_DAYS.filter((day) => schedule[day]?.enabled);
+  if (enabledDays.length === 0) {
+    return "Please enable at least one open day.";
+  }
+  for (const day of enabledDays) {
+    const { start, end } = schedule[day];
+    if (end <= start) {
+      return `${day}: end time must be after start time.`;
+    }
+  }
+  return null;
 }

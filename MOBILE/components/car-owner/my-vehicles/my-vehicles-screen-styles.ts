@@ -141,6 +141,10 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#F1F5F9",
   },
+  vehicleGalleryBrandImg: {
+    width: "42%",
+    height: "58%",
+  },
   collapsedRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -162,6 +166,10 @@ export const styles = StyleSheet.create({
   collapsedThumbImg: {
     width: "100%",
     height: "100%",
+  },
+  collapsedThumbBrandImg: {
+    width: "72%",
+    height: "72%",
   },
   collapsedPlate: {
     flex: 1,

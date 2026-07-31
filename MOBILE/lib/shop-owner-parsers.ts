@@ -237,6 +237,24 @@ function toDeal(raw: unknown): ShopDeal | null {
           }
         : undefined,
     dealImage: s(o.dealImage),
+    dealImages: (() => {
+      const raw = o.dealImages ?? o.images;
+      if (!Array.isArray(raw)) return undefined;
+      const urls: string[] = [];
+      for (const item of raw) {
+        if (typeof item === "string") {
+          const t = item.trim();
+          if (t) urls.push(t);
+          continue;
+        }
+        if (item && typeof item === "object") {
+          const rec = item as Record<string, unknown>;
+          const u = s(rec.url ?? rec.path ?? rec.image ?? rec.dealImage);
+          if (u) urls.push(u);
+        }
+      }
+      return urls.length ? urls : undefined;
+    })(),
     productImage: s(o.productImage),
   };
 }

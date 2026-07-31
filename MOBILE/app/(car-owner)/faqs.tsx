@@ -2,12 +2,13 @@ import { CarOwnerStackScreenFrame } from "@/components/car-owner/car-owner-stack
 import { LoadingProgress, SurfaceCard } from "@/components/reusables";
 import { colors, spacing, typography } from "@/constants/autodaddy";
 import { useCarOwnerFaqs } from "@/hooks/use-car-owner-content";
+import { OWNER_FAQ_PAGE_SLUGS } from "@/lib/owner-faq-page-slug";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function CarOwnerFaqsPage() {
-  const { items, loading, error } = useCarOwnerFaqs();
+  const { items, loading, error } = useCarOwnerFaqs(OWNER_FAQ_PAGE_SLUGS.help);
   const [openIndex, setOpenIndex] = useState(0);
 
   return (

@@ -10,6 +10,7 @@ import {
   type AutoshopPageDetailsServiceDeal,
 } from "@/lib/autoshopowner-job-cards-api";
 import { extractEstimateDiscount } from "@/lib/shop-job-card-estimate";
+import { firstZodError, jobCardFormSchema } from "@/lib/validation-zod";
 import {
   fetchJobCardFormData,
   normalizeJobCardServiceBlocks,
@@ -1058,6 +1059,22 @@ export default function NewJobCardPage() {
       return;
     }
 
+    const zodCheck = jobCardFormSchema.safeParse({
+      customerId: ownerId,
+      vehicleId,
+      odoIn: selectedVehicle.odometerReading?.trim() ?? "",
+      odoOut: "",
+      discount: "",
+      services: blocks.map((b) => ({
+        id: typeof b.service === "string" ? b.service : undefined,
+        name: typeof b.service === "object" ? (b.service as { name?: string }).name : undefined,
+      })),
+    });
+    if (!zodCheck.success) {
+      showToast(firstZodError(zodCheck.error), { type: "error" });
+      return;
+    }
+
     if (blocks.length === 0) {
       showToast(
         !hasAnySubServices
@@ -1380,6 +1397,7 @@ export default function NewJobCardPage() {
                             ) : null}
                             <Text style={[styles.servicesTh, styles.colUnit]}>UNIT</Text>
                             <Text style={[styles.servicesTh, styles.colQty]}>QTY</Text>
+                            <Text style={[styles.servicesTh, styles.colLabour]}>LABOUR</Text>
                             <Text style={[styles.servicesTh, styles.colTotal]}>AMOUNT</Text>
                           </View>
 
@@ -1389,7 +1407,7 @@ export default function NewJobCardPage() {
                             const included = Boolean(line);
                             const lineId = line?.id ?? "";
                             const renderAmountInput = (
-                              field: "unitPriceStr" | "qtyStr",
+                              field: "unitPriceStr" | "qtyStr" | "labourCostStr",
                               value: string,
                               widthStyle: object
                             ) => (
@@ -1480,6 +1498,16 @@ export default function NewJobCardPage() {
                                 </View>
                                 <View style={styles.colQty}>
                                   {renderAmountInput("qtyStr", line?.qtyStr ?? "1", styles.colQty)}
+                                </View>
+                                <View style={styles.colLabour}>
+                                  {renderAmountInput(
+                                    "labourCostStr",
+                                    line?.labourCostStr ??
+                                      String(
+                                        typeof sub.labourCost === "number" ? sub.labourCost : 0
+                                      ),
+                                    styles.colLabour
+                                  )}
                                 </View>
                                 <View style={styles.colTotal}>
                                   <View style={[styles.priceWrap, styles.colTotal, styles.priceWrapReadOnly, !included && styles.priceWrapDisabled]}>
@@ -1797,9 +1825,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 6,
     gap: 0,
-    minWidth: 460,
+    minWidth: 540,
   },
-  servicesListPanelWithOdo: { minWidth: 540 },
+  servicesListPanelWithOdo: { minWidth: 620 },
   servicesTableHead: {
     flexDirection: "row",
     alignItems: "center",
@@ -1820,9 +1848,10 @@ const styles = StyleSheet.create({
   colService: { width: 72, justifyContent: "center" },
   colDesc: { width: 120, justifyContent: "center" },
   colOdo: { width: 72, justifyContent: "center" },
-  colUnit: { width: 88, justifyContent: "center" },
-  colQty: { width: 52, justifyContent: "center" },
-  colTotal: { width: 88, justifyContent: "center" },
+  colUnit: { width: 72, justifyContent: "center" },
+  colQty: { width: 48, justifyContent: "center" },
+  colLabour: { width: 72, justifyContent: "center" },
+  colTotal: { width: 80, justifyContent: "center" },
   colIncl: { width: 44, alignItems: "center", justifyContent: "center" },
   priceWrapReadOnly: { backgroundColor: colors.bgAlt },
   lineTotalText: {

@@ -14,6 +14,11 @@ import {
   pickJobCardNoForApi,
 } from "../../lib/shopOwnerJobCards";
 import {
+  fetchInvoicePrefix,
+  formatNextInvoiceNo,
+  parseInvoicePrefix,
+} from "../../lib/autoshopownerApi";
+import {
   fetchAutoshopJobCardPrefix,
   parseAutoshopJobCardPrefix,
   updateAutoshopJobCardStatus,
@@ -189,6 +194,7 @@ export default function ShopJobCardEstimateView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jobCardPrefix, setJobCardPrefix] = useState("");
+  const [nextInvoiceNo, setNextInvoiceNo] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
   const [actionPreview, setActionPreview] = useState<JobCardActionPreview | null>(
     initialActionPreview,
@@ -224,6 +230,30 @@ export default function ShopJobCardEstimateView({
       cancelled = true;
     };
   }, [token]);
+
+  const invoicePreview = actionPreview === "invoice";
+
+  useEffect(() => {
+    if (!token || !invoicePreview) {
+      setNextInvoiceNo("");
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchInvoicePrefix(token);
+        if (cancelled || !res.ok) return;
+        const { prefix, invoiceCounter } = parseInvoicePrefix(res.data);
+        const formatted = formatNextInvoiceNo(prefix, invoiceCounter);
+        if (formatted) setNextInvoiceNo(formatted);
+      } catch {
+        /* keep empty; display falls back */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, invoicePreview]);
 
   const load = useCallback(async () => {
     if (!jobCardId) return;
@@ -271,7 +301,6 @@ export default function ShopJobCardEstimateView({
     void load();
   }, [load]);
 
-  const invoicePreview = actionPreview === "invoice";
   const cashPreview = actionPreview === "cash";
   const alreadyInvoiced = job ? jobCardShowsInvoiceHst(job) : false;
   /**
@@ -315,9 +344,10 @@ export default function ShopJobCardEstimateView({
         pickInvoiceNoFromRecord(job) ||
         (listRow ? pickJobCardInvoiceNumber(listRow) : "");
       if (invoiceNo) return invoiceNo;
+      if (nextInvoiceNo.trim()) return nextInvoiceNo.trim();
     }
     return estimateDocumentNo(job ?? {}, jobNoHint, listRow, resolvedPrefix);
-  }, [job, jobNoHint, listRow, resolvedPrefix, showInvoiceDocumentNo]);
+  }, [job, jobNoHint, listRow, nextInvoiceNo, resolvedPrefix, showInvoiceDocumentNo]);
   const currencyLabel = currencyLabelFromCode(callingCode);
   const businessBlock = buildBusinessBlock(business);
   const customerBlock = job ? buildCustomerBlock(job) : { name: "—", company: "", address: "" };

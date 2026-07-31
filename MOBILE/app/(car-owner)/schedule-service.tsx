@@ -3,11 +3,12 @@ import { CarOwnerStackScreenFrame } from "@/components/car-owner/car-owner-stack
 import { useToast } from "@/components/reusables";
 import { cardFontSizes, colors, fontSizes, radii, spacing, typography } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
+import { useOwnerShopCityFilter } from "@/context/owner-shop-city-filter-context";
 import { parseServiceCatalogResponse } from "@/hooks/use-auto-shop-services-catalog";
 import { useCarOwnerAutoShops } from "@/hooks/use-car-owner-auto-shops";
 import { useCarOwnerFavoriteShops } from "@/hooks/use-car-owner-favorite-shops";
 import { useCarOwnerCustomerRequests } from "@/hooks/use-car-owner-customer-requests";
-import { getJson, putJson } from "@/lib/api";
+import { getJson } from "@/lib/api";
 import { formatCustomerRequestDate } from "@/lib/car-owner-approvals";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import { isCarOwnerShopOpenToday } from "@/lib/car-owner-auto-shops";
@@ -69,7 +70,7 @@ function formatFilterSummary(selectedId: string | null, options: FilterOption[])
 type AutoShopCardProps = {
   shop: CarOwnerAutoShopListItem;
   isFavorite: boolean;
-  onToggleFavorite: (shopId: string) => void;
+  onToggleFavorite: (shopId: string, currentlyFavorite?: boolean) => void;
   shopTypeFilter: CarOwnerShopType | null;
 };
 
@@ -139,7 +140,7 @@ const AutoShopCard = memo(function AutoShopCard({
             <Pressable
               onPress={(e) => {
                 e.stopPropagation();
-                onToggleFavorite(shop.id);
+                onToggleFavorite(shop.id, isFavorite);
               }}
               hitSlop={8}
               accessibilityRole="button"
@@ -477,7 +478,7 @@ const ShopsList = memo(function ShopsList({
   listTab: ShopsListTab;
   favoriteIds: ReadonlySet<string>;
   isFavorite: (shopId: string) => boolean;
-  onToggleFavorite: (shopId: string) => void;
+  onToggleFavorite: (shopId: string, currentlyFavorite?: boolean) => void;
   onSelectAllTab: () => void;
   hasActiveFilters: boolean;
   shopTypeFilter: CarOwnerShopType | null;
@@ -563,6 +564,13 @@ const ShopsList = memo(function ShopsList({
 export default function CarOwnerScheduleService() {
   const { showToast } = useToast();
   const { token } = useAuth();
+  const {
+    filterCityId: myCityId,
+    filterCityName: myCityName,
+    persistFilterCity,
+    refreshFromProfile: loadMyCity,
+  } = useOwnerShopCityFilter();
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const { shopType: shopTypeParam } = useLocalSearchParams<{ shopType?: string | string[] }>();
   const shopTypeFilter = useMemo(() => {
     const raw = Array.isArray(shopTypeParam) ? shopTypeParam[0] : shopTypeParam;
@@ -573,9 +581,6 @@ export default function CarOwnerScheduleService() {
     () => (shopTypeFilter ? `No ${screenTitle.toLowerCase()} yet` : "No shops yet"),
     [screenTitle, shopTypeFilter]
   );
-  const [myCityId, setMyCityId] = useState<string | null>(null);
-  const [myCityName, setMyCityName] = useState<string>("");
-  const [cityPickerOpen, setCityPickerOpen] = useState(false);
 
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [selectedCarCompanyId, setSelectedCarCompanyId] = useState<string | null>(null);
@@ -596,6 +601,11 @@ export default function CarOwnerScheduleService() {
   );
 
   const { shops, loading, error, refresh } = useCarOwnerAutoShops(shopFilters);
+  const shopsInCity = useMemo(() => {
+    const needle = myCityName.trim().toLowerCase();
+    if (!needle) return shops;
+    return shops.filter((shop) => shop.city.trim().toLowerCase() === needle);
+  }, [myCityName, shops]);
   const { favoriteIds, isFavorite, toggleFavorite, refresh: refreshFavorites } = useCarOwnerFavoriteShops();
   const {
     items: customerRequests,
@@ -674,28 +684,6 @@ export default function CarOwnerScheduleService() {
     void loadFilterOptions();
   }, [loadFilterOptions]);
 
-  const loadMyCity = useCallback(async () => {
-    if (!token) {
-      setMyCityId(null);
-      setMyCityName("");
-      return;
-    }
-    const res = await getJson<unknown>("/api/user/profile", { authToken: token });
-    const payload = res.data;
-    const src =
-      payload && typeof payload === "object" && (payload as any).data && typeof (payload as any).data === "object"
-        ? ((payload as any).data as Record<string, unknown>)
-        : (payload as Record<string, unknown> | null);
-    const city = typeof src?.city === "string" ? src.city : "";
-    const cityId = typeof src?.cityId === "string" ? src.cityId : "";
-    setMyCityName(city?.trim() || "");
-    setMyCityId(cityId?.trim() || null);
-  }, [token]);
-
-  useEffect(() => {
-    void loadMyCity();
-  }, [loadMyCity]);
-
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -712,8 +700,8 @@ export default function CarOwnerScheduleService() {
   }, [loadFilterOptions, loadMyCity, refresh, refreshFavorites, refreshRequests]);
 
   const handleToggleFavorite = useCallback(
-    async (shopId: string) => {
-      const result = await toggleFavorite(shopId);
+    async (shopId: string, currentlyFavorite?: boolean) => {
+      const result = await toggleFavorite(shopId, currentlyFavorite);
       if (!result.ok) {
         showToast(result.error ?? "Could not update favorite.", { type: "error" });
         return;
@@ -737,7 +725,7 @@ export default function CarOwnerScheduleService() {
     }
   }, [browsingAllWithoutFilters, hasActiveFilters]);
 
-  const showShopListChrome = !error && (shops.length > 0 || loading || hasActiveFilters);
+  const showShopListChrome = !error && (shopsInCity.length > 0 || loading || hasActiveFilters);
   const showHeaderFilters =
     showShopListChrome && !(listTab === "favorites" && favoriteIds.size === 0);
   const serviceSummary = formatFilterSummary(selectedServiceId, serviceOptions);
@@ -755,7 +743,7 @@ export default function CarOwnerScheduleService() {
     };
   }, [carCompanyOptions, selectedCarCompanyId]);
 
-  const openCityPicker = useCallback(() => setCityPickerOpen(true), []);
+  const openCityPickerPress = useCallback(() => setCityPickerOpen(true), []);
   const selectAll = useCallback(() => {
     setBrowsingAllWithoutFilters(true);
     setListTab("all");
@@ -775,7 +763,7 @@ export default function CarOwnerScheduleService() {
     return (
       <HeaderTabsAndFilters
         myCityName={myCityName}
-        onEditCity={openCityPicker}
+        onEditCity={openCityPickerPress}
         listTab={listTab}
         onSelectAll={selectAll}
         onSelectFavorites={selectFavorites}
@@ -797,7 +785,7 @@ export default function CarOwnerScheduleService() {
     listTab,
     mainSection,
     myCityName,
-    openCityPicker,
+    openCityPickerPress,
     selectAll,
     selectFavorites,
     serviceSummary,
@@ -855,7 +843,7 @@ export default function CarOwnerScheduleService() {
         <ShopsList
           loading={loading}
           error={error}
-          shops={shops}
+          shops={shopsInCity}
           listTab={listTab}
           favoriteIds={favoriteIds}
           isFavorite={isFavorite}
@@ -964,21 +952,13 @@ export default function CarOwnerScheduleService() {
         authToken={token}
         selectedId={myCityId}
         onSelect={async (city: UserCity) => {
-          setMyCityId(city.id);
-          setMyCityName(city.name);
           setCityPickerOpen(false);
-          if (!token) return;
-          const res = await putJson<any>(
-            "/api/user/edit-profile",
-            { cityId: city.id, city: city.name } as Record<string, unknown>,
-            { authToken: token }
-          );
-          if (!res.ok || res.data?.success === false) {
-            showToast(res.data?.message ?? "Could not update city.", { type: "error" });
-            void loadMyCity();
+          const res = await persistFilterCity(city);
+          if (!res.ok) {
+            showToast(res.message ?? "Could not update city.", { type: "error" });
             return;
           }
-          showToast(res.data?.message ?? "City updated.", { type: "success" });
+          showToast(res.message ?? "City updated.", { type: "success" });
         }}
       />
     </CarOwnerStackScreenFrame>

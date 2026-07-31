@@ -138,7 +138,6 @@ export function ShopOwnerDealCard({
   expanded,
   onToggleExpanded,
   deleting,
-  deactivating,
   selling,
   showSell,
   customers,
@@ -147,13 +146,11 @@ export function ShopOwnerDealCard({
   onSell,
   onEdit,
   onDelete,
-  onDeactivate,
 }: {
   deal: ShopDeal;
   expanded: boolean;
   onToggleExpanded: () => void;
   deleting?: boolean;
-  deactivating?: boolean;
   selling?: boolean;
   showSell?: boolean;
   customers?: MyCustomer[];
@@ -162,7 +159,6 @@ export function ShopOwnerDealCard({
   onSell?: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onDeactivate?: () => void;
 }) {
   const { meta } = useAuth();
   const [customerListOpen, setCustomerListOpen] = useState(false);
@@ -432,26 +428,6 @@ export function ShopOwnerDealCard({
               <Ionicons name="pencil-outline" size={17} color={colors.primary} />
               <Text style={styles.editBtnText}>Edit</Text>
             </Pressable>
-            {onDeactivate && d.dealEnabled !== false ? (
-              <Pressable
-                onPress={onDeactivate}
-                disabled={deactivating}
-                style={({ pressed }) => [
-                  styles.deactivateBtn,
-                  deactivating && styles.deleteBtnDisabled,
-                  pressed && !deactivating && styles.actionBtnPressed,
-                ]}
-              >
-                {deactivating ? (
-                  <ActivityIndicator color={colors.textMuted} size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="pause-circle-outline" size={17} color={colors.textMuted} />
-                    <Text style={styles.deactivateBtnText}>Non-Active</Text>
-                  </>
-                )}
-              </Pressable>
-            ) : null}
             <Pressable
               onPress={onDelete}
               disabled={deleting}
@@ -788,7 +764,7 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
   editBtn: {
     flexGrow: 1,
-    flexBasis: "30%",
+    flexBasis: "45%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -805,28 +781,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: colors.primary,
   },
-  deactivateBtn: {
-    flexGrow: 1,
-    flexBasis: "30%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: radii.round,
-    backgroundColor: "#F1F4FA",
-    borderWidth: 1,
-    borderColor: colors.border,
-    minHeight: 44,
-  },
-  deactivateBtnText: {
-    fontSize: cardFontSizes.md,
-    fontWeight: "900",
-    color: colors.textMuted,
-  },
   deleteBtn: {
     flexGrow: 1,
-    flexBasis: "30%",
+    flexBasis: "45%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

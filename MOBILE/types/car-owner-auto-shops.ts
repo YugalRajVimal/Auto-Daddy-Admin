@@ -22,6 +22,11 @@ export type CarOwnerAutoShopListItem = {
   todayOpen: string | null;
   /** Today's close time from API (`HH:mm`), null when closed or not provided. */
   todayClose: string | null;
+  /**
+   * Shop-owner business active toggle from API. When false the shop is treated as closed
+   * regardless of weekly/override hours.
+   */
+  isBusinessActive: boolean;
   /** Top-level service names (e.g. "Car Wash"). */
   mainServices: string[];
   /** Top-level services with ids for connect / scheduling actions. */

@@ -1,5 +1,6 @@
 import { colors, fontSizes, shadows, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
+import { useShopSubscriptionGateOptional } from "@/context/shop-subscription-gate-context";
 import { useOncePress } from "@/hooks/use-once-press";
 import { Ionicons } from "@expo/vector-icons";
 import { usePathname, useRouter, useSegments } from "expo-router";
@@ -40,8 +41,10 @@ function resolveActiveTab(pathname: string, segments: readonly string[]): TabKey
 
 export function MainTabBar() {
   const { meta } = useAuth();
+  const gate = useShopSubscriptionGateOptional();
   const role = (meta?.role ?? "").toLowerCase();
-  const base = role === "carowner" || role === "car-owner" || role === "car_owner" ? "/(car-owner)" : "/(shop-owner)";
+  const isCarOwner = role === "carowner" || role === "car-owner" || role === "car_owner";
+  const base = isCarOwner ? "/(car-owner)" : "/(shop-owner)";
   const pathname = usePathname();
   const segments = useSegments();
   const router = useRouter();
@@ -52,6 +55,7 @@ export function MainTabBar() {
     router.replace(`${base}/(tabs)/home` as any);
   });
   const toDeals = useOncePress(() => {
+    if (!isCarOwner && gate && !gate.requireSubscription()) return;
     router.replace(`${base}/deals` as any);
   });
   const toProfile = useOncePress(() => {

@@ -5,6 +5,7 @@ import type {
 import { isSalvagesDeal, dealId as parserDealId } from "@/lib/shop-owner-parsers";
 import type { UploadPart } from "@/lib/upload-part";
 import type { ShopDeal } from "@/types/shop-owner";
+import { dealFormSchema, firstZodError } from "@/lib/validation-zod";
 
 export type DealFormMode = "service" | "parts";
 export type DealBoardSectionId = "service" | "parts" | "salvage";
@@ -84,7 +85,7 @@ export function resolveDealType(opts: {
   return mode === "parts" ? "Parts" : "Service";
 }
 
-/** Rebuild API form fields from an existing deal (sell / non-active / edit seed). */
+/** Rebuild API form fields from an existing deal (sell / edit seed). */
 export function dealToFormFields(
   deal: ShopDeal,
   overrides?: Partial<AutoshopDealFormFields>
@@ -157,6 +158,8 @@ export type ShopDealSaveInput = {
   originalPrice?: string;
   /** Image — only for parts/salvages; pass local UploadPart when attaching a new file. */
   dealImage?: UploadPart | null;
+  /** Additional images (max 2 total with dealImage). */
+  dealImages?: UploadPart[];
   attachDealImage?: boolean;
 };
 
@@ -182,6 +185,7 @@ export function buildShopDealSaveFields(
     vehicleYear,
     originalPrice,
     dealImage,
+    dealImages,
     attachDealImage,
   } = input;
 
@@ -191,34 +195,47 @@ export function buildShopDealSaveFields(
       error: mode === "service" ? "Discount (%) is required." : "Discounted price is required.",
     };
   }
-  if (mode === "service") {
-    const pct = Number(discountedPrice.trim());
-    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
-      return { ok: false, error: "Enter a discount between 1 and 100%." };
-    }
-  }
 
   const offerEnd =
     offersEndOnDate instanceof Date
       ? offersEndOnDate.toISOString().slice(0, 10)
       : String(offersEndOnDate).trim().slice(0, 10);
-  if (!offerEnd) {
-    return { ok: false, error: "Offer ends on date is required." };
-  }
-  {
-    const selected = new Date(`${offerEnd}T00:00:00`);
-    const tomorrow = new Date();
-    tomorrow.setHours(0, 0, 0, 0);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    if (Number.isNaN(selected.getTime()) || selected < tomorrow) {
-      return { ok: false, error: "Offer ends on must be a future date." };
-    }
-  }
 
   const dealType = resolveDealType({ deal, section, mode });
+  const imageParts = [
+    ...(dealImage?.uri ? [dealImage] : []),
+    ...((dealImages ?? []).filter((p) => Boolean(p?.uri))),
+  ].slice(0, 2);
   const imageRequired = dealType === "Salvages";
-  if (!deal && imageRequired && (!attachDealImage || !dealImage?.uri)) {
+  if (!deal && imageRequired && (!attachDealImage || imageParts.length === 0)) {
     return { ok: false, error: "Deal image is required." };
+  }
+
+  if (mode === "parts") {
+    const parsed = dealFormSchema.safeParse({
+      mode: "parts" as const,
+      title: partName?.trim() || "",
+      description: description.trim(),
+      originalPrice: (originalPrice?.trim() || discountedPrice.trim()),
+      discountedPrice: discountedPrice.trim(),
+      offerEndsOn: offerEnd,
+      vehicleId: vehicleId ?? "",
+      vehicleModel: vehicleModel ?? "",
+      vehicleYear: vehicleYear ?? "",
+    });
+    if (!parsed.success) {
+      return { ok: false, error: firstZodError(parsed.error) };
+    }
+  } else {
+    const parsed = dealFormSchema.safeParse({
+      mode: "service" as const,
+      subserviceId: serviceOption?.serviceId || serviceOption?.subName || "",
+      discountPercent: discountedPrice.trim(),
+      offerEndsOn: offerEnd,
+    });
+    if (!parsed.success) {
+      return { ok: false, error: firstZodError(parsed.error) };
+    }
   }
 
   const fields: AutoshopDealFormFields = {
@@ -226,26 +243,22 @@ export function buildShopDealSaveFields(
     discountedPrice: discountedPrice.trim(),
     description: mode === "parts" ? description.trim() : "",
     offersEndOnDate: offerEnd,
-    dealImage: mode === "parts" && attachDealImage && dealImage?.uri ? dealImage : null,
+    dealImage: mode === "parts" && attachDealImage ? imageParts[0] ?? null : null,
+    dealImages:
+      mode === "parts" && attachDealImage && imageParts.length > 1 ? imageParts.slice(1) : [],
   };
 
   if (mode === "parts") {
-    if (!partName?.trim() || !vehicleId || !vehicleModel || !vehicleYear) {
-      return { ok: false, error: "Fill all parts deal fields." };
-    }
-    fields.partName = partName.trim();
+    fields.partName = partName!.trim();
     fields.vehicleId = vehicleId;
     fields.vehicleName = vehicleName;
     fields.vehicleModel = vehicleModel;
     fields.vehicleYear = vehicleYear;
-    fields.originalPrice = (originalPrice?.trim() || discountedPrice.trim());
+    fields.originalPrice = originalPrice?.trim() || discountedPrice.trim();
   } else {
-    if (!serviceOption?.serviceId || !serviceOption.subName) {
-      return { ok: false, error: "Select a subservice." };
-    }
-    fields.serviceId = serviceOption.serviceId;
-    fields.productName = serviceOption.subName;
-    fields.subServiceName = serviceOption.subName;
+    fields.serviceId = serviceOption!.serviceId;
+    fields.productName = serviceOption!.subName;
+    fields.subServiceName = serviceOption!.subName;
   }
 
   return { ok: true, fields };

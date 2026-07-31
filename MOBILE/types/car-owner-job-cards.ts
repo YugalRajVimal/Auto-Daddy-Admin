@@ -74,6 +74,7 @@ export type CarOwnerJobCard = {
   status: string;
   jobNo: string;
   jobCardNo?: string;
+  jobCardPrefix?: string;
   invoiceId?: string;
   invoiceNumber?: string;
   invoiceNo?: string;

@@ -400,6 +400,66 @@ export function buildCustomerBlock(job: Record<string, unknown>) {
   return { name, company, address };
 }
 
+function formatOdometerReading(value: unknown): string {
+  if (value == null || value === "") return "";
+  const n = Number(value);
+  if (Number.isFinite(n)) return String(n);
+  return s(value);
+}
+
+function resolveOdoOutFromServices(services: unknown): number | null {
+  if (!Array.isArray(services)) return null;
+  let max = 0;
+  for (const raw of services) {
+    const svc = nested(raw);
+    if (!svc) continue;
+    const n = parseNum(svc.odoOutReading);
+    if (n > max) max = n;
+    const subs = Array.isArray(svc.subServices) ? svc.subServices : [];
+    for (const subRaw of subs) {
+      const sub = nested(subRaw);
+      const sn = parseNum(sub?.odoOutReading);
+      if (sn > max) max = sn;
+    }
+  }
+  return max > 0 ? max : null;
+}
+
+/** Plate, make/model, VIN/CIN, and odo in/out for estimate document headers. */
+export function buildVehicleBlock(job: Record<string, unknown>) {
+  const vehicle = nested(job.vehicleId) ?? nested(job.vehicle);
+  const make = nested(vehicle?.make);
+  const plateRaw = s(
+    vehicle?.licensePlateNo ??
+      vehicle?.licensePlate ??
+      vehicle?.regNo ??
+      vehicle?.plateNo ??
+      job.licensePlateNo ??
+      job.licensePlate
+  );
+  const name = [
+    s(make?.name ?? vehicle?.brand ?? vehicle?.makeName),
+    s(make?.model ?? vehicle?.model ?? vehicle?.vehicleName),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const vin = s(vehicle?.vin ?? vehicle?.vinNo ?? vehicle?.VIN);
+  const cin = s(vehicle?.cin ?? vehicle?.CIN ?? vehicle?.chassisNo ?? vehicle?.chasisNo);
+  const odoIn = formatOdometerReading(job.odometerReading ?? job.odoIn);
+  const odoOut = formatOdometerReading(
+    job.dueOdometerReading ?? job.odoOut ?? resolveOdoOutFromServices(job.services)
+  );
+  const odometer =
+    odoIn || odoOut ? `Odo In: ${odoIn || "—"}  ·  Odo Out: ${odoOut || "—"}` : "";
+  return {
+    plate: plateRaw ? plateRaw.toUpperCase() : "",
+    name,
+    vin,
+    cin,
+    odometer,
+  };
+}
+
 export function estimateTotals(
   lines: EstimateLine[],
   hstRate: number,

@@ -1,14 +1,34 @@
 import { AppSplash } from "@/components/reusables";
+import { ShopSubscriptionRequiredDialog } from "@/components/shop-owner/shop-subscription-required-dialog";
 import { useAuth } from "@/context/auth-provider";
+import {
+  ShopSubscriptionGateProvider,
+  useShopSubscriptionGate,
+} from "@/context/shop-subscription-gate-context";
 import { getPostAuthRoute } from "@/lib/auth";
-import { Redirect, Slot, useSegments } from "expo-router";
+import { Redirect, Slot, useSegments, router } from "expo-router";
 
 function isShopOwnerRole(role: string | null | undefined): boolean {
   const r = (role ?? "").toLowerCase().replace(/[-_\s]/g, "");
   return r === "autoshopowner";
 }
 
-export default function ShopOwnerLayout() {
+function ShopSubscriptionPrompt() {
+  const { subscribePromptOpen, closeSubscribePrompt } = useShopSubscriptionGate();
+
+  return (
+    <ShopSubscriptionRequiredDialog
+      open={subscribePromptOpen}
+      onSubscribe={() => {
+        closeSubscribePrompt();
+        router.push("/(shop-owner)/website" as never);
+      }}
+      onLater={closeSubscribePrompt}
+    />
+  );
+}
+
+function ShopOwnerLayoutInner() {
   const { isBootstrapping, isAuthenticated, meta } = useAuth();
   const segments = useSegments();
   const onBusinessSetup = segments.includes("businessprofile");
@@ -46,6 +66,18 @@ export default function ShopOwnerLayout() {
     return <Redirect href="/(shop-owner)/businessprofile" />;
   }
 
-  // Allow nested screens (tabs + stacks) to render.
-  return <Slot />;
+  return (
+    <>
+      <Slot />
+      <ShopSubscriptionPrompt />
+    </>
+  );
+}
+
+export default function ShopOwnerLayout() {
+  return (
+    <ShopSubscriptionGateProvider>
+      <ShopOwnerLayoutInner />
+    </ShopSubscriptionGateProvider>
+  );
 }

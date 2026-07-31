@@ -51,11 +51,13 @@ function VehicleTopCarousel({
   onOpenViewer,
   viewerTitle,
   rawPathsForViewer,
+  brandLogoUri,
 }: {
   uris: string[];
   onOpenViewer: (title: string, paths: (string | null | undefined)[]) => void;
   viewerTitle: string;
   rawPathsForViewer: string[];
+  brandLogoUri?: string | null;
 }) {
   const [slideWidth, setSlideWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -88,7 +90,16 @@ function VehicleTopCarousel({
   if (uris.length === 0) {
     return (
       <View style={styles.vehicleGalleryPlaceholder}>
-        <Ionicons name="car-sport-outline" size={40} color={colors.textLight} />
+        {brandLogoUri ? (
+          <Image
+            source={{ uri: brandLogoUri }}
+            style={styles.vehicleGalleryBrandImg}
+            contentFit="contain"
+            transition={120}
+          />
+        ) : (
+          <Ionicons name="car-sport-outline" size={40} color={colors.textLight} />
+        )}
       </View>
     );
   }
@@ -139,6 +150,7 @@ export function VehicleAccordion({
   onEdit,
   busyVehicleId,
   onRequestDisable,
+  brandLogoUri,
 }: {
   vehicle: Vehicle;
   expanded: boolean;
@@ -147,6 +159,7 @@ export function VehicleAccordion({
   onEdit: () => void;
   busyVehicleId: string | null;
   onRequestDisable: () => void;
+  brandLogoUri?: string | null;
 }) {
   const title = vehicleTitle(v);
   const isBusy = busyVehicleId === v.id;
@@ -163,6 +176,7 @@ export function VehicleAccordion({
   );
 
   const thumbUri = carGalleryUris[0] ?? null;
+  const displayBrandLogo = brandLogoUri ?? null;
 
   if (!expanded) {
     return (
@@ -177,6 +191,13 @@ export function VehicleAccordion({
           <View style={styles.collapsedThumb}>
             {thumbUri ? (
               <Image source={{ uri: thumbUri }} style={styles.collapsedThumbImg} contentFit="cover" transition={120} />
+            ) : displayBrandLogo ? (
+              <Image
+                source={{ uri: displayBrandLogo }}
+                style={styles.collapsedThumbBrandImg}
+                contentFit="contain"
+                transition={120}
+              />
             ) : (
               <Ionicons name="car-sport-outline" size={28} color={colors.textLight} />
             )}
@@ -199,6 +220,7 @@ export function VehicleAccordion({
         rawPathsForViewer={carGalleryPaths}
         viewerTitle={title}
         onOpenViewer={onOpenViewer}
+        brandLogoUri={displayBrandLogo}
       />
 
       <View style={styles.plateBar}>

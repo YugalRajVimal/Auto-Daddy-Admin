@@ -9,7 +9,7 @@ import {
   formatAutoshopDealOfferEndDate,
   updateAutoshopDeal,
 } from "@/lib/autoshopowner-deals-api";
-import { dealCardImageAspectRatio, pickDealImageFromLibrary } from "@/lib/deal-card-image";
+import { dealCardImageAspectRatio, pickDealImagesFromLibrary } from "@/lib/deal-card-image";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import {
   buildShopDealSaveFields,
@@ -163,8 +163,8 @@ export function ShopDealEditorForm({
   const [offerEndDate, setOfferEndDate] = useState(defaultOfferEndDate);
   const [showOfferDatePicker, setShowOfferDatePicker] = useState(false);
   const [attachDealImage, setAttachDealImage] = useState(false);
-  const [dealImage, setDealImage] = useState<UploadPart | null>(null);
-  const [existingImageUri, setExistingImageUri] = useState<string | null>(null);
+  const [dealImages, setDealImages] = useState<UploadPart[]>([]);
+  const [existingImageUris, setExistingImageUris] = useState<string[]>([]);
   const [vehicleCatalog, setVehicleCatalog] = useState<VehicleCatalogEntry[]>([]);
   const [vehicleLoading, setVehicleLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -221,11 +221,17 @@ export function ShopDealEditorForm({
     setOfferEndDate(
       deal?.offersEndOnDate ? new Date(deal.offersEndOnDate) : defaultOfferEndDate()
     );
-    setDealImage(null);
-    const existing = deal?.dealImage?.trim() || deal?.productImage?.trim() || null;
-    const normalized = normalizeMediaUrl(existing);
-    setExistingImageUri(normalized);
-    setAttachDealImage(mode === "parts" && Boolean(normalized));
+    setDealImages([]);
+    const existingList = [
+      ...(Array.isArray(deal?.dealImages) ? deal.dealImages : []),
+      deal?.dealImage,
+      deal?.productImage,
+    ]
+      .map((u) => (typeof u === "string" ? normalizeMediaUrl(u.trim()) : null))
+      .filter((u): u is string => Boolean(u));
+    const uniqueExisting = [...new Set(existingList)].slice(0, 2);
+    setExistingImageUris(uniqueExisting);
+    setAttachDealImage(mode === "parts" && uniqueExisting.length > 0);
 
     if (mode === "service" && deal) {
       if (deal.discountPercentage != null) {
@@ -289,21 +295,34 @@ export function ShopDealEditorForm({
     });
   }, [deal, mode, serviceOptions]);
 
-  async function pickDealImage() {
+  async function pickDealImages() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       showToast("Photo library permission is required.", { type: "error" });
       return;
     }
-    const picked = await pickDealImageFromLibrary();
-    if (!picked) return;
-    setDealImage({
-      uri: picked.uri,
-      name: picked.fileName ?? "deal.jpg",
-      type: picked.mimeType ?? "image/jpeg",
-    });
+    const remaining = Math.max(0, 2 - dealImages.length);
+    if (remaining <= 0) {
+      showToast("You can attach up to 2 images.", { type: "info" });
+      return;
+    }
+    const picked = await pickDealImagesFromLibrary(remaining);
+    if (!picked.length) return;
+    const next = [
+      ...dealImages,
+      ...picked.map((p) => ({
+        uri: p.uri,
+        name: p.fileName ?? "deal.jpg",
+        type: p.mimeType ?? "image/jpeg",
+      })),
+    ].slice(0, 2);
+    setDealImages(next);
     setAttachDealImage(true);
-    setExistingImageUri(picked.uri);
+    setExistingImageUris([]);
+  }
+
+  function removeDealImageAt(index: number) {
+    setDealImages((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSave() {
@@ -336,8 +355,10 @@ export function ShopDealEditorForm({
       vehicleModel,
       vehicleYear,
       originalPrice: discountedPrice,
-      dealImage,
-      attachDealImage: attachDealImage && Boolean(dealImage?.uri || existingImageUri),
+      dealImage: dealImages[0] ?? null,
+      dealImages: dealImages.slice(1),
+      attachDealImage:
+        attachDealImage && (dealImages.length > 0 || existingImageUris.length > 0),
     });
 
     if (!built.ok) {
@@ -345,12 +366,16 @@ export function ShopDealEditorForm({
       return;
     }
 
-    // Only upload a newly picked local image (matches web: File | null).
+    // Only upload newly picked local images (omit on edit when none selected — keeps existing).
     const fields = {
       ...built.fields,
       offersEndOnDate: formatAutoshopDealOfferEndDate(built.fields.offersEndOnDate ?? offerEndDate),
       dealImage:
-        mode === "parts" && attachDealImage && dealImage?.uri ? dealImage : null,
+        mode === "parts" && attachDealImage && dealImages[0]?.uri ? dealImages[0] : null,
+      dealImages:
+        mode === "parts" && attachDealImage
+          ? dealImages.slice(1).filter((p) => Boolean(p.uri))
+          : [],
     };
 
     setSaving(true);
@@ -376,7 +401,10 @@ export function ShopDealEditorForm({
   const hasServices = categories.length > 0;
   const hasVehicles = vehicleCatalog.length > 0;
   const title = `${deal ? "Edit" : "Add"} ${mode === "parts" ? "Parts" : "Service"} Deal`;
-  const previewUri = dealImage?.uri || existingImageUri;
+  const previewUris =
+    dealImages.length > 0
+      ? dealImages.map((p) => p.uri)
+      : existingImageUris;
 
   const body = (
     <>
@@ -589,34 +617,49 @@ export function ShopDealEditorForm({
             <Pressable
               style={styles.field}
               onPress={() => {
-                if (attachDealImage) {
-                  void pickDealImage();
-                } else {
-                  setAttachDealImage(true);
-                  void pickDealImage();
-                }
+                void pickDealImages();
               }}
-              disabled={saving}
+              disabled={saving || dealImages.length >= 2}
             >
               <View style={[styles.fieldIcon, styles.fieldIconBlue]}>
                 <Ionicons name="image-outline" size={16} color={colors.white} />
               </View>
-              <Text style={[styles.fieldText, !previewUri && styles.fieldPlaceholder]}>
-                {previewUri
-                  ? "Change deal image"
-                  : imageRequired
-                    ? "Attach image *"
-                    : "Attach image"}
+              <Text
+                style={[
+                  styles.fieldText,
+                  previewUris.length === 0 && styles.fieldPlaceholder,
+                ]}
+              >
+                {previewUris.length >= 2
+                  ? "2 images attached (max)"
+                  : previewUris.length === 1
+                    ? "Add another image (max 2)"
+                    : imageRequired
+                      ? "Attach images * (up to 2)"
+                      : "Attach images (up to 2)"}
               </Text>
               <Ionicons name="chevron-forward" size={20} color={colors.text} />
             </Pressable>
-            {previewUri ? (
-              <View style={styles.dealImagePreviewWrap}>
-                <Image
-                  source={{ uri: previewUri }}
-                  style={[styles.dealImagePreview, { aspectRatio: dealCardImageAspectRatio() }]}
-                  contentFit="cover"
-                />
+            {previewUris.length > 0 ? (
+              <View style={styles.dealImagesRow}>
+                {previewUris.map((uri, index) => (
+                  <View key={`${uri}-${index}`} style={styles.dealImagePreviewWrap}>
+                    <Image
+                      source={{ uri }}
+                      style={[styles.dealImagePreview, { aspectRatio: dealCardImageAspectRatio() }]}
+                      contentFit="cover"
+                    />
+                    {dealImages.length > 0 ? (
+                      <Pressable
+                        style={styles.dealImageRemove}
+                        onPress={() => removeDealImageAt(index)}
+                        hitSlop={8}
+                      >
+                        <Ionicons name="close-circle" size={22} color={colors.danger} />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ))}
               </View>
             ) : null}
           </>
@@ -748,13 +791,29 @@ const styles = StyleSheet.create({
   dropdownItem: { paddingHorizontal: spacing.sm, paddingVertical: spacing.sm },
   dropdownText: { fontSize: fontSizes.md, color: colors.text },
   dealImagePreviewWrap: {
+    flex: 1,
+    minWidth: "46%",
     borderRadius: radii.lg,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.bgAlt,
+    position: "relative",
+  },
+  dealImagesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   dealImagePreview: { width: "100%" },
+  dealImageRemove: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+  },
   saveBtn: {
     marginTop: spacing.xs,
     minHeight: 44,

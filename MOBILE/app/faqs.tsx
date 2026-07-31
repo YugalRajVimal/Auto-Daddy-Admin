@@ -2,12 +2,13 @@ import { ShopOwnerInfoStackShell } from "@/components/shop-owner/shop-owner-info
 import { LoadingProgress, SurfaceCard } from "@/components/reusables";
 import { colors, spacing, typography } from "@/constants/autodaddy";
 import { useShopOwnerFaqs } from "@/hooks/use-car-owner-content";
+import { SHOP_FAQ_PAGE_SLUGS } from "@/lib/shop-faq-page-slug";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 
 export default function FaqsPage() {
-  const { items, loading, error } = useShopOwnerFaqs();
+  const { items, loading, error } = useShopOwnerFaqs(SHOP_FAQ_PAGE_SLUGS.help);
   const [openIndex, setOpenIndex] = useState(0);
 
   return (

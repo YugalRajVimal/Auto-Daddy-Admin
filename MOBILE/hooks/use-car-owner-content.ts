@@ -27,7 +27,7 @@ export function usePortalFaqs(role = "car_owner", pageSlug?: string) {
     }
     setLoading(true);
     setError(null);
-    const res = await fetchCarOwnerFaqs(token, role);
+    const res = await fetchCarOwnerFaqs(token, role, pageSlug);
     if (!res.ok) {
       setItems([]);
       setError("Could not load FAQs.");

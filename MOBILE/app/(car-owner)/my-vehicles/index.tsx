@@ -7,7 +7,9 @@ import { VehicleImageViewerModal } from "@/components/car-owner/my-vehicles/vehi
 import { useToast } from "@/components/reusables";
 import { colors } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
+import { useCarCompanyCatalog } from "@/hooks/use-car-company-catalog";
 import { getJson } from "@/lib/api";
+import { buildCarBrandLogoByName, resolveCarBrandLogoUri } from "@/lib/car-brand-logo";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import { putUserVehicleDisabled, userVehiclePutMessage } from "@/lib/user-vehicle-api";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,6 +30,11 @@ import {
 export default function CarOwnerMyVehicles() {
   const { token } = useAuth();
   const { showToast } = useToast();
+  const carCompanyCatalog = useCarCompanyCatalog(token);
+  const brandLogoByMake = useMemo(
+    () => buildCarBrandLogoByName(carCompanyCatalog.companies),
+    [carCompanyCatalog.companies]
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,6 +210,7 @@ export default function CarOwnerMyVehicles() {
                 onToggle={() => toggle(v.id)}
                 onOpenViewer={openViewer}
                 busyVehicleId={busyVehicleId}
+                brandLogoUri={resolveCarBrandLogoUri(v.make?.name, brandLogoByMake)}
                 onRequestDisable={() => requestDisableVehicle(v.id)}
                 onEdit={() => {
                   router.push({

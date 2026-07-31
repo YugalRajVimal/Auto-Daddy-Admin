@@ -112,11 +112,12 @@ function toInvoiceRow(jc: CarOwnerJobCard): CarOwnerInvoiceRow {
   };
 }
 
-export function useCarOwnerInvoices() {
+export function useCarOwnerInvoices(vehicleId?: string | null) {
   const { token, sessionRevision } = useAuth();
   const [items, setItems] = useState<CarOwnerJobCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const vehicleFilter = vehicleId?.trim() || null;
 
   const load = useCallback(async () => {
     if (!token) {
@@ -129,7 +130,10 @@ export function useCarOwnerInvoices() {
     setLoading(true);
     setError(null);
 
-    const res = await getJson<CarOwnerJobCardsResponse>("/api/user/job-cards", {
+    const path = vehicleFilter
+      ? `/api/user/job-cards?vehicleId=${encodeURIComponent(vehicleFilter)}`
+      : "/api/user/job-cards";
+    const res = await getJson<CarOwnerJobCardsResponse>(path, {
       authToken: token,
     });
     if (!res.ok || res.data?.success === false) {
@@ -142,7 +146,7 @@ export function useCarOwnerInvoices() {
     setItems(normalizeJobCardsPayload(resolveJobCardsBuckets(res.data ?? undefined)));
     setLoading(false);
     setError(null);
-  }, [token]);
+  }, [token, vehicleFilter]);
 
   useEffect(() => {
     void load();

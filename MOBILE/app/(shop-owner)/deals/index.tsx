@@ -96,7 +96,6 @@ export default function DealsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [expandedDealId, setExpandedDealId] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
-  const [deactivatingIds, setDeactivatingIds] = useState<Set<string>>(() => new Set());
   const [customers, setCustomers] = useState<MyCustomer[]>([]);
   const [soldDraftIds, setSoldDraftIds] = useState<Record<string, string>>({});
   const [sellingDealId, setSellingDealId] = useState<string | null>(null);
@@ -237,47 +236,6 @@ export default function DealsPage() {
     [removeDeal]
   );
 
-  const confirmDeactivate = useCallback(
-    (d: ShopDeal) => {
-      if (!token) return;
-      const id = dealId(d);
-      if (!id || d.dealEnabled === false) return;
-      Alert.alert("Mark non-active?", "This deal will be marked as non-active.", [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Non-Active",
-          onPress: () => {
-            void (async () => {
-              setDeactivatingIds((prev) => new Set(prev).add(id));
-              try {
-                const res = await updateAutoshopDeal(
-                  token,
-                  id,
-                  dealToFormFields(d, { dealEnabled: "false" })
-                );
-                if (!res.ok) {
-                  showToast("Could not mark deal non-active.", { type: "error" });
-                  return;
-                }
-                showToast("Marked as non-active.", { type: "success" });
-                await loadDeals();
-              } catch {
-                showToast("Network error.", { type: "error" });
-              } finally {
-                setDeactivatingIds((prev) => {
-                  const next = new Set(prev);
-                  next.delete(id);
-                  return next;
-                });
-              }
-            })();
-          },
-        },
-      ]);
-    },
-    [loadDeals, showToast, token]
-  );
-
   const handleSellDeal = useCallback(
     async (deal: ShopDeal) => {
       if (!token) return;
@@ -410,7 +368,6 @@ export default function DealsPage() {
                 expanded={expandedDealId === id}
                 onToggleExpanded={() => id && toggleDealExpanded(id)}
                 deleting={id ? deletingIds.has(id) : false}
-                deactivating={id ? deactivatingIds.has(id) : false}
                 selling={sellingDealId === id}
                 showSell={showSell}
                 customers={customers}
@@ -427,9 +384,6 @@ export default function DealsPage() {
                 onSell={() => void handleSellDeal(deal)}
                 onEdit={() => openEdit?.(deal)}
                 onDelete={() => confirmDelete(deal)}
-                onDeactivate={
-                  activeId !== "completed" ? () => confirmDeactivate(deal) : undefined
-                }
               />
             );
           })}

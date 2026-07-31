@@ -73,16 +73,29 @@ export function useCarOwnerFavoriteShops() {
   const isFavorite = useCallback((shopId: string) => favoriteIds.has(shopId), [favoriteIds]);
 
   const toggleFavorite = useCallback(
-    async (shopId: string): Promise<ToggleResult> => {
+    async (shopId: string, currentlyFavorite?: boolean): Promise<ToggleResult> => {
       const id = shopId.trim();
       if (!id) return { ok: false, isFavorite: false, error: "Missing shop id." };
-      if (!token) return { ok: false, isFavorite: favoriteIds.has(id), error: "Not authenticated." };
+      if (!token) {
+        return {
+          ok: false,
+          isFavorite: currentlyFavorite ?? favoriteIds.has(id),
+          error: "Not authenticated.",
+        };
+      }
       if (inFlightRef.current.has(id)) {
-        return { ok: false, isFavorite: favoriteIds.has(id), error: "Already updating." };
+        return {
+          ok: false,
+          isFavorite: currentlyFavorite ?? favoriteIds.has(id),
+          error: "Already updating.",
+        };
       }
       inFlightRef.current.add(id);
 
-      const wasFavorite = favoriteIds.has(id);
+      // Prefer the UI's current heart state when provided — list `isFavourite` can
+      // be true before/without the id appearing in favoriteIds.
+      const wasFavorite =
+        typeof currentlyFavorite === "boolean" ? currentlyFavorite : favoriteIds.has(id);
       const optimistic = !wasFavorite;
       setFavoriteIds((prev) => {
         const next = new Set(prev);

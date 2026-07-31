@@ -68,6 +68,8 @@ export type ShopDeal = {
     year?: string;
   };
   dealImage?: string;
+  /** Additional deal image URLs from API (max 2 total with dealImage). */
+  dealImages?: string[];
   productImage?: string;
 };
 
