@@ -1,3 +1,8 @@
+import {
+  DUMMY_INVOICE_TEMPLATES,
+  resolveTemplateSlug,
+} from "@/lib/document-templates";
+
 export type InvoiceThemeId =
   | "classic-invoice-v1"
   | "modern-invoice-v2"
@@ -33,6 +38,7 @@ const MODERN_THEME: InvoiceThemeTokens = {
   border: "#e5e5e5",
 };
 
+/** Blue palette from invoice-job-card-viewer — also used for default job card previews. */
 const VIEWER_THEME: InvoiceThemeTokens = {
   id: "viewer-invoice-v1",
   accent: "#1976d2",
@@ -45,15 +51,9 @@ const VIEWER_THEME: InvoiceThemeTokens = {
 
 export const JOB_CARD_PREVIEW_THEME = VIEWER_THEME;
 
-function resolveTemplateSlug(slug: string | undefined | null): InvoiceThemeId {
-  const raw = (slug ?? "").trim();
-  if (raw === "modern-invoice-v2" || raw === "modern") return "modern-invoice-v2";
-  if (raw === "viewer-invoice-v1" || raw === "viewer") return "viewer-invoice-v1";
-  return "classic-invoice-v1";
-}
-
+/** Color themes only — all templates keep the same invoice content layout. */
 export function resolveInvoiceTheme(slug: string | undefined | null): InvoiceThemeTokens {
-  const id = resolveTemplateSlug(slug);
+  const id = resolveTemplateSlug(DUMMY_INVOICE_TEMPLATES, slug) as InvoiceThemeId;
   if (id === "modern-invoice-v2") return MODERN_THEME;
   if (id === "viewer-invoice-v1") return VIEWER_THEME;
   return CLASSIC_THEME;

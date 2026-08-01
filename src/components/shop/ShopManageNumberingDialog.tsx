@@ -26,9 +26,9 @@ const COPY: Record<
   { title: string; codeLabel: string; numberLabel: string }
 > = {
   estimate: {
-    title: "Manage Estimate",
-    codeLabel: "Estimate Code",
-    numberLabel: "Estimate Number",
+    title: "Manage Job Cards",
+    codeLabel: "Job Card Code",
+    numberLabel: "Job Card Number",
   },
   invoice: {
     title: "Manage Invoice",
@@ -82,7 +82,7 @@ export default function ShopManageNumberingDialog({
     try {
       const result = await onSave({ code: trimmedCode, number: trimmedNumber });
       if (result === false) return;
-      toast.success(`${copy.title.replace("Manage ", "")} settings updated.`);
+      toast.success(`${copy.title.replace(/^Manage\s+/i, "")} settings updated.`);
       onClose();
     } finally {
       setSaving(false);

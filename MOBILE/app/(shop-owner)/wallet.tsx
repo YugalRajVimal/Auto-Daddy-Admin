@@ -1228,12 +1228,12 @@ export default function WalletPage() {
       <Modal
         visible={previewRow != null}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={closeInvoicePreview}
       >
-        <View style={styles.viewerBackdrop}>
+        <View style={styles.viewerRoot}>
           <Pressable style={styles.viewerBackdropPress} onPress={closeInvoicePreview} />
-          <View style={styles.viewerCard}>
+          <View style={styles.viewerSheet}>
             {previewRow ? (
               <ShopJobCardEstimateView
                 key={previewRow.id}
@@ -1823,24 +1823,19 @@ const styles = StyleSheet.create({
   },
   sheetFormScroll: { maxHeight: "100%" },
   sheetFormScrollContent: { paddingBottom: spacing.xxl, gap: 2 },
-  viewerBackdrop: {
+  viewerRoot: {
     flex: 1,
+    justifyContent: "flex-end",
     backgroundColor: "rgba(15, 23, 42, 0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.screenHorizontal,
   },
   viewerBackdropPress: {
     ...StyleSheet.absoluteFillObject,
   },
-  viewerCard: {
-    width: "100%",
-    height: "86%",
-    minHeight: 260,
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
+  viewerSheet: {
+    height: "94%",
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
     overflow: "hidden",
     ...shadows.card,
   },

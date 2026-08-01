@@ -26,7 +26,9 @@ export type VehicleDocumentsSection = {
   vehicleId: string;
   title: string;
   subtitle: string;
+  /** Vehicle photo only — never a document scan. Brand logo is resolved in UI when null. */
   thumbUri: string | null;
+  makeName: string | null;
   fields: VehicleDocumentFieldRow[];
 };
 
@@ -116,23 +118,20 @@ export function vehicleImageUri(vehicle: VehicleDocumentsVehicle | null | undefi
   return path ? normalizeMediaUrl(path) : null;
 }
 
-export function sectionThumbUri(
-  vehicle: VehicleDocumentsVehicle | null | undefined,
-  fields: VehicleDocumentFieldRow[]
-): string | null {
-  const fromVehicle = vehicleImageUri(vehicle);
-  if (fromVehicle) return fromVehicle;
-  return fields.find((f) => f.uri)?.uri ?? null;
+export function sectionThumbUri(vehicle: VehicleDocumentsVehicle | null | undefined): string | null {
+  return vehicleImageUri(vehicle);
 }
 
 export function vehicleDocumentSectionFromRecord(record: VehicleDocumentsRecord, index: number): VehicleDocumentsSection {
   const fields = documentFieldsFromRecord(record);
+  const makeName = record.vehicle?.make?.name?.trim() || null;
   return {
     id: record._id,
     vehicleId: record.vehicleId,
     title: vehicleDocumentsTitle(record.vehicle, `Vehicle ${index + 1}`),
     subtitle: vehicleDocumentsSubtitle(record.vehicle),
-    thumbUri: sectionThumbUri(record.vehicle, fields),
+    thumbUri: sectionThumbUri(record.vehicle),
+    makeName,
     fields,
   };
 }

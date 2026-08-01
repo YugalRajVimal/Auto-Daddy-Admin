@@ -8,7 +8,9 @@ import { useOncePress } from "@/hooks/use-once-press";
 import {
   apiMessageFromEnvelope,
   deleteAutoshopJobCard,
+  fetchAutoshopJobCardNextNumber,
   fetchAutoshopJobCardPrefix,
+  parseAutoshopJobCardNextNumber,
   parseAutoshopJobCardPrefix,
   sendAutoshopJobCardForApproval,
 } from "@/lib/autoshopowner-job-cards-api";
@@ -858,7 +860,53 @@ export default function JobCardsPage() {
   const menuCanDelete =
     menuRow != null && section === "all" && !isJobCardApproved(menuRow);
 
-  const navigateToCreateJobCard = useOncePress(() => {
+  const navigateToCreateJobCard = useOncePress(async () => {
+    if (!token) {
+      showToast("Sign in to create a job card.", { type: "error" });
+      return;
+    }
+
+    try {
+      const [prefixRes, nextRes] = await Promise.all([
+        fetchAutoshopJobCardPrefix(token),
+        fetchAutoshopJobCardNextNumber(token),
+      ]);
+      const fromNext = nextRes.ok
+        ? parseAutoshopJobCardNextNumber(nextRes.data)
+        : { nextNumber: "", prefix: "" };
+      const prefix = (
+        (prefixRes.ok ? parseAutoshopJobCardPrefix(prefixRes.data) : "") ||
+        fromNext.prefix
+      ).trim();
+      const nextNumber = fromNext.nextNumber.trim();
+      const nextNumberValid =
+        nextNumber !== "" &&
+        Number.isInteger(Number.parseInt(nextNumber, 10)) &&
+        Number.parseInt(nextNumber, 10) >= 1;
+
+      if (!prefix || !nextNumberValid) {
+        const missing =
+          !prefix && !nextNumberValid
+            ? "job card prefix and number"
+            : !prefix
+              ? "job card prefix"
+              : "job card number";
+        showToast(`Set your ${missing} in Manage Job Cards before creating a job card.`, {
+          type: "error",
+        });
+        setManageEstimatesOpen(true);
+        return;
+      }
+
+      if (prefix) setJobCardPrefix(prefix);
+    } catch {
+      showToast("Could not verify job card numbering. Use Manage Job Cards to set them.", {
+        type: "error",
+      });
+      setManageEstimatesOpen(true);
+      return;
+    }
+
     router.push({
       pathname: "/(shop-owner)/job-cards/add",
       params: { backTo: "/(shop-owner)/job-cards" },
@@ -1022,12 +1070,13 @@ export default function JobCardsPage() {
       scroll={false}
       right={
         <Pressable
-          style={styles.headerIconBtn}
+          style={styles.manageHeaderBtn}
           onPress={() => openManageEstimates?.()}
-          accessibilityLabel="Manage estimates"
+          accessibilityLabel="Manage job cards"
           hitSlop={8}
         >
-          <Ionicons name="settings-outline" size={22} color={colors.text} />
+          <Text style={styles.manageHeaderText}>Manage Job Cards</Text>
+          <Ionicons name="settings-outline" size={20} color={colors.text} />
         </Pressable>
       }
       floatingContent={
@@ -1330,12 +1379,12 @@ export default function JobCardsPage() {
         <Modal
           visible={jobCardViewer.open && jobCardViewer.row != null}
           transparent
-          animationType="fade"
+          animationType="slide"
           onRequestClose={closeJobCardViewer}
         >
-          <View style={styles.viewerBackdrop}>
+          <View style={styles.viewerRoot}>
             <Pressable style={styles.viewerBackdropPress} onPress={closeJobCardViewer} />
-            <View style={styles.viewerCard}>
+            <View style={styles.viewerSheet}>
               {jobCardViewer.row ? (
                 <ShopJobCardEstimateView
                   key={jobCardViewer.row.id}
@@ -1378,12 +1427,21 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     gap: spacing.sm,
   },
-  headerIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  manageHeaderBtn: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 6,
+    maxWidth: 168,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: radii.lg,
+    backgroundColor: colors.primaryMutedBg,
+  },
+  manageHeaderText: {
+    flexShrink: 1,
+    fontSize: fontSizes.xs,
+    fontWeight: "800",
+    color: colors.text,
   },
   sectionTabsScroll: {
     flexGrow: 0,
@@ -2020,24 +2078,19 @@ const styles = StyleSheet.create({
   },
   // addBtn styles removed: now using StackScreenFrame `floatingContent`
 
-  viewerBackdrop: {
+  viewerRoot: {
     flex: 1,
+    justifyContent: "flex-end",
     backgroundColor: "rgba(15, 23, 42, 0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.screenHorizontal,
   },
   viewerBackdropPress: {
     ...StyleSheet.absoluteFillObject,
   },
-  viewerCard: {
-    width: "100%",
-    height: "86%",
-    minHeight: 260,
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
+  viewerSheet: {
+    height: "94%",
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
     overflow: "hidden",
     ...shadows.card,
   },

@@ -20,7 +20,8 @@ import { colors, fontSizes, gradients, radii, spacing } from "@/constants/autoda
 import { useAuth } from "@/context/auth-provider";
 import { useBusinessProfileEditor } from "@/hooks/profile/use-business-profile-editor";
 import { usePersonalProfileEditor } from "@/hooks/profile/use-personal-profile-editor";
-import { updatePersonalProfile, updateWeeklyOpenHours } from "@/lib/autoshopowner-api";
+import { updatePersonalProfile } from "@/lib/autoshopowner-api";
+import { updateBusinessActiveStatus } from "@/lib/auto-shop-owner-api";
 import { fetchAndMergeShopOwnerPortal } from "@/lib/shop-owner-portal-bootstrap";
 import { useLogoutAction } from "@/hooks/use-logout-action";
 import { useOncePress } from "@/hooks/use-once-press";
@@ -30,20 +31,15 @@ import { useShopOwnerServices } from "@/hooks/use-shop-owner-services";
 import { API_BASE_URL, getJson, logApiRequest } from "@/lib/api";
 import { saveAutoShopOwnerProfile } from "@/lib/auth";
 import {
-  createDefaultPerDaySchedule,
   formatPerDayScheduleDisplay,
-  perDayOpenHoursFromSchedule,
   resolvePerDaySchedule,
-  serializePerDayOpenHoursForApi,
-  validatePerDaySchedule,
-  type PerDaySchedule,
 } from "@/lib/per-day-open-hours";
 import { getAutoShopOwnerProfile } from "@/lib/auth";
 import {
   defaultDialCallingCode,
   formatStoredNationalPhone,
 } from "@/lib/dial-countries";
-import { templatesForKind } from "@/lib/document-templates";
+import { resolveTemplateSlug, templatesForKind } from "@/lib/document-templates";
 import { localImageMultipartPart } from "@/lib/local-image-for-form";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import { SHOP_OWNER_HOME, navigateToAppHome } from "@/lib/shop-owner-navigation";
@@ -213,16 +209,13 @@ export default function ProfilePage() {
   const { showToast } = useToast();
   const [personalOpen, setPersonalOpen] = useState(false);
   const [businessOpen, setBusinessOpen] = useState(false);
-  const [activityOpen, setActivityOpen] = useState(false);
-  const [isActivityEditing, setIsActivityEditing] = useState(false);
-  const [activitySaving, setActivitySaving] = useState(false);
-  const [activitySchedule, setActivitySchedule] = useState<PerDaySchedule>(createDefaultPerDaySchedule);
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const [cityPickerTarget, setCityPickerTarget] = useState<"personal" | "business">("business");
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [personalSaving, setPersonalSaving] = useState(false);
   const [businessSaving, setBusinessSaving] = useState(false);
+  const [updatingBusinessActive, setUpdatingBusinessActive] = useState(false);
   const [serverData, setServerData] =
     useState<AutoShopOwnerProfileResponse["data"] | null>(null);
   const [serverProfile, setServerProfile] =
@@ -429,34 +422,24 @@ export default function ProfilePage() {
     () => formatPerDayScheduleDisplay(resolvedActivitySchedule),
     [resolvedActivitySchedule]
   );
-
-  useEffect(() => {
-    if (isActivityEditing) {
-      return;
-    }
-    setActivitySchedule(resolvedActivitySchedule);
-  }, [isActivityEditing, resolvedActivitySchedule]);
+  const isBusinessActive =
+    typeof businessProfile?.isBusinessActive === "boolean" ? businessProfile.isBusinessActive : null;
 
   const cancelPersonalEditRef = useRef(cancelPersonalEdit);
   cancelPersonalEditRef.current = cancelPersonalEdit;
   const cancelBusinessEditRef = useRef(cancelBusinessEdit);
   cancelBusinessEditRef.current = cancelBusinessEdit;
-  const resolvedActivityScheduleRef = useRef(resolvedActivitySchedule);
-  resolvedActivityScheduleRef.current = resolvedActivitySchedule;
 
   useFocusEffect(
     useCallback(() => {
       // Reset UI state whenever Profile regains focus (tabs keep screens mounted).
       setPersonalOpen(false);
       setBusinessOpen(false);
-      setActivityOpen(false);
       setLogoViewerUri(null);
 
       // Exit edit modes and revert any unsaved drafts.
       cancelPersonalEditRef.current();
       cancelBusinessEditRef.current();
-      setIsActivityEditing(false);
-      setActivitySchedule(resolvedActivityScheduleRef.current);
 
       return undefined;
     }, [])
@@ -555,6 +538,12 @@ export default function ProfilePage() {
       params: { backTo: "/(shop-owner)/profile", from: "profile" },
     });
   });
+  const openShopOpenHoursFromProfile = useOncePress(() => {
+    router.push({
+      pathname: "/(shop-owner)/shop-open-hours",
+      params: { backTo: "/(shop-owner)/profile", from: "profile" },
+    });
+  });
   const openInvoiceTemplatesFromProfile = useOncePress(() => {
     router.push({
       pathname: "/(shop-owner)/invoice-templates",
@@ -566,14 +555,26 @@ export default function ProfilePage() {
   });
   const invoiceTemplatePreference = useDocumentTemplatePreference("invoice");
   const savedInvoiceTemplateName = useMemo(() => {
-    if (!invoiceTemplatePreference.isActive) {
-      return "Not selected";
-    }
-    const template = templatesForKind("invoice").find(
-      (item) => item.id === invoiceTemplatePreference.savedId
+    const slug = resolveTemplateSlug(
+      templatesForKind("invoice"),
+      (businessProfile as { invoiceTemplateSlug?: string } | null | undefined)?.invoiceTemplateSlug ??
+        invoiceTemplatePreference.savedId
     );
+    const template = templatesForKind("invoice").find((item) => item.id === slug);
     return template?.name ?? "Not selected";
-  }, [invoiceTemplatePreference.isActive, invoiceTemplatePreference.savedId]);
+  }, [businessProfile, invoiceTemplatePreference.savedId]);
+
+  useEffect(() => {
+    const slug = (businessProfile as { invoiceTemplateSlug?: string } | null | undefined)
+      ?.invoiceTemplateSlug;
+    if (!slug) return;
+    const resolved = resolveTemplateSlug(templatesForKind("invoice"), slug);
+    if (resolved !== invoiceTemplatePreference.savedId) {
+      invoiceTemplatePreference.setSavedId(resolved);
+    }
+    // Sync from server slug only; avoid depending on the whole preference object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessProfile, invoiceTemplatePreference.savedId, invoiceTemplatePreference.setSavedId]);
   const viewableBusinessLogoUri = useMemo(
     () => normalizeMediaUrl(businessProfile?.businessLogo ?? null),
     [businessProfile?.businessLogo]
@@ -636,17 +637,11 @@ export default function ProfilePage() {
       showToast("Save or cancel business editing before switching.", { type: "error" });
       return;
     }
-    if (isActivityEditing && activityOpen) {
-      showToast("Save or cancel activity editing before switching.", { type: "error" });
-      return;
-    }
     setPersonalOpen((prev) => {
       const next = !prev;
       if (next) {
         setBusinessOpen(false);
-        setActivityOpen(false);
         setIsBusinessEditing(false);
-        setIsActivityEditing(false);
       }
       return next;
     });
@@ -660,47 +655,17 @@ export default function ProfilePage() {
       showToast("Save or cancel personal editing before switching.", { type: "error" });
       return;
     }
-    if (isActivityEditing && activityOpen) {
-      showToast("Save or cancel activity editing before switching.", { type: "error" });
-      return;
-    }
     setBusinessOpen((prev) => {
       const next = !prev;
       if (next) {
         setPersonalOpen(false);
-        setActivityOpen(false);
         setIsPersonalEditing(false);
-        setIsActivityEditing(false);
-      }
-      return next;
-    });
-  };
-  const handleToggleActivitySection = () => {
-    if (isActivityEditing && activityOpen) {
-      showToast("Save or cancel editing before closing.", { type: "error" });
-      return;
-    }
-    if (isPersonalEditing && personalOpen) {
-      showToast("Save or cancel personal editing before switching.", { type: "error" });
-      return;
-    }
-    if (isBusinessEditing && businessOpen) {
-      showToast("Save or cancel business editing before switching.", { type: "error" });
-      return;
-    }
-    setActivityOpen((prev) => {
-      const next = !prev;
-      if (next) {
-        setPersonalOpen(false);
-        setBusinessOpen(false);
-        setIsPersonalEditing(false);
-        setIsBusinessEditing(false);
       }
       return next;
     });
   };
   const handleStartPersonalEdit = () => {
-    if (isBusinessEditing || isActivityEditing) {
+    if (isBusinessEditing) {
       showToast("Finish other editing first.", { type: "error" });
       return;
     }
@@ -712,7 +677,7 @@ export default function ProfilePage() {
     cancelPersonalEdit();
   };
   const handleStartBusinessEdit = () => {
-    if (isPersonalEditing || isActivityEditing) {
+    if (isPersonalEditing) {
       showToast("Finish other editing first.", { type: "error" });
       return;
     }
@@ -723,20 +688,57 @@ export default function ProfilePage() {
   const handleCancelBusinessEdit = () => {
     cancelBusinessEdit();
   };
-  const handleStartActivityEdit = () => {
-    if (isPersonalEditing || isBusinessEditing) {
-      showToast("Finish other editing first.", { type: "error" });
-      return;
-    }
-    setActivityOpen(true);
-    setPersonalOpen(false);
-    setBusinessOpen(false);
-    setIsActivityEditing(true);
-  };
-  const handleCancelActivityEdit = () => {
-    setActivitySchedule(resolvedActivitySchedule);
-    setIsActivityEditing(false);
-  };
+
+  const handleBusinessActiveChange = useCallback(
+    async (next: boolean) => {
+      if (!token) {
+        showToast("Please log in again.", { type: "error" });
+        return false;
+      }
+      if (updatingBusinessActive) {
+        return false;
+      }
+      setUpdatingBusinessActive(true);
+      setServerData((prev) => {
+        if (!prev?.businessProfile) {
+          return prev;
+        }
+        return {
+          ...prev,
+          businessProfile: { ...prev.businessProfile, isBusinessActive: next },
+        };
+      });
+      try {
+        const res = await updateBusinessActiveStatus(token, next);
+        if (
+          !res.ok ||
+          (res.data &&
+            typeof res.data === "object" &&
+            "success" in res.data &&
+            (res.data as { success?: boolean }).success === false)
+        ) {
+          const msg =
+            res.data && typeof res.data === "object" && "message" in res.data
+              ? String((res.data as { message?: string }).message ?? "")
+              : "";
+          showToast(msg || "Could not update shop status.", { type: "error" });
+          await loadProfileFromStore();
+          return false;
+        }
+        showToast(next ? "Shop marked as open." : "Shop marked as closed.", { type: "success" });
+        await refreshSession();
+        await loadProfileFromStore();
+        return true;
+      } catch {
+        showToast("Network error while updating shop status.", { type: "error" });
+        await loadProfileFromStore();
+        return false;
+      } finally {
+        setUpdatingBusinessActive(false);
+      }
+    },
+    [loadProfileFromStore, refreshSession, showToast, token, updatingBusinessActive]
+  );
 
   async function handleRefreshProfile() {
     setRefreshing(true);
@@ -1019,80 +1021,6 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleSaveActivitySchedule() {
-    if (!token) {
-      showToast("You are not authenticated. Please log in again.", { type: "error" });
-      return;
-    }
-    const scheduleError = validatePerDaySchedule(activitySchedule);
-    if (scheduleError) {
-      showToast(scheduleError, { type: "error" });
-      return;
-    }
-    const nextPerDayOpenHours = perDayOpenHoursFromSchedule(activitySchedule);
-    const nextPerDayOpenHoursJson = serializePerDayOpenHoursForApi(activitySchedule);
-
-    setActivityOpen(true);
-    setIsActivityEditing(false);
-    setServerData((prev) => {
-      if (!prev?.businessProfile) {
-        return prev;
-      }
-      return {
-        ...prev,
-        businessProfile: {
-          ...prev.businessProfile,
-          perDayOpenHours: nextPerDayOpenHours,
-        },
-      };
-    });
-
-    setActivitySaving(true);
-    try {
-      const response = await updateWeeklyOpenHours(
-        token,
-        nextPerDayOpenHours.map((entry) => ({
-          day: entry.day,
-          open: entry.open,
-          close: entry.close,
-          isClosed: entry.isClosed,
-        }))
-      );
-      const payload = response.data;
-      if (
-        !response.ok ||
-        (payload && typeof payload === "object" && "success" in payload && payload.success === false)
-      ) {
-        const message =
-          payload && typeof payload === "object" && "message" in payload
-            ? String((payload as { message?: string }).message ?? "")
-            : "";
-        showToast(message || "Failed to update open hours.", { type: "error" });
-        await loadProfileFromStore();
-        return;
-      }
-
-      showToast(
-        (payload && typeof payload === "object" && "message" in payload
-          ? String((payload as { message?: string }).message ?? "")
-          : "") || "Open hours updated successfully.",
-        { type: "success" }
-      );
-      await refreshSession();
-      const portal = await fetchAndMergeShopOwnerPortal(token);
-      if (portal.profile) {
-        await saveAutoShopOwnerProfile(portal.profile);
-        setServerData(portal.profile.data);
-        setServerProfile(portal.profile.data.userProfile);
-      }
-    } catch {
-      showToast("Network error while updating open hours.", { type: "error" });
-      await loadProfileFromStore();
-    } finally {
-      setActivitySaving(false);
-    }
-  }
-
   return (
     <>
       <TabScreenFrame
@@ -1183,16 +1111,11 @@ export default function ProfilePage() {
                   />
 
                   <ActivityScheduleCard
-                    expanded={activityOpen}
-                    editing={isActivityEditing}
-                    saving={activitySaving}
-                    onToggle={handleToggleActivitySection}
-                    onEdit={handleStartActivityEdit}
-                    onSave={handleSaveActivitySchedule}
-                    onCancel={handleCancelActivityEdit}
+                    isBusinessActive={isBusinessActive}
+                    updatingBusinessActive={updatingBusinessActive}
+                    onBusinessActiveChange={handleBusinessActiveChange}
                     scheduleDisplay={activityScheduleDisplay}
-                    editSchedule={activitySchedule}
-                    setEditSchedule={setActivitySchedule}
+                    onManagePress={() => openShopOpenHoursFromProfile?.()}
                   />
 
                   <CarCompaniesCard

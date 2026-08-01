@@ -79,6 +79,8 @@ export default function RootLayout() {
                   // iOS back-swipe uses the left edge; drawer swipe interferes with it.
                   // Keep the sidebar accessible via the menu button instead.
                   swipeEnabled: Platform.OS !== "ios",
+                  // Limit drawer open to a thin left edge so horizontal tables/lists can scroll.
+                  swipeEdgeWidth: 28,
                 }}
               >
                 <Drawer.Screen name="index" options={{ swipeEnabled: false, drawerItemStyle: { display: "none" } }} />

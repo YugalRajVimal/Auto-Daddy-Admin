@@ -18,6 +18,7 @@ import {
   scheduleServiceListHref,
   type CarOwnerShopType,
 } from "@/lib/car-owner-shop-types";
+import { navigateToAppHome } from "@/lib/shop-owner-navigation";
 import type { CarOwnerAutoShopListItem } from "@/types/car-owner-auto-shops";
 import type { UserCity } from "@/types/user-cities";
 import { Ionicons } from "@expo/vector-icons";
@@ -815,6 +816,7 @@ export default function CarOwnerScheduleService() {
       headerExtension={headerTabsAndFilters}
       onRefresh={handleRefresh}
       refreshing={refreshing}
+      onBack={() => navigateToAppHome("/(car-owner)/(tabs)/home")}
     >
       <View style={styles.sectionTabs}>
         {([

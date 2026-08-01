@@ -1,4 +1,4 @@
-import { DocumentTemplatePanel } from "@/components/document-templates/document-template-panel";
+import { InvoiceDocumentTemplatePanel } from "@/components/document-templates/invoice-document-template-panel";
 import { StackScreenFrame } from "@/components/reusables";
 import { colors } from "@/constants/autodaddy";
 import { resolveShopOwnerBackTo } from "@/lib/shop-owner-navigation";
@@ -20,7 +20,7 @@ export default function InvoiceTemplatesPage() {
       headerGradient={[colors.tabBarBg, colors.tabBarBg, colors.tabBarBg]}
     >
       <View style={styles.root}>
-        <DocumentTemplatePanel kind="invoice" />
+        <InvoiceDocumentTemplatePanel />
       </View>
     </StackScreenFrame>
   );

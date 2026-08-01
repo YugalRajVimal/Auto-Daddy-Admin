@@ -9,8 +9,9 @@ import { colors } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import { useCarCompanyCatalog } from "@/hooks/use-car-company-catalog";
 import { getJson } from "@/lib/api";
-import { buildCarBrandLogoByName, resolveCarBrandLogoUri } from "@/lib/car-brand-logo";
+import { buildCarBrandLogoByName, resolveCarBrandLogoCandidates } from "@/lib/car-brand-logo";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
+import { navigateToAppHome } from "@/lib/shop-owner-navigation";
 import { putUserVehicleDisabled, userVehiclePutMessage } from "@/lib/user-vehicle-api";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -26,6 +27,8 @@ import {
   UIManager,
   View,
 } from "react-native";
+
+const CAR_OWNER_HOME = "/(car-owner)/(tabs)/home";
 
 export default function CarOwnerMyVehicles() {
   const { token } = useAuth();
@@ -168,6 +171,7 @@ export default function CarOwnerMyVehicles() {
       contentContainerStyle={styles.screenContent}
       onRefresh={handleRefresh}
       refreshing={refreshing}
+      onBack={() => navigateToAppHome(CAR_OWNER_HOME)}
     >
       <MyVehiclesHero subtitle={subtitle} onRefresh={load} onAddVehicle={pushAddVehicle} />
 
@@ -210,7 +214,7 @@ export default function CarOwnerMyVehicles() {
                 onToggle={() => toggle(v.id)}
                 onOpenViewer={openViewer}
                 busyVehicleId={busyVehicleId}
-                brandLogoUri={resolveCarBrandLogoUri(v.make?.name, brandLogoByMake)}
+                brandLogoUris={resolveCarBrandLogoCandidates(v.make?.name, brandLogoByMake)}
                 onRequestDisable={() => requestDisableVehicle(v.id)}
                 onEdit={() => {
                   router.push({

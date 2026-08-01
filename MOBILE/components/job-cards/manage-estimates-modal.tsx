@@ -77,10 +77,10 @@ export function ManageEstimatesModal({ visible, authToken, onClose, onSaved }: P
         setCode(prefix);
         setNumber(fromNext.nextNumber || "1");
         if (!prefixRes.ok && !nextRes.ok) {
-          showToast("Could not load estimate numbering.", { type: "error" });
+          showToast("Could not load job card numbering.", { type: "error" });
         }
       } catch {
-        if (!cancelled) showToast("Could not load estimate numbering.", { type: "error" });
+        if (!cancelled) showToast("Could not load job card numbering.", { type: "error" });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -93,17 +93,17 @@ export function ManageEstimatesModal({ visible, authToken, onClose, onSaved }: P
 
   const handleUpdate = async () => {
     if (!authToken) {
-      showToast("Sign in to update estimate numbering.", { type: "error" });
+      showToast("Sign in to update job card numbering.", { type: "error" });
       return;
     }
     const trimmedNumber = number.trim();
     if (!trimmedNumber) {
-      showToast("Estimate Number is required.", { type: "error" });
+      showToast("Job Card Number is required.", { type: "error" });
       return;
     }
     const newSeq = Number.parseInt(trimmedNumber, 10);
     if (!Number.isInteger(newSeq) || newSeq < 1) {
-      showToast("Estimate Number must be a positive whole number.", { type: "error" });
+      showToast("Job Card Number must be a positive whole number.", { type: "error" });
       return;
     }
 
@@ -122,19 +122,19 @@ export function ManageEstimatesModal({ visible, authToken, onClose, onSaved }: P
       ]);
 
       if (!prefixRes.ok) {
-        showToast(apiMessageFromEnvelope(prefixRes.data) || "Could not update estimate code.", {
+        showToast(apiMessageFromEnvelope(prefixRes.data) || "Could not update job card code.", {
           type: "error",
         });
         return;
       }
       if (!seqRes.ok) {
-        showToast(apiMessageFromEnvelope(seqRes.data) || "Could not update estimate number.", {
+        showToast(apiMessageFromEnvelope(seqRes.data) || "Could not update job card number.", {
           type: "error",
         });
         return;
       }
 
-      showToast("Estimate settings updated.", { type: "success" });
+      showToast("Job Card settings updated.", { type: "success" });
       onSaved?.(prefix);
       onClose();
     } finally {
@@ -152,12 +152,12 @@ export function ManageEstimatesModal({ visible, authToken, onClose, onSaved }: P
             <View style={styles.titleIcon}>
               <Ionicons name="settings-outline" size={20} color={colors.successDark} />
             </View>
-            <Text style={styles.title}>Manage Estimate</Text>
+            <Text style={styles.title}>Manage Job Cards</Text>
             <Pressable
               onPress={onClose}
               disabled={saving}
               style={styles.closeBtn}
-              accessibilityLabel="Close manage estimate"
+              accessibilityLabel="Close manage job cards"
               hitSlop={8}
             >
               <Ionicons name="close" size={20} color={colors.textMuted} />
@@ -171,19 +171,19 @@ export function ManageEstimatesModal({ visible, authToken, onClose, onSaved }: P
             </View>
           ) : (
             <>
-              <Text style={styles.fieldLabel}>Estimate Code</Text>
+              <Text style={styles.fieldLabel}>Job Card Code</Text>
               <TextInput
                 value={code}
                 onChangeText={setCode}
                 editable={!saving}
                 autoCapitalize="characters"
                 autoCorrect={false}
-                placeholder="e.g. EST"
+                placeholder="e.g. JC"
                 placeholderTextColor={colors.textLight}
                 style={styles.input}
               />
 
-              <Text style={styles.fieldLabel}>Estimate Number</Text>
+              <Text style={styles.fieldLabel}>Job Card Number</Text>
               <TextInput
                 value={number}
                 onChangeText={setNumber}

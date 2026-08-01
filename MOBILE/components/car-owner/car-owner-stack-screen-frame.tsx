@@ -1,15 +1,17 @@
 import { Screen, useToast } from "@/components/reusables";
 import { colors, fontSizes, spacing, stackHeaderKeyboardOffset } from "@/constants/autodaddy";
 import { androidRefreshScrollProps } from "@/lib/refresh-scroll-props";
-import { navigateToAppHome } from "@/lib/shop-owner-navigation";
+import { navigateBackTarget } from "@/lib/shop-owner-navigation";
 import { Ionicons } from "@expo/vector-icons";
 import { DrawerActions, useFocusEffect } from "@react-navigation/native";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { useLocalSearchParams, useNavigation } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
 import { useCallback } from "react";
 import { BackHandler, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const CAR_OWNER_HOME = "/(car-owner)/(tabs)/home";
 
 type Props = {
   title: string;
@@ -58,16 +60,10 @@ export function CarOwnerStackScreenFrame({
       onBack();
       return;
     }
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-      return;
-    }
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-    navigateToAppHome(resolvedBackTo ?? "/(car-owner)/(tabs)/home");
-  }, [navigation, onBack, resolvedBackTo]);
+    // Prefer popping history (router.back) over replace — replace duplicates list screens
+    // under the root Drawer and forces multiple top-bar backs to reach Home.
+    navigateBackTarget(resolvedBackTo, CAR_OWNER_HOME);
+  }, [onBack, resolvedBackTo]);
 
   useFocusEffect(
     useCallback(() => {

@@ -5,13 +5,16 @@ import { VehicleImageViewerModal } from "@/components/car-owner/my-vehicles/vehi
 import { VehicleDocumentsAccordion } from "@/components/car-owner/vehicle-documents-accordion";
 import { LoadingProgress, useToast } from "@/components/reusables";
 import { colors, fontSizes, spacing, typography } from "@/constants/autodaddy";
+import { useAuth } from "@/context/auth-provider";
+import { useCarCompanyCatalog } from "@/hooks/use-car-company-catalog";
 import { useCarOwnerDocuments } from "@/hooks/use-car-owner-documents";
+import { buildCarBrandLogoByName, resolveCarBrandLogoCandidates } from "@/lib/car-brand-logo";
 import type { VehicleDocumentFieldKey } from "@/lib/car-owner-documents";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutAnimation,
   Platform,
@@ -26,7 +29,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function Documents() {
+  const { token } = useAuth();
   const { showToast } = useToast();
+  const carCompanyCatalog = useCarCompanyCatalog(token);
+  const brandLogoByMake = useMemo(
+    () => buildCarBrandLogoByName(carCompanyCatalog.companies),
+    [carCompanyCatalog.companies]
+  );
   const {
     sections,
     loading,
@@ -173,6 +182,7 @@ export default function Documents() {
                 onOpenViewer={openViewer}
                 busyField={busyField}
                 mutating={mutating}
+                brandLogoUris={resolveCarBrandLogoCandidates(section.makeName, brandLogoByMake)}
                 onUploadField={(field) => void handleUploadField(section.vehicleId, field)}
               />
             ))}

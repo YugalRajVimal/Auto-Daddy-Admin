@@ -14,14 +14,16 @@ import type { MyCustomer } from "@/types/auto-shop-owner-endpoints";
 import type { ShopDeal } from "@/types/auto-shop-owner-endpoints";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type ViewToken,
 } from "react-native";
 
 function safeDateLabel(iso: string | undefined): string {
@@ -95,9 +97,20 @@ function dealStatusLabel(d: ShopDeal): string {
   return d.dealEnabled === false ? "Non-Active" : "Active";
 }
 
-function dealImageUri(d: ShopDeal): string | null {
-  const raw = d.dealImage?.trim() || d.productImage?.trim() || null;
-  return normalizeMediaUrl(raw);
+/** Prefer gallery when present (list APIs often omit singular `dealImage`). */
+function dealImageUris(d: ShopDeal): string[] {
+  const out: string[] = [];
+  const push = (raw?: string | null) => {
+    const abs = normalizeMediaUrl(raw?.trim() || null);
+    if (abs && !out.includes(abs)) out.push(abs);
+  };
+  if (Array.isArray(d.dealImages) && d.dealImages.length > 0) {
+    for (const u of d.dealImages) push(u);
+  } else {
+    push(d.dealImage);
+    push(d.productImage);
+  }
+  return out;
 }
 
 function CornerRibbon({ label, tone }: { label: string; tone: "active" | "ended" | "sold" }) {
@@ -133,6 +146,91 @@ function DealCollapsedThumb({
   );
 }
 
+function DealImageCarousel({
+  uris,
+  aspectRatio,
+  placeholderIcon,
+}: {
+  uris: string[];
+  aspectRatio: number;
+  placeholderIcon: keyof typeof Ionicons.glyphMap;
+}) {
+  const [slideWidth, setSlideWidth] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 60 }).current;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const first = viewableItems[0];
+      if (first?.index != null) setActiveIndex(first.index);
+    }
+  ).current;
+
+  const renderItem = useCallback(
+    ({ item }: { item: string }) => (
+      <View style={[styles.cardImageFrame, { width: slideWidth, aspectRatio }]}>
+        <Image source={{ uri: item }} style={styles.cardImage} contentFit="cover" transition={180} />
+      </View>
+    ),
+    [aspectRatio, slideWidth]
+  );
+
+  if (uris.length === 0) {
+    return (
+      <View style={[styles.cardImageFallback, { aspectRatio }]}>
+        <Ionicons name={placeholderIcon} size={48} color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (uris.length === 1) {
+    return (
+      <View style={[styles.cardImageFrame, { aspectRatio }]}>
+        <Image source={{ uri: uris[0] }} style={styles.cardImage} contentFit="cover" transition={180} />
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={styles.carouselWrap}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 0 && Math.abs(w - slideWidth) > 1) setSlideWidth(w);
+      }}
+    >
+      {slideWidth > 0 ? (
+        <FlatList
+          data={uris}
+          keyExtractor={(uri, index) => `${uri}-${index}`}
+          renderItem={renderItem}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          nestedScrollEnabled
+          decelerationRate="fast"
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          getItemLayout={(_, index) => ({
+            length: slideWidth,
+            offset: slideWidth * index,
+            index,
+          })}
+        />
+      ) : (
+        <View style={[styles.cardImageFrame, { aspectRatio }]}>
+          <Image source={{ uri: uris[0] }} style={styles.cardImage} contentFit="cover" transition={180} />
+        </View>
+      )}
+      <View style={styles.carouselDots} pointerEvents="none">
+        {uris.map((_, i) => (
+          <View key={`dot-${i}`} style={[styles.carouselDot, i === activeIndex && styles.carouselDotActive]} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export function ShopOwnerDealCard({
   deal: d,
   expanded,
@@ -163,7 +261,8 @@ export function ShopOwnerDealCard({
   const { meta } = useAuth();
   const [customerListOpen, setCustomerListOpen] = useState(false);
   const kind = dealModeOf(d);
-  const imageUri = dealImageUri(d);
+  const imageUris = useMemo(() => dealImageUris(d), [d]);
+  const imageUri = imageUris[0] ?? null;
   const description = d.description?.trim();
   const sold = isDealSold(d);
   const status = dealStatusLabel(d);
@@ -267,15 +366,7 @@ export function ShopOwnerDealCard({
 
       <View style={styles.cardImageSection}>
         <CornerRibbon label={status} tone={ribbonTone} />
-        {imageUri ? (
-          <View style={[styles.cardImageFrame, { aspectRatio: imageAspect }]}>
-            <Image source={{ uri: imageUri }} style={styles.cardImage} contentFit="cover" transition={180} />
-          </View>
-        ) : (
-          <View style={[styles.cardImageFallback, { aspectRatio: imageAspect }]}>
-            <Ionicons name={placeholderIcon} size={48} color={colors.primary} />
-          </View>
-        )}
+        <DealImageCarousel uris={imageUris} aspectRatio={imageAspect} placeholderIcon={placeholderIcon} />
       </View>
 
       <View style={styles.cardBody}>
@@ -549,6 +640,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.bgAlt,
     borderRadius: radii.lg,
+  },
+  carouselWrap: {
+    width: "100%",
+    position: "relative",
+  },
+  carouselDots: {
+    position: "absolute",
+    bottom: spacing.sm,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  carouselDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.55)",
+  },
+  carouselDotActive: {
+    backgroundColor: colors.white,
+    width: 16,
   },
   ribbonWrap: {
     position: "absolute",

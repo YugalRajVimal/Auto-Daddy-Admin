@@ -69,6 +69,8 @@ export interface AutoShopOwnerBusinessProfile {
   myServices: BusinessService[];
   subscriptions?: BusinessSubscription[];
   websiteTemplateId?: string;
+  invoiceTemplateSlug?: string;
+  jobCardTemplateSlug?: string;
   domainName?: string;
   createdAt: string;
   updatedAt: string;

@@ -2,11 +2,46 @@ import { styles } from "@/components/car-owner/my-vehicles/my-vehicles-screen-st
 import { colors, fontSizes } from "@/constants/autodaddy";
 import type { VehicleDocumentFieldKey, VehicleDocumentFieldRow, VehicleDocumentsSection } from "@/lib/car-owner-documents";
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, type ImageStyle } from "expo-image";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp } from "react-native";
+
+/** Brand logo candidates with onError fallback (broken catalog uploads). */
+function BrandLogoImage({
+  uris,
+  style,
+  iconSize = 28,
+}: {
+  uris: string[];
+  style?: StyleProp<ImageStyle>;
+  iconSize?: number;
+}) {
+  const key = uris.join("|");
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [key]);
+
+  const uri = uris[index] ?? null;
+  if (!uri) {
+    return <Ionicons name="car-sport-outline" size={iconSize} color={colors.textLight} />;
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={style}
+      contentFit="contain"
+      transition={120}
+      onError={() => setIndex((i) => (i + 1 < uris.length ? i + 1 : uris.length))}
+    />
+  );
+}
 
 function VehicleDocumentsHeader({
   thumbUri,
+  brandLogoUris,
   plate,
   subtitle,
   expanded,
@@ -14,25 +49,29 @@ function VehicleDocumentsHeader({
   onThumbPress,
 }: {
   thumbUri: string | null;
+  brandLogoUris?: string[];
   plate: string;
   subtitle: string;
   expanded: boolean;
   onToggle: () => void;
   onThumbPress?: () => void;
 }) {
+  const logoUris = brandLogoUris ?? [];
+  const hasVehiclePhoto = Boolean(thumbUri);
+
   const thumb = (
     <View style={styles.collapsedThumb}>
-      {thumbUri ? (
-        <Image source={{ uri: thumbUri }} style={styles.collapsedThumbImg} contentFit="cover" transition={120} />
+      {hasVehiclePhoto ? (
+        <Image source={{ uri: thumbUri! }} style={styles.collapsedThumbImg} contentFit="cover" transition={120} />
       ) : (
-        <Ionicons name="car-sport-outline" size={28} color={colors.textLight} />
+        <BrandLogoImage uris={logoUris} style={styles.collapsedThumbBrandImg} iconSize={28} />
       )}
     </View>
   );
 
   return (
     <View style={styles.collapsedRow}>
-      {onThumbPress && thumbUri ? (
+      {onThumbPress && hasVehiclePhoto ? (
         <Pressable onPress={onThumbPress} accessibilityRole="imagebutton" accessibilityLabel="View vehicle photo">
           {thumb}
         </Pressable>
@@ -139,6 +178,7 @@ export function VehicleDocumentsAccordion({
   busyField,
   mutating,
   onUploadField,
+  brandLogoUris,
 }: {
   section: VehicleDocumentsSection;
   expanded: boolean;
@@ -147,8 +187,10 @@ export function VehicleDocumentsAccordion({
   busyField: string | null;
   mutating: boolean;
   onUploadField: (field: VehicleDocumentFieldKey) => void;
+  brandLogoUris?: string[];
 }) {
   const plate = section.title.trim() || "—";
+  const logoUris = useMemo(() => brandLogoUris ?? [], [brandLogoUris]);
   const thumbPress = section.thumbUri
     ? () => onOpenViewer("Vehicle photo", [section.thumbUri])
     : undefined;
@@ -158,6 +200,7 @@ export function VehicleDocumentsAccordion({
       <View style={styles.vehicleCard}>
         <VehicleDocumentsHeader
           thumbUri={section.thumbUri}
+          brandLogoUris={logoUris}
           plate={plate}
           subtitle=""
           expanded={false}
@@ -172,6 +215,7 @@ export function VehicleDocumentsAccordion({
     <View style={styles.vehicleCard}>
       <VehicleDocumentsHeader
         thumbUri={section.thumbUri}
+        brandLogoUris={logoUris}
         plate={plate}
         subtitle={section.subtitle}
         expanded
@@ -196,7 +240,6 @@ export function VehicleDocumentsAccordion({
           })}
         </View>
       </View>
-
     </View>
   );
 }

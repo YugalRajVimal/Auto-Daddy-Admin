@@ -410,7 +410,7 @@ export default function ShopJobCardsPage() {
     () => (
       <div className={`mt-4 ${shopSidebarButtonStackClass}`}>
         <ShopSidebarButton
-          label="Manage Estimates"
+          label="Manage Job Cards"
           onClick={() => setManageEstimatesOpen(true)}
         />
       </div>
@@ -433,7 +433,7 @@ export default function ShopJobCardsPage() {
           toast.error(
             apiMessageFromEnvelope(prefixRes.data) ||
               apiMessageFromEnvelope(nextRes.data) ||
-              "Could not load estimate numbering.",
+              "Could not load job card numbering.",
           );
           return;
         }
@@ -449,7 +449,7 @@ export default function ShopJobCardsPage() {
         });
         if (prefix) setJobCardPrefix(prefix);
       } catch {
-        if (!cancelled) toast.error("Could not load estimate numbering.");
+        if (!cancelled) toast.error("Could not load job card numbering.");
       } finally {
         if (!cancelled) setEstimatePrefixLoading(false);
       }
@@ -461,7 +461,7 @@ export default function ShopJobCardsPage() {
 
   const saveEstimatePrefix = async (values: NumberingValues): Promise<boolean> => {
     if (!token) {
-      toast.error("Sign in to update estimate numbering.");
+      toast.error("Sign in to update job card numbering.");
       return false;
     }
     const businessProfileId = (business?._id ?? business?.id ?? "").trim();
@@ -472,7 +472,7 @@ export default function ShopJobCardsPage() {
     const prefix = values.code.trim();
     const newSeq = Number.parseInt(values.number.trim(), 10);
     if (!Number.isInteger(newSeq) || newSeq < 1) {
-      toast.error("Estimate Number must be a positive whole number.");
+      toast.error("Job Card Number must be a positive whole number.");
       return false;
     }
 
@@ -481,11 +481,11 @@ export default function ShopJobCardsPage() {
       updateAutoshopJobCardSeq(token, { businessProfileId, newSeq }),
     ]);
     if (!prefixRes.ok) {
-      toast.error(apiMessageFromEnvelope(prefixRes.data) || "Could not update estimate code.");
+      toast.error(apiMessageFromEnvelope(prefixRes.data) || "Could not update job card code.");
       return false;
     }
     if (!seqRes.ok) {
-      toast.error(apiMessageFromEnvelope(seqRes.data) || "Could not update estimate number.");
+      toast.error(apiMessageFromEnvelope(seqRes.data) || "Could not update job card number.");
       return false;
     }
 
@@ -737,7 +737,7 @@ export default function ShopJobCardsPage() {
               ? "job card prefix"
               : "job card number";
         toast.error(
-          `Set your ${missing} in Manage Estimates before creating a job card.`,
+          `Set your ${missing} in Manage Job Cards before creating a job card.`,
         );
         setManageEstimatesOpen(true);
         return;
@@ -746,7 +746,7 @@ export default function ShopJobCardsPage() {
       setJobCardPrefix(prefix);
       setEstimateNumbering({ code: prefix, number: nextNumber });
     } catch {
-      toast.error("Could not verify estimate numbering. Use Manage Estimates to set them.");
+      toast.error("Could not verify job card numbering. Use Manage Job Cards to set them.");
       setManageEstimatesOpen(true);
       return;
     }

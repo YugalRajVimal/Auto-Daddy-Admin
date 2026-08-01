@@ -1,5 +1,5 @@
 import { LoadingProgress, useToast } from "@/components/reusables";
-import { colors, fontSizes, radii, shadows, spacing } from "@/constants/autodaddy";
+import { colors, fontSizes, radii, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
 import {
   fetchInvoicePrefix,
@@ -52,11 +52,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { A4_PAGE_PAD_PX, A4DocumentSheet } from "./a4-document-sheet";
 
 export type JobCardActionPreview = "invoice" | "cash";
 
@@ -102,6 +103,7 @@ export function ShopJobCardEstimateView({
 }: ShopJobCardEstimateViewProps) {
   const { token, meta } = useAuth();
   const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
   const countryCode = meta?.countryCode ?? null;
 
   const [job, setJob] = useState<Record<string, unknown> | null>(null);
@@ -375,15 +377,23 @@ export function ShopJobCardEstimateView({
 
   if (loading && !job) {
     return (
-      <View style={styles.root}>
-        {onBack ? (
+      <View style={[styles.root, styles.rootPlain, { paddingBottom: insets.bottom }]}>
+        <View style={styles.chrome}>
+          <View style={styles.handle} />
           <View style={styles.toolbar}>
-            <Pressable style={styles.outlineBtn} onPress={onBack} hitSlop={8}>
-              <Ionicons name="arrow-back" size={14} color={colors.text} />
-              <Text style={styles.outlineBtnText}>Back</Text>
-            </Pressable>
+            {onBack ? (
+              <Pressable style={styles.navBtn} onPress={onBack} hitSlop={8}>
+                <Ionicons name="arrow-back" size={20} color={colors.text} />
+              </Pressable>
+            ) : (
+              <View style={styles.navBtnSpacer} />
+            )}
+            <Text style={styles.toolbarTitle} numberOfLines={1}>
+              Preview
+            </Text>
+            <View style={styles.navBtnSpacer} />
           </View>
-        ) : null}
+        </View>
         <View style={styles.loadingBox}>
           <LoadingProgress />
         </View>
@@ -393,19 +403,27 @@ export function ShopJobCardEstimateView({
 
   if (error || !job) {
     return (
-      <View style={styles.root}>
-        {onBack ? (
+      <View style={[styles.root, styles.rootPlain, { paddingBottom: insets.bottom }]}>
+        <View style={styles.chrome}>
+          <View style={styles.handle} />
           <View style={styles.toolbar}>
-            <Pressable style={styles.outlineBtn} onPress={onBack} hitSlop={8}>
-              <Ionicons name="arrow-back" size={14} color={colors.text} />
-              <Text style={styles.outlineBtnText}>Back</Text>
-            </Pressable>
+            {onBack ? (
+              <Pressable style={styles.navBtn} onPress={onBack} hitSlop={8}>
+                <Ionicons name="arrow-back" size={20} color={colors.text} />
+              </Pressable>
+            ) : (
+              <View style={styles.navBtnSpacer} />
+            )}
+            <Text style={styles.toolbarTitle} numberOfLines={1}>
+              Preview
+            </Text>
+            <View style={styles.navBtnSpacer} />
           </View>
-        ) : null}
+        </View>
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error ?? "Could not load job card."}</Text>
-          <Pressable style={styles.outlineBtn} onPress={() => void load()}>
-            <Text style={styles.outlineBtnText}>Try again</Text>
+          <Pressable style={styles.secondaryBtn} onPress={() => void load()}>
+            <Text style={styles.secondaryBtnText}>Try again</Text>
           </Pressable>
         </View>
       </View>
@@ -413,95 +431,103 @@ export function ShopJobCardEstimateView({
   }
 
   return (
-    <View style={styles.root}>
-      <View style={styles.toolbar}>
-        {onBack ? (
-          <Pressable style={styles.outlineBtn} onPress={onBack} hitSlop={8}>
-            <Ionicons name="arrow-back" size={14} color={colors.text} />
-            <Text style={styles.outlineBtnText}>Back</Text>
-          </Pressable>
-        ) : (
-          <View />
-        )}
-        <View style={styles.toolbarActions}>
-          {showPaymentActions && invoicePreview && !alreadyInvoiced ? (
-            <>
-              <Pressable
-                style={styles.outlineBtn}
-                disabled={actionBusy}
-                onPress={exitActionPreview}
-              >
-                <Text style={styles.outlineBtnText}>Cancel Preview</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.accentBtn, (!canConvertToInvoice || actionBusy) && styles.btnDisabled]}
-                disabled={!canConvertToInvoice || actionBusy}
-                onPress={() => void handleConfirmConvertToInvoice()}
-              >
-                {actionBusy ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <Text style={styles.accentBtnText}>Confirm Convert</Text>
-                )}
-              </Pressable>
-            </>
-          ) : null}
-
-          {showPaymentActions && cashPreview ? (
-            <>
-              {onEdit ? (
-                <Pressable style={styles.outlineBtn} disabled={actionBusy} onPress={onEdit}>
-                  <Ionicons name="create-outline" size={14} color={colors.text} />
-                  <Text style={styles.outlineBtnText}>Edit</Text>
-                </Pressable>
-              ) : null}
-              <Pressable
-                style={[styles.accentBtn, (!canMarkPaidByCash || actionBusy) && styles.btnDisabled]}
-                disabled={!canMarkPaidByCash || actionBusy}
-                onPress={() => void handleConfirmPaidByCash()}
-              >
-                {actionBusy ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <Text style={styles.accentBtnText}>Confirm Paid by Cash</Text>
-                )}
-              </Pressable>
-            </>
-          ) : null}
-
-          {onEdit && canEdit && !actionPreview ? (
-            <Pressable style={styles.outlineBtn} onPress={onEdit}>
-              <Ionicons name="create-outline" size={14} color={colors.text} />
-              <Text style={styles.outlineBtnText}>Edit</Text>
+    <View style={[styles.root, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+      <View style={styles.chrome}>
+        <View style={styles.handle} />
+        <View style={styles.toolbar}>
+          {onBack ? (
+            <Pressable style={styles.navBtn} onPress={onBack} hitSlop={8}>
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
             </Pressable>
-          ) : null}
-
-          {alreadyInvoiced && showPaymentActions ? (
-            invoicePreview ? (
-              <Pressable style={styles.outlineBtn} onPress={exitActionPreview}>
-                <Text style={styles.outlineBtnText}>View Job Card</Text>
-              </Pressable>
-            ) : (
-              <Pressable style={styles.outlineBtn} onPress={() => setActionPreview("invoice")}>
-                <Text style={styles.outlineBtnText}>View Invoice</Text>
-              </Pressable>
-            )
-          ) : null}
+          ) : (
+            <View style={styles.navBtnSpacer} />
+          )}
+          <Text style={styles.toolbarTitle} numberOfLines={1}>
+            {documentHeading} Preview
+          </Text>
+          <View style={styles.navBtnSpacer} />
         </View>
+
+        {(showPaymentActions && invoicePreview && !alreadyInvoiced) ||
+        (showPaymentActions && cashPreview) ||
+        (onEdit && canEdit && !actionPreview) ||
+        (alreadyInvoiced && showPaymentActions) ? (
+          <View style={styles.actionRow}>
+            {showPaymentActions && invoicePreview && !alreadyInvoiced ? (
+              <>
+                <Pressable
+                  style={styles.secondaryBtn}
+                  disabled={actionBusy}
+                  onPress={exitActionPreview}
+                >
+                  <Text style={styles.secondaryBtnText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.primaryBtn, (!canConvertToInvoice || actionBusy) && styles.btnDisabled]}
+                  disabled={!canConvertToInvoice || actionBusy}
+                  onPress={() => void handleConfirmConvertToInvoice()}
+                >
+                  {actionBusy ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.primaryBtnText}>Confirm Convert</Text>
+                  )}
+                </Pressable>
+              </>
+            ) : null}
+
+            {showPaymentActions && cashPreview ? (
+              <>
+                {onEdit ? (
+                  <Pressable style={styles.secondaryBtn} disabled={actionBusy} onPress={onEdit}>
+                    <Ionicons name="create-outline" size={16} color={colors.text} />
+                    <Text style={styles.secondaryBtnText}>Edit</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  style={[styles.primaryBtn, (!canMarkPaidByCash || actionBusy) && styles.btnDisabled]}
+                  disabled={!canMarkPaidByCash || actionBusy}
+                  onPress={() => void handleConfirmPaidByCash()}
+                >
+                  {actionBusy ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.primaryBtnText}>Confirm Paid by Cash</Text>
+                  )}
+                </Pressable>
+              </>
+            ) : null}
+
+            {onEdit && canEdit && !actionPreview ? (
+              <Pressable style={styles.secondaryBtn} onPress={onEdit}>
+                <Ionicons name="create-outline" size={16} color={colors.text} />
+                <Text style={styles.secondaryBtnText}>Edit</Text>
+              </Pressable>
+            ) : null}
+
+            {alreadyInvoiced && showPaymentActions ? (
+              invoicePreview ? (
+                <Pressable style={styles.secondaryBtn} onPress={exitActionPreview}>
+                  <Text style={styles.secondaryBtnText}>View Job Card</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={styles.secondaryBtn} onPress={() => setActionPreview("invoice")}>
+                  <Text style={styles.secondaryBtnText}>View Invoice</Text>
+                </Pressable>
+              )
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={[styles.document, { borderColor: theme.border }]}>
-          {isInvoiceDocument ? (
-            <View style={[styles.docBar, { backgroundColor: theme.accent }]} />
-          ) : (
-            <View style={[styles.docWaveTop, { backgroundColor: theme.panel }]} />
-          )}
+      <A4DocumentSheet>
+        {isInvoiceDocument ? (
+          <View style={[styles.docBar, { backgroundColor: theme.accent }]} />
+        ) : (
+          <View style={[styles.docWaveTop, { backgroundColor: theme.panel }]} />
+        )}
 
+        <View style={styles.docBody}>
           <View style={styles.docHeader}>
             <View style={styles.docBrand}>
               {logoUrl ? (
@@ -572,7 +598,7 @@ export function ShopJobCardEstimateView({
             <View style={[styles.tableHead, { backgroundColor: theme.accent }]}>
               <Text style={[styles.th, styles.colSno, { color: theme.accentText }]}>S. No.</Text>
               <Text style={[styles.th, styles.colDesc, { color: theme.accentText }]}>Description</Text>
-              <Text style={[styles.th, styles.colUnit, { color: theme.accentText }]}>Unit</Text>
+              <Text style={[styles.th, styles.colUnit, { color: theme.accentText }]}>Unit Cost</Text>
               <Text style={[styles.th, styles.colQty, { color: theme.accentText }]}>Qty</Text>
               {showHst ? (
                 <Text style={[styles.th, styles.colHst, { color: theme.accentText }]}>HST</Text>
@@ -657,69 +683,99 @@ export function ShopJobCardEstimateView({
             </View>
           </View>
 
+          <View style={styles.footerSpacer} />
           <Text style={styles.footerNote}>{footerNote}</Text>
-
-          {isInvoiceDocument ? (
-            <View style={[styles.docBarBottom, { backgroundColor: theme.accent }]} />
-          ) : (
-            <View style={[styles.docWaveBottom, { backgroundColor: theme.panel }]} />
-          )}
         </View>
-      </ScrollView>
+
+        {isInvoiceDocument ? (
+          <View style={[styles.docBarBottom, { backgroundColor: theme.accent }]} />
+        ) : (
+          <View style={[styles.docWaveBottom, { backgroundColor: theme.panel }]} />
+        )}
+      </A4DocumentSheet>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, minHeight: 0 },
+  root: { flex: 1, minHeight: 0, backgroundColor: colors.bg },
+  rootPlain: { backgroundColor: colors.white },
+  chrome: {
+    backgroundColor: colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing.sm,
+  },
+  handle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
   toolbar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.white,
   },
-  toolbarActions: {
+  navBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.bgAlt,
+  },
+  navBtnSpacer: { width: 36, height: 36 },
+  toolbarTitle: {
     flex: 1,
+    minWidth: 0,
+    textAlign: "center",
+    fontSize: fontSizes.lg,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  actionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "flex-end",
-    gap: spacing.xs,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
   },
-  outlineBtn: {
+  secondaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     borderWidth: 1,
-    borderColor: "#9CA3AF",
-    borderRadius: radii.sm,
-    backgroundColor: colors.white,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
+    borderColor: colors.border,
+    borderRadius: radii.round,
+    backgroundColor: colors.bgAlt,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
   },
-  outlineBtnText: {
-    fontSize: fontSizes.xs,
+  secondaryBtnText: {
+    fontSize: fontSizes.sm,
     fontWeight: "800",
     color: colors.text,
   },
-  accentBtn: {
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: radii.sm,
-    backgroundColor: colors.white,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    minWidth: 108,
+  primaryBtn: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radii.round,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    minWidth: 120,
   },
-  accentBtnText: {
-    fontSize: fontSizes.xs,
+  primaryBtnText: {
+    fontSize: fontSizes.sm,
     fontWeight: "800",
-    color: colors.primary,
+    color: colors.white,
   },
   btnDisabled: { opacity: 0.55 },
   loadingBox: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl },
@@ -731,130 +787,134 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   errorText: { color: colors.danger, fontSize: fontSizes.md, fontWeight: "700", textAlign: "center" },
-  scroll: { flex: 1 },
-  scrollContent: { padding: spacing.md, paddingBottom: spacing.xxl },
-  document: {
-    borderWidth: 1,
-    borderRadius: radii.lg,
-    backgroundColor: colors.white,
-    overflow: "hidden",
-    ...shadows.soft,
+  docBody: {
+    flexGrow: 1,
+    paddingHorizontal: A4_PAGE_PAD_PX,
+    paddingBottom: A4_PAGE_PAD_PX,
   },
-  docBar: { height: 6 },
-  docBarBottom: { height: 6, marginTop: spacing.md },
-  docWaveTop: { height: 28 },
-  docWaveBottom: { height: 36, marginTop: spacing.lg },
+  docBar: { height: 8 },
+  docBarBottom: { height: 8 },
+  docWaveTop: { height: 72 },
+  docWaveBottom: { height: 120 },
+  footerSpacer: { flexGrow: 1, minHeight: spacing.xxl },
   docHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
+    gap: spacing.xl,
     paddingTop: spacing.md,
+    marginBottom: spacing.xl,
   },
-  docBrand: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm, minWidth: 0 },
-  logo: { width: 48, height: 48 },
+  docBrand: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md, minWidth: 0 },
+  logo: { width: 56, height: 56 },
   logoFallback: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
     borderRadius: radii.sm,
     alignItems: "center",
     justifyContent: "center",
   },
-  logoFallbackText: { fontSize: fontSizes.xs, fontWeight: "900" },
-  businessName: { flex: 1, fontSize: fontSizes.sm, fontWeight: "800" },
+  logoFallbackText: { fontSize: fontSizes.sm, fontWeight: "900" },
+  businessName: { flex: 1, fontSize: fontSizes.base, fontWeight: "800" },
   docHeading: {
-    fontSize: fontSizes.xl,
+    fontSize: 28,
     fontWeight: "900",
     textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
   },
   docMetaGrid: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    gap: spacing.md,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.xxl,
   },
-  docMetaLeft: { gap: 2 },
-  docMetaRight: { gap: 4 },
-  docBodyText: { fontSize: fontSizes.sm, fontWeight: "600", color: colors.text, lineHeight: 18 },
-  toBlock: { marginTop: spacing.sm, gap: 2 },
-  vehicleBlock: { marginTop: spacing.md, marginBottom: spacing.sm, gap: 2 },
-  toLabel: { fontSize: fontSizes.sm, fontWeight: "900", color: colors.text },
-  toName: { fontSize: fontSizes.sm, fontWeight: "800", color: colors.text },
+  docMetaLeft: { flex: 1, gap: 3, minWidth: 0 },
+  docMetaRight: { width: 280, gap: 6, flexShrink: 0 },
+  docBodyText: { fontSize: 13, fontWeight: "600", color: colors.text, lineHeight: 20 },
+  toBlock: { marginTop: spacing.md, gap: 2 },
+  vehicleBlock: { marginTop: spacing.lg, marginBottom: spacing.sm, gap: 2 },
+  toLabel: { fontSize: 13, fontWeight: "900", color: colors.text },
+  toName: { fontSize: 13, fontWeight: "800", color: colors.text },
   metaRow: { flexDirection: "row", gap: spacing.sm, alignItems: "baseline" },
   metaLabel: {
     width: 108,
     textAlign: "right",
-    fontSize: fontSizes.sm,
+    fontSize: 13,
     fontWeight: "700",
     color: colors.textMuted,
   },
-  metaValue: { flex: 1, fontSize: fontSizes.sm, fontWeight: "800", color: colors.text },
+  metaValue: { flex: 1, fontSize: 13, fontWeight: "800", color: colors.text },
   table: {
-    marginTop: spacing.md,
-    marginHorizontal: spacing.md,
+    marginTop: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
+    borderColor: "#D1D5DB",
     overflow: "hidden",
   },
   tableHead: { flexDirection: "row", alignItems: "center" },
   th: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    fontSize: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    fontSize: 12,
     fontWeight: "900",
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: "rgba(255,255,255,0.25)",
   },
   tableRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: "#D1D5DB",
   },
   td: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    fontSize: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    fontSize: 13,
     fontWeight: "600",
     color: colors.text,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: "#E5E7EB",
   },
   tdRight: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    fontSize: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    fontSize: 13,
     fontWeight: "700",
     color: colors.text,
     textAlign: "right",
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: "#E5E7EB",
   },
   tdCenter: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    fontSize: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    fontSize: 13,
     fontWeight: "700",
     color: colors.text,
     textAlign: "center",
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: "#E5E7EB",
   },
-  colSno: { width: 36 },
-  colDesc: { flex: 1.4, minWidth: 0 },
-  colUnit: { width: 52 },
-  colQty: { width: 34 },
-  colHst: { width: 40 },
-  colPrice: { width: 56 },
-  tableEmpty: { padding: spacing.md, alignItems: "center" },
-  tableEmptyText: { fontSize: fontSizes.sm, fontWeight: "600", color: colors.textMuted },
-  totalsBlock: { paddingTop: spacing.sm, paddingBottom: spacing.sm, gap: 4 },
+  colSno: { width: 64 },
+  colDesc: { flex: 1, minWidth: 0 },
+  colUnit: { width: 100 },
+  colQty: { width: 56 },
+  colHst: { width: 64 },
+  colPrice: { width: 100, borderRightWidth: 0 },
+  tableEmpty: { padding: spacing.xl, alignItems: "center" },
+  tableEmptyText: { fontSize: 13, fontWeight: "600", color: colors.textMuted },
+  totalsBlock: { paddingTop: spacing.md, paddingBottom: spacing.md, gap: 6 },
   totalRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
     alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.sm,
+    gap: spacing.xl,
+    paddingHorizontal: spacing.md,
   },
-  totalLabel: { fontSize: fontSizes.sm, fontWeight: "700", color: colors.text },
+  totalLabel: { fontSize: 13, fontWeight: "700", color: colors.text },
   totalValue: {
-    minWidth: 64,
+    minWidth: 88,
     textAlign: "right",
-    fontSize: fontSizes.sm,
+    fontSize: 13,
     fontWeight: "700",
     color: colors.text,
   },
@@ -864,16 +924,13 @@ const styles = StyleSheet.create({
   grandTotalRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: spacing.sm,
-  },
-  grandTotalLabel: { paddingHorizontal: spacing.sm, paddingVertical: 8 },
-  grandTotalLabelText: { fontSize: 11, fontWeight: "900" },
-  grandTotalValue: { paddingHorizontal: spacing.sm, paddingVertical: 8, minWidth: 64 },
-  grandTotalValueText: { fontSize: 11, fontWeight: "900", textAlign: "right" },
-  footerNote: {
     marginTop: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
+  },
+  grandTotalLabel: { paddingHorizontal: spacing.md, paddingVertical: 10 },
+  grandTotalLabelText: { fontSize: 13, fontWeight: "900" },
+  grandTotalValue: { paddingHorizontal: spacing.md, paddingVertical: 10, minWidth: 88 },
+  grandTotalValueText: { fontSize: 13, fontWeight: "900", textAlign: "right" },
+  footerNote: {
     textAlign: "right",
     fontSize: 10,
     fontWeight: "600",

@@ -1,20 +1,15 @@
 import { CarOwnerStackScreenFrame } from "@/components/car-owner/car-owner-stack-screen-frame";
 import {
-  AddVehicleExistingImageTile,
   AddVehicleField,
-  AddVehicleImageButton,
   AddVehicleSelectField,
 } from "@/components/car-owner/my-vehicles/add-vehicle-form-fields";
 import { addVehicleFormStyles as styles } from "@/components/car-owner/my-vehicles/add-vehicle-form-styles";
 import {
   type ApiEnvelope,
   buildAddVehicleFormData,
-  buildVehicleImageFormData,
   type EditableVehicle,
-  existingImageItems,
   extractEditableVehicleList,
   isValidYear,
-  type PickedImage,
   parseVehicleParam,
   textValue,
   trimMessage,
@@ -23,11 +18,11 @@ import {
 import { LoadingProgress, ModalKeyboardRoot, useToast } from "@/components/reusables";
 import { colors, shadows, spacing } from "@/constants/autodaddy";
 import { useAuth } from "@/context/auth-provider";
-import { getJson, postFormData, putFormData, putJson } from "@/lib/api";
+import { getJson, postFormData, putJson } from "@/lib/api";
+import { navigateBackTarget, navigateToAppHome } from "@/lib/shop-owner-navigation";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -48,6 +43,9 @@ type CarCompaniesResponse = {
   success?: boolean;
 };
 
+const VEHICLES_ROUTE = "/(car-owner)/my-vehicles";
+const CAR_OWNER_HOME = "/(car-owner)/(tabs)/home";
+
 export default function AddVehicle() {
   const params = useLocalSearchParams<{ mode?: string; vehicleId?: string; vehicle?: string }>();
   const vehicleFromParams = parseVehicleParam(typeof params.vehicle === "string" ? params.vehicle : undefined);
@@ -63,8 +61,6 @@ export default function AddVehicle() {
   const [year, setYear] = useState(textValue(vehicleFromParams?.year));
   const [odometerReading, setOdometerReading] = useState(textValue(vehicleFromParams?.odometerReading));
   const [dueOdometerReading, setDueOdometerReading] = useState(textValue(vehicleFromParams?.dueOdometerReading));
-  const [vehicleImage, setVehicleImage] = useState<PickedImage | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const [attemptedSave, setAttemptedSave] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -94,69 +90,9 @@ export default function AddVehicle() {
     setYear("");
     setOdometerReading("");
     setDueOdometerReading("");
-    setVehicleImage(null);
     setAttemptedSave(false);
     setPicker(null);
   }, []);
-
-  const existingImages = useMemo(() => existingImageItems(loadedVehicle), [loadedVehicle]);
-
-  const uploadVehicleImage = useCallback(
-    async (image: PickedImage, vehicleId: string): Promise<boolean> => {
-      if (!token) {
-        showToast("Please login again.", { type: "error" });
-        return false;
-      }
-      setUploadingImage(true);
-      try {
-        const body = buildVehicleImageFormData(image);
-        const res = await putFormData<ApiEnvelope>(`/api/user/vehicle/${vehicleId}`, body, { authToken: token });
-        const message = trimMessage(res.data);
-        if (!res.ok) {
-          showToast(message || "Could not upload vehicle photo.", { type: "error" });
-          return false;
-        }
-        showToast(message || "Vehicle photo updated.", { type: "success" });
-        return true;
-      } catch {
-        showToast("Network error while uploading photo.", { type: "error" });
-        return false;
-      } finally {
-        setUploadingImage(false);
-      }
-    },
-    [showToast, token]
-  );
-
-  const pickVehicleImage = useCallback(async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      showToast("Photo library permission is required.", { type: "error" });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.85,
-      allowsMultipleSelection: false,
-    });
-    if (result.canceled) return;
-    const asset = result.assets[0];
-    if (!asset?.uri) return;
-    const picked: PickedImage = { uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName };
-    if (isEditMode && editId) {
-      const ok = await uploadVehicleImage(picked, editId);
-      if (ok) {
-        setVehicleImage(null);
-        const res = await getJson<UserVehiclesEditableResponse>("/api/user/vehicles", { authToken: token! });
-        if (res.ok) {
-          const found = extractEditableVehicleList(res.data).find((vehicle) => vehicle.id === editId);
-          if (found) applyVehicle(found);
-        }
-      }
-      return;
-    }
-    setVehicleImage(picked);
-  }, [editId, isEditMode, token, uploadVehicleImage]);
 
   useFocusEffect(
     useCallback(() => {
@@ -256,9 +192,15 @@ export default function AddVehicle() {
     return Array.from(new Set(out)).sort((a, b) => Number(b) - Number(a));
   }, [selectedModel]);
 
-  function goBackToVehicles() {
-    router.replace("/(car-owner)/my-vehicles" as never);
-  }
+  const goBackToVehicles = useCallback(() => {
+    // Pop add/edit when it was pushed; avoid replace which duplicates the list screen.
+    navigateBackTarget(VEHICLES_ROUTE, CAR_OWNER_HOME);
+  }, []);
+
+  const goToVehiclesAfterSave = useCallback(() => {
+    // Land on the list without stacking (works from Home → Add and List → Add).
+    navigateToAppHome(VEHICLES_ROUTE);
+  }, []);
 
   async function submit() {
     setAttemptedSave(true);
@@ -306,7 +248,7 @@ export default function AddVehicle() {
           return;
         }
         showToast(message || "Vehicle updated.", { type: "success" });
-        goBackToVehicles();
+        goToVehiclesAfterSave();
         return;
       }
 
@@ -318,7 +260,6 @@ export default function AddVehicle() {
         year: nextYear,
         odometerReading: nextOdometer,
         dueOdometerReading: nextDueOdometer,
-        vehicleImage,
       });
       const res = await postFormData<ApiEnvelope>("/api/user/vehicle", body, { authToken: token });
       const message = trimMessage(res.data);
@@ -327,7 +268,7 @@ export default function AddVehicle() {
         return;
       }
       showToast(message || "Vehicle added.", { type: "success" });
-      goBackToVehicles();
+      goToVehiclesAfterSave();
     } catch {
       showToast("Network error while adding vehicle.", { type: "error" });
     } finally {
@@ -336,7 +277,11 @@ export default function AddVehicle() {
   }
 
   return (
-    <CarOwnerStackScreenFrame title={isEditMode ? "Edit Vehicle" : "Add Vehicle"} backTo="/(car-owner)/my-vehicles" onBack={goBackToVehicles}>
+    <CarOwnerStackScreenFrame
+      title={isEditMode ? "Edit Vehicle" : "Add Vehicle"}
+      backTo={VEHICLES_ROUTE}
+      onBack={goBackToVehicles}
+    >
       <View style={styles.content}>
         {vehicleHydrating ? (
           <View style={hydrateStyles.wrap}>
@@ -430,35 +375,9 @@ export default function AddVehicle() {
           />
         </View>
 
-        <View style={[styles.card, shadows.soft]}>
-          <Text style={styles.sectionTitle}>{isEditMode ? "Vehicle photo" : "Vehicle photo"}</Text>
-          {isEditMode && existingImages.length > 0 ? (
-            <View style={styles.existingImagesGrid}>
-              {existingImages.map((item) => (
-                <AddVehicleExistingImageTile key={`${item.label}-${item.uri}`} label={item.label} uri={item.uri} />
-              ))}
-            </View>
-          ) : isEditMode ? (
-            <Text style={styles.editPhotoHint}>No vehicle photo yet. Pick one below to upload.</Text>
-          ) : null}
-          <AddVehicleImageButton
-            title={isEditMode ? "Change vehicle photo" : "Vehicle image"}
-            image={vehicleImage}
-            onPress={() => void pickVehicleImage()}
-            onRemove={() => setVehicleImage(null)}
-            disabled={uploadingImage || submitting}
-          />
-          {isEditMode && uploadingImage ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <ActivityIndicator size="small" color={colors.successDark} />
-              <Text style={styles.editPhotoHint}>Uploading photo…</Text>
-            </View>
-          ) : null}
-        </View>
-
         <Pressable
-          style={[styles.saveBtn, (submitting || uploadingImage) && styles.saveBtnDisabled]}
-          disabled={submitting || uploadingImage}
+          style={[styles.saveBtn, submitting && styles.saveBtnDisabled]}
+          disabled={submitting}
           onPress={() => void submit()}
         >
           {submitting ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveText}>{isEditMode ? "Update Vehicle" : "Add Vehicle"}</Text>}

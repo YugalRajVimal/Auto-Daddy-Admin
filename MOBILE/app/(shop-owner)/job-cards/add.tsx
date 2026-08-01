@@ -4,6 +4,7 @@ import { colors, fontSizes, radii, shadows, spacing, typography } from "@/consta
 import { useAuth } from "@/context/auth-provider";
 import { customerKey } from "@/hooks/use-my-customers";
 import { useOncePress } from "@/hooks/use-once-press";
+import { useDisableDrawerSwipeOnFocus } from "@/hooks/use-disable-drawer-swipe";
 import { formatCurrencyAmount, getCurrencySign } from "@/lib/currency";
 import {
   findAutoshopServiceDealForSub,
@@ -21,18 +22,21 @@ import type { CustomerVehicle, MyCustomer } from "@/types/auto-shop-owner-endpoi
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
 } from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Phase = "customer" | "configure";
@@ -241,6 +245,112 @@ function vehiclesToShowUnderCustomer(c: MyCustomer, searchTrimmedLower: string):
 function parseAmount(s: string): number {
   const n = parseFloat(String(s).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
+}
+
+type ScrollFriendlyTextInputProps = {
+  value: string;
+  onChangeText: (text: string) => void;
+  editable?: boolean;
+  placeholder?: string;
+  placeholderTextColor?: string;
+  keyboardType?: "default" | "decimal-pad" | "number-pad";
+  style?: StyleProp<TextStyle>;
+  textAlign?: "left" | "right" | "center";
+};
+
+/** Detect taps without becoming a responder, so parent ScrollView can still pan. */
+function TapThroughView({
+  onPress,
+  style,
+  children,
+  disabled,
+}: {
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+  disabled?: boolean;
+}) {
+  const start = useRef({ x: 0, y: 0 });
+  return (
+    <View
+      style={style}
+      onTouchStart={(e) => {
+        start.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+      }}
+      onTouchEnd={(e) => {
+        if (disabled) return;
+        const dx = Math.abs(e.nativeEvent.pageX - start.current.x);
+        const dy = Math.abs(e.nativeEvent.pageY - start.current.y);
+        if (dx < 10 && dy < 10) onPress();
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+/**
+ * Android TextInputs (esp. textAlign right/center) steal horizontal pans from
+ * parent ScrollViews. Keep a plain Text until tapped so row swipes scroll.
+ */
+function ScrollFriendlyTextInput({
+  value,
+  onChangeText,
+  editable = true,
+  placeholder = "",
+  placeholderTextColor = colors.textLight,
+  keyboardType = "default",
+  style,
+  textAlign = "left",
+}: ScrollFriendlyTextInputProps) {
+  const ref = useRef<TextInput>(null);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) return;
+    const id = requestAnimationFrame(() => ref.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [focused]);
+
+  if (!focused) {
+    const showPlaceholder = !value;
+    const display = (
+      <Text
+        style={[style, { textAlign }, showPlaceholder && { color: placeholderTextColor }]}
+        numberOfLines={1}
+      >
+        {showPlaceholder ? placeholder : value}
+      </Text>
+    );
+
+    return (
+      <TapThroughView
+        style={styles.scrollFriendlyInputHit}
+        disabled={!editable}
+        onPress={() => setFocused(true)}
+      >
+        {display}
+      </TapThroughView>
+    );
+  }
+
+  return (
+    <TextInput
+      ref={ref}
+      style={[style, { textAlign }]}
+      value={value}
+      onChangeText={onChangeText}
+      editable={editable}
+      placeholder={placeholder}
+      placeholderTextColor={placeholderTextColor}
+      keyboardType={keyboardType}
+      multiline={false}
+      scrollEnabled={false}
+      textAlignVertical={Platform.OS === "android" ? "center" : "auto"}
+      underlineColorAndroid="transparent"
+      onBlur={() => setFocused(false)}
+    />
+  );
 }
 
 function subServiceKey(catId: string, subIdx: number): string {
@@ -567,6 +677,7 @@ export default function NewJobCardPage() {
   const insets = useSafeAreaInsets();
   const { token, meta } = useAuth();
   const { showToast } = useToast();
+  useDisableDrawerSwipeOnFocus();
   const isOwner = (meta?.role ?? "").toLowerCase() === "autoshopowner";
   const params = useLocalSearchParams<{ backTo?: string; mode?: string; jobCard?: string }>();
   const backTo =
@@ -1386,7 +1497,13 @@ export default function NewJobCardPage() {
                       expanded={expanded}
                       onToggle={() => setExpandedServiceCatId((prev) => (prev === cat.id ? null : cat.id))}
                     >
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <ScrollView
+                        horizontal
+                        nestedScrollEnabled
+                        directionalLockEnabled
+                        keyboardShouldPersistTaps="handled"
+                        showsHorizontalScrollIndicator={false}
+                      >
                         <View style={[styles.servicesListPanel, showOdoOut && styles.servicesListPanelWithOdo]}>
                           <View style={styles.servicesTableHead}>
                             <Text style={[styles.servicesTh, styles.colIncl]}>INCL</Text>
@@ -1412,8 +1529,9 @@ export default function NewJobCardPage() {
                               widthStyle: object
                             ) => (
                               <View style={[styles.priceWrap, widthStyle, !included && styles.priceWrapDisabled]}>
-                                <TextInput
+                                <ScrollFriendlyTextInput
                                   style={[styles.priceInput, !included && styles.priceInputDisabled]}
+                                  textAlign="right"
                                   keyboardType="decimal-pad"
                                   value={included ? value : ""}
                                   onChangeText={(t) => {
@@ -1423,23 +1541,18 @@ export default function NewJobCardPage() {
                                   editable={included}
                                   placeholder={field === "qtyStr" ? "1" : "0"}
                                   placeholderTextColor={colors.textLight}
-                                  multiline={false}
-                                  scrollEnabled={false}
-                                  textAlignVertical={Platform.OS === "android" ? "center" : "auto"}
-                                  underlineColorAndroid="transparent"
                                 />
                               </View>
                             );
                             return (
                               <View key={key} style={styles.servicesDataRow}>
                                 <View style={styles.colIncl}>
-                                  <Pressable
+                                  <TapThroughView
                                     style={[styles.inclBtn, included ? styles.inclBtnOn : styles.inclBtnOff]}
                                     onPress={() => toggleIncludeSubService(cat.id, subIdx)}
-                                    hitSlop={6}
                                   >
                                     <Text style={styles.inclBtnText}>{included ? "Y" : "X"}</Text>
-                                  </Pressable>
+                                  </TapThroughView>
                                 </View>
 
                                 <View style={styles.colService}>
@@ -1449,7 +1562,7 @@ export default function NewJobCardPage() {
                                 </View>
 
                                 <View style={styles.colDesc}>
-                                  <TextInput
+                                  <ScrollFriendlyTextInput
                                     style={[styles.subServiceDescInline, !included && styles.subServiceDescCellDisabled]}
                                     placeholder="Description"
                                     placeholderTextColor={colors.textLight}
@@ -1459,18 +1572,15 @@ export default function NewJobCardPage() {
                                       updateServiceLine(lineId, { desc: t });
                                     }}
                                     editable={included}
-                                    multiline={false}
-                                    scrollEnabled={false}
-                                    textAlignVertical={Platform.OS === "android" ? "center" : "auto"}
-                                    underlineColorAndroid="transparent"
                                   />
                                 </View>
 
                                 {showOdoOut ? (
                                   <View style={styles.colOdo}>
                                     <View style={[styles.priceWrap, styles.colOdo, !included && styles.priceWrapDisabled]}>
-                                      <TextInput
+                                      <ScrollFriendlyTextInput
                                         style={[styles.priceInput, !included && styles.priceInputDisabled]}
+                                        textAlign="right"
                                         keyboardType="number-pad"
                                         value={included ? line?.odoOutStr ?? "" : ""}
                                         onChangeText={(t) => {
@@ -1480,10 +1590,6 @@ export default function NewJobCardPage() {
                                         editable={included}
                                         placeholder={odoPlaceholder}
                                         placeholderTextColor={colors.textLight}
-                                        multiline={false}
-                                        scrollEnabled={false}
-                                        textAlignVertical={Platform.OS === "android" ? "center" : "auto"}
-                                        underlineColorAndroid="transparent"
                                       />
                                     </View>
                                   </View>
@@ -1844,6 +1950,12 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 4,
     minHeight: 32,
+  },
+  scrollFriendlyInputHit: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: "stretch",
+    justifyContent: "center",
   },
   colService: { width: 72, justifyContent: "center" },
   colDesc: { width: 120, justifyContent: "center" },

@@ -3,21 +3,28 @@ import { colors } from "@/constants/autodaddy";
 import type { CarOwnerThoughtOfTheDayView } from "@/lib/normalize-car-owner-thought-of-the-day";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import type { CarOwnerOdometerReading } from "@/types/car-owner-odometer";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import { Pressable, Text, View } from "react-native";
 import { carOwnerHomeStyles as styles } from "./car-owner-home-styles";
 import { CAR_OWNER_SHOP_TYPE_SCREENS } from "@/lib/car-owner-shop-types";
+
+const ACTION_ICON_COLOR = "#1B5E20";
+const ACTION_ICON_SIZE = 24;
+
+type ActionIcon =
+  | { set: "ion"; name: ComponentProps<typeof Ionicons>["name"] }
+  | { set: "material"; name: ComponentProps<typeof MaterialIcons>["name"] };
 
 const ActionTile = memo(function ActionTile({
   icon,
   label,
   href,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: ActionIcon;
   label: string;
   href: string;
 }) {
@@ -33,7 +40,11 @@ const ActionTile = memo(function ActionTile({
       onPress={() => router.push(href as any)}
     >
       <View style={styles.actionIcon}>
-        <Ionicons name={icon} size={24} color="#1B5E20" />
+        {icon.set === "material" ? (
+          <MaterialIcons name={icon.name} size={ACTION_ICON_SIZE} color={ACTION_ICON_COLOR} />
+        ) : (
+          <Ionicons name={icon.name} size={ACTION_ICON_SIZE} color={ACTION_ICON_COLOR} />
+        )}
       </View>
       <Text style={styles.actionLabel} numberOfLines={2}>
         {label}
@@ -220,37 +231,45 @@ export function CarOwnerHomeDashboard({
           <View style={styles.actionGrid}>
             <View style={styles.actionRow}>
               <View style={styles.actionCell}>
-                <ActionTile icon="car-outline" label="My Vehicles" href="/(car-owner)/my-vehicles" />
+                <ActionTile
+                  icon={{ set: "ion", name: "car-outline" }}
+                  label="My Vehicles"
+                  href="/(car-owner)/my-vehicles"
+                />
               </View>
               <View style={styles.actionCell}>
                 <ActionTile
-                  icon="calendar-outline"
+                  icon={{ set: "ion", name: "storefront-outline" }}
                   label="Auto Shops Nearby"
                   href={CAR_OWNER_SHOP_TYPE_SCREENS.autoShop.href}
                 />
               </View>
               <View style={styles.actionCell}>
-                <ActionTile icon="time-outline" label="Expenses" href="/(car-owner)/service-history" />
+                <ActionTile
+                  icon={{ set: "ion", name: "wallet-outline" }}
+                  label="Expenses"
+                  href="/(car-owner)/service-history"
+                />
               </View>
             </View>
             <View style={styles.actionRow}>
               <View style={styles.actionCell}>
                 <ActionTile
-                  icon="disc-outline"
+                  icon={{ set: "ion", name: "disc-outline" }}
                   label="Tyre Shop"
                   href={CAR_OWNER_SHOP_TYPE_SCREENS.tyreShop.href}
                 />
               </View>
               <View style={styles.actionCell}>
                 <ActionTile
-                  icon="water-outline"
+                  icon={{ set: "material", name: "local-car-wash" }}
                   label="Car Wash"
                   href={CAR_OWNER_SHOP_TYPE_SCREENS.carWash.href}
                 />
               </View>
               <View style={styles.actionCell}>
                 <ActionTile
-                  icon="bus-outline"
+                  icon={{ set: "ion", name: "bus-outline" }}
                   label="Tow Truck"
                   href={CAR_OWNER_SHOP_TYPE_SCREENS.towTruck.href}
                 />

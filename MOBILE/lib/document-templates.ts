@@ -6,21 +6,22 @@ export type DocumentTemplate = {
   description: string;
 };
 
+/** Catalog ids must match API `invoiceTemplateSlug` values (same as web). */
 export const DUMMY_INVOICE_TEMPLATES: DocumentTemplate[] = [
   {
-    id: "inv-1",
+    id: "classic-invoice-v1",
     name: "Invoice Template - 1",
-    description: "Classic layout with HST breakdown and payment status chip.",
+    description: "Classic charcoal accents on the standard invoice layout.",
   },
   {
-    id: "inv-2",
+    id: "modern-invoice-v2",
     name: "Invoice Template - 2",
-    description: "Compact single-page invoice with service line items.",
+    description: "Magenta accents on the standard invoice layout.",
   },
   {
-    id: "inv-3",
+    id: "viewer-invoice-v1",
     name: "Invoice Template - 3",
-    description: "Detailed invoice with customer address and round-off row.",
+    description: "Blue viewer accents on the standard invoice layout.",
   },
 ];
 
@@ -52,4 +53,14 @@ export function templateKindLabel(kind: DocumentTemplateKind) {
 
 export function templateKindTitle(kind: DocumentTemplateKind) {
   return kind === "invoice" ? "Invoice Templates" : "Job Card Templates";
+}
+
+export function resolveTemplateSlug(
+  templates: DocumentTemplate[],
+  slug: string | undefined | null,
+  fallback = templates[0]?.id ?? ""
+): string {
+  const value = typeof slug === "string" ? slug.trim() : "";
+  if (value && templates.some((template) => template.id === value)) return value;
+  return fallback;
 }

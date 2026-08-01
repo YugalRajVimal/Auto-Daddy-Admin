@@ -80,7 +80,25 @@ function normalizeDealKind(dealType: string | undefined): "service" | "parts" {
 }
 
 function normalizeImagePath(o: Record<string, unknown>): string | null {
-  return pickString(o.dealImage) ?? pickString(o.imagePath) ?? pickString(o.productImage) ?? null;
+  const fromGallery = Array.isArray(o.dealImages)
+    ? o.dealImages
+        .map((item) => {
+          if (typeof item === "string") return item.trim() || null;
+          if (item && typeof item === "object") {
+            const rec = item as Record<string, unknown>;
+            return pickString(rec.url ?? rec.path ?? rec.image ?? rec.dealImage);
+          }
+          return null;
+        })
+        .find(Boolean)
+    : null;
+  return (
+    pickString(o.dealImage) ??
+    fromGallery ??
+    pickString(o.imagePath) ??
+    pickString(o.productImage) ??
+    null
+  );
 }
 
 function parsePrice(value: unknown): number | undefined {

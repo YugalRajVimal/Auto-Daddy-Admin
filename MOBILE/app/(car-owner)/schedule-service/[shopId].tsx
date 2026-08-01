@@ -4,10 +4,11 @@ import { colors, fontSizes, radii, spacing, typography } from "@/constants/autod
 import { useAuth } from "@/context/auth-provider";
 import { postJson } from "@/lib/api";
 import { fetchCarOwnerAutoShopById, isCarOwnerShopOpenToday } from "@/lib/car-owner-auto-shops";
+import { navigateBackTarget } from "@/lib/shop-owner-navigation";
 import type { CarOwnerAutoShopListItem } from "@/types/car-owner-auto-shops";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -88,10 +89,12 @@ function paramString(value: string | string[] | undefined): string | null {
   return t.length > 0 ? t : null;
 }
 
+const CAR_OWNER_HOME = "/(car-owner)/(tabs)/home";
+const DEFAULT_BACK_ROUTE = "/(car-owner)/schedule-service";
+
 export default function AutoShopDetailScreen() {
   const { showToast } = useToast();
   const { token } = useAuth();
-  const navigation = useNavigation();
   const params = useLocalSearchParams<{ shopId?: string; shop?: string; backTo?: string | string[] }>();
   const [rateOpen, setRateOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -99,9 +102,8 @@ export default function AutoShopDetailScreen() {
   const [picked, setPicked] = useState<number>(0);
   const [hoursOpen, setHoursOpen] = useState(true);
 
-  const defaultBackRoute = "/(car-owner)/schedule-service";
   const explicitBackTo = paramString(params.backTo);
-  const resolvedBackTo = explicitBackTo ?? defaultBackRoute;
+  const resolvedBackTo = explicitBackTo ?? DEFAULT_BACK_ROUTE;
 
   const shopId = typeof params.shopId === "string" ? params.shopId.trim() : "";
 
@@ -297,18 +299,11 @@ export default function AutoShopDetailScreen() {
   }
 
   const goBack = useCallback(() => {
-    // Prefer explicit `backTo` from the screen that opened us. With a root Drawer, the nearest
-    // navigator's goBack() can skip intermediate screens (e.g. Deals) and land on Home.
-    if (explicitBackTo) {
-      router.replace(explicitBackTo as never);
-      return;
-    }
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-      return;
-    }
-    router.replace(resolvedBackTo as never);
-  }, [explicitBackTo, navigation, resolvedBackTo]);
+    // Pop the pushed shop screen when possible. `router.replace(backTo)` was duplicating the
+    // shops list under the root Drawer, so returning to Home needed several top-bar backs.
+    // Fall back to `backTo` (list / deals) only when there is no history to pop.
+    navigateBackTarget(resolvedBackTo, CAR_OWNER_HOME);
+  }, [resolvedBackTo]);
 
   return (
     <CarOwnerStackScreenFrame

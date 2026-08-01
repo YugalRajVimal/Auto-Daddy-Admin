@@ -6,6 +6,7 @@ import { useAuth } from "@/context/auth-provider";
 import { customerKey, parseMyCustomersFromApiPayload } from "@/hooks/use-my-customers";
 import { dealId, useMyDeals } from "@/hooks/use-my-deals";
 import { useOncePress } from "@/hooks/use-once-press";
+import { useDisableDrawerSwipeOnFocus } from "@/hooks/use-disable-drawer-swipe";
 import { fetchAddedCustomers } from "@/lib/autoshopowner-api";
 import { updateAutoshopDeal } from "@/lib/autoshopowner-deals-api";
 import {
@@ -82,6 +83,7 @@ export default function DealsPage() {
   const router = useRouter();
   const { token, meta } = useAuth();
   const { showToast } = useToast();
+  useDisableDrawerSwipeOnFocus();
   const isAutoShopOwner = (meta?.role ?? "").toLowerCase() === "autoshopowner";
   const { deals: rawDeals, loading, loadDeals, removeDeal } = useMyDeals(
     token,

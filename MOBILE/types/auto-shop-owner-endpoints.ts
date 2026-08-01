@@ -101,6 +101,8 @@ export type ShopDeal = {
     year?: string;
   };
   dealImage?: string;
+  /** Gallery paths from list/detail APIs (often set when `dealImage` is omitted). */
+  dealImages?: string[];
   /** Legacy response field; prefer `dealImage`. */
   productImage?: string;
 };

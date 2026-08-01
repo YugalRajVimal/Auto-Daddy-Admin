@@ -27,10 +27,10 @@ export function PageTopBar({ title, left, right, titleColor, titleAlign = "left"
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  side: { width: SIDE, alignItems: "flex-start", justifyContent: "center" },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  side: { minWidth: SIDE, alignItems: "flex-start", justifyContent: "center", flexShrink: 0 },
   sideRight: { alignItems: "flex-end" },
   spacer: { width: SIDE, height: 1 },
-  title: { ...typography.navTitle, flex: 1, textAlign: "left" },
+  title: { ...typography.navTitle, flex: 1, minWidth: 0, textAlign: "left" },
   titleCenter: { textAlign: "center" },
 });

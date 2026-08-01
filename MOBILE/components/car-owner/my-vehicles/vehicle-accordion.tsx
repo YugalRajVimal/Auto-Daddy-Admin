@@ -1,9 +1,17 @@
 import { colors } from "@/constants/autodaddy";
 import { normalizeMediaUrl } from "@/lib/normalize-media-url";
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, Text, TouchableOpacity, View } from "react-native";
+import { Image, type ImageStyle } from "expo-image";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  Text,
+  TouchableOpacity,
+  View,
+  type StyleProp,
+} from "react-native";
 import { styles } from "./my-vehicles-screen-styles";
 import type { Vehicle } from "./user-vehicles";
 import { vehicleTitle } from "./user-vehicles";
@@ -24,6 +32,39 @@ function vehicleCarGalleryPaths(v: Vehicle): string[] {
     }
   }
   return out;
+}
+
+/** Shows brand logo candidates in order; advances on load error (broken catalog uploads). */
+function BrandLogoImage({
+  uris,
+  style,
+  iconSize = 28,
+}: {
+  uris: string[];
+  style?: StyleProp<ImageStyle>;
+  iconSize?: number;
+}) {
+  const key = uris.join("|");
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [key]);
+
+  const uri = uris[index] ?? null;
+  if (!uri) {
+    return <Ionicons name="car-sport-outline" size={iconSize} color={colors.textLight} />;
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={style}
+      contentFit="contain"
+      transition={120}
+      onError={() => setIndex((i) => (i + 1 < uris.length ? i + 1 : uris.length))}
+    />
+  );
 }
 
 function DetailBadge({ text, placeholder, fullWidth }: { text: string; placeholder?: boolean; fullWidth?: boolean }) {
@@ -51,13 +92,13 @@ function VehicleTopCarousel({
   onOpenViewer,
   viewerTitle,
   rawPathsForViewer,
-  brandLogoUri,
+  brandLogoUris,
 }: {
   uris: string[];
   onOpenViewer: (title: string, paths: (string | null | undefined)[]) => void;
   viewerTitle: string;
   rawPathsForViewer: string[];
-  brandLogoUri?: string | null;
+  brandLogoUris?: string[];
 }) {
   const [slideWidth, setSlideWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -70,6 +111,7 @@ function VehicleTopCarousel({
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 85 }).current;
 
   const slideHeight = slideWidth > 0 ? Math.round(slideWidth * (9 / 16)) : 0;
+  const logoUris = brandLogoUris ?? [];
 
   const renderItem = useCallback(
     ({ item }: { item: string }) => (
@@ -90,16 +132,7 @@ function VehicleTopCarousel({
   if (uris.length === 0) {
     return (
       <View style={styles.vehicleGalleryPlaceholder}>
-        {brandLogoUri ? (
-          <Image
-            source={{ uri: brandLogoUri }}
-            style={styles.vehicleGalleryBrandImg}
-            contentFit="contain"
-            transition={120}
-          />
-        ) : (
-          <Ionicons name="car-sport-outline" size={40} color={colors.textLight} />
-        )}
+        <BrandLogoImage uris={logoUris} style={styles.vehicleGalleryBrandImg} iconSize={40} />
       </View>
     );
   }
@@ -151,6 +184,7 @@ export function VehicleAccordion({
   busyVehicleId,
   onRequestDisable,
   brandLogoUri,
+  brandLogoUris,
 }: {
   vehicle: Vehicle;
   expanded: boolean;
@@ -159,7 +193,9 @@ export function VehicleAccordion({
   onEdit: () => void;
   busyVehicleId: string | null;
   onRequestDisable: () => void;
+  /** @deprecated Prefer `brandLogoUris` so broken catalog uploads can fall back. */
   brandLogoUri?: string | null;
+  brandLogoUris?: string[];
 }) {
   const title = vehicleTitle(v);
   const isBusy = busyVehicleId === v.id;
@@ -176,7 +212,10 @@ export function VehicleAccordion({
   );
 
   const thumbUri = carGalleryUris[0] ?? null;
-  const displayBrandLogo = brandLogoUri ?? null;
+  const logoUris = useMemo(() => {
+    if (brandLogoUris && brandLogoUris.length > 0) return brandLogoUris;
+    return brandLogoUri ? [brandLogoUri] : [];
+  }, [brandLogoUri, brandLogoUris]);
 
   if (!expanded) {
     return (
@@ -191,15 +230,8 @@ export function VehicleAccordion({
           <View style={styles.collapsedThumb}>
             {thumbUri ? (
               <Image source={{ uri: thumbUri }} style={styles.collapsedThumbImg} contentFit="cover" transition={120} />
-            ) : displayBrandLogo ? (
-              <Image
-                source={{ uri: displayBrandLogo }}
-                style={styles.collapsedThumbBrandImg}
-                contentFit="contain"
-                transition={120}
-              />
             ) : (
-              <Ionicons name="car-sport-outline" size={28} color={colors.textLight} />
+              <BrandLogoImage uris={logoUris} style={styles.collapsedThumbBrandImg} iconSize={28} />
             )}
           </View>
           <Text style={styles.collapsedPlate} numberOfLines={1}>
@@ -220,7 +252,7 @@ export function VehicleAccordion({
         rawPathsForViewer={carGalleryPaths}
         viewerTitle={title}
         onOpenViewer={onOpenViewer}
-        brandLogoUri={displayBrandLogo}
+        brandLogoUris={logoUris}
       />
 
       <View style={styles.plateBar}>
