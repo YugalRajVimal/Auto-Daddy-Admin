@@ -79,26 +79,29 @@ function normalizeDealKind(dealType: string | undefined): "service" | "parts" {
   return "service";
 }
 
-function normalizeImagePath(o: Record<string, unknown>): string | null {
-  const fromGallery = Array.isArray(o.dealImages)
-    ? o.dealImages
-        .map((item) => {
-          if (typeof item === "string") return item.trim() || null;
-          if (item && typeof item === "object") {
-            const rec = item as Record<string, unknown>;
-            return pickString(rec.url ?? rec.path ?? rec.image ?? rec.dealImage);
-          }
-          return null;
-        })
-        .find(Boolean)
-    : null;
-  return (
-    pickString(o.dealImage) ??
-    fromGallery ??
-    pickString(o.imagePath) ??
-    pickString(o.productImage) ??
-    null
-  );
+function collectDealImagePaths(o: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const add = (value: unknown) => {
+    if (!value) return;
+    if (typeof value === "string") {
+      const path = value.trim();
+      if (path && !out.includes(path)) out.push(path);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) add(item);
+      return;
+    }
+    if (typeof value === "object") {
+      const rec = value as Record<string, unknown>;
+      add(rec.url ?? rec.path ?? rec.image ?? rec.dealImage);
+    }
+  };
+  add(o.dealImages);
+  add(o.dealImage);
+  add(o.imagePath);
+  add(o.productImage);
+  return out.slice(0, 2);
 }
 
 function parsePrice(value: unknown): number | undefined {
@@ -124,6 +127,7 @@ export function normalizeCarOwnerDeal(raw: unknown): CarOwnerDeal | null {
   const discountedPrice = parsePrice(o.discountedPrice) ?? 0;
   const originalPrice = parsePrice(o.price) ?? parsePrice(o.originalPrice);
   const dealTypeRaw = pickString(o.dealType);
+  const dealImages = collectDealImagePaths(o);
 
   const base = {
     _id,
@@ -132,7 +136,8 @@ export function normalizeCarOwnerDeal(raw: unknown): CarOwnerDeal | null {
     originalPrice,
     offerEndsOnDate,
     createdBy,
-    imagePath: normalizeImagePath(o),
+    imagePath: dealImages[0] ?? null,
+    dealImages: dealImages.length > 0 ? dealImages : undefined,
     createdAt,
     updatedAt,
     __v: typeof o.__v === "number" ? o.__v : undefined,

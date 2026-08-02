@@ -38,6 +38,8 @@ export type CarOwnerDealBase = {
   offerEndsOnDate: string;
   createdBy: CarOwnerDealCreatedBy;
   imagePath: string | null;
+  /** Relative upload paths from the API (`dealImages`), when present. */
+  dealImages?: string[];
   createdAt: string;
   updatedAt: string;
   __v?: number;

@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { FiCalendar, FiHeart, FiMapPin, FiPhone, FiTag, FiUser } from "react-icons/fi";
 import {
   dealDiscountPercent,
@@ -10,6 +10,8 @@ import { formatCurrencyAmount } from "../../lib/currency";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import type { CarOwnerDeal } from "../../types/carOwnerDeals";
 
+const DEAL_IMAGE_AUTO_SCROLL_MS = 3500;
+
 type OwnerDealRowProps = {
   deal: CarOwnerDeal;
   vehicleLabel: string;
@@ -17,6 +19,112 @@ type OwnerDealRowProps = {
   onClick?: () => void;
   selected?: boolean;
 };
+
+function DealImageCarousel({ uris }: { uris: string[] }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [timerKey, setTimerKey] = useState(0);
+
+  const scrollToIndex = useCallback((index: number, behavior: ScrollBehavior = "smooth") => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const width = el.clientWidth;
+    if (width <= 0) return;
+    el.scrollTo({ left: width * index, behavior });
+  }, []);
+
+  useEffect(() => {
+    setActiveIndex(0);
+    scrollToIndex(0, "auto");
+    setTimerKey((key) => key + 1);
+  }, [uris, scrollToIndex]);
+
+  useEffect(() => {
+    if (uris.length <= 1 || paused) return;
+    const timer = window.setInterval(() => {
+      setActiveIndex((current) => {
+        const next = (current + 1) % uris.length;
+        scrollToIndex(next);
+        return next;
+      });
+    }, DEAL_IMAGE_AUTO_SCROLL_MS);
+    return () => window.clearInterval(timer);
+  }, [uris.length, paused, timerKey, scrollToIndex]);
+
+  const handleScroll = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const width = el.clientWidth;
+    if (width <= 0) return;
+    const next = Math.round(el.scrollLeft / width);
+    setActiveIndex((prev) => (next === prev ? prev : Math.min(Math.max(next, 0), uris.length - 1)));
+  };
+
+  const pauseAndBump = () => {
+    setPaused(true);
+    setTimerKey((key) => key + 1);
+  };
+
+  const resumeSoon = () => {
+    window.setTimeout(() => setPaused(false), 1200);
+  };
+
+  if (uris.length === 0) {
+    return (
+      <div className="flex aspect-[16/10] w-full items-center justify-center sm:aspect-[4/3]">
+        <FiTag size={40} className="text-slate-300" aria-hidden />
+      </div>
+    );
+  }
+
+  if (uris.length === 1) {
+    return <img src={uris[0]} alt="" className="aspect-[16/10] w-full object-cover sm:aspect-[4/3]" />;
+  }
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+    >
+      <div
+        ref={scrollerRef}
+        className="flex aspect-[16/10] w-full snap-x snap-mandatory overflow-x-auto scroll-smooth sm:aspect-[4/3] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={handleScroll}
+        onPointerDown={pauseAndBump}
+        onPointerUp={resumeSoon}
+        onTouchStart={pauseAndBump}
+        onTouchEnd={resumeSoon}
+        aria-roledescription="carousel"
+        aria-label="Deal images"
+      >
+        {uris.map((uri, index) => (
+          <img
+            key={`${uri}-${index}`}
+            src={uri}
+            alt=""
+            className="h-full w-full shrink-0 snap-center object-cover"
+            draggable={false}
+          />
+        ))}
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center gap-1.5">
+        {uris.map((_, index) => (
+          <span
+            key={`dot-${index}`}
+            className={`h-1.5 w-1.5 rounded-full transition-colors ${
+              index === activeIndex ? "bg-white" : "bg-white/45"
+            }`}
+            aria-hidden
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function formatValidDate(iso: string): string {
   const d = new Date(iso);
@@ -99,7 +207,9 @@ export default function OwnerDealRow({
   const active = isDealActive(deal);
   const discount = dealDiscountPercent(deal);
   const kind = dealKindLabel(deal.dealType);
-  const imageUri = normalizeMediaUrl(deal.imagePath);
+  const imageUris = (deal.dealImages?.length ? deal.dealImages : deal.imagePath ? [deal.imagePath] : [])
+    .map((path) => normalizeMediaUrl(path))
+    .filter((url): url is string => Boolean(url));
   const discounted = formatCurrencyAmount(deal.discountedPrice, countryCode);
   const original =
     deal.originalPrice != null && deal.originalPrice > deal.discountedPrice
@@ -143,15 +253,9 @@ export default function OwnerDealRow({
 
       <div className="flex flex-col sm:flex-row">
         <div className="relative mx-4 mb-4 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 ring-1 ring-slate-200/60 sm:mx-0 sm:mb-0 sm:ml-5 sm:w-[220px] lg:w-[260px]">
-          {imageUri ? (
-            <img src={imageUri} alt="" className="aspect-[16/10] w-full object-cover sm:aspect-[4/3]" />
-          ) : (
-            <div className="flex aspect-[16/10] w-full items-center justify-center sm:aspect-[4/3]">
-              <FiTag size={40} className="text-slate-300" aria-hidden />
-            </div>
-          )}
+          <DealImageCarousel uris={imageUris} />
           <span
-            className={`absolute left-2.5 top-2.5 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide text-white shadow-sm ${
+            className={`pointer-events-none absolute left-2.5 top-2.5 z-20 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide text-white shadow-sm ${
               !active
                 ? "bg-slate-500"
                 : isJustArrived(deal)

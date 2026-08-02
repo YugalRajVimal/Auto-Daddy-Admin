@@ -10,9 +10,12 @@ import type { CarOwnerDeal } from "@/types/car-owner-deals";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -20,9 +23,11 @@ import {
   Text,
   TextInput,
   View,
+  type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const DEAL_IMAGE_AUTO_SCROLL_MS = 3500;
 function safeDateLabel(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -109,12 +114,25 @@ function CornerRibbon({ label, active }: { label: string; active: boolean }) {
   );
 }
 
+function dealImageUris(deal: CarOwnerDeal): string[] {
+  const paths = deal.dealImages?.length
+    ? deal.dealImages
+    : deal.imagePath
+      ? [deal.imagePath]
+      : [];
+  return paths
+    .map((path) => normalizeMediaUrl(path?.trim() || null))
+    .filter((uri): uri is string => Boolean(uri));
+}
+
 function DealCollapsedThumb({
   imageUri,
   placeholderIcon,
+  multi,
 }: {
   imageUri: string | null;
   placeholderIcon: keyof typeof Ionicons.glyphMap;
+  multi?: boolean;
 }) {
   return (
     <View style={styles.collapsedThumb}>
@@ -123,6 +141,146 @@ function DealCollapsedThumb({
       ) : (
         <Ionicons name={placeholderIcon} size={28} color={colors.textLight} />
       )}
+      {multi ? (
+        <View style={styles.collapsedMultiBadge} pointerEvents="none">
+          <Ionicons name="images-outline" size={11} color={colors.white} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function DealImageCarousel({
+  uris,
+  aspectRatio,
+  placeholderIcon,
+}: {
+  uris: string[];
+  aspectRatio: number;
+  placeholderIcon: keyof typeof Ionicons.glyphMap;
+}) {
+  const listRef = useRef<FlatList<string>>(null);
+  const [slideWidth, setSlideWidth] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [timerKey, setTimerKey] = useState(0);
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 60 }).current;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const first = viewableItems[0];
+      if (first?.index != null) setActiveIndex(first.index);
+    }
+  ).current;
+
+  const renderItem = useCallback(
+    ({ item }: { item: string }) => (
+      <View style={[styles.cardImageFrame, { width: slideWidth, aspectRatio }]}>
+        <Image source={{ uri: item }} style={styles.cardImage} contentFit="cover" transition={180} />
+      </View>
+    ),
+    [aspectRatio, slideWidth]
+  );
+
+  useEffect(() => {
+    setActiveIndex(0);
+    setTimerKey((key) => key + 1);
+    if (slideWidth > 0) {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }
+  }, [uris, slideWidth]);
+
+  useEffect(() => {
+    if (uris.length <= 1 || paused || slideWidth <= 0) return;
+    const timer = setInterval(() => {
+      setActiveIndex((current) => {
+        const next = (current + 1) % uris.length;
+        listRef.current?.scrollToIndex({ index: next, animated: true });
+        return next;
+      });
+    }, DEAL_IMAGE_AUTO_SCROLL_MS);
+    return () => clearInterval(timer);
+  }, [uris.length, paused, slideWidth, timerKey]);
+
+  const pauseForInteraction = useCallback(() => {
+    setPaused(true);
+    setTimerKey((key) => key + 1);
+  }, []);
+
+  const resumeAfterInteraction = useCallback(() => {
+    setTimeout(() => setPaused(false), 1400);
+  }, []);
+
+  const onMomentumScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (slideWidth <= 0) return;
+      const next = Math.round(e.nativeEvent.contentOffset.x / slideWidth);
+      setActiveIndex(Math.min(Math.max(next, 0), uris.length - 1));
+      resumeAfterInteraction();
+    },
+    [resumeAfterInteraction, slideWidth, uris.length]
+  );
+
+  if (uris.length === 0) {
+    return (
+      <View style={[styles.cardImageFallback, { aspectRatio }]}>
+        <Ionicons name={placeholderIcon} size={48} color={colors.successDark} />
+      </View>
+    );
+  }
+
+  if (uris.length === 1) {
+    return (
+      <View style={[styles.cardImageFrame, { aspectRatio }]}>
+        <Image source={{ uri: uris[0] }} style={styles.cardImage} contentFit="cover" transition={180} />
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={styles.carouselWrap}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 0 && Math.abs(w - slideWidth) > 1) setSlideWidth(w);
+      }}
+    >
+      {slideWidth > 0 ? (
+        <FlatList
+          ref={listRef}
+          data={uris}
+          keyExtractor={(uri, index) => `${uri}-${index}`}
+          renderItem={renderItem}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          nestedScrollEnabled
+          decelerationRate="fast"
+          onScrollBeginDrag={pauseForInteraction}
+          onMomentumScrollEnd={onMomentumScrollEnd}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          getItemLayout={(_, index) => ({
+            length: slideWidth,
+            offset: slideWidth * index,
+            index,
+          })}
+          onScrollToIndexFailed={({ index }) => {
+            requestAnimationFrame(() => {
+              listRef.current?.scrollToIndex({ index, animated: true });
+            });
+          }}
+        />
+      ) : (
+        <View style={[styles.cardImageFrame, { aspectRatio }]}>
+          <Image source={{ uri: uris[0] }} style={styles.cardImage} contentFit="cover" transition={180} />
+        </View>
+      )}
+      <View style={styles.carouselDots} pointerEvents="none">
+        {uris.map((_, i) => (
+          <View key={`dot-${i}`} style={[styles.carouselDot, i === activeIndex && styles.carouselDotActive]} />
+        ))}
+      </View>
     </View>
   );
 }
@@ -144,7 +302,7 @@ function DealCard({
 }) {
   const { meta } = useAuth();
   const kind = dealKindLabel(d.dealType);
-  const imageUri = normalizeMediaUrl(d.imagePath?.trim() || null);
+  const imageUris = dealImageUris(d);
   const description = d.description?.trim();
   const active = isDealActive(d);
   const subtitle = dealSubtitle(d);
@@ -155,7 +313,11 @@ function DealCard({
     return (
       <SurfaceCard shadow="card" style={styles.card}>
         <View style={styles.collapsedRow}>
-          <DealCollapsedThumb imageUri={imageUri} placeholderIcon={placeholderIcon} />
+          <DealCollapsedThumb
+            imageUri={imageUris[0] ?? null}
+            placeholderIcon={placeholderIcon}
+            multi={imageUris.length > 1}
+          />
           <Pressable
             onPress={onToggleExpanded}
             style={styles.collapsedTitlePress}
@@ -218,15 +380,7 @@ function DealCard({
 
       <View style={styles.cardImageSection}>
         <CornerRibbon label={active ? "Active" : "Ended"} active={active} />
-        {imageUri ? (
-          <View style={[styles.cardImageFrame, { aspectRatio: imageAspect }]}>
-            <Image source={{ uri: imageUri }} style={styles.cardImage} contentFit="cover" transition={180} />
-          </View>
-        ) : (
-          <View style={[styles.cardImageFallback, { aspectRatio: imageAspect }]}>
-            <Ionicons name={placeholderIcon} size={48} color={colors.successDark} />
-          </View>
-        )}
+        <DealImageCarousel uris={imageUris} aspectRatio={imageAspect} placeholderIcon={placeholderIcon} />
       </View>
 
       <View style={styles.cardBody}>
@@ -659,6 +813,17 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  collapsedMultiBadge: {
+    position: "absolute",
+    right: 4,
+    bottom: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15,23,42,0.72)",
+  },
   collapsedTitlePress: {
     flex: 1,
     minWidth: 0,
@@ -707,6 +872,28 @@ const styles = StyleSheet.create({
   cardImage: {
     width: "100%",
     height: "100%",
+  },
+  carouselWrap: {
+    width: "100%",
+    position: "relative",
+  },
+  carouselDots: {
+    position: "absolute",
+    bottom: 10,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  carouselDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.45)",
+  },
+  carouselDotActive: {
+    backgroundColor: colors.white,
   },
   cardImageFallback: {
     width: "100%",
