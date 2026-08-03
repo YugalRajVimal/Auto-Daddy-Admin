@@ -292,6 +292,7 @@ function TapThroughView({
 /**
  * Android TextInputs (esp. textAlign right/center) steal horizontal pans from
  * parent ScrollViews. Keep a plain Text until tapped so row swipes scroll.
+ * Unfocused Text must span full width so textAlign matches the focused TextInput.
  */
 function ScrollFriendlyTextInput({
   value,
@@ -305,6 +306,7 @@ function ScrollFriendlyTextInput({
 }: ScrollFriendlyTextInputProps) {
   const ref = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
+  const alignedStyle = [style, styles.scrollFriendlyAlignedText, { textAlign }];
 
   useEffect(() => {
     if (!focused) return;
@@ -316,7 +318,7 @@ function ScrollFriendlyTextInput({
     const showPlaceholder = !value;
     const display = (
       <Text
-        style={[style, { textAlign }, showPlaceholder && { color: placeholderTextColor }]}
+        style={[alignedStyle, showPlaceholder && { color: placeholderTextColor }]}
         numberOfLines={1}
       >
         {showPlaceholder ? placeholder : value}
@@ -337,7 +339,7 @@ function ScrollFriendlyTextInput({
   return (
     <TextInput
       ref={ref}
-      style={[style, { textAlign }]}
+      style={alignedStyle}
       value={value}
       onChangeText={onChangeText}
       editable={editable}
@@ -346,6 +348,7 @@ function ScrollFriendlyTextInput({
       keyboardType={keyboardType}
       multiline={false}
       scrollEnabled={false}
+      textAlign={textAlign}
       textAlignVertical={Platform.OS === "android" ? "center" : "auto"}
       underlineColorAndroid="transparent"
       onBlur={() => setFocused(false)}
@@ -1420,6 +1423,7 @@ export default function NewJobCardPage() {
                     onChangeText={(t) => setOdomCurrent(t.replace(/\D/g, ""))}
                     placeholder="—"
                     placeholderTextColor={colors.textLight}
+                    textAlign="center"
                   />
                 </View>
               </View>
@@ -1665,6 +1669,7 @@ export default function NewJobCardPage() {
                     onChangeText={(t) => setLabourCharge(t.replace(/[^0-9.]/g, ""))}
                     placeholder="0"
                     placeholderTextColor={colors.textLight}
+                    textAlign="right"
                   />
                 </View>
               </View>
@@ -1688,6 +1693,7 @@ export default function NewJobCardPage() {
                       onChangeText={(t) => setDiscount(t.replace(/[^0-9.]/g, ""))}
                       placeholder="0"
                       placeholderTextColor={colors.textLight}
+                      textAlign="right"
                     />
                   </View>
                 )}
@@ -1957,8 +1963,13 @@ const styles = StyleSheet.create({
   scrollFriendlyInputHit: {
     flex: 1,
     minWidth: 0,
+    width: "100%",
     alignSelf: "stretch",
     justifyContent: "center",
+  },
+  scrollFriendlyAlignedText: {
+    width: "100%",
+    alignSelf: "stretch",
   },
   colService: { width: 72, justifyContent: "center" },
   colDesc: { width: 120, justifyContent: "center" },
@@ -2012,7 +2023,7 @@ const styles = StyleSheet.create({
   },
   priceWrap: {
     flexDirection: "row",
-    alignItems: "stretch",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.md,
@@ -2024,7 +2035,8 @@ const styles = StyleSheet.create({
   priceInput: {
     flex: 1,
     minWidth: 0,
-    height: 30,
+    height: 18,
+    lineHeight: 18,
     paddingVertical: 0,
     paddingHorizontal: 6,
     fontSize: fontSizes.sm,
