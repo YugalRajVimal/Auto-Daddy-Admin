@@ -1506,16 +1506,16 @@ export default function NewJobCardPage() {
                       >
                         <View style={[styles.servicesListPanel, showOdoOut && styles.servicesListPanelWithOdo]}>
                           <View style={styles.servicesTableHead}>
-                            <Text style={[styles.servicesTh, styles.colIncl]}>INCL</Text>
-                            <Text style={[styles.servicesTh, styles.colService]}>SUB</Text>
-                            <Text style={[styles.servicesTh, styles.colDesc]}>DESC</Text>
+                            <Text style={[styles.servicesTh, styles.colIncl, styles.thCenter]}>INCL</Text>
+                            <Text style={[styles.servicesTh, styles.colService, styles.thLeft]}>SUB</Text>
+                            <Text style={[styles.servicesTh, styles.colDesc, styles.thLeft]}>DESC</Text>
                             {showOdoOut ? (
-                              <Text style={[styles.servicesTh, styles.colOdo]}>ODO OUT</Text>
+                              <Text style={[styles.servicesTh, styles.colOdo, styles.thRight]}>ODO OUT</Text>
                             ) : null}
-                            <Text style={[styles.servicesTh, styles.colUnit]}>UNIT</Text>
-                            <Text style={[styles.servicesTh, styles.colQty]}>QTY</Text>
-                            <Text style={[styles.servicesTh, styles.colLabour]}>LABOUR</Text>
-                            <Text style={[styles.servicesTh, styles.colTotal]}>AMOUNT</Text>
+                            <Text style={[styles.servicesTh, styles.colUnit, styles.thRight]}>UNIT</Text>
+                            <Text style={[styles.servicesTh, styles.colQty, styles.thRight]}>QTY</Text>
+                            <Text style={[styles.servicesTh, styles.colLabour, styles.thRight]}>LABOUR</Text>
+                            <Text style={[styles.servicesTh, styles.colTotal, styles.thRight]}>AMOUNT</Text>
                           </View>
 
                           {cat.subServices.map((sub, subIdx) => {
@@ -1944,6 +1944,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   servicesTh: { fontSize: 10, fontWeight: "800", color: colors.primary, letterSpacing: 0.3 },
+  thLeft: { textAlign: "left" },
+  thCenter: { textAlign: "center" },
+  thRight: { textAlign: "right", paddingRight: 7 },
   servicesDataRow: {
     flexDirection: "row",
     alignItems: "center",
