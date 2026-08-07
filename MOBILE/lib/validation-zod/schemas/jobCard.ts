@@ -21,10 +21,12 @@ export const jobCardFormSchema = z
   .superRefine((data, ctx) => {
     const inn = data.odoIn?.trim();
     const out = data.odoOut?.trim();
+    // Skip when ODO OUT is absent. The form uses "0" as a sentinel when no
+    // service requires an out reading — that must not be compared to ODO IN.
     if (inn && out) {
       const a = Number(inn);
       const b = Number(out);
-      if (Number.isFinite(a) && Number.isFinite(b) && b < a) {
+      if (Number.isFinite(a) && Number.isFinite(b) && b > 0 && b < a) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "ODO OUT must be greater than or equal to ODO IN.",

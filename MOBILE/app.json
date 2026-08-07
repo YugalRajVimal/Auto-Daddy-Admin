@@ -46,7 +46,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.appeasing.com.autodaddy",
+      "package": "gowappily.autodaddy",
       "googleServicesFile": "./google-services.json"
     },
     "plugins": [

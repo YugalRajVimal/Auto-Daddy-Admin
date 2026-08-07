@@ -1,4 +1,4 @@
-package com.appeasing.com.autodaddy
+package gowappily.autodaddy
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

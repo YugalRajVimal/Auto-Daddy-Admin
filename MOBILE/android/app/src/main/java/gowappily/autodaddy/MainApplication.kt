@@ -1,4 +1,4 @@
-package com.appeasing.com.autodaddy
+package gowappily.autodaddy
 
 import android.app.Application
 import android.content.res.Configuration
