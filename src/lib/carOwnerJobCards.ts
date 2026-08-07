@@ -207,11 +207,18 @@ export function canonicalizeCarOwnerJobCard(raw: unknown): CarOwnerJobCard | nul
   const id = asString(obj._id ?? obj.id);
   if (!id) return null;
 
+  let status = asString(obj.status) || "Pending";
+  const approvedByCustomer = obj.approvedByCustomer === true;
+
+  // Per prompt: if status is pending AND approvedByCustomer is true, set status to "Approved"
+  if (status.trim().toLowerCase() === "pending" && approvedByCustomer) {
+    status = "Approved";
+  }
+
   const jobNo = resolveJobCardNo(obj);
   const total = resolveJobCardTotal(obj);
   const invoiceNo = resolveInvoiceNo(obj);
   const invoicePaid = obj.invoicePaid === true;
-  const status = asString(obj.status) || "Pending";
   const paymentFromApi = asString(obj.paymentStatus);
   const paymentStatus =
     paymentFromApi ||
@@ -238,7 +245,7 @@ export function canonicalizeCarOwnerJobCard(raw: unknown): CarOwnerJobCard | nul
     invoicePaid,
     paymentStatus,
     status,
-    approvedByCustomer: obj.approvedByCustomer === true,
+    approvedByCustomer: approvedByCustomer,
     licensePlateNo: asString(obj.licensePlateNo) || vehicle?.licensePlateNo || undefined,
     vehicleId: vehicle,
     createdAt: asString(obj.createdAt ?? obj.date) || asString(obj.updatedAt),
@@ -253,21 +260,31 @@ export function normalizeJobCardsPayload(payload: Record<string, unknown> | unde
 
   const mapBucket = (list: unknown[], defaults: Partial<CarOwnerJobCard>): CarOwnerJobCard[] => {
     const out: CarOwnerJobCard[] = [];
+    console.log(list);
     for (const item of list) {
       const next = canonicalizeCarOwnerJobCard(item);
       if (!next) continue;
+
+      // If the final status to be used is "Pending" but approvedByCustomer is true, set status to "Approved"
+      let status = defaults.status
+        ? next.status?.trim()
+          ? next.status
+          : String(defaults.status)
+        : next.status;
+      const approvedByCustomer =
+        defaults.approvedByCustomer !== undefined
+          ? defaults.approvedByCustomer
+          : next.approvedByCustomer;
+
+      if (status && status.toLowerCase().trim() === "pending" && approvedByCustomer) {
+        status = "Approved";
+      }
+
       out.push({
         ...next,
         ...defaults,
-        status: defaults.status
-          ? next.status?.trim()
-            ? next.status
-            : String(defaults.status)
-          : next.status,
-        approvedByCustomer:
-          defaults.approvedByCustomer !== undefined
-            ? defaults.approvedByCustomer
-            : next.approvedByCustomer,
+        status,
+        approvedByCustomer,
       });
     }
     return out;
