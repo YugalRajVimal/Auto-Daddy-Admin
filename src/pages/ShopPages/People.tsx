@@ -246,16 +246,31 @@ function isValidVehicleYear(value: string) {
   return /^\d{4}$/.test(value) && year >= 1900 && year <= VEHICLE_YEAR_MAX;
 }
 
+function vehicleText(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "string") return value.trim();
+  return "";
+}
+
+function vehicleNestedMake(vehicle: CustomerVehicle): { name?: string; model?: string } | null {
+  const make = vehicle.make;
+  if (make && typeof make === "object") return make;
+  return null;
+}
+
 function mapCustomerVehiclesForUpdate(customer: MyCustomer): CustomerVehiclePayload[] {
-  return (customer.vehicles ?? []).map((v) => ({
-    ...(v.vId ?? v._id ? { vId: v.vId ?? v._id } : {}),
-    licensePlateNo: v.licensePlateNo?.trim() ?? "",
-    vinNo: v.vinNo?.trim(),
-    vehicleName: v.vehicleName?.trim() ?? "",
-    model: v.model?.trim() ?? "",
-    year: v.year?.trim() ?? "",
-    odometerReading: v.odometerReading?.trim(),
-  }));
+  return (customer.vehicles ?? []).map((v) => {
+    const make = vehicleMakeName(v);
+    return {
+      ...(v.vId ?? v._id ? { vId: v.vId ?? v._id } : {}),
+      licensePlateNo: vehicleText(v.licensePlateNo),
+      vinNo: vehicleText(v.vinNo) || undefined,
+      vehicleName: make === "—" ? "" : make,
+      model: vehicleModelName(v),
+      year: vehicleYearLabel(v),
+      odometerReading: vehicleText(v.odometerReading) || undefined,
+    };
+  });
 }
 
 function validateVehicleDraft(draft: VehicleDraft): string | null {
@@ -278,20 +293,32 @@ function vehicleRowKey(vehicle: CustomerVehicle, index: number) {
   return vehicle.vId ?? vehicle._id ?? `vehicle-${index}`;
 }
 
+/** Make from flat fields or nested API shape: make: { name, model }. */
 function vehicleMakeName(vehicle: CustomerVehicle) {
-  return vehicle.vehicleName?.trim() || "—";
+  const nested = vehicleNestedMake(vehicle);
+  const fromNested = nested ? vehicleText(nested.name) : "";
+  const fromStringMake = typeof vehicle.make === "string" ? vehicleText(vehicle.make) : "";
+  return vehicleText(vehicle.vehicleName) || fromNested || fromStringMake || "—";
+}
+
+function vehicleModelName(vehicle: CustomerVehicle) {
+  const nested = vehicleNestedMake(vehicle);
+  return vehicleText(vehicle.model) || (nested ? vehicleText(nested.model) : "") || "";
+}
+
+function vehicleYearLabel(vehicle: CustomerVehicle) {
+  return vehicleText(vehicle.year);
 }
 
 function vehicleModelLabel(vehicle: CustomerVehicle) {
-  const model = vehicle.model?.trim();
-  const year = vehicle.year?.trim();
+  const model = vehicleModelName(vehicle);
+  const year = vehicleYearLabel(vehicle);
   if (model && year) return `${model} - ${year}`;
   return model || year || vehicleMakeName(vehicle);
 }
 
-function vehicleFieldValue(value?: string | null) {
-  const trimmed = value?.trim();
-  return trimmed || "—";
+function vehicleFieldValue(value?: string | null | number) {
+  return vehicleText(value) || "—";
 }
 
 function customerApprovalStatus(customer: MyCustomer): string {
@@ -343,8 +370,9 @@ function matchesMyCustomerSearch(customer: MyCustomer, query: string): boolean {
     customer.address,
     ...(customer.vehicles ?? []).flatMap((v) => [
       v.licensePlateNo,
-      v.vehicleName,
-      v.model,
+      vehicleMakeName(v) !== "—" ? vehicleMakeName(v) : "",
+      vehicleModelName(v),
+      vehicleYearLabel(v),
       v.vinNo,
     ]),
   ]
@@ -445,10 +473,17 @@ function VehicleInfoCard({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-nowrap">
-            <VehicleInfoField label="License Plate" value={vehicleFieldValue(vehicle.licensePlateNo)} />
-            <VehicleInfoField label="VIN" value={vehicleFieldValue(vehicle.vinNo)} />
-            <VehicleInfoField label="Current odo" value={vehicleFieldValue(vehicle.odometerReading)} />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-nowrap">
+              <VehicleInfoField label="Make" value={makeName} />
+              <VehicleInfoField label="Model" value={vehicleFieldValue(vehicleModelName(vehicle))} />
+              <VehicleInfoField label="Year" value={vehicleFieldValue(vehicleYearLabel(vehicle))} />
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-nowrap">
+              <VehicleInfoField label="License Plate" value={vehicleFieldValue(vehicle.licensePlateNo)} />
+              <VehicleInfoField label="VIN" value={vehicleFieldValue(vehicle.vinNo)} />
+              <VehicleInfoField label="Current odo" value={vehicleFieldValue(vehicle.odometerReading)} />
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1367,31 +1402,49 @@ function CustomerInfoView({
 
       {vehicle ? (
         <CompactFormRow className="mt-4 items-end">
-          <CompactField label="Car Model" className={compactFixedFieldWidth}>
+          <CompactField label="Make" className={compactFixedFieldWidth}>
             <input
               className={`${shopCompactInputClass} bg-gray-100`}
-              value={[vehicle.model, vehicle.year].filter(Boolean).join(" - ") || "—"}
+              value={vehicleMakeName(vehicle)}
+              readOnly
+            />
+          </CompactField>
+          <CompactField label="Model" className={compactFixedFieldWidth}>
+            <input
+              className={`${shopCompactInputClass} bg-gray-100`}
+              value={vehicleModelName(vehicle) || "—"}
+              readOnly
+            />
+          </CompactField>
+          <CompactField label="Year" className={compactFixedFieldWidth}>
+            <input
+              className={`${shopCompactInputClass} bg-gray-100`}
+              value={vehicleYearLabel(vehicle) || "—"}
               readOnly
             />
           </CompactField>
           <CompactField label="License Plate" className={compactFixedFieldWidth}>
             <input
               className={`${shopCompactInputClass} bg-gray-100`}
-              value={vehicle.licensePlateNo?.trim() || "—"}
+              value={vehicleFieldValue(vehicle.licensePlateNo)}
               readOnly
             />
           </CompactField>
+        </CompactFormRow>
+      ) : null}
+      {vehicle ? (
+        <CompactFormRow className="mt-4 items-end">
           <CompactField label="VIN" className={compactFixedFieldWidth}>
             <input
               className={`${shopCompactInputClass} bg-gray-100`}
-              value={vehicle.vinNo?.trim() || "—"}
+              value={vehicleFieldValue(vehicle.vinNo)}
               readOnly
             />
           </CompactField>
           <CompactField label="Current odo" className={compactFixedFieldWidth}>
             <input
               className={`${shopCompactInputClass} bg-gray-100`}
-              value={vehicle.odometerReading?.trim() || "—"}
+              value={vehicleFieldValue(vehicle.odometerReading)}
               readOnly
             />
           </CompactField>

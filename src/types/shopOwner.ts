@@ -9,6 +9,8 @@ export type CustomerVehicle = {
   year?: string;
   odometerReading?: string;
   dueOdometerReading?: string;
+  /** Present on some API payloads before normalize; prefer vehicleName/model. */
+  make?: string | { name?: string; model?: string };
 };
 
 export type MyCustomer = {

@@ -42,12 +42,13 @@ function parseVehicles(o: Record<string, unknown>) {
     .filter((item) => item && typeof item === "object")
     .map((item) => {
       const v = item as Record<string, unknown>;
-      const make =
+      const makeObj =
         v.make && typeof v.make === "object"
           ? (v.make as Record<string, unknown>)
           : v.vehicleMake && typeof v.vehicleMake === "object"
             ? (v.vehicleMake as Record<string, unknown>)
             : null;
+      const makeString = typeof v.make === "string" ? s(v.make) : undefined;
 
       const odo =
         typeof v.odometerReading === "number"
@@ -61,16 +62,32 @@ function parseVehicles(o: Record<string, unknown>) {
           : typeof v.dueOdometerReading === "string"
             ? v.dueOdometerReading
             : undefined;
+
+      const vehicleName = s(v.vehicleName) ?? s(makeObj?.name) ?? makeString ?? s(v.name);
+      const model = s(v.model) ?? s(makeObj?.model);
+      const year =
+        typeof v.year === "number" && Number.isFinite(v.year)
+          ? String(v.year)
+          : s(v.year);
+
       return {
         _id: s(v._id) ?? s(v.vId) ?? s(v.id),
         vId: s(v.vId) ?? s(v._id) ?? s(v.id),
         licensePlateNo: s(v.licensePlateNo),
         vinNo: s(v.vinNo) ?? s(v.vin),
-        vehicleName: s(v.vehicleName) ?? s(make?.name) ?? s(v.name),
-        model: s(v.model) ?? s(make?.model),
-        year: v.year != null ? String(v.year) : undefined,
+        vehicleName,
+        model,
+        year,
         odometerReading: odo?.trim() || undefined,
         dueOdometerReading: due?.trim() || undefined,
+        // Keep nested make so UI helpers can fall back if flat fields are missing.
+        ...(makeObj || makeString
+          ? {
+              make: makeObj
+                ? { name: s(makeObj.name), model: s(makeObj.model) }
+                : makeString,
+            }
+          : {}),
       };
     });
 }
