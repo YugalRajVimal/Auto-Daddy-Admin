@@ -411,6 +411,7 @@ export default function LoginPage() {
                 valueId={dialCountryId}
                 onChange={setDialCountryId}
                 variant="success"
+                disabled
               />
               <View style={styles.separator} />
               <TextInput

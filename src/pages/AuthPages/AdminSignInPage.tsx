@@ -30,13 +30,7 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
 const LOGO = "/logo.png";
 const RESEND_COOLDOWN_SEC = 5 * 60;
 
-const CALLING_CODES = [
-  { id: "CA", flag: "🇨🇦", label: "Canada", code: "+1" },
-  { id: "US", flag: "🇺🇸", label: "United States", code: "+1" },
-  { id: "IN", flag: "🇮🇳", label: "India", code: "+91" },
-  { id: "GB", flag: "🇬🇧", label: "United Kingdom", code: "+44" },
-  { id: "AU", flag: "🇦🇺", label: "Australia", code: "+61" },
-];
+const DEFAULT_COUNTRY = { id: "CA", flag: "🇨🇦", label: "Canada", code: "+1" } as const;
 
 function formatCooldown(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -47,7 +41,6 @@ function formatCooldown(seconds: number) {
 export default function AdminSignInPage() {
   const navigate = useNavigate();
   const { login, isAuthenticated, isLoading, role } = useAuth();
-  const [countryId, setCountryId] = useState("CA");
   const [loginWithEmail, setLoginWithEmail] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -96,7 +89,7 @@ export default function AdminSignInPage() {
     return () => clearTimeout(timer);
   }, [otpSent, resendCooldown]);
 
-  const countryCode = CALLING_CODES.find((c) => c.id === countryId)?.code ?? "+1";
+  const countryCode = DEFAULT_COUNTRY.code;
   const nationalPhoneDigits = phoneDigits(phone ?? "");
 
   function getAdminAuthPayload() {
@@ -361,23 +354,12 @@ export default function AdminSignInPage() {
                     <div>
                       <label className="mb-1 block text-sm text-gray-500">Mobile Number</label>
                       <div className="flex">
-                        <div className="relative shrink-0">
-                          <select
-                            value={countryId}
-                            onChange={(e) => setCountryId(e.target.value)}
-                            disabled={loading}
-                            aria-label="Country code"
-                            className="appearance-none rounded-l-md border border-r-0 border-gray-400 bg-gray-300 py-2 pl-2 pr-7 text-sm text-gray-700 focus:border-ad-green focus:outline-none"
-                          >
-                            {CALLING_CODES.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.flag} {c.code}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-600">
-                            ▼
-                          </span>
+                        <div
+                          aria-label="Country code"
+                          title="Canada +1"
+                          className="flex shrink-0 items-center rounded-l-md border border-r-0 border-gray-400 bg-gray-300 px-2 py-2 text-sm text-gray-700"
+                        >
+                          {DEFAULT_COUNTRY.flag} {DEFAULT_COUNTRY.code}
                         </div>
                         <input
                           type="tel"

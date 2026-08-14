@@ -43,11 +43,7 @@ export function DialCountrySelector({
   const selected = getDialCountryOption(valueId);
   const minW = triggerMinWidth ?? (compact ? 108 : 120);
   const isSuccess = variant === "success";
-  const chevronColor = disabled
-    ? colors.textLight
-    : isSuccess
-      ? colors.successDark
-      : colors.textMuted;
+  const chevronColor = isSuccess ? colors.successDark : colors.textMuted;
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -66,7 +62,6 @@ export function DialCountrySelector({
           !isSuccess && styles.triggerNeutral,
           compact && styles.triggerCompact,
           { minWidth: minW },
-          disabled && styles.triggerDisabled,
           pressed && !disabled && styles.triggerPressed,
         ]}
         hitSlop={compact ? 4 : 8}
@@ -77,7 +72,9 @@ export function DialCountrySelector({
         <Text style={[styles.triggerCode, compact && styles.triggerCodeCompact]} numberOfLines={1}>
           {selected.callingCode}
         </Text>
-        <Ionicons name="chevron-down" size={compact ? 12 : 14} color={chevronColor} />
+        {disabled ? null : (
+          <Ionicons name="chevron-down" size={compact ? 12 : 14} color={chevronColor} />
+        )}
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
@@ -150,9 +147,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: spacing.xs,
     gap: 2,
-  },
-  triggerDisabled: {
-    opacity: 0.55,
   },
   triggerPressed: {
     opacity: 0.85,
