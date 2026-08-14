@@ -290,7 +290,7 @@ console.log("storedPerms:", storedPerms);
     loginRole;
 
   const logoImageClass =
-    "block h-auto w-auto max-h-16 max-w-[200px] object-contain sm:max-h-[72px] sm:max-w-[220px] md:max-h-20 md:max-w-[260px]";
+    "block h-auto w-auto max-h-16 max-w-[240px] object-contain sm:max-h-[72px] sm:max-w-[280px] md:max-h-20 md:max-w-[320px]";
   const brandLogoLabel = brandLogo?.placeholderLabel?.trim() || "Business logo";
   const headerLogo = brandLogo ? (
     brandLogo.src ? (

@@ -55,7 +55,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/logo-rectangle.png",
-          "imageWidth": 220,
+          "imageWidth": 280,
           "resizeMode": "contain",
           "backgroundColor": "#DCFCE7",
           "dark": {
@@ -63,7 +63,7 @@
           },
           "android": {
             "image": "./assets/images/splash-icon-android.png",
-            "imageWidth": 260,
+            "imageWidth": 300,
             "resizeMode": "contain",
             "backgroundColor": "#DCFCE7"
           }

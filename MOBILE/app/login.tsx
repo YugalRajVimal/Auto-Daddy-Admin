@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
   },
   logoStandalone: {
     width: "100%",
-    height: 60,
+    height: 72,
     resizeMode: "contain",
   },
   panel: {
