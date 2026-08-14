@@ -24,7 +24,7 @@ export default function RequirePermission({
   if (loading) return null;
 
   if (!isAuthenticated) {
-    return <Navigate to="/admin/login" state={{ from: location }} replace />;
+    return <Navigate to="/admin" state={{ from: location }} replace />;
   }
 
   if (superAdminOnly && !isSuperAdmin) {

@@ -1,22 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import OtpInput from "../../components/form/input/OtpInput";
-import {
-  buildSessionMeta,
-  getJson,
-  mapBackendRoleToUserRole,
-  sendMobileOtp,
-  verifyMobileOtp,
-} from "../../api/mobileAuth";
 import { useAuth, getPostLoginRedirect } from "../../auth";
+import { getPortalForRole } from "../../auth/roleRegistry";
 import type { UserRole } from "../../auth/types";
 import { formatPhoneDisplay, phoneDigits } from "../../lib/phoneFormat";
-import {
-  resolveShopIncompleteKindFromAuthFlags,
-  shopProfileCompletionPath,
-} from "../../lib/shopProfileCompleteness";
 import { FormFieldError } from "../../lib/validation/formUi";
 import {
   signInPhoneSchema,
@@ -25,10 +15,17 @@ import {
   type SignInOtpValues,
 } from "../../lib/validation/schemas/identity";
 
+const API_BASE = `${import.meta.env.VITE_API_URL}/api/auth`;
 const LOGO = "/logo.png";
 const RESEND_COOLDOWN_SEC = 5 * 60;
-
 const DEFAULT_COUNTRY = { id: "CA", flag: "🇨🇦", label: "Canada", code: "+1" } as const;
+const ADMIN_PORTAL_ROLES: UserRole[] = [
+  "admin",
+  "role_admin",
+  "sub_admin",
+  "associates",
+  "subadmin",
+];
 
 function formatCooldown(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -36,8 +33,25 @@ function formatCooldown(seconds: number) {
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
 
-export default function AdminSignInPage() {
+function mapAdminStaffRole(raw: unknown): UserRole {
+  const normalized = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (
+    normalized === "role_admin" ||
+    normalized === "sub_admin" ||
+    normalized === "associates" ||
+    normalized === "subadmin"
+  ) {
+    return normalized;
+  }
+  return "admin";
+}
+
+export default function AdminStaffSignInPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, isAuthenticated, isLoading, role } = useAuth();
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -55,6 +69,8 @@ export default function AdminSignInPage() {
     defaultValues: { phone: "" },
   });
   const phone = watchRequest("phone");
+  const countryCode = DEFAULT_COUNTRY.code;
+  const nationalPhoneDigits = phoneDigits(phone ?? "");
 
   const {
     handleSubmit: handleOtpSubmit,
@@ -70,7 +86,7 @@ export default function AdminSignInPage() {
   const otp = watchOtp("otp");
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated && role) {
+    if (!isLoading && isAuthenticated && role && getPortalForRole(role) === "admin") {
       navigate(getPostLoginRedirect(role), { replace: true });
     }
   }, [isLoading, isAuthenticated, role, navigate]);
@@ -83,14 +99,20 @@ export default function AdminSignInPage() {
     return () => clearTimeout(timer);
   }, [otpSent, resendCooldown]);
 
-  const countryCode = DEFAULT_COUNTRY.code;
-  const nationalPhoneDigits = phoneDigits(phone ?? "");
+  function getAuthPayload() {
+    return { countryCode, phone: nationalPhoneDigits, role: "admin" as const };
+  }
 
   async function handleSendOtp() {
     setStatus(null);
     setLoading(true);
     try {
-      const res = await sendMobileOtp(nationalPhoneDigits, countryCode);
+      const res = await fetch(`${API_BASE}/admin/signin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(getAuthPayload()),
+      });
+      const data = await res.json();
       if (res.ok) {
         const isResend = otpSent;
         setOtpSent(true);
@@ -99,7 +121,7 @@ export default function AdminSignInPage() {
         setStatus("OTP sent! Please check your phone.");
       } else {
         setOtpSent(false);
-        setStatus(res.data?.message || "Failed to send OTP");
+        setStatus(data?.message || "Failed to send OTP");
       }
     } catch {
       setStatus("An error occurred.");
@@ -114,91 +136,44 @@ export default function AdminSignInPage() {
     await handleSendOtp();
   }
 
-  async function enrichMobileProfile(
-    token: string,
-    userRole: UserRole,
-    verifyData: Parameters<typeof buildSessionMeta>[0],
-    phone: string,
-    code: string
-  ) {
-    const session = {
-      token,
-      role: userRole,
-      meta: buildSessionMeta(verifyData, phone, code),
-      profile: {
-        name: verifyData.name,
-        phone,
-        profilePhoto: verifyData.profilePhoto ?? null,
-      },
-    };
-    login(session);
-
-    try {
-      const profileRes = await getJson<{
-        success?: boolean;
-        data?: {
-          name?: string;
-          email?: string;
-          city?: string;
-          phone?: string;
-          profilePhoto?: string | null;
-        };
-        name?: string;
-        email?: string;
-        city?: string;
-        phone?: string;
-        profilePhoto?: string | null;
-      }>("/api/user/profile", token);
-      const p = profileRes.data?.data ?? profileRes.data;
-      if (profileRes.ok && p) {
-        login({
-          ...session,
-          profile: {
-            name: p.name ?? verifyData.name,
-            email: p.email,
-            phone: p.phone ?? phone,
-            city: p.city,
-            profilePhoto: p.profilePhoto ?? verifyData.profilePhoto ?? null,
-          },
-        });
-      }
-    } catch {
-      // optional enrichment
-    }
-  }
-
   async function handleVerifyOtp(values: SignInOtpValues) {
-    const otp = values.otp;
     setStatus(null);
     setLoading(true);
     try {
-      const res = await verifyMobileOtp(nationalPhoneDigits, countryCode, otp);
-      const data = res.data;
-      if (!res.ok || !data?.token) {
-        setStatus(data?.message || "OTP verification failed");
-        return;
-      }
-
-      const userRole = mapBackendRoleToUserRole(data.role);
-      if (!userRole) {
-        setStatus("This account type is not supported on the web app.");
-        return;
-      }
-
-      await enrichMobileProfile(data.token, userRole, data, nationalPhoneDigits, countryCode);
-      setStatus("Login successful!");
-      setTimeout(() => {
-        let redirect = getPostLoginRedirect(userRole);
-        if (userRole === "car_owner" && data.isProfileComplete === false) {
-          redirect = "/owner/onboarding";
-        } else if (userRole === "auto_shop_owner") {
-          const shopIncomplete = resolveShopIncompleteKindFromAuthFlags(data);
-          if (shopIncomplete) {
-            redirect = shopProfileCompletionPath(shopIncomplete);
-          }
+      const res = await fetch(`${API_BASE}/admin/verify-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...getAuthPayload(), otp: values.otp }),
+      });
+      const data = await res.json();
+      if (res.ok && data.token) {
+        const userRole = mapAdminStaffRole(data.role);
+        if (!ADMIN_PORTAL_ROLES.includes(userRole)) {
+          setStatus("This account type is not supported on the admin portal.");
+          return;
         }
-        navigate(redirect, { replace: true });
-      }, 800);
+
+        login({ token: data.token, role: userRole, permissions: data.permissions });
+        localStorage.setItem("permission", JSON.stringify(data.permissions ?? null));
+
+        setStatus("Login successful!");
+        const rawFrom = (location.state as { from?: unknown } | null)?.from;
+        const from =
+          typeof rawFrom === "string"
+            ? rawFrom
+            : rawFrom && typeof rawFrom === "object" && "pathname" in rawFrom
+              ? String((rawFrom as { pathname?: string }).pathname ?? "")
+              : "";
+        const redirect =
+          from.startsWith("/admin") && from !== "/admin" && from !== "/admin/"
+            ? from
+            : getPostLoginRedirect(userRole);
+        setTimeout(() => {
+          navigate(redirect, { replace: true });
+        }, 800);
+      } else {
+        setStatus(data?.message || "OTP verification failed");
+      }
     } catch {
       setStatus("An error occurred.");
     } finally {
@@ -211,7 +186,7 @@ export default function AdminSignInPage() {
       <div className="w-full max-w-3xl">
         <div className="relative">
           <p className="mb-2 text-right text-sm font-medium text-ad-green-dark md:absolute md:-top-7 md:right-0 md:mb-0">
-            Login to your account
+            Admin &amp; Staff Login
           </p>
 
           <div className="flex min-h-[320px] overflow-hidden rounded-xl bg-ad-mint shadow-[6px_6px_20px_rgba(0,0,0,0.12)] md:min-h-[360px]">

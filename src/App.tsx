@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -45,6 +45,8 @@ export default function App() {
 
           <Routes>
             <Route index path="/" element={<AdminSignInPage />} />
+            <Route path="/admin/login" element={<Navigate to="/admin" replace />} />
+            <Route path="/admin/signin" element={<Navigate to="/admin" replace />} />
 
             {adminRoutes}
             {ownerRoutes}
