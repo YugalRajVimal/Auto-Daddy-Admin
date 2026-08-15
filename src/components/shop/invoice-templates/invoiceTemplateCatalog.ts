@@ -9,17 +9,17 @@ export const DUMMY_INVOICE_TEMPLATES: ShopDocumentTemplate[] = [
   {
     id: "classic-invoice-v1",
     name: "Invoice Template - 1",
-    description: "Classic charcoal accents on the standard invoice layout.",
+    description: "Professional red invoice with bill-to, item table, and balance due.",
   },
   {
     id: "modern-invoice-v2",
     name: "Invoice Template - 2",
-    description: "Magenta accents on the standard invoice layout.",
+    description: "Magenta accents on the professional invoice layout.",
   },
   {
     id: "viewer-invoice-v1",
     name: "Invoice Template - 3",
-    description: "Blue viewer accents on the standard invoice layout.",
+    description: "Blue accents on the professional invoice layout.",
   },
 ];
 

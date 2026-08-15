@@ -23,22 +23,22 @@ export type InvoiceThemeTokens = {
 
 const CLASSIC_THEME: InvoiceThemeTokens = {
   id: "classic-invoice-v1",
-  accent: "#2f2f2f",
+  accent: "#DE4C3C",
   accentText: "#ffffff",
-  stripe: "#f5f5f5",
-  panel: "#2f2f2f",
-  title: "#111111",
-  border: "#d1d5db",
+  stripe: "#FBEAE8",
+  panel: "#DE4C3C",
+  title: "#1F2A37",
+  border: "#E5E7EB",
 };
 
 const MODERN_THEME: InvoiceThemeTokens = {
   id: "modern-invoice-v2",
   accent: "#d81b60",
   accentText: "#ffffff",
-  stripe: "#f5f5f5",
-  panel: "#f7f7f7",
-  title: "#d81b60",
-  border: "#e5e5e5",
+  stripe: "#FCE8F0",
+  panel: "#d81b60",
+  title: "#1F2A37",
+  border: "#E5E7EB",
 };
 
 /** Blue palette from invoice-job-card-viewer — also used for default job card previews. */

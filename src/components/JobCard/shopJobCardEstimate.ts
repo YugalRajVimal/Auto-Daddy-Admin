@@ -401,9 +401,16 @@ export function estimateDocumentNo(
 
 export function buildBusinessBlock(business: ShopProfileBusiness | null | undefined) {
   const name = s(business?.businessName) || "Auto Shop";
-  const address = [s(business?.address), s(business?.city)].filter(Boolean).join(", ");
+  const address = [
+    s(business?.businessAddress ?? business?.address),
+    s(business?.city),
+    s(business?.pincode),
+  ]
+    .filter(Boolean)
+    .join(", ");
   const phone = phoneDigits(business?.businessPhone);
-  return { name, address, phone: phone ? formatPhoneDisplay(phone) : "" };
+  const email = s(business?.email);
+  return { name, address, phone: phone ? formatPhoneDisplay(phone) : "", email };
 }
 
 export function buildCustomerBlock(job: Record<string, unknown>) {
@@ -417,7 +424,58 @@ export function buildCustomerBlock(job: Record<string, unknown>) {
   ]
     .filter(Boolean)
     .join(", ");
-  return { name, company, address };
+  const phoneRaw = s(customer?.phone ?? customer?.mobile ?? job.customerPhone);
+  const phoneDigitsOnly = phoneDigits(phoneRaw);
+  const email = s(customer?.email ?? job.customerEmail);
+  return {
+    name,
+    company,
+    address,
+    phone: phoneDigitsOnly ? formatPhoneDisplay(phoneDigitsOnly) : phoneRaw,
+    email,
+  };
+}
+
+export function addDaysToEstimateDate(value: unknown, days: number): string {
+  const raw = s(value);
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return "—";
+  d.setDate(d.getDate() + days);
+  return formatEstimateDate(d.toISOString());
+}
+
+export function currencySignFromCode(countryCode: string | null | undefined): string {
+  if (countryCode === "+91") return "₹";
+  if (countryCode === "+44") return "£";
+  return "$";
+}
+
+export function jobPaymentMethodLabel(job: Record<string, unknown>): string {
+  if (getWalletLedgerTab(job) === "cash") return "Cash";
+  const pm = s(job.paymentMethod ?? job.payment_method);
+  if (pm) return pm;
+  return "Online";
+}
+
+export function jobIsPaid(job: Record<string, unknown>): boolean {
+  const payment = s(job.paymentStatus).toLowerCase();
+  return payment.includes("paid");
+}
+
+export function jobTermsNotes(job: Record<string, unknown>): string[] {
+  const embedded = nested(job.business) ?? nested(job.businessProfile);
+  const terms = s(embedded?.termsAndConditions);
+  if (terms) {
+    return terms
+      .split(/(?<=\.)\s+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+  return [
+    "Payment must be received within 7 days.",
+    "Late payments may incur a 1.5% monthly late fee.",
+  ];
 }
 
 function formatOdometerReading(value: unknown): string {

@@ -23,12 +23,23 @@ export type InvoicePreviewCustomer = {
   address?: string;
 };
 
+export type InvoicePreviewPayment = {
+  method?: string;
+  holderName?: string;
+  cardNumber?: string;
+  zip?: string;
+};
+
 export type InvoicePreviewData = {
   invoiceNo: string;
   invoiceDate: string;
+  dueDate?: string;
   paymentMethod: string;
   accountId: string;
   accountName: string;
+  poNumber?: string;
+  vip?: boolean;
+  paidAmount?: number;
   shop: InvoicePreviewShop;
   customer: InvoicePreviewCustomer;
   items: InvoiceLineItem[];
@@ -38,6 +49,7 @@ export type InvoicePreviewData = {
   terms: string;
   signerName: string;
   signerTitle: string;
+  payment?: InvoicePreviewPayment;
   /** When set (e.g. from job card API totals), used instead of recalculating from line items. */
   totalsOverride?: {
     subTotal: number;
@@ -49,10 +61,14 @@ export type InvoicePreviewData = {
 
 export const DEFAULT_INVOICE_PREVIEW: InvoicePreviewData = {
   invoiceNo: "INV-10428",
-  invoiceDate: "July 12, 2026",
+  invoiceDate: "12/07/2026",
+  dueDate: "19/07/2026",
   paymentMethod: "Bank Transfer",
   accountId: "AD-88210",
   accountName: "Auto Daddy Shop",
+  poNumber: "PO-2026-10428",
+  vip: true,
+  paidAmount: 22,
   shop: {
     name: "Auto Daddy Shop",
     slogan: "Care that drives further",
@@ -101,9 +117,15 @@ export const DEFAULT_INVOICE_PREVIEW: InvoicePreviewData = {
   discountPercent: 2,
   currency: "CAD",
   terms:
-    "Payment is due within 15 days of the invoice date. A late charge may apply after the due date. All work is guaranteed for 90 days on labour.",
+    "Payment must be received within 7 days. Late payments may incur a 1.5% monthly late fee.",
   signerName: "Alex Rivera",
   signerTitle: "Shop Manager",
+  payment: {
+    method: "Bank Transfer",
+    holderName: "Auto Daddy Shop",
+    cardNumber: "3461546793621567",
+    zip: "90026",
+  },
 };
 
 export function mergeInvoicePreviewShop(
