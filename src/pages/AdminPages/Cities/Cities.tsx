@@ -7,11 +7,11 @@ import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import {
+  compactInputClass,
   CompactField,
   CompactFormFooter,
   CompactFormPanel,
   CompactFormRow,
-  compactInputClass,
 } from "../../../components/admin/ContentPanel";
 import AdminSearchCard, {
   emptyAdminSearchValues,
@@ -144,8 +144,23 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     }
   };
 
+  // Sort provinces by name, alphabetical order
+  const sortedProvinces = [...provinces].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+
+  // Helper for sorting cities alphabetically by name
+  function sortCitiesAlphabetically<T extends { name: string }>(array: T[]): T[] {
+    return [...array].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+  }
+
+  // Compose allCities using sorted province and sorted city lists
   const allCities: CityRow[] = selectedProvinceId
-    ? (provinces.find((p) => p._id === selectedProvinceId)?.cities || []).map((c) => {
+    ? sortCitiesAlphabetically(
+        (provinces.find((p) => p._id === selectedProvinceId)?.cities || [])
+      ).map((c) => {
         const province = provinces.find((p) => p._id === selectedProvinceId);
         return {
           ...c,
@@ -153,8 +168,8 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
           provinceId: selectedProvinceId,
         };
       })
-    : provinces.flatMap((p) =>
-        (p.cities || []).map((c) => ({
+    : sortedProvinces.flatMap((p) =>
+        sortCitiesAlphabetically(p.cities || []).map((c) => ({
           ...c,
           provinceName: p.name,
           provinceId: p._id,
@@ -163,18 +178,21 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
 
   const displayCities = isDeletedView ? deletedStash : allCities;
 
-  const filtered = displayCities.filter((c) => {
-    const live =
-      !search.trim() ||
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.provinceName.toLowerCase().includes(search.toLowerCase());
-    if (!live) return false;
-    return (
-      searchIncludes(c.name, searchFilters.city) &&
-      searchIncludes(c.provinceName, searchFilters.province) &&
-      searchEquals(c.status || "Active", searchFilters.status)
-    );
-  });
+  // Always present alphabetical order in UI table: cities in name order
+  const filtered = sortCitiesAlphabetically(
+    displayCities.filter((c) => {
+      const live =
+        !search.trim() ||
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.provinceName.toLowerCase().includes(search.toLowerCase());
+      if (!live) return false;
+      return (
+        searchIncludes(c.name, searchFilters.city) &&
+        searchIncludes(c.provinceName, searchFilters.province) &&
+        searchEquals(c.status || "Active", searchFilters.status)
+      );
+    })
+  );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
   const paged = filtered.slice((page - 1) * entriesPerPage, page * entriesPerPage);
@@ -404,7 +422,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
                   {...register("province")}
                 >
                   <option value="">Select Province</option>
-                  {provinces.map((p) => (
+                  {sortedProvinces.map((p) => (
                     <option key={p._id} value={p._id}>
                       {p.name}
                       {p.nickName ? ` (${p.nickName})` : ""}
@@ -490,7 +508,7 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
               className="border border-gray-400 bg-white px-2 py-1 text-xs"
             >
               <option value="">All Provinces</option>
-              {provinces.map((p) => (
+              {sortedProvinces.map((p) => (
                 <option key={p._id} value={p._id}>
                   {p.name}
                   {p.nickName ? ` (${p.nickName})` : ""}

@@ -671,23 +671,26 @@ export default function Domain() {
       return;
     }
 
-    const result = domainSchema.pick({ domain: true, url: true, expiryDate: true }).safeParse({
+    // Only validate domain as required field. Remove validation for expiry and provider/dns
+    // Modified Zod: only domain required, no expiry/provider/dns
+    const result = domainSchema.pick({ domain: true, url: true }).safeParse({
       domain: form.domain,
       url: form.domain,
-      expiryDate: form.expiry,
     });
     const nextErrors: Record<string, string> = {};
     if (!result.success) {
       for (const issue of result.error.issues) {
         const key = String(issue.path[0] ?? "form");
         // "url" issues describe the same Domain field as "domain" — surface under one field.
-        const uiKey = key === "url" ? "domain" : key === "expiryDate" ? "expiry" : key;
+        const uiKey = key === "url" ? "domain" : key;
         if (!nextErrors[uiKey]) nextErrors[uiKey] = issue.message;
       }
     }
     if (!form.userName) nextErrors.userName = "User Name is required.";
-    if (!form.provider) nextErrors.provider = "Provider is required.";
-    if (!form.dns) nextErrors.dns = "DNS is required.";
+    // Remove these required checks:
+    // if (!form.provider) nextErrors.provider = "Provider is required.";
+    // if (!form.dns) nextErrors.dns = "DNS is required.";
+    // if (!form.expiry) nextErrors.expiry = "Expiry is required."; // removed for optional
 
     if (Object.keys(nextErrors).length > 0) {
       setFormErrors(nextErrors);
@@ -709,9 +712,9 @@ export default function Domain() {
             userId: userId,
             domain: form.domain,
             domainType: form.domainType,
-            expiry: form.expiry,
-            provider: providerLabel(form.provider),
-            dns: form.dns,
+            expiry: form.expiry,       // May be empty!
+            provider: form.provider,   // Use value (labeling is fine)
+            dns: form.dns,             // May be empty!
           },
           {
             headers: {
@@ -726,7 +729,7 @@ export default function Domain() {
           `${API_URL}/api/admin/domains/${editId}`,
           {
             expiry: form.expiry,
-            provider: providerLabel(form.provider),
+            provider: form.provider,
             dns: form.dns,
           },
           {
@@ -1254,7 +1257,7 @@ export default function Domain() {
           </CompactField>
         </CompactFormRow>
         <CompactFormRow className="w-full items-start" columns={4}>
-          <CompactField label="Expiry (Date)" required className="w-full min-w-0">
+          <CompactField label="Expiry (Date)" className="w-full min-w-0">
             <input
               type="date"
               name="expiry"
@@ -1264,7 +1267,7 @@ export default function Domain() {
             />
             <FormFieldError message={formErrors.expiry} />
           </CompactField>
-          <CompactField label="Provider" required className="w-full min-w-0">
+          <CompactField label="Provider" className="w-full min-w-0">
             <select
               name="provider"
               value={form.provider}
@@ -1280,7 +1283,7 @@ export default function Domain() {
             </select>
             <FormFieldError message={formErrors.provider} />
           </CompactField>
-          <CompactField label="DNS" required className="w-full min-w-0">
+          <CompactField label="DNS" className="w-full min-w-0">
             <CompactAutoGrowTextarea
               name="dns"
               value={form.dns}

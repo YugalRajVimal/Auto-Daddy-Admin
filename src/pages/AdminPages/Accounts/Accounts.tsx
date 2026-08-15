@@ -1,5 +1,8 @@
 
 
+
+
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -58,7 +61,8 @@ import {
   toastValidationSummary,
   zodIssuesToFieldErrorMap,
 } from "../../../lib/validation/formUi";
- 
+import DatePicker from "react-datepicker";
+
 function buildLedgerSearchFields(variant: "expenses" | "income"): AdminSearchField[] {
   const fields: AdminSearchField[] = [
     { key: "date", label: "Date", type: "date" },
@@ -100,7 +104,7 @@ function buildLedgerSearchFields(variant: "expenses" | "income"): AdminSearchFie
   }
   return fields;
 }
- 
+
 // ---------------------------------------------------------------------------
 // API base + fetch helpers
 // ---------------------------------------------------------------------------
@@ -739,7 +743,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
 // Expenses / Income ledger page — now backed by
 // GET/POST/PATCH/DELETE /accounts/expenses and /accounts/income
 // ---------------------------------------------------------------------------
- 
+
 function LedgerPage({
   initialShowForm = false,
   title,
@@ -755,7 +759,7 @@ function LedgerPage({
   const vendorLabel = "Vendor";
   const billLabel = isExpense ? "Bill Number" : "Invoice Number";
   const listPath = isExpense ? "/accounts/expenses" : "/accounts/income";
- 
+
   const [banks, setBanks] = useState<BankRow[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>(() => cloneCategories(baseCategories));
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -774,7 +778,7 @@ function LedgerPage({
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingId, setEditingId] = useState<string | null>(null);
- 
+
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState("2026-06-20");
   const [paymentMode, setPaymentMode] = useState("");
@@ -849,7 +853,7 @@ function LedgerPage({
     setSearchFilters(empty);
     setShowSearchCard(false);
   };
- 
+
   const {
     viewMode,
     isDeletedView,
@@ -861,7 +865,7 @@ function LedgerPage({
     onToggle: resetTableControls,
     storageKey: "admin_deleted_view:accounts-ledger",
   });
- 
+
   const variantStash = useMemo(
     () =>
       deletedStash.filter((row) =>
@@ -869,14 +873,14 @@ function LedgerPage({
       ),
     [deletedStash, isExpense]
   );
- 
+
   const [categoriesPopupOpen, setCategoriesPopupOpen] = useState(false);
   const [subcategoriesPopupOpen, setSubcategoriesPopupOpen] = useState(false);
   const [categoriesDraft, setCategoriesDraft] = useState<string[]>([""]);
   const [subcategoriesDraft, setSubcategoriesDraft] = useState<string[]>([""]);
   const categoriesSnapshotRef = useRef<CategoryOption[]>([]);
   const subcategoriesSnapshotRef = useRef<{ value: string; label: string }[]>([]);
- 
+
   const categoryLabels = useMemo(() => categories.map((cat) => cat.label), [categories]);
   const selectedCategory = useMemo(
     () => categories.find((cat) => cat.value === category),
@@ -889,9 +893,9 @@ function LedgerPage({
   const selectedCategoryLabel = selectedCategory?.label ?? "";
   const selectedSubcategoryLabel =
     selectedCategory?.subcategories.find((sub) => sub.value === subcategory)?.label ?? subcategory;
- 
+
   const subcategoryOptions = useMemo(() => selectedCategory?.subcategories ?? [], [selectedCategory]);
- 
+
   const vendorOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const row of rows) {
@@ -902,16 +906,16 @@ function LedgerPage({
     }
     return [...seen.values()].sort((a, b) => a.localeCompare(b));
   }, [rows]);
- 
+
   const chequeAccountOptions = useMemo(() => {
     return banks
       .filter((b) => String(b.status).toLowerCase() === "active")
       .map((b) => b.BankName)
       .filter(Boolean);
   }, [banks]);
- 
+
   const bankOptions = useMemo(() => banks.map((b) => b.BankName).filter(Boolean), [banks]);
- 
+
   const loadBanks = async () => {
     try {
       const payload = await apiJson<any>("/accounts/banks");
@@ -920,7 +924,7 @@ function LedgerPage({
       adminNotify.error(err instanceof Error ? err.message : "Failed to load bank accounts.");
     }
   };
- 
+
   const loadRows = async () => {
     setLoading(true);
     try {
@@ -932,7 +936,7 @@ function LedgerPage({
       setLoading(false);
     }
   };
- 
+
   // Expense categories are backend-managed (fixed master list) via
   // /admin/accounts/expenses-category. Income categories remain a local,
   // client-only list — no API was provided for those.
@@ -947,7 +951,7 @@ function LedgerPage({
       setCategoriesLoading(false);
     }
   };
- 
+
   useEffect(() => {
     loadBanks();
     loadRows();
@@ -962,7 +966,7 @@ function LedgerPage({
     setShowSearchCard(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant]);
- 
+
   const handleCategoryChange = (nextCategoryLabel: string) => {
     if (!nextCategoryLabel) {
       setCategory("");
@@ -986,7 +990,7 @@ function LedgerPage({
     setCategory(match.value);
     setSubcategory("");
   };
- 
+
   const handleSubcategoryChange = (nextSubcategoryLabel: string) => {
     if (!nextSubcategoryLabel) {
       setSubcategory("");
@@ -998,7 +1002,7 @@ function LedgerPage({
     const match = subcategoryOptions.find((sub) => sub.label === nextSubcategoryLabel);
     setSubcategory(match?.value ?? nextSubcategoryLabel);
   };
- 
+
   const openCategoriesPopup = () => {
     categoriesSnapshotRef.current = cloneCategories(categories);
     setCategoriesDraft(categoryLabels.length ? [...categoryLabels] : [""]);
@@ -1262,13 +1266,13 @@ function LedgerPage({
     setAttachmentFile(null);
     setFormErrors({});
   };
- 
+
   const openAdd = () => {
     resetForm();
     setShowSearchCard(false);
     setShowForm(true);
   };
- 
+
   const openEdit = (row: ExpenseRow | IncomeRow) => {
     const decoded = decodeCategory(row.category);
     setEditingId(row._id);
@@ -1276,12 +1280,12 @@ function LedgerPage({
     setDate(row.date);
     setVendor(row.vendor);
     setNotes(row.notes ?? "");
- 
+
     const catMatch = categories.find((c) => c.label === decoded.category);
     setCategory(catMatch?.value ?? "");
     const subMatch = catMatch?.subcategories.find((s) => s.label === decoded.subcategory);
     setSubcategory(subMatch?.value ?? decoded.subcategory ?? "");
- 
+
     if (isExpense) {
       const exp = row as ExpenseRow;
       setGst(Boolean(exp.gst));
@@ -1299,11 +1303,11 @@ function LedgerPage({
       setAttachAttachment(Boolean(inc.incomeImage));
       setAttachmentFile(null);
     }
- 
+
     setShowSearchCard(false);
     setShowForm(true);
   };
- 
+
   const openSearchCard = () => {
     setShowForm(false);
     setEditingId(null);
@@ -1329,7 +1333,7 @@ function LedgerPage({
     resetForm();
     setShowForm(false);
   };
- 
+
   const handleSave = async () => {
     if (savingRef.current) return;
 
@@ -1360,14 +1364,14 @@ function LedgerPage({
     const normalizedPaymentMode = values.paymentMode;
 
     const combinedCategory = encodeCategory(selectedCategoryLabel, selectedSubcategoryLabel);
- 
+
     const formData = new FormData();
     formData.set("date", date);
     formData.set("vendor", normalizedVendor);
     formData.set("amount", String(parsedAmount));
     formData.set("category", combinedCategory);
     formData.set("notes", notes);
- 
+
     if (isExpense) {
       formData.set("gst", gst && gstAmount.trim() ? gstAmount.trim() : "0");
       if (hasBillNumber && billNumber.trim()) formData.set("billNumber", billNumber.trim());
@@ -1379,7 +1383,7 @@ function LedgerPage({
       if (bank) formData.set("bank", bank);
       if (attachAttachment && attachmentFile) formData.set("incomeImage", attachmentFile);
     }
- 
+
     savingRef.current = true;
     setSaving(true);
     try {
@@ -1399,39 +1403,37 @@ function LedgerPage({
       setSaving(false);
     }
   };
- 
-  const handleDeleteRow = async (id: string) => {
-    if (!window.confirm("Delete this entry?")) return;
-    const row = rows.find((r) => r._id === id);
-    try {
-      await apiJson<any>(`${listPath}/${id}`, { method: "DELETE" });
-      if (row) stashDeleted(row);
-      adminNotify.success("Entry deleted.");
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-      await loadRows();
-    } catch (err) {
-      adminNotify.error(err instanceof Error ? err.message : "Failed to delete entry.");
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Delete ${selected.size} selected entr${selected.size === 1 ? "y" : "ies"}?`)) return;
+    const ids = [...selected];
+    const rowsById = new Map(rows.map((r) => [r._id, r]));
+    const deletedRows: typeof rows = [];
+    const remaining: string[] = [];
+    // The API has no bulk-delete endpoint, so loop the single-delete call
+    // for every selected row.
+    for (const id of ids) {
+      try {
+        await apiJson<any>(`${listPath}/${id}`, { method: "DELETE" });
+        const row = rowsById.get(id);
+        if (row) deletedRows.push(row);
+      } catch (err) {
+        remaining.push(id);
+        adminNotify.error(
+          err instanceof Error ? err.message : `Failed to delete entry ${id}.`
+        );
+      }
     }
+    if (deletedRows.length > 0) stashDeleted(deletedRows);
+    if (deletedRows.length > 0) {
+      adminNotify.success(
+        `${deletedRows.length} entr${deletedRows.length === 1 ? "y" : "ies"} deleted.`
+      );
+    }
+    setSelected(new Set(remaining));
+    await loadRows();
   };
- 
-  // const handleBulkDelete = async () => {
-  //   if (selected.size === 0) return;
-  //   if (!window.confirm(`Delete ${selected.size} selected entr${selected.size === 1 ? "y" : "ies"}?`)) return;
-  //   const toStash = rows.filter((r) => selected.has(r._id));
-  //   try {
-  //     await Promise.all([...selected].map((id) => apiJson<any>(`${listPath}/${id}`, { method: "DELETE" })));
-  //     if (toStash.length > 0) stashDeleted(toStash);
-  //     adminNotify.success("Selected entries deleted.");
-  //     setSelected(new Set());
-  //     await loadRows();
-  //   } catch (err) {
-  //     adminNotify.error(err instanceof Error ? err.message : "Failed to delete selected entries.");
-  //   }
-  // };
  
   const handleRestore = async (ids?: string[]) => {
     const selectedIds = ids ?? [...selected];
@@ -1471,7 +1473,7 @@ function LedgerPage({
     );
     await loadRows();
   };
- 
+
   return (
     <AdminPage
       title={isDeletedView ? `Deleted ${title}` : title}
@@ -1496,8 +1498,8 @@ function LedgerPage({
                       ? "Updating…"
                       : "Saving…"
                     : editingId != null
-                      ? "Update"
-                      : "Save"
+                    ? "Update"
+                    : "Save"
                 }
                 onSave={() => void handleSave()}
                 onCancel={saving ? undefined : handleCancel}
@@ -1559,17 +1561,23 @@ function LedgerPage({
                 }`}
               >
                 <CompactField label="Date" required className="w-full flex-none">
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => {
-                      setDate(e.target.value);
+                  <DatePicker
+                    selected={date ? new Date(date) : null}
+                    onChange={(dateValue: Date | null) => {
+                      const val = dateValue instanceof Date && !isNaN(dateValue.getTime()) 
+                        ? dateValue.toISOString().slice(0, 10) 
+                        : "";
+                      setDate(val);
                       clearFieldError("date");
                     }}
+               
+                    dateFormat="yyyy-MM-dd"
+                    placeholderText="Select date"
                     className={fieldErrorClass(Boolean(formErrors.date), compactInputClass)}
                   />
                   <FormFieldError message={formErrors.date} />
                 </CompactField>
+          
                 {isExpense ? (
                   <div className="mt-3">
                     <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
@@ -1804,16 +1812,15 @@ function LedgerPage({
             Archive
           </button>
           {!isDeletedView ? (
-            <>
-            </>
-            // <button
-            //   type="button"
-            //   disabled={selected.size === 0}
-            //   onClick={handleBulkDelete}
-            //   className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-            // >
-            //   Delete
-            // </button>
+            selected.size > 0 && (
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                className="bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+            )
           ) : (
             <button
               type="button"
@@ -1869,10 +1876,10 @@ function LedgerPage({
       </div>
  
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm whitespace-nowrap">
+        <table className="w-full table-fixed border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="w-10 border border-ad-purple-dark px-2 py-2 text-center">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -1880,30 +1887,32 @@ function LedgerPage({
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">{vendorLabel}</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Amount</th>
+              <th className="w-28 border border-ad-purple-dark px-2 py-2 text-center font-medium">Date</th>
+              <th className="w-24 border border-ad-purple-dark px-2 py-2 text-center font-medium">{vendorLabel}</th>
+              <th className="w-20 border border-ad-purple-dark px-2 py-2 text-center font-medium">Amount</th>
               {isIncome ? (
-                <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Payment Mode</th>
+                <th className="w-24 border border-ad-purple-dark px-2 py-2 text-center font-medium">Payment Mode</th>
               ) : null}
               {isIncome ? (
-                <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Bank</th>
+                <th className="w-20 border border-ad-purple-dark px-2 py-2 text-center font-medium">Bank</th>
               ) : null}
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Category</th>
+              <th className="w-24 border border-ad-purple-dark px-2 py-2 text-center font-medium">Category</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Notes</th>
               {isExpense ? (
                 <>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">GST</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Bill Number</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">By Cheque</th>
+                  <th className="w-16 border border-ad-purple-dark px-2 py-2 text-center font-medium">GST</th>
+                  <th className="w-20 border border-ad-purple-dark px-2 py-2 text-center font-medium">Bill Number</th>
+                  <th className="w-20 border border-ad-purple-dark px-2 py-2 text-center font-medium">By Cheque</th>
                 </>
               ) : null}
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+              <th className="w-16 border border-ad-purple-dark px-2 py-2 text-center font-medium">
                 {isIncome ? "Attachment" : "Clip"}
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
-                {isDeletedView ? "Restore" : "Delete"}
-              </th>
+              {isDeletedView ? (
+                <th className="w-16 border border-ad-purple-dark px-2 py-2 text-center font-medium">
+                  Restore
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -1935,7 +1944,7 @@ function LedgerPage({
                         className="accent-ad-purple"
                       />
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center">
                       <button
                         type="button"
                         onClick={() => openEdit(row)}
@@ -1945,32 +1954,40 @@ function LedgerPage({
                         {formatDisplayDate(row.date)}
                       </button>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center uppercase" title={row.vendor}>
+                      {row.vendor}
+                    </td>
+                    <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center">
                       {row.amount % 1 === 0 ? row.amount : row.amount.toFixed(2)}
                     </td>
                     {isIncome ? (
-                      <td className="border border-gray-300 px-3 py-2 text-center">{incomeRow.paymentMode || ""}</td>
+                      <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center" title={incomeRow.paymentMode || ""}>
+                        {incomeRow.paymentMode || ""}
+                      </td>
                     ) : null}
                     {isIncome ? (
-                      <td className="border border-gray-300 px-3 py-2 text-center">{incomeRow.bank || ""}</td>
+                      <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center" title={incomeRow.bank || ""}>
+                        {incomeRow.bank || ""}
+                      </td>
                     ) : null}
-                    <td className="border border-gray-300 px-3 py-2 text-center">
-                      <div>
-                        <div className="font-bold leading-tight">{decoded.category}</div>
-                        <div className="text-xs text-gray-500">{decoded.subcategory}</div>
+                    <td className="overflow-hidden border border-gray-300 px-2 py-2 text-center">
+                      <div className="overflow-hidden text-ellipsis whitespace-nowrap font-bold leading-tight" title={decoded.category}>
+                        {decoded.category}
+                      </div>
+                      <div className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-gray-500" title={decoded.subcategory}>
+                        {decoded.subcategory}
                       </div>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.notes || ""}</td>
+                    <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words">{row.notes || ""}</td>
                     {isExpense ? (
                       <>
-                        <td className="border border-gray-300 px-3 py-2 text-center">
+                        <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center">
                           {expenseRow.gst ? `${expenseRow.gst} CAD` : "No"}
                         </td>
-                        <td className="border border-gray-300 px-3 py-2 text-center">
+                        <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center" title={expenseRow.billNumber || ""}>
                           {expenseRow.billNumber || "—"}
                         </td>
-                        <td className="border border-gray-300 px-3 py-2 text-center">
+                        <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center" title={expenseRow.byCheque ? (expenseRow.account ? `Yes (${expenseRow.account})` : "Yes") : "No"}>
                           {expenseRow.byCheque
                             ? expenseRow.account
                               ? `Yes (${expenseRow.account})`
@@ -1979,7 +1996,7 @@ function LedgerPage({
                         </td>
                       </>
                     ) : null}
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="overflow-hidden border border-gray-300 px-2 py-2 text-center">
                       {attachmentUrl ? (
                         <span className="inline-flex items-center gap-2">
                           <ClipImageHover
@@ -1992,8 +2009,8 @@ function LedgerPage({
                         <span className="text-gray-500">--</span>
                       )}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
-                      {isDeletedView ? (
+                    {isDeletedView ? (
+                      <td className="overflow-hidden border border-gray-300 px-2 py-2 text-center">
                         <button
                           type="button"
                           onClick={() => handleRestore([row._id])}
@@ -2001,16 +2018,8 @@ function LedgerPage({
                         >
                           Restore
                         </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRow(row._id)}
-                          className="text-blue-700 hover:underline"
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </td>
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })
@@ -2052,21 +2061,3 @@ export default function AccountsPage({ initialShowForm = false, title = "Account
   }
   return <BankAccountsPage initialShowForm={initialShowForm} title={title} />;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

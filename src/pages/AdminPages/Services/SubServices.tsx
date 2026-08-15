@@ -185,6 +185,9 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingRow, setEditingRow] = useState<SubServiceRow | null>(null);
 
+  // ---- Services Dropdown Filter State ----
+  const [filterServiceId, setFilterServiceId] = useState<"all" | string>("all");
+
   const {
     register,
     handleSubmit,
@@ -202,6 +205,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     setPage(1);
     setSelected(new Set());
     setSearch("");
+    setFilterServiceId("all");
     const empty = emptyAdminSearchValues(searchFields);
     setSearchDraft(empty);
     setSearchFilters(empty);
@@ -262,7 +266,12 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
   const displayRows = isDeletedView ? deletedStash : allRows;
 
-  const tableRows = displayRows.filter((r) => {
+  // Apply top-level filterServiceId if not "all"
+  const filteredRows = filterServiceId === "all"
+    ? displayRows
+    : displayRows.filter(r => r.categoryId === filterServiceId);
+
+  const tableRows = filteredRows.filter((r) => {
     const q = search.toLowerCase();
     const live =
       !search.trim() ||
@@ -606,6 +615,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
         </div>
       )}
 
+      {/* Top Actions Row */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
           {!isDeletedView ? (
@@ -636,6 +646,27 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* --- Service Dropdown beside live search --- */}
+          <div className="flex items-center gap-1 text-xs text-gray-700">
+            <span>Service:</span>
+            <select
+              value={filterServiceId}
+              onChange={e => {
+                setFilterServiceId(e.target.value as "all" | string);
+                setPage(1);
+                setSelected(new Set());
+              }}
+              className="border border-gray-400 bg-white px-2 py-1 text-xs"
+              style={{ minWidth: 110 }}
+            >
+              <option value="all">All</option>
+              {services.map((svc) => (
+                <option key={svc._id} value={svc._id}>
+                  {svc.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <input
             type="text"
             value={search}

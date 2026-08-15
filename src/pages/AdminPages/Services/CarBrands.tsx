@@ -30,16 +30,12 @@ import {
 
 // Helper to get token and provide correct header for admin token (no Bearer)
 const getAdminAuthHeaders = () => {
-  // Try localStorage, then sessionStorage, then cookies.
   let token =
     window.localStorage.getItem("admin-token") ||
     window.sessionStorage.getItem("admin-token") ||
     (document.cookie.split("; ").find((row) => row.startsWith("admin-token=")) || "")
       .split("=")[1];
-
-  // If not found, set as empty string
   if (!token) token = "";
-
   return {
     Authorization: token,
   };
@@ -95,7 +91,6 @@ type ListEditorPopupProps = {
   onCancel: () => void;
   placeholder?: string;
   inputMode?: "text" | "numeric";
-  /** When provided, each item gets a pencil icon to rename it in place. */
   onRename?: (oldValue: string, newValue: string) => Promise<boolean> | boolean;
 };
 
@@ -125,17 +120,14 @@ function ListEditorPopup({
   };
 
   const removeItem = (idx: number) => onChange(items.filter((_, i) => i !== idx));
-
   const startEdit = (idx: number) => {
     setEditingIdx(idx);
     setEditDraft(items[idx]);
   };
-
   const cancelEdit = () => {
     setEditingIdx(null);
     setEditDraft("");
   };
-
   const commitEdit = async () => {
     if (editingIdx === null) return;
     const oldValue = items[editingIdx];
@@ -331,7 +323,6 @@ function ComboSelectWithEditor({
       : placeholder || "Select"
     : value || placeholder || "Select";
 
-  // Sort options alphabetically (use memo so it's not sorted on every render)
   const sortedOptions = useMemo(
     () => [...options].sort((a, b) => a.localeCompare(b)),
     [options]
@@ -463,19 +454,16 @@ function InlineModelSelector({
   className?: string;
 }) {
   const [inputValue, setInputValue] = useState("");
-
   const sortedOptions = useMemo(
     () => [...options].sort((a, b) => a.localeCompare(b)),
     [options]
   );
-
   const handleAdd = () => {
     const v = inputValue.trim();
     if (!v || disabled) return;
     onAddModel(v);
     setInputValue("");
   };
-
   return (
     <CompactField label={label} required={required} className={className ?? equalThirdFieldClass}>
       <div className={`rounded border border-gray-400 bg-white ${disabled ? "opacity-60" : ""}`}>
@@ -589,7 +577,6 @@ function flattenCompanies(companies: CarCompany[]): TableRow[] {
       });
     }
   }
-  // Sort rows alphabetically by make, then by model
   rows.sort((a, b) => {
     const makeCmp = (a.make || "").localeCompare(b.make || "");
     if (makeCmp !== 0) return makeCmp;
@@ -628,9 +615,11 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   const [makesPopupOpen, setMakesPopupOpen] = useState(false);
   const [makesDraft, setMakesDraft] = useState<string[]>([]);
   const [sessionMakeNames, setSessionMakeNames] = useState<string[]>([]);
-  // Multi-select: all models currently selected/associated for the chosen make
   const [selectedModelNames, setSelectedModelNames] = useState<string[]>([]);
   const makesSnapshotRef = useRef<string[]>([]);
+
+  // Filter state for Make dropdown (not searchFilters)
+  const [filterMakeValue, setFilterMakeValue] = useState<string>("");
 
   const resetTableControls = () => {
     setPage(1);
@@ -687,11 +676,13 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   );
 
   const filtered = tableRows.filter((r) => {
-    const live =
+    const matchesLive =
       !search.trim() ||
       r.make.toLowerCase().includes(search.toLowerCase()) ||
       r.model.toLowerCase().includes(search.toLowerCase());
-    if (!live) return false;
+    if (!matchesLive) return false;
+    // Apply filterMakeValue if set
+    if (filterMakeValue && r.make !== filterMakeValue) return false;
     return (
       searchIncludes(r.make, searchFilters.make) &&
       searchIncludes(r.model, searchFilters.model) &&
@@ -699,7 +690,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     );
   });
 
-  // Sort the filtered rows alphabetically by make, then model
   const sortedFiltered = useMemo(
     () =>
       [...filtered].sort((a, b) => {
@@ -756,7 +746,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     if (brandLogoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(brandLogoPreviewUrl);
     setBrandLogoPreviewUrl(null);
     setAttachBrandLogo(false);
-    // Select ALL models already associated with this make
     const allModelNames = (company.models ?? [])
       .map((m) => m.modelName.trim())
       .filter(Boolean);
@@ -850,7 +839,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
       )
     );
     const newlyAdded = names.filter((n) => !previousOptions.has(n.toLowerCase()));
-
     const newSession = names.filter(
       (n) => !companyMakeNames.some((c) => c.toLowerCase() === n.toLowerCase())
     );
@@ -882,16 +870,9 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     setMakesPopupOpen(false);
   };
 
-  /**
-   * Renames a make. If it belongs to an already-saved company, persists the
-   * rename immediately via PATCH (keeping its models/country/logo intact).
-   * If it's only a session/local name (not yet saved), just relabels it.
-   * Also keeps the currently-selected `make` field in sync if it was renamed.
-   */
   const handleRenameMake = async (oldName: string, newName: string): Promise<boolean> => {
     const trimmedNew = newName.trim();
     if (!trimmedNew) return false;
-
     const existingCompany = companies.find(
       (c) => c.companyName.toLowerCase() === oldName.toLowerCase()
     );
@@ -966,7 +947,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     }
   };
 
-  // Toggle a single model in/out of the multi-select
   const toggleSelectedModel = (modelName: string) => {
     setSelectedModelNames((prev) =>
       prev.includes(modelName)
@@ -975,7 +955,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     );
   };
 
-  // Add a brand-new model to the pool for this make, and auto-select it.
   const addModelInline = (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -991,7 +970,6 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
     );
   };
 
-  // Remove a model entirely from the pool for this make.
   const removeModelInline = (name: string) => {
     setModelRows((prev) => {
       const next = prev.filter((m) => m.modelName.toLowerCase() !== name.toLowerCase());
@@ -1014,8 +992,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
       const modelName = m.modelName.trim();
       if (!modelName) continue;
       const key = modelName.toLowerCase();
-      const existing = byName.get(key);
-      if (existing) continue;
+      if (byName.has(key)) continue;
       byName.set(key, { modelName });
     }
     return [...byName.values()];
@@ -1099,26 +1076,24 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
 
   const handleToolbarDelete = async () => {
     if (selected.size === 0) return;
-  
+
     const rows = [...selected]
       .map(findRowById)
-      .filter((r): r is TableRow => !!r && r.model !== "—"); // skip "no models" placeholder rows
-  
+      .filter((r): r is TableRow => !!r && r.model !== "—");
+
     if (rows.length === 0) return;
-  
+
     const label =
       rows.length === 1 ? `${rows[0].make} - ${rows[0].model}` : `${rows.length} models`;
     if (!window.confirm(`Remove ${label}?`)) return;
-  
-    // Group selected rows by companyId so each make gets a single PATCH call
-    // removing all of its selected models at once.
+
     const byCompany = new Map<string, TableRow[]>();
     for (const r of rows) {
       const arr = byCompany.get(r.companyId) ?? [];
       arr.push(r);
       byCompany.set(r.companyId, arr);
     }
-  
+
     setActionLoading(true);
     setError("");
     setSuccessMsg("");
@@ -1126,18 +1101,18 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
       for (const [companyId, rowsForCompany] of byCompany) {
         const company = companies.find((c) => c._id === companyId);
         if (!company) continue;
-  
+
         const removeNames = new Set(rowsForCompany.map((r) => r.model.toLowerCase()));
         const remainingModels = (company.models || [])
           .filter((m) => !removeNames.has(m.modelName.toLowerCase()))
           .map((m) => ({ modelName: m.modelName.trim() }))
           .filter((m) => m.modelName);
-  
+
         const formData = new FormData();
         formData.append("companyName", company.companyName);
         formData.append("models", JSON.stringify(remainingModels));
         formData.append("country", "Canada");
-  
+
         await axios.patch(
           `${API_BASE}/admin/car-company/${companyId}`,
           formData,
@@ -1149,7 +1124,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
           }
         );
       }
-  
+
       adminNotify.success("Model(s) removed.");
       setSuccessMsg("Model(s) removed.");
       setSelected(new Set());
@@ -1222,6 +1197,15 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   const formMessage = editingCompany
     ? "You are updating a 'Car Brand'"
     : "You are creating a 'Car Brand'";
+
+  // -- NEW: helper to get all makes to show in dropdown (unique, sorted) --
+  const allAvailableMakes = useMemo(
+    () =>
+      dedupeStrings(
+        (isDeletedView ? deletedStash : companies).map((c) => c.companyName)
+      ).sort((a, b) => a.localeCompare(b)),
+    [isDeletedView, companies, deletedStash]
+  );
 
   return (
     <AdminPage
@@ -1375,6 +1359,25 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
           </button>
         </div>
         <div className="flex items-center gap-1">
+
+          {/* --- Make Filter Dropdown --- */}
+          <select
+            className="border border-gray-400 px-1.5 py-1 text-xs bg-white text-gray-700"
+            value={filterMakeValue}
+            onChange={e => {
+              setFilterMakeValue(e.target.value);
+              setPage(1);
+            }}
+            style={{ minWidth: 110 }}
+          >
+            <option value="">All Makes</option>
+            {allAvailableMakes.map(m => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+
           <input
             type="text"
             value={search}

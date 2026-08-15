@@ -692,8 +692,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                     {new Date(row.date).toISOString().slice(0, 10)}
                   </button>
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]" style={{ width: "26%" }}>{row.subject}</td>
-                <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]" style={{ width: "36%" }}>{row.notes}</td>
+                <td className="border border-gray-300 px-3 py-2 text-left  whitespace-normal break-words min-w-[200px]" style={{ width: "26%" }}>{row.subject}</td>
+                <td className="border border-gray-300 px-3 py-2 text-left  whitespace-normal break-words min-w-[240px]" style={{ width: "36%" }}>{row.notes}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">{row.likes ?? 0}</td>
                 <td className="border border-gray-300 px-3 py-2 text-center">
                   {(row.imageUrl || row.image) ? (
