@@ -567,16 +567,23 @@ const SubAdminAppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}>
 
       {/* Header */}
-      <div className={`flex items-center gap-3 px-4 py-5 bg-[#1a202c] border-b border-white/10 flex-shrink-0 ${isCollapsed ? "justify-center" : "justify-start"}`}>
-        <div className="w-9 h-9 rounded-lg bg-[#38a169] flex items-center justify-center flex-shrink-0">
-          <span className="text-white font-bold text-base">A</span>
-        </div>
-        {!isCollapsed && (
-          <Link to="/" className="flex items-center gap-1 select-none">
-            <span className="text-white font-extrabold text-xl tracking-wide uppercase">Auto</span>
-            <span className="text-white font-bold text-xl tracking-widest uppercase">Daddy</span>
-          </Link>
-        )}
+      <div className={`flex items-center gap-3 px-4 py-4 bg-[#1a202c] border-b border-white/10 flex-shrink-0 ${isCollapsed ? "justify-center" : "justify-start"}`}>
+        <Link
+          to="/"
+          className={`flex items-center justify-center overflow-hidden ${
+            isCollapsed ? "h-10 w-10" : ""
+          }`}
+        >
+          <img
+            src={isCollapsed ? "/favicon.png" : "/logo.png"}
+            alt="AutoDaddy"
+            className={
+              isCollapsed
+                ? "h-8 w-8 object-contain"
+                : "h-auto w-full max-h-12 max-w-[200px] object-contain"
+            }
+          />
+        </Link>
       </div>
 
       {/* Nav */}

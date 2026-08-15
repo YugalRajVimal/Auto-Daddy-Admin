@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import AdminPage from "../../../components/admin/AdminPage";
+import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
@@ -265,6 +265,12 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     setFormErrors({});
   };
 
+  const openAdd = () => {
+    setShowSearchCard(false);
+    resetForm();
+    setShowForm(true);
+  };
+
   const openSearchCard = () => {
     setShowForm(false);
     setSearchDraft({ ...searchFilters });
@@ -392,6 +398,9 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Web - Temp" : "Web - Temp"}
+      headerAction={
+        !showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined
+      }
       between={
         showSearchCard ? (
           <AdminSearchCard

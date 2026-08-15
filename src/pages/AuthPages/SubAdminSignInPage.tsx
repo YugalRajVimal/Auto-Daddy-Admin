@@ -65,7 +65,7 @@ export default function SubAdminSignInPage() {
 
       <div className="flex w-full max-w-3xl overflow-hidden rounded-3xl border border-ad-green/30 bg-ad-mint shadow-[8px_8px_24px_rgba(0,0,0,0.12)]">
         <div className="hidden w-1/2 flex-col items-center justify-center border-r border-ad-green/40 p-8 md:flex">
-          <img src={LOGO} alt="AutoDaddy" className="mb-6 h-auto w-full max-w-[280px] object-contain" />
+          <img src={LOGO} alt="AutoDaddy" className="mb-6 h-auto w-full max-w-[320px] object-contain" />
           <p className="text-center font-serif italic text-ad-green-dark">
             A Digital Bridge - that connects with
           </p>
@@ -76,7 +76,7 @@ export default function SubAdminSignInPage() {
 
         <div className="flex w-full flex-col justify-center p-8 md:w-1/2">
           <div className="mb-6 flex justify-center md:hidden">
-            <img src={LOGO} alt="AutoDaddy" className="h-auto w-full max-w-[220px] object-contain" />
+            <img src={LOGO} alt="AutoDaddy" className="h-auto w-full max-w-[280px] object-contain" />
           </div>
 
           {status && (

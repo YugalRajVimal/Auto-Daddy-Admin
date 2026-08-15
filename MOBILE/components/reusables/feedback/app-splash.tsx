@@ -25,9 +25,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
   },
   logo: {
-    width: "82%",
-    maxWidth: 360,
-    height: 120,
+    width: "88%",
+    maxWidth: 380,
+    height: 118,
     marginBottom: spacing.xxl,
   },
   loadingRow: {

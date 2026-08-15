@@ -104,26 +104,12 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
         ]}
       >
         <View style={styles.topRow}>
-          <View>
-            <Text
-              style={[
-                styles.brandTop,
-                isCarOwner ? styles.brandTopCarOwner : null,
-                isAssociate ? styles.brandTopAssociate : null,
-              ]}
-            >
-              Auto
-            </Text>
-            <Text
-              style={[
-                styles.brandBottom,
-                isCarOwner ? styles.brandBottomCarOwner : null,
-                isAssociate ? styles.brandBottomAssociate : null,
-              ]}
-            >
-              Daddy
-            </Text>
-          </View>
+          <Image
+            source={require("../../assets/images/logo-rectangle.png")}
+            style={styles.brandLogo}
+            resizeMode="contain"
+            accessibilityLabel="AutoDaddy"
+          />
           <Pressable onPress={() => props.navigation.closeDrawer()} style={styles.closeBtn}>
             <Ionicons
               name="close"
@@ -317,12 +303,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.md,
   },
-  brandTop: { color: colors.primaryBlue900, fontSize: fontSizes.lg, fontWeight: "700" },
-  brandBottom: { color: colors.primaryBlue900, fontSize: fontSizes.xxl, fontWeight: "900", marginTop: -4 },
-  brandTopCarOwner: { color: colors.successDark },
-  brandBottomCarOwner: { color: colors.successDark },
-  brandTopAssociate: { color: associateColors.primaryDark },
-  brandBottomAssociate: { color: associateColors.primaryDark },
+  brandLogo: {
+    width: 176,
+    height: 54,
+  },
   closeBtn: {
     width: 34,
     height: 34,

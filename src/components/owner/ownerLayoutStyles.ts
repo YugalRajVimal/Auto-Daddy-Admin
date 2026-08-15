@@ -46,7 +46,7 @@ export const ownerDashboardTitleClass =
  * Mild short-height overrides live under `.owner-portal` in index.css.
  */
 export const ownerChromeLogoClass =
-  "owner-chrome-logo block h-auto w-auto max-h-10 max-w-[180px] object-contain drop-shadow-sm sm:max-h-12 sm:max-w-[220px] md:max-h-14 md:max-w-[260px] 2xl:max-h-16 2xl:max-w-[300px]";
+  "owner-chrome-logo block h-auto w-auto max-h-12 max-w-[200px] object-contain drop-shadow-sm sm:max-h-14 sm:max-w-[240px] md:max-h-16 md:max-w-[280px] 2xl:max-h-[4.5rem] 2xl:max-w-[320px]";
 
 export const ownerChromeHeaderPadClass =
   "owner-chrome-header pt-2.5 pb-2 sm:pt-3 sm:pb-2.5 2xl:pt-3.5 2xl:pb-3";

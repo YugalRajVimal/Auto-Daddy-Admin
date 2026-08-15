@@ -80,7 +80,7 @@ const SupervisorHeader: React.FC<HeaderProps> = ({ onClick, onToggle }) => {
           </button>
 
           <Link to="/" className="lg:hidden">
-            <img src="/logo.png" alt="AutoDaddy" className="h-9 w-auto max-w-[168px] object-contain" />
+            <img src="/logo.png" alt="AutoDaddy" className="h-11 w-auto max-w-[200px] object-contain" />
           </Link>
 
           <button

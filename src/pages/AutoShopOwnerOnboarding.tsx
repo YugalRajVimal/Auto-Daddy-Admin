@@ -199,7 +199,7 @@ const AutoShopOwnerOnboarding: React.FC = () => {
       <div className="max-w-lg w-full mx-auto bg-white rounded-3xl shadow-2xl border border-gray-200 p-0 overflow-hidden">
         {/* Header with logo and title */}
         <div className="bg-primary-700 py-7 px-8 flex flex-col items-center">
-          <img src="/logo.png" alt="AutoDaddy" className="mb-3 h-auto w-full max-w-[220px] object-contain" />
+          <img src="/logo.png" alt="AutoDaddy" className="mb-3 h-auto w-full max-w-[280px] object-contain" />
           <h1 className="text-3xl font-bold text-gray-900 text-center">
             AutoShop Owner Onboarding
           </h1>

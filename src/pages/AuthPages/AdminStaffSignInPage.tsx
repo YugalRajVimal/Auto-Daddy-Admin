@@ -194,7 +194,7 @@ export default function AdminStaffSignInPage() {
               <img
                 src={LOGO}
                 alt="AutoDaddy"
-                className="mb-6 block h-auto w-full max-w-[260px] shrink-0 object-contain lg:max-w-[300px]"
+                className="mb-6 block h-auto w-full max-w-[300px] shrink-0 object-contain lg:max-w-[340px]"
               />
               <p className="max-w-[220px] text-center font-serif text-sm italic leading-relaxed text-ad-green-dark">
                 A Digital Bridge - that connects with
@@ -209,7 +209,7 @@ export default function AdminStaffSignInPage() {
                 <img
                   src={LOGO}
                   alt="AutoDaddy"
-                  className="block h-auto w-full max-w-[240px] object-contain"
+                  className="block h-auto w-full max-w-[280px] object-contain"
                 />
               </div>
 

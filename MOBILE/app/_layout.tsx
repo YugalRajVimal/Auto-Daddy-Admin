@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   bootLogo: {
     width: "100%",
     // Match the native Android splash icon scale (avoid a noticeable jump).
-    maxWidth: 260,
-    height: 70,
+    maxWidth: 300,
+    height: 96,
   },
 });
