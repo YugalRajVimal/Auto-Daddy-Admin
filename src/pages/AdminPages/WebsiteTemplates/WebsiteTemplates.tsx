@@ -72,6 +72,27 @@ const API_BASE =
     ? `${import.meta.env.VITE_API_URL}/api/admin/common`
     : "/api";
 
+function shouldDebugApi(): boolean {
+  if (!import.meta.env.DEV) return false;
+  try {
+    return window.localStorage.getItem("debug:api") !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function debugApi(method: string, url: string, request: unknown, response: unknown) {
+  if (!shouldDebugApi()) return;
+  // eslint-disable-next-line no-console
+  console.groupCollapsed(`[WebsiteTemplates API] ${method} ${url}`);
+  // eslint-disable-next-line no-console
+  console.log("request:", request ?? null);
+  // eslint-disable-next-line no-console
+  console.log("response:", response ?? null);
+  // eslint-disable-next-line no-console
+  console.groupEnd();
+}
+
 // Returns a Headers object with or without the Authorization header depending on token existence
 function getAdminTokenHeaders(withContentType = false): Headers {
   const headers = new Headers();
@@ -106,13 +127,16 @@ const fetchTemplates = async ({
   const params = new URLSearchParams();
   params.append("country", "Canada");
   if (shopType) params.append("shopType", shopType);
-  const res = await fetch(`${API_BASE}/website-templates?${params}`, {
+  const url = `${API_BASE}/website-templates?${params}`;
+  const request = { country: "Canada", shopType: shopType ?? null };
+  const res = await fetch(url, {
     headers: getAdminTokenHeaders(),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => null);
+  debugApi("GET", url, request, { status: res.status, ok: res.ok, data });
   if (!res.ok) throw new Error("Could not fetch templates");
   // Accepts both { data: [...] } or [...]; best effort:
-  const arr = Array.isArray(data) ? data : data.data || [];
+  const arr = Array.isArray(data) ? data : data?.data || [];
   return arr.map(mapApiTemplate);
 };
 
@@ -122,20 +146,27 @@ const createTemplate = async (body: {
   date: string;
   shopType: string;
 }) => {
-  const res = await fetch(`${API_BASE}/website-templates`, {
+  const url = `${API_BASE}/website-templates`;
+  const request = { ...body, country: "Canada" };
+  const res = await fetch(url, {
     method: "POST",
     headers: getAdminTokenHeaders(true),
-    body: JSON.stringify({ ...body, country: "Canada" }),
+    body: JSON.stringify(request),
   });
+  const data = await res.json().catch(() => null);
+  debugApi("POST", url, request, { status: res.status, ok: res.ok, data });
   if (!res.ok) throw new Error("Could not create website template");
-  return await res.json();
+  return data;
 };
 
 const deleteTemplate = async (id: string) => {
-  const res = await fetch(`${API_BASE}/website-templates/${id}`, {
+  const url = `${API_BASE}/website-templates/${id}`;
+  const res = await fetch(url, {
     method: "DELETE",
     headers: getAdminTokenHeaders(),
   });
+  const data = await res.json().catch(() => null);
+  debugApi("DELETE", url, { id }, { status: res.status, ok: res.ok, data });
   if (!res.ok) throw new Error("Could not delete template");
 };
 
@@ -157,12 +188,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const [shopType, setShopType] = useState("mechanic-shop");
   const [url, setUrl] = useState("");
   const [templateName, setTemplateName] = useState("");
-  const [shopTypeFilters, setShopTypeFilters] = useState<Record<string, boolean>>({
-    "mechanic-shop": true,
-    "car-washing": false,
-    "tire-master": false,
-    "tow-truck": false,
-  });
+  const [filterShopType, setFilterShopType] = useState("mechanic-shop");
   const [loading, setLoading] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -188,23 +214,19 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     storageKey: "admin_deleted_view:website-templates",
   });
 
-  // Helper: Convert checked filters to API shopType params
-  const getActiveShopTypeFilter = () => {
-    return Object.entries(shopTypeFilters).find(([_, val]) => val)?.[0];
-  };
-
   // Fetch templates
   const fetchAndSetTemplates = useCallback(async () => {
     setLoading(true);
     try {
-      const activeShopType = getActiveShopTypeFilter();
-      const arr = await fetchTemplates({ shopType: activeShopType });
+      const arr = await fetchTemplates({
+        shopType: filterShopType === "all" ? undefined : filterShopType,
+      });
       setSites(arr || []);
     } catch (e) {
       adminNotify.error("Failed to fetch website templates");
     }
     setLoading(false);
-  }, [shopTypeFilters]);
+  }, [filterShopType]);
 
   useEffect(() => {
     fetchAndSetTemplates();
@@ -251,10 +273,10 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     else setSelected(new Set(paged.map((s) => s.id)));
   };
 
-  const toggleShopType = (type: string) => {
-    setShopTypeFilters((prev) => ({ ...prev, [type]: !prev[type] }));
+  const handleFilterShopTypeChange = (value: string) => {
+    setFilterShopType(value);
     setPage(1);
-    setTimeout(fetchAndSetTemplates, 0);
+    setSelected(new Set());
   };
 
   const resetForm = () => {
@@ -474,18 +496,22 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
       {isDeletedView && (
         <AdminDeletedBanner count={deletedStash.length} entityLabel="website templates" />
       )}
-      <div className="mb-2 flex flex-wrap items-center gap-4 border-b border-gray-300 bg-gray-100 px-3 py-2">
-        {SHOP_TYPE_OPTIONS.map((option) => (
-          <label key={option.value} className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
-            <input
-              type="checkbox"
-              checked={shopTypeFilters[option.value]}
-              onChange={() => toggleShopType(option.value)}
-              className="h-3.5 w-3.5 accent-ad-green"
-            />
-            {option.label}
-          </label>
-        ))}
+      <div className="mb-2 flex flex-wrap items-center gap-2 border-b border-gray-300 bg-gray-100 px-3 py-2">
+        <label className="flex items-center gap-2 text-xs font-bold text-ad-green-dark">
+          Shop Type
+          <select
+            value={filterShopType}
+            onChange={(e) => handleFilterShopTypeChange(e.target.value)}
+            className="border border-gray-400 bg-white px-2 py-1 text-xs font-medium text-gray-800"
+          >
+            <option value="all">All</option>
+            {SHOP_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
