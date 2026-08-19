@@ -1,18 +1,33 @@
+import { useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { FiPrinter, FiX } from "react-icons/fi";
+import { toast } from "react-toastify";
+import A4DocumentSheet from "../../../components/common/A4DocumentSheet";
+import {
+  addDaysToEstimateDate,
+  formatEstimateDate,
+} from "../../../components/JobCard/shopJobCardEstimate";
+import ClassicInvoiceDocument, {
+  type InvoiceDocumentModel,
+} from "../../../components/shop/invoice-templates/ClassicInvoiceDocument";
+import { resolveInvoiceTheme } from "../../../components/shop/invoice-templates/invoiceTheme";
+import { printDomElement } from "../../../utils/printDomElement";
+import "../../../../invoice-job-card-viewer/invoice-job-card-viewer.css";
 
+const PRINT_ROOT_ID = "admin-invoice-preview-print";
+/** Magenta / modern template — same as Shop Wallet and Owner invoice preview. */
+const DEFAULT_TEMPLATE_ID = "modern-invoice-v2";
 
-import { useEffect, useState } from "react";
-import { InvoicePreviewData } from "./invoice-templates/sampleInvoiceData";
-import { InvoiceTemplatePreview } from "./invoice-templates/InvoiceTemplatePreview";
-// import type { InvoicePreviewData } from "./sampleInvoiceData";
+const TOOLBAR_BTN_CLASS =
+  "inline-flex items-center gap-1.5 rounded border border-gray-400 bg-white px-2.5 py-1.5 text-xs font-bold text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50";
 
-// Shape of a single invoice row as returned by your invoices list/detail API.
-// Adjust field names here if your backend uses different keys.
 type InvoiceLineItemApi = {
   Item: string;
   Description: string;
   UnitPrice: number;
   Units: number;
   GSTPercent: number;
+  Amount?: number;
 };
 
 type InvoiceApiRow = {
@@ -22,157 +37,197 @@ type InvoiceApiRow = {
   client: string;
   clientRemark?: string;
   items: InvoiceLineItemApi[];
+  subtotal?: number;
   gst: number;
+  roundOff?: number;
+  invoiceTotal?: number;
+  bankName?: string;
+  terms?: string;
   status?: string;
-  poNumber?: string;  
-  // shop/business info — adjust to wherever your admin panel stores this
+  poNumber?: string;
   shopName?: string;
   shopAddress?: string;
   shopPhone?: string;
   shopLogoUrl?: string;
-  accountId?: string;
-  currency?: string;
 };
 
-/**
- * Maps a raw invoice row (as used elsewhere in InvoicesPage) into the
- * InvoicePreviewData shape expected by InvoiceTemplatePreview.
- */
-function mapToInvoicePreviewData(row: InvoiceApiRow): InvoicePreviewData {
-  const taxPercent =
-    row.items.length > 0 ? row.items[0].GSTPercent ?? 0 : 0;
+function num(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function splitNotes(terms: string | undefined): string[] | undefined {
+  const text = terms?.trim();
+  if (!text) return undefined;
+  const parts = text
+    .split(/(?<=\.)\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts : undefined;
+}
+
+function mapToInvoiceDocument(row: InvoiceApiRow): InvoiceDocumentModel {
+  const items = Array.isArray(row.items) ? row.items : [];
+  const taxPercent = items[0]?.GSTPercent ?? 0;
+  const subtotal =
+    row.subtotal ?? items.reduce((sum, it) => sum + num(it.UnitPrice) * num(it.Units), 0);
+  const tax = num(row.gst);
+  const total = row.invoiceTotal ?? subtotal + tax + num(row.roundOff);
+  const isPaid = (row.status || "").trim().toLowerCase() === "paid";
+  const paid = isPaid ? total : 0;
+  const companyName = row.shopName?.trim() || "Auto Daddy";
 
   return {
-    invoiceNo: row.invoiceNumber,
-    invoiceDate: new Date(row.dateOfIssue).toLocaleDateString("en-CA"),
-    accountId: row.accountId || "",
-    taxPercent,
-    currency: row.currency || "CAD",
-    poNumber: row.poNumber || "",
-    shop: {
-      name: row.shopName || "",
-      address: row.shopAddress || "",
-      phone: row.shopPhone || "",
-      logoUrl: row.shopLogoUrl || "",
+    badge: isPaid ? "PAID" : null,
+    company: {
+      name: companyName,
+      contactName: companyName,
+      address: row.shopAddress,
+      phone: row.shopPhone,
+      logoUrl: row.shopLogoUrl || null,
     },
-    customer: {
-      name: row.client,
-      title: row.clientRemark || "",
-      address: "",
+    billTo: {
+      name: row.client || "—",
+      extra: row.clientRemark?.trim() ? [row.clientRemark.trim()] : undefined,
     },
-    items: row.items.map((it, idx) => ({
-      id: String(idx),
-      name: it.Item,
-      description: it.Description,
-      price: it.UnitPrice,
-      quantity: it.Units,
-    })),
-  } as InvoicePreviewData;
+    meta: {
+      invoiceNo: row.invoiceNumber,
+      date: formatEstimateDate(row.dateOfIssue),
+      dueDate: addDaysToEstimateDate(row.dateOfIssue, 30),
+      poNumber: row.poNumber?.trim() || undefined,
+    },
+    items: items.map((it) => {
+      const qty = num(it.Units);
+      const price = num(it.UnitPrice);
+      return {
+        description: [it.Item, it.Description].filter(Boolean).join(" — ") || "Item",
+        qty,
+        price,
+        taxLabel: num(it.GSTPercent) > 0 ? `${it.GSTPercent}%` : "—",
+        amount: it.Amount != null ? num(it.Amount) : price * qty,
+      };
+    }),
+    totals: {
+      subtotal,
+      discount: 0,
+      taxLabel: `Tax(${taxPercent}%)`,
+      tax,
+      total,
+      paid,
+      balanceDue: Math.max(0, total - paid),
+    },
+    payment: {
+      method: row.bankName?.trim() || undefined,
+      holderName: companyName,
+    },
+    notes: splitNotes(row.terms),
+    signatureName: companyName,
+    currencySign: "$",
+  };
 }
 
 export default function InvoiceViewModal({
   invoice,
-  templateId,
+  templateId = DEFAULT_TEMPLATE_ID,
   onClose,
   onEdit,
   onSend,
   sending,
 }: {
   invoice: InvoiceApiRow;
-  templateId: string;
+  templateId?: string;
   onClose: () => void;
   onEdit?: () => void;
   onSend?: () => void;
   sending?: boolean;
 }) {
-  const [data, setData] = useState<InvoicePreviewData | null>(null);
+  const invoiceDocument = useMemo(() => mapToInvoiceDocument(invoice), [invoice]);
+  const theme = resolveInvoiceTheme(templateId);
+  const sendDisabled = sending || invoice.status === "Sent" || invoice.status === "Paid";
 
-  useEffect(() => {
-    console.log(invoice);
-    console.log(data);
-    setData(mapToInvoicePreviewData(invoice));
-  }, [invoice]);
-
-  // close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [onClose]);
 
-  if (!data) return null;
+  const handlePrint = () => {
+    const node = document.getElementById(PRINT_ROOT_ID);
+    if (!(node instanceof HTMLElement)) {
+      toast.error("Nothing to print.");
+      return;
+    }
+    printDomElement(node, "Invoice");
+  };
 
-  const sendDisabled = sending || invoice.status === "Sent" || invoice.status === "Paid";
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:p-8"
-      onClick={onClose}
-    >
+  return createPortal(
+    <div className="invoice-viewer-backdrop" onClick={onClose} role="presentation">
       <div
-        className="w-full max-w-3xl rounded bg-white shadow-lg"
+        className="invoice-viewer-panel"
+        style={{
+          borderColor: "#f5c6d6",
+          background: "#cfcfcf",
+          boxShadow: "0 18px 48px rgba(216, 27, 96, 0.14), 0 4px 16px rgba(0, 0, 0, 0.08)",
+        }}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Invoice ${invoice.invoiceNumber}`}
       >
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
-          <span className="text-sm font-semibold text-gray-700">
+        <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-2 border-b border-[#f5c6d6] bg-white/95 px-3 py-2.5 backdrop-blur-sm sm:px-4">
+          <p className="text-sm font-bold text-[#d81b60]">
             Invoice {invoice.invoiceNumber}
-          </span>
-          <div className="flex items-center gap-3">
-            {onEdit && (
-              <button
-                type="button"
-                onClick={onEdit}
-                className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
-              >
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {onEdit ? (
+              <button type="button" onClick={onEdit} className={TOOLBAR_BTN_CLASS}>
                 Edit
               </button>
-            )}
-            {onSend && (
+            ) : null}
+            {onSend ? (
               <button
                 type="button"
                 onClick={onSend}
                 disabled={sendDisabled}
-                className="rounded bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+                className={TOOLBAR_BTN_CLASS}
               >
                 {sending ? "Sending..." : invoice.status === "Sent" ? "Sent" : "Send"}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="rounded bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700"
-            >
+            ) : null}
+            <button type="button" onClick={handlePrint} className={TOOLBAR_BTN_CLASS}>
+              <FiPrinter size={14} aria-hidden />
               Print
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="text-lg font-bold text-gray-500 hover:text-gray-800"
-              aria-label="Close"
+              className={TOOLBAR_BTN_CLASS}
+              aria-label="Close invoice preview"
             >
-              ✕
+              <FiX size={14} aria-hidden />
+              Close
             </button>
           </div>
         </div>
-        <div className="max-h-[80vh] overflow-y-auto">
-          <InvoiceTemplatePreview
-            templateId={templateId}
-            data={data}
-            mode="full"
-            // Removed poNumber prop because it is not supported by InvoiceTemplatePreview
-    
-            stampStatus={
-              invoice.status === "Paid" || invoice.status === "Unpaid" || invoice.status === "None"
-                ? invoice.status
-                : undefined
-            }
-          />
-    
-    
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <A4DocumentSheet
+            id={PRINT_ROOT_ID}
+            className="p-0 print:p-0"
+            stageClassName="!min-h-0 h-auto"
+            fit="width"
+          >
+            <ClassicInvoiceDocument data={invoiceDocument} theme={theme} />
+          </A4DocumentSheet>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

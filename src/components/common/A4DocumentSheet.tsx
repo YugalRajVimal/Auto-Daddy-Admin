@@ -26,6 +26,11 @@ type A4DocumentSheetProps = {
   style?: CSSProperties;
   /** Extra classes on the gray desk/stage around the paper. */
   stageClassName?: string;
+  /**
+   * contain — scale to fit width and height (default).
+   * width — scale to available width only so taller invoices can scroll.
+   */
+  fit?: "contain" | "width";
 };
 
 /**
@@ -38,6 +43,7 @@ export default function A4DocumentSheet({
   className = "",
   style,
   stageClassName = "",
+  fit = "contain",
 }: A4DocumentSheetProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -55,10 +61,14 @@ export default function A4DocumentSheet({
       const contentH = Math.max(sheet.scrollHeight, A4_HEIGHT_PX);
 
       const scaleW = availableW > 0 ? availableW / A4_WIDTH_PX : 1;
-      // Prefer filling width; if the stage has a real height, also fit height (contain).
-      const scaleH =
-        availableH > A4_HEIGHT_PX * 0.35 ? availableH / contentH : scaleW;
-      const nextScale = Math.max(0.35, Math.min(scaleW, scaleH));
+      let nextScale = scaleW;
+      if (fit !== "width") {
+        // Prefer filling width; if the stage has a real height, also fit height (contain).
+        const scaleH =
+          availableH > A4_HEIGHT_PX * 0.35 ? availableH / contentH : scaleW;
+        nextScale = Math.min(scaleW, scaleH);
+      }
+      nextScale = Math.max(0.35, nextScale);
 
       setScale(nextScale);
       setSheetHeight(contentH);
@@ -75,7 +85,7 @@ export default function A4DocumentSheet({
       ro.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, []);
+  }, [fit]);
 
   const scaledW = A4_WIDTH_PX * scale;
   const scaledH = sheetHeight * scale;

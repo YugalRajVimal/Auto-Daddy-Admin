@@ -1221,7 +1221,7 @@ export default function InvoicesPage() {
 {viewingInvoice && (
   <InvoiceViewModal
     invoice={viewingInvoice}
-    templateId="default" // swap in your actual template id source
+    templateId="modern-invoice-v2"
     onClose={() => setViewingInvoice(null)}
     onEdit={() => {
       const rowToEdit = viewingInvoice;

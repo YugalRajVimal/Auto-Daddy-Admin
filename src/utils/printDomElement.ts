@@ -157,6 +157,7 @@ ${css}
     }
     #shop-job-card-estimate-print,
     #owner-invoice-estimate-print,
+    #admin-invoice-preview-print,
     .invoice-viewer-document,
     .a4-document-sheet,
     [data-print-root] {
