@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -82,6 +82,107 @@ function isTodayOrFuture(date: Date) {
   return comp >= now;
 }
 
+// ---- AUTOCOMPLETE DROPDOWN COMPONENT ----
+function SubjectSuggestionDropdown({
+  suggestions,
+  value,
+  onSelect,
+  inputRef,
+  show,
+  setShow,
+}: {
+  suggestions: string[];
+  value: string;
+  onSelect: (s: string) => void;
+  inputRef: React.RefObject<HTMLInputElement>;
+  show: boolean;
+  setShow: (open: boolean) => void;
+}) {
+  const [highlightedIdx, setHighlightedIdx] = useState(0);
+
+  // Only show matching suggestions, hide if none left, ignore blanks
+  const filtered = suggestions
+    .filter(
+      (s) =>
+        s &&
+        s.toLowerCase().includes(value.toLowerCase()) &&
+        s.toLowerCase() !== value.toLowerCase()
+    )
+    .slice(0, 6);
+
+  // Keyboard navigation for dropdown
+  useEffect(() => {
+    if (!show) return;
+    function handleKey(e: KeyboardEvent) {
+      if (filtered.length === 0) return;
+      if (e.key === "ArrowDown") {
+        setHighlightedIdx((i) => (i + 1) % filtered.length);
+        e.preventDefault();
+      } else if (e.key === "ArrowUp") {
+        setHighlightedIdx((i) => (i - 1 + filtered.length) % filtered.length);
+        e.preventDefault();
+      } else if (e.key === "Enter" && filtered[highlightedIdx]) {
+        onSelect(filtered[highlightedIdx]);
+        setShow(false);
+        e.preventDefault();
+      } else if (e.key === "Escape") {
+        setShow(false);
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+    // eslint-disable-next-line
+  }, [filtered, highlightedIdx, show, onSelect, setShow]);
+
+  // Click outside closes dropdown
+  useEffect(() => {
+    if (!show) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        !inputRef.current ||
+        !inputRef.current.parentElement ||
+        !(e.target instanceof Element)
+      )
+        return;
+      if (
+        !inputRef.current.parentElement.contains(e.target)
+      ) {
+        setShow(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [show, inputRef, setShow]);
+
+  if (!show || filtered.length === 0) return null;
+  return (
+    <ul
+      className="absolute z-50 bg-white border border-gray-300 rounded shadow w-full max-h-40 overflow-auto mt-1"
+      style={{ minWidth: 200 }}
+      role="listbox"
+    >
+      {filtered.map((s, i) => (
+        <li
+          key={s}
+          role="option"
+          aria-selected={i === highlightedIdx}
+          className={`cursor-pointer px-2 py-1 ${
+            i === highlightedIdx ? "bg-ad-green text-white" : ""
+          }`}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onSelect(s);
+            setShow(false);
+          }}
+          onMouseEnter={() => setHighlightedIdx(i)}
+        >
+          {s}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfDayPageProps) {
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -93,6 +194,11 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  // New: Subject suggestion state
+  const [subjectSuggestions, setSubjectSuggestions] = useState<string[]>([]);
+  const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
+  const subjectInputRef = useRef<HTMLInputElement>(null);
 
   // Use Date objects for react-datepicker
   const [date, setDate] = useState<Date | null>(null);
@@ -159,7 +265,14 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     })
       .then(async (r) => {
         if (!r.ok) throw new Error(`Failed to fetch: ${r.statusText}`);
-        const data = await r.json();
+        const response = await r.json();
+        const data = response.thoughtOfTheDay;
+
+        // Subject suggestions new logic
+        if (response.thoughtOfTheDaySubjectSuggestions && Array.isArray(response.thoughtOfTheDaySubjectSuggestions)) {
+          setSubjectSuggestions(response.thoughtOfTheDaySubjectSuggestions);
+        }
+
         const arrayData: NoteRow[] = Array.isArray(data) ? data : [data];
         setNotes(
           arrayData.map((item) => ({
@@ -232,6 +345,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setImageFile(null);
     setEditingKey(null);
     setPreviewImageUrl(null);
+    setShowSubjectDropdown(false);
   };
 
   const openAdd = () => {
@@ -250,6 +364,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     setShowSearchCard(false);
     setShowForm(true);
     setPreviewImageUrl(typeof row.imageUrl === "string" ? row.imageUrl : null);
+    setTimeout(() => setShowSubjectDropdown(false), 50); // Hide
   };
 
   const openSearchCard = () => {
@@ -306,14 +421,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     const existingLikes =
       editingKey != null ? findNoteByKey(editingKey)?.likes ?? 0 : 0;
     formData.append("likes", String(existingLikes));
-    if (editingKey == null) {
-      if (attachImage && imageFile) {
-        formData.append("thoughtImage", imageFile);
-      }
-    } else {
-      if (attachImage && imageFile) {
-        formData.append("thoughtImage", imageFile);
-      }
+    if (attachImage && imageFile) {
+      formData.append("thoughtImage", imageFile);
     }
 
     try {
@@ -483,14 +592,36 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 )}
               </CompactField>
               <CompactField label="Subject" required className={compactFixedFieldWidth}>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setValue("subject", e.target.value, { shouldValidate: false })}
-                  className={compactInputClass}
-                />
+                <div style={{position: "relative"}}>
+                  <input
+                    ref={subjectInputRef}
+                    type="text"
+                    value={title}
+                    autoComplete="off"
+                    onChange={(e) => {
+                      setValue("subject", e.target.value, { shouldValidate: false });
+                      setShowSubjectDropdown(true);
+                    }}
+                    className={compactInputClass}
+                    onFocus={() => setShowSubjectDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowSubjectDropdown(false), 100)}
+                  />
+                  <SubjectSuggestionDropdown
+                    suggestions={subjectSuggestions}
+                    value={title}
+                    onSelect={(s) => {
+                      setValue("subject", s, { shouldValidate: true });
+                      setShowSubjectDropdown(false);
+                      subjectInputRef.current?.blur();
+                    }}
+                    inputRef={subjectInputRef as React.RefObject<HTMLInputElement>}
+                    show={showSubjectDropdown}
+                    setShow={setShowSubjectDropdown}
+                  />
+                </div>
                 <FormFieldError message={fieldErrors.subject?.message} />
               </CompactField>
+       
               <CompactField label="Note" className="min-w-0 flex-1">
                 <CompactAutoGrowTextarea
                   value={note}
@@ -648,7 +779,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -656,17 +787,17 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" style={{ width: "26%" }}>Subject</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" style={{ width: "36%" }}>Notes</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Likes</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Image</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "26%" }}>Subject</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "36%" }}>Notes</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Likes</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Image</th>
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted thoughts found." : "No thoughts found."}
                 </td>
               </tr>
@@ -675,7 +806,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 key={getRowKey(row)}
                 className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}
               >
-                <td className="border border-gray-300 px-2 py-2 text-center">
+                <td className="border border-gray-300 px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={selected.has(getRowKey(row))}
@@ -683,7 +814,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                     className="accent-ad-purple"
                   />
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-center">
+                <td className="border border-gray-300 px-3 py-2 text-left">
                   <button
                     type="button"
                     onClick={() => openEdit(row)}
@@ -694,10 +825,10 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 </td>
                 <td className="border border-gray-300 px-3 py-2 text-left  whitespace-normal break-words min-w-[200px]" style={{ width: "26%" }}>{row.subject}</td>
                 <td className="border border-gray-300 px-3 py-2 text-left  whitespace-normal break-words min-w-[240px]" style={{ width: "36%" }}>{row.notes}</td>
-                <td className="border border-gray-300 px-3 py-2 text-center">{row.likes ?? 0}</td>
-                <td className="border border-gray-300 px-3 py-2 text-center">
+                <td className="border border-gray-300 px-3 py-2 text-left">{row.likes ?? 0}</td>
+                <td className="border border-gray-300 px-3 py-2 text-left">
                   {(row.imageUrl || row.image) ? (
-                    <div className="flex flex-col items-center gap-1">
+                    <div className="flex flex-col items-start gap-1">
                       <ClipImageHover
                         imageUrl={
                           ((): string => {

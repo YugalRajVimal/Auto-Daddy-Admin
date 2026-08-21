@@ -444,7 +444,7 @@ export default function ItemsPage() {
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={items.length > 0 && selected.size === items.length}
@@ -452,36 +452,36 @@ export default function ItemsPage() {
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Item Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Description</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Quantity</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Unit Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Unit Cost</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">GST(%)</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Cost with GST</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Item Name</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Description</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Quantity</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Unit Type</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Unit Cost</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">GST(%)</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Cost with GST</th>
               {/* Add the new Image column header */}
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Image</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Image</th>
               {/* Actions column */}
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" />
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" />
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={10} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={10} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={10} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={10} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   No items found.
                 </td>
               </tr>
             ) : (
               items.map((row, idx) => (
                 <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row._id)}
@@ -495,16 +495,16 @@ export default function ItemsPage() {
                     </button>
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-left">{row.description}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.quantity != null ? row.quantity : ""}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.unitType || ""}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{fmtOptionalMoney(row.unitCost)}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.gstPercent != null ? `${row.gstPercent}%` : ""}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{fmtOptionalMoney(row.costWithGst)}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.quantity != null ? row.quantity : ""}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.unitType || ""}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{fmtOptionalMoney(row.unitCost)}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.gstPercent != null ? `${row.gstPercent}%` : ""}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{fmtOptionalMoney(row.costWithGst)}</td>
                   {/* New Image column cell with eye/preview logic */}
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     <ImageHoverCell image={row.image} itemName={row.itemName} />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     <button type="button" onClick={() => openEdit(row)} className="text-blue-700 hover:text-blue-900" aria-label={`Edit item ${row.itemName}`}>
                       ✎
                     </button>
@@ -514,6 +514,7 @@ export default function ItemsPage() {
             )}
           </tbody>
         </table>
+ 
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">

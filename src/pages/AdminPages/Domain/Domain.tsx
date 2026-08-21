@@ -906,7 +906,7 @@ export default function Domain() {
     if (domainsLoading) {
       return (
         <tr>
-          <td colSpan={9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+          <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
             Loading...
           </td>
         </tr>
@@ -915,7 +915,7 @@ export default function Domain() {
     if (rows.length === 0) {
       return (
         <tr>
-          <td colSpan={9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+          <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
             {emptyMessage}
           </td>
         </tr>
@@ -923,7 +923,7 @@ export default function Domain() {
     }
     return rows.map((row, idx) => (
       <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-        <td className="border border-gray-300 px-2 py-2 text-center">
+        <td className="border border-gray-300 px-2 py-2 text-left">
           <input
             type="checkbox"
             checked={selected.has(row.id)}
@@ -931,10 +931,10 @@ export default function Domain() {
             className="accent-ad-purple"
           />
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-center">
+        <td className="border border-gray-300 px-3 py-2 text-left">
           {userTypeLabel(row.userType)}
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-center">
+        <td className="border border-gray-300 px-3 py-2 text-left">
           {!viewingOwner ? (
             <button
               type="button"
@@ -958,7 +958,7 @@ export default function Domain() {
             row.userName
           )}
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-center">
+        <td className="border border-gray-300 px-3 py-2 text-left">
           {row.domain !== "—" ? (
             <a
               href={row.domain.startsWith("http") ? row.domain : `https://${row.domain}`}
@@ -972,15 +972,15 @@ export default function Domain() {
             "—"
           )}
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-center">
+        <td className="border border-gray-300 px-3 py-2 text-left">
           {domainTypeLabel(row.domainType)}
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-center">{row.expiry}</td>
-        <td className="border border-gray-300 px-3 py-2 text-center">{row.providerLabel}</td>
+        <td className="border border-gray-300 px-3 py-2 text-left">{row.expiry}</td>
+        <td className="border border-gray-300 px-3 py-2 text-left">{row.providerLabel}</td>
         <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
           {row.dns}
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-center">
+        <td className="border border-gray-300 px-3 py-2 text-left">
           {!isDeletedView ? (
             <>
               <button
@@ -1010,7 +1010,7 @@ export default function Domain() {
   const domainTableHead = (
     <thead>
       <tr className="bg-ad-purple text-white">
-        <th className="border border-ad-purple-dark px-2 py-2 text-center">
+        <th className="border border-ad-purple-dark px-2 py-2 text-left">
           <input
             type="checkbox"
             checked={pagedDomainRows.length > 0 && selected.size === pagedDomainRows.length}
@@ -1018,28 +1018,28 @@ export default function Domain() {
             className="accent-white"
           />
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
           User Type
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
           User Name
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
           Domain
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
           Domain Type
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
           Expiry
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
           Provider
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
           DNS
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
           Actions
         </th>
       </tr>

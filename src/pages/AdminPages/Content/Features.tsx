@@ -579,7 +579,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
           <table className="w-full border-collapse text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-ad-purple text-white">
-                <th className="border border-ad-purple-dark px-2 py-2 text-center">
+                <th className="border border-ad-purple-dark px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={paged.length > 0 && selected.size === paged.length}
@@ -587,23 +587,23 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                     className="accent-white"
                   />
                 </th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Feature</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Clip</th>
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User</th>
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Feature</th>
+                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
               </tr>
             </thead>
             <tbody>
               {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                  <td colSpan={5} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                     {isDeletedView ? "No deleted features found." : "No features found."}
                   </td>
                 </tr>
               ) : (
                 paged.map((row, idx) => (
                   <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                    <td className="border border-gray-300 px-2 py-2 text-center">
+                    <td className="border border-gray-300 px-2 py-2 text-left">
                       <input
                         type="checkbox"
                         checked={selected.has(row.id)}
@@ -611,7 +611,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                         className="accent-ad-purple"
                       />
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="border border-gray-300 px-3 py-2 text-left">
                       <button
                         type="button"
                         onClick={() => !isDeletedView && openEdit(row)}
@@ -621,11 +621,11 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                         {row.date?.slice(0, 10)}
                       </button>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="border border-gray-300 px-3 py-2 text-left">
                       {USER_OPTIONS.find((o) => o.value === row.user)?.label ?? row.user}
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.feature}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="border border-gray-300 px-3 py-2 text-left">
                       {row.imageUrl ? (
                         <ClipImageHover
                           imageUrl={row.imageUrl}

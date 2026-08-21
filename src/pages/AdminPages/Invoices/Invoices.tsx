@@ -1067,7 +1067,7 @@ export default function InvoicesPage() {
             <table className="w-full border-collapse text-sm whitespace-nowrap">
               <thead>
                 <tr className="bg-ad-purple text-white">
-                  <th className="border border-ad-purple-dark px-2 py-2 text-center">
+                  <th className="border border-ad-purple-dark px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={paged.length > 0 && selected.size === paged.length}
@@ -1075,33 +1075,33 @@ export default function InvoicesPage() {
                       className="accent-white"
                     />
                   </th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Invoice</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Client</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Subtotal</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">GST</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Amount</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" />
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Invoice</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Client</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Subtotal</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">GST</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Amount</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                    <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                       Loading...
                     </td>
                   </tr>
                 ) : paged.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                    <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                       No invoices found.
                     </td>
                   </tr>
                 ) : (
                   paged.map((row, idx) => (
                     <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                      <td className="border border-gray-300 px-2 py-2 text-center">
+                      <td className="border border-gray-300 px-2 py-2 text-left">
                         <input
                           type="checkbox"
                           checked={selected.has(row._id)}
@@ -1109,7 +1109,7 @@ export default function InvoicesPage() {
                           className="accent-ad-purple"
                         />
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="border border-gray-300 px-3 py-2 text-left">
                         <button
                           type="button"
                           onClick={() => setViewingInvoice(row)}
@@ -1126,15 +1126,15 @@ export default function InvoicesPage() {
                           <div className="text-xs text-red-500 mt-0.5">{row._id}</div>
                         )} */}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="border border-gray-300 px-3 py-2 text-left">
                         {new Date(row.dateOfIssue).toLocaleDateString("en-CA", { day: "2-digit", month: "2-digit", year: "numeric" })}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{row.client}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{fmtMoney(row.subtotal)}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{fmtMoney(row.gst)}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{fmtMoney(row.invoiceTotal)}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{row.status}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="border border-gray-300 px-3 py-2 text-left">{row.client}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.subtotal)}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.gst)}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.invoiceTotal)}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-left">{row.status}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-left">
                         <button
                           type="button"
                           onClick={() => openEdit(row)}
@@ -1149,6 +1149,7 @@ export default function InvoicesPage() {
                 )}
               </tbody>
             </table>
+  
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">

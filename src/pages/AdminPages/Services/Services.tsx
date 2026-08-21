@@ -579,7 +579,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -587,30 +587,30 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Shop Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Sub Services</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Odo Out Required</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Name</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Type</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Sub Services</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Odo Out Required</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted services found." : "No services found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row._id)}
@@ -618,7 +618,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => openEdit(row)}
@@ -627,10 +627,10 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                       {row.name}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{shopTypeLabel(row.shopType)}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.subServices?.length ?? 0}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.status || "Active"}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.odoOutRequired ? "Yes" : "No"}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{shopTypeLabel(row.shopType)}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.subServices?.length ?? 0}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.status || "Active"}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.odoOutRequired ? "Yes" : "No"}</td>
                 </tr>
               ))
             )}

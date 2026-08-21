@@ -587,7 +587,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -595,32 +595,32 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
                 Template Name
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">URL</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Shop Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Used by</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">URL</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Type</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Used by</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-gray-500">
+                <td colSpan={6} className="py-6 text-left text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-gray-500">
+                <td colSpan={6} className="py-6 text-left text-gray-500">
                   {isDeletedView ? "No deleted templates found." : "No templates found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
@@ -628,10 +628,10 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     {row.templateName || `Template ${pageStartIndex + idx + 1}`}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     <a
                       href={row.url}
                       target="_blank"
@@ -641,11 +641,11 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                       {row.url}
                     </a>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.date}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.date}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     {SHOP_TYPE_OPTIONS.find((o) => o.value === row.shopType)?.label ?? row.shopType}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.usedBy}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.usedBy}</td>
                 </tr>
               ))
             )}

@@ -1879,7 +1879,7 @@ function LedgerPage({
         <table className="w-full table-fixed border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="w-10 border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="w-10 border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -1887,29 +1887,29 @@ function LedgerPage({
                   className="accent-white"
                 />
               </th>
-              <th className="w-28 border border-ad-purple-dark px-2 py-2 text-center font-medium">Date</th>
-              <th className="w-24 border border-ad-purple-dark px-2 py-2 text-center font-medium">{vendorLabel}</th>
-              <th className="w-20 border border-ad-purple-dark px-2 py-2 text-center font-medium">Amount</th>
+              <th className="w-28 border border-ad-purple-dark px-2 py-2 text-left font-medium">Date</th>
+              <th className="w-24 border border-ad-purple-dark px-2 py-2 text-left font-medium">{vendorLabel}</th>
+              <th className="w-20 border border-ad-purple-dark px-2 py-2 text-left font-medium">Amount</th>
               {isIncome ? (
-                <th className="w-24 border border-ad-purple-dark px-2 py-2 text-center font-medium">Payment Mode</th>
+                <th className="w-24 border border-ad-purple-dark px-2 py-2 text-left font-medium">Payment Mode</th>
               ) : null}
               {isIncome ? (
-                <th className="w-20 border border-ad-purple-dark px-2 py-2 text-center font-medium">Bank</th>
+                <th className="w-20 border border-ad-purple-dark px-2 py-2 text-left font-medium">Bank</th>
               ) : null}
-              <th className="w-24 border border-ad-purple-dark px-2 py-2 text-center font-medium">Category</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Notes</th>
+              <th className="w-24 border border-ad-purple-dark px-2 py-2 text-left font-medium">Category</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
               {isExpense ? (
                 <>
-                  <th className="w-16 border border-ad-purple-dark px-2 py-2 text-center font-medium">GST</th>
-                  <th className="w-20 border border-ad-purple-dark px-2 py-2 text-center font-medium">Bill Number</th>
-                  <th className="w-20 border border-ad-purple-dark px-2 py-2 text-center font-medium">By Cheque</th>
+                  <th className="w-16 border border-ad-purple-dark px-2 py-2 text-left font-medium">GST</th>
+                  <th className="w-20 border border-ad-purple-dark px-2 py-2 text-left font-medium">Bill Number</th>
+                  <th className="w-20 border border-ad-purple-dark px-2 py-2 text-left font-medium">By Cheque</th>
                 </>
               ) : null}
-              <th className="w-16 border border-ad-purple-dark px-2 py-2 text-center font-medium">
+              <th className="w-16 border border-ad-purple-dark px-2 py-2 text-left font-medium">
                 {isIncome ? "Attachment" : "Clip"}
               </th>
               {isDeletedView ? (
-                <th className="w-16 border border-ad-purple-dark px-2 py-2 text-center font-medium">
+                <th className="w-16 border border-ad-purple-dark px-2 py-2 text-left font-medium">
                   Restore
                 </th>
               ) : null}
@@ -1918,13 +1918,13 @@ function LedgerPage({
           <tbody>
             {loading && !isDeletedView ? (
               <tr>
-                <td colSpan={12} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={12} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading…
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={12} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={12} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted entries found." : "No entries found."}
                 </td>
               </tr>
@@ -1936,7 +1936,7 @@ function LedgerPage({
                 const attachmentUrl = isIncome ? incomeRow.incomeImage : expenseRow.expenseImage;
                 return (
                   <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                    <td className="border border-gray-300 px-2 py-2 text-center">
+                    <td className="border border-gray-300 px-2 py-2 text-left">
                       <input
                         type="checkbox"
                         checked={selected.has(row._id)}
@@ -1944,7 +1944,7 @@ function LedgerPage({
                         className="accent-ad-purple"
                       />
                     </td>
-                    <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center">
+                    <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-left">
                       <button
                         type="button"
                         onClick={() => openEdit(row)}
@@ -1954,23 +1954,23 @@ function LedgerPage({
                         {formatDisplayDate(row.date)}
                       </button>
                     </td>
-                    <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center uppercase" title={row.vendor}>
+                    <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-left uppercase" title={row.vendor}>
                       {row.vendor}
                     </td>
-                    <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center">
+                    <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-left">
                       {row.amount % 1 === 0 ? row.amount : row.amount.toFixed(2)}
                     </td>
                     {isIncome ? (
-                      <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center" title={incomeRow.paymentMode || ""}>
+                      <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-left" title={incomeRow.paymentMode || ""}>
                         {incomeRow.paymentMode || ""}
                       </td>
                     ) : null}
                     {isIncome ? (
-                      <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center" title={incomeRow.bank || ""}>
+                      <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-left" title={incomeRow.bank || ""}>
                         {incomeRow.bank || ""}
                       </td>
                     ) : null}
-                    <td className="overflow-hidden border border-gray-300 px-2 py-2 text-center">
+                    <td className="overflow-hidden border border-gray-300 px-2 py-2 text-left">
                       <div className="overflow-hidden text-ellipsis whitespace-nowrap font-bold leading-tight" title={decoded.category}>
                         {decoded.category}
                       </div>
@@ -1981,13 +1981,13 @@ function LedgerPage({
                     <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words">{row.notes || ""}</td>
                     {isExpense ? (
                       <>
-                        <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center">
+                        <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-left">
                           {expenseRow.gst ? `${expenseRow.gst} CAD` : "No"}
                         </td>
-                        <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center" title={expenseRow.billNumber || ""}>
+                        <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-left" title={expenseRow.billNumber || ""}>
                           {expenseRow.billNumber || "—"}
                         </td>
-                        <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-center" title={expenseRow.byCheque ? (expenseRow.account ? `Yes (${expenseRow.account})` : "Yes") : "No"}>
+                        <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-left" title={expenseRow.byCheque ? (expenseRow.account ? `Yes (${expenseRow.account})` : "Yes") : "No"}>
                           {expenseRow.byCheque
                             ? expenseRow.account
                               ? `Yes (${expenseRow.account})`
@@ -1996,7 +1996,7 @@ function LedgerPage({
                         </td>
                       </>
                     ) : null}
-                    <td className="overflow-hidden border border-gray-300 px-2 py-2 text-center">
+                    <td className="overflow-hidden border border-gray-300 px-2 py-2 text-left">
                       {attachmentUrl ? (
                         <span className="inline-flex items-center gap-2">
                           <ClipImageHover
@@ -2010,7 +2010,7 @@ function LedgerPage({
                       )}
                     </td>
                     {isDeletedView ? (
-                      <td className="overflow-hidden border border-gray-300 px-2 py-2 text-center">
+                      <td className="overflow-hidden border border-gray-300 px-2 py-2 text-left">
                         <button
                           type="button"
                           onClick={() => handleRestore([row._id])}
@@ -2026,6 +2026,7 @@ function LedgerPage({
             )}
           </tbody>
         </table>
+
       </div>
  
       <div className="mt-4 flex items-center justify-between">

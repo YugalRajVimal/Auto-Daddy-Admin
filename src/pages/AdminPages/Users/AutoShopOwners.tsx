@@ -1224,7 +1224,7 @@ async function loginAsOwner(userId: string) {
           <table className="w-full border-collapse text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-ad-purple text-white">
-                <th className="border border-ad-purple-dark px-2 py-2 text-center">
+                <th className="border border-ad-purple-dark px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={allPageSel}
@@ -1239,28 +1239,28 @@ async function loginAsOwner(userId: string) {
                   />
                 </th>
                 {visibleColumns.map((c) => (
-                  <th key={c.key} className={thClass}>{c.label}</th>
+                  <th key={c.key} className={`${thClass} text-left`}>{c.label}</th>
                 ))}
-                {viewMode === "active" && <th className={thClass}>Action</th>}
-                {viewMode === "deleted" && <th className={thClass}>Restore</th>}
+                {viewMode === "active" && <th className={`${thClass} text-left`}>Action</th>}
+                {viewMode === "deleted" && <th className={`${thClass} text-left`}>Restore</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
                     Loading shop owners…
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
                     Unable to load auto shop owners.
                   </td>
                 </tr>
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
                     {viewMode === "deleted" ? "No deleted auto shop owners." : "No auto shop owners found."}
                   </td>
                 </tr>
@@ -1270,7 +1270,7 @@ async function loginAsOwner(userId: string) {
                   const busy = !!actionBusy[owner._id];
                   return (
                     <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                      <td className="border border-gray-300 px-2 py-2 text-center">
+                      <td className="border border-gray-300 px-2 py-2 text-left">
                         <input
                           type="checkbox"
                           checked={selectedRows.has(owner._id)}
@@ -1278,9 +1278,28 @@ async function loginAsOwner(userId: string) {
                           className="accent-ad-purple"
                         />
                       </td>
-                      {visibleColumns.map((c) => renderCell(owner, c.key))}
+                      {visibleColumns.map((c) => {
+                        // enforce left alignment for all table cells rendered by renderCell
+                        const rendered = renderCell(owner, c.key);
+                        // If renderCell gives a <td> or a React.Fragment, this just injects style.
+                        // If it gives a value, we wrap in <td>.
+                        if (
+                          rendered &&
+                          typeof rendered.type === "string" &&
+                          rendered.type.toLowerCase() === "td"
+                        ) {
+                          return React.cloneElement(rendered, {
+                            className: `${rendered.props.className || ""} text-left`
+                          });
+                        }
+                        return (
+                          <td key={c.key} className="text-left">
+                            {rendered}
+                          </td>
+                        );
+                      })}
                       {viewMode === "active" && (
-                        <td className={`${tdClass} text-center whitespace-nowrap`}>
+                        <td className={`${tdClass} text-left whitespace-nowrap`}>
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
@@ -1303,7 +1322,7 @@ async function loginAsOwner(userId: string) {
                         </td>
                       )}
                       {viewMode === "deleted" && (
-                        <td className={tdClass}>
+                        <td className={`${tdClass} text-left`}>
                           <button
                             type="button"
                             disabled={busy}

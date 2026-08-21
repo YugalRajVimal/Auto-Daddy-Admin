@@ -1429,7 +1429,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -1437,15 +1437,15 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Make</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Model</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Logo</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Make</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Model</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Logo</th>
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={4} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                <td colSpan={4} className="border border-gray-300 px-3 py-6 text-left text-gray-500">
                   {loading
                     ? "Loading car brands…"
                     : isDeletedView
@@ -1456,7 +1456,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
             ) : (
               paged.map((row, idx) => (
                 <tr key={row.rowId} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row.rowId)}
@@ -1464,7 +1464,7 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => openEditByRow(row)}
@@ -1473,8 +1473,8 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
                       {row.make}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.model}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.model}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     {row.brandLogo ? (
                       <ClipImageHover
                         imageUrl={getBackendImageUrl(row.brandLogo)}
@@ -1491,8 +1491,8 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
             )}
           </tbody>
         </table>
-      </div>
 
+      </div>
       <div className="mt-4 flex items-center justify-between">
         <TableEntriesSummary total={sortedFiltered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
