@@ -171,7 +171,7 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
               <FiTruck size={20} />
             </span>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-sky-700">Garage</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-sky-700">Vehicles</p>
               <h3 className="mt-0.5 text-lg font-bold tracking-tight text-slate-900">Add vehicle</h3>
               <p className="mt-1 text-sm text-slate-600">
                 Enter plate, make, and odometer to start tracking this car.

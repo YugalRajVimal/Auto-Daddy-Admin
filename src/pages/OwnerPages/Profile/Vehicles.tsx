@@ -485,7 +485,7 @@ export default function OwnerVehiclesPage() {
                           <span
                             className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ${theme.chip}`}
                           >
-                            Garage
+                            My vehicle
                           </span>
                         </div>
                         {vin ? (
@@ -721,7 +721,7 @@ export default function OwnerVehiclesPage() {
         <div className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-slate-500">Garage</p>
+              <p className="text-sm font-medium text-slate-500">Vehicles</p>
             </div>
             <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 md:text-2xl">
               {mainSectionLabel || "My vehicles"}

@@ -5,7 +5,7 @@ export type DummyFaqItem = { question: string; answer: string; pageSlug?: string
 
 export const DUMMY_OWNER_FAQS: DummyFaqItem[] = [
   {
-    question: "How do I add a vehicle to my garage?",
+    question: "How do I add a vehicle to my account?",
     answer:
       "Open Profile → My Vehicles and tap Add Vehicle. Enter plate, make, model, year, and odometer to get started.",
   },
@@ -34,7 +34,7 @@ export const DUMMY_OWNER_FAQS: DummyFaqItem[] = [
 export const DUMMY_OWNER_PRIVACY_HEADING = "Privacy Policy";
 
 export const DUMMY_OWNER_PRIVACY_BODY = `Your data, your control
-AutoDaddy collects only what is needed to run your garage workspace: profile details, vehicle records, documents you upload, and service activity with shops you choose.
+AutoDaddy collects only what is needed to run your vehicle workspace: profile details, vehicle records, documents you upload, and service activity with shops you choose.
 
 How we use information
 We use your information to show job cards and invoices, match you with nearby shops, send service reminders, and keep your documents ready when you need them.
@@ -50,8 +50,8 @@ You can edit your profile, remove vehicles, replace documents, and log out at an
 
 export const DUMMY_OWNER_FEATURES: CarOwnerContentBlock[] = [
   {
-    _id: "feat-garage",
-    heading: "Digital garage",
+    _id: "feat-vehicles",
+    heading: "Vehicle records",
     desc: "Keep every vehicle, plate, and odometer reading in one place with quick edits.",
   },
   {
@@ -77,7 +77,7 @@ export const DUMMY_OWNER_FEATURES: CarOwnerContentBlock[] = [
   {
     _id: "feat-diary",
     heading: "Digital diary",
-    desc: "Set reminders for renewals, services, and personal garage to-dos.",
+    desc: "Set reminders for renewals, services, and personal vehicle to-dos.",
   },
 ];
 

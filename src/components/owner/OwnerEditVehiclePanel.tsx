@@ -394,7 +394,7 @@ export default function OwnerEditVehiclePanel({
 
       {editing ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-100/80 bg-white/80 px-4 py-3 sm:px-5">
-          <p className="text-xs text-slate-500 sm:text-sm">Changes save to this vehicle in your garage.</p>
+          <p className="text-xs text-slate-500 sm:text-sm">Changes save to this vehicle.</p>
           <div className="flex items-center gap-2">
             <button
               type="button"
