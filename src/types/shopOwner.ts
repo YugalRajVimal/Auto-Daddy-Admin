@@ -50,7 +50,7 @@ export type ShopDeal = {
   description?: string;
   price?: number | string;
   discountedPrice?: number | string;
-  discountPercentage?:number | string;
+  discountPercentage?: number | string;
   dealEnabled?: boolean;
   offersEndOnDate?: string;
   createdAt?: string;
@@ -73,6 +73,11 @@ export type ShopDeal = {
   productImage?: string;
   /** Up to two deal images (parts/salvage). Prefer this when present. */
   dealImages?: string[];
+  /**
+   * Indicates whether the part is new or old.
+   * Default: "new".
+   */
+  newOld?: "new" | "old";
 };
 
 export type ShopOwnerNotification = {

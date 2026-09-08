@@ -312,7 +312,7 @@ export function isDealActive(d: CarOwnerDeal): boolean {
   return !Number.isFinite(ends) || ends >= Date.now();
 }
 
-export type DealCategory = "service" | "parts" | "tire" | "salvage" | "completed";
+export type DealCategory = "service" | "parts" | "tire"  | "completed";
 
 export function matchesDealCategory(d: CarOwnerDeal, category: DealCategory): boolean {
   const haystack = [

@@ -64,6 +64,7 @@ export function isDealSold(deal: ShopDeal): boolean {
 }
 
 export function applyDealSales(deals: ShopDeal[], sales = readDealSales()): ShopDeal[] {
+
   return deals.map((deal) => {
     const id = dealId(deal);
     const sale = id ? sales[id] : undefined;

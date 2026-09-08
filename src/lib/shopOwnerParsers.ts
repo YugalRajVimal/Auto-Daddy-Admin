@@ -211,6 +211,16 @@ function toDeal(raw: unknown): ShopDeal | null {
   const subServiceName = s(o.subServiceName);
   const dealType = s(o.dealType);
   const partName = s(o.partName);
+
+  // New/Old part field logic:
+  let newOld: "new" | "old" = "new";
+  if (typeof o.newOld === "string") {
+    const val = o.newOld.trim().toLowerCase();
+    if (val === "new" || val === "old") {
+      newOld = val as "new" | "old";
+    }
+  }
+
   const isPartsLike =
     (dealType?.toLowerCase().includes("part") ?? false) || Boolean(partName);
   // Service deals: prefer sub-service name (not parent category like AUTOBODY).
@@ -283,6 +293,8 @@ function toDeal(raw: unknown): ShopDeal | null {
       const urls = collectDealImageUrls(o);
       return urls.length > 0 ? urls : undefined;
     })(),
+    // Add newOld only for part deals, defaulting to "new"
+    ...(isPartsLike ? { newOld } : {}),
   };
 }
 
@@ -294,24 +306,24 @@ export function dealId(d: ShopDeal) {
   return d._id ?? d.id ?? "";
 }
 
-export function isSalvagesDeal(d: ShopDeal) {
-  const t = (d.dealType ?? "").toLowerCase();
-  return t.includes("salvage");
-}
+// export function isSalvagesDeal(d: ShopDeal) {
+//   const t = (d.dealType ?? "").toLowerCase();
+//   return t.includes("salvage");
+// }
 
 export function isPartsDeal(d: ShopDeal) {
-  if (isSalvagesDeal(d)) return false;
+  // if (isSalvagesDeal(d)) return false;
   const t = (d.dealType ?? "").toLowerCase();
   return t.includes("part") || Boolean(d.partName);
 }
 
 /** Display value for list/board: percent for service, price for parts. */
 export function shopDealDiscountLabel(deal: ShopDeal, empty = "—"): string {
-  if (isPartsDeal(deal) || isSalvagesDeal(deal)) {
-    const discounted = Number(deal.discountedPrice);
-    if (!Number.isFinite(discounted) || discounted < 0) return empty;
-    return String(discounted);
-  }
+  // if (isPartsDeal(deal) || isSalvagesDeal(deal)) {
+  //   const discounted = Number(deal.discountedPrice);
+  //   if (!Number.isFinite(discounted) || discounted < 0) return empty;
+  //   return String(discounted);
+  // }
 
   const explicitPct = Number(deal.discountPercentage);
   if (Number.isFinite(explicitPct) && explicitPct > 0) {
