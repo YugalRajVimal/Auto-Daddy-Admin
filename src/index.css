@@ -1182,3 +1182,8 @@ input.shop-compact-input[type="time"] {
     box-shadow: none !important;
   }
 }
+
+
+.react-datepicker-popper {
+  z-index: 100000 !important;
+}
