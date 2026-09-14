@@ -564,6 +564,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [visibleCols, setVisibleCols] = useState<string[]>(config.defaultVisible);
+  // Default viewMode to "active" ONLY (shows not deleted dealers by default)
   const [viewMode, setViewMode] = useState<"active" | "deleted">("active");
 
   const [countAFor, setCountAFor] = useState<DummyUserRow | null>(null);
@@ -1161,9 +1162,10 @@ const DEALERS_CONFIG: DummyUserListConfig = {
   initialData: [], // unused when `api` is set
   api: {
     list: async ({ search, viewMode }) => {
+      // Always default to fetching only not-deleted Dealers, unless explicitly "deleted"
       const apiRows = await fetchDealers({
         name: search || undefined,
-        status: viewMode === "deleted" ? "Deleted" : undefined,
+        status: viewMode === "deleted" ? "Deleted" : "Active", // default to active (not deleted) dealers
       });
       return apiRows.map(mapDealerToRow);
     },

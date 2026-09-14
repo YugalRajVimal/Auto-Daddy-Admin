@@ -3553,7 +3553,11 @@ function LedgerPage({
   return (
     <AdminPage
       title={isDeletedView ? `Deleted ${title}` : title}
-      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerAction={
+        !showForm && !showSearchCard && !isDeletedView ? (
+          <AddNewButton onClick={openAdd} />
+        ) : undefined
+      }
       between={
         showSearchCard ? (
           <AdminSearchCard
@@ -3574,22 +3578,19 @@ function LedgerPage({
                       ? "Updating…"
                       : "Saving…"
                     : editingId != null
-                    ? "Update"
-                    : "Save"
+                      ? "Update"
+                      : "Save"
                 }
                 onSave={() => void handleSave()}
                 onCancel={saving ? undefined : handleCancel}
                 disabled={saving}
               />
             }
-      
           >
-            <CompactFormRow className="items-start gap-y-6">
-              <div
-                className={`min-w-0 shrink-0 flex-none ${
-                  isIncome ? "w-[100px] sm:w-[120px]" : compactFixedFieldWidth
-                }`}
-              >
+            {/* All main fields in a single column on xs screens, row/wrap on sm and up, expand on xl */}
+            <CompactFormRow className="flex flex-col gap-y-3 gap-x-3 sm:flex-row sm:flex-wrap sm:gap-y-3 sm:gap-x-4 xl:flex-nowrap">
+              {/* Amount */}
+              <div className="w-full flex-1 min-w-0 sm:min-w-[120px] xl:w-full">
                 <CompactField label="Amount" required className="w-full flex-none">
                   <input
                     type="text"
@@ -3603,147 +3604,81 @@ function LedgerPage({
                   />
                   <FormFieldError message={formErrors.amount} />
                 </CompactField>
-                {isExpense ? (
-                  <div className="mt-3">
-                    <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                      <input
-                        type="checkbox"
-                        checked={gst}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setGst(checked);
-                          if (!checked) setGstAmount("");
-                        }}
-                        className="h-3.5 w-3.5 accent-ad-green"
-                      />
-                      GST
-                    </label>
-                    {gst ? (
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={gstAmount}
-                        onChange={(e) => setGstAmount(e.target.value)}
-                        placeholder="GST amount"
-                        className={compactInputClass}
-                      />
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
-              <div
-                className={`min-w-0 shrink-0 flex-none ${
-                  isIncome ? "w-[100px] sm:w-[120px]" : compactFixedFieldWidth
-                }`}
-              >
+              {/* Date */}
+              <div className="w-full flex-1 min-w-0 sm:min-w-[120px] xl:w-full">
                 <CompactField label="Date" required className="w-full flex-none">
-                  {/* <DatePicker
+                  <DatePicker
                     selected={date ? new Date(date) : null}
                     onChange={(dateValue: Date | null) => {
-                      const val = dateValue instanceof Date && !isNaN(dateValue.getTime()) 
-                        ? dateValue.toISOString().slice(0, 10) 
-                        : "";
+                      const val =
+                        dateValue instanceof Date && !isNaN(dateValue.getTime())
+                          ? dateValue.toISOString().slice(0, 10)
+                          : "";
                       setDate(val);
                       clearFieldError("date");
                     }}
-               
                     dateFormat="yyyy-MM-dd"
                     placeholderText="Select date"
                     className={fieldErrorClass(Boolean(formErrors.date), compactInputClass)}
+                    portalId="datepicker-portal"
+                    popperClassName="!z-[9999]"
                   />
-                  
-                  
-                  */}
-
-<DatePicker
-  selected={date ? new Date(date) : null}
-  onChange={(dateValue: Date | null) => {
-    const val = dateValue instanceof Date && !isNaN(dateValue.getTime()) 
-      ? dateValue.toISOString().slice(0, 10) 
-      : "";
-    setDate(val);
-    clearFieldError("date");
-  }}
-  dateFormat="yyyy-MM-dd"
-  placeholderText="Select date"
-  className={fieldErrorClass(Boolean(formErrors.date), compactInputClass)}
-  portalId="datepicker-portal"
-  popperClassName="!z-[9999]"
-/>
                   <FormFieldError message={formErrors.date} />
                 </CompactField>
-          
-                {isExpense ? (
-                  <div className="mt-3">
-                    <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                      <input
-                        type="checkbox"
-                        checked={hasBillNumber}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setHasBillNumber(checked);
-                          if (!checked) setBillNumber("");
-                        }}
-                        className="h-3.5 w-3.5 accent-ad-green"
-                      />
-                      {billLabel}
-                    </label>
-                    {hasBillNumber ? (
-                      <input
-                        type="text"
-                        value={billNumber}
-                        onChange={(e) => setBillNumber(e.target.value)}
-                        className={compactInputClass}
-                      />
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
+              {/* Payment Mode (if Income) */}
               {isIncome ? (
-                <CompactField label="Payment Mode" required className={compactFixedFieldWidth}>
-                  <select
-                    value={paymentMode}
-                    onChange={(e) => {
-                      setPaymentMode(e.target.value);
-                      clearFieldError("paymentMode");
-                    }}
-                    className={fieldErrorClass(Boolean(formErrors.paymentMode), compactInputClass)}
-                  >
-                    <option value="">Select</option>
-                    {INCOME_PAYMENT_MODE_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                  <FormFieldError message={formErrors.paymentMode} />
-                </CompactField>
+                <div className="w-full flex-1 min-w-0 sm:min-w-[120px] xl:w-full">
+                  <CompactField label="Payment Mode" required className="w-full flex-none">
+                    <select
+                      value={paymentMode}
+                      onChange={(e) => {
+                        setPaymentMode(e.target.value);
+                        clearFieldError("paymentMode");
+                      }}
+                      className={fieldErrorClass(Boolean(formErrors.paymentMode), compactInputClass)}
+                    >
+                      <option value="">Select</option>
+                      {INCOME_PAYMENT_MODE_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                    <FormFieldError message={formErrors.paymentMode} />
+                  </CompactField>
+                </div>
               ) : null}
+              {/* Bank (if Income) */}
               {isIncome ? (
-                <CompactField
-                  label="Bank"
-                  required={paymentMode === "Bank Transfer"}
-                  className={compactFixedFieldWidth}
-                >
-                  <select
-                    value={bank}
-                    onChange={(e) => {
-                      setBank(e.target.value);
-                      clearFieldError("bank");
-                    }}
-                    className={fieldErrorClass(Boolean(formErrors.bank), compactInputClass)}
+                <div className="w-full flex-1 min-w-0 sm:min-w-[120px] xl:w-full">
+                  <CompactField
+                    label="Bank"
+                    required={paymentMode === "Bank Transfer"}
+                    className="w-full flex-none"
                   >
-                    <option value="">Select account</option>
-                    {bankOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                  <FormFieldError message={formErrors.bank} />
-                </CompactField>
+                    <select
+                      value={bank}
+                      onChange={(e) => {
+                        setBank(e.target.value);
+                        clearFieldError("bank");
+                      }}
+                      className={fieldErrorClass(Boolean(formErrors.bank), compactInputClass)}
+                    >
+                      <option value="">Select account</option>
+                      {bankOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                    <FormFieldError message={formErrors.bank} />
+                  </CompactField>
+                </div>
               ) : null}
-              <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+              {/* Vendor */}
+              <div className="w-full flex-1 min-w-0 sm:min-w-[120px] xl:w-full">
                 <VendorComboField
                   label={vendorLabel}
                   required
@@ -3756,48 +3691,18 @@ function LedgerPage({
                   className="w-full flex-none"
                 />
                 <FormFieldError message={formErrors.vendor} />
-                {isExpense ? (
-                  <div className="mt-3">
-                    <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
-                      <input
-                        type="checkbox"
-                        checked={byCheque}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setByCheque(checked);
-                          if (!checked) setChequeAccount("");
-                        }}
-                        className="h-3.5 w-3.5 accent-ad-green"
-                      />
-                      By Cheque
-                    </label>
-                    {byCheque ? (
-                      <select
-                        value={chequeAccount}
-                        onChange={(e) => {
-                          setChequeAccount(e.target.value);
-                          clearFieldError("chequeAccount");
-                        }}
-                        className={fieldErrorClass(Boolean(formErrors.chequeAccount), compactInputClass)}
-                      >
-                        <option value="">Select account</option>
-                        {chequeAccountOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    ) : null}
-                    <FormFieldError message={formErrors.chequeAccount} />
-                  </div>
-                ) : null}
               </div>
-              <div className={isIncome ? "w-[120px] shrink-0 flex-none sm:w-[140px]" : "min-w-[160px] flex-1"}>
+              {/* Category */}
+              <div className="w-full flex-1 min-w-0 sm:min-w-[120px] xl:w-full">
                 <ComboSelectWithEditor
                   label="Category"
                   required
                   value={selectedCategoryLabel}
-                  placeholder={isExpense && categoriesLoading ? "Loading categories…" : "Select category"}
+                  placeholder={
+                    isExpense && categoriesLoading
+                      ? "Loading categories…"
+                      : "Select category"
+                  }
                   options={categoryLabels}
                   disabled={isExpense && categoriesLoading}
                   onChange={(v) => {
@@ -3809,8 +3714,9 @@ function LedgerPage({
                 />
                 <FormFieldError message={formErrors.category} />
               </div>
+              {/* Subcategory (if Expense) */}
               {isExpense ? (
-                <div className="min-w-[160px] flex-1">
+                <div className="w-full flex-1 min-w-0 sm:min-w-[120px] xl:w-full">
                   <ComboSelectWithEditor
                     label="Subcategory"
                     required
@@ -3828,32 +3734,123 @@ function LedgerPage({
                   <FormFieldError message={formErrors.subcategory} />
                 </div>
               ) : null}
-              {isExpense ? (
-                <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
-                  <CompactField label="Notes" className="w-full flex-none">
-                    <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-                  </CompactField>
-                  <div className="mt-3">
-                    <AttachImageCheckbox
-                      label="Attach Image of Receipt"
-                      checked={attachReceipt}
-                      onCheckedChange={setAttachReceipt}
-                      file={receiptFile}
-                      onFileChange={setReceiptFile}
-                    />
-                  </div>
-                </div>
-              ) : null}
-              {isIncome ? (
-                <CompactField label="Notes" className="min-w-[160px] flex-1">
+              {/* Notes */}
+              <div className="w-full flex-1 min-w-0 sm:min-w-[160px] xl:w-full">
+                <CompactField label="Notes" className="w-full flex-none -mb-1.5">
                   <CompactAutoGrowTextarea value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </CompactField>
-              ) : null}
+                {isExpense ? null : isIncome ? <></> : null}
+              </div>
+              {/* Only show "Notes" twice for income/expense distinction */}
+              {isIncome && <div className="hidden" />}
             </CompactFormRow>
- 
-            {isIncome ? (
-              <CompactFormRow className="items-start gap-y-6">
-                <div className={`min-w-0 shrink-0 flex-none ${compactFixedFieldWidth}`}>
+            {/* Checkbox fields row, always full width and stacked/wrapped */}
+            <CompactFormRow className="flex flex-wrap gap-x-6 gap-y-3 w-full">
+              {/* GST (if Expense) */}
+              {isExpense && (
+                <div className="w-full sm:w-[220px] md:w-[180px] lg:w-[180px] xl:w-[180px] flex flex-col min-w-[140px]">
+                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                    <input
+                      type="checkbox"
+                      checked={gst}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setGst(checked);
+                        if (!checked) setGstAmount("");
+                      }}
+                      className="h-3.5 w-3.5 accent-ad-green"
+                    />
+                    GST
+                  </label>
+                  {gst ? (
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={gstAmount}
+                      onChange={(e) => setGstAmount(e.target.value)}
+                      placeholder="GST amount"
+                      className={compactInputClass}
+                    />
+                  ) : null}
+                </div>
+              )}
+              {/* Bill Number (if Expense) */}
+              {isExpense && (
+                <div className="w-full sm:w-[220px] md:w-[180px] lg:w-[180px] xl:w-[180px] flex flex-col min-w-[140px]">
+                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                    <input
+                      type="checkbox"
+                      checked={hasBillNumber}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setHasBillNumber(checked);
+                        if (!checked) setBillNumber("");
+                      }}
+                      className="h-3.5 w-3.5 accent-ad-green"
+                    />
+                    {billLabel}
+                  </label>
+                  {hasBillNumber ? (
+                    <input
+                      type="text"
+                      value={billNumber}
+                      onChange={(e) => setBillNumber(e.target.value)}
+                      className={compactInputClass}
+                    />
+                  ) : null}
+                </div>
+              )}
+              {/* By Cheque (if Expense) */}
+              {isExpense && (
+                <div className="w-full sm:w-[220px] md:w-[180px] lg:w-[180px] xl:w-[180px] flex flex-col min-w-[140px]">
+                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-green-dark">
+                    <input
+                      type="checkbox"
+                      checked={byCheque}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setByCheque(checked);
+                        if (!checked) setChequeAccount("");
+                      }}
+                      className="h-3.5 w-3.5 accent-ad-green"
+                    />
+                    By Cheque
+                  </label>
+                  {byCheque ? (
+                    <select
+                      value={chequeAccount}
+                      onChange={(e) => {
+                        setChequeAccount(e.target.value);
+                        clearFieldError("chequeAccount");
+                      }}
+                      className={fieldErrorClass(Boolean(formErrors.chequeAccount), compactInputClass)}
+                    >
+                      <option value="">Select account</option>
+                      {chequeAccountOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  <FormFieldError message={formErrors.chequeAccount} />
+                </div>
+              )}
+              {/* Attach Receipt (if Expense) */}
+              {isExpense && (
+                <div className="w-full sm:w-[220px] md:w-[180px] lg:w-[180px] xl:w-[180px] flex flex-col min-w-[140px]">
+                  <AttachImageCheckbox
+                    label="Attach Image of Receipt"
+                    checked={attachReceipt}
+                    onCheckedChange={setAttachReceipt}
+                    file={receiptFile}
+                    onFileChange={setReceiptFile}
+                  />
+                </div>
+              )}
+              {/* Attach Attachment (if Income) */}
+              {isIncome && (
+                <div className="w-full sm:w-[220px] md:w-[180px] lg:w-[180px] xl:w-[180px] flex flex-col min-w-[140px]">
                   <AttachImageCheckbox
                     label="Attach Image"
                     checked={attachAttachment}
@@ -3869,8 +3866,9 @@ function LedgerPage({
                     }}
                   />
                 </div>
-              </CompactFormRow>
-            ) : null}
+              )}
+            </CompactFormRow>
+            {/* Popups */}
             {categoriesPopupOpen && (
               <ListEditorPopup
                 title="Edit / Add Categories"
@@ -3900,10 +3898,18 @@ function LedgerPage({
       )}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
+          <button
+            type="button"
+            disabled={selected.size === 0}
+            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             ↓ Export
           </button>
-          <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
+          <button
+            type="button"
+            disabled={selected.size === 0}
+            className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Archive
           </button>
           {!isDeletedView ? (
@@ -3926,11 +3932,8 @@ function LedgerPage({
               Restore
             </button>
           )}
-          {/* <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
-            Copy
-          </button> */}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 w-full xs:w-auto">
           <input
             type="text"
             value={search}
@@ -3939,7 +3942,7 @@ function LedgerPage({
               setPage(1);
             }}
             placeholder="Live search type here..."
-            className="border border-gray-400 bg-white px-2 py-1 text-xs"
+            className="border border-gray-400 bg-white px-2 py-1 text-xs w-full xs:w-auto"
           />
           <button
             type="button"
@@ -3952,7 +3955,7 @@ function LedgerPage({
           </button>
         </div>
       </div>
- 
+
       <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
         <span>Show</span>
         <select
@@ -3969,7 +3972,7 @@ function LedgerPage({
         </select>
         <span>entries</span>
       </div>
- 
+
       <div className="overflow-x-auto">
         <table className="w-full min-w-full border-collapse text-sm">
           <thead>
@@ -3982,25 +3985,42 @@ function LedgerPage({
                   className="accent-white"
                 />
               </th>
-              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">Date</th>
-              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">{vendorLabel}</th>
-              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">Amount</th>
+              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                Date
+              </th>
+              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                {vendorLabel}
+              </th>
+              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                Amount
+              </th>
               {isIncome ? (
-                <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">Payment Mode</th>
+                <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                  Payment Mode
+                </th>
               ) : null}
               {isIncome ? (
-                <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">Bank</th>
+                <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                  Bank
+                </th>
               ) : null}
-              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">Category</th>
-              {/* Notes is the only column without a w-[1%]/whitespace-nowrap pin,
-                  so with table-layout:auto it's the one column that absorbs
-                  whatever width the fixed-to-content columns don't use. */}
-              <th className="w-full border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
+              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                Category
+              </th>
+              <th className="w-full border border-ad-purple-dark px-3 py-2 text-left font-medium">
+                Notes
+              </th>
               {isExpense ? (
                 <>
-                  <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">GST</th>
-                  <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">Bill Number</th>
-                  <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">By Cheque</th>
+                  <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                    GST
+                  </th>
+                  <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                    Bill Number
+                  </th>
+                  <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                    By Cheque
+                  </th>
                 </>
               ) : null}
               <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
@@ -4016,13 +4036,19 @@ function LedgerPage({
           <tbody>
             {loading && !isDeletedView ? (
               <tr>
-                <td colSpan={columnCount} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td
+                  colSpan={columnCount}
+                  className="border border-gray-300 px-3 py-4 text-left text-gray-500"
+                >
                   Loading…
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={columnCount} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td
+                  colSpan={columnCount}
+                  className="border border-gray-300 px-3 py-4 text-left text-gray-500"
+                >
                   {isDeletedView ? "No deleted entries found." : "No entries found."}
                 </td>
               </tr>
@@ -4033,7 +4059,10 @@ function LedgerPage({
                 const expenseRow = row as ExpenseRow;
                 const attachmentUrl = isIncome ? incomeRow.incomeImage : expenseRow.expenseImage;
                 return (
-                  <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
+                  <tr
+                    key={row._id}
+                    className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}
+                  >
                     <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                       <input
                         type="checkbox"
@@ -4076,7 +4105,9 @@ function LedgerPage({
                         {decoded.subcategory}
                       </div>
                     </td>
-                    <td className="border border-gray-300 px-4 py-2 text-left align-top whitespace-normal break-words">{row.notes || ""}</td>
+                    <td className="border border-gray-300 px-4 py-2 text-left align-top whitespace-normal break-words">
+                      {row.notes || ""}
+                    </td>
                     {isExpense ? (
                       <>
                         <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
@@ -4119,27 +4150,29 @@ function LedgerPage({
                       </td>
                     ) : null}
                   </tr>
-           
                 );
               })
             )}
           </tbody>
         </table>
-
       </div>
- 
       <div className="mt-4 flex items-center justify-between">
-        <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
+        <TableEntriesSummary
+          total={filtered.length}
+          page={page}
+          pageSize={entriesPerPage}
+        />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <button
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${page === p
-                ? "border-ad-green bg-ad-green text-white"
-                : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
-                }`}
+              className={`h-7 w-7 border text-xs font-medium ${
+                page === p
+                  ? "border-ad-green bg-ad-green text-white"
+                  : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+              }`}
             >
               {p}
             </button>
