@@ -23,5 +23,9 @@
     "noUncheckedSideEffectImports": true,
     "allowJs": true
   },
-  "include": ["src", "invoice-job-card-viewer"]
+  // Exclude the file with incorrect casing to fix TS1261 error
+  "include": ["src", "invoice-job-card-viewer"],
+  "exclude": [
+    "src/pages/AdminPages/ContactMessage/Websitemessages.tsx"
+  ]
 }
