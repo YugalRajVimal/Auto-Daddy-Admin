@@ -150,7 +150,7 @@ import ThoughtOfDayPage from "../../pages/AdminPages/Content/ThoughtOfDay";
 import ThoughtOfDayNewPage from "../../pages/AdminPages/Content/ThoughtOfDayNew";
 import Reports from "../../pages/AdminPages/Reports/Reports";
 import LeadsPage from "../../pages/AdminPages/Leads/Leads";
-import WebsiteMessagesPage from "../../pages/AdminPages/ContactMessage/Websitemessages";
+import WebsiteMessagesPage from "../../pages/AdminPages/ContactMessage/WebsiteMessages";
 import AccountsPage from "../../pages/AdminPages/Accounts/Accounts";
 import InvoicesPage from "../../pages/AdminPages/Invoices/Invoices";
 import ItemsPage from "../../pages/AdminPages/Invoices/Items";
