@@ -25,6 +25,7 @@ import { ShopEmptyPanel } from "../../components/shop/ShopPanels";
 import { ShopFormSkeleton } from "../../components/shop/ShopListSkeletons";
 import { Skeleton } from "../../components/common/Skeleton";
 import { useAuth } from "../../auth";
+import { useShopSubscriptionGate } from "../../context/ShopSubscriptionGateContext";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { formatCurrencyAmount } from "../../lib/currency";
 import {
@@ -52,12 +53,14 @@ import {
   parseInvoicePaymentStatus,
   parseSubscriptionPlans,
   parseSubscriptionStatus,
-  purchaseSubscriptionOffline,
+  // purchaseSubscriptionOffline,
   type SubscriptionPlan,
   type SubscriptionStatus,
 } from "../../lib/shopOwnerSubscriptionApi";
 import { redirectToStripeCheckout } from "../../lib/stripe";
 import type { SubscriptionPlanId } from "../../types/websiteSubscription";
+
+
 
 type ShopWebsiteSection = "overview" | "domain" | "templates" | "subscription";
 
@@ -65,31 +68,23 @@ const WEBSITE_SECTIONS = [
   { id: "overview", label: "Overview", variant: "primary" as const },
   { id: "domain", label: "Domain Details", variant: "primary" as const },
   { id: "templates", label: "My Website", variant: "primary" as const },
-  { id: "subscription", label: "Subscription", variant: "primary" as const },
+  { id: "subscription", label: "Website Subscription", variant: "primary" as const },
 ];
 
 const SECTION_TITLES: Record<ShopWebsiteSection, string> = {
   overview: "Overview",
   domain: "Domain Details",
   templates: "My website",
-  subscription: "My website",
+  subscription: "Website Subscription"
 };
 
 const YEARLY_FEATURES: { label: string; note: string }[] = [
   { label: "Website", note: "for 365 days" },
-  { label: "Free Software", note: "for 365 days" },
-  { label: "Job Cards", note: "Unlimited" },
+  { label: "Custom Domain", note: "Connected to your website" },
   { label: "Deals Marketplace", note: "Service deals" },
   { label: "Mobile App", note: "For You and Customers" },
 ];
 
-const BIWEEKLY_FEATURES: { label: string; note: string }[] = [
-  { label: "Website", note: "for 14 days" },
-  { label: "Free Software", note: "for 14 days" },
-  { label: "Job Cards", note: "Unlimited" },
-  { label: "Deals Marketplace", note: "Service deals" },
-  { label: "Mobile App", note: "For You and Customers" },
-];
 
 const FALLBACK_PLANS: Record<SubscriptionPlanId, SubscriptionPlan> = {
   yearly: {
@@ -103,29 +98,12 @@ const FALLBACK_PLANS: Record<SubscriptionPlanId, SubscriptionPlan> = {
       { service: "Website", description: "Website subscription for 365 days", amount: 365 },
     ],
   },
-  biweekly: {
-    id: "biweekly",
-    title: "$ 15 Bi-weekly plan",
-    amount: 15,
-    days: 14,
-    hst: 2,
-    features: BIWEEKLY_FEATURES,
-    invoiceRows: [
-      {
-        service: "Bi-weekly plan",
-        description: "Website subscription for 14 days (CAD 15)",
-        amount: 15,
-      },
-    ],
-  },
 };
 
-/** Prefer local biweekly features so API can't show yearly "365 days" notes. */
 function resolvePlanFeatures(
-  planId: SubscriptionPlanId,
+  _planId: SubscriptionPlanId,
   features: { label: string; note: string }[] | undefined,
 ): { label: string; note: string }[] {
-  if (planId === "biweekly") return BIWEEKLY_FEATURES;
   return features?.length ? features : YEARLY_FEATURES;
 }
 
@@ -929,7 +907,7 @@ function SubscriptionPanel({
     status?.planLabel ||
     (status?.active ? "Active subscription" : "a day payment for 365 accumulative days");
   const yearly = plans.yearly;
-  const biweekly = plans.biweekly;
+  // const biweekly = plans.biweekly;
 
   return (
     <div className="space-y-4">
@@ -958,12 +936,12 @@ function SubscriptionPanel({
           <PlanFeatureList items={yearly.features?.length ? yearly.features : YEARLY_FEATURES} />
         </SubscriptionPlanCard>
 
-        <SubscriptionPlanCard
+        {/* <SubscriptionPlanCard
           title={biweekly.title}
           onViewInvoice={() => onViewInvoice("biweekly")}
         >
           <PlanFeatureList items={resolvePlanFeatures("biweekly", biweekly.features)} />
-        </SubscriptionPlanCard>
+        </SubscriptionPlanCard> */}
       </div>
     </div>
   );
@@ -1001,11 +979,11 @@ function WebsiteInvoiceModal({
   const subTotal = rows.reduce((sum, row) => sum + row.amount, 0);
   const hst = planDetails.hst;
   const totalDue = subTotal + hst;
-  const invoiceLabel = plan === "yearly" ? "AD 0001" : "AD 0002";
+  const invoiceLabel =  "AD 0001";
   const planTitle =
-    plan === "yearly" ? "Yearly website subscription" : "Bi-weekly website subscription";
+    "Yearly website subscription" ;
   const proceedLabel =
-    plan === "biweekly" ? "Submit void cheque purchase" : "Proceed with Payment";
+     "Proceed with Payment";
 
   const formatAmount = (amount: number) =>
     formatCurrencyAmount(amount, countryCode, { fallback: "—" });
@@ -1098,6 +1076,7 @@ function WebsiteInvoiceModal({
 export default function ShopMyWebsitePage() {
   const { token, profile } = useAuth();
   const { faqsHeading, faqsDescription, business, user, refresh } = useShopOwnerPortal();
+  const { requireSubscription } = useShopSubscriptionGate();
   const [activeSection, setActiveSection] = useState<ShopWebsiteSection>("overview");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [domainForm, setDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
@@ -1224,17 +1203,15 @@ export default function ShopMyWebsitePage() {
             next[plan.id] = {
               ...FALLBACK_PLANS[plan.id],
               ...plan,
-              // Bi-weekly is a 14-day period; ignore API values that copy yearly (365).
-              days: plan.id === "biweekly" ? 14 : plan.days,
-              description: plan.id === "biweekly" ? undefined : plan.description,
+              days: plan.days,
+              description: plan.description,
               features: resolvePlanFeatures(plan.id, plan.features),
               invoiceRows:
-                plan.id === "biweekly"
-                  ? FALLBACK_PLANS.biweekly.invoiceRows
-                  : plan.invoiceRows?.length
-                    ? plan.invoiceRows
-                    : FALLBACK_PLANS[plan.id].invoiceRows,
+                plan.invoiceRows?.length
+                  ? plan.invoiceRows
+                  : FALLBACK_PLANS[plan.id].invoiceRows,
             };
+         
           }
           setSubscriptionPlans(next);
         }
@@ -1291,6 +1268,8 @@ export default function ShopMyWebsitePage() {
   }, [business, profile?.name, user]);
 
   const handleDomainSaveAndNext = async () => {
+    if (!requireSubscription()) return;
+
     const result = shopDomainBlockSchema.safeParse({
       domain: domainForm.domainName,
       url: domainForm.domainName,
@@ -1367,6 +1346,8 @@ export default function ShopMyWebsitePage() {
   };
 
   const handleTemplateSaveAndNext = async () => {
+    if (!requireSubscription()) return;
+
     if (!selectedTemplateId) {
       toast.error("Please select a website template.");
       return;
@@ -1414,30 +1395,30 @@ export default function ShopMyWebsitePage() {
 
     setPaymentProcessing(true);
     try {
-      if (invoicePlan === "biweekly") {
-        const res = await purchaseSubscriptionOffline(token, {
-          planId: "biweekly",
-          paymentMethod: "Void Cheque",
-          remarks: "26 void cheques of CAD 15",
-        });
-        const data = res.data;
-        const succeeded = res.ok && data?.success !== false;
-        if (!succeeded) {
-          toast.error(formatSubscriptionApiError(data, "Could not submit void cheque purchase."));
-          return;
-        }
-        const invoiceNo =
-          data?.invoiceNo?.trim() || data?.data?.invoiceNo?.trim() || "";
-        toast.success(
-          data?.message?.trim() ||
-            (invoiceNo
-              ? `Void cheque purchase submitted (${invoiceNo}).`
-              : "Void cheque purchase submitted."),
-        );
-        setInvoiceOpen(false);
-        await loadSubscription();
-        return;
-      }
+      // if (invoicePlan === "biweekly") {
+      //   const res = await purchaseSubscriptionOffline(token, {
+      //     planId: "biweekly",
+      //     paymentMethod: "Void Cheque",
+      //     remarks: "26 void cheques of CAD 15",
+      //   });
+      //   const data = res.data;
+      //   const succeeded = res.ok && data?.success !== false;
+      //   if (!succeeded) {
+      //     toast.error(formatSubscriptionApiError(data, "Could not submit void cheque purchase."));
+      //     return;
+      //   }
+      //   const invoiceNo =
+      //     data?.invoiceNo?.trim() || data?.data?.invoiceNo?.trim() || "";
+      //   toast.success(
+      //     data?.message?.trim() ||
+      //       (invoiceNo
+      //         ? `Void cheque purchase submitted (${invoiceNo}).`
+      //         : "Void cheque purchase submitted."),
+      //   );
+      //   setInvoiceOpen(false);
+      //   await loadSubscription();
+      //   return;
+      // }
 
       const { successUrl, cancelUrl } = buildSubscriptionReturnUrls("yearly");
       const res = await createSubscriptionCheckout(token, {

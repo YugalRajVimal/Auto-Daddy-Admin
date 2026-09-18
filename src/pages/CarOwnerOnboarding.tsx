@@ -25,6 +25,7 @@ import {
   PROFILE_NAME_MAX_LENGTH,
   type UserProfileResponse,
 } from "../lib/carOwnerProfile";
+import { getPendingRedirect } from "../lib/postAuthRedirect";
 
 type CompleteProfileResponse = {
   message?: string;
@@ -63,10 +64,12 @@ export default function CarOwnerOnboardingPage() {
       setProfileLoading(false);
       return;
     }
+    
     if (session?.meta?.isProfileComplete === true) {
       setProfileLoading(false);
       return;
     }
+    
 
     let cancelled = false;
     void (async () => {
@@ -103,8 +106,13 @@ export default function CarOwnerOnboardingPage() {
     return <Navigate to="/" replace />;
   }
 
+  // if (session?.meta?.isProfileComplete === true) {
+  //   return <Navigate to="/owner" replace />;
+  // }
+
   if (session?.meta?.isProfileComplete === true) {
-    return <Navigate to="/owner" replace />;
+    const pending = getPendingRedirect();
+    return <Navigate to={pending?.returnTo ?? "/owner"} replace />;
   }
 
   const onValidSubmit = async (values: CarOwnerOnboardingValues) => {
@@ -148,7 +156,8 @@ export default function CarOwnerOnboardingPage() {
       });
 
       toast.success(res.data?.message ?? "Profile completed.");
-      navigate("/owner", { replace: true });
+      const pending = getPendingRedirect();
+      navigate(pending?.returnTo ?? "/owner", { replace: true });
     } catch {
       toast.error("Network error while completing profile.");
     } finally {

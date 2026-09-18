@@ -720,9 +720,9 @@ export function WebsiteInvoiceModal({
   const subTotal = rows.reduce((sum, row) => sum + row.amount, 0);
   const hst = planDetails.hst;
   const totalDue = subTotal + hst;
-  const invoiceLabel = plan === "yearly" ? "AD 0001" : "AD 0002";
+  const invoiceLabel =  "AD 0001" ;
   const planTitle =
-    plan === "yearly" ? "Yearly website subscription" : "Bi-weekly website subscription";
+    "Yearly website subscription" ;
   const proceedLabel =
     plan === "biweekly" ? "Submit void cheque purchase" : "Proceed with Payment";
 

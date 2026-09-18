@@ -27,6 +27,8 @@ import ShopDocumentTemplatePanel, {
   resolveTemplateSlug,
 } from "../../components/shop/ShopDocumentTemplatePanel";
 import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
+import ShopQrCodePanel from "../../components/shop/ShopQrCodePanel";
+
 import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
 import { shopHeroOnImageMutedTextClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
@@ -96,6 +98,9 @@ const PROFILE_SECTIONS = [
   { id: "brands", label: "Car Brand Specialist", variant: "primary" as const },
   { id: "services", label: "Operational Services", variant: "primary" as const },
   { id: "invoice-templates", label: "Invoice Templates", variant: "primary" as const },
+  { id: "services", label: "Operational Services", variant: "primary" as const },
+  { id: "invoice-templates", label: "Invoice Templates", variant: "primary" as const },
+  { id: "qr-code", label: "Shop QR Code", variant: "primary" as const },
 ];
 
 const SECTION_TITLES: Record<string, string> = {
@@ -106,6 +111,7 @@ const SECTION_TITLES: Record<string, string> = {
   services: "Operational Services",
   "invoice-templates": "Invoice Templates",
   team: "Team Members",
+  "qr-code": "Shop QR Code",
 };
 
 const FLUSH_HERO_SECTIONS = new Set([
@@ -114,7 +120,8 @@ const FLUSH_HERO_SECTIONS = new Set([
   "services",
   "invoice-templates",
 ]);
-const TRANSPARENT_HERO_SECTIONS = new Set(["personal", "business"]);
+const TRANSPARENT_HERO_SECTIONS = new Set(["personal", "business", "qr-code"]);
+
 const TOP_ALIGNED_SECTIONS = new Set([...FLUSH_HERO_SECTIONS, ...TRANSPARENT_HERO_SECTIONS]);
 
 function ProfileHeroFormSection({
@@ -829,7 +836,13 @@ export default function ShopProfilePage() {
             </p>
           </>
         );
-      default:
+case "qr-code":
+  return (
+    <ProfileHeroFormSection thoughtOfTheDay={thoughtOfTheDay}>
+      <ShopQrCodePanel slug={business?.slug} businessName={business?.businessName} />
+    </ProfileHeroFormSection>
+  );
+        default:
         return null;
     }
   };

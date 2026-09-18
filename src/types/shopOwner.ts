@@ -304,6 +304,7 @@ export type DashboardIncomeOverview = {
 export type ShopProfileBusiness = {
   _id?: string;
   id?: string;
+  slug?: string;
   businessName?: string;
   businessPhone?: string;
   city?: string;

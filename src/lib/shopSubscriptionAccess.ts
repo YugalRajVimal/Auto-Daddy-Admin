@@ -1,20 +1,141 @@
+// // import { shopPrimaryNav } from "../config/shopNav";
+// // import type { NavItem } from "../config/adminNav";
+
+// // /** Paths shop owners may fully use without an active subscription. */
+// // const ALLOWED_PREFIXES = [
+// //   "/shop/profile",
+// //   "/shop/my-website",
+// //   "/shop/help",
+// // ] as const;
+
+// // export function isShopPathAllowedWithoutSubscription(pathname: string): boolean {
+// //   return ALLOWED_PREFIXES.some(
+// //     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+// //   );
+// // }
+
+// // /** Full shop nav is always shown; subscription only soft-locks interactions. */
+// // export function getShopPrimaryNavForSubscription(_hasActiveSubscription?: boolean): NavItem[] {
+// //   return shopPrimaryNav;
+// // }
+
+// // /**
+// //  * Dev-only override from `VITE_DEV_SIMULATE_SUBSCRIPTION_ACTIVE`.
+// //  * - `"true"` / `"1"` → force active
+// //  * - `"false"` / `"0"` → force inactive
+// //  * - unset / other → use real API days-left
+// //  * Ignored outside Vite DEV (`import.meta.env.DEV`).
+// //  */
+// // export function getDevSimulatedSubscriptionActive(): boolean | null {
+// //   if (!import.meta.env.DEV) return null;
+// //   const raw = (import.meta.env.VITE_DEV_SIMULATE_SUBSCRIPTION_ACTIVE ?? "")
+// //     .toString()
+// //     .trim()
+// //     .toLowerCase();
+// //   if (raw === "true" || raw === "1" || raw === "yes") return true;
+// //   if (raw === "false" || raw === "0" || raw === "no") return false;
+// //   return null;
+// // }
+
+// // /** Apply daysLeft > 0 rule, with optional DEV env simulation. */
+// // export function resolveHasActiveSubscription(daysLeft: number | null | undefined): boolean {
+// //   const simulated = getDevSimulatedSubscriptionActive();
+// //   if (simulated != null) return simulated;
+// //   return typeof daysLeft === "number" && daysLeft > 0;
+// // }
+
+// // /** Days left for UI when DEV simulation is on. */
+// // export function resolveSubscriptionDaysLeft(
+// //   daysLeft: number | null | undefined,
+// // ): number | undefined {
+// //   const simulated = getDevSimulatedSubscriptionActive();
+// //   if (simulated === true) {
+// //     return typeof daysLeft === "number" && daysLeft > 0 ? daysLeft : 365;
+// //   }
+// //   if (simulated === false) return 0;
+// //   return typeof daysLeft === "number" ? daysLeft : undefined;
+// // }
+
+
+// import { shopPrimaryNav } from "../config/shopNav";
+// import type { NavItem } from "../config/adminNav";
+
+// /**
+//  * Software (job cards, dashboard, customers, etc.) is now governed by the
+//  * Wallet/trial system, NOT the website subscription — so nothing here is
+//  * locked by default. Only the specific website-publishing actions below
+//  * require an active Website subscription.
+//  */
+// const WEBSITE_SUBSCRIPTION_REQUIRED_PREFIXES: readonly string[] = [
+//   // e.g. "/shop/my-website/publish" — add specific sub-routes here if/when
+//   // template selection, domain connection, or publishing become dedicated
+//   // routes. Today they're all tabs inside /shop/my-website, so those
+//   // individual actions call requireSubscription() from
+//   // useShopSubscriptionGate() directly instead of being path-gated.
+// ];
+
+// export function isShopPathAllowedWithoutSubscription(pathname: string): boolean {
+//   return !WEBSITE_SUBSCRIPTION_REQUIRED_PREFIXES.some(
+//     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+//   );
+// }
+
+// /** Full shop nav is always shown — no nav-level lock. */
+// export function getShopPrimaryNavForSubscription(_hasActiveSubscription?: boolean): NavItem[] {
+//   return shopPrimaryNav;
+// }
+
+// export function getDevSimulatedSubscriptionActive(): boolean | null {
+//   if (!import.meta.env.DEV) return null;
+//   const raw = (import.meta.env.VITE_DEV_SIMULATE_SUBSCRIPTION_ACTIVE ?? "")
+//     .toString()
+//     .trim()
+//     .toLowerCase();
+//   if (raw === "true" || raw === "1" || raw === "yes") return true;
+//   if (raw === "false" || raw === "0" || raw === "no") return false;
+//   return null;
+// }
+
+// export function resolveHasActiveSubscription(daysLeft: number | null | undefined): boolean {
+//   const simulated = getDevSimulatedSubscriptionActive();
+//   if (simulated != null) return simulated;
+//   return typeof daysLeft === "number" && daysLeft > 0;
+// }
+
+// export function resolveSubscriptionDaysLeft(daysLeft: number | null | undefined): number | undefined {
+//   const simulated = getDevSimulatedSubscriptionActive();
+//   if (simulated === true) return typeof daysLeft === "number" && daysLeft > 0 ? daysLeft : 365;
+//   if (simulated === false) return 0;
+//   return typeof daysLeft === "number" ? daysLeft : undefined;
+// }
+
 import { shopPrimaryNav } from "../config/shopNav";
 import type { NavItem } from "../config/adminNav";
 
-/** Paths shop owners may fully use without an active subscription. */
-const ALLOWED_PREFIXES = [
-  "/shop/profile",
-  "/shop/my-website",
-  "/shop/help",
-] as const;
+/**
+ * Software (job cards, dashboard, customers, etc.) is governed by the
+ * Wallet/trial system, NOT the website subscription — so nothing is locked
+ * by default. Only the specific website-publishing actions inside
+ * /shop/my-website require an active Website subscription, and those call
+ * requireSubscription() from useShopSubscriptionGate() directly at the
+ * point of action (template selection, domain connect, publish) rather
+ * than being gated here by path.
+ *
+ * This list exists only for the rare case a website-publishing action gets
+ * its own dedicated route (e.g. "/shop/my-website/publish") and needs to be
+ * blocked before it even renders. Today those are tabs inside one page, so
+ * this is empty and isShopPathAllowedWithoutSubscription is true for every
+ * path in the app.
+ */
+const WEBSITE_SUBSCRIPTION_REQUIRED_PREFIXES: readonly string[] = [];
 
 export function isShopPathAllowedWithoutSubscription(pathname: string): boolean {
-  return ALLOWED_PREFIXES.some(
+  return !WEBSITE_SUBSCRIPTION_REQUIRED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }
 
-/** Full shop nav is always shown; subscription only soft-locks interactions. */
+/** Full shop nav is always shown — no nav-level lock. */
 export function getShopPrimaryNavForSubscription(_hasActiveSubscription?: boolean): NavItem[] {
   return shopPrimaryNav;
 }
@@ -45,13 +166,9 @@ export function resolveHasActiveSubscription(daysLeft: number | null | undefined
 }
 
 /** Days left for UI when DEV simulation is on. */
-export function resolveSubscriptionDaysLeft(
-  daysLeft: number | null | undefined,
-): number | undefined {
+export function resolveSubscriptionDaysLeft(daysLeft: number | null | undefined): number | undefined {
   const simulated = getDevSimulatedSubscriptionActive();
-  if (simulated === true) {
-    return typeof daysLeft === "number" && daysLeft > 0 ? daysLeft : 365;
-  }
+  if (simulated === true) return typeof daysLeft === "number" && daysLeft > 0 ? daysLeft : 365;
   if (simulated === false) return 0;
   return typeof daysLeft === "number" ? daysLeft : undefined;
 }

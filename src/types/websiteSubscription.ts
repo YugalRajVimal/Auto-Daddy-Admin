@@ -1,6 +1,6 @@
 /** Shop owner website subscription — /api/autoshopowner/subscription/* */
 
-export type SubscriptionPlanId = "yearly" | "biweekly";
+export type SubscriptionPlanId = "yearly";
 
 export type SubscriptionCheckoutBody = {
   planId: SubscriptionPlanId;

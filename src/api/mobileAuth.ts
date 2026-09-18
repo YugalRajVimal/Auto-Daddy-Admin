@@ -245,3 +245,13 @@ export function isSessionProfileIncomplete(
   const msg = (response?.message ?? "").toLowerCase();
   return msg.includes("profile is incomplete") || msg.includes("complete your profile");
 }
+
+/** GET with no auth header — for /api/public/* endpoints. */
+export async function getPublicJson<T>(path: string) {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url);
+  const data = (await res.json().catch(() => null)) as T | null;
+  const out = { ok: res.ok, status: res.status, data };
+  debugApi("GET", url, null, out);
+  return out;
+}

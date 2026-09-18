@@ -112,6 +112,7 @@ import OnboardingApproval from "./pages/OnboardingApproval";
 import CarOwnerOnboardingApproval from "./pages/CarownerOnboardingApproval";
 import { adminRoutes } from "./portals/admin/routes";
 import { ownerRoutes, shopRoutes } from "./portals/owner/routes";
+import PublicShopProfilePage from "./pages/PublicShopProfile";
 
 export default function App() {
   return (
@@ -147,9 +148,14 @@ export default function App() {
 
             <Route path="/auto-shop-owner/onboarding" element={<AutoShopOwnerOnboarding />} />
             <Route path="/owner/onboarding" element={<CarOwnerOnboardingPage />} />
+            <Route path="/s/:slug" element={<PublicShopProfilePage />} />
             <Route path="/shop/onboarding" element={<ShopOwnerOnboardingPage />} />
             <Route path="/onboarding-approval/:token" element={<OnboardingApproval />} />
             <Route path="/car-owner-onboarding/:token" element={<CarOwnerOnboardingApproval />} />
+
+
+
+
 
             {/* Template / demo routes */}
             <Route path="/calendar" element={<Calendar />} />

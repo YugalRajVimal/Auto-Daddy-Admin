@@ -1,3 +1,2308 @@
+// import { useCallback, useEffect, useMemo, useRef, useState, type TextareaHTMLAttributes } from "react";
+// import { useForm } from "react-hook-form";
+// import { zodResolver } from "@hookform/resolvers/zod";
+// import { z } from "zod";
+// import { motion } from "framer-motion";
+// import AttachImageCheckbox from "../../components/admin/AttachImageCheckbox";
+// import ClipImageHover from "../../components/admin/ClipImageHover";
+// import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
+// import { toast } from "react-toastify";
+// import ComboSelectWithEditor from "../../components/admin/ComboSelectWithEditor";
+// import {
+//   ADMIN_PANEL_THEAD_ROW_CLASS,
+//   adminPanelRowClass,
+//   adminPanelTableClasses,
+//   type AdminPanelTableClasses,
+// } from "../../components/admin/adminPanelTableStyles";
+// import {
+//   CompactField,
+//   CompactFormPanel,
+//   CompactFormRow,
+// } from "../../components/admin/ContentPanel";
+// import ListEditorPopup from "../../components/admin/ListEditorPopup";
+// import ShopJobCardEstimateView from "../../components/JobCard/ShopJobCardEstimateView";
+// import { pickJobNoFromListRow } from "../../components/JobCard/shopJobCardEstimate";
+// import { ShopReveal } from "../../components/shop/ShopAnimated";
+// import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
+// import ShopPageShell from "../../components/shop/ShopPageShell";
+// import {
+//   shopCompactInputClass,
+//   shopCompactTextareaClass,
+//   shopProfileFormPanelClass,
+//   shopProfileFormPanelFooterClass,
+//   shopTableToolbarClass,
+// } from "../../components/shop/shopLayoutStyles";
+// import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
+// import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
+// import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
+// import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
+// import { useShopOwnerData } from "../../context/ShopOwnerDataProvider";
+// import { useShopOwnerPortal } from "../../hooks/useShopPortal";
+// import { useShopWallet } from "../../hooks/useShopWallet";
+// import { formatCurrencyAmount } from "../../lib/currency";
+// import {
+//   DUMMY_SHOP_BANKS,
+//   DUMMY_SHOP_EXPENSES,
+//   USE_DUMMY_SHOP_WALLET,
+//   type ShopWalletBankRow,
+//   type ShopWalletExpenseRow,
+// } from "../../lib/dummyShopWallet";
+// import { useMockShopInvoiceLedger } from "../../lib/mockShopInvoiceLedger";
+// import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
+// import {
+//   markAutoshopInvoicePaid,
+//   sendAutoshopJobCardForApproval,
+// } from "../../lib/autoshopownerJobCardsApi";
+// import {
+//   pickJobCardInvoiceNumber,
+//   pickJobCardNoForApi,
+//   type JobCardListRow,
+// } from "../../lib/shopOwnerJobCards";
+// import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
+// import { createBank, createExpense, fetchBanks, fetchExpenses, updateBank, updateExpense } from "../../lib/shopOwnerAccountsApi";
+// import {
+//   categoryLabel,
+//   cloneCategories,
+//   dedupeLabels,
+//   EXPENSE_CATEGORIES,
+//   slugifyLabel,
+//   type CategoryOption,
+// } from "../AdminPages/Accounts/ledgerCategories";
+// import useAuth from "../../auth/useAuth";
+// import { walletEntrySchema, bankAccountSchema } from "../../lib/validation/schemas/money";
+// import { optionalMoney, requiredTrimmed } from "../../lib/validation/primitives";
+// import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../lib/validation/formUi";
+
+// const shopExpenseFormSchema = walletEntrySchema
+//   .extend({
+//     subcategory: requiredTrimmed("Subcategory"),
+//     gstAmount: optionalMoney,
+//     hasBillNumber: z.boolean().optional().default(false),
+//     billNumber: z.string().optional().default(""),
+//     byCheque: z.boolean().optional().default(false),
+//     chequeAccount: z.string().optional().default(""),
+//   })
+//   .superRefine((data, ctx) => {
+//     if (data.hasBillNumber && !data.billNumber?.trim()) {
+//       ctx.addIssue({ code: "custom", message: "Bill number is required.", path: ["billNumber"] });
+//     }
+//     if (data.byCheque && !data.chequeAccount) {
+//       ctx.addIssue({ code: "custom", message: "Select an account for cheque payment.", path: ["chequeAccount"] });
+//     }
+//   });
+// type ShopExpenseFormValues = z.input<typeof shopExpenseFormSchema>;
+
+// const shopBankFormSchema = bankAccountSchema.extend({
+//   accountName: z.string().optional().default(""),
+//   assignToInvoice: z.boolean().optional().default(false),
+// });
+// type ShopBankFormValues = z.input<typeof shopBankFormSchema>;
+
+// const PAGE_SIZE = 10;
+// const WALLET_SEARCH_INPUT_ID = "shop-wallet-search";
+
+// type WalletView = "paid" | "unpaid" | "expenses" | "banks";
+
+// const SECTION_HEADINGS: Record<WalletView, string> = {
+//   paid: "Paid Invoice",
+//   unpaid: "Un-Paid Invoice",
+//   expenses: "Expenses",
+//   banks: "Manage Banks",
+// };
+
+// const SHOP_COMBO_EDIT_BUTTON_CLASS =
+//   "block w-full border-b-2 border-ad-purple-dark bg-ad-purple px-2 py-2 text-left text-sm font-bold tracking-wide text-white shadow-inner hover:bg-ad-purple-dark";
+// const SHOP_COMBO_ACTIVE_ITEM_CLASS = "bg-[#f5cce8] font-semibold text-ad-purple";
+// const SHOP_FORM_CHECKBOX_LABEL_CLASS = "mb-1 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-ad-purple";
+// const SHOP_LIST_EDITOR_HEADER_CLASS = "bg-[#FDE4D0] px-4 py-2.5 text-center text-sm font-bold text-ad-purple";
+
+// function normalizeVendorLabel(value: string) {
+//   return value.trim().replace(/\s+/g, " ");
+// }
+
+// function ShopCompactAutoGrowTextarea({
+//   value,
+//   onChange,
+//   className = "",
+//   ...props
+// }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+//   const ref = useRef<HTMLTextAreaElement>(null);
+
+//   useEffect(() => {
+//     const el = ref.current;
+//     if (!el) return;
+//     el.style.height = "auto";
+//     el.style.height = `${Math.max(26, el.scrollHeight)}px`;
+//   }, [value]);
+
+//   return (
+//     <textarea
+//       ref={ref}
+//       value={value}
+//       onChange={onChange}
+//       rows={1}
+//       className={`${shopCompactTextareaClass} ${className}`}
+//       {...props}
+//     />
+//   );
+// }
+
+// function ShopVendorComboField({
+//   label,
+//   required,
+//   value,
+//   onChange,
+//   options,
+//   className,
+// }: {
+//   label: string;
+//   required?: boolean;
+//   value: string;
+//   onChange: (next: string) => void;
+//   options: string[];
+//   className?: string;
+// }) {
+//   const [open, setOpen] = useState(false);
+//   const [activeIndex, setActiveIndex] = useState(0);
+//   const rootRef = useRef<HTMLDivElement>(null);
+
+//   const filtered = useMemo(() => {
+//     const q = normalizeVendorLabel(value).toLowerCase();
+//     const base = options
+//       .map(normalizeVendorLabel)
+//       .filter(Boolean)
+//       .filter((opt, idx, arr) => arr.findIndex((v) => v.toLowerCase() === opt.toLowerCase()) === idx);
+//     if (!q) return base.slice(0, 25);
+//     return base.filter((opt) => opt.toLowerCase().includes(q)).slice(0, 25);
+//   }, [value, options]);
+
+//   useEffect(() => {
+//     if (!open) return;
+//     const onPointerDown = (e: MouseEvent) => {
+//       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+//     };
+//     const onKeyDown = (e: KeyboardEvent) => {
+//       if (e.key === "Escape") setOpen(false);
+//     };
+//     document.addEventListener("mousedown", onPointerDown);
+//     document.addEventListener("keydown", onKeyDown);
+//     return () => {
+//       document.removeEventListener("mousedown", onPointerDown);
+//       document.removeEventListener("keydown", onKeyDown);
+//     };
+//   }, [open]);
+
+//   useEffect(() => {
+//     setActiveIndex(0);
+//   }, [value, open]);
+
+//   const listboxId = `shop-vendor-listbox-${label.replace(/\s+/g, "-").toLowerCase()}`;
+
+//   return (
+//     <CompactField label={label} required={required} className={className}>
+//       <div ref={rootRef} className="relative">
+//         <input
+//           type="text"
+//           value={value}
+//           onChange={(e) => {
+//             onChange(e.target.value);
+//             setOpen(true);
+//           }}
+//           onFocus={() => setOpen(true)}
+//           onKeyDown={(e) => {
+//             if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+//               setOpen(true);
+//               return;
+//             }
+//             if (!open) return;
+//             if (e.key === "ArrowDown") {
+//               e.preventDefault();
+//               setActiveIndex((i) => Math.min(filtered.length - 1, i + 1));
+//             } else if (e.key === "ArrowUp") {
+//               e.preventDefault();
+//               setActiveIndex((i) => Math.max(0, i - 1));
+//             } else if (e.key === "Enter") {
+//               const hit = filtered[activeIndex];
+//               if (hit) {
+//                 e.preventDefault();
+//                 onChange(hit);
+//                 setOpen(false);
+//               }
+//             }
+//           }}
+//           role="combobox"
+//           aria-expanded={open}
+//           aria-controls={listboxId}
+//           aria-autocomplete="list"
+//           className={shopCompactInputClass}
+//           autoComplete="off"
+//         />
+
+//         {open && filtered.length > 0 ? (
+//           <div
+//             id={listboxId}
+//             role="listbox"
+//             className="absolute left-0 right-0 z-50 mt-0.5 max-h-52 overflow-y-auto rounded border border-gray-400 bg-white shadow-lg"
+//           >
+//             {filtered.map((opt, idx) => {
+//               const active = idx === activeIndex;
+//               return (
+//                 <button
+//                   key={`${opt}-${idx}`}
+//                   type="button"
+//                   role="option"
+//                   aria-selected={active}
+//                   onMouseEnter={() => setActiveIndex(idx)}
+//                   onClick={() => {
+//                     onChange(opt);
+//                     setOpen(false);
+//                   }}
+//                   className={`block w-full px-2 py-1.5 text-left text-sm hover:bg-gray-100 ${
+//                     active ? SHOP_COMBO_ACTIVE_ITEM_CLASS : "text-gray-900"
+//                   }`}
+//                 >
+//                   {opt}
+//                 </button>
+//               );
+//             })}
+//           </div>
+//         ) : null}
+//       </div>
+//     </CompactField>
+//   );
+// }
+
+// function todayYMD() {
+//   const d = new Date();
+//   const y = d.getFullYear();
+//   const m = String(d.getMonth() + 1).padStart(2, "0");
+//   const day = String(d.getDate()).padStart(2, "0");
+//   return `${y}-${m}-${day}`;
+// }
+
+// function resolveCategoryValue(categories: CategoryOption[], raw: unknown): string {
+//   const input = String(raw ?? "").trim();
+//   if (!input) return "";
+//   const direct = categories.find((c) => c.value === input);
+//   if (direct) return direct.value;
+//   const byLabel = categories.find((c) => c.label.toLowerCase() === input.toLowerCase());
+//   if (byLabel) return byLabel.value;
+//   const slug = slugifyLabel(input);
+//   const bySlug = categories.find((c) => c.value === slug);
+//   return bySlug ? bySlug.value : slug;
+// }
+
+// function resolveSubcategoryValue(category: CategoryOption | undefined, raw: unknown): string {
+//   const input = String(raw ?? "").trim();
+//   if (!input) return "";
+//   const subs = category?.subcategories ?? [];
+//   const direct = subs.find((s) => s.value === input);
+//   if (direct) return direct.value;
+//   const byLabel = subs.find((s) => s.label.toLowerCase() === input.toLowerCase());
+//   if (byLabel) return byLabel.value;
+//   const slug = slugifyLabel(input);
+//   const bySlug = subs.find((s) => s.value === slug);
+//   return bySlug ? bySlug.value : slug;
+// }
+
+// const SHOP_TABLE_BASE = adminPanelTableClasses(true);
+// const SHOP_TABLE: AdminPanelTableClasses = {
+//   ...SHOP_TABLE_BASE,
+//   th: SHOP_TABLE_BASE.th.replace("px-2", "px-4"),
+//   thCheckbox: SHOP_TABLE_BASE.thCheckbox.replace("px-2", "px-4"),
+//   td: SHOP_TABLE_BASE.td.replace("px-2", "px-4"),
+//   tdCheckbox: SHOP_TABLE_BASE.tdCheckbox.replace("px-2", "px-4"),
+// };
+
+// const SHOP_TABLE_HEAD_TH_CLASS = `${SHOP_TABLE.th} h-9 py-0 align-middle`;
+// const SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS = `${SHOP_TABLE.thCheckbox} h-9 py-0 align-middle`;
+// const SHOP_TABLE_BODY_TD_CLASS = `${SHOP_TABLE.td} h-9 py-0 align-middle whitespace-nowrap`;
+// const SHOP_TABLE_BODY_TD_CHECKBOX_CLASS = `${SHOP_TABLE.tdCheckbox} h-9 py-0 align-middle`;
+// const SHOP_TABLE_CHECKBOX_CLASS = "h-3.5 w-3.5 accent-ad-purple";
+
+// const WALLET_BULK_BUTTON_CLASS =
+//   "rounded border border-ad-purple bg-white px-3 py-1 text-xs font-bold text-ad-purple hover:bg-[#f5cce8] disabled:cursor-not-allowed disabled:opacity-60";
+
+// function formatWalletPrice(
+//   total: number | string | undefined,
+//   countryCode: string | null | undefined,
+// ): string {
+//   return formatCurrencyAmount(total, countryCode, { fallback: "—", includeSign: false });
+// }
+
+// function displayBillId(row: JobCardListRow): string {
+//   const invoiceNo = pickJobCardInvoiceNumber(row);
+//   if (invoiceNo) return invoiceNo;
+//   const jobNo = row.jobNo?.trim();
+//   return jobNo || "—";
+// }
+
+// function matchesSearch(row: JobCardListRow, query: string): boolean {
+//   const q = query.trim().toLowerCase();
+//   if (!q) return true;
+//   const haystack = [
+//     row.customerName,
+//     row.phone,
+//     row.vehiclePlate,
+//     row.jobNo,
+//     pickJobCardInvoiceNumber(row),
+//   ]
+//     .filter(Boolean)
+//     .join(" ")
+//     .toLowerCase();
+//   return haystack.includes(q);
+// }
+
+// function matchesExpenseSearch(
+//   row: ShopWalletExpenseRow,
+//   query: string,
+//   categories: CategoryOption[],
+// ): boolean {
+//   const q = query.trim().toLowerCase();
+//   if (!q) return true;
+//   const labels = categoryLabel(categories, row.category, row.subcategory);
+//   const haystack = [
+//     row.date,
+//     formatDisplayDate(row.date),
+//     row.vendor,
+//     String(row.amount),
+//     labels.category,
+//     labels.subcategory,
+//     row.notes,
+//     row.billNumber ?? "",
+//   ]
+//     .join(" ")
+//     .toLowerCase();
+//   return haystack.includes(q);
+// }
+
+// function walletRowsMatchingSelection(
+//   selectedIds: Set<string>,
+//   rows: JobCardListRow[],
+// ): JobCardListRow[] {
+//   return rows.filter((row) => selectedIds.has(row.id));
+// }
+
+// function WalletListFooter({
+//   totalEntries,
+//   page,
+//   totalPages,
+//   onPageChange,
+// }: {
+//   totalEntries: number;
+//   page: number;
+//   totalPages: number;
+//   onPageChange: (page: number) => void;
+// }) {
+//   return (
+//     <ShopListFooter>
+//       <p>{totalEntries} Entries</p>
+//       {totalPages > 1 ? (
+//         <div className="flex items-center gap-1">
+//           {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
+//             const isActive = pageNumber === page;
+//             return (
+//               <button
+//                 key={pageNumber}
+//                 type="button"
+//                 onClick={() => onPageChange(pageNumber)}
+//                 className={`flex h-8 min-w-8 items-center justify-center rounded-sm px-2 text-sm font-bold ${isActive
+//                     ? "bg-gray-500 text-white"
+//                     : "border border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
+//                   }`}
+//                 aria-current={isActive ? "page" : undefined}
+//               >
+//                 {pageNumber}
+//               </button>
+//             );
+//           })}
+//         </div>
+//       ) : null}
+//     </ShopListFooter>
+//   );
+// }
+
+// function AddNewButton({ onClick }: { onClick: () => void }) {
+//   return (
+//     <button type="button" onClick={onClick} className={shopAddNewButtonClass}>
+//       + Add New
+//     </button>
+//   );
+// }
+
+// function WalletExpenseForm({
+//   mode,
+//   amount,
+//   date,
+//   vendor,
+//   category,
+//   notes,
+//   gst,
+//   gstAmount,
+//   hasBillNumber,
+//   billNumber,
+//   byCheque,
+//   chequeAccount,
+//   attachReceipt,
+//   receiptFile,
+//   categoryLabels,
+//   subcategoryLabels,
+//   selectedCategoryLabel,
+//   selectedSubcategoryLabel,
+//   chequeAccountOptions,
+//   vendorOptions,
+//   onAmountChange,
+//   onDateChange,
+//   onVendorChange,
+//   onCategoryChange,
+//   onSubcategoryChange,
+//   onNotesChange,
+//   onGstChange,
+//   onGstAmountChange,
+//   onHasBillNumberChange,
+//   onBillNumberChange,
+//   onByChequeChange,
+//   onChequeAccountChange,
+//   onAttachReceiptChange,
+//   onReceiptFileChange,
+//   onOpenSubcategoriesPopup,
+//   onSave,
+//   onCancel,
+//   saving = false,
+//   errors = {},
+// }: {
+//   mode: "add" | "edit";
+//   amount: string;
+//   date: string;
+//   vendor: string;
+//   category: string;
+//   notes: string;
+//   gst: boolean;
+//   gstAmount: string;
+//   hasBillNumber: boolean;
+//   billNumber: string;
+//   byCheque: boolean;
+//   chequeAccount: string;
+//   attachReceipt: boolean;
+//   receiptFile: File | null;
+//   categoryLabels: string[];
+//   subcategoryLabels: string[];
+//   selectedCategoryLabel: string;
+//   selectedSubcategoryLabel: string;
+//   chequeAccountOptions: string[];
+//   vendorOptions: string[];
+//   onAmountChange: (value: string) => void;
+//   onDateChange: (value: string) => void;
+//   onVendorChange: (value: string) => void;
+//   onCategoryChange: (value: string) => void;
+//   onSubcategoryChange: (value: string) => void;
+//   onNotesChange: (value: string) => void;
+//   onGstChange: (value: boolean) => void;
+//   onGstAmountChange: (value: string) => void;
+//   onHasBillNumberChange: (value: boolean) => void;
+//   onBillNumberChange: (value: string) => void;
+//   onByChequeChange: (value: boolean) => void;
+//   onChequeAccountChange: (value: string) => void;
+//   onAttachReceiptChange: (value: boolean) => void;
+//   onReceiptFileChange: (file: File | null) => void;
+//   onOpenSubcategoriesPopup: () => void;
+//   onSave: () => void;
+//   onCancel: () => void;
+//   saving?: boolean;
+//   errors?: {
+//     amount?: string;
+//     date?: string;
+//     vendor?: string;
+//     category?: string;
+//     subcategory?: string;
+//     billNumber?: string;
+//     chequeAccount?: string;
+//   };
+// }) {
+//   const isEdit = mode === "edit";
+
+//   return (
+//     <CompactFormPanel
+//       className={`${shopProfileFormPanelClass} !mb-4`}
+//       showBottomBorder={false}
+//       focusOnMount
+//       footer={
+//         <div
+//           className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
+//         >
+//           <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
+//             {isEdit ? "You are editing an expense" : "You are adding a new expense"}
+//           </div>
+//           <div className="flex items-center gap-2">
+//             <button
+//               type="button"
+//               onClick={onSave}
+//               disabled={saving}
+//               className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95 disabled:pointer-events-none disabled:opacity-50"
+//             >
+//               {saving ? (isEdit ? "Updating…" : "Saving…") : isEdit ? "Update" : "Save"}
+//             </button>
+//             <span className="text-xs text-gray-700">
+//               or{" "}
+//               <button
+//                 type="button"
+//                 onClick={onCancel}
+//                 disabled={saving}
+//                 className="font-medium text-blue-600 underline hover:text-blue-700 disabled:pointer-events-none disabled:opacity-50"
+//               >
+//                 Cancel
+//               </button>
+//             </span>
+//           </div>
+//         </div>
+//       }
+//     >
+//       <CompactFormRow className="flex-nowrap items-start gap-x-3 overflow-x-auto">
+//         <CompactField label="Amount" required className="min-w-0 flex-1">
+//           <input
+//             type="text"
+//             inputMode="decimal"
+//             value={amount}
+//             onChange={(e) => onAmountChange(e.target.value)}
+//             className={fieldErrorClass(Boolean(errors.amount), shopCompactInputClass)}
+//           />
+//           <FormFieldError message={errors.amount} />
+//         </CompactField>
+//         <CompactField label="Date" required className="min-w-0 flex-1">
+//           <input
+//             type="date"
+//             value={date}
+//             onChange={(e) => onDateChange(e.target.value)}
+//             className={fieldErrorClass(Boolean(errors.date), shopCompactInputClass)}
+//           />
+//           <FormFieldError message={errors.date} />
+//         </CompactField>
+//         <div className="min-w-0 flex-1">
+//           <ShopVendorComboField
+//             label="Vendor"
+//             required
+//             value={vendor}
+//             onChange={onVendorChange}
+//             options={vendorOptions}
+//             className="w-full"
+//           />
+//           <FormFieldError message={errors.vendor} />
+//         </div>
+//         <div className="min-w-0 flex-1">
+//           <ComboSelectWithEditor
+//             label="Category"
+//             required
+//             value={selectedCategoryLabel}
+//             placeholder="Select category"
+//             options={categoryLabels}
+//             onChange={onCategoryChange}
+//             className="w-full"
+//             inputClassName={shopCompactInputClass}
+//             activeItemClassName={SHOP_COMBO_ACTIVE_ITEM_CLASS}
+//           />
+//           <FormFieldError message={errors.category} />
+//         </div>
+//         <div className="min-w-0 flex-1">
+//           <ComboSelectWithEditor
+//             label="Subcategory"
+//             required
+//             value={selectedSubcategoryLabel}
+//             placeholder="Select subcategory"
+//             options={subcategoryLabels}
+//             disabled={!category}
+//             onChange={onSubcategoryChange}
+//             onEditAddNew={onOpenSubcategoriesPopup}
+//             className="w-full"
+//             inputClassName={shopCompactInputClass}
+//             editButtonClassName={SHOP_COMBO_EDIT_BUTTON_CLASS}
+//             activeItemClassName={SHOP_COMBO_ACTIVE_ITEM_CLASS}
+//           />
+//           <FormFieldError message={errors.subcategory} />
+//         </div>
+//       </CompactFormRow>
+//       <CompactFormRow className="flex-nowrap items-start gap-x-3 overflow-x-auto">
+//         <CompactField label="Notes" className="min-w-0 flex-1">
+//           <ShopCompactAutoGrowTextarea value={notes} onChange={(e) => onNotesChange(e.target.value)} />
+//         </CompactField>
+//         <div className="min-w-0 flex-1">
+//           <AttachImageCheckbox
+//             label="Attach Image of Receipt"
+//             checked={attachReceipt}
+//             onCheckedChange={onAttachReceiptChange}
+//             file={receiptFile}
+//             onFileChange={onReceiptFileChange}
+//           />
+//         </div>
+//         <div className="min-w-0 flex-1">
+//           <label className={SHOP_FORM_CHECKBOX_LABEL_CLASS}>
+//             <input
+//               type="checkbox"
+//               checked={hasBillNumber}
+//               onChange={(e) => {
+//                 const checked = e.target.checked;
+//                 onHasBillNumberChange(checked);
+//                 if (!checked) onBillNumberChange("");
+//               }}
+//               className="h-3.5 w-3.5 accent-ad-purple"
+//             />
+//             Bill Number
+//           </label>
+//           {hasBillNumber ? (
+//             <input
+//               type="text"
+//               value={billNumber}
+//               onChange={(e) => onBillNumberChange(e.target.value)}
+//               className={fieldErrorClass(Boolean(errors.billNumber), shopCompactInputClass)}
+//             />
+//           ) : null}
+//           <FormFieldError message={errors.billNumber} />
+//         </div>
+//         <div className="min-w-0 flex-1">
+//           <label className={SHOP_FORM_CHECKBOX_LABEL_CLASS}>
+//             <input
+//               type="checkbox"
+//               checked={byCheque}
+//               onChange={(e) => {
+//                 const checked = e.target.checked;
+//                 onByChequeChange(checked);
+//                 if (!checked) onChequeAccountChange("");
+//               }}
+//               className="h-3.5 w-3.5 accent-ad-purple"
+//             />
+//             By Cheque
+//           </label>
+//           {byCheque ? (
+//             <select
+//               value={chequeAccount}
+//               onChange={(e) => onChequeAccountChange(e.target.value)}
+//               className={fieldErrorClass(Boolean(errors.chequeAccount), shopCompactInputClass)}
+//             >
+//               <option value="">Select account</option>
+//               {chequeAccountOptions.map((opt) => (
+//                 <option key={opt} value={opt}>
+//                   {opt}
+//                 </option>
+//               ))}
+//             </select>
+//           ) : null}
+//           <FormFieldError message={errors.chequeAccount} />
+//         </div>
+//         <div className="min-w-0 flex-1">
+//           <label className={SHOP_FORM_CHECKBOX_LABEL_CLASS}>
+//             <input
+//               type="checkbox"
+//               checked={gst}
+//               onChange={(e) => {
+//                 const checked = e.target.checked;
+//                 onGstChange(checked);
+//                 if (!checked) onGstAmountChange("");
+//               }}
+//               className="h-3.5 w-3.5 accent-ad-purple"
+//             />
+//             GST
+//           </label>
+//           {gst ? (
+//             <input
+//               type="text"
+//               inputMode="decimal"
+//               value={gstAmount}
+//               onChange={(e) => onGstAmountChange(e.target.value)}
+//               placeholder="GST amount"
+//               className={shopCompactInputClass}
+//             />
+//           ) : null}
+//         </div>
+//       </CompactFormRow>
+//     </CompactFormPanel>
+//   );
+// }
+
+// function WalletBankForm({
+//   mode,
+//   label,
+//   accountName,
+//   accountNumber,
+//   balance,
+//   assignToInvoice,
+//   onLabelChange,
+//   onAccountNameChange,
+//   onAccountNumberChange,
+//   onBalanceChange,
+//   onAssignToInvoiceChange,
+//   onSave,
+//   onCancel,
+//   errors = {},
+// }: {
+//   mode: "add" | "edit";
+//   label: string;
+//   accountName: string;
+//   accountNumber: string;
+//   balance: string;
+//   assignToInvoice: boolean;
+//   onLabelChange: (value: string) => void;
+//   onAccountNameChange: (value: string) => void;
+//   onAccountNumberChange: (value: string) => void;
+//   onBalanceChange: (value: string) => void;
+//   onAssignToInvoiceChange: (value: boolean) => void;
+//   onSave: () => void;
+//   onCancel: () => void;
+//   errors?: { label?: string; balance?: string };
+// }) {
+//   const isEdit = mode === "edit";
+//   const fieldErrors = errors;
+
+//   return (
+//     <CompactFormPanel
+//       className={`${shopProfileFormPanelClass} !mb-4`}
+//       showBottomBorder={false}
+//       focusOnMount
+//       footer={
+//         <div
+//           className={`flex flex-wrap items-center justify-between gap-2 px-4 py-1 ${shopProfileFormPanelFooterClass}`}
+//         >
+//           <div className="flex min-w-[180px] flex-1 items-center text-xs font-serif italic text-gray-800">
+//             {isEdit ? "You are editing a bank account" : "You are adding a new bank account"}
+//           </div>
+//           <div className="flex items-center gap-2">
+//             <button
+//               type="button"
+//               onClick={onSave}
+//               className="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded bg-ad-form-save px-5 py-1 text-sm font-bold text-white hover:brightness-95"
+//             >
+//               {isEdit ? "Update" : "Save"}
+//             </button>
+//             <span className="text-xs text-gray-700">
+//               or{" "}
+//               <button
+//                 type="button"
+//                 onClick={onCancel}
+//                 className="font-medium text-blue-600 underline hover:text-blue-700"
+//               >
+//                 Cancel
+//               </button>
+//             </span>
+//           </div>
+//         </div>
+//       }
+//     >
+//       <CompactFormRow className="flex-nowrap items-start gap-x-3 overflow-x-auto">
+//         <CompactField label="Bank / Wallet Label" required className="min-w-[11rem] flex-1">
+//           <input
+//             type="text"
+//             value={label}
+//             onChange={(e) => onLabelChange(e.target.value)}
+//             placeholder="e.g. Business Chequing"
+//             className={fieldErrorClass(Boolean(fieldErrors.label), shopCompactInputClass)}
+//           />
+//           <FormFieldError message={fieldErrors.label} />
+//         </CompactField>
+//         <CompactField label="Account Name" className="min-w-[11rem] flex-1">
+//           <input
+//             type="text"
+//             value={accountName}
+//             onChange={(e) => onAccountNameChange(e.target.value)}
+//             placeholder="Account holder name"
+//             className={shopCompactInputClass}
+//           />
+//         </CompactField>
+//         <CompactField label="Account Number" className="w-[10.5rem] shrink-0">
+//           <input
+//             type="text"
+//             value={accountNumber}
+//             onChange={(e) => onAccountNumberChange(e.target.value)}
+//             placeholder="****1234"
+//             className={shopCompactInputClass}
+//           />
+//         </CompactField>
+//         <CompactField label="Balance" required className="w-[8.5rem] shrink-0">
+//           <input
+//             type="text"
+//             inputMode="decimal"
+//             value={balance}
+//             onChange={(e) => onBalanceChange(e.target.value)}
+//             placeholder="0.00"
+//             className={fieldErrorClass(Boolean(fieldErrors.balance), shopCompactInputClass)}
+//           />
+//           <FormFieldError message={fieldErrors.balance} />
+//         </CompactField>
+//         <CompactField label="Invoice" className="w-[9.5rem] shrink-0">
+//           <label className="flex h-[30px] cursor-pointer items-center gap-2 text-sm font-semibold text-gray-800">
+//             <input
+//               type="checkbox"
+//               checked={assignToInvoice}
+//               onChange={(e) => onAssignToInvoiceChange(e.target.checked)}
+//               className="h-3.5 w-3.5 accent-ad-purple"
+//             />
+//             Assign to invoice
+//           </label>
+//         </CompactField>
+//       </CompactFormRow>
+//     </CompactFormPanel>
+//   );
+// }
+
+// function WalletSearchBar({
+//   value,
+//   onChange,
+//   leading,
+//   trailing,
+// }: {
+//   value: string;
+//   onChange: (value: string) => void;
+//   leading?: React.ReactNode;
+//   trailing?: React.ReactNode;
+// }) {
+//   return (
+//     <div className={shopTableToolbarClass}>
+//       <div className="flex flex-wrap items-center gap-2">{leading}</div>
+//       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+//         <input
+//           id={WALLET_SEARCH_INPUT_ID}
+//           type="search"
+//           value={value}
+//           onChange={(e) => onChange(e.target.value)}
+//           placeholder="Search"
+//           aria-label="Search"
+//           className="h-[26px] min-w-[9rem] border border-gray-400 bg-white px-2 text-sm text-gray-800 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none"
+//         />
+//         {trailing}
+//       </div>
+//     </div>
+//   );
+// }
+
+// function WalletInvoiceTable({
+//   rows,
+//   isPaid,
+//   countryCode,
+//   selectedIds,
+//   onToggleRow,
+//   onTogglePage,
+//   onPreviewRow,
+// }: {
+//   rows: JobCardListRow[];
+//   isPaid: boolean;
+//   countryCode: string | null | undefined;
+//   selectedIds: Set<string>;
+//   onToggleRow: (id: string) => void;
+//   onTogglePage: (ids: string[], checked: boolean) => void;
+//   onPreviewRow: (row: JobCardListRow) => void;
+// }) {
+//   const selectAllRef = useRef<HTMLInputElement>(null);
+//   const idHeader = isPaid ? "Bill No." : "Invoice No.";
+//   const pageRowIds = rows.map((row) => row.id);
+//   const allPageSelected = rows.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
+//   const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
+
+//   useEffect(() => {
+//     if (selectAllRef.current) {
+//       selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+//     }
+//   }, [somePageSelected, allPageSelected]);
+
+//   return (
+//     <motion.div
+//       layout
+//       transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+//       className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+//     >
+//       <div className="overflow-x-auto">
+//         <table className={SHOP_TABLE.table}>
+//           <thead>
+//             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+//               <th className={SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS}>
+//                 <input
+//                   ref={selectAllRef}
+//                   type="checkbox"
+//                   checked={allPageSelected}
+//                   onChange={(e) => onTogglePage(pageRowIds, e.target.checked)}
+//                   aria-label="Select all invoices on this page"
+//                   className={SHOP_TABLE_CHECKBOX_CLASS}
+//                 />
+//               </th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>{idHeader}</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Customer</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Phone</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Plate</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Total</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
+//             </tr>
+//           </thead>
+//           <tbody>
+//             {rows.map((row, index) => {
+//               const customerName = row.customerName?.trim() || "—";
+//               return (
+//                 <tr key={row.id} className={adminPanelRowClass(index)}>
+//                   <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
+//                     <input
+//                       type="checkbox"
+//                       checked={selectedIds.has(row.id)}
+//                       onChange={() => onToggleRow(row.id)}
+//                       aria-label={`Select ${displayBillId(row)}`}
+//                       className={SHOP_TABLE_CHECKBOX_CLASS}
+//                     />
+//                   </td>
+//                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+//                     <button
+//                       type="button"
+//                       onClick={() => onPreviewRow(row)}
+//                       className="font-semibold text-blue-700 hover:underline"
+//                     >
+//                       {displayBillId(row)}
+//                     </button>
+//                   </td>
+//                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+//                     <button
+//                       type="button"
+//                       onClick={() => onPreviewRow(row)}
+//                       className="font-semibold text-blue-700 hover:underline"
+//                     >
+//                       {customerName}
+//                     </button>
+//                   </td>
+//                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+//                     {formatPhoneWithCountryCode(
+//                       row.phone,
+//                       row.phoneCountryCode ?? countryCode,
+//                     )}
+//                   </td>
+//                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+//                     {row.vehiclePlate?.trim() || "—"}
+//                   </td>
+//                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+//                     {formatWalletPrice(row.total, countryCode)}
+//                   </td>
+//                   <td className={SHOP_TABLE_BODY_TD_CLASS}>
+//                     {row.date ? formatDisplayDate(row.date) : "—"}
+//                   </td>
+//                 </tr>
+//               );
+//             })}
+//           </tbody>
+//         </table>
+//       </div>
+//     </motion.div>
+//   );
+// }
+
+// function WalletExpenseTable({
+//   rows,
+//   categories,
+//   countryCode,
+//   selectedIds,
+//   onToggleRow,
+//   onTogglePage,
+//   onEditRow,
+// }: {
+//   rows: ShopWalletExpenseRow[];
+//   categories: CategoryOption[];
+//   countryCode: string | null | undefined;
+//   selectedIds: Set<string>;
+//   onToggleRow: (id: string) => void;
+//   onTogglePage: (ids: string[], checked: boolean) => void;
+//   onEditRow: (row: ShopWalletExpenseRow) => void;
+// }) {
+//   const selectAllRef = useRef<HTMLInputElement>(null);
+//   const pageRowIds = rows.map((row) => row.id);
+//   const allPageSelected = rows.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
+//   const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
+
+//   useEffect(() => {
+//     if (selectAllRef.current) {
+//       selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+//     }
+//   }, [somePageSelected, allPageSelected]);
+
+//   return (
+//     <motion.div
+//       layout
+//       transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+//       className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+//     >
+//       <div className="overflow-x-auto">
+//         <table className={SHOP_TABLE.table}>
+//           <thead>
+//             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+//               <th className={SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS}>
+//                 <input
+//                   ref={selectAllRef}
+//                   type="checkbox"
+//                   checked={allPageSelected}
+//                   onChange={(e) => onTogglePage(pageRowIds, e.target.checked)}
+//                   aria-label="Select all expenses on this page"
+//                   className={SHOP_TABLE_CHECKBOX_CLASS}
+//                 />
+//               </th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Date</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Vendor</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Amount</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Category</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Notes</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Clip</th>
+//             </tr>
+//           </thead>
+//           <tbody>
+//             {rows.map((row, index) => {
+//               const labels = categoryLabel(categories, row.category, row.subcategory);
+//               return (
+//                 <tr key={row.id} className={adminPanelRowClass(index)}>
+//                   <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
+//                     <input
+//                       type="checkbox"
+//                       checked={selectedIds.has(row.id)}
+//                       onChange={() => onToggleRow(row.id)}
+//                       aria-label={`Select expense ${row.vendor}`}
+//                       className={SHOP_TABLE_CHECKBOX_CLASS}
+//                     />
+//                   </td>
+//                   <td className={SHOP_TABLE_BODY_TD_CLASS}>
+//                     <button
+//                       type="button"
+//                       onClick={() => onEditRow(row)}
+//                       className="font-semibold text-blue-700 hover:underline"
+//                     >
+//                       {formatDisplayDate(row.date)}
+//                     </button>
+//                   </td>
+//                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold uppercase text-gray-800`}>
+//                     {row.vendor}
+//                   </td>
+//                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+//                     {formatWalletPrice(row.amount, countryCode)}
+//                   </td>
+//                   <td className={SHOP_TABLE_BODY_TD_CLASS}>
+//                     <div>
+//                       <div className="font-bold leading-tight text-gray-800">{labels.category}</div>
+//                       <div className="text-xs text-gray-500">{labels.subcategory}</div>
+//                     </div>
+//                   </td>
+//                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-gray-800`}>{row.notes || ""}</td>
+//                   <td className={`${SHOP_TABLE_BODY_TD_CLASS} text-center`}>
+//                     {row.attachmentUrl ? (
+//                       <ClipImageHover
+//                         imageUrl={row.attachmentUrl}
+//                         alt={`Receipt for ${row.vendor}`}
+//                         iconClassName="inline text-blue-600"
+//                       />
+//                     ) : (
+//                       <span className="text-gray-500">--</span>
+//                     )}
+//                   </td>
+//                 </tr>
+//               );
+//             })}
+//           </tbody>
+//         </table>
+//       </div>
+//     </motion.div>
+//   );
+// }
+
+// function WalletBankTable({
+//   rows,
+//   countryCode,
+//   selectedIds,
+//   onToggleRow,
+//   onTogglePage,
+// }: {
+//   rows: ShopWalletBankRow[];
+//   countryCode: string | null | undefined;
+//   selectedIds: Set<string>;
+//   onToggleRow: (id: string) => void;
+//   onTogglePage: (ids: string[], checked: boolean) => void;
+// }) {
+//   const selectAllRef = useRef<HTMLInputElement>(null);
+//   const pageRowIds = rows.map((row) => row.id);
+//   const allPageSelected = rows.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
+//   const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
+
+//   useEffect(() => {
+//     if (selectAllRef.current) {
+//       selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+//     }
+//   }, [somePageSelected, allPageSelected]);
+
+//   return (
+//     <motion.div
+//       layout
+//       transition={{ layout: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } }}
+//       className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm"
+//     >
+//       <div className="overflow-x-auto">
+//         <table className={SHOP_TABLE.table}>
+//           <thead>
+//             <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+//               <th className={SHOP_TABLE_HEAD_TH_CHECKBOX_CLASS}>
+//                 <input
+//                   ref={selectAllRef}
+//                   type="checkbox"
+//                   checked={allPageSelected}
+//                   onChange={(e) => onTogglePage(pageRowIds, e.target.checked)}
+//                   aria-label="Select all bank accounts on this page"
+//                   className={SHOP_TABLE_CHECKBOX_CLASS}
+//                 />
+//               </th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Label</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Account Name</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Account Number</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Balance</th>
+//               <th className={SHOP_TABLE_HEAD_TH_CLASS}>Status</th>
+//             </tr>
+//           </thead>
+//           <tbody>
+//             {rows.map((row, index) => (
+//               <tr key={row.id} className={adminPanelRowClass(index)}>
+//                 <td className={SHOP_TABLE_BODY_TD_CHECKBOX_CLASS}>
+//                   <input
+//                     type="checkbox"
+//                     checked={selectedIds.has(row.id)}
+//                     onChange={() => onToggleRow(row.id)}
+//                     aria-label={`Select bank account ${row.label}`}
+//                     className={SHOP_TABLE_CHECKBOX_CLASS}
+//                   />
+//                 </td>
+//                 <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+//                   {row.label}
+//                 </td>
+//                 <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+//                   {row.accountName}
+//                 </td>
+//                 <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-blue-700`}>
+//                   {row.accountNumber}
+//                 </td>
+//                 <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
+//                   {formatWalletPrice(row.balance, countryCode)}
+//                 </td>
+//                 <td className={SHOP_TABLE_BODY_TD_CLASS}>
+//                   {row.assignToInvoice ? (
+//                     <span className="font-semibold text-ad-purple">Assigned to invoice</span>
+//                   ) : (
+//                     "—"
+//                   )}
+//                 </td>
+//               </tr>
+//             ))}
+//           </tbody>
+//         </table>
+//       </div>
+//     </motion.div>
+//   );
+// }
+
+// export default function ShopWalletPage() {
+//   const { token } = useAuth();
+//   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
+//   const [view, setView] = useState<WalletView>("paid");
+//   const [search, setSearch] = useState("");
+//   const [page, setPage] = useState(1);
+//   const [faqsOpen, setFaqsOpen] = useState(false);
+//   const [bulkBusy, setBulkBusy] = useState(false);
+//   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set());
+//   const [expenses, setExpenses] = useState<ShopWalletExpenseRow[]>(() => [...DUMMY_SHOP_EXPENSES]);
+//   const [expenseCategories, setExpenseCategories] = useState<CategoryOption[]>(() =>
+//     cloneCategories(EXPENSE_CATEGORIES),
+//   );
+//   const effectiveExpenseCategories = expenseCategories.length > 0 ? expenseCategories : EXPENSE_CATEGORIES;
+//   const [showExpenseForm, setShowExpenseForm] = useState(false);
+//   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+//   const [savingExpense, setSavingExpense] = useState(false);
+//   const savingExpenseRef = useRef(false);
+
+//   const expenseForm = useForm<ShopExpenseFormValues>({
+//     resolver: zodResolver(shopExpenseFormSchema),
+//     mode: "onSubmit",
+//     defaultValues: {
+//       amount: "",
+//       date: todayYMD(),
+//       vendor: "",
+//       category: "",
+//       subcategory: "",
+//       note: "",
+//       paymentMode: "",
+//       gstAmount: "",
+//       hasBillNumber: false,
+//       billNumber: "",
+//       byCheque: false,
+//       chequeAccount: "",
+//     },
+//   });
+//   const {
+//     watch: watchExpenseField,
+//     setValue: setExpenseFieldValue,
+//     reset: resetExpenseFieldValues,
+//     handleSubmit: handleExpenseFormSubmit,
+//     formState: { errors: expenseFormErrors },
+//   } = expenseForm;
+
+//   const expenseAmount = watchExpenseField("amount");
+//   const expenseDate = watchExpenseField("date");
+//   const expenseVendor = watchExpenseField("vendor");
+//   const expenseCategory = watchExpenseField("category");
+//   const expenseSubcategory = watchExpenseField("subcategory");
+//   const expenseNotes = watchExpenseField("note") ?? "";
+//   const expenseGstAmount = watchExpenseField("gstAmount");
+//   const expenseHasBillNumber = watchExpenseField("hasBillNumber") ?? false;
+//   const expenseBillNumber = watchExpenseField("billNumber") ?? "";
+//   const expenseByCheque = watchExpenseField("byCheque") ?? false;
+//   const expenseChequeAccount = watchExpenseField("chequeAccount") ?? "";
+//   const [expenseGst, setExpenseGst] = useState(false);
+
+//   const setExpenseAmount = (v: string) => setExpenseFieldValue("amount", v);
+//   const setExpenseDate = (v: string) => setExpenseFieldValue("date", v);
+//   const setExpenseVendor = (v: string) => setExpenseFieldValue("vendor", v);
+//   const setExpenseCategory = (v: string) => setExpenseFieldValue("category", v);
+//   const setExpenseSubcategory = (v: string) => setExpenseFieldValue("subcategory", v);
+//   const setExpenseNotes = (v: string) => setExpenseFieldValue("note", v);
+//   const setExpenseGstAmount = (v: string) => setExpenseFieldValue("gstAmount", v);
+//   const setExpenseHasBillNumber = (v: boolean) => setExpenseFieldValue("hasBillNumber", v);
+//   const setExpenseBillNumber = (v: string) => setExpenseFieldValue("billNumber", v);
+//   const setExpenseByCheque = (v: boolean) => setExpenseFieldValue("byCheque", v);
+//   const setExpenseChequeAccount = (v: string) => setExpenseFieldValue("chequeAccount", v);
+
+//   const [expenseAttachReceipt, setExpenseAttachReceipt] = useState(false);
+//   const [expenseReceiptFile, setExpenseReceiptFile] = useState<File | null>(null);
+//   const [subcategoriesPopupOpen, setSubcategoriesPopupOpen] = useState(false);
+//   const [subcategoriesDraft, setSubcategoriesDraft] = useState<string[]>([""]);
+//   const subcategoriesSnapshotRef = useRef<{ value: string; label: string }[]>([]);
+//   const [banks, setBanks] = useState<ShopWalletBankRow[]>(() => [...DUMMY_SHOP_BANKS]);
+//   const [showBankForm, setShowBankForm] = useState(false);
+//   const [editingBankId, setEditingBankId] = useState<string | null>(null);
+
+//   const bankForm = useForm<ShopBankFormValues>({
+//     resolver: zodResolver(shopBankFormSchema),
+//     mode: "onSubmit",
+//     defaultValues: {
+//       label: "",
+//       accountName: "",
+//       accountNumber: "",
+//       balance: "",
+//       assignToInvoice: false,
+//       bankName: "",
+//       email: "",
+//     },
+//   });
+//   const {
+//     watch: watchBankField,
+//     setValue: setBankFieldValue,
+//     reset: resetBankFieldValues,
+//     handleSubmit: handleBankFormSubmit,
+//     formState: { errors: bankFormErrors },
+//   } = bankForm;
+
+//   const bankLabel = watchBankField("label");
+//   const bankAccountName = watchBankField("accountName") ?? "";
+//   const bankAccountNumber = watchBankField("accountNumber") ?? "";
+//   const bankBalance = watchBankField("balance");
+//   const bankAssignToInvoice = watchBankField("assignToInvoice") ?? false;
+
+//   const setBankLabel = (v: string) => setBankFieldValue("label", v);
+//   const setBankAccountName = (v: string) => setBankFieldValue("accountName", v);
+//   const setBankAccountNumber = (v: string) => setBankFieldValue("accountNumber", v);
+//   const setBankBalance = (v: string) => setBankFieldValue("balance", v);
+//   const setBankAssignToInvoice = (v: boolean) => setBankFieldValue("assignToInvoice", v);
+//   const [previewInvoice, setPreviewInvoice] = useState<JobCardListRow | null>(null);
+//   const { refreshSection } = useShopOwnerData();
+//   const {
+//     paidOnline,
+//     unpaidOnline,
+//     loading: walletLoading,
+//     error: walletError,
+//     refresh: refreshWallet,
+//   } = useShopWallet();
+//   const mockLedger = useMockShopInvoiceLedger();
+
+//   // Guard: categories must exist even if expenses list is empty.
+//   // If some path accidentally cleared categories, re-seed from defaults.
+//   useEffect(() => {
+//     if (expenseCategories.length === 0) {
+//       setExpenseCategories(cloneCategories(EXPENSE_CATEGORIES));
+//     }
+//   }, [expenseCategories.length]);
+
+//   const loadAccounts = useCallback(async () => {
+//     if (USE_DUMMY_SHOP_WALLET) return;
+//     if (!token) return;
+//     try {
+//       const [banksRes, expensesRes] = await Promise.all([fetchBanks(token), fetchExpenses(token)]);
+//       if (banksRes.ok) {
+//         const raw = (banksRes.data as any)?.data;
+//         if (Array.isArray(raw)) {
+//           setBanks(
+//             raw.map((b: any) => ({
+//               id: String(b._id ?? b.id ?? ""),
+//               label: String(b.BankName ?? b.bankName ?? "BANK").toUpperCase(),
+//               accountName: String(b.AccountName ?? b.accountName ?? "—") || "—",
+//               accountNumber: String(b.AccountNumber ?? b.accountNumber ?? "—") || "—",
+//               balance: Number(b.totalBalance ?? b.openingBalance ?? 0) || 0,
+//               assignToInvoice: Boolean(b.assignToInvoice),
+//             })),
+//           );
+//         }
+//       }
+//       if (expensesRes.ok) {
+//         const raw = (expensesRes.data as any)?.data;
+//         if (Array.isArray(raw)) {
+//           setExpenses(
+//             raw.map((e: any) => ({
+//               id: String(e._id ?? e.id ?? ""),
+//               date: String(e.date ?? "").slice(0, 10) || todayYMD(),
+//               vendor: String(e.vendor ?? ""),
+//               amount: Number(e.amount ?? 0) || 0,
+//               category: (() => {
+//                 const rawCategory = e.category ?? e.Category ?? e.expenseCategory ?? e.expense_category;
+//                 return resolveCategoryValue(effectiveExpenseCategories, rawCategory);
+//               })(),
+//               subcategory: (() => {
+//                 const rawCategory = e.category ?? e.Category ?? e.expenseCategory ?? e.expense_category;
+//                 const resolvedCategory = resolveCategoryValue(effectiveExpenseCategories, rawCategory);
+//                 const cat = effectiveExpenseCategories.find((c) => c.value === resolvedCategory);
+//                 const rawSub =
+//                   e.subCategory ??
+//                   e.subcategory ??
+//                   e.SubCategory ??
+//                   e.sub_category ??
+//                   e.expenseSubCategory ??
+//                   e.expense_subcategory;
+//                 return resolveSubcategoryValue(cat, rawSub);
+//               })(),
+//               notes: String(e.notes ?? ""),
+//               gst: Boolean(e.gst),
+//               billNumber: e.billNumber != null ? String(e.billNumber) : null,
+//               byCheque: false,
+//               hasReceipt: Boolean(e.imagePath),
+//               attachmentUrl: normalizeMediaUrl(
+//                 e.imagePath != null && String(e.imagePath).trim()
+//                   ? String(e.imagePath).trim()
+//                   : null,
+//               ),
+//             })),
+//           );
+//         }
+//       }
+//     } catch {
+//       // keep existing state; UI already shows generic error states for wallet
+//     }
+//   }, [effectiveExpenseCategories, token]);
+
+//   const syncLedgerData = useCallback(async () => {
+//     await Promise.all([refreshWallet(), refreshSection("jobCards")]);
+//   }, [refreshWallet, refreshSection]);
+
+//   const paid = USE_DUMMY_SHOP_WALLET ? mockLedger.paid : paidOnline;
+//   const unpaid = USE_DUMMY_SHOP_WALLET ? mockLedger.unpaid : unpaidOnline;
+//   const showLoading = !USE_DUMMY_SHOP_WALLET && walletLoading;
+//   const showError = !USE_DUMMY_SHOP_WALLET && walletError;
+
+//   const invoiceList = view === "paid" ? paid : view === "unpaid" ? unpaid : [];
+//   const filteredList = useMemo(
+//     () => invoiceList.filter((row) => matchesSearch(row, search)),
+//     [invoiceList, search],
+//   );
+//   const filteredExpenses = useMemo(
+//     () => expenses.filter((row) => matchesExpenseSearch(row, search, effectiveExpenseCategories)),
+//     [expenses, search, effectiveExpenseCategories],
+//   );
+//   const filteredBanks = useMemo(() => {
+//     const q = search.trim().toLowerCase();
+//     if (!q) return banks;
+//     return banks.filter((row) =>
+//       [row.label, row.accountName, row.accountNumber].join(" ").toLowerCase().includes(q),
+//     );
+//   }, [banks, search]);
+
+//   const totalPages = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
+//   const expenseTotalPages = Math.max(1, Math.ceil(filteredExpenses.length / PAGE_SIZE));
+//   const bankTotalPages = Math.max(1, Math.ceil(filteredBanks.length / PAGE_SIZE));
+//   const activeTotalPages =
+//     view === "expenses" ? expenseTotalPages : view === "banks" ? bankTotalPages : totalPages;
+//   const activeEntryCount =
+//     view === "expenses"
+//       ? filteredExpenses.length
+//       : view === "banks"
+//         ? filteredBanks.length
+//         : filteredList.length;
+
+//   const safePage = Math.min(page, activeTotalPages);
+//   const paginatedList = useMemo(
+//     () => filteredList.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+//     [filteredList, safePage],
+//   );
+//   const paginatedExpenses = useMemo(
+//     () => filteredExpenses.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+//     [filteredExpenses, safePage],
+//   );
+//   const paginatedBanks = useMemo(
+//     () => filteredBanks.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+//     [filteredBanks, safePage],
+//   );
+
+//   const expenseCategoryLabels = useMemo(
+//     () => effectiveExpenseCategories.map((cat) => cat.label),
+//     [effectiveExpenseCategories],
+//   );
+//   const selectedExpenseCategory = useMemo(
+//     () => effectiveExpenseCategories.find((cat) => cat.value === expenseCategory),
+//     [effectiveExpenseCategories, expenseCategory],
+//   );
+//   const expenseSubcategoryLabels = useMemo(
+//     () => selectedExpenseCategory?.subcategories.map((sub) => sub.label) ?? [],
+//     [selectedExpenseCategory],
+//   );
+//   const selectedExpenseCategoryLabel = selectedExpenseCategory?.label ?? "";
+//   const selectedExpenseSubcategoryLabel =
+//     selectedExpenseCategory?.subcategories.find((sub) => sub.value === expenseSubcategory)?.label ?? "";
+//   const expenseSubcategoryOptions = useMemo(
+//     () => selectedExpenseCategory?.subcategories ?? [],
+//     [selectedExpenseCategory],
+//   );
+//   const expenseVendorOptions = useMemo(() => {
+//     const seen = new Map<string, string>();
+//     for (const row of expenses) {
+//       const normalized = normalizeVendorLabel(row.vendor);
+//       if (!normalized) continue;
+//       const key = normalized.toLowerCase();
+//       if (!seen.has(key)) seen.set(key, normalized);
+//     }
+//     return [...seen.values()].sort((a, b) => a.localeCompare(b));
+//   }, [expenses]);
+//   const chequeAccountOptions = useMemo(
+//     () => banks.map((bank) => bank.label).filter(Boolean),
+//     [banks],
+//   );
+
+//   const resetExpenseForm = useCallback(() => {
+//     setEditingExpenseId(null);
+//     resetExpenseFieldValues({
+//       amount: "",
+//       date: todayYMD(),
+//       vendor: "",
+//       category: "",
+//       subcategory: "",
+//       note: "",
+//       paymentMode: "",
+//       gstAmount: "",
+//       hasBillNumber: false,
+//       billNumber: "",
+//       byCheque: false,
+//       chequeAccount: "",
+//     });
+//     setExpenseGst(false);
+//     setExpenseAttachReceipt(false);
+//     setExpenseReceiptFile(null);
+//   }, [resetExpenseFieldValues]);
+
+//   const handleExpenseCategoryChange = useCallback(
+//     (nextCategoryLabel: string) => {
+//       if (!nextCategoryLabel) {
+//         setExpenseCategory("");
+//         setExpenseSubcategory("");
+//         return;
+//       }
+//       const match = effectiveExpenseCategories.find((cat) => cat.label === nextCategoryLabel);
+//       setExpenseCategory(match?.value ?? slugifyLabel(nextCategoryLabel));
+//       setExpenseSubcategory("");
+//     },
+//     [effectiveExpenseCategories],
+//   );
+
+//   const handleExpenseSubcategoryChange = useCallback(
+//     (nextSubcategoryLabel: string) => {
+//       if (!nextSubcategoryLabel) {
+//         setExpenseSubcategory("");
+//         return;
+//       }
+//       const match = expenseSubcategoryOptions.find((sub) => sub.label === nextSubcategoryLabel);
+//       setExpenseSubcategory(match?.value ?? slugifyLabel(nextSubcategoryLabel));
+//     },
+//     [expenseSubcategoryOptions],
+//   );
+
+//   const openSubcategoriesPopup = useCallback(() => {
+//     if (!expenseCategory) return;
+//     subcategoriesSnapshotRef.current = [...expenseSubcategoryOptions];
+//     setSubcategoriesDraft(expenseSubcategoryLabels.length ? [...expenseSubcategoryLabels] : [""]);
+//     setSubcategoriesPopupOpen(true);
+//   }, [expenseCategory, expenseSubcategoryLabels, expenseSubcategoryOptions]);
+
+//   const saveSubcategoriesPopup = useCallback(() => {
+//     if (!expenseCategory) return;
+//     const labels = dedupeLabels(subcategoriesDraft);
+//     const previousLabels = new Set(expenseSubcategoryLabels.map((label) => label.toLowerCase()));
+//     const newlyAdded = labels.filter((label) => !previousLabels.has(label.toLowerCase()));
+
+//     const nextSubcategories = labels.map((label) => {
+//       const existing = expenseSubcategoryOptions.find((sub) => sub.label.toLowerCase() === label.toLowerCase());
+//       if (existing) return { ...existing, label };
+//       let value = slugifyLabel(label);
+//       if (expenseSubcategoryOptions.some((sub) => sub.value === value)) {
+//         value = `${value}-${Date.now()}`;
+//       }
+//       return { value, label };
+//     });
+
+//     setExpenseCategories((prev) =>
+//       prev.map((cat) => (cat.value === expenseCategory ? { ...cat, subcategories: nextSubcategories } : cat)),
+//     );
+
+//     if (newlyAdded.length > 0) {
+//       const lastAdded = newlyAdded[newlyAdded.length - 1];
+//       const match = nextSubcategories.find((sub) => sub.label.toLowerCase() === lastAdded.toLowerCase());
+//       if (match) setExpenseSubcategory(match.value);
+//     } else if (expenseSubcategory && !nextSubcategories.some((sub) => sub.value === expenseSubcategory)) {
+//       setExpenseSubcategory(nextSubcategories[0]?.value ?? "");
+//     }
+
+//     setSubcategoriesPopupOpen(false);
+//   }, [
+//     expenseCategory,
+//     expenseSubcategory,
+//     expenseSubcategoryLabels,
+//     expenseSubcategoryOptions,
+//     subcategoriesDraft,
+//   ]);
+
+//   const cancelSubcategoriesPopup = useCallback(() => {
+//     if (!expenseCategory) return;
+//     setExpenseCategories((prev) =>
+//       prev.map((cat) =>
+//         cat.value === expenseCategory ? { ...cat, subcategories: [...subcategoriesSnapshotRef.current] } : cat,
+//       ),
+//     );
+//     setSubcategoriesPopupOpen(false);
+//   }, [expenseCategory]);
+
+//   useEffect(() => {
+//     if (expenseSubcategory && !expenseSubcategoryOptions.some((sub) => sub.value === expenseSubcategory)) {
+//       setExpenseSubcategory("");
+//     }
+//   }, [expenseSubcategory, expenseSubcategoryOptions]);
+
+//   const openExpenseForm = useCallback(() => {
+//     resetExpenseForm();
+//     // Preselect first category/subcategory so the form is usable
+//     // even when there are no expenses yet.
+//     const firstCategory = effectiveExpenseCategories[0];
+//     if (firstCategory) {
+//       setExpenseCategory(firstCategory.value);
+//       const firstSub = firstCategory.subcategories?.[0];
+//       if (firstSub) setExpenseSubcategory(firstSub.value);
+//     }
+//     setShowExpenseForm(true);
+//   }, [effectiveExpenseCategories, resetExpenseForm]);
+
+//   const openEditExpenseForm = useCallback((row: ShopWalletExpenseRow) => {
+//     const nextCategory = resolveCategoryValue(effectiveExpenseCategories, row.category);
+//     const cat = effectiveExpenseCategories.find((c) => c.value === nextCategory);
+//     const nextSubcategory = resolveSubcategoryValue(cat, row.subcategory);
+//     setEditingExpenseId(row.id);
+//     resetExpenseFieldValues({
+//       amount: String(row.amount),
+//       date: row.date,
+//       vendor: row.vendor,
+//       category: nextCategory,
+//       subcategory: nextSubcategory,
+//       note: row.notes,
+//       paymentMode: "",
+//       gstAmount: "",
+//       hasBillNumber: Boolean(row.billNumber),
+//       billNumber: row.billNumber ?? "",
+//       byCheque: row.byCheque,
+//       chequeAccount: "",
+//     });
+//     setExpenseGst(row.gst);
+//     setExpenseAttachReceipt(row.hasReceipt);
+//     setExpenseReceiptFile(null);
+//     setShowExpenseForm(true);
+//   }, [effectiveExpenseCategories, resetExpenseFieldValues]);
+
+//   const closeExpenseForm = useCallback(() => {
+//     resetExpenseForm();
+//     setShowExpenseForm(false);
+//   }, [resetExpenseForm]);
+
+//   const openAddBankForm = useCallback(() => {
+//     setEditingBankId(null);
+//     resetBankFieldValues({
+//       label: "",
+//       accountName: "",
+//       accountNumber: "",
+//       balance: "",
+//       assignToInvoice: banks.length === 0,
+//       bankName: "",
+//       email: "",
+//     });
+//     setShowBankForm(true);
+//   }, [banks.length, resetBankFieldValues]);
+
+//   const openEditBankForm = useCallback(() => {
+//     const row = banks.find((bank) => selectedRowIds.has(bank.id));
+//     if (!row) {
+//       toast.info("Select one bank account to edit.");
+//       return;
+//     }
+//     setEditingBankId(row.id);
+//     resetBankFieldValues({
+//       label: row.label,
+//       accountName: row.accountName === "—" ? "" : row.accountName,
+//       accountNumber: row.accountNumber === "—" ? "" : row.accountNumber,
+//       balance: String(row.balance),
+//       assignToInvoice: row.assignToInvoice,
+//       bankName: "",
+//       email: "",
+//     });
+//     setShowBankForm(true);
+//   }, [banks, selectedRowIds, resetBankFieldValues]);
+
+//   const closeBankForm = useCallback(() => {
+//     setShowBankForm(false);
+//     setEditingBankId(null);
+//   }, []);
+
+//   const handleSaveBank = handleBankFormSubmit(
+//     (values) => {
+//       const trimmedLabel = values.label.trim();
+//       const balance = Number(values.balance);
+//       const accountName = values.accountName ?? "";
+//       const accountNumber = values.accountNumber ?? "";
+//       const assignToInvoice = Boolean(values.assignToInvoice);
+
+//       const saveLocal = () => {
+//         const bankId = editingBankId ?? `bank-${Date.now()}`;
+//         const nextRow: ShopWalletBankRow = {
+//           id: bankId,
+//           label: trimmedLabel.toUpperCase(),
+//           accountName: accountName.trim() || "—",
+//           accountNumber: accountNumber.trim() || "—",
+//           balance,
+//           assignToInvoice,
+//         };
+//         setBanks((prev) => {
+//           const updated = editingBankId
+//             ? prev.map((row) => (row.id === editingBankId ? nextRow : row))
+//             : [nextRow, ...prev];
+//           if (!nextRow.assignToInvoice) return updated;
+//           return updated.map((row) => ({
+//             ...row,
+//             assignToInvoice: row.id === bankId,
+//           }));
+//         });
+//         setPage(1);
+//         setSelectedRowIds(new Set());
+//         toast.success(editingBankId ? "Bank account updated." : "Bank account added.");
+//         closeBankForm();
+//       };
+
+//       if (USE_DUMMY_SHOP_WALLET || !token) {
+//         saveLocal();
+//         return;
+//       }
+
+//       void (async () => {
+//         try {
+//           if (editingBankId) {
+//             const res = await updateBank(token, editingBankId, {
+//               bankName: trimmedLabel,
+//               openingBalance: balance,
+//               totalBalance: balance,
+//               accountName: accountName.trim() || undefined,
+//               accountNumber: accountNumber.trim() || undefined,
+//               assignToInvoice,
+//             });
+//             if (!res.ok) return toast.error("Could not update bank.");
+//           } else {
+//             const res = await createBank(token, {
+//               bankName: trimmedLabel,
+//               openingBalance: balance,
+//               accountName: accountName.trim() || undefined,
+//               accountNumber: accountNumber.trim() || undefined,
+//               assignToInvoice,
+//             });
+//             if (!res.ok) return toast.error("Could not add bank.");
+//           }
+//           await loadAccounts();
+//           closeBankForm();
+//           toast.success(editingBankId ? "Bank account updated." : "Bank account added.");
+//         } catch {
+//           toast.error("Network error.");
+//         }
+//       })();
+//     },
+//     (formErrors) => toastValidationSummary(toast.error, formErrors as never),
+//   );
+
+//   const handleSaveExpense = handleExpenseFormSubmit(
+//     (values) => {
+//       if (savingExpenseRef.current) return;
+
+//       const trimmedVendor = values.vendor.trim();
+//       const parsedAmount = Number.parseFloat(values.amount);
+//       const parsedGst = Number.parseFloat(values.gstAmount ?? "");
+
+//       const existingExpense = editingExpenseId
+//         ? expenses.find((row) => row.id === editingExpenseId)
+//         : undefined;
+//       const nextAttachmentUrl = expenseAttachReceipt
+//         ? expenseReceiptFile
+//           ? URL.createObjectURL(expenseReceiptFile)
+//           : existingExpense?.attachmentUrl ?? null
+//         : null;
+
+//       const payload: Omit<ShopWalletExpenseRow, "id"> = {
+//         date: values.date,
+//         vendor: trimmedVendor,
+//         amount: parsedAmount || 0,
+//         category: values.category,
+//         subcategory: values.subcategory,
+//         notes: values.note ?? "",
+//         gst: expenseGst,
+//         billNumber: values.hasBillNumber && values.billNumber?.trim() ? values.billNumber.trim() : null,
+//         byCheque: Boolean(values.byCheque),
+//         hasReceipt: expenseAttachReceipt,
+//         attachmentUrl: nextAttachmentUrl,
+//       };
+
+//       const saveLocal = () => {
+//         if (editingExpenseId) {
+//           setExpenses((prev) =>
+//             prev.map((row) => (row.id === editingExpenseId ? { ...row, ...payload } : row)),
+//           );
+//           toast.success("Expense updated.");
+//         } else {
+//           setExpenses((prev) => [
+//             {
+//               id: `exp-${Date.now()}`,
+//               ...payload,
+//             },
+//             ...prev,
+//           ]);
+//           toast.success("Expense added.");
+//         }
+//         setPage(1);
+//         closeExpenseForm();
+//       };
+
+//       if (USE_DUMMY_SHOP_WALLET || !token) {
+//         saveLocal();
+//         return;
+//       }
+
+//       savingExpenseRef.current = true;
+//       setSavingExpense(true);
+//       void (async () => {
+//         try {
+//           const body = {
+//             date: values.date,
+//             vendor: trimmedVendor,
+//             amount: parsedAmount,
+//             category: values.category,
+//             subCategory: values.subcategory,
+//             notes: values.note ?? "",
+//             // Backend schema expects Number (e.g. 13), not boolean.
+//             gst: expenseGst ? (Number.isFinite(parsedGst) ? parsedGst : 0) : 0,
+//             billNumber: values.hasBillNumber && values.billNumber?.trim() ? values.billNumber.trim() : undefined,
+//             account: values.byCheque ? values.chequeAccount : undefined,
+//             expenseImage: expenseAttachReceipt ? expenseReceiptFile : null,
+//           };
+//           if (editingExpenseId) {
+//             const res = await updateExpense(token, editingExpenseId, body);
+//             if (!res.ok) return toast.error("Could not update expense.");
+//           } else {
+//             const res = await createExpense(token, body);
+//             if (!res.ok) return toast.error("Could not add expense.");
+//           }
+//           await loadAccounts();
+//           closeExpenseForm();
+//           toast.success(editingExpenseId ? "Expense updated." : "Expense added.");
+//         } catch {
+//           toast.error("Network error.");
+//         } finally {
+//           savingExpenseRef.current = false;
+//           setSavingExpense(false);
+//         }
+//       })();
+//     },
+//     (formErrors) => toastValidationSummary(toast.error, formErrors as never),
+//   );
+
+//   useEffect(() => {
+//     void loadAccounts();
+//   }, [loadAccounts]);
+
+//   useEffect(() => {
+//     setShowExpenseForm(false);
+//     setShowBankForm(false);
+//     setEditingBankId(null);
+//     setPreviewInvoice(null);
+//     resetExpenseForm();
+//   }, [view, resetExpenseForm]);
+
+//   useEffect(() => {
+//     setPage(1);
+//   }, [search, view]);
+
+//   useEffect(() => {
+//     setSelectedRowIds(new Set());
+//   }, [search, view, page]);
+
+//   useEffect(() => {
+//     if (page > activeTotalPages) {
+//       setPage(activeTotalPages);
+//     }
+//   }, [page, activeTotalPages]);
+
+//   const toggleRowSelection = (id: string) => {
+//     setSelectedRowIds((prev) => {
+//       const next = new Set(prev);
+//       if (next.has(id)) next.delete(id);
+//       else next.add(id);
+//       return next;
+//     });
+//   };
+
+//   const togglePageSelection = (ids: string[], checked: boolean) => {
+//     setSelectedRowIds((prev) => {
+//       const next = new Set(prev);
+//       for (const id of ids) {
+//         if (checked) next.add(id);
+//         else next.delete(id);
+//       }
+//       return next;
+//     });
+//   };
+
+//   const selectionProps = {
+//     selectedIds: selectedRowIds,
+//     onToggleRow: toggleRowSelection,
+//     onTogglePage: togglePageSelection,
+//   };
+
+//   const selectedUnpaidRows = useMemo(
+//     () => (view === "unpaid" ? walletRowsMatchingSelection(selectedRowIds, filteredList) : []),
+//     [view, selectedRowIds, filteredList],
+//   );
+
+//   const selectedPaidRows = useMemo(
+//     () => (view === "paid" ? walletRowsMatchingSelection(selectedRowIds, filteredList) : []),
+//     [view, selectedRowIds, filteredList],
+//   );
+
+//   const selectedBankRows = useMemo(
+//     () => (view === "banks" ? banks.filter((row) => selectedRowIds.has(row.id)) : []),
+//     [view, selectedRowIds, banks],
+//   );
+
+//   const hasUnpaidSelection = selectedUnpaidRows.length > 0;
+//   const hasSingleBankSelection = selectedBankRows.length === 1;
+
+//   const openInvoicePreview = useCallback((row: JobCardListRow) => {
+//     setPreviewInvoice(row);
+//   }, []);
+
+//   const closeInvoicePreview = useCallback(() => {
+//     setPreviewInvoice(null);
+//   }, []);
+
+//   const runCollectPayment = async (rows: JobCardListRow[], label: string) => {
+//     if (rows.length === 0 || bulkBusy) return;
+//     if (!USE_DUMMY_SHOP_WALLET && !token) return;
+
+//     const count = rows.length;
+//     if (!window.confirm(`Mark ${count} invoice${count === 1 ? "" : "s"} as paid?`)) return;
+
+//     setBulkBusy(true);
+//     let failed = 0;
+//     try {
+//       if (USE_DUMMY_SHOP_WALLET) {
+//         mockLedger.markAsPaid(rows.map((row) => row.id));
+//         toast.success(`Marked ${count} invoice${count === 1 ? "" : "s"} as paid.`);
+//       } else {
+//         for (const row of rows) {
+//           const jobCardNo = pickJobCardNoForApi(row);
+//           if (!jobCardNo) {
+//             failed += 1;
+//             continue;
+//           }
+//           const res = await markAutoshopInvoicePaid(token!, jobCardNo);
+//           if (!res.ok) failed += 1;
+//         }
+//         await syncLedgerData();
+//         if (failed > 0) {
+//           toast.error(`${label} failed for ${failed} invoice${failed === 1 ? "" : "s"}.`);
+//         } else {
+//           toast.success(`${label} completed for ${count} invoice${count === 1 ? "" : "s"}.`);
+//         }
+//       }
+//       setSelectedRowIds(new Set());
+//     } finally {
+//       setBulkBusy(false);
+//     }
+//   };
+
+//   const handleMarkAsPaid = async () => {
+//     const rows = selectedUnpaidRows;
+//     if (rows.length === 0) {
+//       toast.info("Select one or more unpaid invoices first.");
+//       return;
+//     }
+//     await runCollectPayment(rows, "Mark as paid");
+//   };
+
+//   const handleSendNotification = async (rows: JobCardListRow[], successLabel: string) => {
+//     if (rows.length === 0 || bulkBusy) return;
+//     if (!USE_DUMMY_SHOP_WALLET && !token) return;
+
+//     setBulkBusy(true);
+//     let failed = 0;
+//     try {
+//       if (USE_DUMMY_SHOP_WALLET) {
+//         toast.success(`${successLabel} sent for ${rows.length} invoice${rows.length === 1 ? "" : "s"}.`);
+//       } else {
+//         for (const row of rows) {
+//           const jobCardNo = pickJobCardNoForApi(row);
+//           if (!jobCardNo) {
+//             failed += 1;
+//             continue;
+//           }
+//           const res = await sendAutoshopJobCardForApproval(token!, jobCardNo);
+//           if (!res.ok) failed += 1;
+//         }
+//         if (failed > 0) {
+//           toast.error(`${successLabel} failed for ${failed} invoice${failed === 1 ? "" : "s"}.`);
+//         } else {
+//           toast.success(`${successLabel} sent for ${rows.length} invoice${rows.length === 1 ? "" : "s"}.`);
+//         }
+//       }
+//       setSelectedRowIds(new Set());
+//     } finally {
+//       setBulkBusy(false);
+//     }
+//   };
+
+//   const handleSendReminder = () => void handleSendNotification(selectedUnpaidRows, "Reminder");
+
+//   const handleViewInvoice = (rows: JobCardListRow[]) => {
+//     if (rows.length === 0) {
+//       toast.info("Select one invoice to preview.");
+//       return;
+//     }
+//     openInvoicePreview(rows[0]);
+//     if (rows.length > 1) {
+//       toast.info("Opened the first selected invoice. Select one row to open a specific invoice.");
+//     }
+//   };
+
+//   const handleClearSelection = () => setSelectedRowIds(new Set());
+
+//   const pageHeading =
+//     previewInvoice
+//       ? "Invoice Preview"
+//       : showExpenseForm && view === "expenses"
+//       ? editingExpenseId
+//         ? "Edit Expense"
+//         : "Add Expense"
+//       : showBankForm && view === "banks"
+//         ? editingBankId
+//           ? "Edit Bank Account"
+//           : "Add Bank Account"
+//         : SECTION_HEADINGS[view];
+
+//   const renderListContent = () => {
+//     if (showLoading) {
+//       return <ShopListSkeleton variant="profile-table" className="w-full" />;
+//     }
+
+//     if (showError && (view === "paid" || view === "unpaid")) {
+//       return <ShopErrorPanel message={walletError ?? ""} onRetry={() => void syncLedgerData()} />;
+//     }
+
+//     if (view === "expenses") {
+//       return (
+//         <>
+//           <WalletExpenseTable
+//             rows={paginatedExpenses}
+//             categories={effectiveExpenseCategories}
+//             countryCode="+1"
+//             onEditRow={openEditExpenseForm}
+//             {...selectionProps}
+//           />
+//           <WalletListFooter
+//             totalEntries={activeEntryCount}
+//             page={safePage}
+//             totalPages={activeTotalPages}
+//             onPageChange={setPage}
+//           />
+//         </>
+//       );
+//     }
+
+//     if (view === "banks") {
+//       return (
+//         <>
+//           <WalletBankTable
+//             rows={paginatedBanks}
+//             countryCode="+1"
+//             {...selectionProps}
+//           />
+//           <WalletListFooter
+//             totalEntries={activeEntryCount}
+//             page={safePage}
+//             totalPages={activeTotalPages}
+//             onPageChange={setPage}
+//           />
+//         </>
+//       );
+//     }
+
+//     return (
+//       <>
+//         <WalletInvoiceTable
+//           rows={paginatedList}
+//           isPaid={view === "paid"}
+//           countryCode="+1"
+//           onPreviewRow={openInvoicePreview}
+//           {...selectionProps}
+//         />
+//         <WalletListFooter
+//           totalEntries={activeEntryCount}
+//           page={safePage}
+//           totalPages={activeTotalPages}
+//           onPageChange={setPage}
+//         />
+//       </>
+//     );
+//   };
+
+//   return (
+//     <ShopPageShell
+//       title="Wallet"
+//       pageHeading={pageHeading}
+//       metaTitle="Wallet | AutoDaddy"
+//       metaDescription="Auto shop wallet and invoices"
+//       sidebarVariant="nav"
+//       sidebarExtra={
+//         <div className={shopSidebarButtonStackClass}>
+//           <ShopSidebarButton
+//             label="Paid Invoice"
+//             active={view === "paid"}
+//             onClick={() => setView("paid")}
+//           />
+
+//           <ShopSidebarButton
+//             label="Un-Paid Invoice"
+//             active={view === "unpaid"}
+//             onClick={() => setView("unpaid")}
+//           />
+
+//           <ShopSidebarButton
+//             label="Expenses"
+//             active={view === "expenses"}
+//             onClick={() => setView("expenses")}
+//           />
+
+//           <ShopSidebarButton
+//             label="Manage Banks"
+//             active={view === "banks"}
+//             onClick={() => setView("banks")}
+//           />
+//         </div>
+//       }
+//       heroBackgroundImage={false}
+//       contentTopOffset
+//       heroCardFlush
+//       onFaqsOpen={() => setFaqsOpen(true)}
+//       onFaqsClose={() => setFaqsOpen(false)}
+//       faqsOpen={faqsOpen}
+//       faqsHeading={faqsHeading}
+//       faqsDescription={faqsDescription}
+//     >
+//       <div className="space-y-3">
+//         <ShopReveal show={previewInvoice != null} clipOverflow={false}>
+//           {previewInvoice ? (
+//             <ShopJobCardEstimateView
+//               key={previewInvoice.id}
+//               jobCardId={previewInvoice.id}
+//               listRow={previewInvoice}
+//               jobNoHint={pickJobNoFromListRow(previewInvoice) ?? null}
+//               showPaymentActions={false}
+//               onBack={closeInvoicePreview}
+//             />
+//           ) : null}
+//         </ShopReveal>
+
+//         <ShopReveal show={previewInvoice == null && showExpenseForm && view === "expenses"} clipOverflow={false}>
+//           <WalletExpenseForm
+//             mode={editingExpenseId ? "edit" : "add"}
+//             amount={expenseAmount}
+//             date={expenseDate}
+//             vendor={expenseVendor}
+//             category={expenseCategory}
+//             notes={expenseNotes}
+//             gst={expenseGst}
+//             gstAmount={expenseGstAmount}
+//             hasBillNumber={expenseHasBillNumber}
+//             billNumber={expenseBillNumber}
+//             byCheque={expenseByCheque}
+//             chequeAccount={expenseChequeAccount}
+//             attachReceipt={expenseAttachReceipt}
+//             receiptFile={expenseReceiptFile}
+//             categoryLabels={expenseCategoryLabels}
+//             subcategoryLabels={expenseSubcategoryLabels}
+//             selectedCategoryLabel={selectedExpenseCategoryLabel}
+//             selectedSubcategoryLabel={selectedExpenseSubcategoryLabel}
+//             chequeAccountOptions={chequeAccountOptions}
+//             vendorOptions={expenseVendorOptions}
+//             onAmountChange={setExpenseAmount}
+//             onDateChange={setExpenseDate}
+//             onVendorChange={setExpenseVendor}
+//             onCategoryChange={handleExpenseCategoryChange}
+//             onSubcategoryChange={handleExpenseSubcategoryChange}
+//             onNotesChange={setExpenseNotes}
+//             onGstChange={setExpenseGst}
+//             onGstAmountChange={setExpenseGstAmount}
+//             onHasBillNumberChange={setExpenseHasBillNumber}
+//             onBillNumberChange={setExpenseBillNumber}
+//             onByChequeChange={setExpenseByCheque}
+//             onChequeAccountChange={setExpenseChequeAccount}
+//             onAttachReceiptChange={setExpenseAttachReceipt}
+//             onReceiptFileChange={setExpenseReceiptFile}
+//             onOpenSubcategoriesPopup={openSubcategoriesPopup}
+//             onSave={() => void handleSaveExpense()}
+//             onCancel={closeExpenseForm}
+//             saving={savingExpense}
+//             errors={{
+//               amount: expenseFormErrors.amount?.message,
+//               date: expenseFormErrors.date?.message,
+//               vendor: expenseFormErrors.vendor?.message,
+//               category: expenseFormErrors.category?.message,
+//               subcategory: expenseFormErrors.subcategory?.message,
+//               billNumber: expenseFormErrors.billNumber?.message,
+//               chequeAccount: expenseFormErrors.chequeAccount?.message,
+//             }}
+//           />
+//           {subcategoriesPopupOpen ? (
+//             <ListEditorPopup
+//               title={`Edit / Add Subcategories${selectedExpenseCategoryLabel ? ` — ${selectedExpenseCategoryLabel}` : ""}`}
+//               items={subcategoriesDraft}
+//               onChange={setSubcategoriesDraft}
+//               onSave={saveSubcategoriesPopup}
+//               onCancel={cancelSubcategoriesPopup}
+//               placeholder="Subcategory name"
+//               headerClassName={SHOP_LIST_EDITOR_HEADER_CLASS}
+//             />
+//           ) : null}
+//         </ShopReveal>
+
+//         <ShopReveal show={previewInvoice == null && showBankForm && view === "banks"} clipOverflow={false}>
+//           <WalletBankForm
+//             mode={editingBankId ? "edit" : "add"}
+//             label={bankLabel}
+//             accountName={bankAccountName}
+//             accountNumber={bankAccountNumber}
+//             balance={bankBalance}
+//             assignToInvoice={bankAssignToInvoice}
+//             onLabelChange={setBankLabel}
+//             onAccountNameChange={setBankAccountName}
+//             onAccountNumberChange={setBankAccountNumber}
+//             onBalanceChange={setBankBalance}
+//             onAssignToInvoiceChange={setBankAssignToInvoice}
+//             onSave={() => void handleSaveBank()}
+//             onCancel={closeBankForm}
+//             errors={{
+//               label: bankFormErrors.label?.message,
+//               balance: bankFormErrors.balance?.message,
+//             }}
+//           />
+//         </ShopReveal>
+
+//         {previewInvoice == null ? (
+//           <>
+//             <WalletSearchBar
+//               value={search}
+//               onChange={setSearch}
+//               leading={
+//                 view === "unpaid" && hasUnpaidSelection ? (
+//                   <>
+//                     <button
+//                       type="button"
+//                       onClick={() => void handleMarkAsPaid()}
+//                       disabled={bulkBusy}
+//                       className={WALLET_BULK_BUTTON_CLASS}
+//                     >
+//                       Mark as Paid
+//                     </button>
+//                     <button
+//                       type="button"
+//                       onClick={handleSendReminder}
+//                       disabled={bulkBusy}
+//                       className={WALLET_BULK_BUTTON_CLASS}
+//                     >
+//                       Send Reminder
+//                     </button>
+//                     <button
+//                       type="button"
+//                       onClick={() => handleViewInvoice(selectedUnpaidRows)}
+//                       disabled={bulkBusy}
+//                       className={WALLET_BULK_BUTTON_CLASS}
+//                     >
+//                       View Invoice
+//                     </button>
+//                   </>
+//                 ) : view === "paid" && selectedPaidRows.length > 0 ? (
+//                   <>
+//                     <button
+//                       type="button"
+//                       onClick={() => handleViewInvoice(selectedPaidRows)}
+//                       disabled={bulkBusy}
+//                       className={WALLET_BULK_BUTTON_CLASS}
+//                     >
+//                       View Invoice
+//                     </button>
+//                     <button
+//                       type="button"
+//                       onClick={() => void handleSendNotification(selectedPaidRows, "Receipt")}
+//                       disabled={bulkBusy}
+//                       className={WALLET_BULK_BUTTON_CLASS}
+//                     >
+//                       Send Receipt
+//                     </button>
+//                   </>
+//                 ) : view === "banks" && selectedBankRows.length > 0 ? (
+//                   <>
+//                     <button
+//                       type="button"
+//                       onClick={openEditBankForm}
+//                       disabled={!hasSingleBankSelection}
+//                       className={WALLET_BULK_BUTTON_CLASS}
+//                     >
+//                       Edit
+//                     </button>
+//                     <button
+//                       type="button"
+//                       onClick={handleClearSelection}
+//                       className={WALLET_BULK_BUTTON_CLASS}
+//                     >
+//                       Clear Selection
+//                     </button>
+//                   </>
+//                 ) : null
+//               }
+//               trailing={
+//                 view === "expenses" && !showExpenseForm ? (
+//                   <AddNewButton onClick={openExpenseForm} />
+//                 ) : view === "banks" && !showBankForm ? (
+//                   <AddNewButton onClick={openAddBankForm} />
+//                 ) : null
+//               }
+//             />
+//             {renderListContent()}
+//           </>
+//         ) : null}
+//       </div>
+//     </ShopPageShell>
+//   );
+// }
+
+
 import { useCallback, useEffect, useMemo, useRef, useState, type TextareaHTMLAttributes } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -40,14 +2345,6 @@ import { useShopOwnerData } from "../../context/ShopOwnerDataProvider";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopWallet } from "../../hooks/useShopWallet";
 import { formatCurrencyAmount } from "../../lib/currency";
-import {
-  DUMMY_SHOP_BANKS,
-  DUMMY_SHOP_EXPENSES,
-  USE_DUMMY_SHOP_WALLET,
-  type ShopWalletBankRow,
-  type ShopWalletExpenseRow,
-} from "../../lib/dummyShopWallet";
-import { useMockShopInvoiceLedger } from "../../lib/mockShopInvoiceLedger";
 import { formatPhoneWithCountryCode } from "../../lib/phoneFormat";
 import {
   markAutoshopInvoicePaid,
@@ -59,7 +2356,16 @@ import {
   type JobCardListRow,
 } from "../../lib/shopOwnerJobCards";
 import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
-import { createBank, createExpense, fetchBanks, fetchExpenses, updateBank, updateExpense } from "../../lib/shopOwnerAccountsApi";
+import {
+  createBank,
+  createExpense,
+  fetchBanks,
+  fetchExpenses,
+  updateBank,
+  updateExpense,
+  type ShopWalletBankRow,
+  type ShopWalletExpenseRow,
+} from "../../lib/shopOwnerAccountsApi";
 import {
   categoryLabel,
   cloneCategories,
@@ -1198,7 +3504,7 @@ export default function ShopWalletPage() {
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set());
-  const [expenses, setExpenses] = useState<ShopWalletExpenseRow[]>(() => [...DUMMY_SHOP_EXPENSES]);
+  const [expenses, setExpenses] = useState<ShopWalletExpenseRow[]>(() => []);
   const [expenseCategories, setExpenseCategories] = useState<CategoryOption[]>(() =>
     cloneCategories(EXPENSE_CATEGORIES),
   );
@@ -1264,7 +3570,7 @@ export default function ShopWalletPage() {
   const [subcategoriesPopupOpen, setSubcategoriesPopupOpen] = useState(false);
   const [subcategoriesDraft, setSubcategoriesDraft] = useState<string[]>([""]);
   const subcategoriesSnapshotRef = useRef<{ value: string; label: string }[]>([]);
-  const [banks, setBanks] = useState<ShopWalletBankRow[]>(() => [...DUMMY_SHOP_BANKS]);
+  const [banks, setBanks] = useState<ShopWalletBankRow[]>(() => []);
   const [showBankForm, setShowBankForm] = useState(false);
   const [editingBankId, setEditingBankId] = useState<string | null>(null);
 
@@ -1309,7 +3615,8 @@ export default function ShopWalletPage() {
     error: walletError,
     refresh: refreshWallet,
   } = useShopWallet();
-  const mockLedger = useMockShopInvoiceLedger();
+  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
 
   // Guard: categories must exist even if expenses list is empty.
   // If some path accidentally cleared categories, re-seed from defaults.
@@ -1320,10 +3627,19 @@ export default function ShopWalletPage() {
   }, [expenseCategories.length]);
 
   const loadAccounts = useCallback(async () => {
-    if (USE_DUMMY_SHOP_WALLET) return;
-    if (!token) return;
+    if (!token) {
+      setAccountsLoading(false);
+      return;
+    }
+    setAccountsLoading(true);
+    setAccountsError(null);
     try {
       const [banksRes, expensesRes] = await Promise.all([fetchBanks(token), fetchExpenses(token)]);
+      if (!banksRes.ok || !expensesRes.ok) {
+        setAccountsError(
+          banksRes.data?.message || expensesRes.data?.message || "Could not load bank accounts and expenses.",
+        );
+      }
       if (banksRes.ok) {
         const raw = (banksRes.data as any)?.data;
         if (Array.isArray(raw)) {
@@ -1380,7 +3696,9 @@ export default function ShopWalletPage() {
         }
       }
     } catch {
-      // keep existing state; UI already shows generic error states for wallet
+      setAccountsError("Network error while loading bank accounts and expenses.");
+    } finally {
+      setAccountsLoading(false);
     }
   }, [effectiveExpenseCategories, token]);
 
@@ -1388,10 +3706,10 @@ export default function ShopWalletPage() {
     await Promise.all([refreshWallet(), refreshSection("jobCards")]);
   }, [refreshWallet, refreshSection]);
 
-  const paid = USE_DUMMY_SHOP_WALLET ? mockLedger.paid : paidOnline;
-  const unpaid = USE_DUMMY_SHOP_WALLET ? mockLedger.unpaid : unpaidOnline;
-  const showLoading = !USE_DUMMY_SHOP_WALLET && walletLoading;
-  const showError = !USE_DUMMY_SHOP_WALLET && walletError;
+  const paid = paidOnline;
+  const unpaid = unpaidOnline;
+  const showLoading = view === "expenses" || view === "banks" ? accountsLoading : walletLoading;
+  const showError = view === "expenses" || view === "banks" ? Boolean(accountsError) : Boolean(walletError);
 
   const invoiceList = view === "paid" ? paid : view === "unpaid" ? unpaid : [];
   const filteredList = useMemo(
@@ -1692,7 +4010,7 @@ export default function ShopWalletPage() {
         closeBankForm();
       };
 
-      if (USE_DUMMY_SHOP_WALLET || !token) {
+      if (!token) {
         saveLocal();
         return;
       }
@@ -1781,7 +4099,7 @@ export default function ShopWalletPage() {
         closeExpenseForm();
       };
 
-      if (USE_DUMMY_SHOP_WALLET || !token) {
+      if (!token) {
         saveLocal();
         return;
       }
@@ -1904,7 +4222,7 @@ export default function ShopWalletPage() {
 
   const runCollectPayment = async (rows: JobCardListRow[], label: string) => {
     if (rows.length === 0 || bulkBusy) return;
-    if (!USE_DUMMY_SHOP_WALLET && !token) return;
+    if (!token) return;
 
     const count = rows.length;
     if (!window.confirm(`Mark ${count} invoice${count === 1 ? "" : "s"} as paid?`)) return;
@@ -1912,25 +4230,20 @@ export default function ShopWalletPage() {
     setBulkBusy(true);
     let failed = 0;
     try {
-      if (USE_DUMMY_SHOP_WALLET) {
-        mockLedger.markAsPaid(rows.map((row) => row.id));
-        toast.success(`Marked ${count} invoice${count === 1 ? "" : "s"} as paid.`);
+      for (const row of rows) {
+        const jobCardNo = pickJobCardNoForApi(row);
+        if (!jobCardNo) {
+          failed += 1;
+          continue;
+        }
+        const res = await markAutoshopInvoicePaid(token, jobCardNo);
+        if (!res.ok) failed += 1;
+      }
+      await syncLedgerData();
+      if (failed > 0) {
+        toast.error(`${label} failed for ${failed} invoice${failed === 1 ? "" : "s"}.`);
       } else {
-        for (const row of rows) {
-          const jobCardNo = pickJobCardNoForApi(row);
-          if (!jobCardNo) {
-            failed += 1;
-            continue;
-          }
-          const res = await markAutoshopInvoicePaid(token!, jobCardNo);
-          if (!res.ok) failed += 1;
-        }
-        await syncLedgerData();
-        if (failed > 0) {
-          toast.error(`${label} failed for ${failed} invoice${failed === 1 ? "" : "s"}.`);
-        } else {
-          toast.success(`${label} completed for ${count} invoice${count === 1 ? "" : "s"}.`);
-        }
+        toast.success(`${label} completed for ${count} invoice${count === 1 ? "" : "s"}.`);
       }
       setSelectedRowIds(new Set());
     } finally {
@@ -1949,28 +4262,24 @@ export default function ShopWalletPage() {
 
   const handleSendNotification = async (rows: JobCardListRow[], successLabel: string) => {
     if (rows.length === 0 || bulkBusy) return;
-    if (!USE_DUMMY_SHOP_WALLET && !token) return;
+    if (!token) return;
 
     setBulkBusy(true);
     let failed = 0;
     try {
-      if (USE_DUMMY_SHOP_WALLET) {
-        toast.success(`${successLabel} sent for ${rows.length} invoice${rows.length === 1 ? "" : "s"}.`);
+      for (const row of rows) {
+        const jobCardNo = pickJobCardNoForApi(row);
+        if (!jobCardNo) {
+          failed += 1;
+          continue;
+        }
+        const res = await sendAutoshopJobCardForApproval(token, jobCardNo);
+        if (!res.ok) failed += 1;
+      }
+      if (failed > 0) {
+        toast.error(`${successLabel} failed for ${failed} invoice${failed === 1 ? "" : "s"}.`);
       } else {
-        for (const row of rows) {
-          const jobCardNo = pickJobCardNoForApi(row);
-          if (!jobCardNo) {
-            failed += 1;
-            continue;
-          }
-          const res = await sendAutoshopJobCardForApproval(token!, jobCardNo);
-          if (!res.ok) failed += 1;
-        }
-        if (failed > 0) {
-          toast.error(`${successLabel} failed for ${failed} invoice${failed === 1 ? "" : "s"}.`);
-        } else {
-          toast.success(`${successLabel} sent for ${rows.length} invoice${rows.length === 1 ? "" : "s"}.`);
-        }
+        toast.success(`${successLabel} sent for ${rows.length} invoice${rows.length === 1 ? "" : "s"}.`);
       }
       setSelectedRowIds(new Set());
     } finally {
@@ -2013,6 +4322,10 @@ export default function ShopWalletPage() {
 
     if (showError && (view === "paid" || view === "unpaid")) {
       return <ShopErrorPanel message={walletError ?? ""} onRetry={() => void syncLedgerData()} />;
+    }
+
+    if (showError && (view === "expenses" || view === "banks")) {
+      return <ShopErrorPanel message={accountsError ?? ""} onRetry={() => void loadAccounts()} />;
     }
 
     if (view === "expenses") {
