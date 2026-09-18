@@ -1650,7 +1650,7 @@ import { ShopEmptyPanel } from "../../components/shop/ShopPanels";
 import { ShopFormSkeleton } from "../../components/shop/ShopListSkeletons";
 import { Skeleton } from "../../components/common/Skeleton";
 import { useAuth } from "../../auth";
-import { useShopSubscriptionGate } from "../../context/ShopSubscriptionGateContext";
+// import { useShopSubscriptionGate } from "../../context/ShopSubscriptionGateContext";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { formatCurrencyAmount } from "../../lib/currency";
 import {
@@ -2701,7 +2701,7 @@ function WebsiteInvoiceModal({
 export default function ShopMyWebsitePage() {
   const { token, profile } = useAuth();
   const { faqsHeading, faqsDescription, business, user, refresh } = useShopOwnerPortal();
-  const { requireSubscription } = useShopSubscriptionGate();
+  // const { requireSubscription } = useShopSubscriptionGate();
   const [activeSection, setActiveSection] = useState<ShopWebsiteSection>("overview");
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [domainForm, setDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
