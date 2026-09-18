@@ -2971,7 +2971,7 @@ export default function ShopMyWebsitePage() {
   };
 
   const handleTemplateSaveAndNext = async () => {
-    if (!requireSubscription()) return;
+    // if (!requireSubscription()) return;
 
     if (!selectedTemplateId) {
       toast.error("Please select a website template.");
