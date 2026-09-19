@@ -2516,7 +2516,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router";
-import { FiPaperclip, FiTrash2, FiUser } from "react-icons/fi";
+import { FiPaperclip, FiTrash2, FiTruck, FiUser } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson } from "../../../api/mobileAuth";
 import {
@@ -2551,11 +2551,14 @@ import { formatPhoneDisplay, phoneDigits } from "../../../lib/phoneFormat";
 import { FormFieldError, fieldErrorClass, zodIssuesToFieldErrorMap } from "../../../lib/validation/formUi";
 import { shopBusinessProfileSchema, shopPersonalProfileSchema } from "../../../lib/validation/schemas/deal";
 import {
+  fetchBusinessProfile,
   fetchOpenHours,
   updateBusinessProfile,
+  updateMobileService,
   updatePersonalProfile,
   updateWeeklyOpenHours,
   upsertSpecialOpenHours,
+  type MobileServiceData,
 } from "../../../lib/autoshopownerApi";
 import {
   addMyCarCompanies,
@@ -4089,6 +4092,175 @@ export type ShopCarCompany = {
 const CAR_BRAND_EMBLEM_TOOLTIP_HEIGHT_PX = 50;
 const CAR_BRAND_EMBLEM_TOOLTIP_WIDTH_PX = 75;
 const CAR_BRAND_EMBLEM_TOOLTIP_GAP_PX = 4;
+
+function parseMobileServiceResponse(payload: unknown): MobileServiceData {
+  const root = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+  const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+  const raw = (data.mobileService && typeof data.mobileService === "object"
+    ? data.mobileService
+    : data) as Record<string, unknown>;
+  const enabled = Boolean(raw.enabled);
+  const coverageRaw = raw.coverageDistanceKm;
+  const coverageDistanceKm =
+    typeof coverageRaw === "number" && Number.isFinite(coverageRaw) ? coverageRaw : null;
+  return { enabled, coverageDistanceKm };
+}
+
+export function ShopMobileServiceEditor({ onSaved }: { onSaved?: () => void }) {
+  const { token } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState<MobileServiceData>({ enabled: false, coverageDistanceKm: null });
+  const [enabled, setEnabled] = useState(false);
+  const [distance, setDistance] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const applyState = useCallback((data: MobileServiceData) => {
+    setSaved(data);
+    setEnabled(data.enabled);
+    setDistance(data.coverageDistanceKm != null ? String(data.coverageDistanceKm) : "");
+  }, []);
+
+  const reload = useCallback(async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetchBusinessProfile(token);
+      if (res.ok) {
+        applyState(parseMobileServiceResponse(res.data));
+      } else {
+        setError("Could not load mobile service settings.");
+      }
+    } catch {
+      setError("Could not load mobile service settings.");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, applyState]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const isDirty =
+    enabled !== saved.enabled ||
+    (enabled && distance.trim() !== (saved.coverageDistanceKm != null ? String(saved.coverageDistanceKm) : ""));
+
+  const reset = () => {
+    setEnabled(saved.enabled);
+    setDistance(saved.coverageDistanceKm != null ? String(saved.coverageDistanceKm) : "");
+  };
+
+  const handleSave = async () => {
+    if (!token) {
+      toast.error("Sign in to save mobile service settings.");
+      return;
+    }
+    let coverageDistanceKm: number | null = null;
+    if (enabled) {
+      const parsed = Number(distance);
+      if (!distance.trim() || Number.isNaN(parsed) || parsed <= 0) {
+        toast.error("Enter a coverage distance greater than 0.");
+        return;
+      }
+      coverageDistanceKm = parsed;
+    }
+
+    setSaving(true);
+    try {
+      const res = await updateMobileService(token, { enabled, coverageDistanceKm });
+      if (!res.ok) {
+        toast.error(apiMessage(res.data) || "Could not save mobile service settings.");
+        return;
+      }
+      applyState({ enabled, coverageDistanceKm });
+      toast.success(apiMessage(res.data) || "Mobile service settings saved.");
+      onSaved?.();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <ShopLoadingPanel variant="form" />;
+
+  return (
+    <CompactFormPanel
+      className={shopProfileFormPanelClass}
+      showBottomBorder={false}
+      footer={
+        isDirty ? (
+          <ProfileFormFooter
+            message={
+              saved.enabled || saved.coverageDistanceKm != null
+                ? "You are updating your mobile service settings"
+                : "You are saving your mobile service settings"
+            }
+            saving={saving}
+            saveLabel="Save"
+            onSave={() => void handleSave()}
+            onReset={reset}
+          />
+        ) : undefined
+      }
+    >
+      <div className="space-y-4">
+        {error ? <p className="text-xs font-semibold text-red-600">{error}</p> : null}
+
+        <div className="rounded border border-gray-200 bg-white p-4">
+          <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
+            <FiTruck className="h-5 w-5 text-ad-purple" aria-hidden />
+            Mobile Service (Road Assistance)
+          </div>
+
+          <label className="mt-4 flex cursor-pointer items-start gap-3">
+            <span className="relative mt-0.5 inline-flex h-6 w-11 shrink-0">
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="Enable Mobile Service"
+                className="peer sr-only"
+                checked={enabled}
+                disabled={saving}
+                onChange={(e) => setEnabled(e.target.checked)}
+              />
+              <span className="absolute inset-0 rounded-full bg-gray-300 transition peer-checked:bg-ad-purple peer-disabled:cursor-not-allowed" />
+              <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+            </span>
+            <span>
+              <span className="block text-sm font-bold text-gray-800">Enable Mobile Service</span>
+              <span className="block text-xs text-gray-500">
+                Offer road assistance and mobile service to customers
+              </span>
+            </span>
+          </label>
+
+          <ShopReveal show={enabled}>
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <CompactField label="Coverage Distance (Kilometers)">
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  className={shopCompactInputClass}
+                  value={distance}
+                  onChange={(e) => setDistance(e.target.value)}
+                  disabled={saving}
+                />
+              </CompactField>
+              <p className="mt-1 text-xs text-gray-500">
+                Maximum distance you can travel for mobile service
+              </p>
+            </div>
+          </ShopReveal>
+        </div>
+      </div>
+    </CompactFormPanel>
+  );
+}
 
 function CarBrandEmblemTooltip({ company }: { company: ShopCarCompany }) {
   const name = getCarBrandName(company);
