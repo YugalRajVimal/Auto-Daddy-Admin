@@ -516,7 +516,7 @@ export const primaryNav: NavItem[] = [
     matchPaths: ["/admin/car-owners", "/admin/auto-shop-owners", "/admin/dealers"],
   },
   {
-    name: "Requested Website",
+    name: "Website",
     permissionModule: "requestedWebsite",
     subItems: [
       { name: "Opted", path: "/admin/requested-website/opted", permissionModule: "requestedWebsite.subNav.opted" },
@@ -570,7 +570,7 @@ export const primaryNav: NavItem[] = [
     matchPaths: ["/admin/domain/manager"],
   },
   {
-    name: "Platform Settings",
+    name: "Settings",
     path: "/admin/platform-settings",
     permissionModule: "platformSettings",
     matchPaths: ["/admin/platform-settings"],

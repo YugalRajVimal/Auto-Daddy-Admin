@@ -915,7 +915,7 @@ export const PERMISSION_TREE: Record<string, NavDef> = {
     },
   },
   requestedWebsite: {
-    label: "Requested Website",
+    label: "Website",
     subNav: {
       opted: { label: "Opted" },
       notOpted: { label: "Not Opted" },
