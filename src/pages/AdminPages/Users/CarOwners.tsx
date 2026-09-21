@@ -1341,10 +1341,28 @@ const CarOwners: React.FC = () => {
     }
   }
 
+  async function setStatusForMany(userIds: string[], status: "active" | "deleted") {
+    if (userIds.length === 0) return;
+    const results = await Promise.allSettled(
+      userIds.map((id) =>
+        axios.put(`${API()}/api/admin/carowners/${id}/status/toggle`, { status }, { headers: getToken() })
+      )
+    );
+    setSelectedRows(new Set());
+    await fetchOwners();
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const verb = status === "deleted" ? "deleted" : "restored";
+    if (failed === 0) {
+      adminNotify.success(userIds.length === 1 ? `Car owner ${verb}.` : `${userIds.length} car owners ${verb}.`);
+    } else {
+      adminNotify.error(`${failed} of ${userIds.length} could not be ${verb}.`);
+    }
+  }
+
   async function toggleStatus(userId: string, status: "active" | "suspended" | "deleted") {
     try {
       await axios.put(
-        `${API()}/api/admin/car-owner/${userId}/status/toggle`,
+        `${API()}/api/admin/carowners/${userId}/status/toggle`,
         { status },
         { headers: getToken() }
       );
@@ -1492,11 +1510,10 @@ const CarOwners: React.FC = () => {
                 type="button"
                 disabled={selCount === 0}
                 onClick={async () => {
-                  const owner = allOwners.find(o => o._id === selected[0]);
-                  if (!owner) return;
-                  if (window.confirm(`Delete ${owner.name}?`)) {
-                    await toggleStatus(selected[0], "deleted");
-                    setSelectedRows(new Set());
+                  const owner = selCount === 1 ? allOwners.find(o => o._id === selected[0]) : null;
+                  const what = owner ? owner.name : `${selCount} selected car owners`;
+                  if (window.confirm(`Delete ${what}?`)) {
+                    await setStatusForMany(selected, "deleted");
                   }
                 }}
                 className={toolbarBtnClass(selCount === 0)}
@@ -1545,11 +1562,10 @@ const CarOwners: React.FC = () => {
                 type="button"
                 disabled={selCount === 0}
                 onClick={async () => {
-                  const owner = allOwners.find(o => o._id === selected[0]);
-                  if (!owner) return;
-                  if (window.confirm(`Restore ${owner.name} as Active?`)) {
-                    await toggleStatus(selected[0], "active");
-                    setSelectedRows(new Set());
+                  const owner = selCount === 1 ? allOwners.find(o => o._id === selected[0]) : null;
+                  const what = owner ? owner.name : `${selCount} selected car owners`;
+                  if (window.confirm(`Restore ${what} as Active?`)) {
+                    await setStatusForMany(selected, "active");
                   }
                 }}
                 className={toolbarBtnClass(selCount === 0)}

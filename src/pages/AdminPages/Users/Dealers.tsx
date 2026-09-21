@@ -706,45 +706,44 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
     }
   }
 
-  async function deleteRow(id: string) {
-    if (!window.confirm(`Delete this ${config.title.toLowerCase()}? They can be restored later.`)) return;
+  async function deleteRows(ids: string[]) {
+    if (ids.length === 0) return;
+    const what = ids.length === 1 ? `this ${config.title.toLowerCase()}` : `${ids.length} selected ${config.title.toLowerCase()}`;
+    if (!window.confirm(`Delete ${what}? They can be restored later.`)) return;
+    const idSet = new Set(ids);
     if (!config.api) {
-      setAllRows((prev) => prev.map((r) => (r._id === id ? { ...r, status: "deleted", isDisabled: true } : r)));
-      setSelectedRows((prev) => {
-        const c = new Set(prev);
-        c.delete(id);
-        return c;
-      });
-      adminNotify.success("Deleted.");
+      setAllRows((prev) => prev.map((r) => (idSet.has(r._id) ? { ...r, status: "deleted", isDisabled: true } : r)));
+      setSelectedRows(new Set());
+      adminNotify.success(ids.length === 1 ? "Deleted." : `${ids.length} deleted.`);
       return;
     }
-    try {
-      await config.api.remove(id);
-      setSelectedRows((prev) => {
-        const c = new Set(prev);
-        c.delete(id);
-        return c;
-      });
-      adminNotify.success("Deleted.");
-      await loadRows();
-    } catch (err: any) {
-      adminNotify.error(err?.message || "Delete failed.");
-    }
+    const api = config.api;
+    const results = await Promise.allSettled(ids.map((id) => api.remove(id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    setSelectedRows(new Set());
+    if (failed === 0) adminNotify.success(ids.length === 1 ? "Deleted." : `${ids.length} deleted.`);
+    else adminNotify.error(`${failed} of ${ids.length} could not be deleted.`);
+    await loadRows();
   }
 
-  async function reviveRow(id: string) {
+  async function reviveRows(ids: string[]) {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
     if (!config.api) {
-      setAllRows((prev) => prev.map((r) => (r._id === id ? { ...r, status: undefined, isDisabled: false } : r)));
-      adminNotify.success("Restored.");
+      setAllRows((prev) => prev.map((r) => (idSet.has(r._id) ? { ...r, status: undefined, isDisabled: false } : r)));
+      setSelectedRows(new Set());
+      adminNotify.success(ids.length === 1 ? "Restored." : `${ids.length} restored.`);
       return;
     }
-    try {
-      await config.api.update(id, { status: "Active" } as Partial<DummyUserFormValues>);
-      adminNotify.success("Restored.");
-      await loadRows();
-    } catch (err: any) {
-      adminNotify.error(err?.message || "Restore failed.");
-    }
+    const api = config.api;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.update(id, { status: "Active" } as Partial<DummyUserFormValues>)),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    setSelectedRows(new Set());
+    if (failed === 0) adminNotify.success(ids.length === 1 ? "Restored." : `${ids.length} restored.`);
+    else adminNotify.error(`${failed} of ${ids.length} could not be restored.`);
+    await loadRows();
   }
 
   const openAdd = () => {
@@ -914,7 +913,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
       >
         {viewMode === "deleted" && (
           <div className="mb-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-            Showing deleted {config.title.toLowerCase()} ({deletedCount}) — select one and use Restore
+            Showing deleted {config.title.toLowerCase()} ({deletedCount}) — select rows and use Restore
           </div>
         )}
 
@@ -936,13 +935,13 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
                 >
                   Export
                 </button>
-                <button type="button" disabled={selCount === 0} onClick={() => deleteRow(selected[0])} className={toolbarBtnClass(selCount === 0)}>
+                <button type="button" disabled={selCount === 0} onClick={() => deleteRows(selected)} className={toolbarBtnClass(selCount === 0)}>
                   Delete
                 </button>
               </>
             )}
             {viewMode === "deleted" && (
-              <button type="button" disabled={selCount === 0} onClick={() => reviveRow(selected[0])} className={toolbarBtnClass(selCount === 0)}>
+              <button type="button" disabled={selCount === 0} onClick={() => reviveRows(selected)} className={toolbarBtnClass(selCount === 0)}>
                 Restore
               </button>
             )}
@@ -1054,7 +1053,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
                             >
                               {isSuspended ? "Enable" : "Suspend"}
                             </button>
-                            <button type="button" onClick={() => deleteRow(row._id)} className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+                            <button type="button" onClick={() => deleteRows([row._id])} className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
                               Delete
                             </button>
                           </div>
@@ -1062,7 +1061,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
                       )}
                       {viewMode === "deleted" && (
                         <td className={tdClass}>
-                          <button type="button" onClick={() => reviveRow(row._id)} className="rounded bg-ad-green px-2 py-0.5 text-xs font-semibold text-white">
+                          <button type="button" onClick={() => reviveRows([row._id])} className="rounded bg-ad-green px-2 py-0.5 text-xs font-semibold text-white">
                             Restore
                           </button>
                         </td>

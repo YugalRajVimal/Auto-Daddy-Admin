@@ -19,6 +19,7 @@ import AdminSearchCard, {
 } from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
+import { countLabel, runBulk } from "../../../utils/adminBulk";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { carBrandSchema } from "../../../lib/validation/schemas/catalog";
 import {
@@ -1140,16 +1141,17 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
   };
 
   const handleRestore = async () => {
-    if (selected.size !== 1) return;
-    const row = findRowById([...selected][0]);
-    if (!row) return;
-    const company = deletedStash.find((c) => c._id === row.companyId);
-    if (!company) return;
-    if (!window.confirm(`Restore car brand "${company.companyName}"?`)) return;
+    const companyIds = new Set(
+      [...selected].map((id) => findRowById(id)?.companyId).filter((id): id is string => Boolean(id))
+    );
+    const list = deletedStash.filter((c) => companyIds.has(c._id));
+    if (list.length === 0) return;
+    const what = list.length === 1 ? `car brand "${list[0].companyName}"` : countLabel(list.length, "car brand");
+    if (!window.confirm(`Restore ${what}?`)) return;
     setActionLoading(true);
     setError("");
     setSuccessMsg("");
-    try {
+    const { succeeded, failed, firstError } = await runBulk(list, (company) => {
       const formData = new FormData();
       formData.append("companyName", company.companyName);
       formData.append(
@@ -1161,29 +1163,28 @@ export default function CarBrandsPage({ initialShowForm = false }: CarBrandsPage
         )
       );
       formData.append("country", "Canada");
-      await axios.post(
-        `${API_BASE}/admin/car-company`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            ...getAdminAuthHeaders(),
-          },
-        }
-      );
-      restoreStashed((item) => item._id === company._id);
-      adminNotify.success("Car brand restored.");
-      setSuccessMsg("Car brand restored.");
-      setSelected(new Set());
-      fetchCompanies(search);
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to restore car brand";
-      setError(msg);
-      adminNotify.error(msg);
-    } finally {
-      setActionLoading(false);
+      return axios.post(`${API_BASE}/admin/car-company`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          ...getAdminAuthHeaders(),
+        },
+      });
+    });
+    const restoredIds = new Set(succeeded.map((c) => c._id));
+    if (succeeded.length > 0) {
+      restoreStashed((item) => restoredIds.has(item._id));
+      const msg = `${countLabel(succeeded.length, "Car brand")} restored.`;
+      adminNotify.success(msg);
+      setSuccessMsg(msg);
     }
+    if (failed.length > 0) {
+      const msg = firstError || "Failed to restore car brand";
+      setError(msg);
+      adminNotify.error(list.length === 1 ? msg : `${failed.length} of ${list.length} could not be restored: ${msg}`);
+    }
+    setSelected(new Set());
+    fetchCompanies(search);
+    setActionLoading(false);
   };
 
   const handleToolbarPrint = () => {

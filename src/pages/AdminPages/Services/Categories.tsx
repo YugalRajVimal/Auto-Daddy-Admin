@@ -20,6 +20,7 @@ import AdminSearchCard, {
 } from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
+import { countLabel, runBulk } from "../../../utils/adminBulk";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import type { ShopType, Service } from "./Services";
 import { subServiceSchema, type SubServiceValues } from "../../../lib/validation/schemas/catalog";
@@ -307,87 +308,80 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     (errs) => toastValidationSummary(adminNotify.error, errs as never),
   );
 
-  const handleDelete = async (row: SubServiceRow) => {
-    if (!window.confirm(`Delete sub service "${row.name}"?`)) return;
-    setActionLoading(true);
-    setError("");
-    setSuccessMsg("");
-    try {
-      const parent = services.find((s) => s._id === row.categoryId);
-      if (!parent) return;
-      const updated = (parent.subServices || []).filter((s) => s.name !== row.name);
-      await axios.put(
-        `${API_BASE}/admin/services/${row.categoryId}`,
-        { subServices: updated },
-        { headers: getAdminAuthHeader() }
-      );
-      stashDeleted(row);
-      adminNotify.success("Sub service deleted successfully.");
-      setSuccessMsg("Sub service deleted successfully.");
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(getRowId(row));
-        return next;
-      });
-      fetchServices();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to delete sub service";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-    } finally {
-      setActionLoading(false);
+  /** Groups rows by parent service; each parent's sub-service list is saved with one PUT. */
+  const groupByParent = (rows: SubServiceRow[]) => {
+    const groups = new Map<string, SubServiceRow[]>();
+    for (const row of rows) groups.set(row.categoryId, [...(groups.get(row.categoryId) ?? []), row]);
+    return [...groups.entries()].map(([categoryId, children]) => ({ categoryId, children }));
+  };
+
+  const reportBulk = (
+    verb: "deleted" | "restored",
+    total: number,
+    doneRows: SubServiceRow[],
+    failedCount: number,
+    firstError: string | null
+  ) => {
+    if (doneRows.length > 0) {
+      const msg = `${countLabel(doneRows.length, "Sub service")} ${verb}${verb === "deleted" ? " successfully" : ""}.`;
+      adminNotify.success(msg);
+      setSuccessMsg(msg);
+    }
+    if (failedCount > 0) {
+      const msg = firstError || `Failed to ${verb === "deleted" ? "delete" : "restore"} sub service`;
+      setError(msg);
+      adminNotify.error(total === 1 ? msg : `${failedCount} of ${total} could not be ${verb}: ${msg}`);
     }
   };
 
-  const findRowById = (id: string) =>
-    (isDeletedView ? deletedStash : allRows).find((r) => getRowId(r) === id);
-
-  const handleToolbarDelete = () => {
-    if (selected.size !== 1) return;
-    const row = findRowById([...selected][0]);
-    if (row) handleDelete(row);
-  };
-
-  const handleRestore = async () => {
-    if (selected.size !== 1) return;
-    const row = deletedStash.find((r) => getRowId(r) === [...selected][0]);
-    if (!row) return;
-    if (!window.confirm(`Restore sub service "${row.name}"?`)) return;
+  const handleToolbarDelete = async () => {
+    const list = allRows.filter((row) => selected.has(getRowId(row)));
+    if (list.length === 0) return;
+    const what = list.length === 1 ? `sub service "${list[0].name}"` : countLabel(list.length, "sub service");
+    if (!window.confirm(`Delete ${what}?`)) return;
     setActionLoading(true);
     setError("");
     setSuccessMsg("");
-    try {
-      const parent = services.find((s) => s._id === row.categoryId);
-      if (!parent) {
-        const __adminMsg = "Parent service not found.";
-        setError(__adminMsg);
-        adminNotify.error(__adminMsg);
-        return;
-      }
+    const { succeeded, failed, firstError } = await runBulk(groupByParent(list), async ({ categoryId, children }) => {
+      const parent = services.find((s) => s._id === categoryId);
+      if (!parent) throw new Error("Parent service not found.");
+      const names = new Set(children.map((c) => c.name));
+      const updated = (parent.subServices || []).filter((s) => !names.has(s.name));
+      await axios.put(`${API_BASE}/admin/services/${categoryId}`, { subServices: updated }, { headers: getAdminAuthHeader() });
+    });
+    const deletedRows = succeeded.flatMap((g) => g.children);
+    if (deletedRows.length > 0) stashDeleted(deletedRows);
+    reportBulk("deleted", list.length, deletedRows, failed.flatMap((g) => g.children).length, firstError);
+    setSelected(new Set());
+    fetchServices();
+    setActionLoading(false);
+  };
+
+  const handleRestore = async () => {
+    const list = deletedStash.filter((row) => selected.has(getRowId(row)));
+    if (list.length === 0) return;
+    const what = list.length === 1 ? `sub service "${list[0].name}"` : countLabel(list.length, "sub service");
+    if (!window.confirm(`Restore ${what}?`)) return;
+    setActionLoading(true);
+    setError("");
+    setSuccessMsg("");
+    const { succeeded, failed, firstError } = await runBulk(groupByParent(list), async ({ categoryId, children }) => {
+      const parent = services.find((s) => s._id === categoryId);
+      if (!parent) throw new Error("Parent service not found.");
       const existing: SubService[] = (parent.subServices || []).map((s) => ({
         name: s.name,
         status: (s.status as SubServiceStatus) || "active",
       }));
-      const updated = [...existing, { name: row.name, status: row.status || "active" }];
-      await axios.put(
-        `${API_BASE}/admin/services/${row.categoryId}`,
-        { subServices: updated },
-        { headers: getAdminAuthHeader() }
-      );
-      restoreStashed((item) => getRowId(item) === getRowId(row));
-      adminNotify.success("Sub service restored.");
-      setSuccessMsg("Sub service restored.");
-      setSelected(new Set());
-      fetchServices();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to restore sub service";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-    } finally {
-      setActionLoading(false);
-    }
+      const updated = [...existing, ...children.map((row) => ({ name: row.name, status: row.status || "active" }))];
+      await axios.put(`${API_BASE}/admin/services/${categoryId}`, { subServices: updated }, { headers: getAdminAuthHeader() });
+    });
+    const restoredRows = succeeded.flatMap((g) => g.children);
+    const restoredIds = new Set(restoredRows.map(getRowId));
+    if (restoredRows.length > 0) restoreStashed((item) => restoredIds.has(getRowId(item)));
+    reportBulk("restored", list.length, restoredRows, failed.flatMap((g) => g.children).length, firstError);
+    setSelected(new Set());
+    fetchServices();
+    setActionLoading(false);
   };
 
   const handleToolbarPrint = () => {

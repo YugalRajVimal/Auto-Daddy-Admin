@@ -320,6 +320,33 @@ const VehicleType: React.FC = () => {
     setDeletingId(null);
   };
 
+  const handleBulkDelete = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (!window.confirm(`Delete ${ids.length} selected compan${ids.length === 1 ? "y" : "ies"} and their models?`)) return;
+    clearAlerts();
+    const baseURL = import.meta.env.VITE_API_URL;
+    const token = getToken();
+    const rows = carDetails.filter((c) => ids.includes(c._id));
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        axios.delete(`${baseURL}/api/auto-shop-owner/car-details/${id}`, {
+          headers: { Authorization: `${token}` },
+        })
+      )
+    );
+    const deleted = rows.filter((row) => results[ids.indexOf(row._id)]?.status === "fulfilled");
+    if (deleted.length > 0) stashDeleted(deleted);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    setSelectedIds(new Set());
+    if (failed === 0) {
+      adminNotify.success(`${ids.length} entr${ids.length === 1 ? "y" : "ies"} deleted.`);
+      setSuccessMsg("Car details entries deleted.");
+    } else {
+      adminNotify.error(`${failed} of ${ids.length} could not be deleted.`);
+    }
+    fetchCarDetails();
+  };
+
   const handleRestore = async (ids: string[]) => {
     if (ids.length === 0) return;
     const toRestore = deletedStash.filter((c) => ids.includes(c._id));
@@ -465,6 +492,12 @@ const VehicleType: React.FC = () => {
                   },
                 ]
               : [
+                  {
+                    label: "Delete Selected",
+                    color: "#e74c3c",
+                    minSelected: 1,
+                    onClick: (ids) => handleBulkDelete(ids),
+                  },
                   {
                     label: "✏️ Update",
                     color: "#0073b7",

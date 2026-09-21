@@ -1121,7 +1121,7 @@
 //       >
 //         {viewMode === "deleted" && (
 //           <div className="mb-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-//             Showing deleted auto shop owners ({deletedOwners.length}) — select one and use Restore
+//             Showing deleted auto shop owners ({deletedOwners.length}) — select rows and use Restore
 //           </div>
 //         )}
 
@@ -1174,7 +1174,7 @@
 //               </>
 //             )}
 //             {viewMode === "deleted" && (
-//               <button type="button" disabled={selCount === 0} onClick={() => reviveOwner(selected[0])} className={toolbarBtnClass(selCount === 0)}>
+//               <button type="button" disabled={selCount === 0} onClick={() => reviveOwners(selected)} className={toolbarBtnClass(selCount === 0)}>
 //                 Restore
 //               </button>
 //             )}
@@ -1313,7 +1313,7 @@
 //                             {/* <button
 //                               type="button"
 //                               disabled={busy}
-//                               onClick={() => deleteOwner(owner._id)}
+//                               onClick={() => deleteOwners([owner._id])}
 //                               className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 disabled:opacity-60"
 //                             >
 //                               {busy ? "…" : "Delete"}
@@ -1326,7 +1326,7 @@
 //                           <button
 //                             type="button"
 //                             disabled={busy}
-//                             onClick={() => reviveOwner(owner._id)}
+//                             onClick={() => reviveOwners([owner._id])}
 //                             className="rounded bg-ad-green px-2 py-0.5 text-xs font-semibold text-white disabled:opacity-60"
 //                           >
 //                             {busy ? "…" : "Restore"}
@@ -2377,33 +2377,44 @@ async function loginAsOwner(userId: string) {
     finally { setActionBusy(prev => ({ ...prev, [ownerId]: false })); }
   }
 
-  async function deleteOwner(ownerId: string) {
-    if (!window.confirm("Delete this auto shop owner? They can be restore later.")) return;
-    setActionBusy(prev => ({ ...prev, [ownerId]: true }));
-    try {
-      await axios.delete(`${API()}/api/admin/autoshopowners/${ownerId}`, { headers: getToken() });
-      setAllOwners(prev => prev.map(o => o._id === ownerId ? { ...o, status: "deleted", isDisabled: true } : o));
-      setSelectedRows(prev => { const c = new Set(prev); c.delete(ownerId); return c; });
-      await fetchOwners();
-      adminNotify.success("Auto shop owner deleted.");
-    } catch (e: any) {
-      const msg = e?.response?.data?.message || "Error deleting.";
-      adminNotify.error(msg);
-    }
-    finally { setActionBusy(prev => ({ ...prev, [ownerId]: false })); }
+  function setOwnersBusy(ownerIds: string[], busy: boolean) {
+    setActionBusy(prev => {
+      const next = { ...prev };
+      for (const id of ownerIds) next[id] = busy;
+      return next;
+    });
   }
 
-  async function reviveOwner(ownerId: string) {
-    setActionBusy(prev => ({ ...prev, [ownerId]: true }));
-    try {
-      await axios.put(`${API()}/api/admin/autoshopowners/${ownerId}/revive`, {}, { headers: getToken() });
-      await fetchOwners();
-      adminNotify.success("Auto shop owner restored.");
-    } catch (e: any) {
-      const msg = e?.response?.data?.message || "Error restoring.";
-      adminNotify.error(msg);
-    }
-    finally { setActionBusy(prev => ({ ...prev, [ownerId]: false })); }
+  async function deleteOwners(ownerIds: string[]) {
+    if (ownerIds.length === 0) return;
+    const what = ownerIds.length === 1 ? "this auto shop owner" : `${ownerIds.length} selected auto shop owners`;
+    if (!window.confirm(`Delete ${what}? They can be restored later.`)) return;
+    setOwnersBusy(ownerIds, true);
+    const results = await Promise.allSettled(
+      ownerIds.map(id => axios.delete(`${API()}/api/admin/autoshopowners/${id}`, { headers: getToken() })),
+    );
+    const deleted = new Set(ownerIds.filter((_, i) => results[i].status === "fulfilled"));
+    setAllOwners(prev => prev.map(o => deleted.has(o._id) ? { ...o, status: "deleted", isDisabled: true } : o));
+    setSelectedRows(new Set());
+    await fetchOwners();
+    setOwnersBusy(ownerIds, false);
+    const failed = ownerIds.length - deleted.size;
+    if (failed === 0) adminNotify.success(ownerIds.length === 1 ? "Auto shop owner deleted." : `${ownerIds.length} auto shop owners deleted.`);
+    else adminNotify.error(`${failed} of ${ownerIds.length} could not be deleted.`);
+  }
+
+  async function reviveOwners(ownerIds: string[]) {
+    if (ownerIds.length === 0) return;
+    setOwnersBusy(ownerIds, true);
+    const results = await Promise.allSettled(
+      ownerIds.map(id => axios.put(`${API()}/api/admin/autoshopowners/${id}/revive`, {}, { headers: getToken() })),
+    );
+    setSelectedRows(new Set());
+    await fetchOwners();
+    setOwnersBusy(ownerIds, false);
+    const failed = results.filter(r => r.status === "rejected").length;
+    if (failed === 0) adminNotify.success(ownerIds.length === 1 ? "Auto shop owner restored." : `${ownerIds.length} auto shop owners restored.`);
+    else adminNotify.error(`${failed} of ${ownerIds.length} could not be restored.`);
   }
 
   function renderCell(owner: AutoShopOwnerType, key: string) {
@@ -2539,7 +2550,7 @@ async function loginAsOwner(userId: string) {
       >
         {viewMode === "deleted" && (
           <div className="mb-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-            Showing deleted auto shop owners ({deletedOwners.length}) — select one and use Restore
+            Showing deleted auto shop owners ({deletedOwners.length}) — select rows and use Restore
           </div>
         )}
 
@@ -2571,7 +2582,7 @@ async function loginAsOwner(userId: string) {
                 <button type="button" disabled={selCount === 0} onClick={() => exportCsv(allOwners.filter(o => selectedRows.has(o._id)), visibleCols)} className={toolbarBtnClass(selCount === 0)}>
                   Export
                 </button>
-                <button type="button" disabled={selCount === 0} onClick={() => deleteOwner(selected[0])} className={toolbarBtnClass(selCount === 0)}>
+                <button type="button" disabled={selCount === 0} onClick={() => deleteOwners(selected)} className={toolbarBtnClass(selCount === 0)}>
                   Delete
                 </button>
                 <button
@@ -2592,7 +2603,7 @@ async function loginAsOwner(userId: string) {
               </>
             )}
             {viewMode === "deleted" && (
-              <button type="button" disabled={selCount === 0} onClick={() => reviveOwner(selected[0])} className={toolbarBtnClass(selCount === 0)}>
+              <button type="button" disabled={selCount === 0} onClick={() => reviveOwners(selected)} className={toolbarBtnClass(selCount === 0)}>
                 Restore
               </button>
             )}
@@ -2731,7 +2742,7 @@ async function loginAsOwner(userId: string) {
                             {/* <button
                               type="button"
                               disabled={busy}
-                              onClick={() => deleteOwner(owner._id)}
+                              onClick={() => deleteOwners([owner._id])}
                               className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 disabled:opacity-60"
                             >
                               {busy ? "…" : "Delete"}
@@ -2744,7 +2755,7 @@ async function loginAsOwner(userId: string) {
                           <button
                             type="button"
                             disabled={busy}
-                            onClick={() => reviveOwner(owner._id)}
+                            onClick={() => reviveOwners([owner._id])}
                             className="rounded bg-ad-green px-2 py-0.5 text-xs font-semibold text-white disabled:opacity-60"
                           >
                             {busy ? "…" : "Restore"}

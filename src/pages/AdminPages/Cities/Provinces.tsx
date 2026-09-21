@@ -20,6 +20,7 @@ import AdminSearchCard, {
 } from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
+import { countLabel, runBulk } from "../../../utils/adminBulk";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { provinceSchema, type ProvinceSchemaInput, type ProvinceSchemaValues } from "../../../lib/validation/schemas/catalog";
 import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../../lib/validation/formUi";
@@ -290,52 +291,46 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
     (errs) => toastValidationSummary(adminNotify.error, errs as never),
   );
 
-  const handleDelete = async (province: Province) => {
-    if (!window.confirm(`Delete province "${province.name}"? All cities will also be deleted.`)) return;
+  const deleteProvinces = async (list: Province[]) => {
+    if (list.length === 0) return;
+    const what = list.length === 1 ? `province "${list[0].name}"` : countLabel(list.length, "province");
+    if (!window.confirm(`Delete ${what}? All cities will also be deleted.`)) return;
     setActionLoading(true);
     setError("");
     setSuccessMsg("");
-    try {
-      await axios.delete(
-        `${API_BASE}/admin/provinces/${province._id}`,
-        getAdminAuthConfig()
-      );
-      stashDeleted(province);
-      adminNotify.success("Province deleted successfully.");
-      setSuccessMsg("Province deleted successfully.");
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(province._id);
-        return next;
-      });
-      fetchProvinces();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to delete province";
-      setError(msg);
-      adminNotify.error(msg);
-    } finally {
-      setActionLoading(false);
+    const { succeeded, failed, firstError } = await runBulk(list, (province) =>
+      axios.delete(`${API_BASE}/admin/provinces/${province._id}`, getAdminAuthConfig())
+    );
+    if (succeeded.length > 0) {
+      stashDeleted(succeeded);
+      const msg = `${countLabel(succeeded.length, "Province")} deleted successfully.`;
+      adminNotify.success(msg);
+      setSuccessMsg(msg);
     }
+    if (failed.length > 0) {
+      const msg = firstError || "Failed to delete province";
+      setError(msg);
+      adminNotify.error(list.length === 1 ? msg : `${failed.length} of ${list.length} could not be deleted: ${msg}`);
+    }
+    setSelected(new Set());
+    fetchProvinces();
+    setActionLoading(false);
   };
 
   const handleToolbarDelete = () => {
-    if (selected.size !== 1) return;
-    const id = [...selected][0];
-    const province = provinces.find((p) => p._id === id);
-    if (province) handleDelete(province);
+    deleteProvinces(provinces.filter((p) => selected.has(p._id)));
   };
 
   const handleRestore = async () => {
-    if (selected.size !== 1) return;
-    const province = deletedStash.find((p) => p._id === [...selected][0]);
-    if (!province) return;
-    if (!window.confirm(`Restore province "${province.name}"?`)) return;
+    const list = deletedStash.filter((p) => selected.has(p._id));
+    if (list.length === 0) return;
+    const what = list.length === 1 ? `province "${list[0].name}"` : countLabel(list.length, "province");
+    if (!window.confirm(`Restore ${what}?`)) return;
     setActionLoading(true);
     setError("");
     setSuccessMsg("");
-    try {
-      await axios.post(
+    const { succeeded, failed, firstError } = await runBulk(list, (province) =>
+      axios.post(
         `${API_BASE}/admin/provinces`,
         {
           name: province.name,
@@ -344,20 +339,23 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
           status: province.status || "Active",
         },
         getAdminAuthConfig()
-      );
-      restoreStashed((item) => item._id === province._id);
-      adminNotify.success("Province restored.");
-      setSuccessMsg("Province restored.");
-      setSelected(new Set());
-      fetchProvinces();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const msg = axErr?.response?.data?.message || axErr?.message || "Failed to restore province";
-      setError(msg);
-      adminNotify.error(msg);
-    } finally {
-      setActionLoading(false);
+      )
+    );
+    const restoredIds = new Set(succeeded.map((p) => p._id));
+    if (succeeded.length > 0) {
+      restoreStashed((item) => restoredIds.has(item._id));
+      const msg = `${countLabel(succeeded.length, "Province")} restored.`;
+      adminNotify.success(msg);
+      setSuccessMsg(msg);
     }
+    if (failed.length > 0) {
+      const msg = firstError || "Failed to restore province";
+      setError(msg);
+      adminNotify.error(list.length === 1 ? msg : `${failed.length} of ${list.length} could not be restored: ${msg}`);
+    }
+    setSelected(new Set());
+    fetchProvinces();
+    setActionLoading(false);
   };
 
   const handleToolbarPrint = () => {

@@ -20,6 +20,7 @@ import AdminSearchCard, {
   type AdminSearchField,
 } from "../../../components/admin/AdminSearchCard";
 import { adminNotify } from "../../../utils/adminNotify";
+import { countLabel, runBulk } from "../../../utils/adminBulk";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { citySchema, type CitySchemaInput, type CitySchemaValues } from "../../../lib/validation/schemas/catalog";
 import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../../lib/validation/formUi";
@@ -199,7 +200,6 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
 
   const selectedProvince = provinces.find((p) => p._id === selectedProvinceId);
 
-  const findCityById = (id: string) => allCities.find((c) => getCityRowId(c) === id);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -302,72 +302,67 @@ export default function Cities({ initialShowForm = false }: CitiesPageProps) {
     (errs) => toastValidationSummary(adminNotify.error, errs as never),
   );
 
-  const handleDelete = async (city: CityRow) => {
-    if (!window.confirm(`Delete city "${city.name}"?`)) return;
+  const deleteCities = async (list: CityRow[]) => {
+    if (list.length === 0) return;
+    const what = list.length === 1 ? `city "${list[0].name}"` : countLabel(list.length, "city");
+    if (!window.confirm(`Delete ${what}?`)) return;
     setActionLoading(true);
     setError("");
     setSuccessMsg("");
-    try {
-      await axios.delete(
+    const { succeeded, failed, firstError } = await runBulk(list, (city) =>
+      axios.delete(
         `${API_BASE}/admin/provinces/${city.provinceId}/cities/${encodeURIComponent(city.name)}`,
         getAdminAuthHeader()
-      );
-      stashDeleted(city);
-      adminNotify.success("City deleted successfully.");
-      setSuccessMsg("City deleted successfully.");
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(getCityRowId(city));
-        return next;
-      });
-      fetchProvinces();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to delete city";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-    } finally {
-      setActionLoading(false);
+      ));
+    if (succeeded.length > 0) {
+      stashDeleted(succeeded);
+      const msg = `${countLabel(succeeded.length, "City")} deleted successfully.`;
+      adminNotify.success(msg);
+      setSuccessMsg(msg);
     }
+    if (failed.length > 0) {
+      const msg = firstError || "Failed to delete city";
+      setError(msg);
+      adminNotify.error(list.length === 1 ? msg : `${failed.length} of ${list.length} could not be deleted: ${msg}`);
+    }
+    setSelected(new Set());
+    fetchProvinces();
+    setActionLoading(false);
   };
 
   const handleToolbarDelete = () => {
-    if (selected.size !== 1) return;
-    const city = findCityById([...selected][0]);
-    if (city) handleDelete(city);
+    deleteCities(allCities.filter((row) => selected.has(getCityRowId(row))));
   };
 
   const handleRestore = async () => {
-    if (selected.size !== 1) return;
-    const id = [...selected][0];
-    const city = deletedStash.find((c) => getCityRowId(c) === id);
-    if (!city) return;
-    if (!window.confirm(`Restore city "${city.name}"?`)) return;
+    const list = deletedStash.filter((row) => selected.has(getCityRowId(row)));
+    if (list.length === 0) return;
+    const what = list.length === 1 ? `city "${list[0].name}"` : countLabel(list.length, "city");
+    if (!window.confirm(`Restore ${what}?`)) return;
     setActionLoading(true);
     setError("");
     setSuccessMsg("");
-    try {
-      await axios.post(
+    const { succeeded, failed, firstError } = await runBulk(list, (city) =>
+      axios.post(
         `${API_BASE}/admin/provinces/${city.provinceId}/cities`,
-        {
-          name: city.name,
-          status: city.status || "Active",
-        },
+        { name: city.name, status: city.status || "Active" },
         getAdminAuthHeader()
-      );
-      restoreStashed((item) => getCityRowId(item) === id);
-      adminNotify.success("City restored.");
-      setSuccessMsg("City restored.");
-      setSelected(new Set());
-      fetchProvinces();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to restore city";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-    } finally {
-      setActionLoading(false);
+      ));
+    const restoredIds = new Set(succeeded.map((row) => getCityRowId(row)));
+    if (succeeded.length > 0) {
+      restoreStashed((item) => restoredIds.has(getCityRowId(item)));
+      const msg = `${countLabel(succeeded.length, "City")} restored.`;
+      adminNotify.success(msg);
+      setSuccessMsg(msg);
     }
+    if (failed.length > 0) {
+      const msg = firstError || "Failed to restore city";
+      setError(msg);
+      adminNotify.error(list.length === 1 ? msg : `${failed.length} of ${list.length} could not be restored: ${msg}`);
+    }
+    setSelected(new Set());
+    fetchProvinces();
+    setActionLoading(false);
   };
 
   const handleToolbarPrint = () => {

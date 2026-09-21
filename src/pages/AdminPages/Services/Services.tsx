@@ -20,6 +20,7 @@ import AdminSearchCard, {
   type AdminSearchField,
 } from "../../../components/admin/AdminSearchCard";
 import { adminNotify } from "../../../utils/adminNotify";
+import { countLabel, runBulk } from "../../../utils/adminBulk";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { serviceSchema, type ServiceSchemaInput, type ServiceSchemaValues } from "../../../lib/validation/schemas/catalog";
 import { FormFieldError, fieldErrorClass, toastValidationSummary } from "../../../lib/validation/formUi";
@@ -304,51 +305,45 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
     (errs) => toastValidationSummary(adminNotify.error, errs as never),
   );
 
-  const handleDelete = async (service: Service) => {
-    if (!window.confirm(`Delete service "${service.name}"?`)) return;
+  const deleteServices = async (list: Service[]) => {
+    if (list.length === 0) return;
+    const what = list.length === 1 ? `service "${list[0].name}"` : countLabel(list.length, "service");
+    if (!window.confirm(`Delete ${what}?`)) return;
     setActionLoading(true);
     setError("");
     setSuccessMsg("");
-    try {
-      await axios.delete(
-        `${API_BASE}/admin/services/${service._id}`,
-        getAdminAuthConfig()
-      );
-      stashDeleted(service);
-      adminNotify.success("Service deleted successfully.");
-      setSuccessMsg("Service deleted successfully.");
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(service._id);
-        return next;
-      });
-      fetchServices();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to delete service";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-    } finally {
-      setActionLoading(false);
+    const { succeeded, failed, firstError } = await runBulk(list, (service) =>
+      axios.delete(`${API_BASE}/admin/services/${service._id}`, getAdminAuthConfig()));
+    if (succeeded.length > 0) {
+      stashDeleted(succeeded);
+      const msg = `${countLabel(succeeded.length, "Service")} deleted successfully.`;
+      adminNotify.success(msg);
+      setSuccessMsg(msg);
     }
+    if (failed.length > 0) {
+      const msg = firstError || "Failed to delete service";
+      setError(msg);
+      adminNotify.error(list.length === 1 ? msg : `${failed.length} of ${list.length} could not be deleted: ${msg}`);
+    }
+    setSelected(new Set());
+    fetchServices();
+    setActionLoading(false);
   };
 
   const handleToolbarDelete = () => {
-    if (selected.size !== 1) return;
-    const service = services.find((s) => s._id === [...selected][0]);
-    if (service) handleDelete(service);
+    deleteServices(services.filter((row) => selected.has(row._id)));
   };
 
   const handleRestore = async () => {
-    if (selected.size !== 1) return;
-    const service = deletedStash.find((s) => s._id === [...selected][0]);
-    if (!service) return;
-    if (!window.confirm(`Restore service "${service.name}"?`)) return;
+    const list = deletedStash.filter((row) => selected.has(row._id));
+    if (list.length === 0) return;
+    const what = list.length === 1 ? `service "${list[0].name}"` : countLabel(list.length, "service");
+    if (!window.confirm(`Restore ${what}?`)) return;
     setActionLoading(true);
     setError("");
     setSuccessMsg("");
-    try {
-      await axios.post(
+    const { succeeded, failed, firstError } = await runBulk(list, (service) =>
+      axios.post(
         `${API_BASE}/admin/services`,
         {
           name: service.name,
@@ -357,20 +352,22 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
           odoOutRequired: Boolean(service.odoOutRequired),
         },
         getAdminAuthConfig()
-      );
-      restoreStashed((item) => item._id === service._id);
-      adminNotify.success("Service restored.");
-      setSuccessMsg("Service restored.");
-      setSelected(new Set());
-      fetchServices();
-    } catch (err) {
-      const axErr = err as AxiosError<{ message?: string }>;
-      const __adminMsg = axErr?.response?.data?.message || axErr?.message || "Failed to restore service";
-      setError(__adminMsg);
-      adminNotify.error(__adminMsg);
-    } finally {
-      setActionLoading(false);
+      ));
+    const restoredIds = new Set(succeeded.map((row) => row._id));
+    if (succeeded.length > 0) {
+      restoreStashed((item) => restoredIds.has(item._id));
+      const msg = `${countLabel(succeeded.length, "Service")} restored.`;
+      adminNotify.success(msg);
+      setSuccessMsg(msg);
     }
+    if (failed.length > 0) {
+      const msg = firstError || "Failed to restore service";
+      setError(msg);
+      adminNotify.error(list.length === 1 ? msg : `${failed.length} of ${list.length} could not be restored: ${msg}`);
+    }
+    setSelected(new Set());
+    fetchServices();
+    setActionLoading(false);
   };
 
   const handleToolbarPrint = () => {

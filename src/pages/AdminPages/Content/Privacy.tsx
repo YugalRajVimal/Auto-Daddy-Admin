@@ -21,6 +21,7 @@ import AdminSearchCard, {
 } from "../../../components/admin/AdminSearchCard";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
+import { countLabel, runBulk } from "../../../utils/adminBulk";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { FormFieldError, toastValidationSummary } from "../../../lib/validation/formUi";
 import { privacySchema, type PrivacyValues } from "../../../lib/validation/schemas/cms";
@@ -363,26 +364,31 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
   };
 
   const handleRestore = async () => {
-    if (selected.size !== 1) return;
-    const id = [...selected][0];
-    const row = deletedStash.find((e) => e.id === id);
-    if (!row) return;
-    if (!window.confirm(`Restore "${row.type}" entry for ${row.date}?`)) return;
-    try {
-      const backendType = row.type.split(" - ")[0].toLowerCase();
-      await createEntry({
+    const list = deletedStash.filter((e) => selected.has(e.id));
+    if (list.length === 0) return;
+    const what = list.length === 1 ? `"${list[0].type}" entry for ${list[0].date}` : countLabel(list.length, "entry", "entries");
+    if (!window.confirm(`Restore ${what}?`)) return;
+    const { succeeded, failed, firstError } = await runBulk(list, (row) =>
+      createEntry({
         date: row.date || new Date().toISOString().slice(0, 10),
         country: row.country,
-        type: backendType,
+        type: row.type.split(" - ")[0].toLowerCase(),
         description: row.description,
-      });
-      restoreStashed((item) => item.id === id);
-      setSelected(new Set());
-      setRefresh((c) => c + 1);
-      adminNotify.success("Entry restored successfully.");
-    } catch (e: any) {
-      adminNotify.error(e.message || "Restore failed");
+      })
+    );
+    const restoredIds = new Set(succeeded.map((row) => row.id));
+    if (succeeded.length > 0) {
+      restoreStashed((item) => restoredIds.has(item.id));
+      adminNotify.success(
+        succeeded.length === 1 ? "Entry restored successfully." : `${succeeded.length} entries restored successfully.`
+      );
     }
+    if (failed.length > 0) {
+      const msg = firstError || "Restore failed";
+      adminNotify.error(list.length === 1 ? msg : `${failed.length} of ${list.length} could not be restored: ${msg}`);
+    }
+    setSelected(new Set());
+    setRefresh((c) => c + 1);
   };
 
   const handleToolbarPrint = () => {

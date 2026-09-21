@@ -511,17 +511,17 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
     fetchNotes();
   };
 
-  // For restore: unchanged, as bulk restore is not mentioned in prompt.
   const handleRestore = () => {
-    if (selected.size !== 1) return;
-    const key = [...selected][0];
-    const row = deletedStash.find((n) => getRowKey(n) === key);
-    if (!row) return;
-    if (!window.confirm(`Restore thought for "${row.date}"?`)) return;
-    restoreStashed((item) => getRowKey(item) === key);
-    setNotes((prev) => sortNotes([...prev, row]));
+    const rows = deletedStash.filter((n) => selected.has(getRowKey(n)));
+    if (rows.length === 0) return;
+    const message =
+      rows.length === 1 ? `Restore thought for "${rows[0].date}"?` : `Restore ${rows.length} thoughts?`;
+    if (!window.confirm(message)) return;
+    const keys = new Set(rows.map(getRowKey));
+    restoreStashed((item) => keys.has(getRowKey(item)));
+    setNotes((prev) => sortNotes([...prev, ...rows]));
     setSelected(new Set());
-    adminNotify.success("Thought restored successfully.");
+    adminNotify.success(rows.length === 1 ? "Thought restored successfully." : `${rows.length} thoughts restored successfully.`);
   };
 
   const handleToolbarPrint = () => {
