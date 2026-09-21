@@ -252,7 +252,14 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     }
   };
 
-  const allRows: SubServiceRow[] = services.flatMap((svc) =>
+  // Sort a list of SubServiceRows alphabetically by name (case-insensitive)
+  const sortRowsByName = (rows: SubServiceRow[]) =>
+    [...rows].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+
+  // This gets all rows, flattens from all services, but does NOT sort yet.
+  const allRowsRaw: SubServiceRow[] = services.flatMap((svc) =>
     (svc.subServices || []).map((sub) => {
       const mapped = mapApiSubService(sub as Record<string, unknown>);
       return {
@@ -264,7 +271,13 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     })
   );
 
-  const displayRows = isDeletedView ? deletedStash : allRows;
+  // Sort allRows alphabetically by name
+  const allRows = sortRowsByName(allRowsRaw);
+
+  // For deleted view, also ensure alphabetical order
+  const sortedDeletedStash = sortRowsByName(deletedStash);
+
+  const displayRows = isDeletedView ? sortedDeletedStash : allRows;
 
   // Apply top-level filterServiceId if not "all"
   const filteredRows = filterServiceId === "all"
@@ -449,7 +462,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
   };
 
   const findRowById = (id: string) =>
-    (isDeletedView ? deletedStash : allRows).find((r) => getRowId(r) === id);
+    (isDeletedView ? sortedDeletedStash : allRows).find((r) => getRowId(r) === id);
 
   const handleToolbarDelete = () => {
     if (selected.size !== 1) return;
@@ -459,7 +472,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
 
   const handleRestore = async () => {
     if (selected.size !== 1) return;
-    const row = deletedStash.find((r) => getRowId(r) === [...selected][0]);
+    const row = sortedDeletedStash.find((r) => getRowId(r) === [...selected][0]);
     if (!row) return;
     if (!window.confirm(`Restore sub service "${row.name}"?`)) return;
     setActionLoading(true);
@@ -710,7 +723,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -718,32 +731,32 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Service</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Shop Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Created By</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" style={{ width: "14%" }}>Shopkeeper Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium" style={{ width: "14%" }}>Phone</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Name</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Service</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Type</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Created By</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "14%" }}>Shopkeeper Name</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "14%" }}>Phone</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={8} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={8} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={8} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted sub services found." : "No sub services found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={getRowId(row)} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(getRowId(row))}
@@ -751,7 +764,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => openEdit(row)}
@@ -760,18 +773,18 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                       {row.name}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center text-xs font-medium uppercase tracking-wide">
+                  <td className="border border-gray-300 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide">
                     {row.categoryName}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{shopTypeLabel(row.shopType)}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center capitalize">{row.status || "active"}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center capitalize">
+                  <td className="border border-gray-300 px-3 py-2 text-left">{shopTypeLabel(row.shopType)}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left capitalize">{row.status || "active"}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left capitalize">
                     {createdByLabel(row.createdBy)}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center" style={{ width: "14%" }}>
+                  <td className="border border-gray-300 px-3 py-2 text-left" style={{ width: "14%" }}>
                     {row.shopkeeperName || "—"}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center" style={{ width: "14%" }}>{row.phone || "—"}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left" style={{ width: "14%" }}>{row.phone || "—"}</td>
                 </tr>
               ))
             )}

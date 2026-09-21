@@ -6,7 +6,7 @@ import {
 } from "../api/autoshopownerHttp";
 import type { ApiEnvelope } from "./autoshopownerApi";
 
-export type AutoshopDealType = "Service" | "Parts" | "Salvages";
+export type AutoshopDealType = "Service" | "Parts" ;
 
 export type AutoshopDealFormFields = {
   dealType?: AutoshopDealType;
@@ -25,6 +25,7 @@ export type AutoshopDealFormFields = {
   vehicleName?: string;
   vehicleModel?: string;
   vehicleYear?: string;
+  newOld?: "new" | "old"; // Indicates whether the part is new or old. Default: "new"
   dealEnabled?: string;
   soldToCustomerId?: string;
   soldToCustomerName?: string;
@@ -84,12 +85,14 @@ function appendPartsDealFields(fd: FormData, fields: AutoshopDealFormFields) {
   appendText(fd, "vehicleYear", fields.vehicleYear);
   appendText(fd, "originalPrice", fields.originalPrice);
   appendText(fd, "discountedPrice", fields.discountedPrice);
+  // Add newOld field for "Parts" deal, defaulting to "new" if not specified
+  appendText(fd, "newOld", fields.newOld ?? "new");
 }
 
 /**
  * Create payload:
  * - Service: productName, discountedPrice, offerEndsOnDate, dealImage×N
- * - Parts: partName, vehicle*, description, originalPrice, discountedPrice, offerEndsOnDate, dealImage×N
+ * - Parts: partName, vehicle*, description, originalPrice, discountedPrice, offerEndsOnDate, dealImage×N, newOld
  */
 function buildCreateAutoshopDealFormData(fields: AutoshopDealFormFields) {
   const fd = new FormData();
@@ -114,7 +117,7 @@ function buildCreateAutoshopDealFormData(fields: AutoshopDealFormFields) {
 /**
  * Edit payload (field names differ from create):
  * - Service: subServiceName, discountPercentage, offerEndOn, optional dealImage×N
- * - Parts: same body fields as create, but offerEndOn instead of offerEndsOnDate
+ * - Parts: same body fields as create, but offerEndOn instead of offerEndsOnDate, and newOld field
  * - Omit dealImage entirely when not replacing images
  */
 function buildEditAutoshopDealFormData(fields: AutoshopDealFormFields) {
@@ -138,6 +141,7 @@ function buildEditAutoshopDealFormData(fields: AutoshopDealFormFields) {
 }
 
 export function fetchAutoshopMyDeals(token: string) {
+  console.log("Fetching my deals with token:", getJsonAutoshopowner<unknown>(`${BASE}/my-deals`, token));
   return getJsonAutoshopowner<unknown>(`${BASE}/my-deals`, token);
 }
 

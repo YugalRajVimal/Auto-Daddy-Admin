@@ -1607,7 +1607,7 @@ const CarOwners: React.FC = () => {
           <table className="w-full border-collapse text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-ad-purple text-white">
-                <th className="border border-ad-purple-dark px-2 py-2 text-center">
+                <th className="border border-ad-purple-dark px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={allPageSel}
@@ -1622,33 +1622,33 @@ const CarOwners: React.FC = () => {
                   />
                 </th>
                 {ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => (
-                  <th key={c.key} className={thClass}>{c.label}</th>
+                  <th key={c.key} className={thClass + " text-left"}>{c.label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
                     Loading car owners…
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
                     Unable to load car owners.
                   </td>
                 </tr>
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
                     {showDeleted ? "No deleted car owners found." : "No car owners found."}
                   </td>
                 </tr>
               ) : (
                 paginated.map((owner, idx) => (
                   <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                    <td className="border border-gray-300 px-2 py-2 text-center">
+                    <td className="border border-gray-300 px-2 py-2 text-left">
                       <input
                         type="checkbox"
                         checked={selectedRows.has(owner._id)}
@@ -1656,7 +1656,17 @@ const CarOwners: React.FC = () => {
                         className="accent-ad-purple"
                       />
                     </td>
-                    {ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => renderCell(owner, c.key))}
+                    {ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) =>
+                      // renderCell is assumed to return a <td>, so we should ensure alignment for all cells
+                      // We assume that renderCell accepts a className with alignment if possible; otherwise, ensure all user <td> defaults are left-aligned.
+                      React.cloneElement(
+                        renderCell(owner, c.key),
+                        {
+                          ...(renderCell(owner, c.key)?.props || {}),
+                          className: ((renderCell(owner, c.key)?.props?.className || "") + " text-left").trim()
+                        }
+                      )
+                    )}
                   </tr>
                 ))
               )}

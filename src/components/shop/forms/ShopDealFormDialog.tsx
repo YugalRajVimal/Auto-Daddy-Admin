@@ -124,6 +124,8 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
   const [vehicleCatalog, setVehicleCatalog] = useState<VehicleCatalogEntry[]>([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // New/Old state for part deals
+  const [newOld, setNewOld] = useState<"new" | "old">("new");
 
   const serviceOptions = useMemo(() => {
     const out: Array<{ value: string; serviceId: string; label: string; subName: string }> = [];
@@ -166,6 +168,12 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
     setOfferEnd(deal?.offersEndOnDate?.slice(0, 10) || defaultOfferEndDate());
     setAttachDealImage(mode === "parts" && Boolean(deal?.dealImage ?? deal?.productImage ?? deal?.dealImages?.length));
     setDealImages([]);
+    // Set newOld only for parts mode
+    if (mode === "parts" && deal?.newOld) {
+      setNewOld(deal.newOld === "old" ? "old" : "new");
+    } else {
+      setNewOld("new");
+    }
     if (mode === "service" && deal) {
       if (deal.discountPercentage != null) {
         setDiscountedPrice(String(deal.discountPercentage));
@@ -248,11 +256,11 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
   const resolveDealType = (): AutoshopDealType => {
     if (deal) {
       const t = (deal.dealType ?? "").toLowerCase();
-      if (t.includes("salvage")) return "Salvages";
+      // if (t.includes("salvage")) return "Salvages";
       if (t.includes("part") || deal.partName) return "Parts";
       return "Service";
     }
-    if (section === "salvage") return "Salvages";
+    // if (section === "salvage") return "Salvages";
     return mode === "parts" ? "Parts" : "Service";
   };
 
@@ -260,7 +268,7 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
     if (!token) return;
 
     const dealType = resolveDealType();
-    const imageRequired = dealType === "Salvages";
+    // const imageRequired = dealType === "Salvages";
     const fieldErrors: Record<string, string> = {};
 
     if (mode === "service") {
@@ -285,6 +293,8 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
         originalPrice: price.trim() || discountedPrice.trim(),
         discountedPrice,
         offerEndsOn: offerEnd,
+        // newOld isn't validated by schema yet, add if present and valid 
+        newOld,
       });
       if (!result.success) {
         for (const issue of result.error.issues) {
@@ -324,6 +334,7 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
       // Service deals have no images. Parts: omit dealImage on edit when unchecked / empty.
       dealImages: mode === "parts" && attachDealImage ? dealImages.slice(0, 2) : [],
     };
+
     if (mode === "parts") {
       fields.partName = partName.trim();
       fields.vehicleId = vehicleId;
@@ -331,6 +342,8 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
       fields.vehicleModel = vehicleModel;
       fields.vehicleYear = vehicleYear;
       fields.originalPrice = price.trim() || discountedPrice.trim();
+      // Add newOld to the sent fields (default to "new" if blank)
+      fields.newOld = newOld || "new";
     } else {
       if (!serviceId || !selectedServiceOption) {
         setErrors({ subservice: "Select a subservice." });
@@ -512,6 +525,18 @@ export default function ShopDealFormDialog({ mode, section = "service", deal, on
               disabled={saving}
             />
             <FormFieldError message={errors.discountedPrice} />
+          </CompactField>
+          {/* New/Old field for part deals */}
+          <CompactField label="Part Condition" className={dealFormCol1Class}>
+            <select
+              className={shopCompactInputClass}
+              value={newOld}
+              onChange={(e) => setNewOld((e.target.value === "old" ? "old" : "new"))}
+              disabled={saving}
+            >
+              <option value="new">New</option>
+              <option value="old">Old</option>
+            </select>
           </CompactField>
         </CompactFormRow>
       )}

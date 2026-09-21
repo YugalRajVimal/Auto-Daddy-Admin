@@ -641,7 +641,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -649,24 +649,24 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Page</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Question</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Answer</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Page</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Question</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Answer</th>
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted FAQs found." : "No FAQs found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
@@ -674,7 +674,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => !isDeletedView && openEdit(row)}
@@ -683,10 +683,10 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                       {USER_OPTIONS.find((o) => o.apiValue === row.role || o.value === row.role)?.label ?? row.role}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     {PAGE_SLUG_OPTIONS.find(p => p.value === row.pageSlug)?.label ?? row.pageSlug ?? ""}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     {row.date ? new Date(row.date).toISOString().slice(0, 10) : ""}
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[220px]">{row.question}</td>

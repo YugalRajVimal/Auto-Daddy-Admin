@@ -25,6 +25,7 @@ export function useShopDeals(filter: DealFilter = "all") {
     try {
       const res = await fetchAutoshopMyDeals(token);
       if (!res.ok) {
+        
         setError("Could not load deals.");
         setDeals([]);
         return;

@@ -25,7 +25,7 @@ import ShopProfilePage from "../../pages/ShopPages/Profile";
 import ShopPeoplePage from "../../pages/ShopPages/People";
 import ShopServicesPage from "../../pages/ShopPages/Services";
 import ShopJobCardsPage from "../../pages/ShopPages/JobCards";
-import ShopWalletPage from "../../pages/ShopPages/Wallet";
+// import ShopWalletPage from "../../pages/ShopPages/Wallet";
 import ShopMessagesPage from "../../pages/ShopPages/Messages";
 import ShopMyWebsitePage from "../../pages/ShopPages/MyWebsite";
 import ShopReportsPage from "../../pages/ShopPages/Reports";
@@ -37,6 +37,7 @@ import ShopServicesSelectionPage from "../../pages/ShopPages/ServicesSelection";
 import ShopTeamPage from "../../pages/ShopPages/Team";
 import ShopTeamMemberFormPage from "../../pages/ShopPages/TeamMemberFormPage";
 import ShopHelpPage from "../../pages/ShopPages/Help";
+import ShopSoftwareWalletPanel from "../../components/shop/ShopSoftwareWalletPanel";
 
 export const ownerRoutes = (
   <Route element={<OwnerPanelLayout />}>
@@ -89,7 +90,12 @@ export const shopRoutes = (
       <Route path="/shop/job-cards" element={<ShopJobCardsPage />} />
       <Route path="/shop/job-cards/new" element={<ShopJobCardAddPage />} />
       <Route path="/shop/job-cards/:id/edit" element={<ShopJobCardEditPage />} />
-      <Route path="/shop/wallet" element={<ShopWalletPage />} />
+      <Route
+        path="/shop/wallet"
+        element={
+          <ShopSoftwareWalletPanel />
+        }
+      />
       <Route path="/shop/messages" element={<ShopMessagesPage />} />
       <Route path="/shop/my-website" element={<ShopMyWebsitePage />} />
       <Route path="/shop/reports" element={<ShopReportsPage />} />

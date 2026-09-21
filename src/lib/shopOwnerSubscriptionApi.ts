@@ -61,7 +61,6 @@ function asNumber(value: unknown): number | null {
 function asPlanId(value: unknown): SubscriptionPlanId | null {
   const id = asString(value).toLowerCase();
   if (id === "yearly" || id === "year" || id === "annual") return "yearly";
-  if (id === "biweekly" || id === "bi-weekly" || id === "fortnightly") return "biweekly";
   return null;
 }
 
@@ -114,21 +113,11 @@ function normalizePlan(raw: unknown): SubscriptionPlan | null {
   const id = asPlanId(o.planId ?? o.id ?? o.slug ?? o.code ?? o.name);
   if (!id) return null;
 
-  const amount =
-    asNumber(o.amount ?? o.price ?? o.total ?? o.baseAmount) ??
-    (id === "yearly" ? 365 : 15);
-  // Bi-weekly period is always 14 days (API sometimes returns yearly 365 by mistake).
-  const days =
-    id === "biweekly"
-      ? 14
-      : (asNumber(o.days ?? o.durationDays ?? o.periodDays ?? o.validityDays) ?? 365);
-  const hst =
-    asNumber(o.hst ?? o.hstAmount ?? o.tax ?? o.taxAmount) ??
-    (id === "yearly" ? 49 : 2);
+  const amount = asNumber(o.amount ?? o.price ?? o.total ?? o.baseAmount) ?? 365;
+  const days = asNumber(o.days ?? o.durationDays ?? o.periodDays ?? o.validityDays) ?? 365;
+  const hst = asNumber(o.hst ?? o.hstAmount ?? o.tax ?? o.taxAmount) ?? 49;
+  const title = asString(o.title ?? o.name ?? o.label) || `$ ${amount} Yearly plan`;
 
-  const title =
-    asString(o.title ?? o.name ?? o.label) ||
-    (id === "yearly" ? `$ ${amount} Yearly plan` : `$ 15 Bi-weekly plan`);
 
   const featuresRaw = o.features ?? o.benefits ?? o.items;
   const features = Array.isArray(featuresRaw)
@@ -199,15 +188,10 @@ export function parseSubscriptionStatus(payload: unknown): SubscriptionStatus | 
           : isSubscriptionPaymentPaid(paymentStatus) ||
             ["active", "subscribed"].includes(paymentStatus.toLowerCase());
 
+            
   const planLabel =
     asString(data.planLabel ?? data.planName ?? data.currentPlan ?? data.label) ||
-    (planId === "yearly"
-      ? "a day payment for 365 accumulative days"
-      : planId === "biweekly"
-        ? "26 void cheques of CAD 15 (bi-weekly)"
-        : active
-          ? "Active subscription"
-          : "No active plan");
+    (planId === "yearly" ? "Yearly website subscription" : active ? "Active subscription" : "No active plan");
 
   return {
     active,

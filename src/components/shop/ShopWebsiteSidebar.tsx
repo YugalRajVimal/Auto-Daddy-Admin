@@ -1,7 +1,7 @@
 import { ShopSidebarButton } from "./ShopSidebar";
 import { shopSidebarButtonStackClass } from "./shopSidebarStyles";
 
-export type ShopWebsiteSection = "overview" | "domain" | "preview" | "subscription";
+export type ShopWebsiteSection = "overview" | "domain" | "preview" | "subscription" | "wallet";
 
 type ShopWebsiteSidebarProps = {
   activeSection: ShopWebsiteSection;

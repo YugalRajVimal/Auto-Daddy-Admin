@@ -544,7 +544,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -552,28 +552,28 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Description</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Type</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Description</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="text-center py-6">
+                <td colSpan={4} className="text-left py-6">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-center py-6">
+                <td colSpan={4} className="text-left py-6">
                   {isDeletedView ? "No deleted entries found." : "No entries found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
@@ -581,7 +581,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => openEdit(row)}
@@ -591,7 +591,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                  
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.type}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.type}</td>
                   <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[280px]">{row.description}</td>
                 </tr>
               ))

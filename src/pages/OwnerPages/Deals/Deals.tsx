@@ -23,7 +23,7 @@ const CATEGORY_BY_PATH: Record<string, DealCategory> = {
   "/owner/deals": "parts",
   "/owner/deals/spare-parts": "parts",
   "/owner/deals/service": "service",
-  "/owner/deals/salvage": "salvage",
+  // "/owner/deals/salvage": "salvage",
   "/owner/deals/completed": "completed",
 };
 
@@ -31,7 +31,7 @@ const CATEGORY_HEADINGS: Record<DealCategory, string> = {
   service: "Service Deals",
   tire: "Tires and Alloy wheels",
   parts: "Spare Parts Deals",
-  salvage: "Salvage Deals",
+  // salvage: "Salvage Deals",
   completed: "Completed Deals",
 };
 
@@ -39,7 +39,7 @@ const CATEGORY_SUBTITLES: Record<DealCategory, string> = {
   service: "Active service offers from nearby shops",
   tire: "Tire and alloy wheel offers for your vehicle",
   parts: "Spare parts and accessory deals matched to you",
-  salvage: "Salvage and recovery offers",
+  // salvage: "Salvage and recovery offers",
   completed: "Offers that have already ended",
 };
 

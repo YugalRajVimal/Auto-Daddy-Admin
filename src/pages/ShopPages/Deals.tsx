@@ -30,19 +30,18 @@ import {
   removeDealSale,
   writeDealSale,
 } from "../../lib/shopDealSales";
-import { dealId, isSalvagesDeal, shopDealDiscountLabel } from "../../lib/shopOwnerParsers";
+import { dealId, shopDealDiscountLabel } from "../../lib/shopOwnerParsers";
 import type { MyCustomer, ShopDeal } from "../../types/shopOwner";
 import { printAdminTable } from "../../utils/adminPrintTable";
 import { formatDisplayDate } from "../AdminPages/Accounts/accountData";
 
-type DealSectionId = "service" | "parts" | "salvage" | "completed";
-type DealBoardSectionId = "service" | "parts" | "salvage";
+type DealSectionId = "service" | "parts" | "completed";
+type DealBoardSectionId = "service" | "parts";
 type DealView = "list" | "detail";
 
 const DEAL_SECTIONS: { id: DealSectionId; label: string }[] = [
   { id: "parts", label: "Spare Part Deals" },
   { id: "service", label: "Service Deals" },
-  { id: "salvage", label: "Salvages" },
   { id: "completed", label: "Completed" },
 ];
 
@@ -115,15 +114,6 @@ function dealVehicleYear(deal: ShopDeal): string {
   return deal.selectedVehicle?.year?.trim() || "—";
 }
 
-function isSalvageDeal(deal: ShopDeal): boolean {
-  if (isSalvagesDeal(deal)) return true;
-  const haystack = [deal.productName, deal.partName, deal.description, deal.dealType, deal.service?.name]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return /\bsalvage/i.test(haystack);
-}
-
 function customerRecordId(customer: MyCustomer): string {
   return customer.carOwnerId ?? customer.id ?? customer._id ?? "";
 }
@@ -137,18 +127,16 @@ function dealSoldToLabel(deal: ShopDeal): string {
 }
 
 function boardSectionForDeal(deal: ShopDeal, activeId: DealSectionId): DealBoardSectionId {
-  if (activeId === "parts" || activeId === "service" || activeId === "salvage") return activeId;
-  if (isSalvageDeal(deal)) return "salvage";
+  console.log(activeId);
+  // Only "parts" and "service" are supported board sections now
   return dealMode(deal) === "parts" ? "parts" : "service";
 }
 
+// Updated: include newOld field for "parts" deals
 function dealToFormFields(deal: ShopDeal, overrides?: Partial<AutoshopDealFormFields>): AutoshopDealFormFields {
   const mode = dealMode(deal);
-  const dealType: AutoshopDealType = isSalvagesDeal(deal)
-    ? "Salvages"
-    : mode === "parts"
-      ? "Parts"
-      : "Service";
+  const dealType: AutoshopDealType = mode === "parts" ? "Parts" : "Service";
+
   const fields: AutoshopDealFormFields = {
     dealType,
     discountedPrice: deal.discountedPrice != null ? String(deal.discountedPrice) : "",
@@ -159,7 +147,7 @@ function dealToFormFields(deal: ShopDeal, overrides?: Partial<AutoshopDealFormFi
     soldToCustomerName: deal.soldToCustomerName,
     ...overrides,
   };
-  if (mode === "parts" || dealType === "Salvages") {
+  if (mode === "parts") {
     fields.partName = deal.partName ?? deal.productName ?? "";
     fields.vehicleId = deal.vehicleId;
     fields.vehicleName = deal.selectedVehicle?.vehicleName ?? deal.selectedVehicle?.name;
@@ -167,6 +155,11 @@ function dealToFormFields(deal: ShopDeal, overrides?: Partial<AutoshopDealFormFi
     fields.vehicleYear = deal.selectedVehicle?.year;
     fields.originalPrice =
       deal.price != null ? String(deal.price) : fields.discountedPrice;
+    // Add newOld to outgoing fields: default to "new" if not present/invalid
+    fields.newOld =
+      typeof deal.newOld === "string" && (deal.newOld === "new" || deal.newOld === "old")
+        ? deal.newOld
+        : "new";
   } else {
     fields.serviceId = deal.serviceId ?? deal.service?.id;
     fields.productName = deal.subServiceName ?? deal.productName ?? deal.service?.name;
@@ -300,7 +293,6 @@ function DealsListTable({
   const somePageSelected = pageRowIds.some((id) => selectedIds.has(id));
 
   useEffect(() => {
-
     if (selectAllRef.current) {
       selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
     }
@@ -328,6 +320,7 @@ function DealsListTable({
               <>
                 <th className={SHOP_TABLE_HEAD_TH_CLASS}>Vehicle</th>
                 <th className={SHOP_TABLE_HEAD_TH_CLASS}>Year</th>
+                <th className={SHOP_TABLE_HEAD_TH_CLASS}>Part Condition</th>
               </>
             ) : null}
             <th className={SHOP_TABLE_HEAD_TH_CLASS}>{discountHeader}</th>
@@ -342,6 +335,20 @@ function DealsListTable({
             const sold = isDealSold(deal);
             const draftCustomerId = soldDraftIds[id] ?? "";
             const canSell = !sold && Boolean(draftCustomerId) && sellingDealId !== id;
+
+            // Show "Part Condition" correctly using the deal.newOld field, fallback to "new"
+            let partCondition = "new";
+
+            if (dealMode(deal) === "parts") {
+              // Respect both deal.newOld and deal["newOld"], safely
+              if (
+                typeof (deal as any).newOld === "string" &&
+                ((deal as any).newOld === "new" || (deal as any).newOld === "old")
+              ) {
+                partCondition = (deal as any).newOld as "new" | "old";
+              }
+            }
+
             return (
               <tr
                 key={id}
@@ -382,6 +389,11 @@ function DealsListTable({
                       {dealVehicleLabel(deal)}
                     </td>
                     <td className={SHOP_TABLE_BODY_TD_CLASS}>{dealVehicleYear(deal)}</td>
+                    <td className={SHOP_TABLE_BODY_TD_CLASS}>
+                      <span className="font-semibold text-gray-800">
+                        {partCondition === "old" ? "Old" : "New"}
+                      </span>
+                    </td>
                   </>
                 ) : null}
                 <td className={`${SHOP_TABLE_BODY_TD_CLASS} font-semibold text-gray-800`}>
@@ -462,9 +474,9 @@ export default function ShopDealsPage() {
 
   const deals = useMemo(() => {
     if (activeId === "completed") return dealsWithSales.filter(isDealSold);
-    const activeDeals = dealsWithSales.filter((deal) => !isDealSold(deal));
-    if (activeId === "salvage") return activeDeals.filter(isSalvageDeal);
-    return activeDeals;
+    // Only filter by service/parts now; no salvage
+
+    return dealsWithSales.filter((deal) => !isDealSold(deal));
   }, [activeId, dealsWithSales]);
 
   const selectedDeals = useMemo(
@@ -515,7 +527,7 @@ export default function ShopDealsPage() {
   const openCreate = () => {
     if (activeId === "completed") return;
     setEditingDeal(null);
-    setFormMode(activeId === "parts" || activeId === "salvage" ? "parts" : "service");
+    setFormMode(activeId === "parts" ? "parts" : "service");
     setFormOpen(true);
   };
 
@@ -665,6 +677,7 @@ export default function ShopDealsPage() {
       activeId === "service" ? "Discount (%)" : "Discounted Price",
       "Status",
       ...(showSoldTo ? ["Sold To"] : []),
+      ...(showVehicleColumns ? ["Part Condition"] : []),
     ];
     const rows = selectedDeals.map((deal) => {
       const base = [
@@ -677,13 +690,25 @@ export default function ShopDealsPage() {
       }
       base.push(shopDealDiscountLabel(deal), dealStatusLabel(deal));
       if (showSoldTo) base.push(dealSoldToLabel(deal));
+      // Add "Part Condition" to print if applicable
+      if (showVehicleColumns) {
+        let partCondition = "new";
+        if (
+          dealMode(deal) === "parts" &&
+          typeof (deal as any).newOld === "string" &&
+          ((deal as any).newOld === "new" || (deal as any).newOld === "old")
+        ) {
+          partCondition = (deal as any).newOld as "new" | "old";
+        }
+        base.push(partCondition === "old" ? "Old" : "New");
+      }
       return base;
     });
     printAdminTable({ title: "Deals On Board", headers, rows });
   };
 
   const formSection: DealBoardSectionId =
-    activeId === "completed" ? detailBoardSection : activeId === "salvage" ? "salvage" : activeId === "service" ? "service" : "parts";
+    activeId === "completed" ? detailBoardSection : activeId === "service" ? "service" : "parts";
 
   return (
     <ShopPageShell

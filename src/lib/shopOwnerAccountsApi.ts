@@ -2,6 +2,30 @@ import { deleteJson, getJson, postFormData, postJson, putFormData, putJson } fro
 
 export type ApiEnvelope = { success?: boolean; message?: string; data?: unknown };
 
+export type ShopWalletExpenseRow = {
+  id: string;
+  date: string;
+  vendor: string;
+  amount: number;
+  category: string;
+  subcategory: string;
+  notes: string;
+  gst: boolean;
+  billNumber: string | null;
+  byCheque: boolean;
+  hasReceipt: boolean;
+  attachmentUrl?: string | null;
+};
+
+export type ShopWalletBankRow = {
+  id: string;
+  label: string;
+  accountName: string;
+  accountNumber: string;
+  balance: number;
+  assignToInvoice: boolean;
+};
+
 export type BankAccountPayload = {
   bankName: string;
   openingBalance: number | string;

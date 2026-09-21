@@ -10,6 +10,7 @@ import {
   sendMobileOtp,
   verifyMobileOtp,
 } from "../../api/mobileAuth";
+import { getPendingRedirect } from "../../lib/postAuthRedirect";
 import { useAuth, getPostLoginRedirect } from "../../auth";
 import type { UserRole } from "../../auth/types";
 import { formatPhoneDisplay, phoneDigits } from "../../lib/phoneFormat";
@@ -24,6 +25,8 @@ import {
   type SignInPhoneValues,
   type SignInOtpValues,
 } from "../../lib/validation/schemas/identity";
+
+
 
 const LOGO = "/logo.png";
 const RESEND_COOLDOWN_SEC = 5 * 60;
@@ -69,11 +72,26 @@ export default function AdminSignInPage() {
   });
   const otp = watchOtp("otp");
 
-  useEffect(() => {
-    if (!isLoading && isAuthenticated && role) {
-      navigate(getPostLoginRedirect(role), { replace: true });
+  // useEffect(() => {
+  //   if (!isLoading && isAuthenticated && role) {
+  //     navigate(getPostLoginRedirect(role), { replace: true });
+  //   }
+  // }, [isLoading, isAuthenticated, role, navigate]);
+
+  // already-authenticated redirect effect
+useEffect(() => {
+  if (!isLoading && isAuthenticated && role) {
+    const pending = getPendingRedirect();
+    if (pending && role === "car_owner") {
+      // Already signed in and came here via a "log in to favourite this
+      // shop" redirect — skip the normal post-login destination and go
+      // straight back, favouriting on the way.
+      navigate(pending.returnTo, { replace: true });
+      return;
     }
-  }, [isLoading, isAuthenticated, role, navigate]);
+    navigate(getPostLoginRedirect(role), { replace: true });
+  }
+}, [isLoading, isAuthenticated, role, navigate]);
 
   useEffect(() => {
     if (!otpSent || resendCooldown <= 0) return;
@@ -185,20 +203,40 @@ export default function AdminSignInPage() {
         return;
       }
 
-      await enrichMobileProfile(data.token, userRole, data, nationalPhoneDigits, countryCode);
-      setStatus("Login successful!");
-      setTimeout(() => {
-        let redirect = getPostLoginRedirect(userRole);
-        if (userRole === "car_owner" && data.isProfileComplete === false) {
-          redirect = "/owner/onboarding";
-        } else if (userRole === "auto_shop_owner") {
-          const shopIncomplete = resolveShopIncompleteKindFromAuthFlags(data);
-          if (shopIncomplete) {
-            redirect = shopProfileCompletionPath(shopIncomplete);
-          }
-        }
-        navigate(redirect, { replace: true });
-      }, 800);
+      // await enrichMobileProfile(data.token, userRole, data, nationalPhoneDigits, countryCode);
+      // setStatus("Login successful!");
+      // setTimeout(() => {
+      //   let redirect = getPostLoginRedirect(userRole);
+      //   if (userRole === "car_owner" && data.isProfileComplete === false) {
+      //     redirect = "/owner/onboarding";
+      //   } else if (userRole === "auto_shop_owner") {
+      //     const shopIncomplete = resolveShopIncompleteKindFromAuthFlags(data);
+      //     if (shopIncomplete) {
+      //       redirect = shopProfileCompletionPath(shopIncomplete);
+      //     }
+      //   }
+      //   navigate(redirect, { replace: true });
+      // }, 800);
+      // inside handleVerifyOtp, replace the redirect block:
+await enrichMobileProfile(data.token, userRole, data, nationalPhoneDigits, countryCode);
+setStatus("Login successful!");
+setTimeout(() => {
+  const pending = getPendingRedirect();
+  let redirect = getPostLoginRedirect(userRole);
+  if (userRole === "car_owner" && data.isProfileComplete === false) {
+    redirect = "/owner/onboarding";
+  } else if (userRole === "auto_shop_owner") {
+    const shopIncomplete = resolveShopIncompleteKindFromAuthFlags(data);
+    if (shopIncomplete) {
+      redirect = shopProfileCompletionPath(shopIncomplete);
+    }
+  } else if (userRole === "car_owner" && pending) {
+    // Profile already complete + came from "log in to favourite a
+    // shop" — go straight back; the shop page finishes the favourite.
+    redirect = pending.returnTo;
+  }
+  navigate(redirect, { replace: true });
+}, 800);
     } catch {
       setStatus("An error occurred.");
     } finally {

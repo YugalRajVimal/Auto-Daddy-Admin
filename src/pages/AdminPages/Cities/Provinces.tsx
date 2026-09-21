@@ -557,7 +557,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <th className="border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -566,35 +566,35 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                 />
               </th>
               <th
-                className="border border-ad-purple-dark px-3 py-2 text-center font-medium cursor-pointer select-none group"
+                className="border border-ad-purple-dark px-3 py-2 text-left font-medium cursor-pointer select-none group"
                 onClick={() => handleSort("name")}
                 style={{ userSelect: "none" }}
               >
                 Province Name
                 {renderSortIcon("name")}
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Nickname</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Cities</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Nickname</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Cities</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted provinces found." : "No provinces found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
+                  <td className="border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row._id)}
@@ -602,7 +602,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => openEdit(row)}
@@ -611,11 +611,11 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                       {row.name}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center italic text-xs">
+                  <td className="border border-gray-300 px-3 py-2 text-left italic text-xs">
                     {row.nickName || "—"}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.cities?.length ?? 0}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{row.status || "Active"}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.cities?.length ?? 0}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">{row.status || "Active"}</td>
                 </tr>
               ))
             )}
