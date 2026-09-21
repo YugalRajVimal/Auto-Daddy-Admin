@@ -885,16 +885,11 @@
 // }
 
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useSearchParams } from "react-router";
 import { toast } from "react-toastify";
 import DashboardPanelCard from "../../components/COMP";
-import { ThoughtOfTheDayCard } from "../../components/portal/ThoughtOfTheDayCard";
 import ShopBusinessOpenToggle from "../../components/shop/ShopBusinessOpenToggle";
-import ShopManageNumberingDialog, {
-  type NumberingKind,
-  type NumberingValues,
-} from "../../components/shop/ShopManageNumberingDialog";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import {
   ShopBusinessProfileEditor,
@@ -910,14 +905,8 @@ import {
 import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
 import { ShopReveal } from "../../components/shop/ShopAnimated";
 import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
-import ShopDocumentTemplatePanel, {
-  DUMMY_INVOICE_TEMPLATES,
-  resolveTemplateSlug,
-} from "../../components/shop/ShopDocumentTemplatePanel";
-import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
 import ShopQrCodePanel from "../../components/shop/ShopQrCodePanel";
 
-import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
 import { shopHeroOnImageMutedTextClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
 import {
@@ -933,10 +922,6 @@ import { parseMyServices } from "../../lib/shopOwnerParsers";
 import {
   addMyService,
   fetchAdminServices,
-  fetchInvoicePrefix,
-  parseInvoicePrefix,
-  updateInvoicePrefix,
-  updateTemplateSlugs,
 } from "../../lib/autoshopownerApi";
 import { getCarBrandId, getCarBrandName } from "../../lib/dummyCarBrands";
 import {
@@ -948,96 +933,30 @@ import { normalizeShopType, normalizeShopTypes } from "../../lib/shopTypes";
 import type { ShopServiceCategory } from "../../types/shopOwner";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 
-const NUMBERING_STORAGE_KEY = "autodaddy.shop.numbering";
-
-const DEFAULT_NUMBERING: Record<NumberingKind, NumberingValues> = {
-  estimate: { code: "", number: "1" },
-  invoice: { code: "", number: "1" },
-};
-
-function readStoredNumbering(): Record<NumberingKind, NumberingValues> {
-  const fallback = {
-    estimate: { ...DEFAULT_NUMBERING.estimate },
-    invoice: { ...DEFAULT_NUMBERING.invoice },
-  };
-  try {
-    const raw = localStorage.getItem(NUMBERING_STORAGE_KEY);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as Partial<Record<NumberingKind, NumberingValues>>;
-    return {
-      estimate: {
-        code: parsed.estimate?.code ?? DEFAULT_NUMBERING.estimate.code,
-        number: parsed.estimate?.number ?? DEFAULT_NUMBERING.estimate.number,
-      },
-      invoice: {
-        code: parsed.invoice?.code ?? DEFAULT_NUMBERING.invoice.code,
-        number: parsed.invoice?.number ?? DEFAULT_NUMBERING.invoice.number,
-      },
-    };
-  } catch {
-    return fallback;
-  }
-}
 
 const PROFILE_SECTIONS = [
-  { id: "personal", label: "Personal Profile", variant: "primary" as const },
-  { id: "business", label: "Business Profile", variant: "primary" as const },
-  { id: "open", label: "Shop is Open", variant: "primary" as const },
-  { id: "brands", label: "Car Brand Specialist", variant: "primary" as const },
-  { id: "services", label: "Operational Services", variant: "primary" as const },
+  { id: "personal", label: "Personal Info", variant: "primary" as const },
+  { id: "business", label: "Business Info", variant: "primary" as const },
+  { id: "brands", label: "Car's Brand", variant: "primary" as const },
+  { id: "services", label: "Operating Services", variant: "primary" as const },
+  { id: "open", label: "Timings", variant: "primary" as const },
   { id: "mobile-service", label: "Mobile Service", variant: "primary" as const },
-  { id: "invoice-templates", label: "Invoice Templates", variant: "primary" as const },
-  { id: "services", label: "Operational Services", variant: "primary" as const },
-  { id: "invoice-templates", label: "Invoice Templates", variant: "primary" as const },
   { id: "qr-code", label: "Shop QR Code", variant: "primary" as const },
 ];
 
 const SECTION_TITLES: Record<string, string> = {
-  personal: "Personal Profile",
-  business: "Business Profile",
-  open: "Shop is Open",
-  brands: "Car Brand Specialist",
-  services: "Operational Services",
+  personal: "Personal Info",
+  business: "Business Info",
+  brands: "Car Brands",
+  services: "Operating Services",
+  open: "Timings",
   "mobile-service": "Mobile Service",
-  "invoice-templates": "Invoice Templates",
   team: "Team Members",
   "qr-code": "Shop QR Code",
 };
 
-const FLUSH_HERO_SECTIONS = new Set([
-  "open",
-  "brands",
-  "services",
-  "mobile-service",
-  "invoice-templates",
-]);
-const TRANSPARENT_HERO_SECTIONS = new Set(["personal", "business", "qr-code"]);
-
-const TOP_ALIGNED_SECTIONS = new Set([...FLUSH_HERO_SECTIONS, ...TRANSPARENT_HERO_SECTIONS]);
-
-function ProfileHeroFormSection({
-  children,
-  thoughtOfTheDay,
-}: {
-  children: ReactNode;
-  thoughtOfTheDay?: { title?: string; description?: string } | string;
-}) {
-  const title =
-    typeof thoughtOfTheDay === "string" ? "" : thoughtOfTheDay?.title?.trim() || "";
-  const description =
-    typeof thoughtOfTheDay === "string"
-      ? thoughtOfTheDay.trim()
-      : thoughtOfTheDay?.description?.trim() || "";
-
-  return (
-    <div className="w-full min-w-0">
-      {children}
-      {title || description ? (
-        <ThoughtOfTheDayCard title={title} description={description} placement="inline" />
-      ) : null}
-    </div>
-  );
-}
+/** Invoice templates moved to Home → Settings; keep old deep links working. */
+const INVOICE_TEMPLATES_PATH = "/shop?section=settings&view=invoice-templates";
 
 function parseCompanies(payload: unknown): ShopCarCompany[] {
   if (!payload || typeof payload !== "object") return [];
@@ -1099,7 +1018,6 @@ export default function ShopProfilePage() {
     teamMembers,
     faqsHeading,
     faqsDescription,
-    thoughtOfTheDay,
     loading,
     refresh,
     isBusinessActive,
@@ -1129,15 +1047,6 @@ export default function ShopProfilePage() {
     Record<string, { createdAt?: string; isActive?: boolean }>
   >({});
   const [showAddHours, setShowAddHours] = useState(false);
-  const [invoiceTemplateId, setInvoiceTemplateId] = useState(
-    () => DUMMY_INVOICE_TEMPLATES[0]?.id ?? "",
-  );
-  const [savedInvoiceTemplateId, setSavedInvoiceTemplateId] = useState(
-    () => DUMMY_INVOICE_TEMPLATES[0]?.id ?? "",
-  );
-  const [numbering, setNumbering] = useState(readStoredNumbering);
-  const [manageInvoicesOpen, setManageInvoicesOpen] = useState(false);
-  const [invoicePrefixLoading, setInvoicePrefixLoading] = useState(false);
 
   useEffect(() => {
     if (!sectionParam) return;
@@ -1145,67 +1054,21 @@ export default function ShopProfilePage() {
     setActiveId(sectionParam);
   }, [sectionParam]);
 
-  const handleSidebarSelect = (id: string) => {
-    setActiveId(id);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("section", id);
-        return next;
-      },
-      { replace: true }
-    );
-  };
-
-  useEffect(() => {
-    const invoiceSlug = resolveTemplateSlug(
-      DUMMY_INVOICE_TEMPLATES,
-      business?.invoiceTemplateSlug,
-    );
-    setInvoiceTemplateId(invoiceSlug);
-    setSavedInvoiceTemplateId(invoiceSlug);
-  }, [business?.invoiceTemplateSlug]);
-
-  useEffect(() => {
-    if (!manageInvoicesOpen || !token) return;
-    let cancelled = false;
-    setInvoicePrefixLoading(true);
-    void fetchInvoicePrefix(token)
-      .then((res) => {
-        if (cancelled) return;
-        if (!res.ok) {
-          toast.error(apiMessage(res.data) || "Could not load invoice prefix.");
-          return;
-        }
-        const { prefix, invoiceCounter } = parseInvoicePrefix(res.data);
-
-        setNumbering((prev) => {
-          const next = {
-            ...prev,
-            invoice: {
-              ...prev.invoice,
-              code: prefix,
-              number: invoiceCounter != null ? String(invoiceCounter) : prev.invoice.number,
-            },
-          };
-          try {
-            localStorage.setItem(NUMBERING_STORAGE_KEY, JSON.stringify(next));
-          } catch {
-            // ignore quota / private mode errors
-          }
+  const handleSidebarSelect = useCallback(
+    (id: string) => {
+      setActiveId(id);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("section", id);
           return next;
-        });
-      })
-      .catch(() => {
-        if (!cancelled) toast.error("Could not load invoice prefix.");
-      })
-      .finally(() => {
-        if (!cancelled) setInvoicePrefixLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [manageInvoicesOpen, token]);
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams],
+  );
+
 
   const shopTypes = useMemo(
     () =>
@@ -1395,43 +1258,6 @@ export default function ShopProfilePage() {
     }
   }, [activeId]);
 
-  const sidebarFooter = useMemo(
-    () => (
-      <div className={`mt-4 ${shopSidebarButtonStackClass}`}>
-        <ShopSidebarButton label="Manage Invoices" onClick={() => setManageInvoicesOpen(true)} />
-      </div>
-    ),
-    [],
-  );
-
-  const saveInvoiceNumbering = async (values: NumberingValues): Promise<boolean> => {
-    if (!token) {
-      toast.error("Sign in to update invoice prefix.");
-      return false;
-    }
-    const prefix = values.code.trim();
-    const res = await updateInvoicePrefix(token, prefix);
-    if (!res.ok) {
-      toast.error(apiMessage(res.data) || "Could not update invoice prefix.");
-      return false;
-    }
-    setNumbering((prev) => {
-      const next = {
-        ...prev,
-        invoice: {
-          code: prefix,
-          number: values.number.trim() || prev.invoice.number,
-        },
-      };
-      try {
-        localStorage.setItem(NUMBERING_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // ignore quota / private mode
-      }
-      return next;
-    });
-    return true;
-  };
 
   const removeBrand = async (company: ShopCarCompany) => {
     const id = getCarBrandId(company);
@@ -1496,17 +1322,14 @@ export default function ShopProfilePage() {
     switch (activeId) {
       case "personal":
         return (
-          <ProfileHeroFormSection thoughtOfTheDay={thoughtOfTheDay}>
             <ShopPersonalProfileEditor
               user={user}
               city={user?.city ?? business?.city}
               onSaved={() => void refresh()}
             />
-          </ProfileHeroFormSection>
         );
       case "business":
         return (
-          <ProfileHeroFormSection thoughtOfTheDay={thoughtOfTheDay}>
             <ShopBusinessProfileEditor
               business={business}
               zipCode={user?.pincode}
@@ -1514,7 +1337,6 @@ export default function ShopProfilePage() {
               shopTypes={business?.shopTypes}
               onSaved={() => void refresh()}
             />
-          </ProfileHeroFormSection>
         );
       case "open":
         return (
@@ -1665,39 +1487,6 @@ export default function ShopProfilePage() {
         );
       case "mobile-service":
         return <ShopMobileServiceEditor onSaved={() => void refresh()} />;
-      case "invoice-templates":
-        return (
-          <ShopDocumentTemplatePanel
-            templates={DUMMY_INVOICE_TEMPLATES}
-            selectedId={invoiceTemplateId}
-            onSelect={setInvoiceTemplateId}
-            savedId={savedInvoiceTemplateId}
-            shopPreview={{
-              name: business?.businessName,
-              address:
-                [business?.businessAddress ?? business?.address, business?.city, business?.pincode]
-                  .filter(Boolean)
-                  .join(", ") || undefined,
-              phone: business?.businessPhone,
-              email: business?.email,
-              logoUrl: business?.businessLogo,
-            }}
-            onSave={async (id) => {
-              if (!token) {
-                toast.error("Sign in to save template.");
-                return false;
-              }
-              const res = await updateTemplateSlugs(token, { invoiceTemplateSlug: id });
-              if (!res.ok) {
-                toast.error(apiMessage(res.data) || "Could not save invoice template.");
-                return false;
-              }
-              setSavedInvoiceTemplateId(id);
-              void refresh();
-              return true;
-            }}
-          />
-        );
       case "team":
         return (
           <>
@@ -1731,14 +1520,16 @@ export default function ShopProfilePage() {
         );
 case "qr-code":
   return (
-    <ProfileHeroFormSection thoughtOfTheDay={thoughtOfTheDay}>
-      <ShopQrCodePanel slug={business?.slug} businessName={business?.businessName} />
-    </ProfileHeroFormSection>
+    <ShopQrCodePanel slug={business?.slug} businessName={business?.businessName} />
   );
         default:
         return null;
     }
   };
+
+  if (sectionParam === "invoice-templates") {
+    return <Navigate to={INVOICE_TEMPLATES_PATH} replace />;
+  }
 
   return (
     <>
@@ -1750,12 +1541,9 @@ case "qr-code":
         sidebarItems={PROFILE_SECTIONS}
         activeSidebarId={activeId}
         onSidebarSelect={handleSidebarSelect}
-        sidebarFooter={sidebarFooter}
         headerAction={headerAction}
-        heroBackgroundImage={false}
-        contentTopOffset={TOP_ALIGNED_SECTIONS.has(activeId)}
-        heroCardFlush={TOP_ALIGNED_SECTIONS.has(activeId)}
-        contentFillHeight={activeId === "invoice-templates"}
+        contentTopOffset
+        heroCardFlush={activeId !== "personal" && activeId !== "business" && activeId !== "qr-code"}
         onFaqsOpen={() => setFaqsOpen(true)}
         onFaqsClose={() => setFaqsOpen(false)}
         faqsOpen={faqsOpen}
@@ -1765,14 +1553,6 @@ case "qr-code":
         {renderContent()}
       </ShopPageShell>
 
-      <ShopManageNumberingDialog
-        open={manageInvoicesOpen}
-        kind="invoice"
-        initial={numbering.invoice}
-        loading={invoicePrefixLoading}
-        onClose={() => setManageInvoicesOpen(false)}
-        onSave={saveInvoiceNumbering}
-      />
     </>
   );
 }

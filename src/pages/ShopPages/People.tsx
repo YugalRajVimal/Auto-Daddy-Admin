@@ -20,6 +20,7 @@ import {
   adminPanelTableClasses,
   type AdminPanelTableClasses,
 } from "../../components/admin/adminPanelTableStyles";
+import ShopDealersDirectory from "../../components/shop/ShopDealersDirectory";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopReveal } from "../../components/shop/ShopAnimated";
 import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage";
@@ -83,9 +84,13 @@ type DetailView =
   | { kind: "vehicle-list"; customer: MyCustomer };
 
 const PEOPLE_SECTIONS = [
-  { id: "my-list", label: "My Customer List", variant: "primary" as const },
-  { id: "approval", label: "Approval", variant: "primary" as const },
+  { id: "my-list", label: "My Customers", variant: "primary" as const },
+  { id: "approval", label: "Approvals", variant: "primary" as const },
+  { id: "dealers", label: "Dealers", variant: "primary" as const },
 ];
+
+/** Sub-nav id for the parts-dealer directory (not a customer list section). */
+const DEALERS_SECTION_ID = "dealers";
 
 /** Maps People tabs to GET /api/autoshopowner/customer/added?status=… */
 function addedCustomersStatusForSection(section: PeopleSection): string {
@@ -93,8 +98,8 @@ function addedCustomersStatusForSection(section: PeopleSection): string {
 }
 
 const SECTION_HEADINGS: Record<PeopleSection, string> = {
-  "my-list": "My Customer List",
-  approval: "Approval",
+  "my-list": "My Customers",
+  approval: "Approvals",
 };
 
 const PEOPLE_SEARCH_INPUT_ID = "shop-people-customer-search";
@@ -1459,6 +1464,7 @@ export default function ShopPeoplePage() {
   const { token } = useAuth();
   const { faqsHeading, faqsDescription, city: shopCity } = useShopOwnerPortal();
   const [section, setSection] = useState<PeopleSection>("my-list");
+  const [showDealers, setShowDealers] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [search, setSearch] = useState("");
   const [faqsOpen, setFaqsOpen] = useState(false);
@@ -1630,6 +1636,12 @@ export default function ShopPeoplePage() {
   };
 
   const selectSection = (id: string) => {
+    if (id === DEALERS_SECTION_ID) {
+      setShowDealers(true);
+      resetDetail();
+      return;
+    }
+    setShowDealers(false);
     const next = id as PeopleSection;
     setSection(next);
     setShowAddForm(false);
@@ -1764,12 +1776,12 @@ export default function ShopPeoplePage() {
   return (
     <ShopPageShell
       title="Customers"
-      pageHeading={SECTION_HEADINGS[section]}
+      pageHeading={showDealers ? "Dealers" : SECTION_HEADINGS[section]}
       metaTitle="Customers | AutoDaddy"
       metaDescription="Auto shop customers"
       sidebarVariant="nav"
       sidebarItems={PEOPLE_SECTIONS}
-      activeSidebarId={detailView ? null : section}
+      activeSidebarId={showDealers ? DEALERS_SECTION_ID : detailView ? null : section}
       onSidebarSelect={selectSection}
       heroBackgroundImage={false}
       contentTopOffset
@@ -1781,7 +1793,9 @@ export default function ShopPeoplePage() {
       faqsDescription={faqsDescription}
     >
       <div className="space-y-1">
-        {detailView?.kind === "customer-info" ? (
+        {showDealers ? (
+          <ShopDealersDirectory />
+        ) : detailView?.kind === "customer-info" ? (
           <CustomerInfoView
             customer={detailView.customer}
             vehicleIndex={detailView.vehicleIndex}

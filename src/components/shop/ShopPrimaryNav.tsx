@@ -8,6 +8,7 @@ type ShopPrimaryNavProps = {
   navLabel?: string;
 };
 
+/** Purple tab bar — the active section renders as a raised white tab. */
 export default function ShopPrimaryNav({
   homePath,
   primaryNav,
@@ -27,20 +28,21 @@ export default function ShopPrimaryNav({
 
   return (
     <nav className={`min-w-0 w-full ${className}`.trim()} aria-label={navLabel}>
-      <ul className="flex h-full w-full flex-col gap-2 py-1 lg:flex-row lg:items-center lg:justify-between lg:gap-1 lg:py-0">
+      <ul className="no-scrollbar flex w-full gap-1 overflow-x-auto rounded-xl bg-gradient-to-r from-ad-purple via-[#a3399a] to-ad-purple-dark p-1 shadow-[0_6px_18px_rgba(155,48,141,0.28)]">
         {primaryNav.map((item) => {
           const isActive = activePrimary?.name === item.name;
           const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
-          const linkClass = `block whitespace-nowrap px-1 text-base font-semibold leading-none text-ad-purple transition-colors md:text-lg ${
-            isActive ? "underline underline-offset-2 decoration-2" : "hover:underline"
-          }`;
           return (
-            <li key={item.name} className="min-w-0 shrink-0">
+            <li key={item.name} className="flex-1 shrink-0">
               <Link
                 to={firstPath}
                 onClick={(e) => handlePrimaryNavLinkClick(firstPath, e)}
-                className={linkClass}
                 aria-current={isActive ? "page" : undefined}
+                className={`block whitespace-nowrap rounded-lg px-3 py-2 text-center text-[15px] font-semibold leading-tight transition-all duration-150 lg:text-base ${
+                  isActive
+                    ? "bg-white text-ad-purple shadow-sm"
+                    : "text-white/90 hover:bg-white/15 hover:text-white"
+                }`}
               >
                 {item.name}
               </Link>

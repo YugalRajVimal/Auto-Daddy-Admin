@@ -22,17 +22,17 @@ export const shopPrimaryNav: NavItem[] = [
     matchPaths: ["/shop/services"],
   },
   {
-    name: "Job Cards",
+    name: "Job Card",
     path: "/shop/job-cards",
     matchPaths: ["/shop/job-cards"],
   },
   {
-    name: "Wallet",
+    name: "Accounts",
     path: "/shop/wallet",
     matchPaths: ["/shop/wallet"],
   },
   {
-    name: "My website",
+    name: "My Website",
     path: "/shop/my-website",
     matchPaths: ["/shop/my-website"],
   },

@@ -40,7 +40,6 @@ function ShopSubscriptionPrompt() {
 function ShopLayoutContent() {
   const {
     displayName,
-    city,
     daysLeft,
     business,
     businessNameLoaded,
@@ -50,7 +49,6 @@ function ShopLayoutContent() {
     subscriptionGateReady,
   } = useShopOwnerPortal();
   const profilePhotoSrc = normalizeMediaUrl(profileIcon ?? null);
-  const locationLabel = city || business?.city?.trim();
   const { login, session } = useAuth();
 
   // State to track back-to-admin-token
@@ -146,7 +144,6 @@ function ShopLayoutContent() {
         brandLogo={{ src: profilePhotoSrc, placeholderLabel: "Profile photo" }}
         businessName={displayName}
         businessNameLoading={!businessNameLoaded}
-        city={locationLabel}
         subscriptionDaysLeft={hasActiveSubscription ? (daysLeft ?? null) : null}
         helpPath="/shop/help"
       />

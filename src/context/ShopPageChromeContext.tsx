@@ -12,6 +12,13 @@ import {
 import { useLocation } from "react-router";
 import type { ShopSidebarItem } from "../components/shop/ShopSidebar";
 
+/** Action-style entry in the sub-nav row (opens a dialog instead of switching section). */
+export type ShopSubNavAction = {
+  id: string;
+  label: string;
+  onClick: () => void;
+};
+
 export type ShopPageChromeConfig = {
   title?: string;
   metaTitle?: string;
@@ -38,8 +45,12 @@ export type ShopPageChromeConfig = {
   faqsHeading?: string;
   faqsDescription?: string;
   headerAction?: ReactNode;
-  /** Center sub-header title (e.g. Dashboard, Personal Profile). */
+  /** Title above the main card (e.g. Dashboard, Personal Info). */
   pageHeading?: string;
+  /** Optional parent label rendered before the heading, e.g. "Settings" in "Settings - Invoice Templates". */
+  pageHeadingParent?: string;
+  /** Extra sub-nav entries after the section items (e.g. "Manage Job Number"). */
+  subNavActions?: ShopSubNavAction[];
   /** `business-card` shows the profile card; `nav` shows section buttons. */
   sidebarVariant?: "business-card" | "nav";
   /** When false, uses the home hero layout instead of the profile background card. */
@@ -125,6 +136,8 @@ function isSameChromeConfig(prev: ShopPageChromeConfig, next: ShopPageChromeConf
     prev.faqsDescription === next.faqsDescription &&
     prev.headerAction === next.headerAction &&
     prev.pageHeading === next.pageHeading &&
+    prev.pageHeadingParent === next.pageHeadingParent &&
+    prev.subNavActions === next.subNavActions &&
     prev.sidebarVariant === next.sidebarVariant &&
     prev.heroCard === next.heroCard &&
     prev.heroBackgroundImage === next.heroBackgroundImage &&

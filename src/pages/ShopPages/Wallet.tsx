@@ -2337,8 +2337,7 @@ import {
   shopProfileFormPanelFooterClass,
   shopTableToolbarClass,
 } from "../../components/shop/shopLayoutStyles";
-import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
-import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
+import ShopSoftwareWalletPanel from "../../components/shop/ShopSoftwareWalletPanel";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
 import { useShopOwnerData } from "../../context/ShopOwnerDataProvider";
@@ -2410,11 +2409,22 @@ const WALLET_SEARCH_INPUT_ID = "shop-wallet-search";
 type WalletView = "paid" | "unpaid" | "expenses" | "banks";
 
 const SECTION_HEADINGS: Record<WalletView, string> = {
-  paid: "Paid Invoice",
-  unpaid: "Un-Paid Invoice",
+  paid: "Paid Invoices",
+  unpaid: "Invoices",
   expenses: "Expenses",
-  banks: "Manage Banks",
+  banks: "Manage Bank",
 };
+
+/** Sub-nav id for the software wallet (recharge + history), shown alongside the ledger views. */
+const SOFTWARE_WALLET_ID = "wallet";
+
+const ACCOUNTS_SECTIONS = [
+  { id: "unpaid", label: "Invoices", variant: "primary" as const },
+  { id: "paid", label: "Paid Invoices", variant: "primary" as const },
+  { id: "expenses", label: "Expenses", variant: "primary" as const },
+  { id: "banks", label: "Manage Bank", variant: "primary" as const },
+  { id: SOFTWARE_WALLET_ID, label: "Software Wallet", variant: "primary" as const },
+];
 
 const SHOP_COMBO_EDIT_BUTTON_CLASS =
   "block w-full border-b-2 border-ad-purple-dark bg-ad-purple px-2 py-2 text-left text-sm font-bold tracking-wide text-white shadow-inner hover:bg-ad-purple-dark";
@@ -3498,7 +3508,19 @@ function WalletBankTable({
 export default function ShopWalletPage() {
   const { token } = useAuth();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
-  const [view, setView] = useState<WalletView>("paid");
+  const [view, setView] = useState<WalletView>("unpaid");
+  // Stripe returns to /shop/wallet?walletPayment=… — open the wallet panel so it can confirm the payment.
+  const [showSoftwareWallet, setShowSoftwareWallet] = useState(() =>
+    new URLSearchParams(window.location.search).has("walletPayment"),
+  );
+  const selectAccountsSection = useCallback((id: string) => {
+    if (id === SOFTWARE_WALLET_ID) {
+      setShowSoftwareWallet(true);
+      return;
+    }
+    setShowSoftwareWallet(false);
+    setView(id as WalletView);
+  }, []);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [faqsOpen, setFaqsOpen] = useState(false);
@@ -4388,37 +4410,13 @@ export default function ShopWalletPage() {
   return (
     <ShopPageShell
       title="Wallet"
-      pageHeading={pageHeading}
-      metaTitle="Wallet | AutoDaddy"
+      pageHeading={showSoftwareWallet ? "Software Wallet" : pageHeading}
+      metaTitle="Accounts | AutoDaddy"
       metaDescription="Auto shop wallet and invoices"
       sidebarVariant="nav"
-      sidebarExtra={
-        <div className={shopSidebarButtonStackClass}>
-          <ShopSidebarButton
-            label="Paid Invoice"
-            active={view === "paid"}
-            onClick={() => setView("paid")}
-          />
-
-          <ShopSidebarButton
-            label="Un-Paid Invoice"
-            active={view === "unpaid"}
-            onClick={() => setView("unpaid")}
-          />
-
-          <ShopSidebarButton
-            label="Expenses"
-            active={view === "expenses"}
-            onClick={() => setView("expenses")}
-          />
-
-          <ShopSidebarButton
-            label="Manage Banks"
-            active={view === "banks"}
-            onClick={() => setView("banks")}
-          />
-        </div>
-      }
+      sidebarItems={ACCOUNTS_SECTIONS}
+      activeSidebarId={showSoftwareWallet ? SOFTWARE_WALLET_ID : view}
+      onSidebarSelect={selectAccountsSection}
       heroBackgroundImage={false}
       contentTopOffset
       heroCardFlush
@@ -4428,6 +4426,9 @@ export default function ShopWalletPage() {
       faqsHeading={faqsHeading}
       faqsDescription={faqsDescription}
     >
+      {showSoftwareWallet ? (
+        <ShopSoftwareWalletPanel />
+      ) : (
       <div className="space-y-3">
         <ShopReveal show={previewInvoice != null} clipOverflow={false}>
           {previewInvoice ? (
@@ -4611,6 +4612,7 @@ export default function ShopWalletPage() {
           </>
         ) : null}
       </div>
+      )}
     </ShopPageShell>
   );
 }

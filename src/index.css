@@ -1187,3 +1187,38 @@ input.shop-compact-input[type="time"] {
 .react-datepicker-popper {
   z-index: 100000 !important;
 }
+/*
+ * Shop portal tables (inside the main content card): softer purple header,
+ * hairline row dividers and a hover tint. Unlayered so it wins over the
+ * shared admin table utilities without touching admin pages.
+ */
+.shop-hero-card table thead tr.bg-ad-purple {
+  background: linear-gradient(90deg, #b643ad 0%, #c95ec9 100%);
+}
+
+.shop-hero-card table thead th {
+  border-color: transparent;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.shop-hero-card table tbody td {
+  border-left-color: transparent;
+  border-right-color: transparent;
+  border-top-color: #eceef2;
+  border-bottom-color: #eceef2;
+  font-size: 0.875rem;
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+
+.shop-hero-card table tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.shop-hero-card table tbody tr:hover {
+  background-color: #fbf2fb;
+}

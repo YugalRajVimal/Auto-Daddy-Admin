@@ -18,10 +18,8 @@ import ShopManageNumberingDialog, {
   type NumberingValues,
 } from "../../components/shop/ShopManageNumberingDialog";
 import ShopPageShell from "../../components/shop/ShopPageShell";
-import { ShopSidebarButton } from "../../components/shop/ShopSidebar";
 import { ShopListSkeleton } from "../../components/shop/ShopListSkeletons";
 import { ShopErrorPanel, ShopListFooter } from "../../components/shop/ShopPanels";
-import { shopSidebarButtonStackClass } from "../../components/shop/shopSidebarStyles";
 import { shopTableToolbarClass } from "../../components/shop/shopLayoutStyles";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useAutoshopJobCards } from "../../hooks/useAutoshopJobCards";
@@ -61,15 +59,15 @@ const JOB_CARDS_SEARCH_INPUT_ID = "shop-job-cards-search";
 const DEFAULT_ESTIMATE_NUMBERING: NumberingValues = { code: "", number: "1" };
 
 const JOB_CARD_SECTIONS = [
-  { id: "my-list", label: "My Job Cards", variant: "primary" as const },
+  { id: "my-list", label: "My Jobs", variant: "primary" as const },
   { id: "approvals", label: "Approvals", variant: "primary" as const },
-  { id: "convert-invoice", label: "Converted to Invoice", variant: "primary" as const },
-  { id: "paid", label: "Paid Jobs", variant: "primary" as const },
+  { id: "convert-invoice", label: "Convert Invoice", variant: "primary" as const },
+  { id: "paid", label: "Paid", variant: "primary" as const },
 ];
 
 const SECTION_HEADINGS: Record<JobCardSection, string> = {
-  "my-list": "My Job Cards",
-  approvals: "Approvals",
+  "my-list": "My Jobs",
+  approvals: "Sent for Approvals",
   "convert-invoice": "Converted to Invoice",
   paid: "Paid Jobs",
 };
@@ -406,15 +404,14 @@ export default function ShopJobCardsPage() {
 
   const hasBulkSelection = selectedJobCardIds.size > 0;
 
-  const sidebarFooter = useMemo(
-    () => (
-      <div className={`mt-4 ${shopSidebarButtonStackClass}`}>
-        <ShopSidebarButton
-          label="Manage Job Cards"
-          onClick={() => setManageEstimatesOpen(true)}
-        />
-      </div>
-    ),
+  const subNavActions = useMemo(
+    () => [
+      {
+        id: "manage-job-number",
+        label: "Manage Job number",
+        onClick: () => setManageEstimatesOpen(true),
+      },
+    ],
     [],
   );
 
@@ -814,7 +811,7 @@ export default function ShopJobCardsPage() {
         sidebarItems={JOB_CARD_SECTIONS}
         activeSidebarId={activeSidebarId}
         onSidebarSelect={selectSection}
-        sidebarFooter={sidebarFooter}
+        subNavActions={subNavActions}
         heroBackgroundImage={false}
         contentTopOffset
         heroCardFlush

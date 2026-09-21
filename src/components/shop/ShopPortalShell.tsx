@@ -2,16 +2,19 @@ import { useEffect, useMemo } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { FiBell } from "react-icons/fi";
 import useAuth from "../../auth/useAuth";
-import { getActivePrimaryItem, type NavItem } from "../../config/adminNav";
+import type { NavItem } from "../../config/adminNav";
 import { Skeleton } from "../common/Skeleton";
 import { useShopPageChromeContext } from "../../context/ShopPageChromeContext";
 import { useShopNotifications } from "../../hooks/useShopNotifications";
 import type { PortalBrandLogo } from "../admin/PortalShell";
 import ShopBrandLogo from "./ShopBrandLogo";
-import { shopNavVerticalGapClass, shopPortalHorizPaddingClass } from "./shopLayoutStyles";
+import ShopPrimaryNav from "./ShopPrimaryNav";
+import ShopSubNav from "./ShopSubNav";
+import { shopPortalHorizPaddingClass } from "./shopLayoutStyles";
 
 const SHOP_MESSAGES_PATH = "/shop/messages";
 const SHOP_LAST_SEEN_KEY = "ad:lastSeen:shop-notifications";
+const AUTODADDY_LOGO = "/logo.png";
 
 function isPathActive(pathname: string, path: string, homePath: string) {
   if (path === homePath) return pathname === homePath;
@@ -25,7 +28,6 @@ export type ShopPortalShellProps = {
   brandLogo?: PortalBrandLogo;
   businessName: string;
   businessNameLoading?: boolean;
-  city?: string;
   subscriptionDaysLeft?: number | null;
   helpPath?: string;
 };
@@ -37,7 +39,6 @@ export default function ShopPortalShell({
   brandLogo,
   businessName,
   businessNameLoading = false,
-  city,
   subscriptionDaysLeft,
   helpPath,
 }: ShopPortalShellProps) {
@@ -47,14 +48,7 @@ export default function ShopPortalShell({
   const { chrome } = useShopPageChromeContext();
   const { items } = useShopNotifications();
 
-  const activePrimary = getActivePrimaryItem(location.pathname, primaryNav, homePath);
   const onHelpNav = helpPath != null && isPathActive(location.pathname, helpPath, homePath);
-
-  const pageHeading =
-    chrome.pageHeading?.trim() ||
-    chrome.title?.trim() ||
-    activePrimary?.name ||
-    "Dashboard";
 
   const handleLogout = () => {
     if (!window.confirm("Are you sure you want to log out?")) return;
@@ -76,18 +70,8 @@ export default function ShopPortalShell({
     navigate(SHOP_MESSAGES_PATH, { state: { initialTab: "notifications" } });
   };
 
-  const utilityLinkClass =
-    "inline-block rounded-b-lg border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-300 sm:px-3 sm:text-xs";
-  const helpLinkActiveClass =
-    "inline-block rounded-b-lg border border-ad-green bg-ad-green-light px-2.5 py-0.5 text-[11px] font-semibold text-ad-green-dark shadow-sm sm:px-3 sm:text-xs";
-
-  const brandLogoLabel = brandLogo?.placeholderLabel?.trim() || "Business logo";
-  const headerLogo = brandLogo ? (
-    <ShopBrandLogo src={brandLogo.src} alt={brandLogoLabel} className="!size-[42px]" />
-  ) : null;
-
-  /** Matches vertical rhythm between header rows and header → primary nav. */
-  const headerStackGapClass = shopNavVerticalGapClass;
+  const utilityItemClass =
+    "px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-white hover:text-ad-purple sm:px-4 sm:text-sm";
 
   useEffect(() => {
     document.body.style.overflow = "";
@@ -96,81 +80,89 @@ export default function ShopPortalShell({
 
   return (
     <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
-      <header className={`${shopPortalHorizPaddingClass} pt-0 pb-0`}>
-        <div className={`grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 ${headerStackGapClass}`}>
-          <div className="col-start-1 row-start-1 row-span-2 flex w-fit max-w-full min-w-0 flex-col items-center justify-self-start self-center pt-1">
+      <header className={`${shopPortalHorizPaddingClass} flex flex-col gap-2 pb-1`}>
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3">
+          <Link to={homePath} className="shrink-0" aria-label="AutoDaddy home">
+            <img
+              src={AUTODADDY_LOGO}
+              alt="AutoDaddy"
+              className="h-11 w-auto max-w-[150px] object-contain sm:h-14 sm:max-w-[200px]"
+            />
+          </Link>
+
+          <div className="flex min-w-0 items-baseline justify-center gap-2 pt-4">
+            <span className="hidden shrink-0 text-sm font-medium text-gray-500 sm:inline">Login as :</span>
             {businessNameLoading ? (
               <span aria-busy="true" aria-label="Loading business name">
-                <Skeleton className="h-7 w-36 rounded sm:h-8 sm:w-44 md:h-9 md:w-52" />
+                <Skeleton className="h-7 w-40 rounded sm:h-8 sm:w-52" />
               </span>
             ) : (
               <Link
-                to={homePath}
-                className="block min-w-0 max-w-full truncate font-serif text-lg italic text-gray-500 hover:text-gray-600 sm:text-xl md:text-2xl"
+                to={profilePath}
+                className="min-w-0 truncate text-xl font-extrabold tracking-tight text-ad-green-dark transition-colors hover:text-ad-green sm:text-2xl lg:text-3xl"
               >
                 {businessName || "Your Business"}
               </Link>
             )}
-            {city ? (
-              <Link
-                to={profilePath}
-                className="text-sm font-bold text-blue-600 underline hover:text-blue-700 md:text-base"
-              >
-                {city}
-              </Link>
-            ) : null}
           </div>
 
-          <div
-            className={`col-start-3 row-start-1 row-span-2 flex flex-col items-end justify-self-end self-start ${headerStackGapClass}`}
-          >
+          <div className="flex flex-col items-end gap-2">
             <nav
-              className="flex shrink-0 items-start gap-0 [&>*+*]:-ml-px"
               aria-label="Account actions"
+              className="flex items-stretch divide-x divide-gray-300 overflow-hidden rounded-b-xl border border-t-0 border-gray-300 bg-gray-100 shadow-sm"
             >
               {subscriptionDaysLeft != null ? (
-                <span className={utilityLinkClass}>{subscriptionDaysLeft} Days Left</span>
+                <span className="px-3 py-1 text-xs font-bold text-gray-800 sm:px-4 sm:text-sm">
+                  {subscriptionDaysLeft} days left
+                </span>
               ) : null}
               <Link
                 to={helpPath ?? "#"}
-                className={helpPath && onHelpNav ? helpLinkActiveClass : utilityLinkClass}
+                className={`${utilityItemClass} ${onHelpNav ? "bg-white font-semibold text-ad-purple" : ""}`}
               >
                 Help
               </Link>
-              <button type="button" onClick={handleLogout} className={utilityLinkClass}>
+              <button type="button" onClick={handleLogout} className={utilityItemClass}>
                 Log out
               </button>
             </nav>
 
-            <div className="relative z-10 flex items-center justify-end gap-2.5">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                className="relative text-blue-600 hover:text-blue-700"
+                className="relative flex size-9 items-center justify-center rounded-full text-blue-600 transition-colors hover:bg-white hover:text-blue-700"
                 aria-label="Notifications"
                 onClick={handleNotificationsClick}
               >
                 <FiBell size={22} strokeWidth={1.75} />
                 {newCount > 0 ? (
-                  <span className="absolute -right-1.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold leading-none text-white">
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold leading-none text-white">
                     {newCount > 99 ? "99+" : newCount}
                   </span>
                 ) : null}
               </button>
-              {headerLogo ? (
-                <Link to={profilePath} className="shrink-0" aria-label="Open profile">
-                  {headerLogo}
-                </Link>
-              ) : null}
+              <Link to={profilePath} className="shrink-0" aria-label="Open profile">
+                <ShopBrandLogo
+                  src={brandLogo?.src}
+                  alt={brandLogo?.placeholderLabel?.trim() || "Profile photo"}
+                  className="!size-11 rounded-lg border-gray-300 bg-white shadow-sm"
+                />
+              </Link>
             </div>
           </div>
-
-          <h1 className="pointer-events-none col-span-3 col-start-1 row-start-2 z-0 flex h-[42px] w-full items-center justify-center self-end text-center font-serif text-lg font-bold leading-tight text-gray-600 md:text-xl lg:text-2xl">
-            {pageHeading}
-          </h1>
         </div>
+
+        <ShopPrimaryNav homePath={homePath} primaryNav={primaryNav} />
+
+        <ShopSubNav
+          items={chrome.sidebarItems ?? []}
+          activeId={chrome.activeSidebarId}
+          onSelect={chrome.onSidebarSelect}
+          actions={chrome.subNavActions}
+        />
       </header>
 
-      <main className="min-h-0 flex-1">
+      <main className="flex min-h-0 flex-1 flex-col">
         <Outlet />
       </main>
     </div>

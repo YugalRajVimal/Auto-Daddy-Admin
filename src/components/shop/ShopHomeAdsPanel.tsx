@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { PartsDealerCard } from "../../hooks/usePartsDealers";
 import { openPartsDealerLink } from "../../lib/shopPartsDealers";
 import ShopDealerCard from "./ShopDealerCard";
-import { shopMainContentHeightClass } from "./shopLayoutStyles";
+import { shopPanelShellClass } from "./shopLayoutStyles";
 
 const ROTATE_MS = 5000;
 const CURTAIN_MS = 550;
@@ -37,7 +37,7 @@ function curtainClass(index: number, activeIndex: number, leavingIndex: number |
 
 function ShopAdPanelShell({ children }: { children: ReactNode }) {
   return (
-    <div className={`flex min-h-0 w-full flex-col overflow-hidden ${shopMainContentHeightClass}`}>
+    <div className={`${shopPanelShellClass} min-h-0 border border-gray-200 bg-white/85 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)]`}>
       {children}
     </div>
   );

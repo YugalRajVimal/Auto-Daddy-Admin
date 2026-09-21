@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FiEdit } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import {
@@ -19,9 +20,17 @@ import { useShopOwnerPortal } from "../../hooks/useShopPortal";
 import { useShopServices } from "../../hooks/useShopServices";
 import { deleteSubService } from "../../lib/autoshopownerApi";
 import { apiMessage } from "../../lib/shopOwnerMutations";
+import { getShopTypeLabel } from "../../lib/shopTypes";
 import type { ShopServiceCategory } from "../../types/shopOwner";
 
 const PAGE_SIZE = 10;
+
+const SERVICES_SECTIONS = [
+  { id: "services", label: "Services", variant: "primary" as const },
+  { id: "sub-service", label: "Sub - Service", variant: "primary" as const },
+];
+
+type ServicesTab = "services" | "sub-service";
 
 const SHOP_TABLE_BASE = adminPanelTableClasses(true);
 const SHOP_TABLE: AdminPanelTableClasses = {
@@ -183,10 +192,73 @@ function SubServiceTable({
   );
 }
 
+function CategoryTable({
+  categories,
+  onOpen,
+}: {
+  categories: ShopServiceCategory[];
+  onOpen: (categoryId: string) => void;
+}) {
+  return (
+    <div className="shop-hero-surface overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className={SHOP_TABLE.table}>
+          <thead>
+            <tr className={ADMIN_PANEL_THEAD_ROW_CLASS}>
+              <th className={`${SHOP_TABLE.th} text-left`}>Category</th>
+              <th className={SHOP_TABLE.th}>Sub-Services</th>
+              <th className={SHOP_TABLE.th}>Vendor Type</th>
+              <th className={SHOP_TABLE.th}>
+                <span className="sr-only">Edit</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.length === 0 ? (
+              <tr>
+                <td colSpan={4} className={`${SHOP_TABLE.td} py-8 text-gray-500`}>
+                  No services yet — add them from Profile → Operating Services.
+                </td>
+              </tr>
+            ) : (
+              categories.map((category, index) => (
+                <tr key={category.id} className={adminPanelRowClass(index)}>
+                  <td className={`${SHOP_TABLE.td} text-left`}>
+                    <button
+                      type="button"
+                      onClick={() => onOpen(category.id)}
+                      className="font-semibold text-blue-700 hover:text-ad-purple hover:underline"
+                    >
+                      {category.name ?? "Category"}
+                    </button>
+                  </td>
+                  <td className={SHOP_TABLE.td}>{category.subServices.length}</td>
+                  <td className={SHOP_TABLE.td}>{getShopTypeLabel(category.shopType)}</td>
+                  <td className={`${SHOP_TABLE.td} w-12`}>
+                    <button
+                      type="button"
+                      onClick={() => onOpen(category.id)}
+                      aria-label={`Edit sub-services of ${category.name ?? "category"}`}
+                      className="inline-flex size-7 items-center justify-center rounded-md text-blue-700 transition-colors hover:bg-ad-bg-purple hover:text-ad-purple"
+                    >
+                      <FiEdit className="size-4" aria-hidden />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function ShopServicesPage() {
   const { token } = useAuth();
   const { faqsHeading, faqsDescription } = useShopOwnerPortal();
   const [faqsOpen, setFaqsOpen] = useState(false);
+  const [tab, setTab] = useState<ServicesTab>("services");
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -379,6 +451,13 @@ export default function ShopServicesPage() {
     }
   };
 
+  const selectTab = useCallback((id: string) => setTab(id as ServicesTab), []);
+
+  const openCategory = (categoryId: string) => {
+    setActiveCategoryId(categoryId);
+    setTab("sub-service");
+  };
+
   const hasBulkSelection = selectedRows.size > 0;
   const showToolbar = activeCategory != null && !formOpen;
   const formCategory = unfilteredCategory ?? activeCategory;
@@ -386,20 +465,14 @@ export default function ShopServicesPage() {
   return (
     <ShopPageShell
       title="Services"
-      pageHeading={activeCategory?.name ?? "My Services"}
+      pageHeading={tab === "services" ? "Operating Services" : "Sub - Services"}
       metaTitle="Services | AutoDaddy"
       metaDescription="Auto shop services"
-      sidebarVariant="nav"
-      heroBackgroundImage={false}
       contentTopOffset
       heroCardFlush
-      sidebarItems={categories.map((cat) => ({
-        id: cat.id,
-        label: cat.name ?? "Category",
-        variant: "primary" as const,
-      }))}
-      activeSidebarId={activeCategoryId}
-      onSidebarSelect={setActiveCategoryId}
+      sidebarItems={SERVICES_SECTIONS}
+      activeSidebarId={tab}
+      onSidebarSelect={selectTab}
       onFaqsOpen={() => setFaqsOpen(true)}
       onFaqsClose={() => setFaqsOpen(false)}
       faqsOpen={faqsOpen}
@@ -411,6 +484,16 @@ export default function ShopServicesPage() {
           <ShopListSkeleton variant="profile-table" className="w-full" />
         ) : error ? (
           <ShopErrorPanel message={error} onRetry={() => void refresh()} />
+        ) : tab === "services" ? (
+          <>
+            <CategoryTable
+              categories={allCategories.length > 0 ? allCategories : categories}
+              onOpen={openCategory}
+            />
+            <ShopListFooter>
+              <p>{(allCategories.length > 0 ? allCategories : categories).length} Entries</p>
+            </ShopListFooter>
+          </>
         ) : categories.length === 0 ? (
           <>
             <SubServiceTable
@@ -430,6 +513,18 @@ export default function ShopServicesPage() {
             {showToolbar ? (
               <div className={`${shopTableToolbarCompactClass} overflow-x-auto`}>
                 <div className="flex min-w-0 flex-wrap items-center gap-2 whitespace-nowrap">
+                  <select
+                    className={shopFilterSelectClass}
+                    value={activeCategory.id}
+                    onChange={(e) => setActiveCategoryId(e.target.value)}
+                    aria-label="Filter by service"
+                  >
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name ?? "Category"}
+                      </option>
+                    ))}
+                  </select>
                   <select
                     className={shopFilterSelectClass}
                     value={makeFilter}

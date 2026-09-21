@@ -185,9 +185,8 @@ import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
 import { StickyFaqsButton } from "../../components/owner/OwnerFaqsButton";
-import ShopBusinessProfileCard from "../../components/shop/ShopBusinessProfileCard";
+import ShopDealersListPanel from "../../components/shop/ShopDealersListPanel";
 import ShopHeroCardToolbar from "../../components/shop/ShopHeroCardToolbar";
-import ShopPrimaryNav from "../../components/shop/ShopPrimaryNav";
 import ShopProfileHeroPanel from "../../components/shop/ShopProfileHeroPanel";
 import {
   shopHeroCardScrollBodyClass,
@@ -195,15 +194,11 @@ import {
   shopHeroCardScrollContentClass,
   shopHeroCardScrollContentTopClass,
   shopMainContentFillClass,
-  shopNavRowNavClass,
-  shopNavRowSlotClass,
-  shopPageBodyGridClass,
+  shopPortalBodyGridClass,
   shopPortalBottomPaddingClass,
   shopPortalHorizPaddingClass,
   shopPortalTopPaddingClass,
 } from "../../components/shop/shopLayoutStyles";
-import ShopSidebar from "../../components/shop/ShopSidebar";
-import { shopPrimaryNav } from "../../config/shopNav";
 import {
   DEFAULT_SHOP_PAGE_CHROME,
   useShopPageChromeContext,
@@ -235,30 +230,16 @@ export default function ShopPageLayout() {
 
   const metaTitle = chrome.metaTitle ?? DEFAULT_SHOP_PAGE_CHROME.metaTitle!;
   const metaDescription = chrome.metaDescription ?? DEFAULT_SHOP_PAGE_CHROME.metaDescription!;
-  const showBusinessCard = chrome.sidebarVariant === "business-card";
   const useHeroCard = chrome.heroCard !== false;
   const showSearch = chrome.searchPlaceholder != null;
   const showToolbar = showSearch || chrome.headerAction || chrome.heroCardToolbarAlways;
+  const heading = chrome.pageHeading?.trim() || chrome.title?.trim() || "";
+  const headingParent = chrome.pageHeadingParent?.trim();
   // Remount page content on every route change so each page re-fetches fresh API data.
   const pageOutlet = <Outlet key={location.pathname} />;
 
-  const sidebarCell = showBusinessCard ? (
-    <ShopBusinessProfileCard />
-  ) : (
-    <ShopSidebar
-      items={chrome.sidebarItems ?? []}
-      activeId={chrome.activeSidebarId}
-      onSelect={chrome.onSidebarSelect}
-      heading={chrome.sidebarHeading}
-      headingClassName={chrome.sidebarHeadingClassName}
-      footer={chrome.sidebarFooter}
-      loading={chrome.sidebarLoading}
-      skeletonCount={chrome.sidebarSkeletonCount}
-      shopStyle
-    >
-      {chrome.sidebarExtra}
-    </ShopSidebar>
-  );
+  // Home supplies its own left column (dealer ad carousel); inner pages list the dealers.
+  const leftPanel = chrome.sidebarExtra ?? <ShopDealersListPanel />;
 
   const scrollRegionClass = chrome.contentFillHeight
     ? "no-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden"
@@ -275,11 +256,7 @@ export default function ShopPageLayout() {
       : shopHeroCardScrollContentClass;
 
   const pageContent = useHeroCard ? (
-    <ShopProfileHeroPanel
-      showBackgroundImage={chrome.heroBackgroundImage !== false}
-      flush={chrome.heroCardFlush === true}
-      transparent={chrome.heroCardTransparent === true}
-    >
+    <ShopProfileHeroPanel flush={chrome.heroCardFlush === true}>
       <div className={`flex h-full min-h-0 w-full flex-col ${chrome.heroCardFlush ? "gap-1" : "gap-3"}`}>
         {showToolbar ? (
           <ShopHeroCardToolbar
@@ -306,30 +283,28 @@ export default function ShopPageLayout() {
 
   return (
     <PortalPageContent
-      className={`flex min-h-0 flex-1 flex-col overflow-hidden ${shopPortalTopPaddingClass} ${shopPortalBottomPaddingClass} ${shopPortalHorizPaddingClass}`}
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent ${shopPortalTopPaddingClass} ${shopPortalBottomPaddingClass} ${shopPortalHorizPaddingClass}`}
     >
       <PageMeta title={metaTitle} description={metaDescription} />
 
-      <div className={shopPageBodyGridClass}>
-        <div
-          className={`order-1 lg:col-start-1 lg:row-start-1 lg:self-center ${shopNavRowSlotClass}`}
-        >
-          {chrome.sidebarHeader ?? (
-            <span className="hidden lg:block lg:size-10" aria-hidden />
+      <div className={shopPortalBodyGridClass}>
+        <h1 className="flex min-h-9 min-w-0 items-end gap-1.5 truncate pt-2 text-lg font-bold text-gray-700 lg:col-start-2 lg:row-start-1 lg:text-xl">
+          {headingParent ? (
+            <>
+              <span className="shrink-0">{headingParent}</span>
+              <span className="shrink-0 text-gray-400">-</span>
+              <span className="truncate text-[#1f3aa0]">{heading}</span>
+            </>
+          ) : (
+            <span className="truncate">{heading}</span>
           )}
+        </h1>
+
+        <div className="order-last min-h-0 lg:order-none lg:col-start-1 lg:row-start-2">
+          {leftPanel}
         </div>
 
-        <ShopPrimaryNav
-          homePath="/shop"
-          primaryNav={shopPrimaryNav}
-          className={`order-2 lg:order-1 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:justify-self-stretch lg:self-center ${shopNavRowNavClass}`}
-        />
-
-        <div className="order-3 min-h-0 lg:order-2 lg:col-start-1 lg:row-start-2 lg:self-start">
-          {sidebarCell}
-        </div>
-
-        <div className="order-4 flex min-h-0 min-w-0 flex-col overflow-hidden lg:order-3 lg:col-start-2 lg:row-start-2">
+        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden lg:col-start-2 lg:row-start-2">
           {pageContent}
         </div>
       </div>

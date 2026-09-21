@@ -28,7 +28,7 @@ export default function ShopHeroCardToolbar({
 
   return (
     <div
-      className={`flex min-h-9 shrink-0 flex-wrap items-center justify-end gap-2 rounded-t border-b border-gray-300 bg-[#d1d5db] px-2 py-1.5 sm:gap-3 ${className}`.trim()}
+      className={`flex min-h-9 shrink-0 flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 sm:gap-3 ${className}`.trim()}
     >
       {showSearch ? (
         <input

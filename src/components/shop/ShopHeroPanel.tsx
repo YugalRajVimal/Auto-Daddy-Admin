@@ -8,7 +8,7 @@ import { Skeleton } from "../common/Skeleton";
 import { ThoughtOfTheDayCard } from "../portal/ThoughtOfTheDayCard";
 import ShopAdDetailContent from "./ShopAdDetailContent";
 import ShopMenuDetailContent from "./ShopMenuDetailContent";
-import { shopHeroOpaqueSurfaceClass, shopMainContentShellClass } from "./shopLayoutStyles";
+import { shopHeroOpaqueSurfaceClass, shopPanelShellClass } from "./shopLayoutStyles";
 
 type ShopHeroPanelProps = {
   thoughtOfTheDay?: ThoughtOfTheDayView | string;
@@ -57,7 +57,7 @@ export default function ShopHeroPanel({
   }, [showingOverlay, handleOverlayClose]);
 
   return (
-    <div className={`relative overflow-hidden ${shopMainContentShellClass} ${className}`}>
+    <div className={`relative overflow-hidden border border-gray-200 shadow-[0_8px_28px_rgba(15,23,42,0.07)] ${shopPanelShellClass} ${className}`}>
       {loading ? (
         <div className="absolute inset-0 animate-pulse">
           <Skeleton className="h-full w-full rounded-none" pulse={false} />

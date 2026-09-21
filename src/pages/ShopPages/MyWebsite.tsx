@@ -1645,6 +1645,7 @@ import {
   shopProfileFormPanelClass,
   shopProfileFormPanelFooterClass,
 } from "../../components/shop/shopLayoutStyles";
+import { useSearchParams } from "react-router";
 import ShopPageShell from "../../components/shop/ShopPageShell";
 import { ShopEmptyPanel } from "../../components/shop/ShopPanels";
 import { ShopFormSkeleton } from "../../components/shop/ShopListSkeletons";
@@ -2702,7 +2703,13 @@ export default function ShopMyWebsitePage() {
   const { token, profile } = useAuth();
   const { faqsHeading, faqsDescription, business, user, refresh } = useShopOwnerPortal();
   // const { requireSubscription } = useShopSubscriptionGate();
-  const [activeSection, setActiveSection] = useState<ShopWebsiteSection>("overview");
+  const [searchParams] = useSearchParams();
+  const [activeSection, setActiveSection] = useState<ShopWebsiteSection>(() => {
+    const requested = searchParams.get("section");
+    return WEBSITE_SECTIONS.some((section) => section.id === requested)
+      ? (requested as ShopWebsiteSection)
+      : "overview";
+  });
   const [faqsOpen, setFaqsOpen] = useState(false);
   const [domainForm, setDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
   const [savedDomainForm, setSavedDomainForm] = useState<DomainForm>(EMPTY_DOMAIN_FORM);
