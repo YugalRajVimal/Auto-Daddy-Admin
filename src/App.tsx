@@ -113,6 +113,8 @@ import CarOwnerOnboardingApproval from "./pages/CarownerOnboardingApproval";
 import { adminRoutes } from "./portals/admin/routes";
 import { ownerRoutes, shopRoutes } from "./portals/owner/routes";
 import PublicShopProfilePage from "./pages/PublicShopProfile";
+import ShopWelcomeSlidesPage from "./pages/ShopPages/WelcomeSlides";
+import { RequirePortal } from "./auth/guards/RequirePortal";
 
 export default function App() {
   return (
@@ -150,6 +152,14 @@ export default function App() {
             <Route path="/owner/onboarding" element={<CarOwnerOnboardingPage />} />
             <Route path="/s/:slug" element={<PublicShopProfilePage />} />
             <Route path="/shop/onboarding" element={<ShopOwnerOnboardingPage />} />
+            <Route
+              path="/shop/welcome"
+              element={
+                <RequirePortal portal="shop" signInPath="/" unauthorizedPath="/">
+                  <ShopWelcomeSlidesPage />
+                </RequirePortal>
+              }
+            />
             <Route path="/onboarding-approval/:token" element={<OnboardingApproval />} />
             <Route path="/car-owner-onboarding/:token" element={<CarOwnerOnboardingApproval />} />
 

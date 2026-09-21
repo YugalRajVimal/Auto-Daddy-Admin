@@ -229,6 +229,9 @@ setTimeout(() => {
     const shopIncomplete = resolveShopIncompleteKindFromAuthFlags(data);
     if (shopIncomplete) {
       redirect = shopProfileCompletionPath(shopIncomplete);
+    } else {
+      // Show the intro slides before the shop home.
+      redirect = "/shop/welcome";
     }
   } else if (userRole === "car_owner" && pending) {
     // Profile already complete + came from "log in to favourite a
