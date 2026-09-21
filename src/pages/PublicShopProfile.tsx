@@ -1,189 +1,3 @@
-// import { useEffect, useState } from "react";
-// import { useNavigate, useParams } from "react-router";
-// import { toast } from "react-toastify";
-// import { getPublicJson, postJson } from "../api/mobileAuth";
-// import { useAuth } from "../auth";
-// import { setPendingRedirect } from "../lib/postAuthRedirect";
-
-// type PublicShop = {
-//   _id: string;
-//   slug: string;
-//   name?: string;
-//   logo?: string | null;
-//   banner?: string | null;
-//   city?: string | null;
-//   address?: string | null;
-//   isBusinessActive?: boolean;
-//   rating?: number | null;
-//   ratingCount?: number;
-// };
-
-// type ToggleFavoriteResponse = {
-//   success?: boolean;
-//   message?: string;
-//   action?: "added" | "removed";
-// };
-
-// export default function PublicShopProfilePage() {
-//   const { slug } = useParams<{ slug: string }>();
-//   const navigate = useNavigate();
-//   const { token, role, isAuthenticated } = useAuth();
-
-//   const [shop, setShop] = useState<PublicShop | null>(null);
-//   const [loading, setLoading] = useState(true);
-//   const [notFound, setNotFound] = useState(false);
-//   const [isFavorite, setIsFavorite] = useState(false);
-//   const [favBusy, setFavBusy] = useState(false);
-
-//   useEffect(() => {
-//     let cancelled = false;
-//     if (!slug) return;
-//     setLoading(true);
-//     setNotFound(false);
-//     getPublicJson<PublicShop>(`/api/public/shop/${encodeURIComponent(slug)}`).then((res) => {
-//       if (cancelled) return;
-//       if (!res.ok || !res.data?._id) {
-//         setNotFound(true);
-//       } else {
-//         console.log(res.data);
-//         setShop(res.data);
-//       }
-//       setLoading(false);
-//     });
-//     return () => {
-//       cancelled = true;
-//     };
-//   }, [slug]);
-
-//   // If we just came back from login/signup with this shop pending, finish
-//   // the favourite automatically so the tap-to-login round trip feels like
-//   // one action instead of two.
-//   useEffect(() => {
-//     if (!shop || !isAuthenticated || role !== "car_owner" || !token) return;
-//     const pending = sessionStorage.getItem("autodaddy.pendingRedirect");
-//     if (!pending) return;
-//     try {
-//       const parsed = JSON.parse(pending) as { favShopId?: string };
-//       if (parsed.favShopId !== shop._id) return;
-//     } catch {
-//       return;
-//     }
-//     sessionStorage.removeItem("autodaddy.pendingRedirect");
-//     void favouriteShop(shop._id, token);
-//     // eslint-disable-next-line react-hooks/exhaustive-deps
-//   }, [shop, isAuthenticated, role, token]);
-
-//   async function favouriteShop(shopId: string, authToken: string) {
-//     setFavBusy(true);
-//     const res = await postJson<ToggleFavoriteResponse>(
-//       "/api/user/toggle-auto-shop-fav",
-//       { autoShopId: shopId },
-//       authToken
-//     );
-//     setFavBusy(false);
-//     if (!res.ok || res.data?.success === false) {
-//       toast.error(res.data?.message ?? "Could not update favourite.");
-//       return;
-//     }
-//     const nowFavorite = res.data?.action ? res.data.action === "added" : !isFavorite;
-//     setIsFavorite(nowFavorite);
-//     toast.success(nowFavorite ? "Added to your favourites!" : "Removed from favourites.");
-//   }
-
-//   function handleAddToFavourite() {
-//     if (!shop) return;
-
-//     if (isAuthenticated && role === "car_owner" && token) {
-//       void favouriteShop(shop._id, token);
-//       return;
-//     }
-
-//     if (isAuthenticated && role !== "car_owner") {
-//       toast.error("Log in with a car-owner account to favourite this shop.");
-//       return;
-//     }
-
-//     // Not logged in: remember where to come back to, then send them to
-//     // sign in / sign up. AdminSignInPage + the onboarding step both know
-//     // to check for this and finish the favourite once auth completes.
-//     setPendingRedirect({ returnTo: `/s/${shop.slug}`, favShopId: shop._id });
-//     navigate("/");
-//   }
-
-//   if (loading) {
-//     return (
-//       <div className="flex min-h-screen items-center justify-center bg-ad-app-bg">
-//         <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
-//       </div>
-//     );
-//   }
-
-//   if (notFound || !shop) {
-//     return (
-//       <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-ad-app-bg px-4 text-center">
-//         <h1 className="text-lg font-bold text-gray-800">Shop not found</h1>
-//         <p className="text-sm text-gray-500">
-//           This link may be out of date. Please check the QR code or link and try again.
-//         </p>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="-mx-4 min-h-screen bg-ad-app-bg pb-16 md:-mx-10 lg:-mx-14">
-//       <div className="relative h-40 w-full overflow-hidden bg-ad-mint sm:h-56">
-//         {shop.banner ? (
-//           <img src={shop.banner} alt="" className="h-full w-full object-cover" />
-//         ) : null}
-//       </div>
-
-//       <div className="mx-auto -mt-12 max-w-xl px-4">
-//         <div className="rounded-2xl bg-white p-5 shadow-[0_6px_24px_rgba(0,0,0,0.08)]">
-//           <div className="flex items-start gap-4">
-//             <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-//               {shop.logo ? (
-//                 <img src={shop.logo} alt="" className="h-full w-full object-cover" />
-//               ) : null}
-//             </div>
-//             <div className="min-w-0 flex-1">
-//               <h1 className="truncate text-lg font-bold text-gray-900">{shop.name}</h1>
-//               {(shop.address || shop.city) && (
-//                 <p className="mt-0.5 truncate text-sm text-gray-500">
-//                   {[shop.address, shop.city].filter(Boolean).join(", ")}
-//                 </p>
-//               )}
-//               {typeof shop.rating === "number" && (
-//                 <p className="mt-1 text-sm text-amber-600">
-//                   ★ {shop.rating.toFixed(1)}{" "}
-//                   <span className="text-gray-400">
-//                     ({shop.ratingCount ?? 0} review{shop.ratingCount === 1 ? "" : "s"})
-//                   </span>
-//                 </p>
-//               )}
-//               {!shop.isBusinessActive && (
-//                 <p className="mt-1 text-xs font-medium text-gray-400">Currently closed</p>
-//               )}
-//             </div>
-//           </div>
-
-//           <button
-//             type="button"
-//             onClick={handleAddToFavourite}
-//             disabled={favBusy}
-//             className={`mt-5 w-full rounded-lg py-2.5 text-sm font-bold uppercase tracking-wide shadow-sm transition disabled:opacity-60 ${
-//               isFavorite
-//                 ? "bg-ad-green-dark text-white"
-//                 : "bg-ad-green text-white hover:bg-ad-green-dark"
-//             }`}
-//           >
-//             {favBusy ? "Please wait..." : isFavorite ? "★ Favourited" : "☆ Add to Favourite"}
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "react-toastify";
@@ -298,6 +112,7 @@ export default function PublicShopProfilePage() {
       if (!res.ok || !res.data?._id) {
         setNotFound(true);
       } else {
+        console.log(res.data);
         setShop(res.data);
       }
       setLoading(false);
@@ -393,7 +208,15 @@ export default function PublicShopProfilePage() {
           <div className="flex justify-center mb-6">
             <div className="h-24 w-24 overflow-hidden rounded-2xl border-4 border-white bg-white shadow-md">
               {shop.logo ? (
-                <img src={shop.logo} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={
+                    shop.logo.startsWith("http")
+                      ? shop.logo
+                      : `${import.meta.env.VITE_UPLOADS_URL || ""}${shop.logo.startsWith("/") ? "" : "/"}${shop.logo}`
+                  }
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <div
                   className={`flex h-full w-full items-center justify-center text-2xl font-bold ${palette.bg} ${palette.text}`}
@@ -402,6 +225,7 @@ export default function PublicShopProfilePage() {
                 </div>
               )}
             </div>
+      
           </div>
 
           {/* Shop Header */}

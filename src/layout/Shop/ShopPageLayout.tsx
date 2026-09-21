@@ -239,7 +239,7 @@ export default function ShopPageLayout() {
   const pageOutlet = <Outlet key={location.pathname} />;
 
   // Home supplies its own left column (dealer ad carousel); inner pages list the dealers.
-  const leftPanel = chrome.sidebarExtra ?? <ShopDealersListPanel />;
+  const leftPanel = <ShopDealersListPanel />;
 
   const scrollRegionClass = chrome.contentFillHeight
     ? "no-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden"
