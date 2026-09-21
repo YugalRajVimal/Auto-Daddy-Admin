@@ -4,7 +4,7 @@ import { useLocation } from "react-router";
 import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerDealFilters from "../../../components/owner/OwnerDealFilters";
 import OwnerDealRow from "../../../components/owner/OwnerDealRow";
-import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
 import { useOwnerShopCityFilter } from "../../../context/OwnerShopCityFilterContext";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerDeals } from "../../../hooks/useCarOwnerDeals";
@@ -33,14 +33,6 @@ const CATEGORY_HEADINGS: Record<DealCategory, string> = {
   parts: "Spare Parts Deals",
   // salvage: "Salvage Deals",
   completed: "Completed Deals",
-};
-
-const CATEGORY_SUBTITLES: Record<DealCategory, string> = {
-  service: "Active service offers from nearby shops",
-  tire: "Tire and alloy wheel offers for your vehicle",
-  parts: "Spare parts and accessory deals matched to you",
-  // salvage: "Salvage and recovery offers",
-  completed: "Offers that have already ended",
 };
 
 function dealCategoryFromPath(pathname: string): DealCategory {
@@ -188,25 +180,12 @@ export default function OwnerDealsPage() {
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading={CATEGORY_HEADINGS[category]}
       metaTitle="Deals | AutoDaddy"
       metaDescription="Car owner deals"
       noPanel
     >
-      <div className="flex flex-col gap-4">
-        <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
-          <div className="space-y-1">
-            <p className="text-sm text-slate-500">{CATEGORY_SUBTITLES[category]}</p>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-              {CATEGORY_HEADINGS[category]}
-            </h1>
-          </div>
-          {!loading && !error && filteredTotal > 0 ? (
-            <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
-              {filteredTotal} deal{filteredTotal === 1 ? "" : "s"}
-            </p>
-          ) : null}
-        </header>
+      <div className="flex flex-col gap-4 p-3 sm:p-4">
 
         {!loading && !error ? (
           <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/90 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] ring-1 ring-black/5 sm:p-4">

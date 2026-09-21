@@ -1,6 +1,6 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import { FiLock, FiStar } from "react-icons/fi";
-import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
 import {
   useCarOwnerPrivacy,
   useCarOwnerProductFeatures,
@@ -17,31 +17,8 @@ const FEATURE_ACCENTS = [
   { soft: "bg-teal-50", tint: "text-teal-700", ring: "ring-teal-100", blob: "bg-teal-100" },
 ] as const;
 
-function PageIntro({
-  eyebrow,
-  title,
-  subtitle,
-  icon,
-  accentClass,
-}: {
-  eyebrow: string;
-  title: string;
-  subtitle: string;
-  icon: ReactNode;
-  accentClass: string;
-}) {
-  return (
-    <div className={`${ownerPageIntroClass} flex flex-wrap items-start justify-between gap-3`}>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-slate-500">{eyebrow}</p>
-        <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 md:text-2xl">{title}</h2>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">{subtitle}</p>
-      </div>
-      <span className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${accentClass}`}>
-        {icon}
-      </span>
-    </div>
-  );
+function PageIntro({ subtitle }: { subtitle: string }) {
+  return <p className="px-1 text-sm text-gray-500">{subtitle}</p>;
 }
 
 function EmptyState({ message }: { message: string }) {
@@ -147,19 +124,13 @@ export function OwnerPrivacyPage() {
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading={heading}
       metaTitle="Privacy | AutoDaddy"
       metaDescription="Privacy policy for car owners"
       noPanel
     >
-      <div className="space-y-4">
-        <PageIntro
-          eyebrow="Trust & safety"
-          title={heading}
-          subtitle="How AutoDaddy handles your personal and vehicle information."
-          icon={<FiLock size={20} className="text-emerald-700" />}
-          accentClass="bg-emerald-50 text-emerald-700"
-        />
+      <div className="space-y-4 p-3 sm:p-4">
+        <PageIntro subtitle="How AutoDaddy handles your personal and vehicle information." />
         {loading ? (
           <LoadingBlock />
         ) : description ? (
@@ -180,19 +151,13 @@ export function OwnerFeaturesPage() {
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading="Features"
       metaTitle="Features | AutoDaddy"
       metaDescription="Product features for car owners"
       noPanel
     >
-      <div className="space-y-4">
-        <PageIntro
-          eyebrow="Product"
-          title="Features"
-          subtitle="Everything built into your car-owner workspace."
-          icon={<FiStar size={20} className="text-amber-700" />}
-          accentClass="bg-amber-50 text-amber-700"
-        />
+      <div className="space-y-4 p-3 sm:p-4">
+        <PageIntro subtitle="Everything built into your car-owner workspace." />
         {loading ? (
           <LoadingBlock />
         ) : sections.length > 0 ? (

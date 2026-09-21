@@ -1,53 +1,27 @@
 import type { ServiceCategory, ServiceSubItem } from "../../lib/serviceCatalog";
-import { shopMainContentFillClass, shopMainContentShellClass } from "../shop/shopLayoutStyles";
+import { OwnerTitleBar } from "./ownerUi";
 
-function PanelHeader({
-  title,
-  onBack,
-}: {
-  title: string;
-  onBack?: () => void;
-}) {
-  return (
-    <div className="flex shrink-0 items-center justify-between gap-3 bg-ad-purple px-4 py-2.5">
-      <div className="min-w-0 flex-1 text-center text-sm font-bold text-white">{title}</div>
-      {onBack ? (
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 rounded bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/15"
-        >
-          Back
-        </button>
-      ) : null}
-    </div>
-  );
-}
+/** Alternating mockup tile tones: pale green and lime. */
+const TILE_TONES = [
+  "bg-[#d4fcd4] text-[#0a6b0a] ring-green-200",
+  "bg-gradient-to-br from-[#a8d63a] to-[#8cc21f] text-white ring-lime-400",
+  "bg-gradient-to-br from-[#a8d63a] to-[#8cc21f] text-white ring-lime-400",
+  "bg-[#d4fcd4] text-[#0a6b0a] ring-green-200",
+];
 
-function TileButton({
-  label,
-  onClick,
-  muted = false,
-}: {
-  label: string;
-  onClick: () => void;
-  muted?: boolean;
-}) {
+function TileButton({ label, tone, onClick }: { label: string; tone: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex min-h-[120px] w-full flex-col items-center justify-end rounded border px-3 py-4 text-center shadow-sm transition-all hover:shadow-md ${
-        muted ? "border-gray-300 bg-gray-200" : "border-gray-300 bg-white"
-      }`}
+      className={`flex aspect-square w-full flex-col items-center justify-end rounded-xl p-4 text-center shadow-sm ring-1 transition-all hover:-translate-y-1 hover:shadow-lg ${tone}`}
     >
-      <span className={`font-serif text-base font-bold ${muted ? "text-gray-800" : "text-ad-green"}`}>
-        {label}
-      </span>
+      <span className="font-serif text-lg font-bold italic leading-tight drop-shadow-sm">{label}</span>
     </button>
   );
 }
 
+/** Home → service category: 2-column grid of sub-service tiles (mockup Safety / Tires screens). */
 export default function OwnerServiceTilesPanel({
   indoor,
   outdoor,
@@ -64,54 +38,50 @@ export default function OwnerServiceTilesPanel({
   onSubServiceSelect?: (sub: ServiceSubItem) => void;
 }) {
   const allServices = [...indoor, ...outdoor];
+  const index = selectedService
+    ? allServices.findIndex((s) => (s.id ?? s.name) === (selectedService.id ?? selectedService.name))
+    : -1;
+  const next = index >= 0 && allServices.length > 1 ? allServices[(index + 1) % allServices.length] : null;
 
-  if (!selectedService) {
-    return (
-      <div className={`${shopMainContentShellClass} ${shopMainContentFillClass} bg-white`}>
-        <PanelHeader title="Dashboard" />
-        <div className="grid grid-cols-2 gap-4 p-6 lg:grid-cols-3">
-          {allServices.map((service) => {
-            const key = service.id ?? service.name;
-            return (
-              <TileButton
-                key={key}
-                label={service.name}
-                onClick={() => onServiceSelect(service)}
-                muted={false}
-              />
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  const subs = selectedService.subServices ?? [];
-  const title = selectedService.name.trim() || "Service";
+  const tiles = selectedService ? selectedService.subServices ?? [] : [];
+  const title = selectedService ? selectedService.name.trim() || "Service" : "Services";
 
   return (
-    <div className={`${shopMainContentShellClass} ${shopMainContentFillClass} bg-white`}>
-      <PanelHeader title={title} onBack={onCloseService} />
-      {subs.length === 0 ? (
+    <div className="flex h-full min-h-0 flex-col">
+      <OwnerTitleBar
+        title={title}
+        onPrev={onCloseService}
+        onNext={next ? () => onServiceSelect(next) : undefined}
+      />
+      {!selectedService ? (
+        <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-6 p-8">
+          {allServices.map((service, i) => (
+            <TileButton
+              key={service.id ?? service.name}
+              label={service.name}
+              tone={TILE_TONES[i % TILE_TONES.length]}
+              onClick={() => onServiceSelect(service)}
+            />
+          ))}
+        </div>
+      ) : tiles.length === 0 ? (
         <div className="flex min-h-[240px] items-center justify-center p-6 text-center text-sm text-gray-600">
           No sub services available.
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-6 p-6 md:grid-cols-2 lg:grid-cols-3">
-          {subs.map((sub) => {
-            const key = sub.id ?? sub.name;
-            return (
+        <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
+          <div className={`grid w-full gap-6 ${tiles.length > 4 ? "max-w-2xl grid-cols-2 sm:grid-cols-3" : "max-w-md grid-cols-2"}`}>
+            {tiles.map((sub, i) => (
               <TileButton
-                key={key}
+                key={sub.id ?? sub.name}
                 label={sub.name}
+                tone={TILE_TONES[i % TILE_TONES.length]}
                 onClick={() => onSubServiceSelect?.(sub)}
-                muted={true}
               />
-            );
-          })}
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 }
-

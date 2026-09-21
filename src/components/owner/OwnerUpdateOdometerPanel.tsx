@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { FiChevronLeft } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { putJson } from "../../api/mobileAuth";
-import { compactInputClass } from "../admin/ContentPanel";
 import { useCarOwnerJobCards } from "../../hooks/useCarOwnerJobCards";
 import { businessName } from "../../lib/carOwnerJobCards";
 import {
@@ -16,13 +14,19 @@ import { odometerUpdateSchema } from "../../lib/validation/schemas/vehicle";
 import OwnerOdometerVehiclePicker from "./OwnerOdometerVehiclePicker";
 import { Skeleton } from "../common/Skeleton";
 import { shopMainContentFillClass } from "../shop/shopLayoutStyles";
+import {
+  OwnerFormFooter,
+  OwnerTitleBar,
+  ownerFormInputClass as compactInputClass,
+  ownerFormPanelClass,
+} from "./ownerUi";
 
 /** Fill parent height so the save footer is not clipped by nested layout chrome. */
 const panelShellClass =
   "flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg bg-white";
 
 const readOnlyFieldClass =
-  "flex h-[30px] w-full items-center border border-gray-400 bg-white px-2 text-sm text-gray-800";
+  "flex h-10 w-full items-center justify-center rounded-md bg-white px-3 text-sm text-gray-800 shadow-sm";
 
 type OwnerUpdateOdometerPanelProps = {
   vehicles: CarOwnerVehicle[];
@@ -31,6 +35,8 @@ type OwnerUpdateOdometerPanelProps = {
   token: string | null;
   onBack: () => void;
   onSaved?: () => void;
+  /** « on the vehicle list (leave the odometer flow). */
+  onExit?: () => void;
   /** When true, opens the update form directly (e.g. Vehicles page). */
   skipVehiclePicker?: boolean;
 };
@@ -127,25 +133,13 @@ function OdometerVehicleForm({
 
   return (
     <div className={`${panelShellClass} ${shopMainContentFillClass}`}>
-      <div className="shrink-0 bg-ad-purple px-4 py-2.5 text-center">
-        <h2 className="font-serif text-base font-bold text-white md:text-lg">Update Odometer - {plate}</h2>
-      </div>
+      <OwnerTitleBar title={`Update Odometer - ${plate}`} onPrev={onBack} />
 
-      <div className="flex shrink-0 items-center justify-end border-b border-gray-200 bg-white px-4 py-2">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
-        >
-          <FiChevronLeft className="text-gray-500" aria-hidden />
-          Back
-        </button>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto bg-ad-form-bg px-4 py-4 md:px-6 md:py-5">
+      <div className="p-3 sm:p-5">
+      <div className={ownerFormPanelClass}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           <div className="min-w-0">
-            <label htmlFor="owner-odometer-current" className="mb-1 block text-sm font-semibold text-gray-900">
+            <label htmlFor="owner-odometer-current" className="mb-1.5 block text-sm font-medium text-gray-700">
               Current Odometer
             </label>
             <input
@@ -160,7 +154,7 @@ function OdometerVehicleForm({
           </div>
 
           <div className="min-w-0">
-            <label htmlFor="owner-odometer-due" className="mb-1 block text-sm font-semibold text-gray-900">
+            <label htmlFor="owner-odometer-due" className="mb-1.5 block text-sm font-medium text-gray-700">
               Due on Kms
             </label>
             <input
@@ -174,12 +168,12 @@ function OdometerVehicleForm({
           </div>
 
           <div className="min-w-0">
-            <p className="mb-1 text-sm font-semibold text-gray-900">Status</p>
-            <div className={`${readOnlyFieldClass} font-semibold text-blue-600`}>{statusText}</div>
+            <p className="mb-1.5 text-sm font-medium text-gray-700">Status</p>
+            <div className={`${readOnlyFieldClass} font-semibold text-blue-700 underline underline-offset-2`}>{statusText}</div>
           </div>
 
           <div className="min-w-0">
-            <label htmlFor="owner-odometer-serviced-by" className="mb-1 block text-sm font-semibold text-gray-900">
+            <label htmlFor="owner-odometer-serviced-by" className="mb-1.5 block text-sm font-medium text-gray-700">
               Serviced by
             </label>
             <input
@@ -196,26 +190,14 @@ function OdometerVehicleForm({
         {validationError ? <p className="mt-3 text-xs text-red-600">{validationError}</p> : null}
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-4 py-2.5 md:px-6">
-        <button
-          type="button"
-          disabled={!canSave}
-          onClick={() => void handleSave()}
-          className="rounded bg-ad-form-save px-6 py-1 text-sm font-bold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {saving ? "Updating…" : "Update"}
-        </button>
-        <span className="text-sm text-gray-700">
-          or{" "}
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onBack}
-            className="font-medium text-blue-600 underline hover:text-blue-700 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-        </span>
+      <OwnerFormFooter
+        note={`You are updating the odometer of ${plate}`}
+        onSave={() => void handleSave()}
+        saveLabel={saving ? "Updating…" : "Update"}
+        saving={saving}
+        disabled={!canSave}
+        onCancel={onBack}
+      />
       </div>
     </div>
   );
@@ -228,6 +210,7 @@ export default function OwnerUpdateOdometerPanel({
   token,
   onBack,
   onSaved,
+  onExit,
   skipVehiclePicker = false,
 }: OwnerUpdateOdometerPanelProps) {
   const activeVehicles = vehicles.filter((v) => !v.disabled);
@@ -279,6 +262,7 @@ export default function OwnerUpdateOdometerPanel({
       <OwnerOdometerVehiclePicker
         vehicles={activeVehicles}
         onSelect={(vehicle) => setSelectedVehicleId(vehicle.id)}
+        onBack={onExit}
       />
     );
   }

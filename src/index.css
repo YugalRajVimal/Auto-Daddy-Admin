@@ -1222,3 +1222,41 @@ input.shop-compact-input[type="time"] {
 .shop-hero-card table tbody tr:hover {
   background-color: #fbf2fb;
 }
+
+/* Car owner portal tables (mockup: orchid header, alternating grey rows). */
+.owner-page-body table thead tr {
+  background: linear-gradient(90deg, #b643ad 0%, #cc66cc 100%);
+}
+
+.owner-page-body table thead th {
+  background: transparent;
+  color: #fff;
+  border-color: transparent;
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.owner-page-body table tbody td {
+  border-left-color: transparent;
+  border-right-color: transparent;
+  border-top-color: #e5e7eb;
+  border-bottom-color: #e5e7eb;
+  font-size: 0.875rem;
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+
+.owner-page-body table tbody tr:nth-child(even) {
+  background-color: #ececec;
+}
+
+.owner-page-body table tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.owner-page-body table tbody tr:hover {
+  background-color: #fbf2fb;
+}

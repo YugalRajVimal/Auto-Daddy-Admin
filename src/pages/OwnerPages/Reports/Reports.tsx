@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FiBarChart2, FiSearch } from "react-icons/fi";
 import { useLocation } from "react-router";
-import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
 import {
   OwnerFlatReportTable,
   OwnerGroupedReportTable,
@@ -60,15 +60,6 @@ const REPORT_PAGE_HEADINGS: Record<OwnerReportType, string> = {
   "auto-shop": "Auto Shop Reports",
   "ticket-raised": "Ticket Raised",
   "ticket-resolved": "Resolved",
-};
-
-const REPORT_PAGE_SUBTITLES: Record<OwnerReportType, string> = {
-  service: "Summaries of service activity across shops",
-  "job-card": "Job card history grouped by category or shop",
-  invoice: "Invoice spend and payment tallies",
-  "auto-shop": "Shops you’ve used and how they rate",
-  "ticket-raised": "Support tickets you’ve opened",
-  "ticket-resolved": "Tickets that have been closed",
 };
 
 const SAMPLE_REPORT_CATEGORIES = [
@@ -333,18 +324,12 @@ export default function OwnerReportsPage() {
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading={REPORT_PAGE_HEADINGS[activeReport]}
       metaTitle="Reports | AutoDaddy"
       metaDescription="Car owner reports"
       noPanel
     >
-      <div className="flex flex-col gap-4">
-        <header className={`${ownerPageIntroClass} space-y-1`}>
-          <p className="text-sm text-slate-500">{REPORT_PAGE_SUBTITLES[activeReport]}</p>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-            {REPORT_PAGE_HEADINGS[activeReport]}
-          </h1>
-        </header>
+      <div className="flex flex-col gap-4 p-3 sm:p-4">
 
         <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5 sm:p-5">
           <div className="mb-4">

@@ -1,18 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiPlus, FiUser } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson, postJson } from "../../api/mobileAuth";
-import DashboardPanelCard from "../COMP";
 import CarBrandLogo from "../shop/CarBrandLogo";
-import { shopMainContentFillClass, shopMainContentShellClass } from "../shop/shopLayoutStyles";
+import { OwnerTitleBar } from "./ownerUi";
+import { OwnerShopListRow } from "./OwnerShopListRow";
 import { useCarOwnerAutoShops } from "../../hooks/useCarOwnerAutoShops";
 import { useCarOwnerFavoriteShops } from "../../hooks/useCarOwnerFavoriteShops";
 import type { ServiceCategory } from "../../hooks/useOwnerPortal";
 import { isCarOwnerShopOpenToday } from "../../lib/carOwnerAutoShops";
 import { getCarBrandId, getCarBrandName } from "../../lib/dummyCarBrands";
-import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import type { OwnerShopType } from "../../lib/serviceCatalog";
-import type { CarOwnerAutoShopListItem } from "../../types/carOwnerAutoShops";
 import type { ShopCarCompany } from "../shop/forms/ShopProfileEditors";
 import OwnerShopExpandedPanel, { ownerShopServiceRequestKey } from "./OwnerShopExpandedPanel";
 import { Skeleton } from "../common/Skeleton";
@@ -21,6 +18,8 @@ type OwnerDashboardServicePanelProps = {
   service: ServiceCategory;
   selectedSubServiceId?: string | null;
   token: string | null;
+  /** « on the make grid (leave the service flow). */
+  onExit?: () => void;
 };
 
 function serviceShopTypeParam(shopType?: OwnerShopType): string | null {
@@ -41,11 +40,6 @@ function resolveServiceFilterId(service: ServiceCategory): string | null {
   return null;
 }
 
-function OwnerPanelSectionHeader({ title }: { title: string }) {
-  return (
-    <div className="shrink-0 bg-ad-purple px-4 py-2.5 text-center text-sm font-bold text-white">{title}</div>
-  );
-}
 
 function OwnerVehicleMakeGrid({
   brands,
@@ -84,12 +78,12 @@ function OwnerVehicleMakeGrid({
             key={id}
             type="button"
             onClick={() => onSelect(brand)}
-            className="flex flex-col items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-3 shadow-sm transition-all hover:border-ad-purple/40 hover:shadow-md"
+            className="group flex flex-col overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-ad-purple/50 hover:shadow-md"
           >
-            <div className="flex h-14 w-full items-center justify-center">
-              <CarBrandLogo company={brand} className="max-h-12 max-w-full object-contain" />
+            <div className="flex h-24 w-full items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 p-3">
+              <CarBrandLogo company={brand} className="max-h-16 max-w-full object-contain transition-transform group-hover:scale-105" />
             </div>
-            <span className="text-center text-[11px] font-bold uppercase tracking-wide text-gray-800">{name}</span>
+            <span className="border-t border-gray-200 py-2 text-center text-sm font-bold uppercase tracking-wide text-gray-800">{name}</span>
           </button>
         );
       })}
@@ -97,56 +91,11 @@ function OwnerVehicleMakeGrid({
   );
 }
 
-function OwnerDashboardShopRow({
-  shop,
-  onExpand,
-}: {
-  shop: CarOwnerAutoShopListItem;
-  onExpand: () => void;
-}) {
-  const openToday = isCarOwnerShopOpenToday(shop);
-  const logoUri = normalizeMediaUrl(shop.logoUrl);
-  const phone = shop.phone.trim() || "Phone not listed";
-
-  return (
-    <button
-      type="button"
-      onClick={onExpand}
-      className="flex w-full items-center gap-3 border-b border-[#b2e0a0]/60 bg-ad-green-light/50 px-3 py-3 text-left transition-colors hover:bg-ad-green-light/70 last:border-b-0"
-      aria-label={`View ${shop.name}`}
-    >
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-200 bg-white text-gray-400">
-        {logoUri ? (
-          <img src={logoUri} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <FiUser size={24} strokeWidth={1.5} aria-hidden />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-gray-900">{shop.name}</p>
-        <p className="truncate text-sm font-medium text-blue-600">{phone}</p>
-      </div>
-      <span
-        className={`shrink-0 rounded px-3 py-1 text-xs font-bold text-white ${
-          openToday ? "bg-ad-green" : "bg-gray-400"
-        }`}
-      >
-        {openToday ? "Shop is Open" : "Shop is Closed"}
-      </span>
-      <span
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-ad-purple text-lg font-bold leading-none text-white shadow-sm"
-        aria-hidden
-      >
-        <FiPlus aria-hidden />
-      </span>
-    </button>
-  );
-}
-
 export default function OwnerDashboardServicePanel({
   service,
   selectedSubServiceId,
   token,
+  onExit,
 }: OwnerDashboardServicePanelProps) {
   const [brands, setBrands] = useState<ShopCarCompany[]>([]);
   const [brandsLoading, setBrandsLoading] = useState(true);
@@ -342,14 +291,19 @@ export default function OwnerDashboardServicePanel({
     : "Select Vehicle Make";
 
   return (
-    <div className={`${shopMainContentShellClass} ${shopMainContentFillClass} bg-white`}>
-      <OwnerPanelSectionHeader title={headerTitle} />
+    <div className="flex h-full min-h-0 flex-col">
+      <OwnerTitleBar
+        title={headerTitle}
+        onPrev={
+          expandedShop ? handleCollapseShop : selectedBrand ? () => setSelectedBrand(null) : onExit
+        }
+      />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {!selectedBrand ? (
           <OwnerVehicleMakeGrid brands={brands} loading={brandsLoading} onSelect={handleBrandSelect} />
         ) : expandedShop ? (
-          <DashboardPanelCard variant="form" className="m-2 mb-0 flex min-h-0 flex-1 flex-col">
+          <div className="m-3 flex min-h-0 flex-1 flex-col rounded-2xl bg-[#d4fcd4] p-3 ring-1 ring-green-200 sm:m-4 sm:p-5">
             <OwnerShopExpandedPanel
               shop={expandedShop}
               connectingServiceKey={connectingServiceKey}
@@ -362,7 +316,7 @@ export default function OwnerDashboardServicePanel({
               onConnect={(serviceId, serviceName) => void handleConnect(serviceId, serviceName)}
               onRated={() => void refresh()}
             />
-          </DashboardPanelCard>
+          </div>
         ) : shopsLoading ? (
           <div className="flex flex-1 items-center justify-center py-16">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ad-purple" />
@@ -383,9 +337,9 @@ export default function OwnerDashboardServicePanel({
             No shops found for {brandLabel} and {serviceLabel} in your area yet.
           </div>
         ) : (
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-2 p-2 sm:p-3">
             {shopsWithFavorites.map((shop) => (
-              <OwnerDashboardShopRow key={shop.id} shop={shop} onExpand={() => handleExpandShop(shop.id)} />
+              <OwnerShopListRow key={shop.id} shop={shop} onExpand={() => handleExpandShop(shop.id)} />
             ))}
           </div>
         )}

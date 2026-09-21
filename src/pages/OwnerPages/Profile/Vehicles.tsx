@@ -13,7 +13,8 @@ import {
   OwnerJobCardsTable,
   OwnerVehicleDocumentsTable,
 } from "../../../components/owner/OwnerPanelTables";
-import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import { AddVehicleTile } from "../../../components/owner/OwnerAddVehicleTile";
 import OwnerUpdateOdometerPanel from "../../../components/owner/OwnerUpdateOdometerPanel";
 import type { VehiclePanelSection } from "../../../components/owner/OwnerVehicleSectionsSidebar";
 import { useAuth } from "../../../auth";
@@ -41,14 +42,7 @@ import { type CarOwnerVehicle } from "../../../lib/carOwnerVehicles";
 import { resolveCarBrandLogo } from "../../../lib/dummyCarBrands";
 import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
 import type { CarOwnerJobCard } from "../../../types/carOwnerJobCards";
-import {
-  FiClipboard,
-  FiFileText,
-  FiPlus,
-  FiTrash2,
-  FiTruck,
-  FiUpload,
-} from "react-icons/fi";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { odometerToNumber, remainingKmNumber, formatOdometerStatus } from "../../../lib/carOwnerOdometer";
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
@@ -68,7 +62,7 @@ const VEHICLE_SECTION_LABELS: Record<VehiclePanelSection, string> = {
 };
 
 function vehicleSectionLabel(showForm: boolean, activeSection: VehiclePanelSection | null): string | null {
-  if (showForm) return "Add your Vehicle";
+  if (showForm) return "Add Vehicle";
   if (!activeSection) return null;
   return VEHICLE_SECTION_LABELS[activeSection];
 }
@@ -162,10 +156,21 @@ export default function OwnerVehiclesPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [vehicleDetailsMode, setVehicleDetailsMode] = useState<"view" | "edit">("view");
   const deepLinkApplied = useRef(false);
+  const [odometerMode, setOdometerMode] = useState(
+    () => (location.state as VehiclesLocationState | null)?.vehicleSection === "update-odometer",
+  );
+
+  // The left-panel "Update Odometer" shortcut can be pressed while already on this page.
+  useEffect(() => {
+    if ((location.state as VehiclesLocationState | null)?.vehicleSection === "update-odometer") {
+      setOdometerMode(true);
+      setShowForm(false);
+    }
+  }, [location.key, location.state]);
 
   useEffect(() => {
     const section = (location.state as VehiclesLocationState | null)?.vehicleSection;
-    if (!section || deepLinkApplied.current) return;
+    if (!section || section === "update-odometer" || deepLinkApplied.current) return;
     deepLinkApplied.current = true;
     setActiveSection(section);
     if (section !== "invoices") {
@@ -252,7 +257,12 @@ export default function OwnerVehiclesPage() {
   }, [vehicles]);
 
   useOwnerSidebarDefault(!loading, resetSidebar);
-  useOwnerNavReset(resetSidebar);
+  useOwnerNavReset(
+    useCallback(() => {
+      setOdometerMode(false);
+      resetSidebar();
+    }, [resetSidebar]),
+  );
 
   const deleteVehicleFromList = useCallback(
     async (vehicleId: string) => {
@@ -363,227 +373,130 @@ export default function OwnerVehiclesPage() {
 
     if (vehicles.length === 0) {
       return (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-5 py-12 text-center">
-          <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
-              <FiTruck size={24} />
-            </span>
-            <h3 className="text-lg font-bold text-slate-900">No vehicles yet</h3>
-            <p className="text-sm text-slate-600">Add your first car to track odometer, docs, and service history.</p>
-            <button
-              type="button"
-              onClick={() => {
-                setAddFormDismissed(false);
-                setShowForm(true);
-                setActiveSection(null);
-              }}
-              className="mt-2 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700"
-            >
-              <FiPlus size={16} /> Add vehicle
-            </button>
-          </div>
+        <div className="flex min-h-[420px] items-center justify-center rounded-xl bg-[#d4fcd4]">
+          <AddVehicleTile
+            onClick={() => {
+              setAddFormDismissed(false);
+              setShowForm(true);
+              setActiveSection(null);
+            }}
+          />
         </div>
       );
     }
 
     if (!activeSection) {
-      const CARD_THEMES = [
-        {
-          shell: "from-sky-50 via-white to-cyan-50 ring-sky-100",
-          bar: "bg-sky-500",
-          progress: "bg-sky-500",
-          chip: "bg-sky-50 text-sky-800 ring-sky-100",
-        },
-        {
-          shell: "from-emerald-50 via-white to-teal-50 ring-emerald-100",
-          bar: "bg-emerald-500",
-          progress: "bg-emerald-500",
-          chip: "bg-emerald-50 text-emerald-800 ring-emerald-100",
-        },
-        {
-          shell: "from-amber-50 via-white to-orange-50 ring-amber-100",
-          bar: "bg-amber-500",
-          progress: "bg-amber-500",
-          chip: "bg-amber-50 text-amber-900 ring-amber-100",
-        },
-        {
-          shell: "from-indigo-50 via-white to-violet-50 ring-indigo-100",
-          bar: "bg-indigo-500",
-          progress: "bg-indigo-500",
-          chip: "bg-indigo-50 text-indigo-800 ring-indigo-100",
-        },
-      ] as const;
-
+      const actionClass =
+        "rounded-md border border-ad-purple/50 bg-[#fde6d2] px-3 py-1.5 text-xs font-semibold text-ad-purple shadow-sm transition hover:-translate-y-px hover:bg-[#fff0e3] sm:px-4 sm:text-sm";
       return (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            {vehicles.map((v, index) => {
-              const plate = plateLabel(v);
-              const make = (v.make?.name ?? "").trim();
-              const model = (v.make?.model ?? "").trim();
-              const year = v.year != null ? String(v.year) : "";
-              const title = [make, model].filter(Boolean).join(" ") || "Vehicle";
-              const vin = (v.vinNo ?? "").trim();
-              const current = odometerToNumber(v.odometerReading);
-              const due = odometerToNumber(v.dueOdometerReading);
-              const remaining = remainingKmNumber(due, current);
-              const progressPct =
-                current != null && due != null && due > 0
-                  ? Math.min(100, Math.max(0, Math.round((current / due) * 100)))
-                  : null;
-              const overdue = remaining != null && remaining < 0;
-              const dueSoon = remaining != null && remaining >= 0 && remaining <= 1500;
-              const vehicleThumb =
-                normalizeMediaUrl(v.carImage ?? v.carImages?.[0] ?? null) ||
-                resolveCarBrandLogo(make ? { companyName: make } : null);
-              const theme = CARD_THEMES[index % CARD_THEMES.length];
-              const statusTone = overdue
-                ? "bg-rose-50 text-rose-700 ring-rose-100"
-                : dueSoon
-                  ? "bg-amber-50 text-amber-800 ring-amber-100"
-                  : "bg-emerald-50 text-emerald-800 ring-emerald-100";
+        <div className="flex flex-col gap-3">
+          {vehicles.map((v) => {
+            const plate = plateLabel(v);
+            const make = (v.make?.name ?? "").trim();
+            const model = (v.make?.model ?? "").trim();
+            const year = v.year != null ? String(v.year) : "";
+            const title = [make, model, year].filter(Boolean).join(" ") || "Vehicle";
+            const current = odometerToNumber(v.odometerReading);
+            const due = odometerToNumber(v.dueOdometerReading);
+            const remaining = remainingKmNumber(due, current);
+            const overdue = remaining != null && remaining < 0;
+            const vehicleThumb =
+              normalizeMediaUrl(v.carImage ?? v.carImages?.[0] ?? null) ||
+              resolveCarBrandLogo(make ? { companyName: make } : null);
 
-              return (
-                <article
-                  key={v.id}
-                  className={`group relative overflow-hidden rounded-2xl border border-white/90 bg-gradient-to-br ${theme.shell} shadow-[0_10px_28px_rgba(15,23,42,0.06)] ring-1 transition duration-200 hover:-translate-y-1 hover:shadow-[0_18px_36px_rgba(15,23,42,0.12)]`}
-                >
-                  <div className={`h-1.5 w-full ${theme.bar}`} />
-                  <div className="p-4 sm:p-5">
-                    <div className="flex gap-4">
-                      <div className="flex h-24 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 sm:h-28 sm:w-32">
-                        <img
-                          src={vehicleThumb}
-                          alt=""
-                          className="h-full w-full object-contain p-3"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedVehicleId(v.id);
-                              setActiveSection("vehicle-details");
-                              setVehicleDetailsMode("edit");
-                            }}
-                            className="min-w-0 text-left"
-                          >
-                            <p className="text-xl font-bold tracking-tight text-slate-900 underline-offset-2 group-hover:underline sm:text-2xl">
-                              {plate}
-                            </p>
-                            <p className="mt-1 truncate text-sm font-semibold text-slate-700">
-                              {title}
-                              {year ? (
-                                <span className="font-medium text-slate-500">{` · ${year}`}</span>
-                              ) : null}
-                            </p>
-                          </button>
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ${theme.chip}`}
-                          >
-                            My vehicle
-                          </span>
-                        </div>
-                        {vin ? (
-                          <p className="mt-2 truncate font-mono text-[11px] text-slate-500">
-                            VIN {vin}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 rounded-xl bg-white/80 p-3 ring-1 ring-black/5">
-                      <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="font-semibold text-slate-600">Odometer</span>
-                        <span className={`rounded-full px-2 py-0.5 font-bold ring-1 ${statusTone}`}>
-                          {formatOdometerStatus(remaining)}
-                        </span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
-                        <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                            Current
-                          </p>
-                          <p className="text-lg font-bold tabular-nums text-slate-900">
-                            {current != null ? current.toLocaleString() : "—"}
-                            <span className="ml-1 text-xs font-semibold text-slate-500">km</span>
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                            Service due
-                          </p>
-                          <p className="text-sm font-bold tabular-nums text-slate-700">
-                            {due != null ? `${due.toLocaleString()} km` : "—"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            overdue ? "bg-rose-500" : theme.progress
-                          }`}
-                          style={{ width: `${progressPct ?? 8}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigate(`/owner/expenses/job-cards?vehicleId=${encodeURIComponent(v.id)}`)
-                        }
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100 transition hover:bg-indigo-100"
-                      >
-                        <FiClipboard size={13} /> Job cards
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/owner/documents/${v.id}`)}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 ring-1 ring-teal-100 transition hover:bg-teal-100"
-                      >
-                        <FiUpload size={13} /> Docs
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigate(`/owner/expenses/invoices?vehicleId=${encodeURIComponent(v.id)}`)
-                        }
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 ring-1 ring-amber-100 transition hover:bg-amber-100"
-                      >
-                        <FiFileText size={13} /> Invoices
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteVehicleFromList(v.id)}
-                        className="ml-auto inline-flex size-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-                        aria-label="Delete vehicle"
-                        title="Delete"
-                      >
-                        <FiTrash2 size={15} />
-                      </button>
-                    </div>
+            return (
+              <article
+                key={v.id}
+                className="group grid grid-cols-[96px_minmax(0,1fr)] overflow-hidden rounded-xl bg-[#d4fcd4] shadow-sm ring-1 ring-green-200 transition hover:shadow-md sm:grid-cols-[136px_minmax(0,1fr)]"
+              >
+                <div className="flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-950 p-3">
+                  <img
+                    src={vehicleThumb}
+                    alt=""
+                    className="max-h-16 w-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.visibility = "hidden";
+                    }}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedVehicleId(v.id);
+                      setActiveSection("vehicle-details");
+                      setVehicleDetailsMode("view");
+                    }}
+                    className="min-w-[10rem] flex-1 text-left sm:text-center"
+                  >
+                    <span className="block text-2xl font-bold tracking-wide text-ad-purple sm:text-[1.75rem]">{plate}</span>
+                    <span className="block truncate text-xs text-gray-600">
+                      {title}
+                      {v.vinNo ? ` · VIN ${v.vinNo}` : ""}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-gray-600">
+                      {current != null ? `${current.toLocaleString()} km` : "Odometer —"}
+                      {due != null ? ` · due ${due.toLocaleString()} km · ` : " · "}
+                      <span className={`font-semibold ${overdue ? "text-red-600" : "text-blue-700"}`}>
+                        {formatOdometerStatus(remaining)}
+                      </span>
+                    </span>
+                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/owner/expenses/job-cards?vehicleId=${encodeURIComponent(v.id)}`)}
+                      className={actionClass}
+                    >
+                      Job-Card
+                    </button>
+                    <button type="button" onClick={() => navigate(`/owner/documents/${v.id}`)} className={actionClass}>
+                      Docs
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/owner/expenses/invoices?vehicleId=${encodeURIComponent(v.id)}`)}
+                      className={actionClass}
+                    >
+                      Invoices
+                    </button>
                   </div>
-                </article>
-              );
-            })}
-          </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedVehicleId(v.id);
+                        setActiveSection("vehicle-details");
+                        setVehicleDetailsMode("edit");
+                      }}
+                      className="flex size-10 items-center justify-center rounded-lg text-blue-600 transition hover:bg-white/70"
+                      aria-label={`Edit ${plate}`}
+                      title="Edit"
+                    >
+                      <FiEdit size={22} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteVehicleFromList(v.id)}
+                      className="flex size-10 items-center justify-center rounded-lg text-ad-purple transition hover:bg-white/70 hover:text-red-600"
+                      aria-label={`Delete ${plate}`}
+                      title="Delete"
+                    >
+                      <FiTrash2 size={22} />
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
 
-          <button
-            type="button"
+          <AddVehicleTile
+            compact
             onClick={() => {
               setAddFormDismissed(false);
               setShowForm(true);
             }}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-sky-200 bg-sky-50/70 px-4 py-5 text-sm font-bold text-sky-800 transition hover:border-sky-300 hover:bg-sky-50"
-          >
-            <FiPlus size={16} /> Add another vehicle
-          </button>
+          />
         </div>
       );
     }
@@ -712,69 +625,52 @@ export default function OwnerVehiclesPage() {
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading={odometerMode ? "" : mainSectionLabel || "My Vehicle"}
+      onTitlePrev={
+        !odometerMode && (showForm || activeSection)
+          ? () => {
+              setShowForm(false);
+              setActiveSection(null);
+              setVehicleDetailsMode("view");
+            }
+          : undefined
+      }
       metaTitle="My Vehicles | AutoDaddy"
       metaDescription="Car owner vehicles"
       noPanel
     >
-      <div className="space-y-4">
-        <div className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-slate-500">Vehicles</p>
-            </div>
-            <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 md:text-2xl">
-              {mainSectionLabel || "My vehicles"}
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Manage plates, documents, and service history for every car you own.
-            </p>
-          </div>
-          {!showForm && !activeSection ? (
-            <button
-              type="button"
-              onClick={() => {
-                setAddFormDismissed(false);
-                setShowForm(true);
-              }}
-              className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700"
-            >
-              <FiPlus size={16} /> Add vehicle
-            </button>
-          ) : null}
-          {!showForm && activeSection ? (
-            <button
-              type="button"
-              onClick={() => {
-                setActiveSection(null);
-                setVehicleDetailsMode("view");
-              }}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Back to list
-            </button>
-          ) : null}
-        </div>
-
-        <div className="rounded-2xl border border-white/80 bg-white/70 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] ring-1 ring-black/5 sm:p-4">
+      {odometerMode ? (
+        <OwnerUpdateOdometerPanel
+          vehicles={vehicles}
+          loading={loading}
+          error={error}
+          token={token}
+          onBack={() => setOdometerMode(false)}
+          onExit={() => setOdometerMode(false)}
+          onSaved={() => void refresh()}
+        />
+      ) : (
+        <div className="p-3 sm:p-4">
           {showForm ? (
-            <OwnerAddVehicleForm
-              onCancel={() => {
-                setShowForm(false);
-                setAddFormDismissed(true);
-              }}
-              onAdded={() => {
-                setAddFormDismissed(false);
-                setShowForm(false);
-                void refresh();
-                setActiveSection(null);
-              }}
-            />
+            <div className="flex flex-col gap-6">
+              <OwnerAddVehicleForm
+                onCancel={() => {
+                  setShowForm(false);
+                  setAddFormDismissed(true);
+                }}
+                onAdded={() => {
+                  setAddFormDismissed(false);
+                  setShowForm(false);
+                  void refresh();
+                  setActiveSection(null);
+                }}
+              />
+            </div>
           ) : (
             <div className="min-h-0 flex-1">{renderRightPanel()}</div>
           )}
         </div>
-      </div>
+      )}
 
       <InvoiceViewerDialog
         open={viewerKind === "invoice"}

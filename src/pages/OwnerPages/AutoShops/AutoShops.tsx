@@ -8,10 +8,12 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { FiFilter, FiHeart, FiMapPin, FiTool } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiFilter, FiHeart, FiMapPin, FiTool } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
-import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import { OwnerShopListRow } from "../../../components/owner/OwnerShopListRow";
+import { OwnerSideButton, ownerSideListClass } from "../../../components/owner/ownerUi";
 import OwnerShopFilters, {
   EMPTY_SHOP_LIST_FILTERS,
   mergeServiceCatalogWithShopOfferings,
@@ -36,8 +38,7 @@ import {
   vehicleSidebarLabel,
   type CarOwnerVehicle,
 } from "../../../lib/carOwnerVehicles";
-import { getShopTypeLabel, getShopTypeLabels } from "../../../lib/shopTypes";
-import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
+import { getShopTypeLabels } from "../../../lib/shopTypes";
 import type { CarOwnerAutoShopListItem } from "../../../types/carOwnerAutoShops";
 
 const SELECT_VEHICLE_PROMPT = "Select a vehicle to find matching auto shops.";
@@ -171,7 +172,6 @@ export default function OwnerAutoShopsPage() {
     serviceSelectionPreview.kind === "all" ? "" : serviceSelectionPreview.serviceId;
 
   const { vehicles, loading: vehiclesLoading, error: vehiclesError } = useCarOwnerVehicles();
-  const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId) ?? null;
 
   const shopFilters = useMemo(
     () => ({
@@ -222,6 +222,26 @@ export default function OwnerAutoShopsPage() {
   const serviceSelection = useMemo(
     () => parseShopServiceValue(listFilters.serviceValue, catalog),
     [listFilters.serviceValue, catalog],
+  );
+
+  /** Mockup "< Oil Change Service >" selector: cycles the main service filter. */
+  const serviceCarousel = useMemo(
+    () => sidebarCatalog.filter((c) => Boolean(c.id?.trim())),
+    [sidebarCatalog],
+  );
+  const carouselIndex = serviceCarousel.findIndex((c) => c.id === selectedServiceId);
+  const stepService = useCallback(
+    (delta: number) => {
+      if (serviceCarousel.length === 0) return;
+      // -1 = "All services"; wraps through every main service.
+      const count = serviceCarousel.length + 1;
+      const nextIndex = ((carouselIndex + 1 + delta + count) % count) - 1;
+      setListFilters((prev) => ({
+        ...prev,
+        serviceValue: nextIndex < 0 ? "" : `svc:${serviceCarousel[nextIndex].id}`,
+      }));
+    },
+    [carouselIndex, serviceCarousel],
   );
 
   const cityOptions = useMemo(() => {
@@ -289,14 +309,6 @@ export default function OwnerAutoShopsPage() {
     shopsWithFavorites.find((s) => s.id === expandedShopId) ??
     null;
 
-  const vehicleMakeLabel = useMemo(() => {
-    const make = selectedVehicle?.make?.name?.trim();
-    if (make) return make;
-    const plate = selectedVehicle?.licensePlateNo?.trim().toUpperCase();
-    if (plate) return plate;
-    return "Your vehicle";
-  }, [selectedVehicle]);
-
   const showShopList = Boolean(selectedVehicleId);
 
   const handleVehicleSelect = useCallback((vehicleId: string) => {
@@ -334,23 +346,7 @@ export default function OwnerAutoShopsPage() {
   const pageTitle =
     section === "approvals"
       ? "Approvals"
-      : selectedVehicleId
-        ? `Shops for ${vehicleMakeLabel}`
-        : "Auto Repair Shops";
-
-  const pageSubtitle = (() => {
-    if (section === "approvals") return "Review shops waiting to connect with you";
-    if (serviceSelection.kind === "subservice") {
-      return `Nearby shops for ${serviceSelection.subServiceName}`;
-    }
-    if (serviceSelection.kind === "service") {
-      return `Nearby shops for ${serviceSelection.serviceName}`;
-    }
-    if (listFilters.shopType) {
-      return `Nearby ${getShopTypeLabel(listFilters.shopType).toLowerCase()} shops`;
-    }
-    return "Find mechanics near you by shop type, service, and filters";
-  })();
+      : "Auto Mechanics Near by";
 
   const handleApprove = async (businessId: string) => {
     const result = await approve(businessId);
@@ -396,25 +392,26 @@ export default function OwnerAutoShopsPage() {
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading={pageTitle}
+      sidebarExtra={
+        section === "auto-shops" && vehicles.length > 0 ? (
+          <div className={ownerSideListClass}>
+            {vehicles.map((vehicle, index) => (
+              <OwnerSideButton
+                key={vehicle.id}
+                label={vehicleOptionLabel(vehicle, index)}
+                active={vehicle.id === selectedVehicleId}
+                onClick={() => handleVehicleSelect(vehicle.id)}
+              />
+            ))}
+          </div>
+        ) : undefined
+      }
       metaTitle="Auto Shops | AutoDaddy"
       metaDescription="Find auto shops near you"
       noPanel
     >
-      <div className="flex flex-col gap-4">
-        <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
-          <div className="space-y-1">
-            <p className="text-sm text-slate-500">{pageSubtitle}</p>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-              {pageTitle}
-            </h1>
-          </div>
-          {section === "auto-shops" && !loading && showShopList && filteredShops.length > 0 ? (
-            <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
-              {filteredShops.length} shop{filteredShops.length === 1 ? "" : "s"}
-            </p>
-          ) : null}
-        </header>
+      <div className="flex flex-col gap-4 p-3 sm:p-4">
 
         {section === "approvals" ? (
           <div className="flex min-h-[320px] flex-col gap-3">
@@ -495,6 +492,30 @@ export default function OwnerAutoShopsPage() {
               </div>
             ) : null}
 
+            {showShopList && serviceCarousel.length > 0 ? (
+              <div className="mx-auto flex w-full max-w-lg items-stretch overflow-hidden rounded-lg shadow-sm ring-1 ring-ad-purple/30">
+                <button
+                  type="button"
+                  onClick={() => stepService(-1)}
+                  aria-label="Previous service"
+                  className="flex w-11 items-center justify-center bg-gradient-to-b from-[#b045a4] to-ad-purple text-white transition hover:brightness-110"
+                >
+                  <FiChevronLeft size={24} strokeWidth={3} aria-hidden />
+                </button>
+                <p className="flex-1 truncate bg-[#fde6d2] px-4 py-2.5 text-center text-lg font-medium text-gray-800">
+                  {carouselIndex >= 0 ? serviceCarousel[carouselIndex].name : "All Services"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => stepService(1)}
+                  aria-label="Next service"
+                  className="flex w-11 items-center justify-center bg-gradient-to-b from-[#b045a4] to-ad-purple text-white transition hover:brightness-110"
+                >
+                  <FiChevronRight size={24} strokeWidth={3} aria-hidden />
+                </button>
+              </div>
+            ) : null}
+
             {showShopList && filtersOpen ? (
               <div id="auto-shops-filters">
                 <OwnerShopFilters
@@ -564,87 +585,48 @@ export default function OwnerAutoShopsPage() {
                 </button>
               </EmptyState>
             ) : (
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2">
                 {filteredShops.map((shop) => {
-                  const open = isCarOwnerShopOpenToday(shop);
-                  const phone = shop.phone.trim();
-                  const logo = normalizeMediaUrl(shop.logoUrl);
                   const favoriteBusy = favoriteBusyId === shop.id;
+                  const toggleFav = (e: React.SyntheticEvent) => {
+                    e.stopPropagation();
+                    if (!favoriteBusy) void handleToggleFavorite(shop.id);
+                  };
                   return (
-                    <button
+                    <OwnerShopListRow
                       key={shop.id}
-                      type="button"
-                      onClick={() => setExpandedShopId(shop.id)}
-                      className="group flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-white/80 bg-white/95 px-3 py-3 text-left shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(15,23,42,0.1)] hover:ring-sky-100 sm:px-4"
-                    >
-                      <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 ring-1 ring-slate-200/70 sm:size-14">
-                        {logo ? (
-                          <img src={logo} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <FiTool className="text-slate-300" size={22} aria-hidden />
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-bold tracking-tight text-slate-900">
-                          {shop.name}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs font-semibold text-sky-700 sm:text-sm">
-                          {phone || "—"}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
-                          {[
-                            shop.city,
-                            getShopTypeLabels(
-                              shop.shopTypes?.length ? shop.shopTypes : shop.shopType,
-                            ),
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </p>
-                      </div>
-
-                      <div className="flex shrink-0 flex-col items-end gap-1">
+                      shop={shop}
+                      onExpand={() => setExpandedShopId(shop.id)}
+                      meta={[
+                        shop.city,
+                        getShopTypeLabels(shop.shopTypes?.length ? shop.shopTypes : shop.shopType),
+                        shop.todayHoursText,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      trailing={
                         <span
-                          className={`rounded-full px-3 py-1 text-[11px] font-bold text-white ${
-                            open ? "bg-emerald-600" : "bg-slate-400"
-                          }`}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={shop.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                          aria-pressed={shop.isFavorite}
+                          className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-gray-400 transition hover:bg-white/70 hover:text-red-500"
+                          onClick={toggleFav}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleFav(e);
+                            }
+                          }}
                         >
-                          {open ? "Shop is Open" : "Closed"}
+                          <FiHeart
+                            className={shop.isFavorite ? "fill-red-500 text-red-500" : undefined}
+                            size={22}
+                            aria-hidden
+                          />
                         </span>
-                        <span className="max-w-[9.5rem] truncate text-right text-[10px] font-medium text-slate-500">
-                          {shop.todayHoursText}
-                        </span>
-                      </div>
-
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        aria-label={
-                          shop.isFavorite ? "Remove from favorites" : "Add to favorites"
-                        }
-                        className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:opacity-50"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!favoriteBusy) void handleToggleFavorite(shop.id);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (!favoriteBusy) void handleToggleFavorite(shop.id);
-                          }
-                        }}
-                      >
-                        <FiHeart
-                          className={
-                            shop.isFavorite ? "fill-rose-500 text-rose-500" : undefined
-                          }
-                          size={20}
-                          aria-hidden
-                        />
-                      </span>
-                    </button>
+                      }
+                    />
                   );
                 })}
               </div>

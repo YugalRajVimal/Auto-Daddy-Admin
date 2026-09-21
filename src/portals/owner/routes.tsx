@@ -4,6 +4,12 @@ import OwnerPanelLayout from "../../layout/Owner/OwnerPanelLayout";
 import ShopPanelLayout from "../../layout/Shop/ShopPanelLayout";
 import ShopPageLayout from "../../layout/Shop/ShopPageLayout";
 import OwnerHomePage from "../../pages/OwnerPages/Home/Home";
+import OwnerDashboardPage from "../../pages/OwnerPages/Home/Dashboard";
+import {
+  OwnerAccountsExpensesPage,
+  OwnerJobCardPaymentPage,
+  OwnerManageBanksPage,
+} from "../../pages/OwnerPages/Accounts/AccountsPlaceholder";
 import {
   OwnerFeaturesPage,
   OwnerPrivacyPage,
@@ -43,6 +49,7 @@ export const ownerRoutes = (
     <Route element={<OwnerPageLayout />}>
       <Route index path="/owner" element={<OwnerHomePage />} />
       <Route path="/owner/faqs" element={<Navigate to="/owner" replace />} />
+      <Route path="/owner/dashboard" element={<OwnerDashboardPage />} />
       <Route path="/owner/privacy" element={<OwnerPrivacyPage />} />
       <Route path="/owner/features" element={<OwnerFeaturesPage />} />
       <Route path="/owner/profile" element={<OwnerProfilePage />} />
@@ -63,6 +70,10 @@ export const ownerRoutes = (
       <Route path="/owner/invoices" element={<Navigate to="/owner/expenses/invoices" replace />} />
       <Route path="/owner/expenses/job-cards" element={<OwnerExpensesJobCardsPage />} />
       <Route path="/owner/expenses" element={<Navigate to="/owner/expenses/job-cards" replace />} />
+      <Route path="/owner/accounts" element={<Navigate to="/owner/expenses/invoices" replace />} />
+      <Route path="/owner/accounts/job-card-payment" element={<OwnerJobCardPaymentPage />} />
+      <Route path="/owner/accounts/expenses" element={<OwnerAccountsExpensesPage />} />
+      <Route path="/owner/accounts/manage-banks" element={<OwnerManageBanksPage />} />
       <Route path="/owner/messages" element={<OwnerMessagesPage />} />
       <Route path="/owner/digital-diary/documents" element={<Navigate to="/owner/documents" replace />} />
       <Route path="/owner/digi-purse" element={<Navigate to="/owner/documents" replace />} />

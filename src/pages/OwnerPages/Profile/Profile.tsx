@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiCamera, FiMail, FiMapPin, FiPhone, FiUser } from "react-icons/fi";
+import { FiUser } from "react-icons/fi";
 import { getJson } from "../../../api/mobileAuth";
-import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
+import {
+  OwnerFormFooter,
+  OwnerUploadChip,
+  ownerFormInputClass,
+  ownerFormLabelClass,
+  ownerFormPanelClass,
+} from "../../../components/owner/ownerUi";
 import { Skeleton } from "../../../components/common/Skeleton";
 import { useAuth } from "../../../auth";
 import { useCarOwnerProfile } from "../../../hooks/useCarOwnerProfile";
@@ -9,9 +16,8 @@ import { parseCitiesApiResponse, type UserCity } from "../../../lib/carOwnerCiti
 import { DUMMY_OWNER_PROFILE } from "../../../lib/dummyOwnerHomeProfile";
 import { FormFieldError, fieldErrorClass } from "../../../lib/validation/formUi";
 
-const labelClass = "mb-1 block text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500";
-const inputClass =
-  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50 disabled:opacity-70";
+const labelClass = ownerFormLabelClass;
+const inputClass = ownerFormInputClass;
 
 export default function OwnerProfilePage() {
   const { token } = useAuth();
@@ -91,116 +97,27 @@ export default function OwnerProfilePage() {
     !loading && !display.name.trim() && !display.email.trim() && !display.address.trim();
   const previewName =
     editName.trim() || display.name || (usingDummy ? DUMMY_OWNER_PROFILE.name : "Car owner");
-  const previewCity =
-    editCityName.trim() || display.city || (usingDummy ? DUMMY_OWNER_PROFILE.city : "Add your city");
-  const previewPhone =
-    editPhone || display.phoneReadOnly || (usingDummy ? DUMMY_OWNER_PROFILE.phone : "No phone");
-  const previewEmail =
-    editEmail || display.email || (usingDummy ? DUMMY_OWNER_PROFILE.email : "No email");
-  const previewAddress =
-    editAddress || display.address || (usingDummy ? DUMMY_OWNER_PROFILE.address : "No address");
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading="Personal Profile"
       metaTitle="Profile | AutoDaddy"
       metaDescription="Car owner profile"
       noPanel
     >
-      <div className="space-y-4">
-        <div className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-slate-500">Account</p>
-              {usingDummy ? (
-                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800 ring-1 ring-amber-100">
-                  Demo preview
-                </span>
-              ) : null}
-            </div>
-            <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 md:text-2xl">
-              My profile
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Keep your contact details current for shops and invoices.
-            </p>
-          </div>
-        </div>
-
+      <div className="p-3 sm:p-5">
+        {usingDummy ? (
+          <p className="mb-3 inline-block rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-800 ring-1 ring-amber-100">
+            Demo preview
+          </p>
+        ) : null}
         {loading ? (
-          <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <Skeleton className="h-64 rounded-2xl" />
-            <Skeleton className="h-80 rounded-2xl" />
-          </div>
+          <Skeleton className="h-64 rounded-xl" />
         ) : (
-          <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <aside className="overflow-hidden rounded-2xl border border-white/80 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-sky-100">
-              <div className="flex flex-col items-center text-center">
-                <div className="relative">
-                  {photoUri ? (
-                    <img
-                      src={photoUri}
-                      alt=""
-                      className="size-24 rounded-2xl object-cover ring-4 ring-white shadow-md"
-                    />
-                  ) : (
-                    <div className="flex size-24 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 ring-4 ring-white shadow-md">
-                      <FiUser size={40} strokeWidth={1.5} aria-hidden />
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowUploadImage(true);
-                      openPhotoPicker();
-                    }}
-                    disabled={saving}
-                    className="absolute -bottom-2 -right-2 flex size-9 items-center justify-center rounded-full bg-sky-600 text-white shadow-md hover:bg-sky-700 disabled:opacity-50"
-                    aria-label="Upload profile photo"
-                  >
-                    <FiCamera size={16} />
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={onPhotoSelected}
-                  />
-                </div>
-                <h3 className="mt-4 text-lg font-bold text-slate-900">{previewName}</h3>
-                <p className="mt-1 text-sm text-slate-600">{previewCity}</p>
-              </div>
-
-              <ul className="mt-5 space-y-2.5 text-left text-sm text-slate-600">
-                <li className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2">
-                  <FiPhone className="shrink-0 text-sky-600" size={14} />
-                  <span className="truncate">{previewPhone}</span>
-                </li>
-                <li className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2">
-                  <FiMail className="shrink-0 text-indigo-600" size={14} />
-                  <span className="truncate">{previewEmail}</span>
-                </li>
-                <li className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2">
-                  <FiMapPin className="shrink-0 text-emerald-600" size={14} />
-                  <span className="truncate">{previewAddress}</span>
-                </li>
-              </ul>
-            </aside>
-
-            <section className="rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-black/5 md:p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
-                  <FiUser size={16} />
-                </span>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Edit details</h3>
-                  <p className="text-xs text-slate-500">Changes save to your car-owner account</p>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block sm:col-span-1">
+          <>
+            <div className={ownerFormPanelClass}>
+              <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-[1fr_0.8fr_0.8fr_1.4fr]">
+                <label className="block">
                   <span className={labelClass}>Name *</span>
                   <input
                     type="text"
@@ -216,7 +133,6 @@ export default function OwnerProfilePage() {
                   />
                   <FormFieldError message={fieldErrors.name} />
                 </label>
-
                 <label className="block">
                   <span className={labelClass}>Phone</span>
                   <input
@@ -233,23 +149,6 @@ export default function OwnerProfilePage() {
                   />
                   <FormFieldError message={fieldErrors.phone} />
                 </label>
-
-                <label className="block">
-                  <span className={labelClass}>Email</span>
-                  <input
-                    type="email"
-                    value={editEmail}
-                    onChange={(e) => {
-                      setEditEmail(e.target.value);
-                      clearFieldError("email");
-                    }}
-                    placeholder={usingDummy ? DUMMY_OWNER_PROFILE.email : "you@example.com"}
-                    disabled={saving}
-                    className={fieldErrorClass(!!fieldErrors.email, inputClass)}
-                  />
-                  <FormFieldError message={fieldErrors.email} />
-                </label>
-
                 <label className="block">
                   <span className={labelClass}>City</span>
                   <select
@@ -271,8 +170,7 @@ export default function OwnerProfilePage() {
                     ))}
                   </select>
                 </label>
-
-                <label className="block sm:col-span-1">
+                <label className="block">
                   <span className={labelClass}>Address</span>
                   <input
                     type="text"
@@ -288,7 +186,25 @@ export default function OwnerProfilePage() {
                   />
                   <FormFieldError message={fieldErrors.address} />
                 </label>
-
+                <div className="flex items-center gap-4 sm:col-span-2">
+                  <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-gray-300 shadow-sm ring-1 ring-green-200">
+                    {photoUri ? (
+                      <img src={photoUri} alt="Profile photo" className="h-full w-full object-cover" />
+                    ) : (
+                      <FiUser size={26} strokeWidth={1.5} aria-hidden />
+                    )}
+                  </span>
+                  <OwnerUploadChip
+                    checked={showUploadImage}
+                    onToggle={setShowUploadImage}
+                    onPick={() => {
+                      setShowUploadImage(true);
+                      openPhotoPicker();
+                    }}
+                    disabled={saving}
+                  />
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onPhotoSelected} />
+                </div>
                 <label className="block">
                   <span className={labelClass}>Zip</span>
                   <input
@@ -305,53 +221,34 @@ export default function OwnerProfilePage() {
                   />
                   <FormFieldError message={fieldErrors.pincode} />
                 </label>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-                <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+                <label className="block">
+                  <span className={labelClass}>E-mail</span>
                   <input
-                    type="checkbox"
-                    checked={showUploadImage}
-                    onChange={(e) => setShowUploadImage(e.target.checked)}
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => {
+                      setEditEmail(e.target.value);
+                      clearFieldError("email");
+                    }}
+                    placeholder={usingDummy ? DUMMY_OWNER_PROFILE.email : "you@example.com"}
                     disabled={saving}
-                    className="h-3.5 w-3.5 accent-sky-600"
+                    className={fieldErrorClass(!!fieldErrors.email, inputClass)}
                   />
-                  Show photo upload
+                  <FormFieldError message={fieldErrors.email} />
                 </label>
-                {showUploadImage ? (
-                  <button
-                    type="button"
-                    onClick={openPhotoPicker}
-                    disabled={saving}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-                  >
-                    Choose image
-                  </button>
-                ) : null}
-                <div className="ml-auto flex gap-2">
-                  <button
-                    type="button"
-                    onClick={cancelEditing}
-                    disabled={saving}
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Reset
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void saveProfile()}
-                    disabled={saving}
-                    className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700 disabled:opacity-50"
-                  >
-                    {saving ? "Updating…" : "Save changes"}
-                  </button>
-                </div>
               </div>
-            </section>
-          </div>
+            </div>
+            <OwnerFormFooter
+              note={display.name.trim() ? `You are editing the profile of ${previewName}` : "You are creating your Profile page"}
+              onSave={() => void saveProfile()}
+              saving={saving}
+              saveLabel={saving ? "Updating…" : "Save"}
+              onCancel={cancelEditing}
+            />
+          </>
         )}
 
-        <p className="text-center text-sm italic text-slate-500">
+        <p className="mt-8 text-center font-serif text-lg italic text-gray-500">
           With AutoDaddy, you are not just choosing a system — you are choosing a standard of excellence.
         </p>
       </div>

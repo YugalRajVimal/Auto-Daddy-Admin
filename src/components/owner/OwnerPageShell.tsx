@@ -1,17 +1,17 @@
 import type { ReactNode } from "react";
-import AdminPage from "../admin/AdminPage";
-import { ContentPanel } from "../admin/ContentPanel";
+import { useLocation, useNavigate } from "react-router";
 import type { OwnerPageChromeConfig } from "../../context/OwnerPageChromeContext";
 import { useOwnerPageChrome } from "../../context/OwnerPageChromeContext";
-import ShopSidebar from "../shop/ShopSidebar";
+import { useOwnerNav } from "../../context/OwnerNavContext";
+import { ShopSidebarButtonsSkeleton } from "../shop/ShopSidebar";
+import OwnerUpdateOdometerFooter from "./OwnerUpdateOdometerFooter";
+import { OwnerSideButton, OwnerTitleBar, ownerSideListClass } from "./ownerUi";
 import { ownerPageSidebarFooterClass } from "./OwnerFaqsButton";
 import { ownerSidebarButtonStackClass } from "../shop/shopSidebarStyles";
 import {
-  ownerPageIntroClass,
-  ownerPageOuterClass,
-  ownerPageShellGridClass,
   ownerPageSidebarClass,
   ownerPageSidebarPanelClass,
+  ownerPortalGridClass,
 } from "./ownerLayoutStyles";
 
 export {
@@ -87,84 +87,107 @@ export function OwnerPageSearchInput({
 
 type OwnerPageShellProps = OwnerPageChromeConfig & {
   children: ReactNode;
-  /** Skip the green content panel (raw children under the page title). */
+  /** Render children without the card body padding (page draws its own surfaces). */
   noPanel?: boolean;
 };
 
-function hasSidebarContent(chrome: OwnerPageChromeConfig): boolean {
-  if (chrome.customSidebar != null) return true;
-  if ((chrome.sidebarItems?.length ?? 0) > 0) return true;
-  if (chrome.sidebarExtra != null) return true;
-  return false;
-}
+const ODOMETER_PATH = "/owner/profile/vehicles";
 
-/** Admin-style page chrome under the owner menu: title row + green content panel. */
+/**
+ * Owner page frame (mockup): vertical left panel with the tab's sections, the page's own
+ * sidebar and the Update Odometer shortcut; main white card with a grey title bar.
+ */
 export default function OwnerPageShell({
   children,
   noPanel = false,
   ...chrome
 }: OwnerPageShellProps) {
   useOwnerPageChrome(chrome);
+  const { subItems, activeSubPath, onSubNavClick } = useOwnerNav();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const title =
-    chrome.pageHeading?.trim() ||
-    chrome.title?.trim() ||
-    "";
+  const title = chrome.pageHeading?.trim() || chrome.title?.trim() || "";
+  const placement = chrome.subNavPlacement ?? "before";
 
-  const showSidebar = hasSidebarContent(chrome);
-  const sidebar = showSidebar ? (
-    chrome.customSidebar ?? (
-      <ShopSidebar
-        items={chrome.sidebarItems ?? []}
-        activeId={chrome.activeSidebarId}
-        onSelect={chrome.onSidebarSelect}
-        heading={chrome.sidebarHeading}
-        headingClassName={chrome.sidebarHeadingClassName}
-        footer={chrome.sidebarFooter}
-        loading={chrome.sidebarLoading}
-        skeletonCount={chrome.sidebarSkeletonCount}
-        ownerStyle
-        className="lg:!h-auto lg:!max-h-none"
-      >
-        {chrome.sidebarExtra}
-      </ShopSidebar>
-    )
-  ) : null;
+  const subNav =
+    placement !== "hidden" && subItems.length > 0 ? (
+      <div className={ownerSideListClass}>
+        {subItems.map((item) => (
+          <OwnerSideButton
+            key={item.path}
+            label={item.name}
+            to={item.path}
+            active={item.path === activeSubPath}
+            onClick={(e) => onSubNavClick(item.path, e as React.MouseEvent<HTMLAnchorElement>)}
+          />
+        ))}
+      </div>
+    ) : null;
 
-  const titleHeaderClass = title ? ownerPageIntroClass : undefined;
+  const pageSidebar =
+    chrome.customSidebar ??
+    (chrome.sidebarLoading ? (
+      <ShopSidebarButtonsSkeleton count={chrome.sidebarSkeletonCount ?? 3} ownerStyle />
+    ) : (chrome.sidebarItems?.length ?? 0) > 0 ? (
+      <div className={ownerSideListClass}>
+        {chrome.sidebarHeading ? (
+          <p className={chrome.sidebarHeadingClassName ?? "px-1 text-xs font-bold uppercase tracking-wide text-gray-500"}>
+            {chrome.sidebarHeading}
+          </p>
+        ) : null}
+        {chrome.sidebarItems!.map((item) => (
+          <OwnerSideButton
+            key={item.id}
+            label={item.label}
+            active={item.id === chrome.activeSidebarId}
+            onClick={() => chrome.onSidebarSelect?.(item.id)}
+          />
+        ))}
+      </div>
+    ) : null);
 
-  if (showSidebar && sidebar) {
-    return (
-      <AdminPage
-        title={title}
-        headerAction={chrome.headerAction}
-        between={chrome.pageHeader}
-        noPanel
-        className={ownerPageOuterClass}
-        headerClassName={titleHeaderClass}
-      >
-        <div className={ownerPageShellGridClass}>
-          <div className="min-w-0">{sidebar}</div>
-          {noPanel ? (
-            <div className="min-w-0">{children}</div>
-          ) : (
-            <ContentPanel className="min-w-0">{children}</ContentPanel>
-          )}
-        </div>
-      </AdminPage>
-    );
-  }
+  const odometerActive =
+    location.pathname === ODOMETER_PATH &&
+    (location.state as { vehicleSection?: string } | null)?.vehicleSection === "update-odometer";
 
   return (
-    <AdminPage
-      title={title}
-      headerAction={chrome.headerAction}
-      between={chrome.pageHeader}
-      noPanel={noPanel}
-      className={ownerPageOuterClass}
-      headerClassName={titleHeaderClass}
-    >
-      {children}
-    </AdminPage>
+    <div className="owner-page-body pb-6 pt-1">
+      <div className={`${ownerPortalGridClass} lg:items-start`}>
+        <aside className={`${ownerPageSidebarClass} gap-4 lg:sticky lg:top-3 lg:min-h-[calc(100vh-200px)]`}>
+          <div className={ownerPageSidebarPanelClass}>
+            {chrome.sidebarHeader}
+            {placement === "before" ? subNav : null}
+            {pageSidebar}
+            {chrome.sidebarExtra}
+            {placement === "after" && subNav ? (
+              <div className="border-t border-dashed border-gray-300 pt-3">{subNav}</div>
+            ) : null}
+          </div>
+          {chrome.sidebarFooter}
+          {chrome.hideOdometerShortcut ? null : (
+            <div className="mt-auto pt-2 lg:pt-6">
+              <OwnerUpdateOdometerFooter
+                active={odometerActive}
+                onClick={() => navigate(ODOMETER_PATH, { state: { vehicleSection: "update-odometer" } })}
+              />
+            </div>
+          )}
+        </aside>
+
+        <section className="flex min-h-[calc(100vh-200px)] min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+          {title ? (
+            <OwnerTitleBar
+              title={title}
+              onPrev={chrome.onTitlePrev}
+              onNext={chrome.onTitleNext}
+              right={chrome.headerAction}
+            />
+          ) : null}
+          {chrome.pageHeader}
+          <div className={`min-w-0 flex-1 ${noPanel ? "" : "p-3 sm:p-4 2xl:p-5"}`}>{children}</div>
+        </section>
+      </div>
+    </div>
   );
 }

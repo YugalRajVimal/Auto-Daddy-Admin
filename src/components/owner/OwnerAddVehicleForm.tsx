@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiPlus, FiTruck, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getJson, postFormData } from "../../api/mobileAuth";
 import { useAuth } from "../../auth";
 import { FormFieldError, fieldErrorClass } from "../../lib/validation/formUi";
 import { ownerVehicleRequireVinSchema } from "../../lib/validation/schemas/vehicle";
+import { OwnerFormFooter, ownerFormPanelClass } from "./ownerUi";
 import {
   type CarCompaniesResponse,
   type CarCompanyCatalogItem,
@@ -163,32 +163,9 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
   const titlePreview = [name, model].filter(Boolean).join(" ") || "New vehicle";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/80 bg-gradient-to-br from-sky-50 via-white to-indigo-50 shadow-[0_10px_28px_rgba(15,23,42,0.06)] ring-1 ring-sky-100">
-      <div className="border-b border-sky-100/80 bg-white/70 px-4 py-4 sm:px-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 shadow-sm ring-1 ring-sky-100">
-              <FiTruck size={20} />
-            </span>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-sky-700">Vehicles</p>
-              <h3 className="mt-0.5 text-lg font-bold tracking-tight text-slate-900">Add vehicle</h3>
-              <p className="mt-1 text-sm text-slate-600">
-                Enter plate, make, and odometer to start tracking this car.
-              </p>
-            </div>
-          </div>
-          <div className="rounded-xl bg-white/90 px-3 py-2 text-right shadow-sm ring-1 ring-black/5">
-            <p className="text-base font-bold tracking-tight text-slate-900">{platePreview}</p>
-            <p className="text-xs font-medium text-slate-500">{titlePreview}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-4 p-4 sm:p-5">
-        <section className="rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
-          <h4 className="mb-3 text-sm font-bold text-slate-900">Identity</h4>
-          <div className="grid gap-3 sm:grid-cols-2">
+    <div className="flex flex-col">
+      <div className={ownerFormPanelClass}>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <label className="block">
               <span className={ownerVehicleLabelClass}>License plate *</span>
               <input
@@ -202,31 +179,6 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
               />
               <FormFieldError message={errors.licensePlateNo} />
             </label>
-            <label className="block">
-              <span className={ownerVehicleLabelClass}>
-                VIN *{" "}
-                <span className={vinLen === 17 ? "text-emerald-600" : "text-slate-400"}>
-                  ({vinLen}/17)
-                </span>
-              </span>
-              <input
-                type="text"
-                value={vinNo}
-                onChange={(e) => setVinNo(e.target.value.toUpperCase())}
-                maxLength={17}
-                autoComplete="off"
-                placeholder="17-character VIN"
-                disabled={submitting}
-                className={fieldErrorClass(!!errors.vinNo, `${ownerVehicleFieldClass} font-mono tracking-wide`)}
-              />
-              <FormFieldError message={errors.vinNo} />
-            </label>
-          </div>
-        </section>
-
-        <section className="rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
-          <h4 className="mb-3 text-sm font-bold text-slate-900">Vehicle details</h4>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="block">
               <span className={ownerVehicleLabelClass}>Make *</span>
               <select
@@ -301,31 +253,42 @@ export default function OwnerAddVehicleForm({ onCancel, onAdded }: OwnerAddVehic
               />
               <FormFieldError message={errors.odometerReading} />
             </label>
+        </div>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="flex items-end">
+            <p className="text-sm font-semibold text-gray-700">
+              {platePreview} <span className="font-normal text-gray-500">· {titlePreview}</span>
+            </p>
           </div>
-        </section>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-sky-100/80 bg-white/80 px-4 py-3 sm:px-5">
-        <p className="text-xs text-slate-500 sm:text-sm">Required fields are marked with *</p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={handleCancel}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            <FiX size={15} /> Cancel
-          </button>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={() => void handleSave()}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <FiPlus size={15} /> {submitting ? "Saving…" : "Save vehicle"}
-          </button>
+          <div className="sm:col-span-1 lg:col-span-2">
+            <label className="block">
+              <span className={ownerVehicleLabelClass}>
+                VIN *{" "}
+                <span className={vinLen === 17 ? "text-emerald-600" : "text-slate-400"}>
+                  ({vinLen}/17)
+                </span>
+              </span>
+              <input
+                type="text"
+                value={vinNo}
+                onChange={(e) => setVinNo(e.target.value.toUpperCase())}
+                maxLength={17}
+                autoComplete="off"
+                placeholder="17-character VIN"
+                disabled={submitting}
+                className={fieldErrorClass(!!errors.vinNo, `${ownerVehicleFieldClass} font-mono tracking-wide`)}
+              />
+              <FormFieldError message={errors.vinNo} />
+            </label>
+          </div>
         </div>
       </div>
+      <OwnerFormFooter
+        note="You are adding a vehicle to your profile. Fields marked * are required."
+        onSave={() => void handleSave()}
+        saving={submitting}
+        onCancel={handleCancel}
+      />
     </div>
   );
 }

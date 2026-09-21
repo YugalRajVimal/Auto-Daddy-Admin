@@ -53,6 +53,13 @@ export type OwnerPageChromeConfig = {
   heroCardFlush?: boolean;
   heroCardTransparent?: boolean;
   heroCardToolbarAlways?: boolean;
+  /** Grey title bar « / » handlers. */
+  onTitlePrev?: () => void;
+  onTitleNext?: () => void;
+  /** Where the active tab's sections sit relative to the page's own sidebar (default before). */
+  subNavPlacement?: "before" | "after" | "hidden";
+  /** Hide the Update Odometer shortcut at the bottom of the left panel. */
+  hideOdometerShortcut?: boolean;
 };
 
 export const DEFAULT_OWNER_PAGE_CHROME: OwnerPageChromeConfig = {

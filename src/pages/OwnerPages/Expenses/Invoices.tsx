@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router";
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerInvoiceEstimateView from "../../../components/owner/OwnerInvoiceEstimateView";
-import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
 import { useAuth } from "../../../auth";
 import { useOwnerNavReset } from "../../../hooks/useOwnerNavReset";
 import { useCarOwnerInvoices, type CarOwnerInvoiceRow } from "../../../hooks/useCarOwnerInvoices";
@@ -177,12 +177,12 @@ export default function OwnerInvoicesPage() {
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading={view === "payment" ? "Enter Payment" : "Invoices"}
       metaTitle="Expenses | AutoDaddy"
       metaDescription="Car owner expenses"
       noPanel
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 p-3 sm:p-4">
         {previewInvoice ? (
           <OwnerInvoiceEstimateView
             key={`invoice-${previewInvoice.id}`}
@@ -211,19 +211,6 @@ export default function OwnerInvoicesPage() {
           />
         ) : (
           <>
-            <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
-              <div className="space-y-1">
-                <p className="text-sm text-slate-500">Track shop invoices and record payments</p>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-                  {view === "payment" ? "Enter Payment" : "Invoices"}
-                </h1>
-              </div>
-              {!loading && !error && view === "list" && invoiceRows.length > 0 ? (
-                <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
-                  {invoiceRows.length} invoice{invoiceRows.length === 1 ? "" : "s"}
-                </p>
-              ) : null}
-            </header>
 
             {loading ? (
               <div className="space-y-3">

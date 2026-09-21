@@ -1,3 +1,10 @@
+/** Horizontal gutter shared by the owner header and page body. */
+export const ownerPortalGutterClass = "px-3 sm:px-5 md:px-6 lg:px-8 2xl:px-12";
+
+/** Two-column owner grid (left panel + main) shared by header and page so columns line up. */
+export const ownerPortalGridClass =
+  "grid grid-cols-1 gap-x-6 gap-y-3 lg:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)] 2xl:grid-cols-[310px_minmax(0,1fr)] 2xl:gap-x-8";
+
 /** Owner sub-page body: sidebar + hero card (primary nav stays in PortalShell). */
 export const ownerPageBodyGridClass =
   "grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[200px_minmax(0,1fr)] lg:items-stretch lg:gap-x-4 xl:grid-cols-[220px_minmax(0,1fr)] 2xl:gap-4 2xl:grid-cols-[260px_minmax(0,1fr)] 2xl:gap-x-5";
@@ -68,8 +75,7 @@ export const ownerPageSidebarClass =
   "relative flex w-full min-w-0 shrink-0 flex-col overflow-hidden";
 
 /** Glass panel that wraps owner sidebar button stacks (matches ShopSidebar ownerStyle). */
-export const ownerPageSidebarPanelClass =
-  "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-2xl border border-white/70 bg-white/45 p-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] backdrop-blur-xl";
+export const ownerPageSidebarPanelClass = "flex min-w-0 flex-col gap-2.5";
 
 /** @deprecated Main content is rendered inside the hero card by OwnerPageLayout. */
 export const ownerPageMainClass = "min-w-0 flex-1";

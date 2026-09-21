@@ -1,18 +1,16 @@
 import OwnerPortalShell from "../../components/owner/OwnerPortalShell";
 import { RequirePortal } from "../../auth/guards/RequirePortal";
 import useAuth from "../../auth/useAuth";
-import { buildOwnerPrimaryNav, ownerHelpNav } from "../../config/ownerNav";
+import { ownerHelpNav, ownerPrimaryNav } from "../../config/ownerNav";
 import { OwnerPageChromeProvider } from "../../context/OwnerPageChromeContext";
 import { OwnerShopCityFilterProvider } from "../../context/OwnerShopCityFilterContext";
-import { useCarOwnerVehicles } from "../../hooks/useCarOwnerVehicles";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router";
 import { getPostLoginRedirect } from "../../auth";
 
 function OwnerLayoutContent() {
   const { login, profile, session } = useAuth();
-  const { vehicles } = useCarOwnerVehicles();
   const loginAs = session?.meta?.phone || profile?.phone || "";
   const name = profile?.name?.trim();
   const city = profile?.city?.trim();
@@ -58,17 +56,6 @@ function OwnerLayoutContent() {
     }
   };
 
-  const primaryNav = useMemo(
-    () =>
-      buildOwnerPrimaryNav(
-        vehicles.map((v, index) => ({
-          id: v.id,
-          label: v.licensePlateNo?.trim() || `Vehicle ${index + 1}`,
-        }))
-      ),
-    [vehicles]
-  );
-
   if (session?.meta?.isProfileComplete === false) {
     console.log("[OwnerLayoutContent] Profile not complete, redirecting to onboarding.");
     return <Navigate to="/owner/onboarding" replace />;
@@ -112,7 +99,7 @@ function OwnerLayoutContent() {
       <OwnerPortalShell
         homePath="/owner"
         profilePath="/owner/profile"
-        primaryNav={primaryNav}
+        primaryNav={ownerPrimaryNav}
         displayName={displayName}
         city={city}
         loginAs={loginAs}

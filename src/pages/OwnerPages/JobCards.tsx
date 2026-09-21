@@ -72,7 +72,7 @@ export default function OwnerJobCardsPage() {
 
   return (
     <OwnerPageShell
-      pageHeading="Job Cards"
+      pageHeading="Job Card History"
       metaTitle="Job Cards | AutoDaddy"
       metaDescription="Car owner job cards"
     >

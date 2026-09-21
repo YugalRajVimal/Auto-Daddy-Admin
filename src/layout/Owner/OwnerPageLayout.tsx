@@ -8,7 +8,7 @@ import {
   DEFAULT_OWNER_PAGE_CHROME,
   useOwnerPageChromeContext,
 } from "../../context/OwnerPageChromeContext";
-import { ownerPortalContentPadClass } from "../../components/owner/ownerLayoutStyles";
+import { ownerPortalGutterClass } from "../../components/owner/ownerLayoutStyles";
 import { useCarOwnerFaqs } from "../../hooks/useOwnerPortal";
 import { ownerFaqPageSlugFromPath } from "../../lib/ownerFaqPageSlug";
 
@@ -29,7 +29,7 @@ export default function OwnerPageLayout() {
   const metaDescription = chrome.metaDescription ?? DEFAULT_OWNER_PAGE_CHROME.metaDescription!;
 
   return (
-    <PortalPageContent className={`relative py-0 md:py-0 ${ownerPortalContentPadClass}`}>
+    <PortalPageContent className={`relative py-0 md:py-0 ${ownerPortalGutterClass}`}>
       <PageMeta title={metaTitle} description={metaDescription} />
       <Outlet />
       <StickyFaqsButton onClick={openFaqs} />

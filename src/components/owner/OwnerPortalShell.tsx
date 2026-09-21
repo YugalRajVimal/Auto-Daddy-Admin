@@ -2,18 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { FiBell, FiEdit2 } from "react-icons/fi";
 import useAuth from "../../auth/useAuth";
-import { getActivePrimaryItem, type NavItem, type NavSubItem } from "../../config/adminNav";
+import type { NavItem, NavSubItem } from "../../config/adminNav";
+import { OwnerNavContext } from "../../context/OwnerNavContext";
 import { useOwnerShopCityFilter } from "../../context/OwnerShopCityFilterContext";
 import { useCarOwnerNotifications } from "../../hooks/useCarOwnerNotifications";
 import ShopBrandLogo from "../shop/ShopBrandLogo";
-import { shopPortalHorizPaddingClass } from "../shop/shopLayoutStyles";
-import {
-  ownerChromeHeaderPadClass,
-  ownerChromeLogoClass,
-  ownerChromeNameClass,
-  ownerChromePrimaryTabClass,
-  ownerChromeSubNavLinkClass,
-} from "./ownerLayoutStyles";
+import { ownerPortalGridClass, ownerPortalGutterClass } from "./ownerLayoutStyles";
 
 const LOGO = "/logo.png";
 const OWNER_MESSAGES_PATH = "/owner/messages";
@@ -22,6 +16,23 @@ const OWNER_LAST_SEEN_KEY = "ad:lastSeen:owner-notifications";
 function isPathActive(pathname: string, path: string, homePath: string) {
   if (path === homePath) return pathname === homePath;
   return pathname === path || pathname.startsWith(`${path}/`);
+}
+
+/** Longest matching `matchPaths` entry wins, so nested routes pick the most specific tab. */
+function findActivePrimary(pathname: string, items: NavItem[], homePath: string): NavItem | null {
+  let best: NavItem | null = null;
+  let bestLen = -1;
+  for (const item of items) {
+    const paths = item.matchPaths ?? [...(item.path ? [item.path] : []), ...(item.subItems?.map((s) => s.path) ?? [])];
+    for (const p of paths) {
+      const hit = p === homePath ? pathname === homePath : pathname === p || pathname.startsWith(`${p}/`);
+      if (hit && p.length > bestLen) {
+        best = item;
+        bestLen = p.length;
+      }
+    }
+  }
+  return best;
 }
 
 function getActiveSubItemPath(pathname: string, subItems: NavSubItem[], homePath: string): string | null {
@@ -78,15 +89,16 @@ export default function OwnerPortalShell({
     ? filterCityName.trim() || "All cities"
     : city?.trim() || "";
 
-  const activePrimary = getActivePrimaryItem(location.pathname, primaryNav, homePath);
+  const activePrimary = findActivePrimary(location.pathname, primaryNav, homePath);
   const onHelpNav = helpPath != null && isPathActive(location.pathname, helpPath, homePath);
   const helpSubItems = onHelpNav ? helpNav : [];
   const primarySubItems: NavSubItem[] = activePrimary?.subItems ?? [];
   const displaySubItems: NavSubItem[] =
     helpSubItems.length > 0 ? helpSubItems : primarySubItems;
-  const hasSubNav =
-    displaySubItems.length > 0 && (activePrimary != null || (onHelpNav && helpSubItems.length > 0));
-  const activeSubItemPath = getActiveSubItemPath(location.pathname, displaySubItems, homePath);
+  // A tab with a single section (e.g. My vehicles on the Docs page) keeps that section highlighted.
+  const activeSubItemPath =
+    getActiveSubItemPath(location.pathname, displaySubItems, homePath) ??
+    (activePrimary && displaySubItems.length === 1 ? displaySubItems[0].path : null);
 
   const handleNavLinkClick = (path: string, e: React.MouseEvent<HTMLAnchorElement>) => {
     setMobileOpen(false);
@@ -94,12 +106,6 @@ export default function OwnerPortalShell({
       e.preventDefault();
       navigate(path, { replace: true, state: { navReset: Date.now() } });
     }
-  };
-
-  const handlePrimaryClick = (item: NavItem) => {
-    const target = item.path ?? item.subItems?.[0]?.path;
-    if (target) navigate(target);
-    setMobileOpen(false);
   };
 
   const handleLogout = () => {
@@ -122,240 +128,153 @@ export default function OwnerPortalShell({
     navigate(OWNER_MESSAGES_PATH, { state: { initialTab: "notifications" } });
   };
 
-  const utilityLinkClass =
-    "rounded-full px-2.5 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-white/70 hover:text-ad-purple sm:px-3 sm:text-xs";
-  const helpLinkActiveClass =
-    "rounded-full bg-ad-green-light/80 px-2.5 py-1 text-[11px] font-semibold text-ad-green-dark ring-1 ring-ad-green/25 sm:px-3 sm:text-xs";
-
-  const subNavActiveClass =
-    "bg-white font-semibold text-ad-purple shadow-sm ring-1 ring-ad-purple/15";
-
-  const headerStackGapClass = "gap-2";
   const loginAsDisplay = loginAs?.trim() || displayName;
-
-  const headerAvatar = (
-    <ShopBrandLogo
-      src={headerAvatarSrc}
-      alt="Profile photo"
-      className="!size-9 !rounded-xl !border-white/80 !bg-white/70 !shadow-md text-ad-purple/50 ring-2 ring-ad-purple/10 backdrop-blur-sm sm:!size-10"
-    />
-  );
 
   useEffect(() => {
     document.body.style.overflow = "";
     document.documentElement.style.overflow = "";
   }, [location.pathname]);
 
+  const navContext = useMemo(
+    () => ({
+      subItems: onHelpNav ? helpSubItems : activePrimary ? displaySubItems : [],
+      activeSubPath: activeSubItemPath,
+      onSubNavClick: handleNavLinkClick,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onHelpNav, helpSubItems, activePrimary, displaySubItems, activeSubItemPath, location.pathname],
+  );
+
+  const cityLinkClass =
+    "inline-flex items-center gap-1.5 font-serif text-xl font-bold text-blue-700 underline decoration-2 underline-offset-4 transition-colors hover:text-ad-purple 2xl:text-2xl";
+  const cityLabel = headerCity || (onCityFilterPages ? "Select city" : "");
+
+  const utilityClass =
+    "px-3 py-1 text-xs font-semibold text-gray-700 transition-colors hover:bg-white hover:text-ad-purple sm:px-4 sm:text-[13px]";
+
   return (
-    <div className="owner-portal relative flex min-h-screen flex-col bg-ad-app-bg font-sans">
-      <div
-        className="owner-chrome-mist pointer-events-none absolute inset-x-0 top-0 z-0 h-40 bg-[radial-gradient(ellipse_80%_70%_at_50%_-10%,rgba(155,48,141,0.18),transparent_65%),radial-gradient(ellipse_50%_50%_at_8%_20%,rgba(44,140,44,0.12),transparent_55%)] 2xl:h-44"
-        aria-hidden
-      />
-
-      <header className={`relative z-20 ${shopPortalHorizPaddingClass} ${ownerChromeHeaderPadClass}`}>
-        <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 md:grid-cols-[auto_1fr_auto] md:gap-x-5">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="rounded-xl border border-white/70 bg-white/55 p-2 text-gray-600 shadow-sm backdrop-blur-md md:hidden"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Toggle menu"
-            >
-              <svg width="20" height="16" viewBox="0 0 16 12" fill="currentColor">
-                <rect width="16" height="2" y="0" />
-                <rect width="16" height="2" y="5" />
-                <rect width="16" height="2" y="10" />
-              </svg>
-            </button>
-            <Link to={homePath} className="shrink-0" onClick={(e) => handleNavLinkClick(homePath, e)}>
-              <img src={LOGO} alt="AutoDaddy" className={ownerChromeLogoClass} />
-            </Link>
-          </div>
-
-          <div className="col-span-2 flex items-center justify-center md:col-span-1">
-            <p className={ownerChromeNameClass}>
-              <Link
-                to={homePath}
-                className="bg-gradient-to-r from-ad-purple to-ad-pink-dark bg-clip-text font-semibold text-transparent transition-opacity hover:opacity-80"
-              >
-                {displayName}
-              </Link>
-              {headerCity ? (
-                <>
-                  <span className="mx-1.5 font-normal text-ad-purple/25" aria-hidden>
-                    ·
-                  </span>
-                  {onCityFilterPages ? (
-                    <button
-                      type="button"
-                      onClick={openCityPicker}
-                      aria-label="Change city filter"
-                      className="inline-flex items-center gap-1.5 font-medium text-ad-blue-dark/80 underline decoration-ad-blue-dark/20 underline-offset-4 transition-colors hover:text-ad-blue-dark hover:decoration-ad-blue-dark/50"
-                    >
-                      <span>{headerCity}</span>
-                      <FiEdit2 size={13} className="shrink-0 no-underline" aria-hidden />
-                    </button>
-                  ) : (
-                    <Link
-                      to={profilePath}
-                      className="font-medium text-ad-blue-dark/80 underline decoration-ad-blue-dark/20 underline-offset-4 transition-colors hover:text-ad-blue-dark hover:decoration-ad-blue-dark/50"
-                    >
-                      {headerCity}
-                    </Link>
-                  )}
-                </>
-              ) : onCityFilterPages ? (
-                <>
-                  <span className="mx-1.5 font-normal text-ad-purple/25" aria-hidden>
-                    ·
-                  </span>
-                  <button
-                    type="button"
-                    onClick={openCityPicker}
-                    aria-label="Select city filter"
-                    className="inline-flex items-center gap-1.5 font-medium text-ad-blue-dark/80 underline decoration-ad-blue-dark/20 underline-offset-4 transition-colors hover:text-ad-blue-dark hover:decoration-ad-blue-dark/50"
-                  >
-                    <span>Select city</span>
-                    <FiEdit2 size={13} className="shrink-0" aria-hidden />
-                  </button>
-                </>
-              ) : null}
-            </p>
-          </div>
-
-          <div
-            className={`col-span-2 flex flex-col items-end md:col-span-1 md:col-start-3 md:row-start-1 ${headerStackGapClass}`}
-          >
-            <nav
-              className="flex shrink-0 items-center gap-1 rounded-full border border-white/60 bg-white/45 px-1.5 py-0.5 shadow-sm backdrop-blur-md"
-              aria-label="Account actions"
-            >
-              <span className={`${utilityLinkClass} cursor-default text-gray-400 hover:bg-transparent hover:text-gray-400`}>
-                Login as : <span className="text-gray-600">{loginAsDisplay}</span>
-              </span>
-              <Link
-                to={helpPath ?? "#"}
-                className={helpPath && onHelpNav ? helpLinkActiveClass : utilityLinkClass}
-              >
-                Help
-              </Link>
-              <button type="button" onClick={handleLogout} className={utilityLinkClass}>
-                Log out
-              </button>
-            </nav>
-
-            <div className="relative z-10 flex items-center justify-end gap-2.5">
+    <OwnerNavContext.Provider value={navContext}>
+      <div className="owner-portal relative flex min-h-screen flex-col bg-ad-app-bg font-sans">
+        <header className={`relative z-20 ${ownerPortalGutterClass} pt-2 pb-3 2xl:pt-3`}>
+          <div className={ownerPortalGridClass}>
+            {/* Logo + city (mockup: logo with the city link under it) */}
+            <div className="flex items-center gap-3 lg:flex-col lg:items-center lg:justify-center lg:gap-1">
               <button
                 type="button"
-                className="relative rounded-xl border border-white/70 bg-white/55 p-2 text-ad-blue-dark/80 shadow-sm backdrop-blur-md transition-colors hover:bg-white/85 hover:text-ad-blue-dark"
-                aria-label="Notifications"
-                onClick={handleNotificationsClick}
+                className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm lg:hidden"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                aria-label="Toggle menu"
+                aria-expanded={mobileOpen}
               >
-                <FiBell size={18} strokeWidth={1.75} />
-                {newCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gradient-to-br from-ad-purple to-ad-pink-dark px-1 text-[10px] font-bold leading-none text-white shadow-sm">
-                    {newCount > 99 ? "99+" : newCount}
-                  </span>
-                ) : null}
+                <svg width="20" height="16" viewBox="0 0 16 12" fill="currentColor" aria-hidden>
+                  <rect width="16" height="2" y="0" />
+                  <rect width="16" height="2" y="5" />
+                  <rect width="16" height="2" y="10" />
+                </svg>
               </button>
-              <Link to={profilePath} className="shrink-0 transition-transform hover:scale-[1.03]">
-                {headerAvatar}
+              <Link to={homePath} className="shrink-0" onClick={(e) => handleNavLinkClick(homePath, e)}>
+                <img
+                  src={LOGO}
+                  alt="AutoDaddy"
+                  className="block h-auto max-h-12 w-auto max-w-[200px] object-contain drop-shadow-sm md:max-h-14 2xl:max-h-16 2xl:max-w-[240px]"
+                />
               </Link>
+              {cityLabel ? (
+                onCityFilterPages ? (
+                  <button type="button" onClick={openCityPicker} className={cityLinkClass} aria-label="Change city filter">
+                    {cityLabel}
+                    <FiEdit2 className="size-3.5 shrink-0" aria-hidden />
+                  </button>
+                ) : (
+                  <Link to={profilePath} className={cityLinkClass}>
+                    {cityLabel}
+                  </Link>
+                )
+              ) : null}
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <p className="order-last w-full min-w-0 truncate text-center font-serif sm:order-none sm:w-auto sm:flex-1 sm:pt-4 text-2xl font-bold tracking-wide text-gray-400 [text-shadow:0_1px_0_#fff] md:text-[1.75rem] 2xl:text-3xl">
+                  <Link to={profilePath} className="transition-colors hover:text-ad-purple">
+                    {displayName}
+                  </Link>
+                </p>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <nav
+                    className="flex items-center divide-x divide-white overflow-hidden rounded-md bg-gray-200/90 shadow-sm ring-1 ring-gray-300/60"
+                    aria-label="Account actions"
+                  >
+                    <span className="px-3 py-1 text-xs font-bold text-gray-700 sm:text-[13px]">
+                      Login as : {loginAsDisplay}
+                    </span>
+                    <Link
+                      to={helpPath ?? "#"}
+                      className={`${utilityClass} ${onHelpNav ? "bg-white text-ad-purple" : ""}`}
+                    >
+                      Help
+                    </Link>
+                    <button type="button" onClick={handleLogout} className={utilityClass}>
+                      Log out
+                    </button>
+                  </nav>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      className="relative flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-md transition-transform hover:scale-105"
+                      aria-label={newCount > 0 ? `Notifications (${newCount} new)` : "Notifications"}
+                      onClick={handleNotificationsClick}
+                    >
+                      <FiBell size={20} strokeWidth={2} />
+                      {newCount > 0 ? (
+                        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-ad-purple px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                          {newCount > 99 ? "99+" : newCount}
+                        </span>
+                      ) : null}
+                    </button>
+                    <Link to={profilePath} className="shrink-0 transition-transform hover:scale-[1.03]" aria-label="Profile">
+                      <ShopBrandLogo
+                        src={headerAvatarSrc}
+                        alt="Profile photo"
+                        className="!size-14 !rounded-lg !border !border-gray-300 !bg-white text-ad-purple/40 shadow-sm"
+                      />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <nav className={mobileOpen ? "block" : "hidden lg:block"} aria-label="Owner sections">
+                <ul className="flex flex-col gap-1.5 lg:flex-row">
+                  {primaryNav.map((item) => {
+                    const isActive = activePrimary?.name === item.name && !onHelpNav;
+                    const target = item.path ?? item.subItems?.[0]?.path ?? "#";
+                    return (
+                      <li key={item.name} className="min-w-0 flex-1">
+                        <Link
+                          to={target}
+                          onClick={(e) => handleNavLinkClick(target, e)}
+                          aria-current={isActive ? "page" : undefined}
+                          className={`block truncate rounded-lg border-2 px-2 py-1.5 text-center text-[15px] font-bold tracking-wide transition-all 2xl:text-base ${
+                            isActive
+                              ? "border-ad-purple bg-white text-ad-purple shadow-[0_4px_14px_rgba(155,48,141,0.18)]"
+                              : "border-transparent bg-gradient-to-b from-[#b045a4] to-ad-purple text-white shadow-sm hover:-translate-y-px hover:brightness-110"
+                          }`}
+                        >
+                          {item.name}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <nav
-        className={`relative z-20 ${shopPortalHorizPaddingClass} pb-0 ${
-          mobileOpen ? "block" : "hidden md:block"
-        }`}
-        aria-label="Owner sections"
-      >
-        <div
-          className={`overflow-hidden border border-white/50 bg-gradient-to-b from-white/55 to-ad-bg-purple/40 p-1 shadow-[0_8px_28px_rgba(155,48,141,0.1)] backdrop-blur-xl ${
-            hasSubNav ? "rounded-t-2xl border-b-0" : "rounded-2xl"
-          }`}
-        >
-          <ul className="flex flex-col gap-1 md:flex-row md:gap-1">
-            {primaryNav.map((item) => {
-              const isActive = activePrimary?.name === item.name;
-              const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
-              const itemClass = `${ownerChromePrimaryTabClass} ${
-                isActive
-                  ? "bg-gradient-to-br from-ad-purple to-ad-purple-dark text-white shadow-[0_6px_16px_rgba(155,48,141,0.35)]"
-                  : "text-ad-purple/80 hover:bg-white/70 hover:text-ad-purple"
-              }`;
-              return (
-                <li key={item.name} className="min-w-0 flex-1">
-                  {item.subItems && item.subItems.length > 0 ? (
-                    <button type="button" onClick={() => handlePrimaryClick(item)} className={itemClass}>
-                      {item.name}
-                    </button>
-                  ) : (
-                    <Link
-                      to={firstPath}
-                      onClick={(e) => handleNavLinkClick(firstPath, e)}
-                      className={`block ${itemClass}`}
-                    >
-                      {item.name}
-                    </Link>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </nav>
-
-      {hasSubNav ? (
-        <div className={`relative z-10 ${shopPortalHorizPaddingClass}`}>
-          <div className="rounded-b-2xl border border-t-0 border-white/50 bg-white/45 px-1.5 pb-1.5 pt-1 shadow-[0_10px_24px_rgba(100,130,170,0.06)] backdrop-blur-xl">
-            <ul className="hidden w-full items-center md:flex">
-              {primaryNav.map((item, colIndex) => {
-                const sub = colIndex < displaySubItems.length ? displaySubItems[colIndex] : null;
-                const active = sub ? sub.path === activeSubItemPath : false;
-                return (
-                  <li key={item.name} className="relative min-w-0 flex-1 px-0.5 py-1">
-                    {sub ? (
-                      <Link
-                        to={sub.path}
-                        onClick={(e) => handleNavLinkClick(sub.path, e)}
-                        className={`${ownerChromeSubNavLinkClass} ${active ? subNavActiveClass : ""}`}
-                      >
-                        {sub.name}
-                      </Link>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-            <ul className="flex flex-col gap-1 p-1 md:hidden">
-              {displaySubItems.map((sub) => {
-                const active = sub.path === activeSubItemPath;
-                return (
-                  <li key={sub.path}>
-                    <Link
-                      to={sub.path}
-                      onClick={(e) => handleNavLinkClick(sub.path, e)}
-                      className={`${ownerChromeSubNavLinkClass} max-w-none text-left ${
-                        active ? subNavActiveClass : ""
-                      }`}
-                    >
-                      {sub.name}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </div>
-      ) : null}
-
-      <main key={contentKey} className="relative z-10 min-h-0 flex-1">
-        <Outlet />
-      </main>
-    </div>
+        <main key={contentKey} className="relative z-10 min-h-0 flex-1">
+          <Outlet />
+        </main>
+      </div>
+    </OwnerNavContext.Provider>
   );
 }

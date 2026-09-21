@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { FiHelpCircle, FiPlus } from "react-icons/fi";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "react-toastify";
-import OwnerPageShell, { ownerPageIntroClass } from "../owner/OwnerPageShell";
+import OwnerPageShell from "../owner/OwnerPageShell";
 import { useOwnerNavReset } from "../../hooks/useOwnerNavReset";
 import ShopSupportPanel from "../shop/ShopSupportPanel";
 import ShopTicketRow, { type ShopTicket } from "../shop/ShopTicketRow";
@@ -167,28 +167,13 @@ export default function PortalHelpPage({
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading={meta.title}
       metaTitle="Help | AutoDaddy"
       metaDescription={metaDescription}
       noPanel
       headerAction={headerAction ?? raiseTicketButton}
     >
-      <div className="flex flex-col gap-4">
-        {!showForm ? (
-          <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
-            <div className="space-y-1">
-              <p className="text-sm text-slate-500">{meta.subtitle}</p>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-                {meta.title}
-              </h1>
-            </div>
-            {filteredTickets.length > 0 ? (
-              <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
-                {filteredTickets.length} ticket{filteredTickets.length === 1 ? "" : "s"}
-              </p>
-            ) : null}
-          </header>
-        ) : null}
+      <div className="flex flex-col gap-4 p-3 sm:p-4">
 
         {showForm ? (
           <ShopSupportPanel

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { FiFileText, FiImage, FiTruck, FiUpload } from "react-icons/fi";
 import { Navigate, useParams } from "react-router";
 import { toast } from "react-toastify";
-import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
 import { Skeleton } from "../../../components/common/Skeleton";
 import { useCarOwnerDocuments } from "../../../hooks/useCarOwnerDocuments";
 import { useCarOwnerVehicles } from "../../../hooks/useCarOwnerVehicles";
@@ -204,24 +204,12 @@ export default function OwnerDocumentsPage() {
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading={plateLabel ? `Docs - ${plateLabel}` : "Documents"}
       metaTitle="Documents | AutoDaddy"
       metaDescription="Car owner documents"
       noPanel
     >
-      <div className="flex flex-col gap-4">
-        <header className={`${ownerPageIntroClass} space-y-1`}>
-          <p className="text-sm text-slate-500">
-            {plateLabel ? (
-              <>
-                Digi purse for <span className="font-medium text-slate-700">{plateLabel}</span>
-              </>
-            ) : (
-              "Upload and manage vehicle documents"
-            )}
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">Documents</h1>
-        </header>
+      <div className="flex flex-col gap-4 p-3 sm:p-4">
 
         {loading || vehiclesLoading ? (
           <div className="space-y-3">

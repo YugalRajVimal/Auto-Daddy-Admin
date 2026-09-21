@@ -10,7 +10,7 @@ import {
   FiPlus,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
-import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
 import {
   ownerVehicleFieldClass,
   ownerVehicleLabelClass,
@@ -400,19 +400,14 @@ export default function OwnerDigitalDiaryPage() {
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading={"Digital Diary"}
       metaTitle="Digital Diary | AutoDaddy"
       metaDescription="Car owner digital diary notes"
       noPanel
     >
-      <div className="flex flex-col gap-4">
-        <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
-          <div className="min-w-0 space-y-1">
-            <p className="text-sm text-slate-500">Reminders, service dates, and personal notes</p>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-              Digital Diary
-            </h1>
-          </div>
+      <div className="flex flex-col gap-4 p-3 sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+          <p className="text-sm text-gray-500">Reminders, service dates, and personal notes</p>
           <button
             type="button"
             onClick={openCreate}
@@ -427,7 +422,7 @@ export default function OwnerDigitalDiaryPage() {
             <FiPlus size={15} aria-hidden />
             New Note
           </button>
-        </header>
+        </div>
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className="min-w-0 flex-1 space-y-3">

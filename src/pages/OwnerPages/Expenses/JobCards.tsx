@@ -4,7 +4,7 @@ import { FiCheck, FiClipboard, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Skeleton } from "../../../components/common/Skeleton";
 import OwnerInvoiceEstimateView from "../../../components/owner/OwnerInvoiceEstimateView";
-import OwnerPageShell, { ownerPageIntroClass } from "../../../components/owner/OwnerPageShell";
+import OwnerPageShell from "../../../components/owner/OwnerPageShell";
 import {
   ownerVehicleLabelClass,
   ownerVehicleSelectClass,
@@ -189,12 +189,12 @@ export default function OwnerExpensesJobCardsPage() {
 
   return (
     <OwnerPageShell
-      pageHeading=""
+      pageHeading={"Job Cards"}
       metaTitle="Expenses | Job Cards | AutoDaddy"
       metaDescription="Car owner job cards for expenses"
       noPanel
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 p-3 sm:p-4">
         {detailJobCardId ? (
           <OwnerInvoiceEstimateView
             key={detailJobCardId}
@@ -208,19 +208,6 @@ export default function OwnerExpensesJobCardsPage() {
           />
         ) : (
           <>
-            <header className={`${ownerPageIntroClass} flex flex-wrap items-end justify-between gap-3`}>
-              <div className="space-y-1">
-                <p className="text-sm text-slate-500">Review and approve shop job cards</p>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-                  Job Cards
-                </h1>
-              </div>
-              {!loading && !error && items.length > 0 ? (
-                <p className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
-                  {items.length} job card{items.length === 1 ? "" : "s"}
-                </p>
-              ) : null}
-            </header>
 
             {loading ? (
               <div className="space-y-3">

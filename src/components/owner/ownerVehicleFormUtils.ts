@@ -1,15 +1,15 @@
 export const currentYear = new Date().getFullYear();
 
 export const ownerVehicleLabelClass =
-  "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500";
+  "mb-1.5 block text-sm font-medium text-gray-700";
 
 export const ownerVehicleFieldClass =
-  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70";
+  "h-10 w-full rounded-md border border-white bg-white px-3 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-ad-purple/50 focus:ring-2 focus:ring-ad-purple/15 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-70";
 
 export const ownerVehicleSelectClass = `${ownerVehicleFieldClass} appearance-none bg-[length:10px] bg-[right_12px_center] bg-no-repeat pr-9 [background-image:url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2210%22%20height%3D%2210%22%20viewBox%3D%220%200%2010%2010%22%3E%3Cpath%20fill%3D%22%2364758b%22%20d%3D%22M1.5%203.5l3.5%204%203.5-4z%22/%3E%3C/svg%3E')]`;
 
 export const ownerVehicleReadOnlyFieldClass =
-  "h-10 w-full cursor-default rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600 shadow-sm outline-none disabled:cursor-default disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-600 disabled:opacity-100";
+  "h-10 w-full cursor-default rounded-md border border-white bg-white/80 px-3 text-sm text-slate-600 shadow-sm outline-none disabled:cursor-default disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-600 disabled:opacity-100";
 
 export const ownerVehicleReadOnlySelectClass = `${ownerVehicleReadOnlyFieldClass} appearance-none pr-3`;
 
