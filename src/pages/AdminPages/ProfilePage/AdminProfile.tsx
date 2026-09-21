@@ -7,6 +7,7 @@ import {
   type Permissions,
 } from "../../../components/admin/PermissionMatrix";
 import { normalizeMediaUrl } from "../../../lib/normalizeMediaUrl";
+import { notifyAdminProfileUpdated } from "../../../hooks/useAdminProfilePhoto";
 
 // Get API base from env (VITE_API_BASE_URL) or fallback
 const API_BASE = import.meta.env.VITE_API_URL || "";
@@ -217,6 +218,7 @@ const AdminProfile: React.FC = () => {
       }
 
       applyProfile(json.data);
+      notifyAdminProfileUpdated(json.data?.profilePhoto);
       setSaveSuccess("Profile updated successfully.");
     } catch (err: any) {
       setSaveError(err?.message || "Failed to update profile.");

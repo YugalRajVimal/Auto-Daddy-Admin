@@ -7,6 +7,7 @@ import {
   type NavItem,
 } from "../../config/adminNav";
 import PortalShell from "./PortalShell";
+import useAdminProfilePhoto from "../../hooks/useAdminProfilePhoto";
 
 function filterNavItem(
   item: NavItem,
@@ -27,6 +28,7 @@ function filterNavItem(
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const { isAdmin, canView } = useAuth();
+  const profilePhoto = useAdminProfilePhoto();
 
   const visibleNav = [
     ...(primaryNav.map((n) => filterNavItem(n, canView, isAdmin)).filter(Boolean) as NavItem[]),
@@ -45,6 +47,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     <PortalShell
       homePath="/admin"
       profilePath="/admin/profile"
+      headerAvatarSrc={profilePhoto}
       primaryNav={visibleNav}
       utilityNav={visibleUtilityNav}
       utilityNavLabel="Admin"
