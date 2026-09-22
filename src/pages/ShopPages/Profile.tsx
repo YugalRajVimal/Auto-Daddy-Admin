@@ -886,7 +886,7 @@
 
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { toast } from "react-toastify";
 import DashboardPanelCard from "../../components/COMP";
 import ShopBusinessOpenToggle from "../../components/shop/ShopBusinessOpenToggle";
@@ -906,6 +906,7 @@ import { shopAddNewButtonClass } from "../../components/shop/forms/ShopFormPage"
 import { ShopReveal } from "../../components/shop/ShopAnimated";
 import { ShopLoadingPanel } from "../../components/shop/ShopPanels";
 import ShopQrCodePanel from "../../components/shop/ShopQrCodePanel";
+import ShopInvoiceTemplateSettings from "../../components/shop/ShopInvoiceTemplateSettings";
 
 import { shopHeroOnImageMutedTextClass } from "../../components/shop/shopLayoutStyles";
 import { useAuth } from "../../auth";
@@ -942,6 +943,7 @@ const PROFILE_SECTIONS = [
   { id: "open", label: "Timings", variant: "primary" as const },
   { id: "mobile-service", label: "Mobile Service", variant: "primary" as const },
   { id: "qr-code", label: "Shop QR Code", variant: "primary" as const },
+  { id: "invoice-templates", label: "Invoice Templates", variant: "primary" as const },
 ];
 
 const SECTION_TITLES: Record<string, string> = {
@@ -953,10 +955,8 @@ const SECTION_TITLES: Record<string, string> = {
   "mobile-service": "Mobile Service",
   team: "Team Members",
   "qr-code": "Shop QR Code",
+  "invoice-templates": "Invoice Templates",
 };
-
-/** Invoice templates moved to Home → Settings; keep old deep links working. */
-const INVOICE_TEMPLATES_PATH = "/shop?section=settings&view=invoice-templates";
 
 function parseCompanies(payload: unknown): ShopCarCompany[] {
   if (!payload || typeof payload !== "object") return [];
@@ -1322,21 +1322,21 @@ export default function ShopProfilePage() {
     switch (activeId) {
       case "personal":
         return (
-            <ShopPersonalProfileEditor
-              user={user}
-              city={user?.city ?? business?.city}
-              onSaved={() => void refresh()}
-            />
+          <ShopPersonalProfileEditor
+            user={user}
+            city={user?.city ?? business?.city}
+            onSaved={() => void refresh()}
+          />
         );
       case "business":
         return (
-            <ShopBusinessProfileEditor
-              business={business}
-              zipCode={user?.pincode}
-              shopType={user?.shopType ?? business?.shopType}
-              shopTypes={business?.shopTypes}
-              onSaved={() => void refresh()}
-            />
+          <ShopBusinessProfileEditor
+            business={business}
+            zipCode={user?.pincode}
+            shopType={user?.shopType ?? business?.shopType}
+            shopTypes={business?.shopTypes}
+            onSaved={() => void refresh()}
+          />
         );
       case "open":
         return (
@@ -1345,17 +1345,17 @@ export default function ShopProfilePage() {
             onSaved={() => void refresh()}
             showAddForm={showAddHours}
             onAddFormClose={() => setShowAddHours(false)}
-            headerAction={
+            centerAction={
               !showAddHours ? (
-                <div className="flex items-center gap-2">
-                  <ShopBusinessOpenToggle
-                    isBusinessActive={isBusinessActive}
-                    updating={updatingActive}
-                    onChange={setBusinessActive}
-                  />
-                  <AddNewButton onClick={() => setShowAddHours(true)} />
-                </div>
+                <ShopBusinessOpenToggle
+                  isBusinessActive={isBusinessActive}
+                  updating={updatingActive}
+                  onChange={setBusinessActive}
+                />
               ) : undefined
+            }
+            headerAction={
+              !showAddHours ? <AddNewButton onClick={() => setShowAddHours(true)} /> : undefined
             }
           />
         );
@@ -1522,14 +1522,12 @@ case "qr-code":
   return (
     <ShopQrCodePanel slug={business?.slug} businessName={business?.businessName} />
   );
+      case "invoice-templates":
+        return <ShopInvoiceTemplateSettings />;
         default:
         return null;
     }
   };
-
-  if (sectionParam === "invoice-templates") {
-    return <Navigate to={INVOICE_TEMPLATES_PATH} replace />;
-  }
 
   return (
     <>
@@ -1538,12 +1536,18 @@ case "qr-code":
         metaTitle="Profile | AutoDaddy"
         metaDescription="Auto shop owner profile"
         sidebarVariant="nav"
+        hideAds={activeId === "personal" || activeId === "business"}
         sidebarItems={PROFILE_SECTIONS}
         activeSidebarId={activeId}
         onSidebarSelect={handleSidebarSelect}
         headerAction={headerAction}
         contentTopOffset
-        heroCardFlush={activeId !== "personal" && activeId !== "business" && activeId !== "qr-code"}
+        heroCardFlush={
+          activeId !== "personal" &&
+          activeId !== "business" &&
+          activeId !== "qr-code" &&
+          activeId !== "invoice-templates"
+        }
         onFaqsOpen={() => setFaqsOpen(true)}
         onFaqsClose={() => setFaqsOpen(false)}
         faqsOpen={faqsOpen}

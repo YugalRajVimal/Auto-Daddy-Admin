@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import axios from "axios";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
@@ -122,12 +124,6 @@ const PROVIDER_OPTIONS = [
 ];
 
 const DOMAIN_SEARCH_FIELDS: AdminSearchField[] = [
-  {
-    key: "userType",
-    label: "User Type",
-    type: "select",
-    options: USER_TYPE_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
-  },
   { key: "userName", label: "User Name" },
   { key: "domain", label: "Domain" },
   {
@@ -179,6 +175,20 @@ function formatDisplayDate(iso: string) {
 function toDateInputValue(value?: string) {
   if (!value) return "";
   return value.slice(0, 10);
+}
+
+// "YYYY-MM-DD" <-> local Date for the calendar picker.
+function parseDateValue(value: string): Date | null {
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+function formatDateValue(value: Date): string {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, "0");
+  const d = String(value.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function userTypeLabel(value: string) {
@@ -743,7 +753,9 @@ export default function Domain() {
       }
       resetForm();
       setShowForm(false);
-      setViewingOwner(activeOwner ?? null);
+      setViewingOwner(null);
+      setActiveOwner(null);
+      setActiveCarOwner(null);
       await refreshDomains();
     } catch (err: unknown) {
       const msg =
@@ -785,7 +797,6 @@ export default function Domain() {
         if (!matchesSearch) return false;
 
         return (
-          searchEquals(userTypeLabel(row.userType), searchFilters.userType) &&
           searchIncludes(row.userName, searchFilters.userName) &&
           searchIncludes(row.domain, searchFilters.domain) &&
           searchEquals(domainTypeLabel(row.domainType), searchFilters.domainType) &&
@@ -824,7 +835,6 @@ export default function Domain() {
     printAdminTable({
       title: isDeletedView ? "Deleted Domain" : "Domain",
       headers: [
-        "User Type",
         "User Name",
         "Domain",
         "Domain Type",
@@ -833,7 +843,6 @@ export default function Domain() {
         "DNS",
       ],
       rows: filteredDomainRows.map((row) => [
-        userTypeLabel(row.userType),
         row.userName,
         row.domain,
         domainTypeLabel(row.domainType),
@@ -906,7 +915,7 @@ export default function Domain() {
     if (domainsLoading) {
       return (
         <tr>
-          <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+          <td colSpan={8} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
             Loading...
           </td>
         </tr>
@@ -915,7 +924,7 @@ export default function Domain() {
     if (rows.length === 0) {
       return (
         <tr>
-          <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+          <td colSpan={8} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
             {emptyMessage}
           </td>
         </tr>
@@ -930,9 +939,6 @@ export default function Domain() {
             onChange={() => toggleSelect(row.id)}
             className="accent-ad-purple"
           />
-        </td>
-        <td className="border border-gray-300 px-3 py-2 text-left">
-          {userTypeLabel(row.userType)}
         </td>
         <td className="border border-gray-300 px-3 py-2 text-left">
           {!viewingOwner ? (
@@ -1019,9 +1025,6 @@ export default function Domain() {
           />
         </th>
         <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
-          User Type
-        </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
           User Name
         </th>
         <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
@@ -1079,9 +1082,6 @@ export default function Domain() {
         }
       >
         <CompactFormRow className="w-full items-start">
-          <CompactField label="User Type" className={compactFixedFieldWidth}>
-            <div className={compactReadOnlyValueClass}>Shop Owner</div>
-          </CompactField>
           <CompactField label="User Name" className={compactFixedFieldWidth}>
             <div className={compactReadOnlyValueClass}>
               {viewingOwner.businessProfile?.businessName ||
@@ -1154,25 +1154,6 @@ export default function Domain() {
           </div>
         )}
         <CompactFormRow className="w-full items-start" columns={4}>
-          <CompactField label="User Type" required className="w-full min-w-0">
-            <select
-              name="userType"
-              value={form.userType}
-              onChange={(e) => {
-                const userType = e.target.value;
-                setForm((prev) => ({ ...prev, userType, userName: "" }));
-                setActiveOwner(null);
-                setActiveCarOwner(null);
-              }}
-              className={compactInputClass}
-            >
-              {USER_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </CompactField>
           <CompactField label="User Name" required className="w-full min-w-0">
             <select
               name="userName"
@@ -1258,12 +1239,16 @@ export default function Domain() {
         </CompactFormRow>
         <CompactFormRow className="w-full items-start" columns={4}>
           <CompactField label="Expiry (Date)" className="w-full min-w-0">
-            <input
-              type="date"
-              name="expiry"
-              value={form.expiry}
-              onChange={handleFormChange}
+            <DatePicker
+              selected={parseDateValue(form.expiry)}
+              onChange={(picked: Date | null) =>
+                setForm((prev) => ({ ...prev, expiry: picked ? formatDateValue(picked) : "" }))
+              }
+              dateFormat="yyyy-MM-dd"
+              placeholderText="Select date"
+              isClearable
               className={fieldErrorClass(!!formErrors.expiry, compactInputClass)}
+              wrapperClassName="w-full"
             />
             <FormFieldError message={formErrors.expiry} />
           </CompactField>

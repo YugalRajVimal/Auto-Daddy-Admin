@@ -409,7 +409,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
 
   const handleToolbarPrint = () => {
     printAdminTable({
-      title: isDeletedView ? "Deleted Product Features" : "Product Features",
+      title: isDeletedView ? "Deleted What's New" : "What's New",
       headers: ["Date", "User", "Feature", "Clip"],
       rows: filtered.map((featureRow) => [
         featureRow.date,
@@ -422,7 +422,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
 
   return (
     <AdminPage
-      title={isDeletedView ? "Deleted Product Features" : "Product Features"}
+      title={isDeletedView ? "Deleted What's New" : "What's New"}
       headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showSearchCard ? (
@@ -440,8 +440,8 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
               <CompactFormFooter
                 message={
                   editingId != null
-                    ? "You are editing a 'Product Feature'"
-                    : "You are creating a 'Product Feature'"
+                    ? "You are editing a 'What's New' entry"
+                    : "You are creating a 'What's New' entry"
                 }
                 messageCenter
                 actionLabel={editingId != null ? "Update" : "Save"}
@@ -661,7 +661,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
             </button>
           ))}
         </div>
-        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active Features" />
+        <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active What's New" />
       </div>
     </AdminPage>
   );

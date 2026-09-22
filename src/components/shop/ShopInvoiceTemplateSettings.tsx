@@ -13,6 +13,7 @@ import {
 import { apiMessage } from "../../lib/shopOwnerMutations";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import { Modal } from "../ui/modal";
+import { InvoiceMiniature } from "./invoice-templates/InvoiceMiniature";
 import { InvoiceTemplatePreview } from "./invoice-templates/InvoiceTemplatePreview";
 import {
   DUMMY_INVOICE_TEMPLATES,
@@ -24,31 +25,7 @@ import {
 } from "./invoice-templates/sampleInvoiceData";
 import { ShopFieldRow, ShopSaveBar, shopSoftInputClass } from "./shopUi";
 
-/** Natural render width of an invoice; miniatures scale this down so they keep the page's proportions. */
-const INVOICE_RENDER_WIDTH = 720;
-
-/** Scaled-down full invoice, clipped to a fixed box (keeps A4-like proportions at any size). */
-function InvoiceMiniature({
-  templateId,
-  data,
-  width,
-  height,
-}: {
-  templateId: string;
-  data: ReturnType<typeof mergeInvoicePreviewShop>;
-  width: number;
-  height: number;
-}) {
-  return (
-    <div className="pointer-events-none overflow-hidden bg-white" style={{ width, height }} aria-hidden>
-      <div style={{ width: INVOICE_RENDER_WIDTH, zoom: width / INVOICE_RENDER_WIDTH }}>
-        <InvoiceTemplatePreview templateId={templateId} data={data} mode="full" />
-      </div>
-    </div>
-  );
-}
-
-/** Home → Settings → Invoice Templates: template strip, large preview and invoice settings. */
+/** Profile → Invoice Templates: template strip, large preview and invoice settings. */
 export default function ShopInvoiceTemplateSettings() {
   const { token } = useAuth();
   const { business, refresh } = useShopOwnerPortal();

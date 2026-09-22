@@ -1,5 +1,5 @@
 /** Portal page edge inset — horizontal matches bottom (0.25rem). */
-export const shopPortalBottomPaddingClass = "pb-1 md:pb-1";
+export const shopPortalBottomPaddingClass = "pb-4 md:pb-5";
 
 /**
  * Shared horizontal inset so header (profile link → logout) aligns with the page body grid.
@@ -136,12 +136,17 @@ export const shopProfileEditingRowClass = "shop-profile-editing-row bg-[#FDE4D0]
 /**
  * Shop portal body height (left panel + main card) below the header, tab bar, sub-nav and page title.
  * Shop-only — the owner portal keeps {@link shopMainContentHeightClass}.
+ * Mobile: fixed viewport-based height. Desktop: fills the grid row (the portal is exactly one screen tall).
  */
 export const shopPanelHeightClass =
-  "h-[calc(100vh-13rem)] min-h-[460px] lg:h-[calc(100vh-240px)] lg:max-h-[calc(100vh-240px)]";
+  "h-[calc(100vh-13rem)] min-h-[460px] lg:h-full lg:min-h-0";
 
 export const shopPanelShellClass = `flex w-full flex-col overflow-hidden rounded-2xl ${shopPanelHeightClass}`;
 
 /** Shop page body: left dealer panel + titled main card. */
 export const shopPortalBodyGridClass =
   "grid min-h-0 flex-1 grid-cols-1 gap-x-5 gap-y-2 lg:grid-cols-[260px_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]";
+
+/** Same body grid without the left ads column (Profile pages, expanded hero card). */
+export const shopPortalBodyFullGridClass =
+  "grid min-h-0 flex-1 grid-cols-1 gap-x-5 gap-y-2 lg:grid-rows-[auto_minmax(0,1fr)]";

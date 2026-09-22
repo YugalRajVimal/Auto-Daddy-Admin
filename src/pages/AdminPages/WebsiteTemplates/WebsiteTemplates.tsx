@@ -191,6 +191,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
   const [filterShopType, setFilterShopType] = useState("mechanic-shop");
   const [loading, setLoading] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [previewRow, setPreviewRow] = useState<TemplateRow | null>(null);
 
   const resetTableControls = () => {
     setPage(1);
@@ -417,6 +418,32 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
     });
   };
 
+  if (previewRow) {
+    return (
+      <AdminPage
+        title={previewRow.templateName || "Web - Temp"}
+        noPanel
+        onTitleClick={() => setPreviewRow(null)}
+        headerAction={
+          <button
+            type="button"
+            onClick={() => setPreviewRow(null)}
+            className="shrink-0 rounded bg-ad-green px-4 py-2 text-sm font-bold text-white hover:bg-ad-green-dark"
+          >
+            &larr; Back
+          </button>
+        }
+      >
+        <div className="mb-2 truncate text-xs text-gray-600">{previewRow.url}</div>
+        <iframe
+          src={previewRow.url}
+          title={previewRow.templateName || "Website preview"}
+          className="h-[calc(100vh-220px)] min-h-[480px] w-full rounded border border-gray-300 bg-white"
+        />
+      </AdminPage>
+    );
+  }
+
   return (
     <AdminPage
       title={isDeletedView ? "Deleted Web - Temp" : "Web - Temp"}
@@ -632,14 +659,13 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                     {row.templateName || `Template ${pageStartIndex + idx + 1}`}
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-left">
-                    <a
-                      href={row.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => setPreviewRow(row)}
                       className="text-blue-700 hover:underline"
                     >
                       {row.url}
-                    </a>
+                    </button>
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-left">{row.date}</td>
                   <td className="border border-gray-300 px-3 py-2 text-left">

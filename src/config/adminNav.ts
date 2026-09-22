@@ -470,7 +470,7 @@ export const primaryNav: NavItem[] = [
     subItems: [
       { name: "Dashboard", path: "/admin", permissionModule: "home.subNav.dashboard" },
       { name: "Thought of Day", path: "/admin/thought-of-day", permissionModule: "home.subNav.thoughtOfDay" },
-      { name: "Features", path: "/admin/features", permissionModule: "home.subNav.features" },
+      { name: "What's New", path: "/admin/features", permissionModule: "home.subNav.features" },
       { name: "FAQs", path: "/admin/faqs", permissionModule: "home.subNav.faqs" },
       { name: "Privacy", path: "/admin/privacy", permissionModule: "home.subNav.privacy" },
       { name: "Web - Temp", path: "/admin/website-templates", permissionModule: "home.subNav.websiteTemplate" },

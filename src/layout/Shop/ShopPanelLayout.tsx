@@ -49,6 +49,7 @@ function ShopLayoutContent() {
     subscriptionGateReady,
   } = useShopOwnerPortal();
   const profilePhotoSrc = normalizeMediaUrl(profileIcon ?? null);
+  const businessLogoSrc = normalizeMediaUrl(business?.businessLogo ?? null);
   const { login, session } = useAuth();
 
   // State to track back-to-admin-token
@@ -104,6 +105,8 @@ function ShopLayoutContent() {
 
   return (
     <ShopSubscriptionGateProvider subscriptionLocked={subscriptionLocked}>
+      {/* Banner + portal share one screen height on desktop so the page never overflows the viewport. */}
+      <div className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
       {backToAdminToken && (
         <div
           className="flex items-center justify-between px-4 py-2 text-sm z-50 border border-yellow-300 text-yellow-900 bg-yellow-100 whitespace-nowrap"
@@ -142,11 +145,13 @@ function ShopLayoutContent() {
         profilePath="/shop/profile"
         primaryNav={shopPrimaryNav}
         brandLogo={{ src: profilePhotoSrc, placeholderLabel: "Profile photo" }}
+        businessLogoSrc={businessLogoSrc}
         businessName={displayName}
         businessNameLoading={!businessNameLoaded}
         subscriptionDaysLeft={hasActiveSubscription ? (daysLeft ?? null) : null}
         helpPath="/shop/help"
       />
+      </div>
 
       <ShopSubscriptionPrompt />
     </ShopSubscriptionGateProvider>

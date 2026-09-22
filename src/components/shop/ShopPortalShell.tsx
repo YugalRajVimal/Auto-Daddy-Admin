@@ -26,6 +26,8 @@ export type ShopPortalShellProps = {
   profilePath: string;
   primaryNav: NavItem[];
   brandLogo?: PortalBrandLogo;
+  /** Shop's own business logo shown top-left; falls back to the AutoDaddy logo. */
+  businessLogoSrc?: string | null;
   businessName: string;
   businessNameLoading?: boolean;
   subscriptionDaysLeft?: number | null;
@@ -37,6 +39,7 @@ export default function ShopPortalShell({
   profilePath,
   primaryNav,
   brandLogo,
+  businessLogoSrc,
   businessName,
   businessNameLoading = false,
   subscriptionDaysLeft,
@@ -79,13 +82,16 @@ export default function ShopPortalShell({
   }, [location.pathname]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
+    <div className="flex min-h-0 flex-1 flex-col bg-ad-app-bg font-sans">
       <header className={`${shopPortalHorizPaddingClass} flex flex-col gap-2 pb-1`}>
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3">
-          <Link to={homePath} className="shrink-0" aria-label="AutoDaddy home">
+          <Link to={homePath} className="shrink-0" aria-label={`${businessName || "AutoDaddy"} home`}>
             <img
-              src={AUTODADDY_LOGO}
-              alt="AutoDaddy"
+              src={businessLogoSrc || AUTODADDY_LOGO}
+              onError={(e) => {
+                if (!e.currentTarget.src.endsWith(AUTODADDY_LOGO)) e.currentTarget.src = AUTODADDY_LOGO;
+              }}
+              alt={businessLogoSrc ? `${businessName || "Business"} logo` : "AutoDaddy"}
               className="h-11 w-auto max-w-[150px] object-contain sm:h-14 sm:max-w-[200px]"
             />
           </Link>

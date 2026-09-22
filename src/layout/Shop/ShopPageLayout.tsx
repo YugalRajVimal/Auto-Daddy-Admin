@@ -181,12 +181,13 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router";
+import { FiMaximize2, FiMinimize2 } from "react-icons/fi";
 import PageMeta from "../../components/common/PageMeta";
 import { PortalPageContent } from "../../components/admin/PortalPageContent";
 import OwnerFaqsDialog from "../../components/owner/OwnerFaqsDialog";
 import { StickyFaqsButton } from "../../components/owner/OwnerFaqsButton";
-import ShopDealersListPanel from "../../components/shop/ShopDealersListPanel";
 import ShopHeroCardToolbar from "../../components/shop/ShopHeroCardToolbar";
+import ShopHomeAdsPanel from "../../components/shop/ShopHomeAdsPanel";
 import ShopProfileHeroPanel from "../../components/shop/ShopProfileHeroPanel";
 import {
   shopHeroCardScrollBodyClass,
@@ -194,6 +195,7 @@ import {
   shopHeroCardScrollContentClass,
   shopHeroCardScrollContentTopClass,
   shopMainContentFillClass,
+  shopPortalBodyFullGridClass,
   shopPortalBodyGridClass,
   shopPortalBottomPaddingClass,
   shopPortalHorizPaddingClass,
@@ -217,6 +219,7 @@ export default function ShopPageLayout() {
   );
   const { items, loading } = useShopOwnerFaqs(pageSlug);
   const [localFaqsOpen, setLocalFaqsOpen] = useState(false);
+  const [heroExpanded, setHeroExpanded] = useState(false);
 
   const faqsOpen = chrome.faqsOpen === true || localFaqsOpen;
   const openFaqs = useCallback(() => {
@@ -238,8 +241,9 @@ export default function ShopPageLayout() {
   // Remount page content on every route change so each page re-fetches fresh API data.
   const pageOutlet = <Outlet key={location.pathname} />;
 
-  // Home › Dash Board supplies its own left column (dealer ad carousel); other pages list the dealers.
-  const leftPanel = chrome.sidebarExtra ?? <ShopDealersListPanel />;
+  // Every page shows the ads column unless the page opts out (Profile) or the hero card is expanded.
+  const showLeftPanel = !chrome.hideAds && !heroExpanded;
+  const leftPanel = chrome.sidebarExtra ?? <ShopHomeAdsPanel />;
 
   const scrollRegionClass = chrome.contentFillHeight
     ? "no-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden"
@@ -287,24 +291,48 @@ export default function ShopPageLayout() {
     >
       <PageMeta title={metaTitle} description={metaDescription} />
 
-      <div className={shopPortalBodyGridClass}>
-        <h1 className="flex min-h-9 min-w-0 items-end gap-1.5 truncate pt-2 text-lg font-bold text-gray-700 lg:col-start-2 lg:row-start-1 lg:text-xl">
-          {headingParent ? (
-            <>
-              <span className="shrink-0">{headingParent}</span>
-              <span className="shrink-0 text-gray-400">-</span>
-              <span className="truncate text-[#1f3aa0]">{heading}</span>
-            </>
-          ) : (
-            <span className="truncate">{heading}</span>
-          )}
-        </h1>
-
-        <div className="order-last min-h-0 lg:order-none lg:col-start-1 lg:row-start-2">
-          {leftPanel}
+      <div className={showLeftPanel ? shopPortalBodyGridClass : shopPortalBodyFullGridClass}>
+        <div
+          className={`flex min-h-9 min-w-0 items-end justify-between gap-3 pt-2 lg:row-start-1 ${
+            showLeftPanel ? "lg:col-start-2" : "lg:col-start-1"
+          }`}
+        >
+          <h1 className="flex min-w-0 items-end gap-1.5 truncate text-lg font-bold text-gray-700 lg:text-xl">
+            {headingParent ? (
+              <>
+                <span className="shrink-0">{headingParent}</span>
+                <span className="shrink-0 text-gray-400">-</span>
+                <span className="truncate text-[#1f3aa0]">{heading}</span>
+              </>
+            ) : (
+              <span className="truncate">{heading}</span>
+            )}
+          </h1>
+          {!chrome.hideAds ? (
+            <button
+              type="button"
+              onClick={() => setHeroExpanded((prev) => !prev)}
+              aria-pressed={heroExpanded}
+              title={heroExpanded ? "Collapse and show ads" : "Expand"}
+              className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-ad-purple shadow-sm transition-colors hover:bg-purple-50 lg:inline-flex"
+            >
+              {heroExpanded ? <FiMinimize2 aria-hidden /> : <FiMaximize2 aria-hidden />}
+              {heroExpanded ? "Collapse" : "Expand"}
+            </button>
+          ) : null}
         </div>
 
-        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden lg:col-start-2 lg:row-start-2">
+        {showLeftPanel ? (
+          <div className="order-last min-h-0 lg:order-none lg:col-start-1 lg:row-start-2">
+            {leftPanel}
+          </div>
+        ) : null}
+
+        <div
+          className={`flex min-h-0 min-w-0 flex-col overflow-hidden lg:row-start-2 ${
+            showLeftPanel ? "lg:col-start-2" : "lg:col-start-1"
+          }`}
+        >
           {pageContent}
         </div>
       </div>

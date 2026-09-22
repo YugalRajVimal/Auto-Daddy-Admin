@@ -561,18 +561,19 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Type</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Description</th>
+              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="text-left py-6">
+                <td colSpan={5} className="text-left py-6">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-left py-6">
+                <td colSpan={5} className="text-left py-6">
                   {isDeletedView ? "No deleted entries found." : "No entries found."}
                 </td>
               </tr>
@@ -588,17 +589,23 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                     />
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-left">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(row)}
-                      className="text-blue-700 hover:underline"
-                    >
-                      {row.date ? new Date(row.date).toISOString().slice(0, 10) : ""}
-                 
-                    </button>
+                    {row.date ? new Date(row.date).toISOString().slice(0, 10) : ""}
                   </td>
                   <td className="border border-gray-300 px-3 py-2 text-left">{row.type}</td>
                   <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[280px]">{row.description}</td>
+                  <td className="border border-gray-300 px-3 py-2 text-left">
+                    {!isDeletedView ? (
+                      <button
+                        type="button"
+                        onClick={() => openEdit(row)}
+                        className="text-blue-700 hover:underline"
+                      >
+                        Edit
+                      </button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                 </tr>
               ))
             )}

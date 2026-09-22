@@ -39,9 +39,6 @@ type ItemFormDraft = z.input<typeof itemFormSchema>;
 
 const QUANTITY_UNIT_OPTIONS = ["Unit", "Days"];
 
-// Adjust to wherever your server serves the Uploads folder from
-const IMAGE_BASE_URL = import.meta.env.VITE_UPLOADS_URL;
-
 function emptyItemForm(): ItemFormDraft {
   return {
     itemName: "",
@@ -58,48 +55,6 @@ function fmtOptionalMoney(value: number | null) {
   return `${value % 1 === 0 ? value : value.toFixed(2)} CAD`;
 }
 
-// Tooltip for image preview on hover
-function ImageHoverCell({ image, itemName }: { image: string; itemName: string }) {
-  // Tailwind's group-hover may not apply in table cells as expected, so using custom hover state
-  const [show, setShow] = useState(false);
-  if (!image) return <span className="text-gray-300">–</span>;
-  return (
-    <div
-      className="relative flex justify-center items-center"
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
-      tabIndex={0}
-      style={{ outline: "none" }}
-    >
-      <button
-        type="button"
-        className="text-gray-600 hover:text-ad-purple focus:outline-none"
-        aria-label={`Preview image of ${itemName}`}
-        tabIndex={-1}
-        style={{ background: "none", border: "none", padding: 0, margin: 0, cursor: "pointer" }}
-      >
-        {/* Simple "eye" SVG icon */}
-        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-          <path d="M10 4C5.636 4 2.057 7.11 0.62 10c1.438 2.889 5.017 6 9.38 6 4.364 0 7.943-3.111 9.38-6C17.943 7.11 14.364 4 10 4zm0 10c-3.763 0-6.931-2.776-8.19-4C3.069 8.776 6.237 6 10 6c3.763 0 6.931 2.776 8.19 4-1.259 1.224-4.427 4-8.19 4zm0-7a3 3 0 100 6 3 3 0 000-6zm0 5a2 2 0 110-4 2 2 0 010 4z"/>
-        </svg>
-      </button>
-      {show && (
-        <div
-          className="absolute z-10 top-full left-1/2 -translate-x-1/2 mt-2 min-w-max bg-white border border-gray-200 shadow-lg rounded p-1"
-          style={{ whiteSpace: "nowrap" }}
-        >
-          <img
-            src={`${IMAGE_BASE_URL}/Uploads/Items/${image}`}
-            alt={`${itemName} preview`}
-            className="h-24 w-24 object-cover rounded"
-            style={{ minWidth: "2rem", minHeight: "2rem" }}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function ItemsPage() {
   const [items, setItems] = useState<ItemRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -111,8 +66,6 @@ export default function ItemsPage() {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [existingImage, setExistingImage] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   const {
@@ -172,8 +125,6 @@ export default function ItemsPage() {
 
   const resetForm = () => {
     reset(emptyItemForm());
-    setImageFile(null);
-    setExistingImage("");
     setEditingId(null);
   };
 
@@ -184,8 +135,6 @@ export default function ItemsPage() {
 
   const openEdit = (row: ItemRow) => {
     setEditingId(row._id);
-    setImageFile(null);
-    setExistingImage(row.image || "");
     reset({
       itemName: row.itemName,
       description: row.description,
@@ -215,10 +164,10 @@ export default function ItemsPage() {
           gstPercent: values.gstPercent ?? "",
         };
         if (editingId) {
-          await updateItem(editingId, payload, imageFile);
+          await updateItem(editingId, payload);
           adminNotify.success("Item updated.");
         } else {
-          await createItem(payload, imageFile);
+          await createItem(payload);
           adminNotify.success("Item saved.");
         }
         resetForm();
@@ -361,23 +310,6 @@ export default function ItemsPage() {
                 </CompactField>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                <CompactField label="Image">
-                  {existingImage && !imageFile && (
-                    <img
-                      src={`${IMAGE_BASE_URL}/${existingImage}`}
-                      alt="Current item"
-                      className="mb-2 h-16 w-16 rounded object-cover"
-                    />
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-                    className="block w-full text-sm text-gray-700 file:mr-3 file:rounded file:border-0 file:bg-gray-200 file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-gray-300"
-                  />
-                </CompactField>
-              </div>
             </CompactFormPanel>
           </div>
         </div>
@@ -459,8 +391,6 @@ export default function ItemsPage() {
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Unit Cost</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">GST(%)</th>
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Cost with GST</th>
-              {/* Add the new Image column header */}
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Image</th>
               {/* Actions column */}
               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" />
             </tr>
@@ -468,13 +398,13 @@ export default function ItemsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={10} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={10} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
                   No items found.
                 </td>
               </tr>
@@ -500,10 +430,6 @@ export default function ItemsPage() {
                   <td className="border border-gray-300 px-3 py-2 text-left">{fmtOptionalMoney(row.unitCost)}</td>
                   <td className="border border-gray-300 px-3 py-2 text-left">{row.gstPercent != null ? `${row.gstPercent}%` : ""}</td>
                   <td className="border border-gray-300 px-3 py-2 text-left">{fmtOptionalMoney(row.costWithGst)}</td>
-                  {/* New Image column cell with eye/preview logic */}
-                  <td className="border border-gray-300 px-3 py-2 text-left">
-                    <ImageHoverCell image={row.image} itemName={row.itemName} />
-                  </td>
                   <td className="border border-gray-300 px-3 py-2 text-left">
                     <button type="button" onClick={() => openEdit(row)} className="text-blue-700 hover:text-blue-900" aria-label={`Edit item ${row.itemName}`}>
                       ✎

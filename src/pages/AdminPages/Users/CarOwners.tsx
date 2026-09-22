@@ -533,7 +533,7 @@ function VehicleRowForm({ v, i, attempted, carCatalog, onChange, onRemove, canRe
         )}
       </div>
       <div className={vehicleGridClass}>
-        <CompactField label="Make" required className={vehicleFieldClass}>
+        <CompactField label="Make" className={vehicleFieldClass}>
           <select
             value={v.vehicleName}
             onChange={(e) => onChange({ vehicleName: e.target.value, model: "", year: "" })}
@@ -548,7 +548,7 @@ function VehicleRowForm({ v, i, attempted, carCatalog, onChange, onRemove, canRe
             )}
           </select>
         </CompactField>
-        <CompactField label="Model" required className={vehicleFieldClass}>
+        <CompactField label="Model" className={vehicleFieldClass}>
           <select
             value={v.model}
             onChange={(e) => onChange({ model: e.target.value, year: "" })}
@@ -564,7 +564,7 @@ function VehicleRowForm({ v, i, attempted, carCatalog, onChange, onRemove, canRe
             )}
           </select>
         </CompactField>
-        <CompactField label="Year" required className={vehicleFieldClass}>
+        <CompactField label="Year" className={vehicleFieldClass}>
           <select
             value={v.year}
             onChange={(e) => onChange({ year: e.target.value })}
@@ -594,7 +594,7 @@ function VehicleRowForm({ v, i, attempted, carCatalog, onChange, onRemove, canRe
 
 {/* Inside VehicleRowForm, replace the "License Plate" CompactField with this: */}
 
-<CompactField label="License Plate" required className={vehicleFieldClass}>
+<CompactField label="License Plate" className={vehicleFieldClass}>
   <input
     type="text"
     value={v.licensePlateNo}
@@ -603,7 +603,7 @@ function VehicleRowForm({ v, i, attempted, carCatalog, onChange, onRemove, canRe
     disabled={!!v._id}
     className={`${compactInputClass} ${v._id ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""}`}
   />
-  {attempted && !v.licensePlateNo.trim() && <p className={fieldErrorClass}>Required</p>}
+  {attempted && v.vehicleName.trim() && !v.licensePlateNo.trim() && <p className={fieldErrorClass}>Required to save this vehicle</p>}
   {!!v._id && (
     <p className="mt-0.5 text-[11px] text-gray-500">License plate can't be changed after creation</p>
   )}
@@ -698,10 +698,10 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
     mode: "onSubmit",
     defaultValues: { name: "", phone: "", email: "", address: "", city: "", attachEmail: false },
   });
-  const name = watch("name");
+  const name = watch("name") ?? "";
   const email = watch("email") ?? "";
   const phone = watch("phone");
-  const address = watch("address");
+  const address = watch("address") ?? "";
   const city = watch("city") ?? "";
   const attachEmail = watch("attachEmail") ?? false;
   const setName = (v: string) => setValue("name", v);
@@ -899,7 +899,7 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
           />
           <FormFieldError message={fieldErrors.phone?.message} />
         </CompactField>
-        <CompactField label="Full Name" required className={carOwnerRowFieldWidth}>
+        <CompactField label="Full Name" className={carOwnerRowFieldWidth}>
           <input
             type="text"
             value={name}
@@ -922,7 +922,7 @@ const CarOwnerAddEditForm: React.FC<{ owner?: CarOwnerType | null; onCancel: () 
             ))}
           </select>
         </CompactField>
-        <CompactField label="Address" required className={carOwnerAddressFieldWidth}>
+        <CompactField label="Address" className={carOwnerAddressFieldWidth}>
           <CompactAutoGrowTextarea
             value={address}
             onChange={(e) => setAddress(e.target.value.slice(0, 50))}

@@ -877,7 +877,7 @@ export const PERMISSION_TREE: Record<string, NavDef> = {
     subNav: {
       dashboard: { label: "Dashboard" },
       thoughtOfDay: { label: "Thought of the Day" },
-      features: { label: "Features" },
+      features: { label: "What's New" },
       faqs: { label: "FAQs" },
       privacy: { label: "Privacy" },
       websiteTemplate: { label: "Website Template" },

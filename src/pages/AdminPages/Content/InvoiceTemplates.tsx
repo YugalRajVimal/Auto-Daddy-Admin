@@ -26,6 +26,8 @@ import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
 import { adminNotify } from "../../../utils/adminNotify";
 import { printAdminTable } from "../../../utils/adminPrintTable";
 import { DUMMY_INVOICE_TEMPLATES, resolveTemplateSlug } from "../../../components/shop/ShopDocumentTemplatePanel";
+import { FiCheck, FiMaximize2 } from "react-icons/fi";
+import { InvoiceMiniature } from "../../../components/shop/invoice-templates/InvoiceMiniature";
 import { InvoiceTemplatePreview } from "../../../components/shop/invoice-templates/InvoiceTemplatePreview";
 import { DEFAULT_INVOICE_PREVIEW } from "../../../components/shop/invoice-templates/sampleInvoiceData";
 import { FormFieldError, toastValidationSummary } from "../../../lib/validation/formUi";
@@ -238,6 +240,152 @@ function InvoicePreviewModal({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Shop-style design picker: template strip, large preview and usage details (mirrors Shop › Invoice Templates). */
+function InvoiceTemplateGallery({
+  rows,
+  onCreate,
+}: {
+  rows: TemplateRow[];
+  onCreate: (templateSlug: string) => void;
+}) {
+  const [templateId, setTemplateId] = useState(DUMMY_INVOICE_TEMPLATES[0]?.id ?? "");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const selectedTemplate =
+    DUMMY_INVOICE_TEMPLATES.find((template) => template.id === templateId) ?? DUMMY_INVOICE_TEMPLATES[0];
+  const usingRows = rows.filter((row) => row.templateSlug === selectedTemplate?.id);
+  const usedBy = usingRows.reduce((sum, row) => sum + row.usedBy, 0);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreviewOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewOpen]);
+
+  if (!selectedTemplate) return null;
+
+  return (
+    <div className="mb-4 flex flex-col gap-6">
+      <div className="rounded-xl border border-[#9fd49f] bg-[#fffbe3] p-3 shadow-inner">
+        <ul className="no-scrollbar flex gap-4 overflow-x-auto px-1 py-2">
+          {DUMMY_INVOICE_TEMPLATES.map((template) => {
+            const selected = template.id === selectedTemplate.id;
+            return (
+              <li key={template.id} className="shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setTemplateId(template.id)}
+                  aria-pressed={selected}
+                  title={template.name}
+                  className={`relative block w-[92px] overflow-hidden rounded-md bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                    selected ? "ring-2 ring-ad-purple ring-offset-2 ring-offset-[#fffbe3]" : "ring-1 ring-gray-200"
+                  }`}
+                >
+                  <InvoiceMiniature templateId={template.id} data={DEFAULT_INVOICE_PREVIEW} width={92} height={120} />
+                  {selected ? (
+                    <span className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-ad-purple text-white shadow">
+                      <FiCheck className="size-3" strokeWidth={3} aria-hidden />
+                    </span>
+                  ) : null}
+                </button>
+                <p className="mt-1.5 w-[92px] truncate text-center text-[11px] font-semibold text-gray-600">
+                  {template.name}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
+        <div className="mx-auto w-[300px]">
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            className="group relative block w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+            aria-label={`Open full preview of ${selectedTemplate.name}`}
+          >
+            <InvoiceMiniature templateId={selectedTemplate.id} data={DEFAULT_INVOICE_PREVIEW} width={298} height={390} />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/25 group-hover:opacity-100">
+              <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-bold text-ad-purple shadow">
+                <FiMaximize2 aria-hidden /> Full preview
+              </span>
+            </span>
+          </button>
+          <p className="mt-2 text-center text-sm font-semibold text-ad-purple">{selectedTemplate.name}</p>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ad-purple">Design</p>
+            <h2 className="text-lg font-bold text-gray-900">{selectedTemplate.name}</h2>
+            <p className="text-sm text-gray-600">{selectedTemplate.description}</p>
+          </div>
+          <dl className="grid max-w-md grid-cols-2 gap-3">
+            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+              <dt className="text-xs font-semibold text-gray-500">Templates using it</dt>
+              <dd className="text-xl font-bold text-gray-900">{usingRows.length}</dd>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+              <dt className="text-xs font-semibold text-gray-500">Used by (shops)</dt>
+              <dd className="text-xl font-bold text-gray-900">{usedBy}</dd>
+            </div>
+          </dl>
+          {usingRows.length > 0 ? (
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold">Shop types:</span>{" "}
+              {[...new Set(usingRows.map((row) => getUserTypeLabel(row.userType)))].join(", ")}
+            </p>
+          ) : null}
+          <div>
+            <button
+              type="button"
+              onClick={() => onCreate(selectedTemplate.id)}
+              className="rounded bg-ad-green px-4 py-2 text-sm font-bold text-white hover:bg-ad-green-dark"
+            >
+              Create template with this design
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {previewOpen ? (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setPreviewOpen(false)}
+        >
+          <div
+            className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-ad-purple">Invoice Preview</p>
+                <h3 className="text-base font-bold text-gray-900">{selectedTemplate.name}</h3>
+              </div>
+              <button
+                type="button"
+                aria-label="Close preview"
+                onClick={() => setPreviewOpen(false)}
+                className="text-2xl leading-none text-gray-400 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            <div className="overflow-y-auto bg-[#f0f0f0] p-4 sm:p-6">
+              <div className="mx-auto max-w-[720px] overflow-hidden rounded shadow-md">
+                <InvoiceTemplatePreview templateId={selectedTemplate.id} data={DEFAULT_INVOICE_PREVIEW} mode="full" />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -584,6 +732,17 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
         ) : undefined
       }
     >
+      {!isDeletedView && !showForm ? (
+        <InvoiceTemplateGallery
+          rows={templates}
+          onCreate={(slug) => {
+            resetForm();
+            setTemplateSlug(slug);
+            setShowSearchCard(false);
+            setShowForm(true);
+          }}
+        />
+      ) : null}
       {isDeletedView && (
         <AdminDeletedBanner count={deletedStash.length} entityLabel="invoice templates" />
       )}

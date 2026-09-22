@@ -156,13 +156,13 @@ export const carOwnerAddEditFormSchema = z
     }
   });
 
-/** Admin > Car Owners page inline add/edit form: address required, no pincode, optional attach-email. */
+/** Admin > Car Owners page inline add/edit form: only phone required, no pincode, optional attach-email. */
 export const carOwnerPageSchema = z
   .object({
-    name: requiredTrimmed("Full Name"),
+    name: z.string().trim().optional().default(""),
     phone: phone10,
     email: optionalEmail,
-    address: requiredTrimmed("Address"),
+    address: z.string().trim().optional().default(""),
     city: z.string().trim().optional().default(""),
     attachEmail: z.boolean().optional(),
   })

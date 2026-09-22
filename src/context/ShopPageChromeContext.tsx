@@ -35,6 +35,8 @@ export type ShopPageChromeConfig = {
   sidebarHeading?: string;
   sidebarHeadingClassName?: string;
   sidebarExtra?: ReactNode;
+  /** When true, the left ads column is not shown and the main card spans the full width. */
+  hideAds?: boolean;
   /** Top-left slot above sidebar content (home grid menu). */
   sidebarHeader?: ReactNode;
   sidebarFooter?: ReactNode;
@@ -126,6 +128,7 @@ function isSameChromeConfig(prev: ShopPageChromeConfig, next: ShopPageChromeConf
     prev.sidebarHeading === next.sidebarHeading &&
     prev.sidebarHeadingClassName === next.sidebarHeadingClassName &&
     prev.sidebarExtra === next.sidebarExtra &&
+    prev.hideAds === next.hideAds &&
     prev.sidebarHeader === next.sidebarHeader &&
     prev.sidebarFooter === next.sidebarFooter &&
     prev.searchInputId === next.searchInputId &&
