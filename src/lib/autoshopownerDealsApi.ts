@@ -141,7 +141,6 @@ function buildEditAutoshopDealFormData(fields: AutoshopDealFormFields) {
 }
 
 export function fetchAutoshopMyDeals(token: string) {
-  console.log("Fetching my deals with token:", getJsonAutoshopowner<unknown>(`${BASE}/my-deals`, token));
   return getJsonAutoshopowner<unknown>(`${BASE}/my-deals`, token);
 }
 

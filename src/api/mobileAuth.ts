@@ -255,3 +255,47 @@ export async function getPublicJson<T>(path: string) {
   debugApi("GET", url, null, out);
   return out;
 }
+
+export type ShopOwnerSignupResponse = {
+  success?: boolean;
+  message?: string;
+  userId?: string;
+  isNewUser?: boolean;
+  smsSent?: boolean;
+};
+
+export type ShopOwnerCompleteSignupResponse = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    name?: string;
+    isProfileComplete?: boolean;
+    isAutoShopBusinessProfileComplete?: boolean;
+    businessProfile?: { businessName?: string; city?: string; businessLogo?: string | null };
+  };
+};
+
+/** SHOP SIGNUP: POST /api/auth/autoshopowner/signup — sends the OTP. */
+export async function sendShopOwnerSignupOtp(phone: string, countryCode: string) {
+  return postJson<ShopOwnerSignupResponse>("/api/auth/autoshopowner/signup", {
+    countryCode,
+    phone: normalizePhoneDigits(phone),
+  });
+}
+
+/** SHOP SIGNUP: PUT /api/autoshopowner/profile/complete-signup (multipart). */
+export async function completeShopOwnerSignup(
+  token: string,
+  fields: { name: string; businessName: string; city: string; businessLogo?: File | null }
+) {
+  const fd = new FormData();
+  fd.append("name", fields.name.trim());
+  fd.append("businessName", fields.businessName.trim());
+  fd.append("city", fields.city.trim());
+  if (fields.businessLogo) fd.append("businessLogo", fields.businessLogo);
+  return putFormData<ShopOwnerCompleteSignupResponse>(
+    "/api/autoshopowner/profile/complete-signup",
+    fd,
+    token
+  );
+}

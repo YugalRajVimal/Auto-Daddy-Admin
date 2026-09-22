@@ -105,6 +105,7 @@ import Blank from "./pages/AdminPages/Blank";
 
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import AdminSignInPage from "./pages/AuthPages/AdminSignInPage";
+import ShopOwnerSignUpPage from "./pages/AuthPages/ShopOwnerSignUpPage";
 import AutoShopOwnerOnboarding from "./pages/AutoShopOwnerOnboarding";
 import CarOwnerOnboardingPage from "./pages/CarOwnerOnboarding";
 import ShopOwnerOnboardingPage from "./pages/ShopOwnerOnboarding";
@@ -151,6 +152,7 @@ export default function App() {
             <Route path="/auto-shop-owner/onboarding" element={<AutoShopOwnerOnboarding />} />
             <Route path="/owner/onboarding" element={<CarOwnerOnboardingPage />} />
             <Route path="/s/:slug" element={<PublicShopProfilePage />} />
+            <Route path="/shop/signup" element={<ShopOwnerSignUpPage />} />
             <Route path="/shop/onboarding" element={<ShopOwnerOnboardingPage />} />
             <Route
               path="/shop/welcome"
