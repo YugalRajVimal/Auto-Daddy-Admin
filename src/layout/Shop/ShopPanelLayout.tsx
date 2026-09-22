@@ -12,12 +12,14 @@ import {
   useShopSubscriptionGate,
 } from "../../context/ShopSubscriptionGateContext";
 import { useShopOwnerPortal } from "../../hooks/useShopPortal";
+import { updateBusinessProfile } from "../../lib/autoshopownerApi";
 import { normalizeMediaUrl } from "../../lib/normalizeMediaUrl";
 import {
   resolveShopNeedsBusinessOnboarding,
   shopProfileCompletionPath,
 } from "../../lib/shopProfileCompleteness";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { Navigate, useNavigate } from "react-router";
 import { getPostLoginRedirect, useAuth } from "../../auth";
 
@@ -47,10 +49,34 @@ function ShopLayoutContent() {
     user,
     hasActiveSubscription,
     subscriptionGateReady,
+    refresh,
   } = useShopOwnerPortal();
   const profilePhotoSrc = normalizeMediaUrl(profileIcon ?? null);
   const businessLogoSrc = normalizeMediaUrl(business?.businessLogo ?? null);
-  const { login, session } = useAuth();
+  const { login, session, token } = useAuth();
+
+  // Header placeholder → upload the business logo without leaving the current page.
+  const handleBusinessLogoUpload = useCallback(
+    async (file: File) => {
+      if (!token) return;
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please choose an image file.");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Logo must be 5 MB or smaller.");
+        return;
+      }
+      const res = await updateBusinessProfile(token, { businessLogo: file });
+      if (!res.ok) {
+        toast.error((res.data as { message?: string } | null)?.message || "Could not upload logo.");
+        return;
+      }
+      await refresh();
+      toast.success("Business logo updated.");
+    },
+    [token, refresh]
+  );
 
   // State to track back-to-admin-token
   const [backToAdminToken, setBackToAdminToken] = useState<string | null>(null);
@@ -146,6 +172,7 @@ function ShopLayoutContent() {
         primaryNav={shopPrimaryNav}
         brandLogo={{ src: profilePhotoSrc, placeholderLabel: "Profile photo" }}
         businessLogoSrc={businessLogoSrc}
+        onBusinessLogoUpload={handleBusinessLogoUpload}
         businessName={displayName}
         businessNameLoading={!businessNameLoaded}
         subscriptionDaysLeft={hasActiveSubscription ? (daysLeft ?? null) : null}

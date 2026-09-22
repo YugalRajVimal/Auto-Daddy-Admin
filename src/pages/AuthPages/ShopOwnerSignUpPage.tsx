@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { FiImage, FiX } from "react-icons/fi";
 import OtpInput from "../../components/form/input/OtpInput";
 import {
@@ -16,7 +16,7 @@ import { FormFieldError } from "../../lib/validation/formUi";
 
 /**
  * Shop owner sign-up: phone → OTP → business details.
- * Standalone URL (/shop/signup) — not linked from anywhere yet.
+ * Route: /shop/signup — linked from the login page.
  */
 
 const LOGO = "/logo.png";
@@ -271,6 +271,12 @@ export default function ShopOwnerSignUpPage() {
                   <button type="submit" disabled={loading} className={primaryButtonClass}>
                     {loading ? "Sending..." : "Get OTP"}
                   </button>
+                  <p className="text-center text-sm text-gray-500">
+                    Already have an account?{" "}
+                    <Link to="/" className="font-semibold text-ad-green-dark hover:underline">
+                      Log in
+                    </Link>
+                  </p>
                 </form>
               )}
 

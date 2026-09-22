@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import OtpInput from "../../components/form/input/OtpInput";
@@ -331,6 +331,12 @@ setTimeout(() => {
                   >
                     {loading ? "Sending..." : "Get OTP"}
                   </button>
+                  <p className="text-center text-sm text-gray-500">
+                    New auto shop?{" "}
+                    <Link to="/shop/signup" className="font-semibold text-ad-green-dark hover:underline">
+                      Create a shop account
+                    </Link>
+                  </p>
                 </form>
               ) : (
                 <form

@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
-import { FiBell } from "react-icons/fi";
+import { FiBell, FiImage } from "react-icons/fi";
 import useAuth from "../../auth/useAuth";
 import type { NavItem } from "../../config/adminNav";
 import { Skeleton } from "../common/Skeleton";
@@ -14,7 +14,6 @@ import { shopPortalHorizPaddingClass } from "./shopLayoutStyles";
 
 const SHOP_MESSAGES_PATH = "/shop/messages";
 const SHOP_LAST_SEEN_KEY = "ad:lastSeen:shop-notifications";
-const AUTODADDY_LOGO = "/logo.png";
 
 function isPathActive(pathname: string, path: string, homePath: string) {
   if (path === homePath) return pathname === homePath;
@@ -26,8 +25,9 @@ export type ShopPortalShellProps = {
   profilePath: string;
   primaryNav: NavItem[];
   brandLogo?: PortalBrandLogo;
-  /** Shop's own business logo shown top-left; falls back to the AutoDaddy logo. */
+  /** Shop's own business logo shown top-left; a clickable upload placeholder when missing. */
   businessLogoSrc?: string | null;
+  onBusinessLogoUpload?: (file: File) => Promise<void>;
   businessName: string;
   businessNameLoading?: boolean;
   subscriptionDaysLeft?: number | null;
@@ -40,6 +40,7 @@ export default function ShopPortalShell({
   primaryNav,
   brandLogo,
   businessLogoSrc,
+  onBusinessLogoUpload,
   businessName,
   businessNameLoading = false,
   subscriptionDaysLeft,
@@ -50,6 +51,24 @@ export default function ShopPortalShell({
   const { logout } = useAuth();
   const { chrome } = useShopPageChromeContext();
   const { items } = useShopNotifications();
+
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  // Saved logo URLs can be stale; show the upload placeholder instead of a broken image.
+  const [logoFailed, setLogoFailed] = useState(false);
+  useEffect(() => setLogoFailed(false), [businessLogoSrc]);
+  const showBusinessLogo = !!businessLogoSrc && !logoFailed;
+
+  const handleLogoFile = async (file: File | undefined) => {
+    if (!file || !onBusinessLogoUpload) return;
+    setLogoUploading(true);
+    try {
+      await onBusinessLogoUpload(file);
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
 
   const onHelpNav = helpPath != null && isPathActive(location.pathname, helpPath, homePath);
 
@@ -85,16 +104,43 @@ export default function ShopPortalShell({
     <div className="flex min-h-0 flex-1 flex-col bg-ad-app-bg font-sans">
       <header className={`${shopPortalHorizPaddingClass} flex flex-col gap-2 pb-1`}>
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3">
-          <Link to={homePath} className="shrink-0" aria-label={`${businessName || "AutoDaddy"} home`}>
-            <img
-              src={businessLogoSrc || AUTODADDY_LOGO}
-              onError={(e) => {
-                if (!e.currentTarget.src.endsWith(AUTODADDY_LOGO)) e.currentTarget.src = AUTODADDY_LOGO;
-              }}
-              alt={businessLogoSrc ? `${businessName || "Business"} logo` : "AutoDaddy"}
-              className="h-11 w-auto max-w-[150px] object-contain sm:h-14 sm:max-w-[200px]"
-            />
-          </Link>
+          {businessNameLoading ? (
+            <span aria-busy="true" aria-label="Loading business logo">
+              <Skeleton className="h-11 w-28 rounded-lg sm:h-14 sm:w-32" />
+            </span>
+          ) : showBusinessLogo ? (
+            <Link to={homePath} className="shrink-0" aria-label={`${businessName || "Business"} home`}>
+              <img
+                src={businessLogoSrc ?? undefined}
+                onError={() => setLogoFailed(true)}
+                alt={`${businessName || "Business"} logo`}
+                className="h-11 w-auto max-w-[150px] object-contain sm:h-14 sm:max-w-[200px]"
+              />
+            </Link>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => logoInputRef.current?.click()}
+                disabled={!onBusinessLogoUpload || logoUploading}
+                className="flex h-11 w-28 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed border-gray-300 bg-white/70 text-gray-400 transition-colors hover:border-ad-purple hover:text-ad-purple disabled:cursor-wait disabled:opacity-60 sm:h-14 sm:w-32"
+                aria-label="Upload business logo"
+                title="Upload business logo"
+              >
+                <FiImage size={18} aria-hidden />
+                <span className="text-[10px] font-semibold uppercase tracking-wide sm:text-[11px]">
+                  {logoUploading ? "Uploading…" : "Add logo"}
+                </span>
+              </button>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => void handleLogoFile(e.target.files?.[0])}
+              />
+            </>
+          )}
 
           <div className="flex min-w-0 items-baseline justify-center gap-2 pt-4">
             <span className="hidden shrink-0 text-sm font-medium text-gray-500 sm:inline">Login as :</span>
