@@ -172,18 +172,19 @@ export const carOwnerPageSchema = z
     }
   });
 
-/** Admin > Auto Shop Owners page inline add/edit form. */
+/** Admin > Auto Shop Owners page inline add/edit form — only the phone number is required. */
 export const autoShopOwnerPageSchema = z.object({
-  name: requiredTrimmed("Business Name"),
+  name: z.string().trim().optional().default(""),
   phone: phone10,
   email: optionalEmail,
   city: z.string().trim().optional().default(""),
   address: z.string().trim().optional().default(""),
   zipCode: z
-    .string({ error: "Postal code is required." })
+    .string()
     .trim()
-    .min(1, "Postal code is required.")
-    .refine((v) => /^[A-Z]\d[A-Z][ ]?\d[A-Z]\d$/i.test(v), "Enter a valid Canadian Postal Code (e.g. K1A0B1)."),
+    .optional()
+    .default("")
+    .refine((v) => !v || /^[A-Z]\d[A-Z][ ]?\d[A-Z]\d$/i.test(v), "Enter a valid Canadian Postal Code (e.g. K1A0B1)."),
   shopType: z.array(z.string()).min(1, "Shop type is required."),
 });
 

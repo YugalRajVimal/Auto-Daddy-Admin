@@ -1838,12 +1838,12 @@ const AutoShopAddEditForm: React.FC<{
     mode: "onSubmit",
     defaultValues: { name: "", phone: "", email: "", city: "", address: "", zipCode: "", shopType: ["autoShop"] },
   });
-  const Name = watch("name");
+  const Name = watch("name") ?? "";
   const email = watch("email") ?? "";
   const phone = watch("phone");
   const city = watch("city") ?? "";
   const address = watch("address") ?? "";
-  const zipCode = watch("zipCode");
+  const zipCode = watch("zipCode") ?? "";
   const setName = (v: string) => setValue("name", v);
   const setEmail = (v: string) => setValue("email", v);
   const setPhone = (v: string) => setValue("phone", v);
@@ -2045,7 +2045,7 @@ const AutoShopAddEditForm: React.FC<{
           />
           <FormFieldError message={fieldErrors.phone?.message} />
         </CompactField>
-        <CompactField label="Business Name" required>
+        <CompactField label="Business Name">
           <input
             type="text"
             value={Name}
@@ -2054,7 +2054,7 @@ const AutoShopAddEditForm: React.FC<{
           />
           <FormFieldError message={fieldErrors.name?.message} />
         </CompactField>
-        <CompactField label="Shop Type" required>
+        <CompactField label="Shop Type">
           <div ref={shopTypeRef} className="relative min-w-0 w-full">
             <button
               type="button"
