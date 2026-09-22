@@ -238,8 +238,8 @@ export default function ShopPageLayout() {
   // Remount page content on every route change so each page re-fetches fresh API data.
   const pageOutlet = <Outlet key={location.pathname} />;
 
-  // Home supplies its own left column (dealer ad carousel); inner pages list the dealers.
-  const leftPanel = <ShopDealersListPanel />;
+  // Home › Dash Board supplies its own left column (dealer ad carousel); other pages list the dealers.
+  const leftPanel = chrome.sidebarExtra ?? <ShopDealersListPanel />;
 
   const scrollRegionClass = chrome.contentFillHeight
     ? "no-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden"

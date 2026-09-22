@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { PartsDealerCard } from "../../hooks/usePartsDealers";
 import { openPartsDealerLink } from "../../lib/shopPartsDealers";
 import ShopDealerCard from "./ShopDealerCard";
+import { ShopDealerAdCardSkeleton } from "./ShopDealerSkeletons";
 import { shopPanelShellClass } from "./shopLayoutStyles";
 
 const ROTATE_MS = 5000;
@@ -43,25 +44,17 @@ function ShopAdPanelShell({ children }: { children: ReactNode }) {
   );
 }
 
-function ShopAdCardSkeleton() {
+function ShopAdPanelPlaceholder({ loading }: { loading: boolean }) {
   return (
-    <div
-      className="flex h-full w-full animate-pulse flex-col overflow-hidden rounded-lg border border-gray-200/80 bg-white shadow-lg"
-      aria-busy="true"
-      aria-label="Loading ads"
-    >
-      <div className="min-h-0 flex-1 bg-gray-200" />
-      <div className="h-9 shrink-0 bg-[#008000]/70" />
-      <div className="shrink-0 space-y-2 px-3 py-3">
-        <div className="h-7 rounded bg-[#d4ffd4]" />
-        <div className="flex justify-center gap-3">
-          <div className="h-5 w-5 rounded-full bg-gray-200" />
-          <div className="h-5 w-5 rounded-full bg-gray-200" />
-          <div className="h-5 w-5 rounded-full bg-gray-200" />
-        </div>
-        <div className="h-8 rounded border border-gray-200 bg-gray-100" />
+    <ShopAdPanelShell>
+      <div
+        className="min-h-0 flex-1 overflow-hidden"
+        aria-busy={loading}
+        aria-label={loading ? "Loading dealer ads" : "No dealer ads yet"}
+      >
+        <ShopDealerAdCardSkeleton pulse={loading} className="h-full min-h-0" />
       </div>
-    </div>
+    </ShopAdPanelShell>
   );
 }
 
@@ -152,18 +145,8 @@ export default function ShopHomeAdsPanel({
     openPartsDealerLink(dealer);
   };
 
-  if (loading) {
-    return (
-      <ShopAdPanelShell>
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <ShopAdCardSkeleton />
-        </div>
-      </ShopAdPanelShell>
-    );
-  }
-
-  if (partsDealers.length === 0 || !activeDealer) {
-    return null;
+  if (loading || partsDealers.length === 0 || !activeDealer) {
+    return <ShopAdPanelPlaceholder loading={Boolean(loading)} />;
   }
 
   return (

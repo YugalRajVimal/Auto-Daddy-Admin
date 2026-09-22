@@ -57,9 +57,13 @@ export default function ShopHomePage() {
     setSearchParams({ section: "settings", view: "invoice-templates" });
   };
 
+  // Only the dashboard swaps the dealer list for the rotating dealer ad.
   const sidebarExtra = useMemo(
-    () => <ShopHomeAdsPanel partsDealers={dealers} loading={dealersLoading} />,
-    [dealers, dealersLoading],
+    () =>
+      section === "dashboard" ? (
+        <ShopHomeAdsPanel partsDealers={dealers} loading={dealersLoading} />
+      ) : undefined,
+    [section, dealers, dealersLoading],
   );
 
   const inInvoiceTemplates = settingsView === "invoice-templates";
