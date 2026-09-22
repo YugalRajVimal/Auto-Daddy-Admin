@@ -168,10 +168,12 @@ function parseDateSafe(val: string): Date | null {
   // Accepts YYYY-MM-DD
   if (!val) return null;
   // DatePicker can't take invalid dates
-  const parts = val.split("-");
+  // API dates may be full ISO strings ("2026-09-22T00:00:00.000Z") — keep only the day part.
+  const parts = val.slice(0, 10).split("-");
   if (parts.length !== 3) return null;
   const [y, m, d] = parts;
-  return new Date(Number(y), Number(m) - 1, Number(d));
+  const date = new Date(Number(y), Number(m) - 1, Number(d));
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProps) {
