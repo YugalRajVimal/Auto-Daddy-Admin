@@ -570,6 +570,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                     : null
                 }
                 text={note ?? ""}
+                title={title ?? ""}
               />
             }
             footer={

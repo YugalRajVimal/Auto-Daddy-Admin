@@ -10,25 +10,25 @@ export function PreviewHeading({ children }: { children: ReactNode }) {
 export function TipPreview({
   imageUrl,
   text,
-  byline = "Unknown",
+  title,
 }: {
   imageUrl?: string | null;
   text: string;
-  byline?: string;
+  /** Shown in the top-left corner; falls back to "Thought of the day" until a title is typed. */
+  title?: string;
 }) {
   return (
     <div className="relative -m-5 aspect-[16/10] overflow-hidden bg-gradient-to-br from-[#86b5bd] to-[#a8ccd1] sm:-m-8">
       {imageUrl ? (
         <img src={imageUrl} alt="Thought of the day" className="absolute inset-0 h-full w-full object-cover" />
       ) : null}
-      <span className="absolute left-3 top-3 font-serif text-sm tracking-wide text-gray-800">
-        THOUGHT OF THE DAY
+      <span className="absolute left-3 top-3 max-w-[60%] break-words font-serif text-sm uppercase tracking-wide text-gray-800">
+        {title?.trim() || "Thought of the day"}
       </span>
       <div className="absolute right-0 top-[18%] w-[58%] bg-[#3a9660] px-5 py-4 text-right text-white sm:px-7 sm:py-5">
-        <p className="text-xl leading-snug sm:text-2xl">
+        <p className="text-lg leading-snug sm:text-2xl">
           {text.trim() || "Your thought of the day appears here as you type."}
         </p>
-        <p className="mt-1 text-base font-semibold sm:text-2xl">{byline}</p>
       </div>
     </div>
   );
