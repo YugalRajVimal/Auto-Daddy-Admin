@@ -391,7 +391,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
 
   return (
     <AdminPage
-      title={isDeletedView ? "Deleted Services" : "Services"}
+      title={isDeletedView ? "Deleted Services" : "Main Services"}
       headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showSearchCard ? (
@@ -425,7 +425,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
               </div>
             )}
             <CompactFormRow className="items-start" columns={4}>
-              <CompactField label="Service Name" required>
+              <CompactField label="Name Service" required>
                 <input
                   type="text"
                   className={fieldErrorClass(Boolean(formErrors.name), compactInputClass)}
@@ -433,7 +433,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                 />
                 <FormFieldError message={formErrors.name?.message} />
               </CompactField>
-              <CompactField label="Shop Type" required>
+              <CompactField label="Match with user" required>
                 <select
                   className={fieldErrorClass(Boolean(formErrors.shopType), compactInputClass)}
                   {...register("shopType")}
@@ -484,8 +484,21 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
         </div>
       )}
 
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
+          {!isDeletedView && (
+            <button
+              type="button"
+              onClick={() => {
+                const row = services.find((r) => selected.has(r._id));
+                if (row) openEdit(row);
+              }}
+              disabled={selected.size !== 1}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Update
+            </button>
+          )}
           {!isDeletedView ? (
             <button
               type="button"
@@ -550,12 +563,12 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -575,8 +588,8 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -584,30 +597,30 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Sub Services</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Odo Out Required</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Name Service</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Type</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Sub-Services</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Odo Out Required</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={6} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={6} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted services found." : "No services found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row._id)}
@@ -615,7 +628,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => openEdit(row)}
@@ -624,10 +637,10 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
                       {row.name}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{shopTypeLabel(row.shopType)}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.subServices?.length ?? 0}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.status || "Active"}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.odoOutRequired ? "Yes" : "No"}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{shopTypeLabel(row.shopType)}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.subServices?.length ?? 0}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.status || "Active"}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.odoOutRequired ? "Yes" : "No"}</td>
                 </tr>
               ))
             )}
@@ -635,7 +648,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -643,7 +656,7 @@ export default function Services({ initialShowForm = false }: ServicesPageProps)
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

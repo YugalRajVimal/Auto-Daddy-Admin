@@ -910,7 +910,7 @@ export default function Invitehelp({
         </div>
       )}
 
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
           {!isDeletedView ? (
             <button
@@ -957,12 +957,12 @@ export default function Invitehelp({
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -982,8 +982,8 @@ export default function Invitehelp({
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-center">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -993,20 +993,20 @@ export default function Invitehelp({
               </th>
               {section === "sent" ? (
                 <>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Title</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Note</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User Type</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Title</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Note</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">User Type</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">User</th>
                 </>
               ) : (
                 <>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Ticket No.</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User Type</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">User Name</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Audio</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Ticket No.</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">User Type</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">User Name</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Audio</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
                 </>
               )}
             </tr>
@@ -1014,13 +1014,13 @@ export default function Invitehelp({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={section === "sent" ? 7 : 7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={section === "sent" ? 7 : 7} className="ad-td border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={section === "sent" ? 7 : 7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={section === "sent" ? 7 : 7} className="ad-td border border-gray-300 px-3 py-4 text-center text-gray-500">
                   {isDeletedView
                     ? section === "sent"
                       ? "No deleted sent notifications found."
@@ -1035,7 +1035,7 @@ export default function Invitehelp({
                 const notification = row as SentNotification;
                 return (
                   <tr key={notification._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                    <td className="border border-gray-300 px-2 py-2 text-center">
+                    <td className="ad-td border border-gray-300 px-2 py-2 text-center">
                       <input
                         type="checkbox"
                         checked={selected.has(notification._id)}
@@ -1043,13 +1043,13 @@ export default function Invitehelp({
                         className="accent-ad-purple"
                       />
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{notification.date}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{notification.title}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">{notification.date}</td>
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">{notification.title}</td>
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
                       {notification.note}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{userTypeLabel(notification.userType)}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{userScopeLabel(notification)}</td>
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">{userTypeLabel(notification.userType)}</td>
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">{userScopeLabel(notification)}</td>
                   </tr>
                 );
               })
@@ -1077,7 +1077,7 @@ export default function Invitehelp({
 
                 return (
                   <tr key={invite._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                    <td className="border border-gray-300 px-2 py-2 text-center">
+                    <td className="ad-td border border-gray-300 px-2 py-2 text-center">
                       <input
                         type="checkbox"
                         checked={selected.has(invite._id)}
@@ -1085,7 +1085,7 @@ export default function Invitehelp({
                         className="accent-ad-purple"
                       />
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                       <button
                         type="button"
                         onClick={() => openReceivedView(invite)}
@@ -1094,14 +1094,14 @@ export default function Invitehelp({
                         {receivedDate(invite)}
                       </button>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">{receivedTicketNo(invite)}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">{receivedTicketNo(invite)}</td>
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                       {userTypeLabel(receivedUserType(invite))}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                       <span className="text-blue-700">{receivedUserName(invite)}</span>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                       {url ? (
                         <audio controls src={url} className="h-8 w-44 accent-blue-600" />
                       ) : isLoading ? (
@@ -1125,7 +1125,7 @@ export default function Invitehelp({
                         </span>
                       )}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                       {invite.status ? (
                         <span
                           className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${invite.status === "resolved"
@@ -1147,7 +1147,7 @@ export default function Invitehelp({
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -1155,7 +1155,7 @@ export default function Invitehelp({
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

@@ -830,7 +830,7 @@ export default function LeadsPage({
       }
     >
       {isDeletedView && <AdminDeletedBanner count={deletedStash.length} entityLabel="leads" />}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap items-center gap-1">
           {!readOnly && (
             <>
@@ -859,7 +859,7 @@ export default function LeadsPage({
                   <select
                     value={bulkStatus}
                     onChange={(e) => setBulkStatus(e.target.value as LeadStatus)}
-                    className="border border-gray-300 px-1 py-0.5 text-xs"
+                    className="ad-td border border-gray-300 px-1 py-0.5 text-xs"
                     disabled={bulkUpdating}
                   >
                     {STATUS_OPTIONS.map((opt) => (
@@ -906,12 +906,12 @@ export default function LeadsPage({
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -931,8 +931,8 @@ export default function LeadsPage({
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -940,37 +940,37 @@ export default function LeadsPage({
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">City</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Email</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Website</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">{sentToLabel}</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Lead name</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Phone</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">City</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Website URL</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">{sentToLabel}</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Remarks</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Email</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
               {section === "completed" && (
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">View Image</th>
+                <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">View Image</th>
               )}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={11} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+                <td colSpan={11} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
                   Loading…
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={11} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+                <td colSpan={11} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
                   {isDeletedView ? "No deleted leads found." : "No leads found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
@@ -978,27 +978,27 @@ export default function LeadsPage({
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => (readOnly ? openView(row) : openEdit(row))}
                       className="text-blue-700 hover:underline"
                     >
-                      {formatLeadDate(row.date)}
+                      {row.name || formatLeadDate(row.date)}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.name}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.phone}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.city}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.email}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.website}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.phone}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.city}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.website}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{formatLeadDate(row.date)}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.sentToName || "-"}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
                     {row.notes}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.sentToName || "-"}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left capitalize">{row.status || "-"}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.email}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left capitalize">{row.status || "-"}</td>
                   {section === "completed" && (
-                    <td className="border border-gray-300 px-3 py-2 text-left">
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                       {row.imageUrl ? (
                         <div className="flex flex-col items-start gap-1">
                           <ClipImageHover
@@ -1031,7 +1031,7 @@ export default function LeadsPage({
 
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -1039,7 +1039,7 @@ export default function LeadsPage({
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

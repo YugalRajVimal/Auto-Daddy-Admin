@@ -152,7 +152,7 @@ export default function WebsiteMessages() {
       <div className="overflow-x-auto">
         <table className="w-full min-w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-ad-purple text-white">
+            <tr className="bg-ad-purple text-white ad-thead">
               <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">Date</th>
               <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">Name</th>
               <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">Email</th>
@@ -165,13 +165,13 @@ export default function WebsiteMessages() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={7} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={7} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   No messages yet.
                 </td>
               </tr>
@@ -186,7 +186,7 @@ export default function WebsiteMessages() {
                   </td>
                   <td className="whitespace-nowrap border border-gray-300 px-2 py-2 text-left">{row.email}</td>
                   <td className="whitespace-nowrap border border-gray-300 px-2 py-2 text-left">{row.subject || "-"}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words">
                     {row.message.length > 140 ? `${row.message.slice(0, 140)}…` : row.message}
                   </td>
                   <td className="whitespace-nowrap border border-gray-300 px-2 py-2 text-left">

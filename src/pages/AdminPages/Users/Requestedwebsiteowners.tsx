@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { Link } from "react-router";
 import { adminNotify } from "../../../utils/adminNotify";
 import { authHeaders } from "../../../api/client";
 import AdminPage from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
+import { printAdminTable } from "../../../utils/adminPrintTable";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type ShopType = "autoShop" | "tyreShop" | "carWash" | "towTruck";
@@ -100,18 +100,40 @@ function latestPaidSubscription(owner: AutoShopOwnerType): SubscriptionRecord | 
 }
 
 // ─── Style constants (matches Auto Shop Owners table) ──────────────────────
-const tdClass = "border border-gray-300 px-3 py-2 text-center text-sm text-gray-700";
-const thClass = "border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap";
+const tdClass = "ad-td border border-gray-300 px-3 py-2 text-center text-sm text-gray-700";
+const thClass = "ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap";
 
 // ─── Column config ──────────────────────────────────────────────────────────
-const BASE_COLUMNS = [
-  { key: "date", label: "Date" },
-  { key: "phone", label: "Phone" },
-  { key: "Name", label: "Business Name" },
-  { key: "shopType", label: "Shop Type" },
+const OPTED_COLUMNS = [
+  { key: "subscriptionDate", label: "Date" },
+  { key: "Name", label: "Vendor" },
   { key: "city", label: "City" },
+  { key: "invoice", label: "Invoice" },
+  { key: "expiry", label: "Domain Expiry" },
+  { key: "shopType", label: "User Type" },
+  { key: "phone", label: "Phone" },
   { key: "email", label: "Email" },
+  { key: "status", label: "Status" },
 ];
+
+const NOT_OPTED_COLUMNS = [
+  { key: "date", label: "Date" },
+  { key: "Name", label: "Vendor" },
+  { key: "city", label: "City" },
+  { key: "shopType", label: "User Type" },
+  { key: "phone", label: "Phone" },
+  { key: "email", label: "Email" },
+  { key: "subscription", label: "Website Subscription" },
+  { key: "status", label: "Status" },
+];
+
+function addDaysIso(iso?: string, days?: number): string {
+  if (!iso || !days) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 type Mode = "opted" | "notOpted";
 
@@ -198,9 +220,7 @@ const RequestedWebsiteOwners: React.FC<{ mode: Mode }> = ({ mode }) => {
     }
   }
 
-  const columns = mode === "opted"
-    ? [...BASE_COLUMNS, { key: "subscription", label: "Purchased On" }, { key: "invoice", label: "Invoice" }]
-    : [...BASE_COLUMNS, { key: "subscription", label: "Website Subscription" }];
+  const columns = mode === "opted" ? OPTED_COLUMNS : NOT_OPTED_COLUMNS;
 
   function renderCell(owner: AutoShopOwnerType, key: string) {
     switch (key) {
@@ -244,33 +264,62 @@ const RequestedWebsiteOwners: React.FC<{ mode: Mode }> = ({ mode }) => {
       }
       case "invoice": {
         const latest = latestPaidSubscription(owner);
-        return <td key={key} className={tdClass}>{latest?.invoiceNo || "-"}</td>;
+        return (
+          <td key={key} className={tdClass}>
+            {latest?.invoiceNo ? <span className="text-blue-700">{latest.invoiceNo}</span> : "-"}
+          </td>
+        );
       }
+      case "subscriptionDate":
+        return <td key={key} className={tdClass}>{fmtDate(latestPaidSubscription(owner)?.purchasedOn)}</td>;
+      case "expiry": {
+        const latest = latestPaidSubscription(owner);
+        return <td key={key} className={tdClass}>{addDaysIso(latest?.purchasedOn, latest?.days)}</td>;
+      }
+      case "status":
+        return <td key={key} className={tdClass}>{owner.isDisabled ? "Suspended" : "Active"}</td>;
       default:
         return <td key={key} className={tdClass}>-</td>;
     }
   }
 
   return (
-    <AdminPage title={mode === "opted" ? "Requested Website — Opted" : "Requested Website — Not Opted"}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2">
-        <div className="flex gap-2">
-          <Link
-            to="/admin/requested-website/opted"
-            className={`rounded px-3 py-1 text-xs font-bold ${
-              mode === "opted" ? "bg-ad-purple text-white" : "bg-white text-ad-purple border border-ad-purple"
-            }`}
+    <AdminPage title="Website" noPanel>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            onClick={() =>
+              printAdminTable({
+                title: mode === "opted" ? "Website — Opted" : "Website — Not Opted",
+                headers: columns.map((c) => c.label),
+                rows: filtered.map((o) =>
+                  columns.map((c) => {
+                    switch (c.key) {
+                      case "date": return fmtDate(o.createdAt);
+                      case "subscriptionDate": return fmtDate(latestPaidSubscription(o)?.purchasedOn);
+                      case "Name": return o.businessProfile?.businessName || "-";
+                      case "city": return o.businessProfile?.city || o.city || "-";
+                      case "invoice": return latestPaidSubscription(o)?.invoiceNo || "-";
+                      case "expiry": {
+                        const l = latestPaidSubscription(o);
+                        return addDaysIso(l?.purchasedOn, l?.days);
+                      }
+                      case "shopType": return ownerShopTypes(o).map((st) => SHOP_TYPE_OPTIONS.find((x) => x.value === st)?.label || "-").join(", ");
+                      case "phone": return o.phone || "-";
+                      case "email": return o.email || o.businessProfile?.businessEmail || "-";
+                      case "subscription": return "Not Purchased";
+                      case "status": return o.isDisabled ? "Suspended" : "Active";
+                      default: return "-";
+                    }
+                  })
+                ),
+              })
+            }
+            className="bg-ad-green px-3 py-1 text-xs font-medium text-white hover:bg-ad-green-dark"
           >
-            Opted
-          </Link>
-          <Link
-            to="/admin/requested-website/not-opted"
-            className={`rounded px-3 py-1 text-xs font-bold ${
-              mode === "notOpted" ? "bg-ad-purple text-white" : "bg-white text-ad-purple border border-ad-purple"
-            }`}
-          >
-            Not Opted
-          </Link>
+            Print
+          </button>
         </div>
         <input
           type="text"
@@ -279,12 +328,12 @@ const RequestedWebsiteOwners: React.FC<{ mode: Mode }> = ({ mode }) => {
             setSearch(e.target.value);
             setCurrentPage(1);
           }}
-          placeholder="Search by name, phone, email, city…"
-          className="w-64 rounded border border-gray-400 px-2 py-1 text-sm"
+          placeholder="Live Search here"
+          className="border border-gray-400 bg-white px-2 py-1 text-xs"
         />
       </div>
 
-      <div className="mb-2 flex items-center gap-2 px-1 text-sm text-gray-600">
+      <div className="mb-2 flex items-center gap-2 px-1 text-sm text-gray-600 ad-entries">
         <span>Show</span>
         <select
           value={pageSize}
@@ -310,7 +359,7 @@ const RequestedWebsiteOwners: React.FC<{ mode: Mode }> = ({ mode }) => {
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
+            <tr className="bg-ad-purple text-white ad-thead">
               {columns.map((c) => (
                 <th key={c.key} className={thClass}>{c.label}</th>
               ))}
@@ -320,19 +369,19 @@ const RequestedWebsiteOwners: React.FC<{ mode: Mode }> = ({ mode }) => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={columns.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                <td colSpan={columns.length + 1} className="ad-td border border-gray-300 px-3 py-8 text-center text-gray-500">
                   Loading shop owners…
                 </td>
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={columns.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                <td colSpan={columns.length + 1} className="ad-td border border-gray-300 px-3 py-8 text-center text-gray-500">
                   Unable to load auto shop owners.
                 </td>
               </tr>
             ) : paginated.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + 1} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                <td colSpan={columns.length + 1} className="ad-td border border-gray-300 px-3 py-8 text-center text-gray-500">
                   {mode === "opted"
                     ? "No auto shop owners have purchased the website subscription yet."
                     : "Every auto shop owner has purchased the website subscription."}
@@ -367,7 +416,7 @@ const RequestedWebsiteOwners: React.FC<{ mode: Mode }> = ({ mode }) => {
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={filtered.length} page={currentPage} pageSize={pageSize} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -375,7 +424,7 @@ const RequestedWebsiteOwners: React.FC<{ mode: Mode }> = ({ mode }) => {
               key={p}
               type="button"
               onClick={() => setCurrentPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 currentPage === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

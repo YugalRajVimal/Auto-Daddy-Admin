@@ -225,7 +225,7 @@ const RunningDeals: React.FC = () => {
   );
 
   return (
-    <AdminPage title="Running Deals" noPanel>
+    <AdminPage title="Service Deals" noPanel>
       <p className="mb-6 text-sm text-gray-500">
         All currently active offers and deals for Auto Shop Owners
       </p>

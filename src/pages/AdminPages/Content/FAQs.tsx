@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
+import { FaqPreview } from "../../../components/admin/ContentPreviews";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactAutoGrowTextarea,
@@ -476,8 +477,15 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
 
   return (
     <AdminPage
-      title={isDeletedView ? "Deleted FAQ Management" : "FAQ Management"}
-      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerClassName={showForm ? "lg:pl-[28%]" : undefined}
+      title={
+        isDeletedView
+          ? "Deleted FAQs"
+          : showForm
+            ? editingId != null ? "Edit Frequently Asked Question" : "Add Frequently Asked Question"
+            : "Frequently asked Question"
+      }
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} label="New Note" /> : undefined}
       between={
         showSearchCard ? (
           <AdminSearchCard
@@ -490,6 +498,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
           />
         ) : showForm ? (
           <CompactFormPanel
+            splitPreview={<FaqPreview question={question ?? ""} answer={answer ?? ""} />}
             footer={
               <CompactFormFooter
                 message={editingId != null ? "You are editing an 'FAQ'" : "You are creating an 'FAQ'"}
@@ -501,7 +510,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
             }
           >
             <CompactFormRow className="items-start">
-              <CompactField label="User" required className={compactFixedFieldWidth}>
+              <CompactField label="Module" required className={compactFixedFieldWidth}>
                 <select
                   value={user}
                   onChange={(e) => {
@@ -518,7 +527,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                   ))}
                 </select>
               </CompactField>
-              <CompactField label="Page Slug" required className={compactFixedFieldWidth}>
+              <CompactField label="Main Tab" required className={compactFixedFieldWidth}>
                 <select
                   value={pageSlug}
                   onChange={(e) => setPageSlug(e.target.value)}
@@ -533,17 +542,6 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                     </option>
                   ))}
                 </select>
-              </CompactField>
-              <CompactField label="Date" required className={compactFixedFieldWidth}>
-                <DatePicker
-                  selected={parseDateValue(date)}
-                  onChange={(picked: Date | null) => {
-                    if (picked) setDate(formatDateValue(picked));
-                  }}
-                  dateFormat="yyyy-MM-dd"
-                  className={compactInputClass}
-                  wrapperClassName="w-full"
-                />
               </CompactField>
               <CompactField label="Question" required className="min-w-[200px] flex-1">
                 <CompactAutoGrowTextarea
@@ -560,16 +558,42 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                 />
                 <FormFieldError message={fieldErrors.answer?.message} />
               </CompactField>
+              <CompactField label="Date" required className={compactFixedFieldWidth}>
+                <DatePicker
+                  selected={parseDateValue(date)}
+                  onChange={(picked: Date | null) => {
+                    if (picked) setDate(formatDateValue(picked));
+                  }}
+                  dateFormat="yyyy-MM-dd"
+                  className={compactInputClass}
+                  wrapperClassName="w-full"
+                />
+              </CompactField>
             </CompactFormRow>
           </CompactFormPanel>
         ) : undefined
       }
     >
+      {!showForm && (
+      <>
       {isDeletedView && (
         <AdminDeletedBanner count={deletedStash.length} entityLabel="FAQs" />
       )}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
+          {!isDeletedView ? (
+            <button
+              type="button"
+              disabled={selected.size !== 1}
+              onClick={() => {
+                const row = paged.find((r) => selected.has(r.id));
+                if (row) openEdit(row);
+              }}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Update
+            </button>
+          ) : null}
           {!isDeletedView ? (
             <button
               type="button"
@@ -615,12 +639,12 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -640,8 +664,8 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -649,24 +673,25 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Page</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Question</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Answer</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Module</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Main Tab</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Sub-Tab</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Question</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Answer</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={7} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted FAQs found." : "No FAQs found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
@@ -674,7 +699,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => !isDeletedView && openEdit(row)}
@@ -683,14 +708,15 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
                       {USER_OPTIONS.find((o) => o.apiValue === row.role || o.value === row.role)?.label ?? row.role}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
-                    {PAGE_SLUG_OPTIONS.find(p => p.value === row.pageSlug)?.label ?? row.pageSlug ?? ""}
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
+                    {(PAGE_SLUG_OPTIONS.find(p => p.value === row.pageSlug)?.label ?? row.pageSlug ?? "").split(" - ")[0]}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">–</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[220px]">{row.question}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[280px]">{row.answer}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     {row.date ? new Date(row.date).toISOString().slice(0, 10) : ""}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[220px]">{row.question}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[280px]">{row.answer}</td>
                 </tr>
               ))
             )}
@@ -698,7 +724,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -706,7 +732,7 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${page === p
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${page === p
                 ? "border-ad-green bg-ad-green text-white"
                 : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
                 }`}
@@ -717,6 +743,8 @@ export default function FAQsPage({ initialShowForm = false }: FAQsPageProps) {
         </div>
         <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active FAQs" />
       </div>
+      </>
+      )}
     </AdminPage>
   );
 }

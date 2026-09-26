@@ -27,6 +27,15 @@ import {
 } from "../../../components/admin/ContentPanel";
 import { getPostLoginRedirect, useAuth } from "../../../auth";
 import { FormFieldError } from "../../../lib/validation/formUi";
+import {
+  DetailEditLink,
+  DetailField,
+  DetailGrid,
+  OverviewBar,
+  PhotoTile,
+  UserDetailLayout,
+  VehiclePill,
+} from "../../../components/admin/UserDetail";
 import { carOwnerPageSchema, type CarOwnerPageFormInput, type CarOwnerPageValues } from "../../../lib/validation/schemas/identity";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -70,11 +79,13 @@ type CarOwnerType = {
 const ALL_COLUMNS = [
   { key: "name", label: "Name" },
   { key: "phone", label: "Phone" },
-  { key: "email", label: "Email" },
   { key: "city", label: "City" },
   { key: "address", label: "Address" },
+  { key: "pincode", label: "Zip" },
+  { key: "activeDays", label: "Active Days" },
   { key: "date", label: "Date" },
   { key: "profilePhoto", label: "Profile Image" },
+  { key: "email", label: "Email" },
   { key: "documents", label: "Documents" },
   { key: "vin", label: "VIN" },
   { key: "vehicle", label: "Vehicle" },
@@ -84,7 +95,7 @@ const ALL_COLUMNS = [
   { key: "likes", label: "Likes" },
   { key: "status", label: "Status" },
 ];
-const DEFAULT_VISIBLE = ["name", "phone", "email", "city", "address", "date", "profilePhoto", "documents", "vehicle", "autoShops", "jobCard", "likes", "status"];
+const DEFAULT_VISIBLE = ["name", "phone", "city", "address", "pincode", "activeDays", "date", "profilePhoto", "status"];
 
 const CAR_OWNER_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "name", label: "Name" },
@@ -1086,7 +1097,7 @@ const ColSelector: React.FC<{ visible: string[]; onChange: (v: string[]) => void
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
       <button type="button" onClick={() => setOpen(o => !o)} style={{ padding: "6px 14px", background: "#555", color: "#fff", border: "none", borderRadius: 3, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-        Select Heading <span style={{ fontSize: 10 }}>▼</span>
+        Heading Bar <span style={{ fontSize: 12 }}>v</span>
       </button>
       {open && (
         <div style={{ position: "absolute", right: 0, top: "110%", background: "#fff", border: "1px solid #d2d6de", borderRadius: 3, boxShadow: "0 3px 10px rgba(0,0,0,.15)", zIndex: 200, minWidth: 160, padding: "6px 0" }}>
@@ -1149,8 +1160,164 @@ function printOwnersTable(owners: CarOwnerType[], visibleCols: string[], title: 
 }
 
 // ─── STYLE CONSTANTS ──────────────────────────────────────────────────────────
-const tdClass = "border border-gray-300 px-3 py-2 text-center text-sm text-gray-700";
-const thClass = "border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap";
+function activeDays(d?: string): string {
+  if (!d) return "-";
+  const parsed = new Date(d);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return String(Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 86_400_000)));
+}
+
+const OWNER_DETAIL_VIEWS = ["Profile", "Vehicles", "Job Cards"];
+
+/** Read-only detail screen: Profile / Vehicles / Job Cards, built from the data already loaded for the owner. */
+const CarOwnerDetail: React.FC<{
+  owner: CarOwnerType;
+  onEdit: () => void;
+  onBack: () => void;
+}> = ({ owner, onEdit, onBack }) => {
+  const [view, setView] = useState("Profile");
+  const vehicles = owner.myVehicles ?? [];
+  const [vehicleId, setVehicleId] = useState<string | null>(vehicles[0]?._id ?? null);
+  const vehicle = vehicles.find((v) => v._id === vehicleId) ?? vehicles[0];
+  const plate = (v?: VehicleType) => (v?.licensePlateNo ? String(v.licensePlateNo) : "—");
+  const jobCards = (owner.jobCards ?? []).filter(
+    (j) => !vehicle || !j.vehicleId?.licensePlateNo || j.vehicleId.licensePlateNo === vehicle.licensePlateNo
+  );
+  const status = (owner.status ?? "active").toLowerCase();
+  const statusLabel = status === "suspended" ? "Inactive" : status === "deleted" ? "Deleted" : "Active";
+  const profileImg = ownerProfileImg(owner);
+
+  const vehicleList =
+    view === "Profile" ? null : (
+      <>
+        <p className="mb-2 text-base text-gray-900">Vehicle Details</p>
+        <div className="space-y-3">
+          {vehicles.length === 0 ? (
+            <p className="text-sm text-gray-500">No vehicles added.</p>
+          ) : (
+            vehicles.map((v) => (
+              <VehiclePill
+                key={v._id}
+                label={plate(v)}
+                active={v._id === vehicle?._id}
+                onSelect={() => setVehicleId(v._id)}
+                onEdit={onEdit}
+              />
+            ))
+          )}
+        </div>
+      </>
+    );
+
+  const shopCount = (owner.autoshopsReceivedServiceFrom ?? []).length;
+
+  return (
+    <div>
+      <button type="button" onClick={onBack} className="mb-4 text-base text-[#0000ee] underline">
+        ← Back to Car Owners
+      </button>
+      <UserDetailLayout
+        name={owner.name}
+        views={OWNER_DETAIL_VIEWS}
+        view={view}
+        onViewChange={setView}
+        leftExtra={vehicleList}
+        bottom={
+          view === "Profile" ? (
+            <OverviewBar title="Overview">
+              <dl className="grid grid-cols-2 gap-4 text-lg md:grid-cols-4">
+                <div><dt className="text-gray-500">Vehicles</dt><dd className="font-semibold">{vehicles.length}</dd></div>
+                <div><dt className="text-gray-500">Job Cards</dt><dd className="font-semibold">{(owner.jobCards ?? []).length}</dd></div>
+                <div><dt className="text-gray-500">Auto Shops</dt><dd className="font-semibold">{shopCount}</dd></div>
+                <div><dt className="text-gray-500">Active Days</dt><dd className="font-semibold">{activeDays(owner.createdAt)}</dd></div>
+              </dl>
+            </OverviewBar>
+          ) : undefined
+        }
+      >
+        {view === "Profile" && (
+          <>
+            <DetailEditLink onClick={onEdit}>Edit customer details</DetailEditLink>
+            <DetailGrid>
+              <DetailField label="Name" value={owner.name} />
+              <DetailField label="Phone" value={owner.phone} />
+              <DetailField label="City" value={owner.city} />
+              <DetailField label="Address" value={owner.address} />
+              <DetailField label="Zip Code" value={owner.pincode} />
+              <DetailField label="Email" value={owner.email} />
+              <PhotoTile label="Profile photo" src={profileImg || null} className="mt-2" />
+              <div>
+                <p className="mb-1 text-base text-gray-900">Status</p>
+                <div className="flex overflow-hidden rounded-md border border-gray-400">
+                  <span className="flex-1 bg-white px-4 py-2 text-lg text-gray-500">{activeDays(owner.createdAt)}</span>
+                  <span
+                    className={`px-8 py-2 text-2xl font-semibold text-white ${
+                      statusLabel === "Active" ? "bg-[#6b9e2c]" : statusLabel === "Inactive" ? "bg-amber-500" : "bg-red-600"
+                    }`}
+                  >
+                    {statusLabel}
+                  </span>
+                </div>
+              </div>
+            </DetailGrid>
+          </>
+        )}
+
+        {view === "Vehicles" && (
+          <>
+            <DetailEditLink onClick={onEdit}>Edit vehicle details</DetailEditLink>
+            {vehicle ? (
+              <>
+                <DetailGrid>
+                  <DetailField label="License Plate number" value={plate(vehicle)} />
+                  <DetailField label="Year" value={vehicle.year} />
+                  <DetailField label="Make" value={getMakeName(vehicle) === "-" ? "" : getMakeName(vehicle)} />
+                  <DetailField label="Model" value={getMakeModel(vehicle) === "-" ? "" : getMakeModel(vehicle)} />
+                  <DetailField label="Current Odometer" value={vehicle.odometerReading} />
+                </DetailGrid>
+                <div className="mt-8 flex flex-wrap gap-x-10 gap-y-6">
+                  <PhotoTile label="Ownership" src={mediaUrl(vehicle.carOwnershipCertificate) || null} />
+                  <PhotoTile label="Insurance" src={mediaUrl(vehicle.insuranceCertificate) || null} />
+                  <PhotoTile label="D L - Front" src={mediaUrl(vehicle.drivingLicenseFront) || null} />
+                  <PhotoTile label="D L - Back" src={mediaUrl(vehicle.drivingLicenseBack) || null} />
+                  <PhotoTile label="Safety" src={mediaUrl(vehicle.safetyCertificate) || null} />
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-500">No vehicles added for this owner.</p>
+            )}
+          </>
+        )}
+
+        {view === "Job Cards" && (
+          <>
+            {vehicle && (
+              <div className="mb-8 ml-auto w-full max-w-[400px]">
+                <VehiclePill label={plate(vehicle)} active onEdit={onEdit} />
+              </div>
+            )}
+            {jobCards.length === 0 ? (
+              <p className="text-gray-500">No job cards for this vehicle.</p>
+            ) : (
+              <div className="flex flex-wrap gap-x-10 gap-y-8">
+                {jobCards.map((j) => (
+                  <div key={j._id} className="flex flex-col items-start">
+                    <span className="mb-2 text-base text-[#0000ee]">{fmtDate(j.createdAt)}</span>
+                    <PhotoTile src={mediaUrl(j.vehiclePhotos?.[0]) || null} />
+                    <span className="mt-3 text-base text-gray-900">Job # {j.jobNo ?? "—"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </UserDetailLayout>
+    </div>
+  );
+};
+
+const tdClass = "ad-td border border-gray-300 px-3 py-2 text-center text-sm text-gray-700";
+const thClass = "ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap";
 const linkClass = "text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-medium";
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
@@ -1177,6 +1344,7 @@ const CarOwners: React.FC = () => {
   const [jobCardsFor, setJobCardsFor] = useState<CarOwnerType | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingOwner, setEditingOwner] = useState<CarOwnerType | null>(null);
+  const [viewOwnerId, setViewOwnerId] = useState<string | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
 
   const openAdd = () => {
@@ -1383,8 +1551,10 @@ const CarOwners: React.FC = () => {
   function renderCell(owner: CarOwnerType, key: string) {
     const shops = owner.autoshopsReceivedServiceFrom ?? [];
     switch (key) {
-      case "name": return <td key={key} className={`${tdClass} text-center font-medium`}><button type="button" onClick={() => openEdit(owner)} className="text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">{owner.name || "-"}</button></td>;
+      case "name": return <td key={key} className={`${tdClass} text-center font-medium`}><button type="button" onClick={() => setViewOwnerId(owner._id)} className="text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-semibold">{owner.name || "-"}</button></td>;
       case "phone": return <td key={key} className={tdClass}>{owner.phone || "-"}</td>;
+      case "pincode": return <td key={key} className={tdClass}>{owner.pincode || "-"}</td>;
+      case "activeDays": return <td key={key} className={tdClass}>{activeDays(owner.createdAt)}</td>;
       case "email": return <td key={key} className={tdClass}>{owner.email || "-"}</td>;
       case "city": return <td key={key} className={tdClass}>{owner.city || "-"}</td>;
       case "address": return <td key={key} className={`${tdClass} whitespace-normal break-words text-left align-top min-w-[240px]`}>{owner.address || "-"}</td>;
@@ -1457,6 +1627,22 @@ const CarOwners: React.FC = () => {
   const toolbarBtnClass = (disabled = false) =>
     `px-3 py-1 text-xs font-medium text-white whitespace-nowrap ${disabled ? "bg-gray-400 cursor-not-allowed" : "bg-gray-600 hover:bg-gray-700"}`;
 
+  const viewOwner = viewOwnerId ? allOwners.find((o) => o._id === viewOwnerId) : undefined;
+  if (viewOwner) {
+    return (
+      <AdminPage title="User - Car Owner" noPanel>
+        <CarOwnerDetail
+          owner={viewOwner}
+          onBack={() => setViewOwnerId(null)}
+          onEdit={() => {
+            setViewOwnerId(null);
+            openEdit(viewOwner);
+          }}
+        />
+      </AdminPage>
+    );
+  }
+
   return (
     <>
       {/* ── MODALS ── */}
@@ -1468,7 +1654,7 @@ const CarOwners: React.FC = () => {
       <SendNotifModal isOpen={notifOpen} onClose={() => setNotifOpen(false)} ids={selected} onDone={() => { }} />
 
       <AdminPage
-        title={showDeleted ? "Deleted Car Owners" : "Car Owners"}
+        title={showDeleted ? "Deleted Car Owners" : "User - Car Owner"}
         headerAction={
           !showDeleted && !showForm && !showSearchCard ? (
             <AddNewButton onClick={openAdd} />
@@ -1494,7 +1680,7 @@ const CarOwners: React.FC = () => {
           ) : undefined
         }
       >
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
           <div className="flex flex-wrap gap-1">
             <button type="button" disabled={selCount === 0} onClick={() => setNotifOpen(true)} className={toolbarBtnClass(selCount === 0)}>
               Send Notification
@@ -1598,12 +1784,12 @@ const CarOwners: React.FC = () => {
                 showSearchCard ? "bg-gray-700" : "bg-gray-500"
               }`}
             >
-              Filters
+              Search
             </button>
           </div>
         </div>
 
-        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
           <span>Show</span>
           <select
             value={pageSize}
@@ -1622,8 +1808,8 @@ const CarOwners: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm whitespace-nowrap">
             <thead>
-              <tr className="bg-ad-purple text-white">
-                <th className="border border-ad-purple-dark px-2 py-2 text-left">
+              <tr className="bg-ad-purple text-white ad-thead">
+                <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={allPageSel}
@@ -1645,26 +1831,26 @@ const CarOwners: React.FC = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+                  <td colSpan={visibleCols.length + 1} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
                     Loading car owners…
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+                  <td colSpan={visibleCols.length + 1} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
                     Unable to load car owners.
                   </td>
                 </tr>
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={visibleCols.length + 1} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+                  <td colSpan={visibleCols.length + 1} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
                     {showDeleted ? "No deleted car owners found." : "No car owners found."}
                   </td>
                 </tr>
               ) : (
                 paginated.map((owner, idx) => (
                   <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                    <td className="border border-gray-300 px-2 py-2 text-left">
+                    <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                       <input
                         type="checkbox"
                         checked={selectedRows.has(owner._id)}
@@ -1690,7 +1876,7 @@ const CarOwners: React.FC = () => {
           </table>
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between ad-pager">
             <TableEntriesSummary total={filtered.length} page={currentPage} pageSize={pageSize} />
             <div className="flex gap-1">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -1698,7 +1884,7 @@ const CarOwners: React.FC = () => {
                   key={p}
                   type="button"
                   onClick={() => setCurrentPage(p)}
-                  className={`h-7 w-7 border text-xs font-medium ${currentPage === p
+                  className={`h-7 w-7 border text-xs font-medium ad-pg ${currentPage === p
                       ? "border-ad-green bg-ad-green text-white"
                       : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
                     }`}

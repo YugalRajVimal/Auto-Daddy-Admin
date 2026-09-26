@@ -490,7 +490,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
         </div>
       )}
 
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
           {!isDeletedView ? (
             <button
@@ -576,12 +576,12 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -601,8 +601,8 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-center">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -610,29 +610,29 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Service</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Shop Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Name</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Service</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Shop Type</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={5} className="ad-td border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={5} className="ad-td border border-gray-300 px-3 py-4 text-center text-gray-500">
                   {isDeletedView ? "No deleted sub services found." : "No sub services found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={getRowId(row)} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-2 py-2 text-center">
                     <input
                       type="checkbox"
                       checked={selected.has(getRowId(row))}
@@ -640,7 +640,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     <button
                       type="button"
                       onClick={() => openEdit(row)}
@@ -649,11 +649,11 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                       {row.name}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center text-xs font-medium uppercase tracking-wide">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center text-xs font-medium uppercase tracking-wide">
                     {row.categoryName}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{shopTypeLabel(row.shopType)}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center capitalize">{row.status || "active"}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">{shopTypeLabel(row.shopType)}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center capitalize">{row.status || "active"}</td>
                 </tr>
               ))
             )}
@@ -661,7 +661,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={tableRows.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -669,7 +669,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

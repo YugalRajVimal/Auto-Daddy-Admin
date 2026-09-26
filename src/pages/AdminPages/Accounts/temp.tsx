@@ -336,27 +336,27 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
                 Assign to Invoice
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
                 Total Balance
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
                 Account Name
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
                 Account Number
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Interac</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Interac</th>
             </tr>
           </thead>
           <tbody>
             {draft.map((row, idx) => (
               <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                <td className="border border-gray-300 px-3 py-2 text-center">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                   <label className="inline-flex cursor-pointer items-center gap-2 font-bold uppercase">
                     <input
                       type="radio"
@@ -368,7 +368,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
                     {row.label}
                   </label>
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-center">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                   <select
                     value={row.status}
                     onChange={(e) => updateDraftRow(row.id, { status: e.target.value })}
@@ -381,8 +381,8 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
                     ))}
                   </select>
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-center">{row.totalBalance}</td>
-                <td className="border border-gray-300 px-3 py-2 text-center">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-center">{row.totalBalance}</td>
+                <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                   <input
                     type="text"
                     value={row.accountName}
@@ -390,7 +390,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
                     className={tableInputClass}
                   />
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-center">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                   <input
                     type="text"
                     value={row.accountNumber}
@@ -398,7 +398,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
                     className={tableInputClass}
                   />
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-center">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                   <input
                     type="email"
                     value={row.interac}
@@ -1065,7 +1065,7 @@ function LedgerPage({
         ) : undefined
       }
     >
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
           <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
             ↓ Export
@@ -1097,7 +1097,7 @@ function LedgerPage({
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -1117,8 +1117,8 @@ function LedgerPage({
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-center">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-center">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -1126,25 +1126,25 @@ function LedgerPage({
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">{vendorLabel}</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Amount</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">{vendorLabel}</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Amount</th>
               {isIncome ? (
-                <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Payment Mode</th>
+                <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Payment Mode</th>
               ) : null}
               {isIncome ? (
-                <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Bank</th>
+                <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Bank</th>
               ) : null}
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Category</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Notes</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Category</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Notes</th>
               {isExpense ? (
                 <>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">GST</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Bill Number</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">By Cheque</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">GST</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Bill Number</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">By Cheque</th>
                 </>
               ) : null}
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
                 {isIncome ? "Attachment" : "Clip"}
               </th>
             </tr>
@@ -1154,7 +1154,7 @@ function LedgerPage({
               const labels = categoryLabel(categories, row.category, row.subcategory);
               return (
                 <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-2 py-2 text-center">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
@@ -1162,7 +1162,7 @@ function LedgerPage({
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     <button
                       type="button"
                       onClick={() => openEdit(row)}
@@ -1171,34 +1171,34 @@ function LedgerPage({
                       {formatDisplayDate(row.date)}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     {row.amount % 1 === 0 ? row.amount : row.amount.toFixed(2)} CAD
                   </td>
                   {isIncome ? (
-                    <td className="border border-gray-300 px-3 py-2 text-center">{row.paymentMode || ""}</td>
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">{row.paymentMode || ""}</td>
                   ) : null}
                   {isIncome ? (
-                    <td className="border border-gray-300 px-3 py-2 text-center">{row.bank || ""}</td>
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-center">{row.bank || ""}</td>
                   ) : null}
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     <div>
                       <div className="font-bold leading-tight">{labels.category}</div>
                       <div className="text-xs text-gray-500">{labels.subcategory}</div>
                     </div>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.notes || ""}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.notes || ""}</td>
                   {isExpense ? (
                     <>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                         {row.gst
                           ? row.gstAmount
                             ? `${row.gstAmount} CAD`
                             : "Yes"
                           : "No"}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{row.billNumber || "—"}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">{row.billNumber || "—"}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                         {row.byCheque
                           ? row.chequeAccount
                             ? `Yes (${row.chequeAccount})`
@@ -1207,7 +1207,7 @@ function LedgerPage({
                       </td>
                     </>
                   ) : null}
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     {row.attachmentUrl ? (
                       <span className="inline-flex items-center gap-2">
                         <ClipImageHover
@@ -1239,7 +1239,7 @@ function LedgerPage({
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${page === p
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${page === p
                 ? "border-ad-green bg-ad-green text-white"
                 : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
                 }`}

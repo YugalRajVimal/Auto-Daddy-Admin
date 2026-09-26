@@ -154,7 +154,7 @@ const RoleManagement: React.FC = () => {
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-ad-purple text-white">
+            <tr className="bg-ad-purple text-white ad-thead">
               <th className="border px-3 py-2">Name</th>
               <th className="border px-3 py-2">Type</th>
               <th className="border px-3 py-2">Actions</th>

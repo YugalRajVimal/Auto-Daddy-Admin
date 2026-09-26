@@ -67,8 +67,8 @@ export type DummyUserListConfig = {
   exportFilePrefix: string;
 };
 
-const tdClass = "border border-gray-300 px-3 py-2 text-center text-sm text-gray-700";
-const thClass = "border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap";
+const tdClass = "ad-td border border-gray-300 px-3 py-2 text-center text-sm text-gray-700";
+const thClass = "ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap";
 const linkClass = "text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-medium";
 
 const GREEN_CARD: React.CSSProperties = {
@@ -476,7 +476,7 @@ const ColSelector: React.FC<{ columns: ColumnDef[]; visible: string[]; onChange:
         onClick={() => setOpen((o) => !o)}
         className="flex cursor-pointer items-center gap-1 border-0 bg-gray-600 px-3.5 py-1.5 text-[13px] font-semibold text-white"
       >
-        Select Heading <span className="text-[10px]">▼</span>
+        Heading Bar <span className="text-xs">v</span>
       </button>
       {open && (
         <div className="absolute right-0 top-[110%] z-[200] min-w-[170px] rounded border border-gray-300 bg-white py-1.5 shadow-md">
@@ -821,7 +821,7 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
           </div>
         )}
 
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
           <div className="flex flex-wrap gap-1">
             {viewMode === "active" && (
               <>
@@ -881,12 +881,12 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
                 showSearchCard ? "bg-gray-700" : "bg-gray-500"
               }`}
             >
-              Filters
+              Search
             </button>
           </div>
         </div>
 
-        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
           <span>Show</span>
           <select
             value={pageSize}
@@ -908,8 +908,8 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm whitespace-nowrap">
             <thead>
-              <tr className="bg-ad-purple text-white">
-                <th className="border border-ad-purple-dark px-2 py-2 text-center">
+              <tr className="bg-ad-purple text-white ad-thead">
+                <th className="ad-th border border-ad-purple-dark px-2 py-2 text-center">
                   <input
                     type="checkbox"
                     checked={allPageSel}
@@ -935,7 +935,7 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+                  <td colSpan={visibleColumns.length + 2} className="ad-td border border-gray-300 px-3 py-8 text-center text-gray-500">
                     {viewMode === "deleted" ? `No deleted ${config.title.toLowerCase()}.` : `No ${config.title.toLowerCase()} found.`}
                   </td>
                 </tr>
@@ -944,7 +944,7 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
                   const isSuspended = !!row.isDisabled;
                   return (
                     <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                      <td className="border border-gray-300 px-2 py-2 text-center">
+                      <td className="ad-td border border-gray-300 px-2 py-2 text-center">
                         <input
                           type="checkbox"
                           checked={selectedRows.has(row._id)}
@@ -996,7 +996,7 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
           </table>
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between ad-pager">
           <TableEntriesSummary total={filtered.length} page={currentPage} pageSize={pageSize} />
           <div className="flex gap-1">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -1004,7 +1004,7 @@ export default function DummyUserListPage({ config }: DummyUserListPageProps) {
                 key={p}
                 type="button"
                 onClick={() => setCurrentPage(p)}
-                className={`h-7 w-7 border text-xs font-medium ${
+                className={`h-7 w-7 border text-xs font-medium ad-pg ${
                   currentPage === p ? "border-ad-green bg-ad-green text-white" : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
                 }`}
               >

@@ -10,7 +10,7 @@ export function AdminDeletedToggle({
   activeLabel?: string;
 }) {
   return (
-    <button type="button" onClick={onToggle} className="text-sm text-blue-700 hover:underline">
+    <button type="button" onClick={onToggle} className="text-base text-blue-700 underline hover:text-blue-900">
       {viewMode === "active" ? "Deleted" : activeLabel}
     </button>
   );

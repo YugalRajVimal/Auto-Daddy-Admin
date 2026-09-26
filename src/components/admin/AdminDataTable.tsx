@@ -9,26 +9,31 @@ import {
   adminPanelTableClasses,
 } from "./adminPanelTableStyles";
 import { adminNotify } from "../../utils/adminNotify";
+import { printAdminTable } from "../../utils/adminPrintTable";
 
 export const adminPageBtn = (active: boolean, disabled: boolean): React.CSSProperties => ({
   border: "1px solid",
-  borderColor: active ? "#0073b7" : "#ddd",
-  background: active ? "#0073b7" : "#fff",
-  color: active ? "#fff" : disabled ? "#bbb" : "#777",
-  padding: "6px 13px",
-  fontSize: 13,
+  borderColor: disabled ? "#b9d6b9" : "#008000",
+  background: active ? "#008000" : "#fff",
+  color: active ? "#fff" : disabled ? "#b9d6b9" : "#008000",
+  padding: "5px 12px",
+  fontSize: 14,
   cursor: disabled ? "not-allowed" : "pointer",
   marginLeft: -1,
 });
 
+export const ADMIN_TOOLBAR_BTN_BG = "#5b6165";
+
 export function ToolbarButton({
   label,
-  bg = "#555",
+  bg = ADMIN_TOOLBAR_BTN_BG,
+  color = "#fff",
   onClick,
   disabled = false,
 }: {
   label: string;
   bg?: string;
+  color?: string;
   onClick: () => void;
   disabled?: boolean;
 }) {
@@ -38,13 +43,14 @@ export function ToolbarButton({
       onClick={onClick}
       disabled={disabled}
       style={{
-        padding: "6px 14px",
+        padding: "5px 16px",
         borderRadius: 2,
-        border: "1px solid rgba(0,0,0,0.2)",
-        fontSize: 13,
-        background: disabled ? "#bbb" : bg,
-        color: "#fff",
-        fontWeight: 600,
+        border: "1px solid rgba(0,0,0,0.12)",
+        fontSize: 14,
+        background: disabled ? "#a9adb0" : bg,
+        color,
+        fontWeight: 700,
+        letterSpacing: 0.2,
         cursor: disabled ? "not-allowed" : "pointer",
         whiteSpace: "nowrap",
       }}
@@ -84,19 +90,19 @@ export function ColSelector({
         onClick={() => setOpen((o) => !o)}
         style={{
           padding: "6px 14px",
-          background: "#555",
+          background: ADMIN_TOOLBAR_BTN_BG,
           color: "#fff",
           border: "none",
-          borderRadius: 3,
-          fontSize: 13,
-          fontWeight: 600,
+          borderRadius: 2,
+          fontSize: 14,
+          fontWeight: 700,
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
-          gap: 4,
+          gap: 14,
         }}
       >
-        Select Heading <span style={{ fontSize: 10 }}>▼</span>
+        Heading Bar <span style={{ fontSize: 12 }}>v</span>
       </button>
       {open && (
         <div
@@ -306,6 +312,12 @@ export function AdminDataTable<T>({
       else setInternalPage(totalPages);
     }
   }, [currentPage, totalPages, onCurrentPageChange]);
+  // Up to 7 page buttons, sliding so the current page stays visible on long lists.
+  const windowStart = Math.max(1, Math.min(safePage - 3, totalPages - 6));
+  const pageWindow = Array.from(
+    { length: Math.min(totalPages, 7) },
+    (_, i) => windowStart + i
+  );
   const paginated = serverPaginated
     ? items
     : items.slice((safePage - 1) * pageSize, safePage * pageSize);
@@ -347,6 +359,16 @@ export function AdminDataTable<T>({
     });
   }
 
+  function handlePrint() {
+    const printCols = columns.filter((c) => visibleCols.includes(c.key));
+    const source = selCount > 0 ? items.filter((row) => selectedRows.has(getRowId(row))) : items;
+    printAdminTable({
+      title: exportFilename,
+      headers: printCols.map((c) => c.label),
+      rows: source.map((row) => printCols.map((c) => c.exportValue?.(row) ?? "-")),
+    });
+  }
+
   const standardButtons = showStandardToolbar ? (
     <>
       <ToolbarButton
@@ -359,13 +381,13 @@ export function AdminDataTable<T>({
       />
       <ToolbarButton
         label="WhatsApp"
-        bg="#25d366"
         onClick={() => {
           if (!requireSelection()) return;
           if (onWhatsApp) onWhatsApp(selected);
         }}
       />
       <ToolbarButton label="↓ Export XL" onClick={handleExport} />
+      <ToolbarButton label="Print" bg="#c9f7c6" color="#2d6a2d" onClick={handlePrint} />
     </>
   ) : null;
 
@@ -395,19 +417,12 @@ export function AdminDataTable<T>({
     });
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #d2d6de",
-        borderRadius: 3,
-        boxShadow: "0 1px 1px rgba(0,0,0,.1)",
-      }}
-    >
+    <div className="admin-grid" style={{ background: "#fff" }}>
       <div
         style={{
-          padding: "8px 14px",
-          background: "#d2d6de",
-          borderBottom: "1px solid #bbb",
+          padding: "10px 14px",
+          background: "#bcbdc1",
+          border: "1px solid #a9aaae",
           display: "flex",
           alignItems: "center",
           gap: 6,
@@ -427,17 +442,20 @@ export function AdminDataTable<T>({
                 setCurrentPage(1);
               }}
               style={{
-                height: 30,
-                width: 170,
-                border: "1px solid #bbb",
+                height: 32,
+                width: 220,
+                border: "1px solid #b5b6ba",
                 borderRadius: 2,
                 padding: "0 10px",
-                fontSize: 13,
+                fontSize: 14,
                 outline: "none",
                 backgroundColor: "#fff",
               }}
               placeholder={searchPlaceholder}
             />
+          )}
+          {showSearch && (
+            <ToolbarButton label="Search" onClick={() => setCurrentPage(1)} />
           )}
           {selCount > 0 && (
             <span style={{ fontSize: 12, color: "#555", fontWeight: 600, whiteSpace: "nowrap" }}>
@@ -456,15 +474,15 @@ export function AdminDataTable<T>({
 
       {banner}
 
-      <div style={{ padding: 20 }}>
+      <div style={{ padding: "16px 0 0" }}>
         <div
-          style={{
+            style={{
             display: "flex",
             alignItems: "center",
-            gap: 6,
-            fontSize: 14,
+            gap: 8,
+            fontSize: 15,
             color: "#333",
-            marginBottom: 14,
+            margin: "0 0 14px 42px",
           }}
         >
           <span>Show</span>
@@ -475,10 +493,10 @@ export function AdminDataTable<T>({
               setCurrentPage(1);
             }}
             style={{
-              height: 32,
-              border: "1px solid #d2d6de",
-              borderRadius: 3,
-              padding: "0 8px",
+              height: 28,
+              border: "1px solid #9a9ba0",
+              borderRadius: 2,
+              padding: "0 6px",
               fontSize: 14,
               outline: "none",
             }}
@@ -587,15 +605,46 @@ export function AdminDataTable<T>({
 
         <div
             style={{
-              marginTop: 14,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 10,
-            }}
-          >
-            <p style={{ margin: 0, fontSize: 14, color: "#333" }}>
+            marginTop: 14,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 10,
+          }}
+        >
+          <div>
+            <div style={{ display: "flex" }}>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                aria-label="Previous page"
+                style={adminPageBtn(false, safePage === 1)}
+              >
+                ‹
+              </button>
+              {pageWindow.map((pg) => (
+                <button
+                  key={pg}
+                  type="button"
+                  onClick={() => setCurrentPage(pg)}
+                  style={adminPageBtn(pg === safePage, false)}
+                >
+                  {pg}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                aria-label="Next page"
+                style={adminPageBtn(false, safePage === totalPages)}
+              >
+                ›
+              </button>
+            </div>
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "#666" }}>
               {itemTotal === 0
                 ? "No entries"
                 : `Showing ${(safePage - 1) * pageSize + 1} to ${Math.min(safePage * pageSize, itemTotal)} of ${itemTotal} entries${search && totalBeforeFilter !== undefined
@@ -603,41 +652,11 @@ export function AdminDataTable<T>({
                   : ""
                 }`}
             </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ display: "flex" }}>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={safePage === 1}
-                  style={adminPageBtn(false, safePage === 1)}
-                >
-                  Previous
-                </button>
-                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map((pg) => (
-                  <button
-                    key={pg}
-                    type="button"
-                    onClick={() => setCurrentPage(pg)}
-                    style={adminPageBtn(pg === safePage, false)}
-                  >
-                    {pg}
-                  </button>
-                ))}
-                {totalPages > 7 && (
-                  <span style={{ padding: "6px 8px", fontSize: 13 }}>…</span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={safePage === totalPages}
-                  style={adminPageBtn(false, safePage === totalPages)}
-                >
-                  Next
-                </button>
-              </div>
-              {footerRight}
-            </div>
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", paddingRight: 42 }}>
+            {footerRight}
+          </div>
+        </div>
       </div>
     </div>
   );

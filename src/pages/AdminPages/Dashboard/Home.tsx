@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminNotify } from "../../../utils/adminNotify";
 import PageMeta from "../../../components/common/PageMeta";
-import DashboardPanelCard from "../../../components/COMP";
 
 interface AdminDashboardAPI {
   carOwners: {
@@ -30,12 +29,20 @@ interface AdminDashboardAPI {
   };
 }
 
+type StatTone = "green" | "purple" | "blue" | "grey";
+
 type StatCard = {
   label: string;
   value: number | string;
-  bg: string;
-  text: string;
-  labelColor: string;
+  tone: StatTone;
+};
+
+// Solid value squares with a matching label colour, as in the revised admin mockups.
+const TONE_STYLES: Record<StatTone, { square: string; label: string }> = {
+  green: { square: "bg-[#008000] text-white", label: "text-[#008000]" },
+  purple: { square: "bg-[#a5348f] text-white", label: "text-[#8f1f7f]" },
+  blue: { square: "bg-[#0000ff] text-white", label: "text-[#0000ff]" },
+  grey: { square: "bg-[#cfcfcf] text-black", label: "text-black" },
 };
 
 type StatRow = {
@@ -46,19 +53,20 @@ type StatRow = {
 const API_URL = import.meta.env.VITE_API_URL;
 
 function StatCardView({ card }: { card: StatCard }) {
+  const tone = TONE_STYLES[card.tone];
   return (
-    <DashboardPanelCard className="mb-3 min-w-[110px] flex-1">
-      <div className="flex items-center gap-2">
-        <div
-          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded text-sm font-bold ${card.bg} ${card.text}`}
-        >
-          {card.value}
-        </div>
-        <span className={`font-serif text-xs font-bold leading-tight ${card.labelColor}`}>
-          {card.label}
-        </span>
+    <div className="flex min-w-0 items-center gap-4 border border-gray-200 bg-white p-2.5 shadow-[4px_4px_0_0_#d9d9d9]">
+      <div
+        className={`flex h-14 min-w-[4.25rem] flex-shrink-0 items-center justify-center px-2 text-lg font-bold sm:h-[3.5rem] sm:min-w-[5rem] ${tone.square}`}
+      >
+        {card.value}
       </div>
-    </DashboardPanelCard>
+      <span
+        className={`flex-1 self-end whitespace-nowrap pb-1 pl-2 text-left font-serif text-base font-bold leading-tight sm:text-lg ${tone.label}`}
+      >
+        {card.label}
+      </span>
+    </div>
   );
 }
 
@@ -91,37 +99,37 @@ export default function AdminDashboardHome() {
     {
       title: "Car Owners",
       cards: [
-        { label: "Total", value: data?.carOwners?.total ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
-        { label: "Active", value: data?.carOwners?.active ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
-        { label: "Non-Active", value: data?.carOwners?.nonActive ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
-        { label: "Closed", value: data?.carOwners?.closed ?? "—", bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
+        { label: "Total", value: data?.carOwners?.total ?? "—", tone: "green" },
+        { label: "Active", value: data?.carOwners?.active ?? "—", tone: "purple" },
+        { label: "Non-Active", value: data?.carOwners?.nonActive ?? "—", tone: "blue" },
+        { label: "Closed", value: data?.carOwners?.closed ?? "—", tone: "grey" },
       ],
     },
     {
       title: "Vendors",
       cards: [
-        { label: "Auto Shop", value: data?.shops?.carShops ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
-        { label: "Tyre Shop", value: data?.shops?.tireMaster ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
-        { label: "Car Wash", value: data?.shops?.carWash ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
-        { label: "Tow Truck", value: data?.shops?.towTruck ?? "—", bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
+        { label: "Repair Shops", value: data?.shops?.carShops ?? "—", tone: "green" },
+        { label: "Car Wash", value: data?.shops?.carWash ?? "—", tone: "purple" },
+        { label: "Tire Master", value: data?.shops?.tireMaster ?? "—", tone: "blue" },
+        { label: "Tow Truck", value: data?.shops?.towTruck ?? "—", tone: "grey" },
       ],
     },
     {
       title: "Subscription",
       cards: [
-        { label: "Received", value: data?.subscriptions?.received ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
-        { label: "Pending", value: data?.subscriptions?.pending ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
-        { label: "In Process", value: data?.subscriptions?.inProcess ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
-        { label: "Un-Answered", value: data?.subscriptions?.unAnswered ?? "—", bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
+        { label: "Received", value: data?.subscriptions?.received ?? "—", tone: "green" },
+        { label: "Pending", value: data?.subscriptions?.pending ?? "—", tone: "purple" },
+        { label: "In Process", value: data?.subscriptions?.inProcess ?? "—", tone: "blue" },
+        { label: "Un-Answered", value: data?.subscriptions?.unAnswered ?? "—", tone: "grey" },
       ],
     },
     {
       title: "Help",
       cards: [
-        { label: "Resolved", value: data?.help?.resolved ?? "—", bg: "bg-ad-green-light", text: "text-ad-green-dark", labelColor: "text-ad-green-dark" },
-        { label: "Received", value: data?.help?.received ?? "—", bg: "bg-pink-100", text: "text-ad-pink-dark", labelColor: "text-ad-pink-dark" },
-        { label: "In Process", value: data?.help?.inProcess ?? "—", bg: "bg-ad-blue-light", text: "text-ad-blue-dark", labelColor: "text-ad-blue-dark" },
-        { label: "Un-Answered", value: data?.help?.unAnswered ?? "—", bg: "bg-gray-200", text: "text-black", labelColor: "text-black" },
+        { label: "Resolved", value: data?.help?.resolved ?? "—", tone: "green" },
+        { label: "Received", value: data?.help?.received ?? "—", tone: "purple" },
+        { label: "In Process", value: data?.help?.inProcess ?? "—", tone: "blue" },
+        { label: "Un-Answered", value: data?.help?.unAnswered ?? "—", tone: "grey" },
       ],
     },
   ];
@@ -137,11 +145,11 @@ export default function AdminDashboardHome() {
       ) : error ? (
         <div className="rounded-[10px] border border-red-300 bg-red-100 p-4 text-red-700">{error}</div>
       ) : (
-        <div className="space-y-4">
+        <div className="mx-auto max-w-[1180px] space-y-5 lg:pl-6">
           {rows.map((row) => (
             <section key={row.title}>
-              <h2 className="mb-2 font-serif text-base font-bold text-ad-green-dark">{row.title}</h2>
-              <div className="flex flex-wrap gap-2 overflow-visible pb-2">
+              <h2 className="mb-2 font-serif text-xl font-bold text-ad-green">{row.title}</h2>
+              <div className="grid grid-cols-1 gap-x-7 gap-y-3 pl-2 pr-2 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,250px))]">
                 {row.cards.map((card) => (
                   <StatCardView key={card.label} card={card} />
                 ))}

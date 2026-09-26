@@ -2,20 +2,20 @@
 
 export const ADMIN_PANEL_TABLE_CLASS = "w-full border-collapse text-sm whitespace-nowrap";
 
-export const ADMIN_PANEL_THEAD_ROW_CLASS = "bg-ad-purple text-white";
+export const ADMIN_PANEL_THEAD_ROW_CLASS = "bg-ad-purple text-white ad-thead";
 
 export const ADMIN_PANEL_TH_CLASS =
-  "border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap";
+  "border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap ad-th";
 
 export const ADMIN_PANEL_TH_CHECKBOX_CLASS =
-  "border border-ad-purple-dark px-2 py-2 text-center";
+  "border border-ad-purple-dark px-2 py-2 text-center ad-th";
 
 export const ADMIN_PANEL_TD_CLASS =
-  "border border-gray-300 px-3 py-2 text-center align-middle text-[13px] text-[#555] whitespace-nowrap";
+  "border border-gray-300 px-3 py-2 text-center align-middle text-[13px] text-[#555] whitespace-nowrap ad-td";
 
 /** Long free-text cells (description, notes, address, etc.): wrap and stay wide so full text is visible */
 export const ADMIN_PANEL_TD_WRAP_CLASS =
-  "border border-gray-300 px-3 py-2 text-left align-top text-[13px] text-[#555] whitespace-normal break-words min-w-[240px]";
+  "border border-gray-300 px-3 py-2 text-left align-top text-[13px] text-[#555] whitespace-normal break-words min-w-[240px] ad-td";
 
 /**
  * Additive class for pages that use local td classes.
@@ -25,24 +25,24 @@ export const ADMIN_PANEL_CELL_WRAP =
   "whitespace-normal break-words text-left align-top min-w-[240px]";
 
 export const ADMIN_PANEL_TD_CHECKBOX_CLASS =
-  "border border-gray-300 px-2 py-2 text-center align-middle";
+  "border border-gray-300 px-2 py-2 text-center align-middle ad-td";
 
 export const ADMIN_PANEL_TABLE_COMPACT_CLASS = "w-full border-collapse text-xs whitespace-nowrap";
 
 export const ADMIN_PANEL_TH_COMPACT_CLASS =
-  "border border-ad-purple-dark px-2 py-1 text-center text-xs font-medium whitespace-nowrap";
+  "border border-ad-purple-dark px-2 py-1 text-center text-xs font-medium whitespace-nowrap ad-th";
 
 export const ADMIN_PANEL_TH_CHECKBOX_COMPACT_CLASS =
-  "border border-ad-purple-dark px-2 py-1 text-center";
+  "border border-ad-purple-dark px-2 py-1 text-center ad-th";
 
 export const ADMIN_PANEL_TD_COMPACT_CLASS =
-  "border border-gray-300 px-2 py-1 text-center align-middle text-xs text-[#555] whitespace-nowrap";
+  "border border-gray-300 px-2 py-1 text-center align-middle text-xs text-[#555] whitespace-nowrap ad-td";
 
 export const ADMIN_PANEL_TD_WRAP_COMPACT_CLASS =
-  "border border-gray-300 px-2 py-1 text-left align-top text-xs text-[#555] whitespace-normal break-words min-w-[200px]";
+  "border border-gray-300 px-2 py-1 text-left align-top text-xs text-[#555] whitespace-normal break-words min-w-[200px] ad-td";
 
 export const ADMIN_PANEL_TD_CHECKBOX_COMPACT_CLASS =
-  "border border-gray-300 px-2 py-1 text-center align-middle";
+  "border border-gray-300 px-2 py-1 text-center align-middle ad-td";
 
 export type AdminPanelTableClasses = {
   table: string;

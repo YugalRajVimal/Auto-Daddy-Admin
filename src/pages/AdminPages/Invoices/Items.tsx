@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import AdminPage, { adminPageTitleClass } from "../../../components/admin/AdminPage";
+import AdminPage, { adminPageHeaderClass, adminPageTitleClass } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
 import { CompactField, CompactFormFooter, CompactFormPanel, compactInputClass } from "../../../components/admin/ContentPanel";
 import { adminNotify } from "../../../utils/adminNotify";
@@ -233,11 +233,7 @@ export default function ItemsPage() {
   return (
     <AdminPage title="" noPanel>
       {showForm ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
-          onClick={handleCancel}
-        >
-          <div className="w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+        <>
             <CompactFormPanel
               footer={
                 <CompactFormFooter
@@ -249,7 +245,6 @@ export default function ItemsPage() {
                 />
               }
             >
-              <h2 className="mb-1 text-base font-bold text-ad-green-dark">{editingId ? "Edit Item" : "New Item"}</h2>
               <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
                 <CompactField label="Item Name" required className="sm:col-span-1">
                   <input
@@ -311,22 +306,23 @@ export default function ItemsPage() {
               </div>
 
             </CompactFormPanel>
-          </div>
-        </div>
+        </>
       ) : null}
 
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h1 className={adminPageTitleClass}>Items</h1>
-        <button
-          type="button"
-          onClick={openAdd}
-          className="shrink-0 rounded bg-ad-green px-4 py-2 text-sm font-bold text-white hover:bg-ad-green-dark"
-        >
-          + New Item
-        </button>
+      <div className={adminPageHeaderClass}>
+        <h1 className={adminPageTitleClass}>Item Summary</h1>
+        <div className="self-end md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2 md:self-auto">
+          <button
+            type="button"
+            onClick={openAdd}
+            className="shrink-0 border border-ad-green-dark bg-ad-green px-5 py-1.5 text-lg font-semibold text-white shadow-sm hover:bg-ad-green-dark md:px-7 md:text-xl"
+          >
+            + Add New
+          </button>
+        </div>
       </div>
 
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
           {viewMode === "active" ? (
             <>
@@ -355,7 +351,7 @@ export default function ItemsPage() {
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -375,8 +371,8 @@ export default function ItemsPage() {
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={items.length > 0 && selected.size === items.length}
@@ -384,34 +380,34 @@ export default function ItemsPage() {
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Item Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Description</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Quantity</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Unit Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Unit Cost</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">GST(%)</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Cost with GST</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Item Name</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Description</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Quantity</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Unit Type</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Unit Cost</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Tax %</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Amount</th>
               {/* Actions column */}
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" />
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium" />
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={9} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={9} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   No items found.
                 </td>
               </tr>
             ) : (
               items.map((row, idx) => (
                 <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row._id)}
@@ -419,18 +415,18 @@ export default function ItemsPage() {
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     <button type="button" onClick={() => openEdit(row)} className="text-blue-700 hover:underline">
                       {row.itemName}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.description}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.quantity != null ? row.quantity : ""}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.unitType || ""}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{fmtOptionalMoney(row.unitCost)}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.gstPercent != null ? `${row.gstPercent}%` : ""}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{fmtOptionalMoney(row.costWithGst)}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.description}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.quantity != null ? row.quantity : ""}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.unitType || ""}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{fmtOptionalMoney(row.unitCost)}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.gstPercent != null ? `${row.gstPercent}%` : ""}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{fmtOptionalMoney(row.costWithGst)}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     <button type="button" onClick={() => openEdit(row)} className="text-blue-700 hover:text-blue-900" aria-label={`Edit item ${row.itemName}`}>
                       ✎
                     </button>
@@ -451,7 +447,7 @@ export default function ItemsPage() {
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

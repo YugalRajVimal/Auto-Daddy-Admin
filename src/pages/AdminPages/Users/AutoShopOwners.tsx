@@ -347,7 +347,7 @@
 //   return (
 //     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
 //       <button type="button" onClick={() => setOpen(o => !o)} style={{ padding: "6px 14px", background: "#555", color: "#fff", border: "none", borderRadius: 3, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-//         Select Heading <span style={{ fontSize: 10 }}>▼</span>
+//         Heading Bar <span style={{ fontSize: 12 }}>v</span>
 //       </button>
 //       {open && (
 //         <div style={{ position: "absolute", right: 0, top: "110%", background: "#fff", border: "1px solid #d2d6de", borderRadius: 3, boxShadow: "0 3px 10px rgba(0,0,0,.15)", zIndex: 200, minWidth: 170, padding: "6px 0" }}>
@@ -1140,7 +1140,7 @@
 //           ))}
 //         </div>
 
-//         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+//         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
 //           <div className="flex flex-wrap gap-1">
 //             {viewMode === "active" && (
 //               <>
@@ -1204,7 +1204,7 @@
 //           </div>
 //         </div>
 
-//         <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+//         <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
 //           <span>Show</span>
 //           <select
 //             value={pageSize}
@@ -1223,8 +1223,8 @@
 //         <div className="overflow-x-auto">
 //           <table className="w-full border-collapse text-sm whitespace-nowrap">
 //             <thead>
-//               <tr className="bg-ad-purple text-white">
-//                 <th className="border border-ad-purple-dark px-2 py-2 text-left">
+//               <tr className="bg-ad-purple text-white ad-thead">
+//                 <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
 //                   <input
 //                     type="checkbox"
 //                     checked={allPageSel}
@@ -1248,19 +1248,19 @@
 //             <tbody>
 //               {loading ? (
 //                 <tr>
-//                   <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+//                   <td colSpan={visibleColumns.length + 2} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
 //                     Loading shop owners…
 //                   </td>
 //                 </tr>
 //               ) : error ? (
 //                 <tr>
-//                   <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+//                   <td colSpan={visibleColumns.length + 2} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
 //                     Unable to load auto shop owners.
 //                   </td>
 //                 </tr>
 //               ) : paginated.length === 0 ? (
 //                 <tr>
-//                   <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+//                   <td colSpan={visibleColumns.length + 2} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
 //                     {viewMode === "deleted" ? "No deleted auto shop owners." : "No auto shop owners found."}
 //                   </td>
 //                 </tr>
@@ -1270,7 +1270,7 @@
 //                   const busy = !!actionBusy[owner._id];
 //                   return (
 //                     <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-//                       <td className="border border-gray-300 px-2 py-2 text-left">
+//                       <td className="ad-td border border-gray-300 px-2 py-2 text-left">
 //                         <input
 //                           type="checkbox"
 //                           checked={selectedRows.has(owner._id)}
@@ -1349,7 +1349,7 @@
 //                   key={p}
 //                   type="button"
 //                   onClick={() => setCurrentPage(p)}
-//                   className={`h-7 w-7 border text-xs font-medium ${currentPage === p
+//                   className={`h-7 w-7 border text-xs font-medium ad-pg ${currentPage === p
 //                     ? "border-ad-green bg-ad-green text-white"
 //                     : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
 //                     }`}
@@ -1406,6 +1406,13 @@ import {
 } from "../../../components/admin/ContentPanel";
 import { getPostLoginRedirect, useAuth } from "../../../auth";
 import { FormFieldError } from "../../../lib/validation/formUi";
+import {
+  DetailEditLink,
+  DetailField,
+  DetailGrid,
+  PhotoTile,
+  UserDetailLayout,
+} from "../../../components/admin/UserDetail";
 import {
   autoShopOwnerPageSchema,
   type AutoShopOwnerPageFormInput,
@@ -1487,17 +1494,19 @@ const OnboardingStatusBadge: React.FC<{ status?: string }> = ({ status }) => {
 
 // ─── Column Config ────────────────────────────────────────────────────────────
 const ALL_COLUMNS = [
-  { key: "date", label: "Date" },
-  { key: "phone", label: "Phone" },
   { key: "Name", label: "Business Name" },
-  { key: "shopType", label: "Shop Type" },
+  { key: "phone", label: "Phone" },
   { key: "city", label: "City" },
-  { key: "customers", label: "No. of Customers" },
+  { key: "shopType", label: "Shop Type" },
+  { key: "ownerName", label: "Owner Name" },
+  { key: "date", label: "Date" },
+  { key: "customers", label: "Clients" },
+  { key: "jobs", label: "Jobs" },
   { key: "dealsPosted", label: "Deals Posted" },
   { key: "email", label: "Email" },
   { key: "onboardingStatus", label: "Onboarding Status" },
 ];
-const DEFAULT_VISIBLE = ["date", "phone", "Name", "shopType", "city", "customers", "dealsPosted", "email", "onboardingStatus"];
+const DEFAULT_VISIBLE = ["Name", "phone", "city", "shopType", "ownerName", "date", "customers", "jobs", "dealsPosted", "onboardingStatus"];
 
 const AUTO_SHOP_SEARCH_FIELDS: AdminSearchField[] = [
   { key: "date", label: "Date", type: "date" },
@@ -1756,7 +1765,7 @@ const ColSelector: React.FC<{ visible: string[]; onChange: (v: string[]) => void
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
       <button type="button" onClick={() => setOpen(o => !o)} style={{ padding: "6px 14px", background: "#555", color: "#fff", border: "none", borderRadius: 3, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-        Select Heading <span style={{ fontSize: 10 }}>▼</span>
+        Heading Bar <span style={{ fontSize: 12 }}>v</span>
       </button>
       {open && (
         <div style={{ position: "absolute", right: 0, top: "110%", background: "#fff", border: "1px solid #d2d6de", borderRadius: 3, boxShadow: "0 3px 10px rgba(0,0,0,.15)", zIndex: 200, minWidth: 170, padding: "6px 0" }}>
@@ -1797,6 +1806,8 @@ function autoShopOwnerPrintColMap(): Record<string, (o: AutoShopOwnerType) => st
     city: o => o.businessProfile?.city || "-",
     date: o => fmtDate(o.createdAt),
     customers: o => String(ownerCustomersCount(o)),
+    ownerName: o => o.name || "-",
+    jobs: o => String((o.jobCards ?? []).length),
     dealsPosted: o => String(ownerDealsList(o).length),
     email: o => o.email || o.businessProfile?.businessEmail || "-",
   };
@@ -1813,10 +1824,158 @@ function printOwnersTable(owners: AutoShopOwnerType[], visibleCols: string[], ti
 }
 
 // ─── STYLE CONSTANTS ──────────────────────────────────────────────────────────
+// ─── Read-only shop detail (Business Profile / Services / Brand Speciality / Opening Hours) ───
+const SHOP_DETAIL_VIEWS = ["Business Profile", "Services", "Brand Speciality", "Opening Hours"];
+
+function to12h(value?: string): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec(value ?? "");
+  if (!m) return value || "—";
+  const h = Number(m[1]);
+  return `${h % 12 === 0 ? 12 : h % 12}.${m[2]} ${h >= 12 ? "Pm" : "Am"}`;
+}
+
+function shopServiceNames(owner: AutoShopOwnerType): string[] {
+  return (owner.businessProfile?.myServices ?? [])
+    .map((ms) => ms.service?.name || ms.serviceName || "")
+    .filter(Boolean);
+}
+
+function shopBrandNames(owner: AutoShopOwnerType): string[] {
+  const raw = (owner.businessProfile as Record<string, any> | null | undefined)?.carCompanies;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((c) => (typeof c === "string" ? "" : c?.companyName || c?.name || ""))
+    .filter(Boolean);
+}
+
+type HoursRow = { day: string; open?: string; close?: string; closed: boolean };
+function shopHoursRows(owner: AutoShopOwnerType): HoursRow[] {
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const perDay = owner.businessProfile?.perDayOpenHours;
+  const parsed: any[] = Array.isArray(perDay)
+    ? perDay
+    : typeof perDay === "string"
+      ? (() => {
+          try {
+            const j = JSON.parse(perDay);
+            return Array.isArray(j) ? j : [];
+          } catch {
+            return [];
+          }
+        })()
+      : [];
+  return days.map((day) => {
+    const e = parsed.find((x) => String(x?.day ?? "").toLowerCase() === day.toLowerCase());
+    if (!e) {
+      const openDays = owner.businessProfile?.openDays ?? [];
+      return { day, closed: !openDays.some((d) => d.toLowerCase() === day.toLowerCase()) };
+    }
+    return { day, open: e.open ?? e.start, close: e.close ?? e.end, closed: Boolean(e.isClosed) || e.enabled === false };
+  });
+}
+
+const ShopOwnerDetail: React.FC<{ owner: AutoShopOwnerType; onEdit: () => void; onBack: () => void }> = ({
+  owner,
+  onEdit,
+  onBack,
+}) => {
+  const [view, setView] = useState("Business Profile");
+  const bp = owner.businessProfile;
+  const shopTypeText = ownerShopTypes(owner)
+    .map((st) => SHOP_TYPE_OPTIONS.find((x) => x.value === st)?.label || "")
+    .filter(Boolean)
+    .join(", ");
+  const list = (items: string[], empty: string) =>
+    items.length === 0 ? (
+      <p className="text-gray-500">{empty}</p>
+    ) : (
+      <div className="grid grid-cols-1 gap-x-10 gap-y-4 md:grid-cols-2">
+        {items.map((name, i) => (
+          <div key={`${name}-${i}`} className="rounded bg-[#e6e6e6] px-5 py-3 text-base uppercase text-gray-800">
+            {name}
+          </div>
+        ))}
+      </div>
+    );
+
+  return (
+    <div>
+      <button type="button" onClick={onBack} className="mb-4 text-base text-[#0000ee] underline">
+        ← Back to Shop Owners
+      </button>
+      <UserDetailLayout
+        name={owner.name}
+        views={SHOP_DETAIL_VIEWS}
+        view={view}
+        onViewChange={setView}
+        leftExtra={
+          <div className="flex justify-center pt-4">
+            <PhotoTile label="Business logo" src={bp?.businessLogo ? mediaUrl(bp.businessLogo) : null} />
+          </div>
+        }
+      >
+        {view === "Business Profile" && (
+          <>
+            <DetailEditLink onClick={onEdit}>Edit customer details</DetailEditLink>
+            <DetailGrid>
+              <DetailField label="Business Name" value={bp?.businessName || bp?.Name} />
+              <DetailField label="Contact Person" value={owner.name} />
+              <DetailField label="Phone No." value={owner.phone || bp?.businessPhone} />
+              <DetailField label="User Type" value={shopTypeText} />
+              <DetailField label="City" value={bp?.city || owner.city} />
+              <DetailField label="Address" value={bp?.businessAddress || owner.address} />
+              <DetailField label="HST No." value={bp?.businessHSTNumber} />
+              <DetailField label="Email" value={owner.email || bp?.businessEmail} />
+            </DetailGrid>
+          </>
+        )}
+        {view === "Services" && (
+          <>
+            <h3 className="mb-6 text-2xl text-gray-800">Operated Services</h3>
+            {list(shopServiceNames(owner), "No services added yet.")}
+          </>
+        )}
+        {view === "Brand Speciality" && (
+          <>
+            <h3 className="mb-6 text-2xl text-gray-800">Brand Speciality</h3>
+            {list(shopBrandNames(owner), "No brand speciality added yet.")}
+          </>
+        )}
+        {view === "Opening Hours" && (
+          <>
+            <div className="mb-6 flex items-end justify-between">
+              <h3 className="text-2xl text-gray-800">Opening Hours</h3>
+              <span className="mr-4 text-base text-gray-700">Close on</span>
+            </div>
+            <div className="space-y-4">
+              {shopHoursRows(owner).map((row) => (
+                <div key={row.day} className="grid grid-cols-[1fr_120px_170px] items-center gap-6">
+                  <div className="rounded bg-[#e6e6e6] px-5 py-3 text-base uppercase text-gray-800">{row.day}</div>
+                  {row.closed ? (
+                    <>
+                      <div className="rounded bg-[#ee2e55] px-4 py-3 text-center text-base text-white">Closed</div>
+                      <div className="rounded bg-[#ee2e55] px-4 py-3 text-center text-base text-white">Closed</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="rounded bg-[#e6e6e6] px-4 py-3 text-center text-base text-gray-800">Open</div>
+                      <div className="rounded bg-[#e6e6e6] px-4 py-3 text-center text-base text-gray-800">{to12h(row.close)}</div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </UserDetailLayout>
+    </div>
+  );
+};
+
 type ProvinceCityOption = { name: string; status?: string };
 type ProvinceWithCities = { cities?: ProvinceCityOption[] };
-const tdClass = "border border-gray-300 px-3 py-2 text-center text-sm text-gray-700";
-const thClass = "border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap";
+const tdClass = "ad-td border border-gray-300 px-3 py-2 text-center text-sm text-gray-700";
+const thClass = "ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium whitespace-nowrap";
 const linkClass = "text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-medium";
 
 const DEFAULT_COUNTRY_CODE = "+1";
@@ -2182,6 +2341,7 @@ const AutoShopOwners: React.FC = () => {
 
   const [showForm, setShowForm] = useState(false);
   const [editingOwner, setEditingOwner] = useState<AutoShopOwnerType | null>(null);
+  const [viewOwnerId, setViewOwnerId] = useState<string | null>(null);
 
   const fetchOwners = useCallback(async () => {
     setLoading(true); setError("");
@@ -2444,7 +2604,7 @@ async function loginAsOwner(userId: string) {
             {viewMode === "active" && label !== "-" ? (
               <button
                 type="button"
-                onClick={() => openEdit(owner)}
+                onClick={() => setViewOwnerId(owner._id)}
                 className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-blue-700 hover:underline"
               >
                 {label}
@@ -2491,6 +2651,10 @@ async function loginAsOwner(userId: string) {
           </td>
         );
       }
+      case "ownerName":
+        return <td key={key} className={tdClass}>{owner.name || "-"}</td>;
+      case "jobs":
+        return <td key={key} className={tdClass}>{(owner.jobCards ?? []).length}</td>;
       case "email":
         return <td key={key} className={tdClass}>{owner.email || owner.businessProfile?.businessEmail || "-"}</td>;
       case "onboardingStatus":
@@ -2514,6 +2678,22 @@ async function loginAsOwner(userId: string) {
     viewMode === "active" ? visibleCols.includes(c.key) : DEFAULT_VISIBLE.includes(c.key)
   );
 
+  const viewOwner = viewOwnerId ? allOwners.find((o) => o._id === viewOwnerId) : undefined;
+  if (viewOwner) {
+    return (
+      <AdminPage title="User - Auto Shop" noPanel>
+        <ShopOwnerDetail
+          owner={viewOwner}
+          onBack={() => setViewOwnerId(null)}
+          onEdit={() => {
+            setViewOwnerId(null);
+            openEdit(viewOwner);
+          }}
+        />
+      </AdminPage>
+    );
+  }
+
   return (
     <>
       {customersFor && <CustomersModal owner={customersFor} onClose={() => setCustomersFor(null)} />}
@@ -2522,7 +2702,7 @@ async function loginAsOwner(userId: string) {
       <SendNotifModal isOpen={notifOpen} onClose={() => setNotifOpen(false)} ids={selected} onDone={() => { }} />
 
       <AdminPage
-        title={viewMode === "deleted" ? "Deleted Auto Shop Owners" : "Auto Shop Owners"}
+        title={viewMode === "deleted" ? "Deleted Auto Shop Owners" : "User - Shop Owner"}
         headerAction={
           viewMode === "active" && !showForm && !showSearchCard ? (
             <AddNewButton onClick={openAdd} />
@@ -2569,7 +2749,7 @@ async function loginAsOwner(userId: string) {
           ))}
         </div>
 
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
           <div className="flex flex-wrap gap-1">
             {viewMode === "active" && (
               <>
@@ -2628,12 +2808,12 @@ async function loginAsOwner(userId: string) {
                 showSearchCard ? "bg-gray-700" : "bg-gray-500"
               }`}
             >
-              Filters
+              Search
             </button>
           </div>
         </div>
 
-        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
           <span>Show</span>
           <select
             value={pageSize}
@@ -2652,8 +2832,8 @@ async function loginAsOwner(userId: string) {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm whitespace-nowrap">
             <thead>
-              <tr className="bg-ad-purple text-white">
-                <th className="border border-ad-purple-dark px-2 py-2 text-left">
+              <tr className="bg-ad-purple text-white ad-thead">
+                <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={allPageSel}
@@ -2677,19 +2857,19 @@ async function loginAsOwner(userId: string) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+                  <td colSpan={visibleColumns.length + 2} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
                     Loading shop owners…
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+                  <td colSpan={visibleColumns.length + 2} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
                     Unable to load auto shop owners.
                   </td>
                 </tr>
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+                  <td colSpan={visibleColumns.length + 2} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
                     {viewMode === "deleted" ? "No deleted auto shop owners." : "No auto shop owners found."}
                   </td>
                 </tr>
@@ -2699,7 +2879,7 @@ async function loginAsOwner(userId: string) {
                   const busy = !!actionBusy[owner._id];
                   return (
                     <tr key={owner._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                      <td className="border border-gray-300 px-2 py-2 text-left">
+                      <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                         <input
                           type="checkbox"
                           checked={selectedRows.has(owner._id)}
@@ -2770,7 +2950,7 @@ async function loginAsOwner(userId: string) {
           </table>
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between ad-pager">
             <TableEntriesSummary total={filtered.length} page={currentPage} pageSize={pageSize} />
             <div className="flex gap-1">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -2778,7 +2958,7 @@ async function loginAsOwner(userId: string) {
                   key={p}
                   type="button"
                   onClick={() => setCurrentPage(p)}
-                  className={`h-7 w-7 border text-xs font-medium ${currentPage === p
+                  className={`h-7 w-7 border text-xs font-medium ad-pg ${currentPage === p
                     ? "border-ad-green bg-ad-green text-white"
                     : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
                     }`}

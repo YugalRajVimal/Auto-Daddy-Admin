@@ -1,11 +1,9 @@
 import React,{ useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { FiBell, FiImage, FiUser } from "react-icons/fi";
+import { FiImage, FiUser } from "react-icons/fi";
+import { FaBell } from "react-icons/fa";
 import useAuth from "../../auth/useAuth";
-import { getRoleConfig } from "../../auth/roleRegistry";
-import { getActivePrimaryItem, type NavItem, type NavSubItem } from "../../config/adminNav";
-import { adminNotify } from "../../utils/adminNotify";
-import SupportHelpModal from "./SupportHelpModal";
+import { adminSettingsNav, getActivePrimaryItem, type NavItem, type NavSubItem } from "../../config/adminNav";
 import { hasView, type StoredPermissions } from "../../utils/navPermissions";
 
 const LOGO = "/logo.png";
@@ -64,16 +62,12 @@ export type PortalShellProps = {
   utilityNavLabel?: string;
   /** Sub-header tabs shown when on matching paths (e.g. notification messages). */
   contextualNav?: NavSubItem[];
-  /** Shown in the top utility row as `Login as : …` (defaults to role label). */
-  loginAs?: string;
   /** When set, replaces the default AutoDaddy logo in the header. */
   brandLogo?: PortalBrandLogo;
   /** Center header content (e.g. owner name and city). */
   headerCenter?: React.ReactNode;
   /** Optional profile photo shown beside the notification bell. */
   headerAvatarSrc?: string | null;
-  /** When set, shows "{n} Days Left" in the utility row instead of "Login as". */
-  subscriptionDaysLeft?: number | null;
   /** Help page path; when set, the Help utility link navigates here. */
   helpPath?: string;
 };
@@ -87,25 +81,25 @@ export default function PortalShell({
   utilityNav = [],
   utilityNavLabel = "Admin",
   contextualNav = [],
-  loginAs,
   brandLogo,
   headerCenter,
   headerAvatarSrc,
-  subscriptionDaysLeft,
   helpPath,
 }: PortalShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
 
-  const { role, logout, session, permissions } = useAuth();
+  const { role, logout, permissions } = useAuth();
 
 const isSuperAdmin = role === "admin";
 
 const storedPerms = (permissions as StoredPermissions | null) ?? null;
 
 const canShowPrimary = (item: NavItem) =>
-  isSuperAdmin || hasView(storedPerms, item.permissionModule);
+  isSuperAdmin ||
+  hasView(storedPerms, item.permissionModule) ||
+  (item.subItems ?? []).some((sub) => hasView(storedPerms, sub.permissionModule));
 
 const canShowSub = (sub: NavSubItem) =>
   isSuperAdmin || hasView(storedPerms, sub.permissionModule);
@@ -145,10 +139,6 @@ console.log("storedPerms:", storedPerms);
   //   isSuperAdmin || hasView(storedPerms, sub.permissionModule);
 
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [helpSubject, setHelpSubject] = useState("");
-  const [helpDetails, setHelpDetails] = useState("");
-  const [helpTicketNo, setHelpTicketNo] = useState<string>("");
   const navReset = (location.state as { navReset?: number } | null | undefined)?.navReset ?? 0;
   const contentKey = `${location.pathname}-${navReset}`;
 
@@ -166,6 +156,9 @@ console.log("storedPerms:", storedPerms);
     () => contextualNav.filter(canShowSub),
     [contextualNav, storedPerms, isSuperAdmin]
   );
+
+  const showSettings = canShowSub(adminSettingsNav);
+  const onSettingsNav = isPathActive(location.pathname, adminSettingsNav.path, homePath);
 
   const onUtilityNav = visibleUtilityNav.some((s) => isPathActive(location.pathname, s.path, homePath));
   const onContextualNav = visibleContextualNav.some((s) => isPathActive(location.pathname, s.path, homePath));
@@ -229,65 +222,14 @@ console.log("storedPerms:", storedPerms);
     logout();
   };
 
-  const helpSubjects = useMemo(
-    () => [
-      "Accounts",
-      "Apps",
-      "Clients",
-      "Estimates",
-      "Expenses",
-      "Inventory",
-      "Invoicing",
-      "Others",
-      "Reports",
-      "Taxation",
-    ],
-    []
-  );
-
-  const openHelp = () => {
-    setHelpTicketNo(String(Math.floor(10000000 + Math.random() * 90000000)));
-    setHelpSubject("");
-    setHelpDetails("");
-    setHelpOpen(true);
-  };
-
-  useEffect(() => {
-    const perms = window.localStorage.getItem("permission");
-    console.log("LocalStorage permissions:", perms);
-  }, []);
-
-  const closeHelp = () => setHelpOpen(false);
-
-  const submitHelp = () => {
-    if (!helpSubject.trim()) {
-      adminNotify.error("Please select a subject.");
-      return;
-    }
-    if (!helpDetails.trim()) {
-      adminNotify.error("Please enter details.");
-      return;
-    }
-    adminNotify.success(`Ticket submitted. Ticket No. ${helpTicketNo}`);
-    setHelpOpen(false);
-  };
-
   const utilityLinkClass =
-    "inline-block rounded-b-lg border border-gray-400 bg-gray-200 px-2.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-300 sm:px-3 sm:text-xs";
+    "inline-flex min-w-[76px] items-center justify-center rounded-b-md border border-[#c3c3c3] bg-[#d3d3d3] px-3 py-1 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-300 sm:min-w-[96px] sm:px-5 sm:text-[16px]";
   const utilityLinkActiveClass =
-    "inline-block rounded-b-lg border border-ad-purple bg-ad-glass px-2.5 py-0.5 text-[11px] font-semibold text-ad-purple shadow-sm sm:px-3 sm:text-xs";
-  const helpLinkActiveClass =
-    "inline-block rounded-b-lg border border-ad-green bg-ad-green-light px-2.5 py-0.5 text-[11px] font-semibold text-ad-green-dark shadow-sm sm:px-3 sm:text-xs";
+    "inline-flex min-w-[76px] items-center justify-center rounded-b-md border border-[#a5348f] bg-[#a5348f] px-3 py-1 text-sm font-semibold text-white shadow-sm sm:min-w-[96px] sm:px-5 sm:text-[16px]";
+  const helpLinkActiveClass = utilityLinkActiveClass;
 
   const subNavLinkClass =
-    "relative block px-2 py-1.5 text-center text-xs leading-snug text-blue-700 underline-offset-2 hover:underline lg:px-1.5 lg:py-1.5 lg:text-xs lg:leading-snug lg:whitespace-normal";
-
-  const loginRole = role ? getRoleConfig(role).label : "User";
-  const loginAsDisplay =
-    loginAs?.trim() ||
-    session?.meta?.phone?.trim() ||
-    session?.profile?.phone?.trim() ||
-    loginRole;
+    "relative block px-2 py-1.5 text-center text-sm font-normal leading-snug text-[#0000e6] underline-offset-2 hover:underline lg:px-1.5 lg:py-1.5 lg:text-[13px] lg:leading-snug lg:whitespace-normal";
 
   const logoImageClass =
     "block h-auto w-auto max-h-[4.25rem] max-w-[220px] object-contain sm:max-h-[4.75rem] sm:max-w-[260px] md:max-h-20 md:max-w-[300px]";
@@ -315,17 +257,18 @@ console.log("storedPerms:", storedPerms);
     document.documentElement.style.overflow = "";
   }, [location.pathname]);
 
+  // Scopes the white admin theme (see `.admin-portal` in index.css) to this portal only,
+  // including popups that render outside the shell's DOM tree.
+  useEffect(() => {
+    document.body.classList.add("admin-portal");
+    return () => document.body.classList.remove("admin-portal");
+  }, []);
+
   const utilityNavBar = (
     <nav
       className="flex shrink-0 items-center gap-0 [&>*+*]:-ml-px"
       aria-label="Account actions"
     >
-      {headerCenter != null &&
-        (subscriptionDaysLeft != null ? (
-          <span className={utilityLinkClass}>{subscriptionDaysLeft} Days Left</span>
-        ) : (
-          <span className={utilityLinkClass}>Login as : {loginAsDisplay}</span>
-        ))}
       {visibleUtilityNav.length > 0 && (
         <Link
           to={utilityNavPath}
@@ -335,17 +278,24 @@ console.log("storedPerms:", storedPerms);
           {utilityNavLabel}
         </Link>
       )}
-      <Link
-        to={helpPath ?? "#"}
-        className={helpPath && onHelpNav ? helpLinkActiveClass : utilityLinkClass}
-        onClick={(e) => {
-          e.preventDefault();
-          if (helpPath) handleNavLinkClick(helpPath, e);
-          else openHelp();
-        }}
-      >
-        Help
-      </Link>
+      {showSettings && (
+        <Link
+          to={adminSettingsNav.path}
+          className={onSettingsNav ? utilityLinkActiveClass : utilityLinkClass}
+          onClick={(e) => handleNavLinkClick(adminSettingsNav.path, e)}
+        >
+          {adminSettingsNav.name}
+        </Link>
+      )}
+      {helpPath && (
+        <Link
+          to={helpPath}
+          className={onHelpNav ? helpLinkActiveClass : utilityLinkClass}
+          onClick={(e) => handleNavLinkClick(helpPath, e)}
+        >
+          Help
+        </Link>
+      )}
       <button type="button" onClick={handleLogout} className={utilityLinkClass}>
         Log out
       </button>
@@ -354,17 +304,6 @@ console.log("storedPerms:", storedPerms);
 
   return (
     <div className="flex min-h-screen flex-col bg-ad-app-bg font-sans">
-      <SupportHelpModal
-        isOpen={helpOpen}
-        onClose={closeHelp}
-        ticketNo={helpTicketNo}
-        subject={helpSubject}
-        onSubjectChange={setHelpSubject}
-        details={helpDetails}
-        onDetailsChange={setHelpDetails}
-        subjects={helpSubjects}
-        onSubmit={submitHelp}
-      />
 
 {backToSuperAdminToken && (
         <div
@@ -445,12 +384,9 @@ console.log("storedPerms:", storedPerms);
 
             <div className="col-span-2 flex items-center justify-center md:col-span-1 md:self-center">
               {headerCenter ?? (
-                <p className="text-center font-serif text-base text-gray-700 md:text-lg lg:text-xl">
-                  Login as :{" "}
-                  <span className="text-lg font-bold text-ad-green md:text-xl lg:text-2xl">
-                    {loginAsDisplay}
-                  </span>
-                </p>
+                <span className="select-none font-canada text-3xl leading-none text-[#86c232] sm:text-4xl">
+                  Canada
+                </span>
               )}
             </div>
 
@@ -459,15 +395,15 @@ console.log("storedPerms:", storedPerms);
               <div className="flex items-center gap-4">
                 <button
                   type="button"
-                  className="relative text-blue-600 hover:text-blue-700"
+                  className="relative text-[#1a6fe0] transition-colors hover:text-[#0d4fb0]"
                   aria-label="Notifications"
                   onClick={() => navigate(ADMIN_MESSAGES_PATH)}
                 >
-                  <FiBell size={26} strokeWidth={1.75} />
+                  <FaBell size={26} />
                 </button>
                 <Link
                   to={profilePath}
-                  className="flex h-11 w-11 items-center justify-center overflow-hidden border border-gray-300 bg-white text-gray-400 shadow-sm sm:h-12 sm:w-12"
+                  className="flex h-11 w-11 items-center justify-center overflow-hidden border border-gray-400 bg-white text-gray-400 shadow-sm sm:h-[46px] sm:w-[46px]"
                   aria-label="Profile"
                   onClick={(e) => handleNavLinkClick(profilePath, e)}
                 >
@@ -489,9 +425,9 @@ console.log("storedPerms:", storedPerms);
             {visiblePrimaryNav.map((item) => {
               const isActive = activePrimary?.name === item.name;
               const firstPath = item.path ?? item.subItems?.[0]?.path ?? "#";
-              const itemClass = `w-full px-3 py-1.5 text-center text-sm font-semibold transition-colors lg:rounded-b-lg lg:px-4 lg:py-2 lg:text-sm ${isActive
-                  ? "relative z-20 border border-ad-purple bg-ad-glass text-ad-purple shadow-md"
-                  : "border border-ad-purple/80 bg-ad-purple text-white shadow-sm hover:bg-ad-purple-dark"
+              const itemClass = `w-full px-3 py-1.5 text-center text-sm font-semibold transition-colors lg:rounded lg:px-4 lg:py-1.5 whitespace-nowrap lg:text-[14px] xl:text-[16px] 2xl:text-[17px] lg:leading-tight ${isActive
+                  ? "relative z-20 border border-ad-purple bg-white text-ad-purple shadow-md"
+                  : "border border-[#a5348f] bg-[#a5348f] text-white shadow-sm hover:bg-[#8c2179]"
                 }`;
               return (
                 <li key={item.name} className="min-w-0 flex-1">
@@ -527,7 +463,7 @@ console.log("storedPerms:", storedPerms);
                         <Link
                           to={sub.path}
                           onClick={(e) => handleSubNavClick(sub.path, e)}
-                          className={`${subNavLinkClass} ${active ? "bg-gray-200 font-medium" : ""}`}
+                          className={`${subNavLinkClass} ${active ? "bg-[#dcdcdc]" : ""}`}
                         >
                           {sub.name}
                           {active && (
@@ -564,7 +500,11 @@ console.log("storedPerms:", storedPerms);
         )}
   
 
-        <main key={contentKey} className="flex min-h-0 flex-1 flex-col">
+        {displaySubItems.length === 0 || !(activePrimary || onUtilityNav || onContextualNav) ? (
+          <div className="mt-1 hidden h-10 border-b-2 border-ad-purple lg:block" aria-hidden />
+        ) : null}
+
+        <main key={contentKey} className="flex min-h-0 flex-1 flex-col px-3 sm:px-4">
           {children}
         </main>
       </div>

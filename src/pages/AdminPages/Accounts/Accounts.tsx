@@ -598,41 +598,41 @@
 //       <div className="overflow-x-auto">
 //         <table className="w-full border-collapse text-sm whitespace-nowrap">
 //           <thead>
-//             <tr className="bg-ad-purple text-white">
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+//             <tr className="bg-ad-purple text-white ad-thead">
+//               <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
 //                 Assign to Invoice
 //               </th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+//               <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
+//               <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
 //                 Total Balance
 //               </th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+//               <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
 //                 Account Name
 //               </th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+//               <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
 //                 Account Number
 //               </th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Interac</th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Delete</th>
+//               <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Interac</th>
+//               <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Delete</th>
 //             </tr>
 //           </thead>
 //           <tbody>
 //             {loading ? (
 //               <tr>
-//                 <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+//                 <td colSpan={7} className="ad-td border border-gray-300 px-3 py-4 text-center text-gray-500">
 //                   Loading banks…
 //                 </td>
 //               </tr>
 //             ) : draft.length === 0 ? (
 //               <tr>
-//                 <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+//                 <td colSpan={7} className="ad-td border border-gray-300 px-3 py-4 text-center text-gray-500">
 //                   No bank accounts yet.
 //                 </td>
 //               </tr>
 //             ) : (
 //               draft.map((row, idx) => (
 //                 <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">
+//                   <td className="ad-td border border-gray-300 px-3 py-2 text-center">
 //                     <label className="inline-flex cursor-pointer items-center gap-2 font-bold uppercase">
 //                       <input
 //                         type="radio"
@@ -644,7 +644,7 @@
 //                       {row.BankName}
 //                     </label>
 //                   </td>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">
+//                   <td className="ad-td border border-gray-300 px-3 py-2 text-center">
 //                     <select
 //                       value={row.status}
 //                       onChange={(e) =>
@@ -659,10 +659,10 @@
 //                       ))}
 //                     </select>
 //                   </td>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">
+//                   <td className="ad-td border border-gray-300 px-3 py-2 text-center">
 //                     {row.totalBalance ?? row.openingBalance ?? 0}
 //                   </td>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">
+//                   <td className="ad-td border border-gray-300 px-3 py-2 text-center">
 //                     <input
 //                       type="text"
 //                       value={row.AccountName}
@@ -670,7 +670,7 @@
 //                       className={tableInputClass}
 //                     />
 //                   </td>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">
+//                   <td className="ad-td border border-gray-300 px-3 py-2 text-center">
 //                     <input
 //                       type="text"
 //                       value={row.AccountNumber}
@@ -678,7 +678,7 @@
 //                       className={tableInputClass}
 //                     />
 //                   </td>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">
+//                   <td className="ad-td border border-gray-300 px-3 py-2 text-center">
 //                     <input
 //                       type="email"
 //                       value={row.Interac}
@@ -686,7 +686,7 @@
 //                       className={tableInputClass}
 //                     />
 //                   </td>
-//                   <td className="border border-gray-300 px-3 py-2 text-center">
+//                   <td className="ad-td border border-gray-300 px-3 py-2 text-center">
 //                     <button
 //                       type="button"
 //                       onClick={async () => {
@@ -1803,7 +1803,7 @@
 //       {isDeletedView && (
 //         <AdminDeletedBanner count={variantStash.length} entityLabel="entries" />
 //       )}
-//       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+//       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
 //         <div className="flex flex-wrap gap-1">
 //           <button type="button" disabled={selected.size === 0} className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
 //             ↓ Export
@@ -1858,7 +1858,7 @@
 //         </div>
 //       </div>
  
-//       <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+//       <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
 //         <span>Show</span>
 //         <select
 //           value={entriesPerPage}
@@ -1878,7 +1878,7 @@
 //       <div className="overflow-x-auto">
 //         <table className="w-full table-fixed border-collapse text-sm whitespace-nowrap">
 //           <thead>
-//             <tr className="bg-ad-purple text-white">
+//             <tr className="bg-ad-purple text-white ad-thead">
 //               <th className="w-10 border border-ad-purple-dark px-2 py-2 text-left">
 //                 <input
 //                   type="checkbox"
@@ -1897,7 +1897,7 @@
 //                 <th className="w-20 border border-ad-purple-dark px-2 py-2 text-left font-medium">Bank</th>
 //               ) : null}
 //               <th className="w-24 border border-ad-purple-dark px-2 py-2 text-left font-medium">Category</th>
-//               <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
+//               <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Notes</th>
 //               {isExpense ? (
 //                 <>
 //                   <th className="w-16 border border-ad-purple-dark px-2 py-2 text-left font-medium">GST</th>
@@ -1918,13 +1918,13 @@
 //           <tbody>
 //             {loading && !isDeletedView ? (
 //               <tr>
-//                 <td colSpan={12} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+//                 <td colSpan={12} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
 //                   Loading…
 //                 </td>
 //               </tr>
 //             ) : paged.length === 0 ? (
 //               <tr>
-//                 <td colSpan={12} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+//                 <td colSpan={12} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
 //                   {isDeletedView ? "No deleted entries found." : "No entries found."}
 //                 </td>
 //               </tr>
@@ -1936,7 +1936,7 @@
 //                 const attachmentUrl = isIncome ? incomeRow.incomeImage : expenseRow.expenseImage;
 //                 return (
 //                   <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-//                     <td className="border border-gray-300 px-2 py-2 text-left">
+//                     <td className="ad-td border border-gray-300 px-2 py-2 text-left">
 //                       <input
 //                         type="checkbox"
 //                         checked={selected.has(row._id)}
@@ -1978,7 +1978,7 @@
 //                         {decoded.subcategory}
 //                       </div>
 //                     </td>
-//                     <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words">{row.notes || ""}</td>
+//                     <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words">{row.notes || ""}</td>
 //                     {isExpense ? (
 //                       <>
 //                         <td className="overflow-hidden text-ellipsis border border-gray-300 px-2 py-2 text-left">
@@ -2037,7 +2037,7 @@
 //               key={p}
 //               type="button"
 //               onClick={() => setPage(p)}
-//               className={`h-7 w-7 border text-xs font-medium ${page === p
+//               className={`h-7 w-7 border text-xs font-medium ad-pg ${page === p
 //                 ? "border-ad-green bg-ad-green text-white"
 //                 : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
 //                 }`}
@@ -2667,41 +2667,41 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
                 Assign to Invoice
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
                 Total Balance
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
                 Account Name
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">
                 Account Number
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Interac</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Delete</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Interac</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Delete</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={7} className="ad-td border border-gray-300 px-3 py-4 text-center text-gray-500">
                   Loading banks…
                 </td>
               </tr>
             ) : draft.length === 0 ? (
               <tr>
-                <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                <td colSpan={7} className="ad-td border border-gray-300 px-3 py-4 text-center text-gray-500">
                   No bank accounts yet.
                 </td>
               </tr>
             ) : (
               draft.map((row, idx) => (
                 <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     <label className="inline-flex cursor-pointer items-center gap-2 font-bold uppercase">
                       <input
                         type="radio"
@@ -2713,7 +2713,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
                       {row.BankName}
                     </label>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     <select
                       value={row.status}
                       onChange={(e) =>
@@ -2728,10 +2728,10 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
                       ))}
                     </select>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     {row.totalBalance ?? row.openingBalance ?? 0}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     <input
                       type="text"
                       value={row.AccountName}
@@ -2739,7 +2739,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
                       className={tableInputClass}
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     <input
                       type="text"
                       value={row.AccountNumber}
@@ -2747,7 +2747,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
                       className={tableInputClass}
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     <input
                       type="email"
                       value={row.Interac}
@@ -2755,7 +2755,7 @@ function BankAccountsPage({ initialShowForm = false, title = "Manage Banks" }: A
                       className={tableInputClass}
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     <button
                       type="button"
                       onClick={async () => {
@@ -3304,7 +3304,7 @@ function LedgerPage({
   // (checkbox + Date + vendor/label + Amount + Category + Notes + Clip,
   // plus the income-only / expense-only / deleted-only columns).
   const columnCount =
-    7 + (isIncome ? 2 : 0) + (isExpense ? 3 : 0) + (isDeletedView ? 1 : 0);
+    8 + (isIncome ? 2 : 0) + (isExpense ? 3 : 0) + (isDeletedView ? 1 : 0);
  
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -3552,7 +3552,7 @@ function LedgerPage({
 
   return (
     <AdminPage
-      title={isDeletedView ? `Deleted ${title}` : title}
+      title={isDeletedView ? `Deleted ${title}` : showForm ? (editingId != null ? "Edit Expenses" : `Add New ${title}`) : title}
       headerAction={
         !showForm && !showSearchCard && !isDeletedView ? (
           <AddNewButton onClick={openAdd} />
@@ -3572,6 +3572,11 @@ function LedgerPage({
           <CompactFormPanel
             footer={
               <CompactFormFooter
+                message={
+                  editingId != null
+                    ? `You are changing this ${isExpense ? "expense" : "entry"}`
+                    : `You are adding new ${isExpense ? "expenses" : "income"}`
+                }
                 actionLabel={
                   saving
                     ? editingId != null
@@ -3896,7 +3901,7 @@ function LedgerPage({
       {isDeletedView && (
         <AdminDeletedBanner count={variantStash.length} entityLabel="entries" />
       )}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
@@ -3951,12 +3956,12 @@ function LedgerPage({
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -3976,8 +3981,8 @@ function LedgerPage({
       <div className="overflow-x-auto">
         <table className="w-full min-w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -3985,49 +3990,52 @@ function LedgerPage({
                   className="accent-white"
                 />
               </th>
-              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+              <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                 Date
               </th>
-              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+              <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                 {vendorLabel}
               </th>
-              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+              <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                 Amount
               </th>
               {isIncome ? (
-                <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                   Payment Mode
                 </th>
               ) : null}
               {isIncome ? (
-                <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                   Bank
                 </th>
               ) : null}
-              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+              <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                 Category
               </th>
-              <th className="w-full border border-ad-purple-dark px-3 py-2 text-left font-medium">
+              <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                Sub-Category
+              </th>
+              <th className="ad-th w-full border border-ad-purple-dark px-3 py-2 text-left font-medium">
                 Notes
               </th>
               {isExpense ? (
                 <>
-                  <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                  <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                     GST
                   </th>
-                  <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                  <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                     Bill Number
                   </th>
-                  <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                  <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                     By Cheque
                   </th>
                 </>
               ) : null}
-              <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+              <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                 {isIncome ? "Attachment" : "Clip"}
               </th>
               {isDeletedView ? (
-                <th className="w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
+                <th className="ad-th w-[1%] whitespace-nowrap border border-ad-purple-dark px-2 py-2 text-left font-medium">
                   Restore
                 </th>
               ) : null}
@@ -4038,7 +4046,7 @@ function LedgerPage({
               <tr>
                 <td
                   colSpan={columnCount}
-                  className="border border-gray-300 px-3 py-4 text-left text-gray-500"
+                  className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500"
                 >
                   Loading…
                 </td>
@@ -4047,7 +4055,7 @@ function LedgerPage({
               <tr>
                 <td
                   colSpan={columnCount}
-                  className="border border-gray-300 px-3 py-4 text-left text-gray-500"
+                  className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500"
                 >
                   {isDeletedView ? "No deleted entries found." : "No entries found."}
                 </td>
@@ -4063,7 +4071,7 @@ function LedgerPage({
                     key={row._id}
                     className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}
                   >
-                    <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                    <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                       <input
                         type="checkbox"
                         checked={selected.has(row._id)}
@@ -4071,7 +4079,7 @@ function LedgerPage({
                         className="accent-ad-purple"
                       />
                     </td>
-                    <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                    <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                       <button
                         type="button"
                         onClick={() => openEdit(row)}
@@ -4081,42 +4089,40 @@ function LedgerPage({
                         {formatDisplayDate(row.date)}
                       </button>
                     </td>
-                    <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left uppercase">
+                    <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left uppercase">
                       {row.vendor}
                     </td>
-                    <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                    <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                       {row.amount % 1 === 0 ? row.amount : row.amount.toFixed(2)}
                     </td>
                     {isIncome ? (
-                      <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                      <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                         {incomeRow.paymentMode || ""}
                       </td>
                     ) : null}
                     {isIncome ? (
-                      <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                      <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                         {incomeRow.bank || ""}
                       </td>
                     ) : null}
-                    <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
-                      <div className="whitespace-nowrap font-bold leading-tight">
-                        {decoded.category}
-                      </div>
-                      <div className="whitespace-nowrap text-xs text-gray-500">
-                        {decoded.subcategory}
-                      </div>
+                    <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                      {decoded.category}
                     </td>
-                    <td className="border border-gray-300 px-4 py-2 text-left align-top whitespace-normal break-words">
+                    <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                      {decoded.subcategory}
+                    </td>
+                    <td className="ad-td border border-gray-300 px-4 py-2 text-left align-top whitespace-normal break-words">
                       {row.notes || ""}
                     </td>
                     {isExpense ? (
                       <>
-                        <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                        <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                           {expenseRow.gst ? `${expenseRow.gst} CAD` : "No"}
                         </td>
-                        <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                        <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                           {expenseRow.billNumber || "—"}
                         </td>
-                        <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                        <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                           {expenseRow.byCheque
                             ? expenseRow.account
                               ? `Yes (${expenseRow.account})`
@@ -4125,7 +4131,7 @@ function LedgerPage({
                         </td>
                       </>
                     ) : null}
-                    <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                    <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                       {attachmentUrl ? (
                         <span className="inline-flex items-center gap-2">
                           <ClipImageHover
@@ -4139,7 +4145,7 @@ function LedgerPage({
                       )}
                     </td>
                     {isDeletedView ? (
-                      <td className="whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
+                      <td className="ad-td whitespace-nowrap border border-gray-300 px-4 py-2 text-left">
                         <button
                           type="button"
                           onClick={() => handleRestore([row._id])}
@@ -4156,7 +4162,7 @@ function LedgerPage({
           </tbody>
         </table>
       </div>
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary
           total={filtered.length}
           page={page}
@@ -4168,7 +4174,7 @@ function LedgerPage({
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

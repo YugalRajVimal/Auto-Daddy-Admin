@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import AttachImageCheckbox from "../../../components/admin/AttachImageCheckbox";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
+import { TipPreview } from "../../../components/admin/ContentPreviews";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import ClipImageHover from "../../../components/admin/ClipImageHover";
 import { useAdminDeletedView } from "../../../hooks/useAdminDeletedView";
@@ -542,9 +543,10 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
 
   return (
     <AdminPage
-      title={isDeletedView ? "Deleted Today's Tips" : "Today's Tip"}
+      headerClassName={showForm ? "lg:pl-[28%]" : undefined}
+      title={isDeletedView ? "Deleted Thoughts of the Day" : "Thought of the Day"}
       headerAction={
-        !showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined
+        !showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} label="New Note" /> : undefined
       }
       between={
         showSearchCard ? (
@@ -558,6 +560,18 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
           />
         ) : showForm ? (
           <CompactFormPanel
+            splitPreview={
+              <TipPreview
+                imageUrl={
+                  previewImageUrl
+                    ? previewImageUrl.startsWith("http") || previewImageUrl.startsWith("/") || previewImageUrl.startsWith("blob:")
+                      ? previewImageUrl
+                      : `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + "/" : "/"}${previewImageUrl.replace(/^\/+/, "")}`
+                    : null
+                }
+                text={note ?? ""}
+              />
+            }
             footer={
               <CompactFormFooter
                 message={
@@ -591,7 +605,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   <span className="text-xs text-red-600 block mt-1">{dateError}</span>
                 )}
               </CompactField>
-              <CompactField label="Subject" required className={compactFixedFieldWidth}>
+              <CompactField label="Title" required className={compactFixedFieldWidth}>
                 <div style={{position: "relative"}}>
                   <input
                     ref={subjectInputRef}
@@ -622,7 +636,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 <FormFieldError message={fieldErrors.subject?.message} />
               </CompactField>
        
-              <CompactField label="Note" className="min-w-0 flex-1">
+              <CompactField label="Description" className="min-w-0 flex-1">
                 <CompactAutoGrowTextarea
                   value={note}
                   onChange={(e) => setValue("note", e.target.value, { shouldValidate: false })}
@@ -632,7 +646,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
             </CompactFormRow>
             <CompactFormRow className="items-start justify-start gap-4">
               <AttachImageCheckbox
-                label="Attach Image"
+                variant="field"
+                label="Image File"
                 checked={attachImage}
                 onCheckedChange={setAttachImage}
                 file={imageFile}
@@ -703,13 +718,28 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
         ) : undefined
       }
     >
+      {!showForm && (
+      <>
       {isDeletedView && (
         <AdminDeletedBanner count={deletedStash.length} entityLabel="thoughts" />
       )}
 
       {/* Filter/Toolbar */}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
+          {!isDeletedView ? (
+            <button
+              type="button"
+              onClick={() => {
+                const row = displayNotes.find((n) => getRowKey(n) === Array.from(selected)[0]);
+                if (row) openEdit(row);
+              }}
+              disabled={selected.size !== 1}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Update
+            </button>
+          ) : null}
           {!isDeletedView ? (
             <button
               type="button"
@@ -752,12 +782,12 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -778,8 +808,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -787,17 +817,17 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "26%" }}>Subject</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "36%" }}>Notes</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Likes</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Image</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "26%" }}>Title</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "36%" }}>Description</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Likes</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Image</th>
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={6} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted thoughts found." : "No thoughts found."}
                 </td>
               </tr>
@@ -806,7 +836,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                 key={getRowKey(row)}
                 className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}
               >
-                <td className="border border-gray-300 px-2 py-2 text-left">
+                <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={selected.has(getRowKey(row))}
@@ -814,7 +844,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                     className="accent-ad-purple"
                   />
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-left">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                   <button
                     type="button"
                     onClick={() => openEdit(row)}
@@ -823,10 +853,10 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
                     {new Date(row.date).toISOString().slice(0, 10)}
                   </button>
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-left  whitespace-normal break-words min-w-[200px]" style={{ width: "26%" }}>{row.subject}</td>
-                <td className="border border-gray-300 px-3 py-2 text-left  whitespace-normal break-words min-w-[240px]" style={{ width: "36%" }}>{row.notes}</td>
-                <td className="border border-gray-300 px-3 py-2 text-left">{row.likes ?? 0}</td>
-                <td className="border border-gray-300 px-3 py-2 text-left">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left  whitespace-normal break-words min-w-[200px]" style={{ width: "26%" }}>{row.subject}</td>
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left  whitespace-normal break-words min-w-[240px]" style={{ width: "36%" }}>{row.notes}</td>
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.likes ?? 0}</td>
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                   {(row.imageUrl || row.image) ? (
                     <div className="flex flex-col items-start gap-1">
                       <ClipImageHover
@@ -902,7 +932,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
       )}
 
       {/* Pagination */}
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -910,7 +940,7 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
@@ -926,6 +956,8 @@ export default function ThoughtOfDayPage({ initialShowForm = false }: ThoughtOfD
           activeLabel="Active Tips"
         />
       </div>
+      </>
+      )}
     </AdminPage>
   );
 }

@@ -2,9 +2,11 @@ import type { ReactNode } from "react";
 import { twMerge } from "tailwind-merge";
 import { ContentPanel } from "./ContentPanel";
 
-export const adminPageTitleClass = "text-xl font-bold text-ad-green md:text-2xl";
+export const adminPageTitleClass = "text-center text-xl font-bold text-ad-green md:text-[26px] md:leading-tight";
 
-export const adminPageHeaderClass = "mb-3 flex items-center justify-between gap-3";
+/** Centered green title with the action button pinned to the right edge (md+). */
+export const adminPageHeaderClass =
+  "relative mb-4 flex flex-col items-center gap-2 md:min-h-[46px] md:justify-center";
 
 type AdminPageProps = {
   title: string;
@@ -63,14 +65,18 @@ export default function AdminPage({
               <button
                 type="button"
                 onClick={onTitleClick}
-                className={`text-left ${adminPageTitleClass} hover:underline`}
+                className={`${adminPageTitleClass} hover:underline`}
               >
                 {title}
               </button>
             ) : (
               <h1 className={adminPageTitleClass}>{title}</h1>
             )}
-            {headerAction}
+            {headerAction != null && (
+              <div className="self-end md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2 md:self-auto">
+                {headerAction}
+              </div>
+            )}
           </div>
         )}
         {between}
@@ -80,14 +86,14 @@ export default function AdminPage({
   );
 }
 
-export function AddNewButton({ onClick }: { onClick: () => void }) {
+export function AddNewButton({ onClick, label = "+ Add New" }: { onClick: () => void; label?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="shrink-0 rounded bg-ad-green px-4 py-2 text-sm font-bold text-white hover:bg-ad-green-dark"
+      className="shrink-0 border border-ad-green-dark bg-ad-green px-4 py-1 text-base font-semibold text-white shadow-sm hover:bg-ad-green-dark md:px-6 md:text-[17px]"
     >
-      Add New
+      {label}
     </button>
   );
 }

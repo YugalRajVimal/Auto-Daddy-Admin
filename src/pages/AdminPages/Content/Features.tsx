@@ -503,7 +503,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
       {isDeletedView && (
         <AdminDeletedBanner count={deletedStash.length} entityLabel="features" />
       )}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
           {!isDeletedView ? (
             <button
@@ -550,12 +550,12 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -578,8 +578,8 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
         ) : (
           <table className="w-full border-collapse text-sm whitespace-nowrap">
             <thead>
-              <tr className="bg-ad-purple text-white">
-                <th className="border border-ad-purple-dark px-2 py-2 text-left">
+              <tr className="bg-ad-purple text-white ad-thead">
+                <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={paged.length > 0 && selected.size === paged.length}
@@ -587,23 +587,23 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                     className="accent-white"
                   />
                 </th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Feature</th>
-                <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
+                <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+                <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">User</th>
+                <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Feature</th>
+                <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
               </tr>
             </thead>
             <tbody>
               {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                  <td colSpan={5} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                     {isDeletedView ? "No deleted features found." : "No features found."}
                   </td>
                 </tr>
               ) : (
                 paged.map((row, idx) => (
                   <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                    <td className="border border-gray-300 px-2 py-2 text-left">
+                    <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                       <input
                         type="checkbox"
                         checked={selected.has(row.id)}
@@ -611,7 +611,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                         className="accent-ad-purple"
                       />
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-left">
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                       <button
                         type="button"
                         onClick={() => !isDeletedView && openEdit(row)}
@@ -621,11 +621,11 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
                         {row.date?.slice(0, 10)}
                       </button>
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-left">
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                       {USER_OPTIONS.find((o) => o.value === row.user)?.label ?? row.user}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.feature}</td>
-                    <td className="border border-gray-300 px-3 py-2 text-left">
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">{row.feature}</td>
+                    <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                       {row.imageUrl ? (
                         <ClipImageHover
                           imageUrl={row.imageUrl}
@@ -643,7 +643,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -651,7 +651,7 @@ export default function FeaturesPage({ initialShowForm = false }: FeaturesPagePr
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

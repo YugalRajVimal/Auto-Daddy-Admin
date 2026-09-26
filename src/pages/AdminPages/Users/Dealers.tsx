@@ -24,6 +24,13 @@ import {
 import { useAdminCityOptions, withSelectedCity } from "../../../hooks/useAdminCityOptions";
 import { adminNotify } from "../../../utils/adminNotify";
 import { FormFieldError } from "../../../lib/validation/formUi";
+import {
+  DetailEditLink,
+  DetailField,
+  DetailGrid,
+  PhotoTile,
+  UserDetailLayout,
+} from "../../../components/admin/UserDetail";
 import { dummyUserFormSchema, type DummyUserFormInput } from "../../../lib/validation/schemas/identity";
 import {
   createDealer,
@@ -99,8 +106,8 @@ export type DummyUserListConfig = {
 // Changed alignment utility classes:
 // tdClass: removed 'text-center', replaced with 'text-left'
 // thClass: removed 'text-center', replaced with 'text-left'
-const tdClass = "border border-gray-300 px-3 py-2 text-left text-sm text-gray-700";
-const thClass = "border border-ad-purple-dark px-3 py-2 text-left font-medium whitespace-nowrap";
+const tdClass = "ad-td border border-gray-300 px-3 py-2 text-left text-sm text-gray-700";
+const thClass = "ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium whitespace-nowrap";
 const linkClass = "text-blue-700 hover:underline bg-transparent border-0 p-0 text-sm cursor-pointer font-medium";
 
 const GREEN_CARD: React.CSSProperties = {
@@ -500,7 +507,7 @@ const ColSelector: React.FC<{ columns: ColumnDef[]; visible: string[]; onChange:
         onClick={() => setOpen((o) => !o)}
         className="flex cursor-pointer items-center gap-1 border-0 bg-gray-600 px-3.5 py-1.5 text-[13px] font-semibold text-white"
       >
-        Select Heading <span className="text-[10px]">▼</span>
+        Heading Bar <span className="text-xs">v</span>
       </button>
       {open && (
         <div className="absolute right-0 top-[110%] z-[200] min-w-[170px] rounded border border-gray-300 bg-white py-1.5 shadow-md">
@@ -546,6 +553,39 @@ function exportCsv(rows: DummyUserRow[], config: DummyUserListConfig, visibleCol
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+function DealerDetail({ row, onEdit, onBack }: { row: DummyUserRow; onEdit: () => void; onBack: () => void }) {
+  const [view, setView] = useState("Business Profile");
+  return (
+    <div>
+      <button type="button" onClick={onBack} className="mb-4 text-base text-[#0000ee] underline">
+        ← Back to Dealers
+      </button>
+      <UserDetailLayout
+        name={row.primaryLabel || row.name}
+        views={["Business Profile"]}
+        view={view}
+        onViewChange={setView}
+        leftExtra={
+          <div className="flex justify-center pt-4">
+            <PhotoTile label="Dealer image" src={row.imageUrl || null} />
+          </div>
+        }
+      >
+        <DetailEditLink onClick={onEdit}>Edit Dealer details</DetailEditLink>
+        <DetailGrid>
+          <DetailField label="Business Name" value={row.primaryLabel} />
+          <DetailField label="Contact Person" value={row.name} />
+          <DetailField label="Phone No." value={row.phone} />
+          <DetailField label="URL" value={row.websiteUrl} />
+          <DetailField label="City" value={row.city} />
+          <DetailField label="Address" value={row.address} />
+          <DetailField label="Email" value={row.email} />
+        </DetailGrid>
+      </UserDetailLayout>
+    </div>
+  );
+}
+
 type DummyUserListPageProps = {
   config: DummyUserListConfig;
 };
@@ -571,6 +611,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
   const [countBFor, setCountBFor] = useState<DummyUserRow | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingRow, setEditingRow] = useState<DummyUserRow | null>(null);
+  const [viewRowId, setViewRowId] = useState<string | null>(null);
 
   const loadRows = useCallback(async () => {
     if (!config.api) return;
@@ -789,18 +830,20 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
     switch (key) {
       case "name":
         return (
-          <td key={key} className={`${tdClass} font-medium`}>
-            <button type="button" onClick={() => openEdit(row)} className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-blue-700 hover:underline">
-              {row.name}
-            </button>
-          </td>
+          <td key={key} className={tdClass}>{row.name}</td>
         );
       case "email":
         return <td key={key} className={tdClass}>{row.email}</td>;
       case "phone":
         return <td key={key} className={tdClass}>{row.phone}</td>;
       case "primary":
-        return <td key={key} className={tdClass}>{row.primaryLabel}</td>;
+        return (
+          <td key={key} className={`${tdClass} font-medium`}>
+            <button type="button" onClick={() => setViewRowId(row._id)} className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-blue-700 hover:underline">
+              {row.primaryLabel || row.name}
+            </button>
+          </td>
+        );
       case "city":
         return <td key={key} className={tdClass}>{row.city}</td>;
       case "address":
@@ -882,6 +925,22 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
     (c) => (viewMode === "active" ? visibleCols.includes(c.key) : config.defaultVisible.includes(c.key)) && c.key !== "categories"
   );
 
+  const viewRow = viewRowId ? allRows.find((r) => r._id === viewRowId) : undefined;
+  if (viewRow) {
+    return (
+      <AdminPage title="User - Dealer Address" noPanel>
+        <DealerDetail
+          row={viewRow}
+          onBack={() => setViewRowId(null)}
+          onEdit={() => {
+            setViewRowId(null);
+            openEdit(viewRow);
+          }}
+        />
+      </AdminPage>
+    );
+  }
+
   return (
     <>
       {countAFor && <CountModal row={countAFor} label={config.countALabel} count={countAFor.countA} onClose={() => setCountAFor(null)} />}
@@ -917,7 +976,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
           </div>
         )}
 
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
           <div className="flex flex-wrap gap-1">
             {viewMode === "active" && (
               <>
@@ -966,12 +1025,12 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
                 showSearchCard ? "bg-gray-700" : "bg-gray-500"
               }`}
             >
-              Filters
+              Search
             </button>
           </div>
         </div>
 
-        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
           <span>Show</span>
           <select
             value={pageSize}
@@ -993,8 +1052,8 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm whitespace-nowrap">
             <thead>
-              <tr className="bg-ad-purple text-white">
-                <th className="border border-ad-purple-dark px-2 py-2 text-left">
+              <tr className="bg-ad-purple text-white ad-thead">
+                <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={allPageSel}
@@ -1020,13 +1079,13 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+                  <td colSpan={visibleColumns.length + 2} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
                     Loading…
                   </td>
                 </tr>
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={visibleColumns.length + 2} className="border border-gray-300 px-3 py-8 text-left text-gray-500">
+                  <td colSpan={visibleColumns.length + 2} className="ad-td border border-gray-300 px-3 py-8 text-left text-gray-500">
                     {viewMode === "deleted" ? `No deleted ${config.title.toLowerCase()}.` : `No ${config.title.toLowerCase()} found.`}
                   </td>
                 </tr>
@@ -1035,7 +1094,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
                   const isSuspended = !!row.isDisabled;
                   return (
                     <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                      <td className="border border-gray-300 px-2 py-2 text-left">
+                      <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                         <input type="checkbox" checked={selectedRows.has(row._id)} onChange={() => toggleRow(row._id)} className="accent-ad-purple" />
                       </td>
                       {visibleColumns.map((c) => renderCell(row, c.key))}
@@ -1074,7 +1133,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
           </table>
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between ad-pager">
           <TableEntriesSummary total={filtered.length} page={currentPage} pageSize={pageSize} />
           <div className="flex gap-1">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -1082,7 +1141,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
                 key={p}
                 type="button"
                 onClick={() => setCurrentPage(p)}
-                className={`h-7 w-7 border text-xs font-medium ${
+                className={`h-7 w-7 border text-xs font-medium ad-pg ${
                   currentPage === p ? "border-ad-green bg-ad-green text-white" : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
                 }`}
               >
@@ -1115,7 +1174,7 @@ function DummyUserListPage({ config }: DummyUserListPageProps) {
 // ---------- Dealers config wired to the live API ----------
 
 const DEALERS_CONFIG: DummyUserListConfig = {
-  title: "Dealers",
+  title: "User - Dealer Address",
   deletedTitle: "Deleted Dealers",
   addLabel: "New Dealer",
   roleLabel: "dealer",
@@ -1129,33 +1188,27 @@ const DEALERS_CONFIG: DummyUserListConfig = {
   countBLabel: "Leads",
   exportFilePrefix: "dealers",
   columns: [
-    { key: "name", label: "Name" },
-    { key: "email", label: "Email" },
+    { key: "primary", label: "Agency Name" },
     { key: "phone", label: "Phone" },
-    { key: "primary", label: "Dealership" },
     { key: "city", label: "City" },
+    { key: "name", label: "Contact Person" },
     { key: "address", label: "Address" },
-    // { key: "categories", label: "Categories" }, // removed
-    { key: "websiteUrl", label: "Website URL" },
+    { key: "websiteUrl", label: "URL" },
     { key: "image", label: "Image" },
+    { key: "email", label: "Email" },
     { key: "date", label: "Date" },
     { key: "countA", label: "Listings" },
     { key: "countB", label: "Leads" },
     { key: "status", label: "Status" },
   ],
   defaultVisible: [
-    "name",
-    "email",
-    "phone",
     "primary",
+    "phone",
     "city",
+    "name",
     "address",
-    // "categories", // removed
     "websiteUrl",
     "image",
-    "date",
-    "countA",
-    "countB",
     "status",
   ],
   initialData: [], // unused when `api` is set

@@ -1,5 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap") layer(base);
-@import url("https://fonts.googleapis.com/css2?family=Pacifico&family=Georgia:ital,wght@0,400;0,700;1,400&display=swap") layer(base);
+@import url("https://fonts.googleapis.com/css2?family=Pacifico&display=swap") layer(base);
 
 @import "tailwindcss";
 
@@ -1259,4 +1259,310 @@ input.shop-compact-input[type="time"] {
 
 .owner-page-body table tbody tr:hover {
   background-color: #fbf2fb;
+}
+
+/* ---------------------------------------------------------------------------
+   Admin portal theme.
+   PortalShell adds `admin-portal` to <body> while the admin panel is mounted, so
+   these overrides never touch the shop-owner / car-owner portals. Tailwind v4
+   utilities read the palette from CSS variables, so re-pointing the variables
+   here re-skins every admin page (and popups rendered outside the shell) at once.
+   --------------------------------------------------------------------------- */
+body.admin-portal {
+  --color-ad-purple: #99009c;
+  --color-ad-purple-dark: #6d006f;
+  --color-ad-green: #008000;
+  --color-ad-green-dark: #006400;
+  --color-ad-green-light: #ccffcc;
+  --color-ad-form-bg: #ccffcc;
+  --color-ad-form-border: #7cc47c;
+  --color-ad-form-save: #6b9e2c;
+  background: #ffffff;
+}
+
+.admin-portal .bg-ad-app-bg,
+body.admin-portal .bg-ad-app-bg {
+  background: #ffffff;
+}
+
+/* Admin list tables: purple header, grey/white zebra rows, visible column rules. */
+.admin-portal .ad-thead {
+  background-color: var(--color-ad-purple);
+}
+
+.admin-portal .ad-th {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+  border-color: #b562b8;
+}
+
+.admin-portal .ad-td {
+  font-size: 14px;
+  color: #222222;
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+  border-color: #8e9094;
+}
+
+.admin-portal .ad-th input[type="checkbox"],
+.admin-portal .ad-td input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-portal tr.bg-gray-100 {
+  background-color: #d5d7db;
+}
+
+/* Page-local list toolbars, "Show N entries" row and pagination (markers added to the admin pages). */
+.admin-portal .ad-toolbar {
+  background: #bcbdc1;
+  border: 1px solid #a9aaae;
+  padding: 0.6rem 2.75rem;
+  gap: 0.5rem;
+}
+
+.admin-portal .ad-toolbar button {
+  background: #5b6165;
+  color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 2px;
+  padding: 0.25rem 1.2rem;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.admin-portal .ad-toolbar button:hover:not(:disabled) {
+  background: #464b4f;
+}
+
+.admin-portal .ad-toolbar button.bg-ad-green {
+  background: #c9f7c6;
+  color: #2d6a2d;
+}
+
+.admin-portal .ad-toolbar button.bg-ad-green:hover:not(:disabled) {
+  background: #b4efb0;
+}
+
+.admin-portal .ad-toolbar input[type="text"],
+.admin-portal .ad-toolbar input:not([type]),
+.admin-portal .ad-toolbar input[type="search"] {
+  height: 32px;
+  min-width: 210px;
+  padding: 0 0.6rem;
+  font-size: 13px;
+}
+
+.admin-portal .ad-entries {
+  font-size: 15px;
+  color: #333333;
+  margin: 0.9rem 0 0.9rem 3.75rem;
+}
+
+.admin-portal .ad-entries select {
+  font-size: 14px;
+  padding: 1px 4px;
+}
+
+.admin-portal .ad-pager {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.admin-portal .ad-pager > div {
+  order: -1;
+}
+
+.admin-portal .ad-pager > p {
+  order: 1;
+  margin-right: auto;
+  padding-top: 0.45rem;
+  font-size: 13px;
+  color: #666666;
+}
+
+.admin-portal .ad-pager > button:last-child {
+  order: 2;
+  font-size: 16px;
+  text-decoration: underline;
+  color: #1a1ad6;
+}
+
+.admin-portal .ad-pg {
+  width: 2.1rem;
+  height: 2rem;
+  font-size: 14px;
+  font-weight: 500;
+  border-color: #008000;
+  color: #008000;
+  background: #ffffff;
+}
+
+.admin-portal .ad-pg.bg-ad-green {
+  background: #008000;
+  color: #ffffff;
+}
+
+/* Create / edit popups and form footers. */
+.admin-portal .ad-form-footer {
+  background: #fdf9d8;
+  border-top: 0;
+}
+
+.admin-portal .ad-modal-card .ad-form-footer {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #ffffff;
+  padding: 1.4rem 2rem 1.6rem;
+}
+
+.admin-portal .ad-modal-card .ad-form-footer > div:empty {
+  display: none;
+}
+
+.admin-portal .ad-modal-card .ad-form-msg {
+  text-align: left;
+  font-size: 16px;
+}
+
+.admin-portal .ad-modal-card .ad-form-footer .text-gray-700 {
+  font-size: 16px;
+  color: #111111;
+}
+
+.admin-portal .ad-modal-card .ad-form-save {
+  font-size: 20px;
+  padding: 0.25rem 2rem;
+}
+
+.admin-portal .ad-form-msg {
+  background: transparent;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 15px;
+  color: #1a1ad6;
+}
+
+.admin-portal .ad-form-save {
+  background: #008000;
+  border-radius: 0;
+  padding: 0.25rem 1.8rem;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.admin-portal .ad-form-save > span {
+  display: none;
+}
+
+.admin-portal .ad-modal-card label {
+  color: #111111;
+  font-size: 14px;
+}
+
+.admin-portal .ad-modal-card input:not([type="checkbox"]):not([type="radio"]),
+.admin-portal .ad-modal-card select,
+.admin-portal .ad-modal-card textarea {
+  border-color: #c3d9c3;
+  box-shadow: 1px 2px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Form on the left (grey panel) + live preview on the right, used by the content pages. */
+.admin-portal .ad-split-left [class*="flex-wrap"],
+.admin-portal .ad-split-left .grid {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.25rem;
+}
+
+.admin-portal .ad-split-left .ad-field {
+  width: 100% !important;
+  flex: none !important;
+}
+
+.admin-portal .ad-split-left label {
+  font-size: 15px;
+  font-weight: 400;
+  color: #111111;
+}
+
+.admin-portal .ad-split-left input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.admin-portal .ad-split-left select {
+  height: 42px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #9a9a9a;
+  background: #ffffff;
+  padding: 0 12px;
+  font-size: 15px;
+}
+
+.admin-portal .ad-split-left textarea {
+  min-height: 110px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #9a9a9a;
+  background: #ffffff;
+  padding: 8px 12px;
+  font-size: 15px;
+}
+
+.admin-portal .ad-split-left .react-datepicker-wrapper {
+  width: 100%;
+}
+
+.admin-portal .ad-split-left .ad-form-footer {
+  display: flex !important;
+  justify-content: flex-start;
+  background: transparent;
+  border: 0;
+  padding: 1.75rem 0 0;
+}
+
+.admin-portal .ad-split-left .ad-form-footer > div:empty,
+.admin-portal .ad-split-left .ad-form-msg {
+  display: none;
+}
+
+.admin-portal .ad-split-left .ad-form-save {
+  background: #6b9e2c;
+}
+
+/* The revised admin layout keeps the shell close to the window edges (≈2% margin). */
+body.admin-portal #root > .min-h-screen {
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+.admin-portal .ad-modal-card .ad-field input:not([type="checkbox"]):not([type="radio"]),
+.admin-portal .ad-modal-card .ad-field select {
+  height: 36px;
+  font-size: 14px;
+  padding: 0 10px;
+}
+
+.admin-portal .ad-modal-card label {
+  font-size: 14px;
+}
+
+/* Inline (non-popup) mint forms such as the expense entry strip. */
+.admin-portal .ad-field > label {
+  font-size: 14px;
+  font-weight: 400;
+  color: #111111;
+}
+
+.admin-portal .ad-field input:not([type="checkbox"]):not([type="radio"]),
+.admin-portal .ad-field select {
+  height: 36px;
+  font-size: 14px;
 }

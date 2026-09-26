@@ -776,7 +776,7 @@
 //                     <col style={{ width: "36px" }} /> {/* X icon column */}
 //                   </colgroup>
 //                   <thead>
-//                     <tr className="bg-ad-purple text-white">
+//                     <tr className="bg-ad-purple text-white ad-thead">
 //                       <th className="border-b border-ad-purple-dark px-3 py-3 text-left font-semibold">Item</th>
 //                       <th className="border-b border-ad-purple-dark px-3 py-3 text-left font-semibold">Description</th>
 //                       <th className="border-b border-ad-purple-dark px-3 py-3 text-center font-semibold">Unit Type</th>
@@ -1016,7 +1016,7 @@
 //             </button>
 //           </div>
 
-//           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+//           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
 //             <div className="flex flex-wrap gap-1">
 //               {viewMode === "active" ? (
 //                 <>
@@ -1049,7 +1049,7 @@
 //             </div>
 //           </div>
 
-//           <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+//           <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
 //             <span>Show</span>
 //             <select
 //               value={entriesPerPage}
@@ -1066,8 +1066,8 @@
 //           <div className="overflow-x-auto">
 //             <table className="w-full border-collapse text-sm whitespace-nowrap">
 //               <thead>
-//                 <tr className="bg-ad-purple text-white">
-//                   <th className="border border-ad-purple-dark px-2 py-2 text-left">
+//                 <tr className="bg-ad-purple text-white ad-thead">
+//                   <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
 //                     <input
 //                       type="checkbox"
 //                       checked={paged.length > 0 && selected.size === paged.length}
@@ -1075,33 +1075,33 @@
 //                       className="accent-white"
 //                     />
 //                   </th>
-//                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Invoice</th>
-//                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-//                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Client</th>
-//                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Subtotal</th>
-//                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">GST</th>
-//                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Amount</th>
-//                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
-//                   <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" />
+//                   <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Invoice</th>
+//                   <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+//                   <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Client</th>
+//                   <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Subtotal</th>
+//                   <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">GST</th>
+//                   <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Amount</th>
+//                   <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+//                   <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium" />
 //                 </tr>
 //               </thead>
 //               <tbody>
 //                 {loading ? (
 //                   <tr>
-//                     <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+//                     <td colSpan={9} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
 //                       Loading...
 //                     </td>
 //                   </tr>
 //                 ) : paged.length === 0 ? (
 //                   <tr>
-//                     <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+//                     <td colSpan={9} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
 //                       No invoices found.
 //                     </td>
 //                   </tr>
 //                 ) : (
 //                   paged.map((row, idx) => (
 //                     <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-//                       <td className="border border-gray-300 px-2 py-2 text-left">
+//                       <td className="ad-td border border-gray-300 px-2 py-2 text-left">
 //                         <input
 //                           type="checkbox"
 //                           checked={selected.has(row._id)}
@@ -1109,7 +1109,7 @@
 //                           className="accent-ad-purple"
 //                         />
 //                       </td>
-//                       <td className="border border-gray-300 px-3 py-2 text-left">
+//                       <td className="ad-td border border-gray-300 px-3 py-2 text-left">
 //                         <button
 //                           type="button"
 //                           onClick={() => setViewingInvoice(row)}
@@ -1126,15 +1126,15 @@
 //                           <div className="text-xs text-red-500 mt-0.5">{row._id}</div>
 //                         )} */}
 //                       </td>
-//                       <td className="border border-gray-300 px-3 py-2 text-left">
+//                       <td className="ad-td border border-gray-300 px-3 py-2 text-left">
 //                         {new Date(row.dateOfIssue).toLocaleDateString("en-CA", { day: "2-digit", month: "2-digit", year: "numeric" })}
 //                       </td>
-//                       <td className="border border-gray-300 px-3 py-2 text-left">{row.client}</td>
-//                       <td className="border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.subtotal)}</td>
-//                       <td className="border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.gst)}</td>
-//                       <td className="border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.invoiceTotal)}</td>
-//                       <td className="border border-gray-300 px-3 py-2 text-left">{row.status}</td>
-//                       <td className="border border-gray-300 px-3 py-2 text-left">
+//                       <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.client}</td>
+//                       <td className="ad-td border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.subtotal)}</td>
+//                       <td className="ad-td border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.gst)}</td>
+//                       <td className="ad-td border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.invoiceTotal)}</td>
+//                       <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.status}</td>
+//                       <td className="ad-td border border-gray-300 px-3 py-2 text-left">
 //                         <button
 //                           type="button"
 //                           onClick={() => openEdit(row)}
@@ -2128,7 +2128,7 @@ export default function InvoicesPage() {
                     <col style={{ width: "36px" }} /> {/* X icon column */}
                   </colgroup>
                   <thead>
-                    <tr className="bg-ad-purple text-white">
+                    <tr className="bg-ad-purple text-white ad-thead">
                       <th className="border-b border-ad-purple-dark px-3 py-3 text-left font-semibold">Item</th>
                       <th className="border-b border-ad-purple-dark px-3 py-3 text-left font-semibold">Description</th>
                       <th className="border-b border-ad-purple-dark px-3 py-3 text-center font-semibold">Unit Type</th>
@@ -2348,9 +2348,7 @@ export default function InvoicesPage() {
       ) : (
         <>
           <div className="mb-3 grid grid-cols-3 items-center gap-3">
-            {/* Use currentHeading state for heading */}
-            <h1 className={`${adminPageTitleClass} justify-self-start`}>{currentHeading}</h1>
-            <div className="relative justify-self-center">
+            <div className="relative justify-self-start">
               <button
                 type="button"
                 onClick={openManage}
@@ -2359,16 +2357,18 @@ export default function InvoicesPage() {
                 <span aria-hidden>⚙</span> Manage Invoice
               </button>
             </div>
+            {/* Use currentHeading state for heading */}
+            <h1 className={`${adminPageTitleClass} justify-self-center`}>{currentHeading}</h1>
             <button
               type="button"
               onClick={openAdd}
-              className="shrink-0 justify-self-end rounded bg-ad-green px-4 py-2 text-sm font-bold text-white hover:bg-ad-green-dark"
+              className="shrink-0 justify-self-end border border-ad-green-dark bg-ad-green px-5 py-1.5 text-lg font-semibold text-white shadow-sm hover:bg-ad-green-dark md:px-7 md:text-xl"
             >
-              + New Invoice
+              + Add New
             </button>
           </div>
 
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
             <div className="flex flex-wrap gap-1">
               {viewMode === "active" ? (
                 <>
@@ -2401,7 +2401,7 @@ export default function InvoicesPage() {
             </div>
           </div>
 
-          <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+          <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
             <span>Show</span>
             <select
               value={entriesPerPage}
@@ -2418,8 +2418,8 @@ export default function InvoicesPage() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm whitespace-nowrap">
               <thead>
-                <tr className="bg-ad-purple text-white">
-                  <th className="border border-ad-purple-dark px-2 py-2 text-left">
+                <tr className="bg-ad-purple text-white ad-thead">
+                  <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={paged.length > 0 && selected.size === paged.length}
@@ -2427,33 +2427,33 @@ export default function InvoicesPage() {
                       className="accent-white"
                     />
                   </th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Invoice</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Client</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Subtotal</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">GST</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Amount</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" />
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Invoice</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Vendor</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Sub Total</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">HST</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Amount</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium" />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                    <td colSpan={9} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                       Loading...
                     </td>
                   </tr>
                 ) : paged.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                    <td colSpan={9} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                       No invoices found.
                     </td>
                   </tr>
                 ) : (
                   paged.map((row, idx) => (
                     <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                      <td className="border border-gray-300 px-2 py-2 text-left">
+                      <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                         <input
                           type="checkbox"
                           checked={selected.has(row._id)}
@@ -2461,7 +2461,7 @@ export default function InvoicesPage() {
                           className="accent-ad-purple"
                         />
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-left">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                         <button
                           type="button"
                           onClick={() => setViewingInvoice(row)}
@@ -2478,14 +2478,14 @@ export default function InvoicesPage() {
                           <div className="text-xs text-red-500 mt-0.5">{row._id}</div>
                         )} */}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-left">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                         {new Date(row.dateOfIssue).toLocaleDateString("en-CA", { day: "2-digit", month: "2-digit", year: "numeric" })}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-left">{row.client}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.subtotal)}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.gst)}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.invoiceTotal)}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-left">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.client}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.subtotal)}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.gst)}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-left">{fmtMoney(row.invoiceTotal)}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                         <span
                           className={
                             row.status === "Paid"
@@ -2505,7 +2505,7 @@ export default function InvoicesPage() {
                           </div>
                         )}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-left">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                         <button
                           type="button"
                           onClick={() => openEdit(row)}

@@ -1,5 +1,5 @@
 import type { ReactNode, TextareaHTMLAttributes } from "react";
-import { Children, useEffect, useRef } from "react";
+import { Children, isValidElement, useEffect, useRef } from "react";
 import { twMerge } from "tailwind-merge";
 import { useFormRevealFocus } from "../shop/ShopAnimated";
 
@@ -118,6 +118,26 @@ export function PanelBottomBorder({
   );
 }
 
+/**
+ * In the admin panel, create/edit forms open as a centred popup (like the revised admin
+ * mockups). The popup title is taken from the footer message ("You are creating a 'City'"
+ * becomes "Create City"), so existing pages need no changes. Other portals keep the inline panel.
+ */
+function isAdminPortal(): boolean {
+  return typeof document !== "undefined" && document.body.classList.contains("admin-portal");
+}
+
+function deriveAdminModalTitle(footer: ReactNode): string | null {
+  if (!isAdminPortal()) return null;
+  if (!isValidElement(footer)) return null;
+  const message = (footer.props as { message?: unknown }).message;
+  if (typeof message !== "string") return null;
+  const match = message.match(/^You are (creating|updating|editing) (?:an?\s+|the\s+)?'?(.+?)'?\.?$/i);
+  if (!match) return null;
+  const verb = match[1].toLowerCase() === "creating" ? "Create" : "Edit";
+  return `${verb} ${match[2].replace(/^'+|'+$/g, "")}`;
+}
+
 export function CompactFormPanel({
   children,
   footer,
@@ -125,6 +145,7 @@ export function CompactFormPanel({
   contentClassName = "min-h-[96px] space-y-4 px-4 py-4",
   focusOnMount = false,
   showBottomBorder = true,
+  splitPreview,
 }: {
   children: ReactNode;
   footer?: ReactNode;
@@ -134,9 +155,55 @@ export function CompactFormPanel({
   focusOnMount?: boolean;
   /** When false, omits the decorative curved bottom border/shadow. */
   showBottomBorder?: boolean;
+  /**
+   * Admin panel only: render the form as a grey panel on the left with this live preview in a
+   * green-bordered panel on the right (instead of a popup). Other portals ignore it.
+   */
+  splitPreview?: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   useFormRevealFocus(focusOnMount, panelRef);
+
+  if (splitPreview !== undefined && isAdminPortal()) {
+    return (
+      <div
+        ref={panelRef}
+        className="mb-10 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(300px,380px)_1fr]"
+      >
+        <div className="ad-split-left rounded-2xl border border-gray-500 bg-[#f4f4f4] px-6 py-6">
+          {children}
+          {footer}
+        </div>
+        <div className="min-h-[560px] overflow-hidden rounded-3xl border border-[#a8d05a] bg-white p-5 sm:p-8">
+          {splitPreview}
+        </div>
+      </div>
+    );
+  }
+
+  const modalTitle = deriveAdminModalTitle(footer);
+
+  if (modalTitle) {
+    return (
+      <div
+        className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-transparent px-3 py-10 sm:py-24"
+        role="dialog"
+        aria-modal="true"
+        aria-label={modalTitle}
+      >
+        <div
+          ref={panelRef}
+          className="ad-modal-card w-max min-w-[min(100%,760px)] max-w-full overflow-hidden rounded-2xl border border-ad-green bg-white shadow-[0_10px_40px_rgba(0,0,0,0.28)] sm:max-w-[920px]"
+        >
+          <h2 className="px-6 py-6 text-center text-xl font-normal text-ad-green sm:text-[26px]">
+            {modalTitle}
+          </h2>
+          <div className="min-h-[200px] space-y-4 bg-ad-form-bg px-5 py-7 sm:px-8">{children}</div>
+          {footer}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -217,7 +284,7 @@ export function CompactField({
   labelClassName?: string;
 }) {
   return (
-    <div className={twMerge("min-w-0 flex-1", className)}>
+    <div className={twMerge("ad-field min-w-0 flex-1", className)}>
       <label className={twMerge("mb-1 block text-xs font-bold text-ad-green-dark", labelClassName)}>
         {label}
         {required ? <span className="text-red-600"> *</span> : null}
@@ -260,7 +327,7 @@ export function CompactFormFooter({
         type={actionType}
         onClick={onSave}
         disabled={saveDisabled}
-        className="inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95 disabled:pointer-events-none disabled:opacity-50"
+        className="ad-form-save inline-flex items-center gap-1.5 rounded bg-ad-form-save px-4 py-1 text-sm font-bold text-white hover:brightness-95 disabled:pointer-events-none disabled:opacity-50"
       >
         {actionLabel}
         <span aria-hidden className="text-base leading-none">
@@ -284,17 +351,17 @@ export function CompactFormFooter({
 
   if (messageCenter) {
     return (
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
+      <div className="ad-form-footer grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-ad-form-border bg-ad-form-required-bg px-3 py-2.5">
         <div />
-        <span className="text-center text-xs font-serif italic text-gray-800">{footerMessage}</span>
+        <span className="ad-form-msg text-center text-xs font-serif italic text-gray-800">{footerMessage}</span>
         <div className="flex justify-end">{actions}</div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-wrap items-stretch justify-between gap-2 border-t border-ad-form-border bg-ad-form-bg">
-      <div className="flex min-w-[180px] flex-1 items-center bg-ad-form-required-bg px-3 py-2.5 text-xs text-gray-800">
+    <div className="ad-form-footer flex flex-wrap items-stretch justify-between gap-2 border-t border-ad-form-border bg-ad-form-bg">
+      <div className="ad-form-msg flex min-w-[180px] flex-1 items-center bg-ad-form-required-bg px-3 py-2.5 text-xs text-gray-800">
         {footerMessage}
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5">{actions}</div>

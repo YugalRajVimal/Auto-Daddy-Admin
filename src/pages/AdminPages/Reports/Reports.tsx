@@ -93,7 +93,7 @@ function CategoryCell({
 }) {
   const labels = categoryLabel(categories, row.category, row.subcategory);
   return (
-    <td className="border border-gray-300 px-3 py-2 text-center align-top">
+    <td className="ad-td border border-gray-300 px-3 py-2 text-center align-top">
       <div className="font-bold leading-tight">{labels.category}</div>
       <div className="text-xs text-gray-600">{labels.subcategory}</div>
     </td>
@@ -103,7 +103,7 @@ function CategoryCell({
 function GroupTotalRow({ colSpan, total }: { colSpan: number; total: number }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="border border-gray-300 px-3 py-2 text-center font-bold">
+      <td colSpan={colSpan} className="ad-td border border-gray-300 px-3 py-2 text-center font-bold">
         Total : {formatReportAmount(total)}
       </td>
     </tr>
@@ -207,11 +207,11 @@ function GroupedLedgerReport({
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
+            <tr className="bg-ad-purple text-white ad-thead">
               {tableHeaders.map((header) => (
                 <th
                   key={header}
-                  className="border border-ad-purple-dark px-3 py-2 text-center font-medium"
+                  className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium"
                 >
                   {header}
                 </th>
@@ -223,7 +223,7 @@ function GroupedLedgerReport({
               <tr>
                 <td
                   colSpan={tableHeaders.length}
-                  className="border border-gray-300 px-3 py-6 text-center text-gray-500"
+                  className="ad-td border border-gray-300 px-3 py-6 text-center text-gray-500"
                 >
                   No records found for the selected filters.
                 </td>
@@ -234,23 +234,23 @@ function GroupedLedgerReport({
                   categoryGroups.map((group) => (
                     <Fragment key={`cat-${group.key}`}>
                       <tr className="bg-gray-300">
-                        <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold uppercase">
+                        <td colSpan={4} className="ad-td border border-gray-300 px-3 py-2 text-center font-bold uppercase">
                           {group.label}
                         </td>
                       </tr>
                       {group.subcategories.map((sub) => (
                         <Fragment key={`sub-${group.key}-${sub.key}`}>
                           <tr>
-                            <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold uppercase">
+                            <td colSpan={4} className="ad-td border border-gray-300 px-3 py-2 text-center font-bold uppercase">
                               {sub.label}
                             </td>
                           </tr>
                           {sub.rows.map((row) => (
                             <tr key={row.id}>
-                              <td className="border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
-                              <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
-                              <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
-                              <td className="border border-gray-300 px-3 py-2 text-center">
+                              <td className="ad-td border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
+                              <td className="ad-td border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
+                              <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
+                              <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                                 {formatReportAmount(row.amount)}
                               </td>
                             </tr>
@@ -265,16 +265,16 @@ function GroupedLedgerReport({
                   vendorGroups.map((group) => (
                     <Fragment key={`vendor-${group.key}`}>
                       <tr className="bg-gray-300">
-                        <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold uppercase">
+                        <td colSpan={4} className="ad-td border border-gray-300 px-3 py-2 text-center font-bold uppercase">
                           {group.label}
                         </td>
                       </tr>
                       {group.rows.map((row) => (
                         <tr key={row.id}>
-                          <td className="border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
                           <CategoryCell categories={categories} row={row as unknown as ReportLedgerRow} />
-                          <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
-                          <td className="border border-gray-300 px-3 py-2 text-center">
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                             {formatReportAmount(row.amount)}
                           </td>
                         </tr>
@@ -287,16 +287,16 @@ function GroupedLedgerReport({
                   projectGroups.map((group) => (
                     <Fragment key={`project-${group.key}`}>
                       <tr className="bg-gray-300">
-                        <td colSpan={4} className="border border-gray-300 px-3 py-2 text-center font-bold">
+                        <td colSpan={4} className="ad-td border border-gray-300 px-3 py-2 text-center font-bold">
                           {group.label}
                         </td>
                       </tr>
                       {group.rows.map((row) => (
                         <tr key={row.id}>
-                          <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
                           <CategoryCell categories={categories} row={row as unknown as ReportLedgerRow} />
-                          <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
-                          <td className="border border-gray-300 px-3 py-2 text-center">
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                             {formatReportAmount(row.amount)}
                           </td>
                         </tr>
@@ -306,10 +306,10 @@ function GroupedLedgerReport({
                   ))}
 
                 <tr className="bg-gray-100">
-                  <td colSpan={3} className="border border-gray-300 px-3 py-2 text-center font-bold">
+                  <td colSpan={3} className="ad-td border border-gray-300 px-3 py-2 text-center font-bold">
                     Grand Total
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center font-bold">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center font-bold">
                     {formatReportAmount(grandTotal)}
                   </td>
                 </tr>
@@ -381,11 +381,11 @@ function GstReportView({
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
+            <tr className="bg-ad-purple text-white ad-thead">
               {["Date", "Type", "Vendor / Source", "Category", "Amount", "GST", "Notes"].map((header) => (
                 <th
                   key={header}
-                  className="border border-ad-purple-dark px-3 py-2 text-center font-medium"
+                  className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium"
                 >
                   {header}
                 </th>
@@ -395,7 +395,7 @@ function GstReportView({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                <td colSpan={7} className="ad-td border border-gray-300 px-3 py-6 text-center text-gray-500">
                   No GST records found for the selected date range.
                 </td>
               </tr>
@@ -407,33 +407,33 @@ function GstReportView({
                   const gstAmount = estimateGstAmount(row.amount);
                   return (
                     <tr key={`${row.ledgerType}-${row.id}`}>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center capitalize">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">{formatDisplayDate(row.date)}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center capitalize">
                         {row.ledgerType === "expenses" ? "Expense" : "Income"}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center uppercase">{row.vendor}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                         <div className="font-bold leading-tight">{labels.category}</div>
                         <div className="text-xs text-gray-600">{labels.subcategory}</div>
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                         {formatReportAmount(row.amount)}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                         {formatReportAmount(gstAmount)}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">{row.notes || ""}</td>
                     </tr>
                   );
                 })}
                 <tr className="bg-gray-100">
-                  <td colSpan={5} className="border border-gray-300 px-3 py-2 text-center font-bold">
+                  <td colSpan={5} className="ad-td border border-gray-300 px-3 py-2 text-center font-bold">
                     Net GST
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center font-bold">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center font-bold">
                     {formatReportAmount(netGst)}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center" />
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center" />
                 </tr>
               </>
             )}
@@ -761,31 +761,31 @@ export default function Reports() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-sm whitespace-nowrap">
                   <thead>
-                    <tr className="bg-ad-purple text-white">
-                      <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Bank / Wallet</th>
-                      <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
-                      <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Total Balance</th>
-                      <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Account Name</th>
-                      <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Account Number</th>
-                      <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Interac</th>
+                    <tr className="bg-ad-purple text-white ad-thead">
+                      <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Bank / Wallet</th>
+                      <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
+                      <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Total Balance</th>
+                      <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Account Name</th>
+                      <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Account Number</th>
+                      <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Interac</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pagedBanks.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="border border-gray-300 px-3 py-4 text-center text-gray-500">
+                        <td colSpan={6} className="ad-td border border-gray-300 px-3 py-4 text-center text-gray-500">
                           No bank records found.
                         </td>
                       </tr>
                     ) : (
                       pagedBanks.map((row: ReportBankRow, idx) => (
                         <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                          <td className="border border-gray-300 px-3 py-2 text-center font-bold uppercase">{row.label}</td>
-                          <td className="border border-gray-300 px-3 py-2 text-center capitalize">{row.status}</td>
-                          <td className="border border-gray-300 px-3 py-2 text-center">{row.totalBalance}</td>
-                          <td className="border border-gray-300 px-3 py-2 text-center">{row.accountName || "—"}</td>
-                          <td className="border border-gray-300 px-3 py-2 text-center">{row.accountNumber || "—"}</td>
-                          <td className="border border-gray-300 px-3 py-2 text-center">{row.interac || "—"}</td>
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-center font-bold uppercase">{row.label}</td>
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-center capitalize">{row.status}</td>
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-center">{row.totalBalance}</td>
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-center">{row.accountName || "—"}</td>
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-center">{row.accountNumber || "—"}</td>
+                          <td className="ad-td border border-gray-300 px-3 py-2 text-center">{row.interac || "—"}</td>
                         </tr>
                       ))
                     )}
@@ -794,7 +794,7 @@ export default function Reports() {
               </div>
 
               {filteredBanks.length > 0 && (
-                <div className="mt-4 flex items-center justify-between">
+                <div className="mt-4 flex items-center justify-between ad-pager">
                   <TableEntriesSummary total={filteredBanks.length} page={page} pageSize={entriesPerPage} />
                   <div className="flex gap-1">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -802,7 +802,7 @@ export default function Reports() {
                       key={p}
                       type="button"
                       onClick={() => setPage(p)}
-                      className={`h-7 w-7 border text-xs font-medium ${
+                      className={`h-7 w-7 border text-xs font-medium ad-pg ${
                         page === p
                           ? "border-ad-green bg-ad-green text-white"
                           : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

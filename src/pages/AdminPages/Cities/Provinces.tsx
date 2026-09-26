@@ -437,7 +437,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
               </div>
             )}
             <CompactFormRow className="items-start">
-              <CompactField label="Province Name" required>
+              <CompactField label="Name" required>
                 <input
                   type="text"
                   className={fieldErrorClass(Boolean(formErrors.name), compactInputClass)}
@@ -445,7 +445,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                 />
                 <FormFieldError message={formErrors.name?.message} />
               </CompactField>
-              <CompactField label="Nickname">
+              <CompactField label="Nick name">
                 <input
                   type="text"
                   className={compactInputClass}
@@ -481,8 +481,21 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
       )}
 
       {/* Toolbar */}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
+          {!isDeletedView && (
+            <button
+              type="button"
+              onClick={() => {
+                const row = provinces.find((p) => selected.has(p._id));
+                if (row) openEdit(row);
+              }}
+              disabled={selected.size !== 1}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Update
+            </button>
+          )}
           {!isDeletedView ? (
             <button
               type="button"
@@ -528,12 +541,12 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -554,8 +567,8 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -564,35 +577,35 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                 />
               </th>
               <th
-                className="border border-ad-purple-dark px-3 py-2 text-left font-medium cursor-pointer select-none group"
+                className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium cursor-pointer select-none group"
                 onClick={() => handleSort("name")}
                 style={{ userSelect: "none" }}
               >
-                Province Name
+                Name Province
                 {renderSortIcon("name")}
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Nickname</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Cities</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium text-center">Nick name</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">City</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={5} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={5} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted provinces found." : "No provinces found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={row._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row._id)}
@@ -600,7 +613,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => openEdit(row)}
@@ -609,11 +622,13 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
                       {row.name}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left italic text-xs">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                     {row.nickName || "—"}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.cities?.length ?? 0}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.status || "Active"}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
+                    <a href="/admin/cities" className="text-blue-700 underline">{row.cities?.length ?? 0}</a>
+                  </td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.status || "Active"}</td>
                 </tr>
               ))
             )}
@@ -622,7 +637,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
       </div>
 
       {/* Pagination */}
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={sorted.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -630,7 +645,7 @@ export default function Provinces({ initialShowForm = false }: ProvincesPageProp
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

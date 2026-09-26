@@ -529,12 +529,12 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
     SHOP_TYPE_OPTIONS.find((o) => o.value === value)?.label || "—";
 
   const formMessage = editingRow
-    ? "You are updating a 'Sub Service'"
-    : "You are creating a 'Sub Service'";
+    ? "You are updating a 'Sub-Service'"
+    : "You are creating a 'Sub-Service'";
 
   return (
     <AdminPage
-      title={isDeletedView ? "Deleted Sub Services" : "Sub Services"}
+      title={isDeletedView ? "Deleted Sub - Services" : "Sub - Services"}
       headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
       between={
         showSearchCard ? (
@@ -568,7 +568,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
               </div>
             )}
             <CompactFormRow className="items-start">
-              <CompactField label="Service" required>
+              <CompactField label="Main Service" required>
                 <select
                   className={fieldErrorClass(Boolean(formErrors.serviceId), compactInputClass)}
                   {...register("serviceId")}
@@ -582,7 +582,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                 </select>
                 <FormFieldError message={formErrors.serviceId?.message} />
               </CompactField>
-              <CompactField label="Sub Service Name" required>
+              <CompactField label="Sub - Service" required>
                 <input
                   type="text"
                   className={fieldErrorClass(Boolean(formErrors.name), compactInputClass)}
@@ -619,8 +619,21 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       )}
 
       {/* Top Actions Row */}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
+          {!isDeletedView && (
+            <button
+              type="button"
+              onClick={() => {
+                const row = allRows.find((r) => selected.has(getRowId(r)));
+                if (row) openEdit(row);
+              }}
+              disabled={selected.size !== 1}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Update
+            </button>
+          )}
           {!isDeletedView ? (
             <button
               type="button"
@@ -687,12 +700,12 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -712,8 +725,8 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -721,32 +734,32 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Service</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Created By</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "14%" }}>Shopkeeper Name</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "14%" }}>Phone</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Operating Service</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Main Service</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Type</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Status</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Created By</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "14%" }}>Shopkeeper Name</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium" style={{ width: "14%" }}>Phone</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={8} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={8} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={8} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted sub services found." : "No sub services found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={getRowId(row)} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(getRowId(row))}
@@ -754,7 +767,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => openEdit(row)}
@@ -763,18 +776,18 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
                       {row.name}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide">
                     {row.categoryName}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{shopTypeLabel(row.shopType)}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left capitalize">{row.status || "active"}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left capitalize">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{shopTypeLabel(row.shopType)}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left capitalize">{row.status || "active"}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left capitalize">
                     {createdByLabel(row.createdBy)}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left" style={{ width: "14%" }}>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left" style={{ width: "14%" }}>
                     {row.shopkeeperName || "—"}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left" style={{ width: "14%" }}>{row.phone || "—"}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left" style={{ width: "14%" }}>{row.phone || "—"}</td>
                 </tr>
               ))
             )}
@@ -782,7 +795,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={tableRows.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -790,7 +803,7 @@ export default function SubServicesPage({ initialShowForm = false }: SubServices
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

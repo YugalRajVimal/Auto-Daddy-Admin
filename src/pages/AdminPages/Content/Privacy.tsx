@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import AdminPage, { AddNewButton } from "../../../components/admin/AdminPage";
 import { TableEntriesSummary } from "../../../components/admin/AdminDataTable";
+import { PolicyPreview } from "../../../components/admin/ContentPreviews";
 import { AdminDeletedBanner, AdminDeletedToggle } from "../../../components/admin/AdminDeletedView";
 import {
   CompactAutoGrowTextarea,
@@ -407,8 +408,15 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
 
   return (
     <AdminPage
-      title={isDeletedView ? "Deleted Privacy and Disclaimer" : "Privacy and Disclaimer"}
-      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined}
+      headerClassName={showForm ? "lg:pl-[28%]" : undefined}
+      title={
+        isDeletedView
+          ? "Deleted Privacy Policy"
+          : showForm
+            ? "Privacy Terms"
+            : "Privacy Policy"
+      }
+      headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} label="New Note" /> : undefined}
       between={
         showSearchCard ? (
           <AdminSearchCard
@@ -421,6 +429,14 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
           />
         ) : showForm ? (
           <CompactFormPanel
+            splitPreview={
+              <PolicyPreview
+                title={type}
+                updated={date ? date.toISOString().slice(0, 10) : ""}
+                module=""
+                body={description ?? ""}
+              />
+            }
             footer={
               <CompactFormFooter
                 message={
@@ -450,7 +466,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                   isClearable={false}
                 />
               </CompactField>
-              <CompactField label="Type" required className="w-[180px] shrink-0 flex-none sm:w-[220px]">
+              <CompactField label="Title" required className="w-[180px] shrink-0 flex-none sm:w-[220px]">
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
@@ -476,11 +492,26 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
         ) : undefined
       }
     >
+      {!showForm && (
+      <>
       {isDeletedView && (
         <AdminDeletedBanner count={deletedStash.length} entityLabel="entries" />
       )}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
+          {!isDeletedView ? (
+            <button
+              type="button"
+              disabled={selected.size !== 1}
+              onClick={() => {
+                const row = paged.find((r) => selected.has(r.id));
+                if (row) openEdit(row);
+              }}
+              className="bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Update
+            </button>
+          ) : null}
           {!isDeletedView ? (
             <button
               type="button"
@@ -526,12 +557,12 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -551,8 +582,8 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -560,29 +591,28 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Description</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Actions</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Title</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Description</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="text-left py-6">
+                <td colSpan={4} className="text-left py-6">
                   Loading...
                 </td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-left py-6">
+                <td colSpan={4} className="text-left py-6">
                   {isDeletedView ? "No deleted entries found." : "No entries found."}
                 </td>
               </tr>
             ) : (
               paged.map((row, idx) => (
                 <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
@@ -590,24 +620,24 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
-                    {row.date ? new Date(row.date).toISOString().slice(0, 10) : ""}
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
+                    {(() => {
+                      const dateText = row.date ? new Date(row.date).toISOString().slice(0, 10) : "";
+                      return isDeletedView ? (
+                        dateText
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openEdit(row)}
+                          className="text-blue-700 hover:underline"
+                        >
+                          {dateText || "Edit"}
+                        </button>
+                      );
+                    })()}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.type}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[280px]">{row.description}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
-                    {!isDeletedView ? (
-                      <button
-                        type="button"
-                        onClick={() => openEdit(row)}
-                        className="text-blue-700 hover:underline"
-                      >
-                        Edit
-                      </button>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.type}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[280px]">{row.description}</td>
                 </tr>
               ))
             )}
@@ -615,7 +645,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -623,7 +653,7 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${page === p
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${page === p
                 ? "border-ad-green bg-ad-green text-white"
                 : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
                 }`}
@@ -634,6 +664,8 @@ export default function PrivacyPage({ initialShowForm = false }: PrivacyPageProp
         </div>
         <AdminDeletedToggle viewMode={viewMode} onToggle={toggleViewMode} activeLabel="Active Privacy" />
       </div>
+      </>
+      )}
     </AdminPage>
   );
 }

@@ -915,7 +915,7 @@ export default function Domain() {
     if (domainsLoading) {
       return (
         <tr>
-          <td colSpan={8} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+          <td colSpan={8} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
             Loading...
           </td>
         </tr>
@@ -924,7 +924,7 @@ export default function Domain() {
     if (rows.length === 0) {
       return (
         <tr>
-          <td colSpan={8} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+          <td colSpan={8} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
             {emptyMessage}
           </td>
         </tr>
@@ -932,7 +932,7 @@ export default function Domain() {
     }
     return rows.map((row, idx) => (
       <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-        <td className="border border-gray-300 px-2 py-2 text-left">
+        <td className="ad-td border border-gray-300 px-2 py-2 text-left">
           <input
             type="checkbox"
             checked={selected.has(row.id)}
@@ -940,7 +940,7 @@ export default function Domain() {
             className="accent-ad-purple"
           />
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-left">
+        <td className="ad-td border border-gray-300 px-3 py-2 text-left">
           {!viewingOwner ? (
             <button
               type="button"
@@ -964,7 +964,7 @@ export default function Domain() {
             row.userName
           )}
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-left">
+        <td className="ad-td border border-gray-300 px-3 py-2 text-left">
           {row.domain !== "—" ? (
             <a
               href={row.domain.startsWith("http") ? row.domain : `https://${row.domain}`}
@@ -978,15 +978,15 @@ export default function Domain() {
             "—"
           )}
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-left">
+        <td className="ad-td border border-gray-300 px-3 py-2 text-left">
           {domainTypeLabel(row.domainType)}
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-left">{row.expiry}</td>
-        <td className="border border-gray-300 px-3 py-2 text-left">{row.providerLabel}</td>
-        <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
+        <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.expiry}</td>
+        <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.providerLabel}</td>
+        <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[240px]">
           {row.dns}
         </td>
-        <td className="border border-gray-300 px-3 py-2 text-left">
+        <td className="ad-td border border-gray-300 px-3 py-2 text-left">
           {!isDeletedView ? (
             <>
               <button
@@ -1015,8 +1015,8 @@ export default function Domain() {
   // --- 13. Table Head ---
   const domainTableHead = (
     <thead>
-      <tr className="bg-ad-purple text-white">
-        <th className="border border-ad-purple-dark px-2 py-2 text-left">
+      <tr className="bg-ad-purple text-white ad-thead">
+        <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
           <input
             type="checkbox"
             checked={pagedDomainRows.length > 0 && selected.size === pagedDomainRows.length}
@@ -1024,25 +1024,25 @@ export default function Domain() {
             className="accent-white"
           />
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
+        <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">
           User Name
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
+        <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">
           Domain
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
+        <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">
           Domain Type
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
+        <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">
           Expiry
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
+        <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">
           Provider
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
+        <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">
           DNS
         </th>
-        <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
+        <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">
           Actions
         </th>
       </tr>
@@ -1298,7 +1298,7 @@ export default function Domain() {
 
   // --- 16. Toolbar, table, pagination ---
   const toolbar = (
-    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
       <div className="flex flex-wrap gap-1">
         {!isDeletedView ? (
           <>
@@ -1369,7 +1369,7 @@ export default function Domain() {
             showSearchCard ? "bg-gray-700" : "bg-gray-500"
           }`}
         >
-          Filters
+          Search
         </button>
       </div>
     </div>
@@ -1452,7 +1452,7 @@ export default function Domain() {
   ) : null;
 
   const entriesControl = (
-    <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+    <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
       <span>Show</span>
       <select
         value={entriesPerPage}
@@ -1471,7 +1471,7 @@ export default function Domain() {
   );
 
   const paginationFooter = (
-    <div className="mt-4 flex items-center justify-between">
+    <div className="mt-4 flex items-center justify-between ad-pager">
       <TableEntriesSummary
         total={filteredDomainRows.length}
         page={isDeletedView ? page : undefined}
@@ -1483,7 +1483,7 @@ export default function Domain() {
             key={p}
             type="button"
             onClick={() => setPage(p)}
-            className={`h-7 w-7 border text-xs font-medium ${
+            className={`h-7 w-7 border text-xs font-medium ad-pg ${
               page === p
                 ? "border-ad-green bg-ad-green text-white"
                 : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"

@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { FaCamera } from "react-icons/fa";
 
 type AttachImageCheckboxProps = {
   label?: string;
@@ -16,6 +17,11 @@ type AttachImageCheckboxProps = {
   accept?: string;
   uploadButtonText?: string;
   className?: string;
+  /**
+   * "field" (admin content forms): a labelled box with a blue camera button instead of a checkbox.
+   * Picking a file marks the image as attached; clearing it un-marks it.
+   */
+  variant?: "checkbox" | "field";
 };
 
 export default function AttachImageCheckbox({
@@ -31,6 +37,7 @@ export default function AttachImageCheckbox({
   accept = "image/*",
   uploadButtonText = "Upload File",
   className = "",
+  variant = "checkbox",
 }: AttachImageCheckboxProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const multi = maxFiles > 1;
@@ -54,6 +61,47 @@ export default function AttachImageCheckbox({
     if (multi) onFilesChange?.(picked);
     else onFileChange?.(picked[0] ?? null);
   };
+
+  if (variant === "field") {
+    const name = selectedFiles.length > 1 ? `${selectedFiles.length} files selected` : selectedFiles[0]?.name;
+    return (
+      <div className={`w-full ${className}`}>
+        <span className="mb-1 block text-base text-gray-900">
+          {label}
+          {required ? <span className="text-red-600"> *</span> : null}
+        </span>
+        <div className="flex h-12 items-center justify-between gap-2 rounded-lg border border-gray-400 bg-white px-4">
+          <span className="min-w-0 flex-1 truncate text-base text-gray-800">
+            {name ?? (checked ? "Image attached" : "")}
+          </span>
+          {checked ? (
+            <button
+              type="button"
+              onClick={() => handleCheckedChange(false)}
+              aria-label="Remove image"
+              className="text-lg leading-none text-gray-500 hover:text-red-600"
+            >
+              ×
+            </button>
+          ) : null}
+          <label className="cursor-pointer text-[#0000ff] hover:text-blue-900" title="Choose image">
+            <FaCamera size={26} aria-hidden />
+            <input
+              type="file"
+              accept={accept}
+              multiple={multi}
+              ref={inputRef}
+              className="hidden"
+              onChange={(e) => {
+                handleFilesPicked(e.target.files);
+                if ((e.target.files?.length ?? 0) > 0) onCheckedChange(true);
+              }}
+            />
+          </label>
+        </div>
+      </div>
+    );
+  }
 
   const buttonLabel =
     selectedFiles.length === 0

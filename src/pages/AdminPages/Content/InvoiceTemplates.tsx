@@ -637,7 +637,8 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
 
   return (
     <AdminPage
-      title={isDeletedView ? "Deleted Inv - Temp" : "Inv - Temp"}
+      headerClassName={showForm ? "lg:pl-[28%]" : undefined}
+      title={isDeletedView ? "Deleted Templets" : "Templets"}
       between={
         showSearchCard ? (
           <AdminSearchCard
@@ -650,6 +651,11 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
           />
         ) : showForm ? (
           <CompactFormPanel
+            splitPreview={
+              <div className="mx-auto w-full max-w-[560px] overflow-hidden rounded border border-gray-200 shadow-sm">
+                <InvoiceTemplatePreview templateId={templateSlug} data={DEFAULT_INVOICE_PREVIEW} mode="full" />
+              </div>
+            }
             footer={
               <CompactFormFooter
                 message={
@@ -673,28 +679,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                 />
                 <FormFieldError message={fieldErrors.date?.message} />
               </CompactField>
-              <CompactField label="User Type" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
-                <select
-                  {...register("userType")}
-                  className={compactInputClass}
-                >
-                  {USER_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </CompactField>
-              <CompactField label="Template Name" required className="min-w-[200px] flex-1">
-                <input
-                  type="text"
-                  {...register("templateName")}
-                  placeholder="Invoice Template - 1"
-                  className={compactInputClass}
-                />
-                <FormFieldError message={fieldErrors.templateName?.message} />
-              </CompactField>
-              <CompactField label="Design" required className="w-[180px] shrink-0 flex-none sm:w-[220px]">
+              <CompactField label="Templet" required className="w-[180px] shrink-0 flex-none sm:w-[220px]">
                 <select
                   value={templateSlug}
                   onChange={(e) => setTemplateSlug(e.target.value)}
@@ -707,31 +692,44 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                   ))}
                 </select>
               </CompactField>
+              <CompactField label="Module" required className="w-[150px] shrink-0 flex-none sm:w-[180px]">
+                <select
+                  {...register("userType")}
+                  className={compactInputClass}
+                >
+                  {USER_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </CompactField>
+              <CompactField label="Name" required className="min-w-[200px] flex-1">
+                <input
+                  type="text"
+                  {...register("templateName")}
+                  placeholder="Invoice Template - 1"
+                  className={compactInputClass}
+                />
+                <FormFieldError message={fieldErrors.templateName?.message} />
+              </CompactField>
             </CompactFormRow>
             <CompactFormRow className="items-start justify-start">
               <AttachImageCheckbox
+                variant="field"
+                label="Image file"
                 checked={attachImage}
                 onCheckedChange={setAttachImage}
                 file={imageFile}
                 onFileChange={setImageFile}
               />
             </CompactFormRow>
-            <CompactFormRow className="items-start justify-start">
-              <div className="w-full max-w-sm">
-                <p className="mb-1 text-xs font-semibold text-gray-600">Live preview</p>
-                <div className="overflow-hidden rounded border border-gray-300">
-                  <InvoiceTemplatePreview
-                    templateId={templateSlug}
-                    data={DEFAULT_INVOICE_PREVIEW}
-                    mode="thumbnail"
-                  />
-                </div>
-              </div>
-            </CompactFormRow>
           </CompactFormPanel>
         ) : undefined
       }
     >
+      {!showForm && (
+      <>
       {!isDeletedView && !showForm ? (
         <InvoiceTemplateGallery
           rows={templates}
@@ -747,7 +745,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
         <AdminDeletedBanner count={deletedStash.length} entityLabel="invoice templates" />
       )}
 
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
           {!isDeletedView ? (
             <button
@@ -794,12 +792,12 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -819,8 +817,8 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
       <div className="overflow-x-auto ">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -829,24 +827,24 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                 />
               </th>
               {/* Remove Preview column, shift columns left, add a new "Preview" icon in Template cell */}
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Template</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Design</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">User Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Used by</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Template</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Design</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">User Type</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Used by</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Clip</th>
             </tr>
           </thead>
           <tbody className="">
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={7} className="border border-gray-300 px-3 py-4 text-left text-gray-500">
+                <td colSpan={7} className="ad-td border border-gray-300 px-3 py-4 text-left text-gray-500">
                   {isDeletedView ? "No deleted invoice templates found." : "No invoice templates found."}
                 </td>
               </tr>
             ) : paged.map((row, idx) => (
               <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                <td className="border border-gray-300 px-2 py-2 text-left">
+                <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={selected.has(row.id)}
@@ -854,7 +852,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                     className="accent-ad-purple"
                   />
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left align-top whitespace-normal break-words min-w-[200px]">
 
                   <div className="flex items-center gap-1">
                     {/* Edit button (existing) */}
@@ -871,17 +869,17 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
                     )}
                   </div>
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-left">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                   {getTemplateLabel(row.templateSlug)}
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-left">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                   {row.date ? new Date(row.date).toLocaleDateString() : "--"}
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-left">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                   {getUserTypeLabel(row.userType)}
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-left">{row.usedBy}</td>
-                <td className="border border-gray-300 px-3 py-2 text-left">
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.usedBy}</td>
+                <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                   {row.imageUrl ? (
                     <div className="">
                       <PreviewPopover
@@ -932,7 +930,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -940,7 +938,7 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
@@ -959,6 +957,8 @@ export default function InvoiceTemplatesPage({ initialShowForm = false }: Invoic
 
       {modalRow && (
         <InvoicePreviewModal row={modalRow} onClose={() => setModalPreviewId(null)} />
+      )}
+      </>
       )}
     </AdminPage>
   );

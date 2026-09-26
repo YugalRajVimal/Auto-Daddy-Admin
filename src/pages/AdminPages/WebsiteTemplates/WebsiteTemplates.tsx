@@ -446,7 +446,8 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
 
   return (
     <AdminPage
-      title={isDeletedView ? "Deleted Web - Temp" : "Web - Temp"}
+      headerClassName={showForm ? "lg:pl-[28%]" : undefined}
+      title={isDeletedView ? "Deleted Templets" : "Templets"}
       headerAction={
         !showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openAdd} /> : undefined
       }
@@ -462,6 +463,19 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
           />
         ) : showForm ? (
           <CompactFormPanel
+            splitPreview={
+              /^https?:\/\//i.test(url.trim()) ? (
+                <iframe
+                  src={url.trim()}
+                  title={templateName || "Website preview"}
+                  className="h-[520px] w-full rounded border border-gray-300 bg-white"
+                />
+              ) : (
+                <div className="flex h-[420px] items-center justify-center rounded bg-sky-50 px-6 text-center text-lg text-gray-500">
+                  Enter the template URL (https://…) to preview the website here.
+                </div>
+              )
+            }
             footer={
               <CompactFormFooter
                 message="You are creating a 'Website Template'"
@@ -472,7 +486,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
             }
           >
             <CompactFormRow className="items-start">
-              <CompactField label="Template Name" required className={compactFixedFieldWidth}>
+              <CompactField label="Templet" required className={compactFixedFieldWidth}>
                 <input
                   type="text"
                   value={templateName}
@@ -520,6 +534,8 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
         ) : undefined
       }
     >
+      {!showForm && (
+      <>
       {isDeletedView && (
         <AdminDeletedBanner count={deletedStash.length} entityLabel="website templates" />
       )}
@@ -541,7 +557,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
         </label>
       </div>
 
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
         <div className="flex flex-wrap gap-1">
           {!isDeletedView ? (
             <button
@@ -588,12 +604,12 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
               showSearchCard ? "bg-gray-700" : "bg-gray-500"
             }`}
           >
-            Filters
+            Search
           </button>
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+      <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
         <span>Show</span>
         <select
           value={entriesPerPage}
@@ -613,8 +629,8 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm whitespace-nowrap">
           <thead>
-            <tr className="bg-ad-purple text-white">
-              <th className="border border-ad-purple-dark px-2 py-2 text-left">
+            <tr className="bg-ad-purple text-white ad-thead">
+              <th className="ad-th border border-ad-purple-dark px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && selected.size === paged.length}
@@ -622,13 +638,13 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                   className="accent-white"
                 />
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">
                 Template Name
               </th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">URL</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Type</th>
-              <th className="border border-ad-purple-dark px-3 py-2 text-left font-medium">Used by</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">URL</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Date</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Shop Type</th>
+              <th className="ad-th border border-ad-purple-dark px-3 py-2 text-left font-medium">Used by</th>
             </tr>
           </thead>
           <tbody>
@@ -647,7 +663,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
             ) : (
               paged.map((row, idx) => (
                 <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                  <td className="border border-gray-300 px-2 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-2 py-2 text-left">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
@@ -655,10 +671,10 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                       className="accent-ad-purple"
                     />
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     {row.templateName || `Template ${pageStartIndex + idx + 1}`}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => setPreviewRow(row)}
@@ -667,11 +683,11 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
                       {row.url}
                     </button>
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.date}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.date}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">
                     {SHOP_TYPE_OPTIONS.find((o) => o.value === row.shopType)?.label ?? row.shopType}
                   </td>
-                  <td className="border border-gray-300 px-3 py-2 text-left">{row.usedBy}</td>
+                  <td className="ad-td border border-gray-300 px-3 py-2 text-left">{row.usedBy}</td>
                 </tr>
               ))
             )}
@@ -679,7 +695,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between ad-pager">
         <TableEntriesSummary total={filtered.length} page={page} pageSize={entriesPerPage} />
         <div className="flex gap-1">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -687,7 +703,7 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
               key={p}
               type="button"
               onClick={() => setPage(p)}
-              className={`h-7 w-7 border text-xs font-medium ${
+              className={`h-7 w-7 border text-xs font-medium ad-pg ${
                 page === p
                   ? "border-ad-green bg-ad-green text-white"
                   : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"
@@ -703,6 +719,8 @@ export default function WebsiteTemplates({ initialShowForm = false }: WebsiteTem
           activeLabel="Active Templates"
         />
       </div>
+      </>
+      )}
     </AdminPage>
   );
 }

@@ -745,7 +745,7 @@ const StaffUserManagement: React.FC = () => {
       </Modal>
 
       <AdminPage
-        title={isDeletedView ? "Deleted Staff Users" : "Staff Users"}
+        title={isDeletedView ? "Deleted Admins" : "Manage Admin"}
         headerAction={!showForm && !showSearchCard && !isDeletedView ? <AddNewButton onClick={openCreate} /> : undefined}
         between={
           showSearchCard ? (
@@ -761,7 +761,7 @@ const StaffUserManagement: React.FC = () => {
             <CompactFormPanel
               footer={
                 <CompactFormFooter
-                  message={editingStaff ? `You are editing '${editingStaff.name}'` : "You are creating a Staff User"}
+                  message={editingStaff ? `You are editing '${editingStaff.name}'` : "You are creating an Admin User"}
                   messageCenter
                   actionLabel={formLoading ? (editingStaff ? "Updating..." : "Saving...") : (editingStaff ? "Update" : "Save")}
                   onSave={saveForm}
@@ -776,7 +776,7 @@ const StaffUserManagement: React.FC = () => {
               )}
               <form onSubmit={onStaffFormSubmit} autoComplete="off" className="flex flex-col gap-4">
                 <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <CompactField label="Role" required className={compactFixedFieldWidth}>
+                  <CompactField label="Designation" required className={compactFixedFieldWidth}>
                     <select
                       {...register("role")}
                       className={compactInputClass}
@@ -835,16 +835,24 @@ const StaffUserManagement: React.FC = () => {
                     <FormFieldError message={errors.email?.message} />
                   </CompactField>
 
-                  <CompactField label="Status" className={compactFixedFieldWidth}>
-                    <div className="flex h-[30px] items-center gap-4">
-                      <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-gray-800">
-                        <input type="radio" name="staffStatus" checked={isActive} onChange={() => setIsActive(true)} className="h-3.5 w-3.5 accent-ad-green" />
-                        Active
-                      </label>
-                      <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-gray-800">
-                        <input type="radio" name="staffStatus" checked={!isActive} onChange={() => setIsActive(false)} className="h-3.5 w-3.5 accent-ad-green" />
-                        Inactive
-                      </label>
+                  <CompactField label="Active" className={compactFixedFieldWidth}>
+                    <div className="inline-flex h-[30px] overflow-hidden border border-gray-500 text-sm font-semibold" role="group" aria-label="Active">
+                      <button
+                        type="button"
+                        onClick={() => setIsActive(false)}
+                        aria-pressed={!isActive}
+                        className={`w-10 ${!isActive ? "bg-red-600 text-white" : "bg-white text-red-600"}`}
+                      >
+                        N
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsActive(true)}
+                        aria-pressed={isActive}
+                        className={`w-10 ${isActive ? "bg-[#008000] text-white" : "bg-white text-gray-500"}`}
+                      >
+                        Y
+                      </button>
                     </div>
                   </CompactField>
 {/* 
@@ -870,7 +878,7 @@ const StaffUserManagement: React.FC = () => {
         {error && <div className="mb-2 rounded border border-red-200 bg-red-100 px-3 py-2 text-xs text-red-800">{error}</div>}
         {success && <div className="mb-2 rounded border border-green-200 bg-green-100 px-3 py-2 text-xs text-green-800">{success}</div>}
 
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 bg-gray-300 px-3 py-2 ad-toolbar">
           <div className="flex flex-wrap gap-1">
             {!isDeletedView && (
               <button type="button" onClick={handleDeleteSelected} disabled={selectedIds.size === 0}
@@ -903,12 +911,12 @@ const StaffUserManagement: React.FC = () => {
             />
             <button type="button" onClick={openSearchCard}
               className={`px-3 py-1 text-xs font-medium text-white hover:bg-gray-600 ${showSearchCard ? "bg-gray-700" : "bg-gray-500"}`}>
-              Filters
+              Search
             </button>
           </div>
         </div>
 
-        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700">
+        <div className="mb-2 flex items-center gap-2 text-xs text-gray-700 ad-entries">
           <span>Show</span>
           <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} className="border border-gray-400 px-1 py-0.5">
             <option value={10}>10</option>
@@ -924,56 +932,56 @@ const StaffUserManagement: React.FC = () => {
           ) : (
             <table className="w-full border-collapse text-sm whitespace-nowrap">
               <thead>
-                <tr className="bg-ad-purple text-white">
-                  <th className="border border-ad-purple-dark px-2 py-2 text-center">
+                <tr className="bg-ad-purple text-white ad-thead">
+                  <th className="ad-th border border-ad-purple-dark px-2 py-2 text-center">
                     <input type="checkbox" checked={paged.length > 0 && selectedIds.size === paged.length} onChange={toggleSelectAll} className="accent-white" />
                   </th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Role</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Name</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Phone</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Email</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Permissions</th>
-                  <th className="border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
-                  <th className="border border-ad-purple-dark px-2 py-2 text-center font-medium w-12" aria-label="Actions" />
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Date</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Designation</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Name</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Phone</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Email</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Permissions</th>
+                  <th className="ad-th border border-ad-purple-dark px-3 py-2 text-center font-medium">Status</th>
+                  <th className="ad-th border border-ad-purple-dark px-2 py-2 text-center font-medium w-12" aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
                 {paged.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                    <td colSpan={9} className="ad-td border border-gray-300 px-3 py-6 text-center text-gray-500">
                       {isDeletedView ? "No deleted staff users found." : "No staff users found."}
                     </td>
                   </tr>
                 ) : (
                   paged.map((s, idx) => (
                     <tr key={s._id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-                      <td className="border border-gray-300 px-2 py-2 text-center">
+                      <td className="ad-td border border-gray-300 px-2 py-2 text-center">
                         <input type="checkbox" checked={selectedIds.has(s._id)} onChange={() => toggleSelect(s._id)} className="accent-ad-purple" />
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{formatAdminDate(s.createdAt)}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">{formatAdminDate(s.createdAt)}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                         {roleLabel(s.role)}
                         {(s as any).roleRef?.name ? (
                           <div className="text-[11px] text-gray-500">{(s as any).roleRef.name}</div>
                         ) : null}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                         {!isDeletedView ? (
                           <button type="button" onClick={() => openEdit(s)} className="font-medium text-blue-700 hover:underline">
                             {s.name}
                           </button>
                         ) : s.name}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{s.phone || "—"}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{s.email}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center max-w-[280px] truncate" title={s.roleRef?.permissions ? permissionsSummary(s.roleRef.permissions) : "—"}>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">{s.phone || "—"}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">{s.email}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center max-w-[280px] truncate" title={s.roleRef?.permissions ? permissionsSummary(s.roleRef.permissions) : "—"}>
                         {s.roleRef?.permissions
                           ? permissionsSummary(s.roleRef.permissions)
                           : "—"}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{s.isActive ? "Active" : "Inactive"}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">{s.isActive ? "Active" : "Inactive"}</td>
+                      <td className="ad-td border border-gray-300 px-3 py-2 text-center">
                         {!isDeletedView ? (
                           <TableRowMenu
                             open={openMenuId === s._id}
@@ -998,12 +1006,12 @@ const StaffUserManagement: React.FC = () => {
           )}
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between ad-pager">
           <TableEntriesSummary total={filtered.length} page={currentPage} pageSize={pageSize} />
           <div className="flex gap-1">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
               <button key={p} type="button" onClick={() => setCurrentPage(p)}
-                className={`h-7 w-7 border text-xs font-medium ${currentPage === p ? "border-ad-green bg-ad-green text-white" : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"}`}>
+                className={`h-7 w-7 border text-xs font-medium ad-pg ${currentPage === p ? "border-ad-green bg-ad-green text-white" : "border-gray-400 bg-white text-gray-700 hover:bg-gray-100"}`}>
                 {p}
               </button>
             ))}
